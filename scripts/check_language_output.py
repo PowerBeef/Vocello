@@ -41,10 +41,12 @@ from lib.language_metrics import (  # noqa: E402
     ACCURACY_METRIC_VERSIONS,
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
+    SEGMENTATION_AWARE_METRIC_VERSIONS,
     edge_allowance_seconds,
     edit_metrics,
     locale_matches_expected_language,
     normalized_word_tokens,
+    primary_accuracy_metric,
     primary_accuracy_score,
     recomputed_accuracy,
 )
@@ -272,11 +274,17 @@ def validate_structured_verification(
     if verification.get("transcript") != consensus:
         failures.append(f"{identity}: scored transcript differs from recognition consensus")
 
+    # The declared accuracy metric version picks the text normalization and the
+    # gated score (v1: plain rates; v2: the segmentation-aware word rate; v3:
+    # both under normalization v2, Korean by characters). An unknown version
+    # fails below and is recomputed under the current one for the other checks.
+    version = verification.get("accuracyMetricVersion")
+    scoring_version = version if version in ACCURACY_METRIC_VERSIONS else ACCURACY_METRIC_VERSION
     recomputed_word: dict[str, int | float] | None = None
     recomputed_character: dict[str, int | float] | None = None
     if isinstance(consensus, str) and consensus.strip():
         recomputed_word, recomputed_character = recomputed_accuracy(
-            expected_script, consensus, expected_language
+            expected_script, consensus, expected_language, version=scoring_version,
         )
 
     for key in (
@@ -343,21 +351,16 @@ def validate_structured_verification(
         if cer is None or not math.isclose(cer, float(recomputed_character["errorRate"]), rel_tol=1e-9, abs_tol=1e-12):
             failures.append(f"{identity}: CER does not match the consensus transcript")
 
-        expected_metric = (
-            "characterErrorRate" if expected_language in {"chinese", "japanese"}
-            else "wordErrorRate"
-        )
-        # The declared accuracy metric version picks the gated score: v1 the
-        # plain rate, v2 (audit #43) the segmentation-aware word rate. Either
-        # is recomputed here from the consensus transcript.
-        version = verification.get("accuracyMetricVersion")
+        expected_metric = primary_accuracy_metric(expected_language, version=scoring_version)
+        # The gated score under the declared version, recomputed here from the
+        # consensus transcript.
         expected_score = (
             primary_accuracy_score(
                 recomputed_word, recomputed_character, expected_language, version=version,
             )
             if version in ACCURACY_METRIC_VERSIONS else None
         )
-        if version == ACCURACY_METRIC_VERSION:
+        if version in SEGMENTATION_AWARE_METRIC_VERSIONS:
             aware = finite_number(verification.get("segmentationAwareWordErrorRate"))
             if aware is None or not math.isclose(
                 aware, float(recomputed_word["segmentationAwareErrorRate"]), rel_tol=1e-9, abs_tol=1e-12,

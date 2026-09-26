@@ -181,7 +181,8 @@ def successful_asr_verification(
         "wordErrorRate": word_metrics["errorRate"],
         "characterErrorRate": character_metrics["errorRate"],
         "accuracyMetric": "wordErrorRate",
-        "accuracyMetricVersion": "segmentation-aware-edit-rate-v2",
+        # The in-app verifier declares the version the publisher scores under.
+        "accuracyMetricVersion": publisher.LANGUAGE_ACCURACY_METRIC_VERSION,
         "accuracyThreshold": 0.15,
         "accuracyValue": word_metrics["segmentationAwareErrorRate"],
         "segmentationAwareWordErrorRate": word_metrics["segmentationAwareErrorRate"],
@@ -1880,7 +1881,7 @@ class PublisherTests(unittest.TestCase):
                 "designInstructionDigest": None,
                 "expectedLanguage": "french",
                 "selectedLocaleIdentifier": "fr-CA",
-                "accuracyMetricVersion": "segmentation-aware-edit-rate-v2",
+                "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
                 "accuracyMetric": "wordErrorRate",
                 "accuracyThreshold": 0.15,
                 "outputVerifierSchemaVersion": 3,
@@ -1905,7 +1906,7 @@ class PublisherTests(unittest.TestCase):
             "outputAlgorithm": "language-output-verifier-v3",
             "recognitionSchemaVersion": 2,
             "recognitionAlgorithm": "apple-speech-file-consensus-v2",
-            "accuracyMetricVersion": "segmentation-aware-edit-rate-v2",
+            "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
             "requiredPassCount": 3,
             "families": ["apple-speech"],
         })

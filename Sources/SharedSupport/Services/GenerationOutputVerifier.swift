@@ -22,8 +22,10 @@ enum GenerationOutputVerifier {
         /// `accuracyValue` under its own metric's key, the segmentation-aware word
         /// rate as `word_error_rate` or the character rate (Chinese, Japanese) as
         /// `character_error_rate`. Through v4 the gate reported the v1 word rate
-        /// whatever its outcome read. The verifier's `accuracyMetricVersion`
-        /// records which word rate the outcome used.
+        /// whatever its outcome read. v6 (text normalization v2, AQ-02) scores every
+        /// rate under normalization v2 and gates Korean by its syllable character
+        /// rate. The verifier's `accuracyMetricVersion` records which rate and
+        /// normalization the outcome used.
         func languageASRGateResult(evidenceDigest: String? = nil) -> GenerationQualityGateResult {
             let consensusPasses = recognition.consensusStatus == .consistent
                 ? recognition.repetitions.count
@@ -61,7 +63,7 @@ enum GenerationOutputVerifier {
             return GenerationQualityGateResult(
                 gate: .languageASR,
                 outcome: outcome,
-                algorithmVersion: 5,
+                algorithmVersion: 6,
                 evidenceDigest: evidenceDigest,
                 measurements: measurements
             )
@@ -69,11 +71,13 @@ enum GenerationOutputVerifier {
 
         static let currentSchemaVersion = 3
         static let currentAlgorithmVersion = "language-output-verifier-v3"
-        /// WER v2 (audit #43, 2026-09-25): the word gate reads the segmentation-aware rate,
-        /// which does not charge a recognizer's word-boundary merges or splits. `wordErrorRate`
-        /// keeps the v1 rate; characters are unchanged. Mirrors `ACCURACY_METRIC_VERSION` in
-        /// `scripts/lib/language_metrics.py`.
-        static let currentAccuracyMetricVersion = "segmentation-aware-edit-rate-v2"
+        /// Accuracy metric v3 (AQ-02 P2a, 2026-09-25): WER v2 (audit #43), the segmentation-aware
+        /// word rate that does not charge a recognizer's word-boundary merges or splits, scored
+        /// under text normalization v2 (`VoiceClipTranscriber.textNormalizationVersion`), with
+        /// Korean gated by its syllable character rate. `wordErrorRate` keeps the plain word
+        /// rate under the same normalization. Mirrors `ACCURACY_METRIC_VERSION` in
+        /// `scripts/lib/language_metrics.py`, which still rescores the v1 and v2 records.
+        static let currentAccuracyMetricVersion = "normalization-v2-edit-rate-v3"
 
         var schemaVersion: Int
         var algorithmVersion: String
@@ -106,7 +110,7 @@ enum GenerationOutputVerifier {
         var skipReason: String?
         var recognition: VoiceClipTranscriber.VerificationEvidence
         /// Warn-only: the longest run of consecutive reference units deleted, on the primary
-        /// accuracy metric's units (words, or characters for Chinese and Japanese). Never part
+        /// accuracy metric's units (words, or characters for Chinese, Japanese and Korean). Never part
         /// of `pass`. Added compatibly; earlier records decode with `nil`.
         var longestDeletionRun: Int?
         /// WER v2: the segmentation-aware word rate the word gate reads, and the plain word
@@ -251,7 +255,8 @@ enum GenerationOutputVerifier {
         let languagePass = languageScore >= VoiceClipTranscriber.outputVerificationLanguagePassScore
         let wordMetrics = VoiceClipTranscriber.wordErrorMetrics(
             reference: expectedScript,
-            hypothesis: transcript
+            hypothesis: transcript,
+            expectedLanguage: expectedLanguage
         )
         let characterMetrics = VoiceClipTranscriber.characterErrorMetrics(
             reference: expectedScript,
@@ -260,7 +265,8 @@ enum GenerationOutputVerifier {
         )
         let segmentationAware = VoiceClipTranscriber.segmentationAwareWordMetrics(
             reference: expectedScript,
-            hypothesis: transcript
+            hypothesis: transcript,
+            expectedLanguage: expectedLanguage
         )
         let accuracyValue = switch accuracyMetric {
         case .wordErrorRate: segmentationAware.errorRate
@@ -347,11 +353,13 @@ enum GenerationOutputVerifier {
         )
     }
 
+    /// The gated rate: characters where words are not reliably space-delimited (Chinese,
+    /// Japanese and, since accuracy metric v3, Korean syllables, audit AQ-F21), words elsewhere.
     static func accuracyMetric(for language: Qwen3SupportedLanguage) -> AccuracyMetric {
         switch language {
-        case .chinese, .japanese:
+        case .chinese, .japanese, .korean:
             return .characterErrorRate
-        case .auto, .english, .korean, .german, .french, .russian, .portuguese, .spanish, .italian:
+        case .auto, .english, .german, .french, .russian, .portuguese, .spanish, .italian:
             return .wordErrorRate
         }
     }

@@ -14,6 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from language_bench_evidence import build_plan, write_json_atomic
 from check_language_output import recomputed_accuracy, validate_structured_verification
+from lib.language_metrics import primary_accuracy_metric
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CHECK = os.path.join(ROOT, "scripts", "check_language_output.py")
@@ -48,10 +49,13 @@ def verification(
     inconsistent: bool = False,
     missing_metrics: bool = False,
     failing: bool = False,
+    accuracy_metric_version: str = "normalized-edit-rate-v1",
 ) -> dict:
     """A structured verification; `failing` renders the negative control's
     genuine outcome (English-locked recognition of a French take: wrong words,
-    accuracy failed, verdict false)."""
+    accuracy failed, verdict false). Its counts and rates are scored under
+    `accuracy_metric_version` (v1 by default: the app evidence published
+    before WER v2, which must keep validating)."""
     locale = LOCALES[expected_language]
     if failing and transcript_override is None:
         transcript_override = "the train has quit the guard a lobe"
@@ -62,11 +66,10 @@ def verification(
             else "Le train a quitté la gare à l'aube."
         )
     transcript = transcript_override or script
-    word, character = recomputed_accuracy(script, transcript, expected_language)
-    accuracy_metric = (
-        "characterErrorRate" if expected_language in {"chinese", "japanese"}
-        else "wordErrorRate"
+    word, character = recomputed_accuracy(
+        script, transcript, expected_language, version=accuracy_metric_version,
     )
+    accuracy_metric = primary_accuracy_metric(expected_language, version=accuracy_metric_version)
     repetitions = []
     for index in (1, 2, 3):
         pass_transcript = transcript
@@ -112,7 +115,7 @@ def verification(
         "characterSubstitutions": character["substitutions"],
         "characterInsertions": character["insertions"],
         "characterDeletions": character["deletions"],
-        "accuracyMetricVersion": "normalized-edit-rate-v1",
+        "accuracyMetricVersion": accuracy_metric_version,
         "accuracyMetric": accuracy_metric,
         "accuracyThreshold": 0.15,
         "accuracyValue": character["errorRate"] if accuracy_metric == "characterErrorRate" else word["errorRate"],
@@ -578,11 +581,40 @@ class CheckLanguageOutputTests(unittest.TestCase):
         self.assertLess(value["characterErrorRate"], 0.15)
 
     def test_japanese_dakuten_is_preserved_by_cer(self) -> None:
+        # The primary Japanese CER retains the audible dakuten distinction.
+        # v1 words folded it away; normalization v2 keeps it in words too.
+        word, character = recomputed_accuracy(
+            "かきくけこ", "がきくけこ", "japanese", version="normalized-edit-rate-v1",
+        )
+        self.assertEqual((word["errorRate"], character["errorRate"]), (0.0, 0.2))
         word, character = recomputed_accuracy("かきくけこ", "がきくけこ", "japanese")
-        # Compatibility WER folds diacritics, but the primary Japanese CER
-        # must retain the audible dakuten distinction.
-        self.assertEqual(word["errorRate"], 0.0)
-        self.assertEqual(character["errorRate"], 0.2)
+        self.assertEqual((word["errorRate"], character["errorRate"]), (1.0, 0.2))
+
+    def test_normalization_v2_verification_is_recomputed_under_its_own_version(self) -> None:
+        """AQ-02: a v3 verification is rescored under normalization v2, so a
+        French elision the app heard split and Korean eojeol spacing cost
+        nothing, and Korean gates its syllable rate."""
+        v3 = "normalization-v2-edit-rate-v3"
+        script = "L'homme arrive à l'heure aujourd'hui avec le train du matin."
+        split = "l homme arrive a l'heure aujourd'hui avec le train du matin"
+        french = verification("french", script=script, transcript_override=split, accuracy_metric_version=v3)
+        french.update({"segmentationAwareWordErrorRate": 0.0, "wordBoundaryOnlyEdits": 2, "accuracyValue": 0.0})
+        self.assertEqual(validate_structured_verification(french, "french", script, "fr"), [])
+        korean_script = "기차는 조용한 역을 제시간에 떠났습니다"
+        korean = verification(
+            "korean", script=korean_script, transcript_override="기차는 조용한역을 제 시간에 떠났습니다",
+            accuracy_metric_version=v3,
+        )
+        korean.update({"segmentationAwareWordErrorRate": 0.0, "wordBoundaryOnlyEdits": 3})
+        self.assertEqual(korean["accuracyMetric"], "characterErrorRate")
+        self.assertEqual((korean["referenceCharacterCount"], korean["accuracyValue"]), (17, 0.0))
+        self.assertEqual(validate_structured_verification(korean, "korean", korean_script, "ko"), [])
+        # The same app evidence declared under v2 is rescored under v1
+        # tokens and a word gate, and no longer matches.
+        failures = validate_structured_verification(
+            dict(korean, accuracyMetricVersion="segmentation-aware-edit-rate-v2"), "korean", korean_script, "ko",
+        )
+        self.assertTrue(any("wrong primary accuracy metric" in failure for failure in failures), failures)
 
 
 if __name__ == "__main__":

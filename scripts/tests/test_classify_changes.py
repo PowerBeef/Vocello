@@ -239,6 +239,7 @@ class ClassificationTests(unittest.TestCase):
             "scripts/privacy_scan.py": {"python"},
             "config/test-quarantine.json": {"swift", "python"},
             "config/ios-memory-budget-policy.json": {"swift", "python"},
+            "scripts/tests/fixtures/language_normalization_v2.json": {"swift", "python"},
             "config/orchestration-contract.json": {"python"},
             "scripts/tests/test_benchmark_history.py": {"python"},
             "scripts/tests/conftest.py": {"python"},

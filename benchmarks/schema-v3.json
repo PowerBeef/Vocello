@@ -251,10 +251,11 @@
               ]
             },
             "accuracyMetricVersion": {
-              "description": "normalized-edit-rate-v1 gates the plain word or character rate; segmentation-aware-edit-rate-v2 (records since 2026-09-25, audit #43) gates the word rate that does not charge word-boundary merges and splits.",
+              "description": "normalized-edit-rate-v1 gates the plain word or character rate; segmentation-aware-edit-rate-v2 (records since 2026-09-25, audit #43) gates the word rate that does not charge word-boundary merges and splits; normalization-v2-edit-rate-v3 (AQ-02) gates the same rates under text normalization v2 and Korean by its syllable character rate.",
               "enum": [
                 "normalized-edit-rate-v1",
-                "segmentation-aware-edit-rate-v2"
+                "segmentation-aware-edit-rate-v2",
+                "normalization-v2-edit-rate-v3"
               ]
             },
             "requiredPassCount": {

@@ -1048,6 +1048,67 @@ class BenchmarkHistoryTests(unittest.TestCase):
         with self.assertRaises(history.HistoryError):
             self.publish(v1, "wer-v1-merge")
 
+    def test_normalization_v2_records_keep_the_segmentation_aware_rules_and_count_fillers(self) -> None:
+        """AQ-02: a v3 record (text normalization v2) gates WER v2 like a v2
+        record and may publish each family's excess filler count, a
+        nonnegative count that earlier versions never carry."""
+        valid = self._schema_v3_language_record("normalization-v2-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.APPLE_SPEECH_VERIFICATION_IDENTITY,
+            "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
+            "families": ["apple-speech", "whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+        }
+        valid["takes"][0].update({"accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15})
+        # A French take heard with one elision split (l homme): v3 credits it.
+        valid["takes"][0]["metrics"].update({
+            "wordErrorRate": 2 / 20, "characterErrorRate": 0.0, "primaryAccuracyScore": 0.0,
+            "segmentationAwareWordErrorRate": 0.0, "wordBoundaryOnlyEdits": 2.0,
+            "excessFillerCount": 0.0,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.9,
+            "outputLanguagePass": 1.0, "outputAccuracyPass": 1.0,
+            "referenceTokenCount": 20.0, "hypothesisTokenCount": 21.0,
+            "referenceCharacterCount": 90.0, "hypothesisCharacterCount": 90.0,
+            "substitutions": 1.0, "insertions": 1.0, "deletions": 0.0,
+            "characterSubstitutions": 0.0, "characterInsertions": 0.0, "characterDeletions": 0.0,
+            "recognitionPassCount": 3.0, "recognitionDurationSeconds": 0.3,
+            "independentWordErrorRate": 2 / 20, "independentCharacterErrorRate": 0.0,
+            "independentPrimaryAccuracyScore": 0.0, "independentLanguageMatchScore": 0.97,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 1.0,
+            "independentRecognitionDurationSeconds": 0.4,
+            "independentSegmentationAwareWordErrorRate": 0.0, "independentWordBoundaryOnlyEdits": 2.0,
+            "independentExcessFillerCount": 1.0,
+        })
+        self.publish(valid, "normalization-v2-valid")
+
+        metrics = lambda record: record["takes"][0]["metrics"]  # noqa: E731
+        mutations = {
+            "a v3 record without the segmentation-aware rate": lambda record: metrics(record).pop(
+                "segmentationAwareWordErrorRate"),
+            "a gated score that is the plain rate": lambda record: metrics(record).__setitem__(
+                "primaryAccuracyScore", 2 / 20),
+            "a fractional filler count": lambda record: metrics(record).__setitem__(
+                "independentExcessFillerCount", 0.5),
+            "a negative filler count": lambda record: metrics(record).__setitem__("excessFillerCount", -1.0),
+            "filler counts on a WER v2 record": lambda record: record["evidence"]["languageVerification"]
+                .__setitem__("accuracyMetricVersion", "segmentation-aware-edit-rate-v2"),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"normalization-v2-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"normalization-v2-invalid-{index}")
+
+        # Without filler counts the same take is a valid WER v2 record.
+        v2 = copy.deepcopy(valid)
+        v2["run"]["id"] = "normalization-v2-as-wer-v2"
+        v2["evidence"]["languageVerification"]["accuracyMetricVersion"] = "segmentation-aware-edit-rate-v2"
+        for key in ("excessFillerCount", "independentExcessFillerCount"):
+            metrics(v2).pop(key)
+        self.publish(v2, "normalization-v2-as-wer-v2")
+
     def test_schema_v2_language_requires_complete_memory_qualification(self) -> None:
         valid = record_fixture(run_id="language-memory-v2", kind="language")
         valid["schemaVersion"] = 2

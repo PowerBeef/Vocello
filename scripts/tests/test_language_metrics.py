@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import sys
+import unicodedata
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -76,14 +78,27 @@ class TokenizerAndEditDistanceTests(unittest.TestCase):
         self.assertTrue(metrics.locale_matches_expected_language("ZH-Hans-CN", "chinese"))
         self.assertFalse(metrics.locale_matches_expected_language("en-US", "french"))
         self.assertFalse(metrics.locale_matches_expected_language("", "french"))
-        self.assertFalse(metrics.locale_matches_expected_language("ko-KR", "korean"))
-        self.assertEqual(set(metrics.LANGUAGE_LOCALE_CODES), {"english", "french", "german", "spanish", "chinese", "japanese"})
+        # The table covers the product's ten languages (AQ-02); others fail closed.
+        self.assertTrue(metrics.locale_matches_expected_language("ko-KR", "korean"))
+        self.assertTrue(metrics.locale_matches_expected_language("pt-BR", "portuguese"))
+        self.assertFalse(metrics.locale_matches_expected_language("ar-SA", "arabic"))
+        self.assertEqual(set(metrics.LANGUAGE_LOCALE_CODES), {
+            "english", "french", "german", "spanish", "italian", "portuguese", "russian",
+            "chinese", "japanese", "korean",
+        })
+        self.assertEqual(metrics.PRODUCT_LANGUAGES, tuple(metrics.LANGUAGE_LOCALE_CODES))
+        self.assertEqual(set(metrics.NORMALIZATION_PROFILES), set(metrics.PRODUCT_LANGUAGES))
 
     def test_thresholds_are_the_product_gate(self) -> None:
         self.assertEqual(metrics.MAX_ACCURACY_ERROR_RATE, 0.15)
         self.assertEqual(metrics.MIN_LANGUAGE_MATCH_SCORE, 0.5)
-        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "segmentation-aware-edit-rate-v2")
+        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "normalization-v2-edit-rate-v3")
+        self.assertEqual(metrics.SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION, "segmentation-aware-edit-rate-v2")
         self.assertEqual(metrics.LEGACY_ACCURACY_METRIC_VERSION, "normalized-edit-rate-v1")
+        self.assertEqual(
+            [metrics.ACCURACY_METRIC_NORMALIZATIONS[version] for version in metrics.ACCURACY_METRIC_VERSIONS],
+            ["text-normalization-v1", "text-normalization-v1", "text-normalization-v2"],
+        )
 
 
 class SegmentationAwareWERTests(unittest.TestCase):
@@ -119,13 +134,16 @@ class SegmentationAwareWERTests(unittest.TestCase):
         # CER zero: every word error is a two-word merge. v1 charges four edits
         # (0.4 here); v2 charges none, and the v1 rate stays published.
         entry = recognition(script=self.CASES[0][0], transcript=self.CASES[0][1], language="german")
-        v2 = metrics.score_recognition(entry, script=self.CASES[0][0], language="german")
-        self.assertEqual(v2["accuracyMetricVersion"], "segmentation-aware-edit-rate-v2")
-        self.assertAlmostEqual(v2["wordErrorRate"], 0.4)
-        self.assertEqual(v2["segmentationAwareWordErrorRate"], 0.0)
-        self.assertEqual(v2["wordBoundaryOnlyEdits"], 4)
-        self.assertEqual(v2["errorRate"], 0.0)
-        self.assertTrue(v2["accuracyPass"])
+        for version in ("segmentation-aware-edit-rate-v2", "normalization-v2-edit-rate-v3"):
+            with self.subTest(version=version):
+                aware = metrics.score_recognition(
+                    entry, script=self.CASES[0][0], language="german", accuracy_metric_version=version)
+                self.assertEqual(aware["accuracyMetricVersion"], version)
+                self.assertAlmostEqual(aware["wordErrorRate"], 0.4)
+                self.assertEqual(aware["segmentationAwareWordErrorRate"], 0.0)
+                self.assertEqual(aware["wordBoundaryOnlyEdits"], 4)
+                self.assertEqual(aware["errorRate"], 0.0)
+                self.assertTrue(aware["accuracyPass"])
         v1 = metrics.score_recognition(entry, script=self.CASES[0][0], language="german",
                                        accuracy_metric_version="normalized-edit-rate-v1")
         self.assertAlmostEqual(v1["errorRate"], 0.4)
@@ -152,6 +170,173 @@ class SegmentationAwareWERTests(unittest.TestCase):
             self.assertEqual(aware["wordBoundaryOnlyEdits"], plain_distance - aware["segmentationAwareEditDistance"])
             if "".join(reference) == "".join(hypothesis) and max(len(reference), len(hypothesis)) <= 4:
                 self.assertEqual(aware["segmentationAwareEditDistance"], 0)
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "language_normalization_v2.json"
+ROOT = Path(__file__).resolve().parents[2]
+# The tracked corpora whose scripts a language verdict gates.
+# `language_bench_evidence.build_plan` refuses a lint issue at plan time; this
+# keeps the tracked copies clean before any run.
+GATED_SCRIPT_CORPORA = (ROOT / "config" / "language-bench-corpus.json",)
+
+
+class NormalizationV2ParityTests(unittest.TestCase):
+    """AQ-02 P2a: text normalization v2 on the fixtures the Swift verifier's
+    `WordErrorRateTests.testNormalizationV2ParityFixtures` scores too."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.document = json.loads(FIXTURES.read_text(encoding="utf-8"))
+        cls.cases = cls.document["cases"]
+
+    def test_the_fixtures_name_the_current_versions_and_cover_every_language(self) -> None:
+        self.assertEqual(self.document["normalizationVersion"], metrics.TEXT_NORMALIZATION_V2)
+        self.assertEqual(self.document["accuracyMetricVersion"], metrics.ACCURACY_METRIC_VERSION)
+        identifiers = [case["id"] for case in self.cases]
+        self.assertEqual(len(identifiers), len(set(identifiers)))
+        covered = {case["language"] for case in self.cases if case["phase"] == "P2a"}
+        self.assertLessEqual(set(metrics.PRODUCT_LANGUAGES), covered)
+
+    def test_every_case_scores_exactly_as_pinned(self) -> None:
+        for case in self.cases:
+            with self.subTest(case=case["id"]):
+                language, reference, hypothesis = case["language"], case["reference"], case["hypothesis"]
+                expected = case["expected"]
+                reference_tokens = metrics.normalized_tokens(reference, language)
+                hypothesis_tokens = metrics.normalized_tokens(hypothesis, language)
+                self.assertEqual(reference_tokens, expected["referenceTokens"])
+                self.assertEqual(hypothesis_tokens, expected["hypothesisTokens"])
+                self.assertEqual("".join(metrics.character_units(reference_tokens)), expected["referenceCharacters"])
+                self.assertEqual("".join(metrics.character_units(hypothesis_tokens)), expected["hypothesisCharacters"])
+                word, character = metrics.recomputed_accuracy(reference, hypothesis, language)
+                for key, value in expected["word"].items():
+                    self.assertEqual(word[key], value, key)
+                self.assertEqual(word["segmentationAwareEditDistance"], expected["segmentationAwareEditDistance"])
+                self.assertEqual(word["wordBoundaryOnlyEdits"], expected["wordBoundaryOnlyEdits"])
+                for key, value in expected["character"].items():
+                    self.assertEqual(character[key], value, key)
+                primary = metrics.primary_accuracy_metric(language)
+                self.assertEqual(primary, expected["primaryMetric"])
+                units = len(expected["referenceCharacters"] if primary == "characterErrorRate"
+                            else expected["referenceTokens"])
+                self.assertAlmostEqual(
+                    metrics.primary_accuracy_score(word, character, language), expected["primaryErrors"] / units)
+                diagnostics = case["pythonDiagnostics"]
+                self.assertEqual(
+                    metrics.filler_counts(reference, hypothesis, language)["excessFillerCount"],
+                    diagnostics["excessFillerCount"],
+                )
+                computed = metrics.normalization_diagnostics(reference, hypothesis, language)
+                self.assertEqual(set(computed), set(diagnostics) - {"excessFillerCount"})
+                for key, value in computed.items():
+                    self.assertAlmostEqual(value, diagnostics[key], msg=key)
+
+    def test_p2b_cases_name_a_slot_normalization_v2_leaves_empty(self) -> None:
+        self.assertEqual(metrics.NORMALIZATION_EXTENSION_STEPS[metrics.TEXT_NORMALIZATION_V2], ())
+        pending = [case for case in self.cases if case["phase"] == "P2b"]
+        self.assertTrue(pending)
+        for case in self.cases:
+            with self.subTest(case=case["id"]):
+                if case["phase"] == "P2b":
+                    self.assertIn(case["language"], metrics.NORMALIZATION_EXTENSION_SLOTS[case["slot"]])
+                    self.assertIn("expectedAfterP2b", case)
+                else:
+                    self.assertEqual(case["phase"], "P2a")
+                    self.assertNotIn("slot", case)
+                    self.assertNotIn("expectedAfterP2b", case)
+
+    def test_case_folding_equals_unicode_folding_for_the_ten_languages(self) -> None:
+        # Basic Latin to Latin Extended-B, Latin Extended Additional, Cyrillic,
+        # kana, a CJK and a Hangul sample, and the half- and full-width forms.
+        blocks = [(0x20, 0x250), (0x1E00, 0x1F00), (0x400, 0x500), (0x3040, 0x3100),
+                  (0x4E00, 0x4F00), (0xAC00, 0xAD00), (0xFF00, 0xFFF0)]
+        for start, end in blocks:
+            for code_point in range(start, end):
+                character = unicodedata.normalize("NFKC", chr(code_point))
+                self.assertEqual(
+                    unicodedata.normalize("NFC", metrics._case_fold(character)),
+                    unicodedata.normalize("NFC", character.casefold()),
+                    hex(code_point),
+                )
+
+    def test_legacy_versions_keep_the_v1_tokenizer(self) -> None:
+        # Legacy records rescore exactly as published: Korean was word-gated
+        # over NFKD jamo, tags were words and ß stayed a letter.
+        legacy = metrics.SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION
+        self.assertEqual(metrics.primary_accuracy_metric("korean", version=legacy), "wordErrorRate")
+        self.assertEqual(metrics.primary_accuracy_metric("korean"), "characterErrorRate")
+        _word, legacy_characters = metrics.recomputed_accuracy("가다", "거다", "korean", version=legacy)
+        _word, characters = metrics.recomputed_accuracy("가다", "거다", "korean")
+        self.assertEqual((legacy_characters["referenceCount"], characters["referenceCount"]), (4, 2))
+        for reference, hypothesis in (("the train left", "<|en|>the train left"), ("Straße", "strasse")):
+            legacy_word, _ = metrics.recomputed_accuracy(reference, hypothesis, "english", version=legacy)
+            word, _ = metrics.recomputed_accuracy(reference, hypothesis, "english")
+            self.assertEqual((legacy_word["segmentationAwareEditDistance"], word["segmentationAwareEditDistance"]), (1, 0))
+        with self.assertRaises(ValueError):
+            metrics.recomputed_accuracy("a", "a", "english", version="edit-rate-v9")
+
+    def test_v3_verdicts_count_fillers_and_carry_diagnostics_that_never_gate(self) -> None:
+        script = "The train left the station"
+        entry = recognition(script=script, transcript="The um train uh left the station")
+        verdict = metrics.score_recognition(entry, script=script, language="english")
+        self.assertEqual(verdict["textNormalization"], "text-normalization-v2")
+        self.assertEqual((verdict["hypothesisFillerCount"], verdict["excessFillerCount"]), (2, 2))
+        self.assertAlmostEqual(verdict["errorRate"], 0.4)
+        korean = metrics.score_recognition(
+            recognition(script="가다", transcript="거다", language="korean"), script="가다", language="korean")
+        self.assertEqual((korean["metric"], korean["errorRate"]), ("CER", 0.5))
+        self.assertEqual(korean["diagnostics"], {"jamoCharacterErrorRate": 0.25})
+        legacy = metrics.score_recognition(
+            entry, script=script, language="english",
+            accuracy_metric_version=metrics.SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION)
+        self.assertEqual(legacy["textNormalization"], "text-normalization-v1")
+        self.assertNotIn("excessFillerCount", legacy)
+        self.assertNotIn("diagnostics", legacy)
+
+
+class CorpusLintTests(unittest.TestCase):
+    """Gated scripts hold no digits, brackets, symbols or abbreviations (AQ-02)."""
+
+    def test_each_refusal_has_its_code(self) -> None:
+        cases = {
+            "The twelve trains leave at 9": ["digit"],
+            "Le train ２ part": ["digit"],
+            "Sie fährt ½ Stunde": ["digit", "symbol"],  # NFKC: 1, U+2044, 2
+            "Le train (rouge) part": ["bracket"],
+            "列車は「のぞみ」です": ["bracket"],
+            "The fare is €5": ["digit", "symbol"],
+            "Rock & roll tonight": ["symbol"],
+            "One in 100% of cases": ["digit", "symbol"],
+            "The BBC reported it": ["abbreviation"],
+            "Wir fahren z.B. heute": ["abbreviation"],
+            "Приехал из США вчера": ["abbreviation"],
+        }
+        for script, issues in cases.items():
+            with self.subTest(script=script):
+                self.assertEqual(metrics.script_lint_issues(script), issues)
+
+    def test_spelled_scripts_pass(self) -> None:
+        for script in (
+            "The morning train left the quiet station on time.",
+            "¿Dónde está la estación? ¡Aquí!",
+            "L'homme arrive à l'heure, n'est-ce pas ?",
+            "Viele Menschen sehen Häuser, Straßen und Bäume.",
+            "二〇二六年，火车准时开往远处的城市。",
+            "今日は天気がよく、赤い列車が駅を出発します。",
+            "아침 열차는 조용한 역을 제시간에 떠났습니다.",
+            "Утренний поезд вовремя покинул тихую станцию.",
+            "A estação não fica longe.",
+        ):
+            with self.subTest(script=script):
+                self.assertEqual(metrics.script_lint_issues(script), [])
+
+    def test_the_tracked_gated_corpora_are_clean(self) -> None:
+        for corpus_path in GATED_SCRIPT_CORPORA:
+            corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+            for entry in corpus["languages"]:
+                with self.subTest(corpus=corpus_path.name, language=entry["id"]):
+                    self.assertIn(entry["id"], metrics.PRODUCT_LANGUAGES)
+                    self.assertEqual(metrics.script_lint_issues(entry["script"]), [])
 
 
 class EdgeCoverageTests(unittest.TestCase):

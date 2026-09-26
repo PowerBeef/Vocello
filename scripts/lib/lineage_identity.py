@@ -133,7 +133,15 @@ LANGUAGE_VERIFICATION = (
     "scripts/check_language_output.py",
     "scripts/independent_asr.py",
     "scripts/independent_asr_worker.py",
+    # The run plan, which refuses scripts that fail the corpus lint (AQ-02).
+    "scripts/language_bench_evidence.py",
     "scripts/lib/language_metrics.py",
+)
+# The iPhone app's own verifier: its normalization and scores are the Apple
+# Speech family's measurement (AQ-02 mirrors language_metrics.py in it).
+IN_APP_LANGUAGE_VERIFICATION = (
+    "Sources/SharedSupport/Services/GenerationOutputVerifier.swift",
+    "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
 )
 PROFILE_SUMMARY = (
     "scripts/lib/profile_trace_retention.py",
@@ -201,7 +209,7 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
         "config/ios-memory-budget-policy.json",
     ),
     ("language", "macos"): (*MACOS_ENGINE_LANE, *LANGUAGE_VERIFICATION),
-    ("language", "ios"): (*IOS_ENGINE_LANE, *LANGUAGE_VERIFICATION),
+    ("language", "ios"): (*IOS_ENGINE_LANE, *LANGUAGE_VERIFICATION, *IN_APP_LANGUAGE_VERIFICATION),
     ("instrument-profile", "macos"): (*MACOS_ENGINE_LANE, *PROFILE_SUMMARY),
     ("instrument-profile", "ios"): (*IOS_ENGINE_LANE, *PROFILE_SUMMARY),
     # Calibration analyzes a labeled corpus; it builds and launches nothing.
@@ -263,12 +271,19 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # family; the Auto seed (#86), the macOS corpus fixtures (#88) and the
     # engine-row prompt digest that proves Auto resolution on the Mac (BT-05
     # review) ride this version because no record carries it yet.
-    ("language", "macos"): 3,
+    # 4 (2026-09-25, AQ-02 P2a): every family is scored under text
+    # normalization v2 (accuracy metric normalization-v2-edit-rate-v3: NFKC and
+    # case folding, the extra Latin folds, recognizer-tag stripping, elisions
+    # joined, Korean gated by its syllable rate), and the plan refuses scripts
+    # that fail the corpus lint.
+    ("language", "macos"): 4,
     # 3 (2026-09-25, audit #87, #42/#43 and the sampler change): the iPhone lang-bench
     # probes each take's sentinel first at its predicted end, then every 3 s,
     # instead of every 10 s from the launch, so fewer device copies overlap the
     # measured generation.
-    ("language", "ios"): 3,
+    # 4 (2026-09-25, AQ-02 P2a): the in-app verifier and the Mac rescoring move
+    # to text normalization v2, as on the Mac.
+    ("language", "ios"): 4,
     # 2 (2026-09-25, audit #51/#52/#97 and the sampler change): the iPhone
     # memory profile records through the Allocations template (no automatic VM
     # snapshots, which suspended the target), every iPhone profile stops

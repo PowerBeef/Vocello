@@ -79,6 +79,7 @@ from lib.language_metrics import (  # noqa: E402
     MIN_LANGUAGE_MATCH_SCORE,
     NEGATIVE_CONTROL_KIND,
     channel_consensus,
+    filler_counts,
     is_sha256,
     locale_matches_expected_language,
     primary_accuracy_metric,
@@ -99,8 +100,10 @@ LANGUAGE_OUTPUT_ALGORITHM = "language-output-verifier-v3"
 ASR_EVIDENCE_SCHEMA = 2
 ASR_EVIDENCE_ALGORITHM = "apple-speech-file-consensus-v2"
 ASR_REQUIRED_PASS_COUNT = 3
-# WER v2 (audit #43, 2026-09-25): new records gate the segmentation-aware word
-# rate and keep publishing the v1 rate beside it; lib.language_metrics owns it.
+# Accuracy metric v3 (AQ-02 P2a, 2026-09-25): new records gate WER v2 (the
+# segmentation-aware word rate, audit #43) and Korean's syllable rate under text
+# normalization v2, and keep publishing the plain word rate beside it;
+# lib.language_metrics owns the version.
 LANGUAGE_ACCURACY_METRIC_VERSION = ACCURACY_METRIC_VERSION
 LANGUAGE_SAMPLING_VARIATION = "expressive"
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
@@ -2710,7 +2713,7 @@ def sanitized_asr_evidence(
     ):
         raise PublicationError(f"language cell {cell_id} recognition consensus is inconsistent")
     word_metrics, character_metrics = recomputed_accuracy(
-        reference_script, transcripts[0], str(expected_language),
+        reference_script, transcripts[0], str(expected_language), version=LANGUAGE_ACCURACY_METRIC_VERSION,
     )
     recomputed_fields = {
         "referenceTokenCount": word_metrics["referenceCount"],
@@ -2730,7 +2733,9 @@ def sanitized_asr_evidence(
         character_error_rate, character_metrics["errorRate"], rel_tol=1e-9, abs_tol=1e-12
     ):
         raise PublicationError(f"language cell {cell_id} metrics do not match corpus and consensus")
-    expected_accuracy_metric = primary_accuracy_metric(str(expected_language))
+    expected_accuracy_metric = primary_accuracy_metric(
+        str(expected_language), version=LANGUAGE_ACCURACY_METRIC_VERSION,
+    )
     accuracy_metric = verification.get("accuracyMetric")
     accuracy_threshold = finite_number(verification.get("accuracyThreshold"))
     accuracy_value = finite_number(verification.get("accuracyValue"))
@@ -2793,6 +2798,11 @@ def sanitized_asr_evidence(
         "primaryAccuracyScore": primary_score,
         "segmentationAwareWordErrorRate": float(word_metrics["segmentationAwareErrorRate"]),
         "wordBoundaryOnlyEdits": int(word_metrics["wordBoundaryOnlyEdits"]),
+        # Fillers the script does not hold (normalization v2, AQ-02): counted,
+        # never erased and never gated.
+        "excessFillerCount": int(filler_counts(
+            reference_script, transcripts[0], str(expected_language),
+        )["excessFillerCount"]),
         **count_fields,
         **boolean_fields,
     }
@@ -2944,7 +2954,10 @@ def sanitized_independent_evidence(
         raise PublicationError(
             f"language cell {cell_id} independent recognition is unqualified: " + ", ".join(sorted(set(issues)))
         )
-    verdict = score_recognition(recognition, script=reference_script, language=expected_language)
+    verdict = score_recognition(
+        recognition, script=reference_script, language=expected_language,
+        accuracy_metric_version=LANGUAGE_ACCURACY_METRIC_VERSION,
+    )
     expect_failure = cell.get("expectedOutcome") == "fail"
     # Per-channel consensus (audit #42): each family votes its language and its
     # accuracy verdict separately; the accuracy control constrains accuracy only.
@@ -2986,6 +2999,7 @@ def sanitized_independent_evidence(
         "wordErrorRate": verdict["wordErrorRate"],
         "segmentationAwareWordErrorRate": verdict["segmentationAwareWordErrorRate"],
         "wordBoundaryOnlyEdits": int(verdict["wordBoundaryOnlyEdits"]),
+        "excessFillerCount": int(verdict["excessFillerCount"]),
         "characterErrorRate": verdict["characterErrorRate"],
         "accuracyMetric": verdict["accuracyMetric"],
         "accuracyThreshold": verdict["accuracyThreshold"],
@@ -3248,6 +3262,7 @@ def language_command(args: argparse.Namespace) -> Path:
                 "longestDeletionRun": float(evidence["longestDeletionRun"]),
                 "segmentationAwareWordErrorRate": evidence["segmentationAwareWordErrorRate"],
                 "wordBoundaryOnlyEdits": float(evidence["wordBoundaryOnlyEdits"]),
+                "excessFillerCount": float(evidence["excessFillerCount"]),
             })
             record_detected_language(take, "apple-speech", evidence.get("detectedLanguage"))
             flag_deletion_run(take, evidence["longestDeletionRun"], family="apple-speech",
@@ -3313,6 +3328,7 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
                 "independentSegmentationAwareWordErrorRate": evidence["segmentationAwareWordErrorRate"],
                 "independentWordBoundaryOnlyEdits": float(evidence["wordBoundaryOnlyEdits"]),
+                "independentExcessFillerCount": float(evidence["excessFillerCount"]),
             })
             record_detected_language(take, "whisper", evidence.get("detectedLanguage"))
             if evidence.get("channelConsensus") is not None:

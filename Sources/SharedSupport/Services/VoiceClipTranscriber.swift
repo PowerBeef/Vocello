@@ -656,24 +656,39 @@ enum VoiceClipTranscriber {
         return Qwen3SupportedLanguage.normalized(code) == expected
     }
 
-    static func wordErrorMetrics(reference: String, hypothesis: String) -> EditMetrics {
-        editMetrics(lhs: normalizedWordTokens(reference), rhs: normalizedWordTokens(hypothesis))
+    /// Word edit metrics under text normalization v2 for `expectedLanguage` (Auto folds like a
+    /// Latin language).
+    static func wordErrorMetrics(
+        reference: String,
+        hypothesis: String,
+        expectedLanguage: Qwen3SupportedLanguage = .auto
+    ) -> EditMetrics {
+        editMetrics(
+            lhs: normalizedWordTokens(reference, language: expectedLanguage),
+            rhs: normalizedWordTokens(hypothesis, language: expectedLanguage)
+        )
     }
 
+    /// Space-free character edit metrics under text normalization v2: Unicode scalars of the
+    /// normalized words, so Korean counts Hangul syllables and Japanese keeps its dakuten.
     static func characterErrorMetrics(
         reference: String,
         hypothesis: String,
         expectedLanguage: Qwen3SupportedLanguage = .auto
     ) -> EditMetrics {
-        let preservesDiacritics = expectedLanguage == .chinese || expectedLanguage == .japanese
-        return editMetrics(
-            lhs: normalizedCharacterTokens(reference, preservesDiacritics: preservesDiacritics),
-            rhs: normalizedCharacterTokens(hypothesis, preservesDiacritics: preservesDiacritics)
+        editMetrics(
+            lhs: normalizedCharacterUnits(reference, language: expectedLanguage),
+            rhs: normalizedCharacterUnits(hypothesis, language: expectedLanguage)
         )
     }
 
-    static func wordErrorRate(reference: String, hypothesis: String) -> Double {
-        wordErrorMetrics(reference: reference, hypothesis: hypothesis).errorRate
+    static func wordErrorRate(
+        reference: String,
+        hypothesis: String,
+        expectedLanguage: Qwen3SupportedLanguage = .auto
+    ) -> Double {
+        wordErrorMetrics(reference: reference, hypothesis: hypothesis, expectedLanguage: expectedLanguage)
+            .errorRate
     }
 
     /// WER v2: the plain word alignment plus one free operation, a block of one to
@@ -682,10 +697,11 @@ enum VoiceClipTranscriber {
     /// holding two or more words (a merge, a split or a moved boundary).
     static func segmentationAwareWordMetrics(
         reference: String,
-        hypothesis: String
+        hypothesis: String,
+        expectedLanguage: Qwen3SupportedLanguage = .auto
     ) -> SegmentationAwareMetrics {
-        let lhs = normalizedWordTokens(reference)
-        let rhs = normalizedWordTokens(hypothesis)
+        let lhs = normalizedWordTokens(reference, language: expectedLanguage)
+        let rhs = normalizedWordTokens(hypothesis, language: expectedLanguage)
         let plainDistance = editMetrics(lhs: lhs, rhs: rhs).editDistance
         let distance = segmentationAwareDistance(lhs: lhs, rhs: rhs)
         let rate: Double
@@ -786,29 +802,125 @@ enum VoiceClipTranscriber {
         )
     }
 
-    private static func normalizedWordTokens(_ text: String) -> [String] {
-        text
-            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
-            .lowercased(with: Locale(identifier: "en_US_POSIX"))
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
+    // MARK: Text normalization v2
+
+    /// Text normalization v2 (AQ-02 P2a; audit AQ-F21, AQ-F24, AQ-F25), the normalization
+    /// accuracy metric `normalization-v2-edit-rate-v3` scores under. It mirrors
+    /// `normalized_tokens` in `scripts/lib/language_metrics.py` step for step, from Unicode
+    /// properties both runtimes expose; `scripts/tests/fixtures/language_normalization_v2.json`
+    /// pins the two to identical tokens and edit counts.
+    ///
+    /// 1. NFKC, or NFC for Korean (NFKC would compose compatibility jamo into syllables).
+    /// 2. Recognizer tags (`<|…|>`) become spaces.
+    /// 3. Case folding: each scalar's full lowercase mapping, then `caseFoldExtras`.
+    /// 4. Latin and Cyrillic (and Auto): NFKD, nonspacing marks dropped, then
+    ///    `additionalDiacritics`. Chinese and Japanese keep their marks, Korean its syllables.
+    /// 5. Words are runs of letters, marks and numbers; anything else is a boundary, so bracket
+    ///    contents and fillers stay words. English, French and Italian join a word across an
+    ///    apostrophe between two word scalars (l'homme, don't) without scoring the apostrophe.
+    static let textNormalizationVersion = "text-normalization-v2"
+
+    private enum NormalizationProfile {
+        case folded
+        case compatibility
+        case hangul
     }
 
-    private static func normalizedCharacterTokens(
-        _ text: String,
-        preservesDiacritics: Bool
-    ) -> [Character] {
-        var options: String.CompareOptions = [.widthInsensitive]
-        if !preservesDiacritics { options.insert(.diacriticInsensitive) }
-        let folded = text
-            .folding(options: options, locale: Locale(identifier: "en_US_POSIX"))
-            .lowercased(with: Locale(identifier: "en_US_POSIX"))
-        return Array(
-            folded.unicodeScalars
-                .filter { CharacterSet.alphanumerics.contains($0) }
-                .map(String.init)
-                .joined()
+    private static let apostrophes: Set<Unicode.Scalar> = ["\u{27}", "\u{2019}", "\u{2BC}"]
+    private static let caseFoldExtras: [Unicode.Scalar: String] = ["\u{DF}": "ss", "\u{3C2}": "\u{3C3}"]
+    private static let additionalDiacritics: [Unicode.Scalar: String] = [
+        "\u{DF}": "ss", "\u{E6}": "ae", "\u{153}": "oe", "\u{F8}": "o", "\u{142}": "l"
+    ]
+    private static let recognizerTagPattern = #"<\|[^|<>]*\|>"#
+
+    private static func normalizationProfile(for language: Qwen3SupportedLanguage) -> NormalizationProfile {
+        switch language {
+        case .chinese, .japanese:
+            return .compatibility
+        case .korean:
+            return .hangul
+        case .auto, .english, .german, .french, .russian, .portuguese, .spanish, .italian:
+            return .folded
+        }
+    }
+
+    private static func joinsWordsAcrossApostrophes(_ language: Qwen3SupportedLanguage) -> Bool {
+        language == .english || language == .french || language == .italian
+    }
+
+    /// Normalization v2 word tokens of `text` for `language`.
+    static func normalizedWordTokens(_ text: String, language: Qwen3SupportedLanguage) -> [String] {
+        let scalars = normalizedScalars(text, language: language)
+        let joinsApostrophes = joinsWordsAcrossApostrophes(language)
+        var tokens: [String] = []
+        var current = String.UnicodeScalarView()
+        for index in scalars.indices {
+            let scalar = scalars[index]
+            if isWordScalar(scalar) {
+                current.append(scalar)
+            } else if joinsApostrophes, apostrophes.contains(scalar), !current.isEmpty,
+                      index + 1 < scalars.count, isWordScalar(scalars[index + 1]) {
+                continue
+            } else if !current.isEmpty {
+                tokens.append(String(current))
+                current = String.UnicodeScalarView()
+            }
+        }
+        if !current.isEmpty {
+            tokens.append(String(current))
+        }
+        return tokens
+    }
+
+    /// The space-free character units of `text`: the Unicode scalars of its normalized words.
+    static func normalizedCharacterUnits(_ text: String, language: Qwen3SupportedLanguage) -> [Unicode.Scalar] {
+        normalizedWordTokens(text, language: language).flatMap { Array($0.unicodeScalars) }
+    }
+
+    private static func normalizedScalars(_ text: String, language: Qwen3SupportedLanguage) -> [Unicode.Scalar] {
+        let profile = normalizationProfile(for: language)
+        let composed = profile == .hangul
+            ? text.precomposedStringWithCanonicalMapping
+            : text.precomposedStringWithCompatibilityMapping
+        let untagged = composed.replacingOccurrences(
+            of: recognizerTagPattern,
+            with: " ",
+            options: .regularExpression
         )
+        var folded = String.UnicodeScalarView()
+        for scalar in untagged.unicodeScalars {
+            for lowered in scalar.properties.lowercaseMapping.unicodeScalars {
+                if let extra = caseFoldExtras[lowered] {
+                    folded.append(contentsOf: extra.unicodeScalars)
+                } else {
+                    folded.append(lowered)
+                }
+            }
+        }
+        guard profile == .folded else { return Array(folded) }
+        var stripped: [Unicode.Scalar] = []
+        for scalar in String(folded).decomposedStringWithCompatibilityMapping.unicodeScalars
+        where scalar.properties.generalCategory != .nonspacingMark {
+            if let replacement = additionalDiacritics[scalar] {
+                stripped.append(contentsOf: replacement.unicodeScalars)
+            } else {
+                stripped.append(scalar)
+            }
+        }
+        return stripped
+    }
+
+    /// General categories L, M and N; an apostrophe is never a word scalar (U+02BC is a letter).
+    private static func isWordScalar(_ scalar: Unicode.Scalar) -> Bool {
+        guard !apostrophes.contains(scalar) else { return false }
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+             .nonspacingMark, .spacingMark, .enclosingMark,
+             .decimalNumber, .letterNumber, .otherNumber:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func isPositiveFinite(_ value: Double) -> Bool {

@@ -111,10 +111,106 @@ final class WordErrorRateTests: XCTestCase {
             expectedScript: script,
             expectedLanguage: .german
         )
-        XCTAssertEqual(result.accuracyMetricVersion, "segmentation-aware-edit-rate-v2")
+        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v2-edit-rate-v3")
         XCTAssertEqual(try XCTUnwrap(result.wordErrorRate), 0.4, accuracy: 1e-12)
         XCTAssertEqual(try XCTUnwrap(result.segmentationAwareWordErrorRate), 0, accuracy: 1e-12)
         XCTAssertEqual(result.wordBoundaryOnlyEdits, 4)
+        XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0, accuracy: 1e-12)
+        XCTAssertEqual(result.accuracyPass, true)
+    }
+
+    /// Normalization v2 parity (AQ-02 P2a): every case of the fixtures shared with
+    /// `scripts/tests/test_language_metrics.py` scores to the same tokens, character units and
+    /// edit counts here. P2b cases pin today's scores as well; their `expectedAfterP2b` belongs
+    /// to the package steps P2b adds.
+    func testNormalizationV2ParityFixtures() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let data = try Data(contentsOf: repositoryRoot.appendingPathComponent(
+            "scripts/tests/fixtures/language_normalization_v2.json"
+        ))
+        let fixtures = try JSONDecoder().decode(NormalizationFixtures.self, from: data)
+        XCTAssertEqual(fixtures.normalizationVersion, VoiceClipTranscriber.textNormalizationVersion)
+        XCTAssertEqual(
+            fixtures.accuracyMetricVersion,
+            GenerationOutputVerifier.Result.currentAccuracyMetricVersion
+        )
+        let covered = Set(fixtures.cases.filter { $0.phase == "P2a" }.map(\.language))
+        XCTAssertTrue(Set(Qwen3SupportedLanguage.selectableCases.map(\.rawValue)).isSubset(of: covered))
+
+        for fixture in fixtures.cases {
+            let language = try XCTUnwrap(Qwen3SupportedLanguage(rawValue: fixture.language), fixture.id)
+            let expected = fixture.expected
+            XCTAssertEqual(
+                VoiceClipTranscriber.normalizedWordTokens(fixture.reference, language: language),
+                expected.referenceTokens,
+                fixture.id
+            )
+            XCTAssertEqual(
+                VoiceClipTranscriber.normalizedWordTokens(fixture.hypothesis, language: language),
+                expected.hypothesisTokens,
+                fixture.id
+            )
+            XCTAssertEqual(
+                scalarString(VoiceClipTranscriber.normalizedCharacterUnits(fixture.reference, language: language)),
+                expected.referenceCharacters,
+                fixture.id
+            )
+            XCTAssertEqual(
+                scalarString(VoiceClipTranscriber.normalizedCharacterUnits(fixture.hypothesis, language: language)),
+                expected.hypothesisCharacters,
+                fixture.id
+            )
+            let word = VoiceClipTranscriber.wordErrorMetrics(
+                reference: fixture.reference,
+                hypothesis: fixture.hypothesis,
+                expectedLanguage: language
+            )
+            assertCounts(word, expected.word, fixture.id + " word")
+            let aware = VoiceClipTranscriber.segmentationAwareWordMetrics(
+                reference: fixture.reference,
+                hypothesis: fixture.hypothesis,
+                expectedLanguage: language
+            )
+            XCTAssertEqual(aware.editDistance, expected.segmentationAwareEditDistance, fixture.id)
+            XCTAssertEqual(aware.wordBoundaryOnlyEdits, expected.wordBoundaryOnlyEdits, fixture.id)
+            let character = VoiceClipTranscriber.characterErrorMetrics(
+                reference: fixture.reference,
+                hypothesis: fixture.hypothesis,
+                expectedLanguage: language
+            )
+            assertCounts(character, expected.character, fixture.id + " character")
+            let metric = GenerationOutputVerifier.accuracyMetric(for: language)
+            XCTAssertEqual(metric.rawValue, expected.primaryMetric, fixture.id)
+            let primaryErrors = metric == .characterErrorRate ? character.editDistance : aware.editDistance
+            XCTAssertEqual(primaryErrors, expected.primaryErrors, fixture.id)
+        }
+    }
+
+    /// AQ-F21: Korean gates its space-free syllable rate, so eojeol spacing costs nothing and
+    /// Hangul is never split into NFKD jamo; the word rate stays published beside it.
+    func testKoreanGatesItsSyllableCharacterRate() throws {
+        let script = "기차는 조용한 역을 제시간에 떠났습니다"
+        let transcript = "기차는 조용한역을 제 시간에 떠났습니다"
+        let passes = (1 ... 3).map { pass(index: $0, transcript: transcript, localeIdentifier: "ko-KR") }
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: evidence(
+                authorization: .authorized,
+                consensus: .consistent,
+                repetitions: passes,
+                transcript: transcript,
+                expectedLanguage: .korean
+            ),
+            expectedScript: script,
+            expectedLanguage: .korean
+        )
+        XCTAssertNil(result.skipReason)
+        XCTAssertEqual(result.accuracyMetric, .characterErrorRate)
+        XCTAssertEqual(result.referenceCharacterCount, 17)
+        XCTAssertEqual(try XCTUnwrap(result.characterErrorRate), 0, accuracy: 1e-12)
+        XCTAssertEqual(try XCTUnwrap(result.wordErrorRate), 0.6, accuracy: 1e-12)
         XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0, accuracy: 1e-12)
         XCTAssertEqual(result.accuracyPass, true)
     }
@@ -412,7 +508,7 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(result.deletions, 0)
         XCTAssertEqual(result.detectedLanguage, Qwen3SupportedLanguage.auto.rawValue)
         XCTAssertEqual(result.accuracyPass, true)
-        XCTAssertEqual(result.accuracyMetricVersion, "segmentation-aware-edit-rate-v2")
+        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v2-edit-rate-v3")
         XCTAssertEqual(result.accuracyMetric, .wordErrorRate)
         XCTAssertEqual(result.accuracyThreshold, 0.30, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0.25, accuracy: 0.001)
@@ -793,6 +889,62 @@ final class WordErrorRateTests: XCTestCase {
         )
     }
 
+    private func scalarString(_ scalars: [Unicode.Scalar]) -> String {
+        var view = String.UnicodeScalarView()
+        view.append(contentsOf: scalars)
+        return String(view)
+    }
+
+    private func assertCounts(
+        _ metrics: VoiceClipTranscriber.EditMetrics,
+        _ expected: NormalizationFixtures.EditCounts,
+        _ message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(metrics.substitutions, expected.substitutions, message, file: file, line: line)
+        XCTAssertEqual(metrics.insertions, expected.insertions, message, file: file, line: line)
+        XCTAssertEqual(metrics.deletions, expected.deletions, message, file: file, line: line)
+        XCTAssertEqual(metrics.longestDeletionRun, expected.longestDeletionRun, message, file: file, line: line)
+    }
+
+    /// `scripts/tests/fixtures/language_normalization_v2.json`; Python-only diagnostics and the
+    /// P2b expectations are ignored here.
+    private struct NormalizationFixtures: Decodable {
+        struct EditCounts: Decodable {
+            var substitutions: Int
+            var insertions: Int
+            var deletions: Int
+            var longestDeletionRun: Int
+        }
+
+        struct Expected: Decodable {
+            var referenceTokens: [String]
+            var hypothesisTokens: [String]
+            var referenceCharacters: String
+            var hypothesisCharacters: String
+            var word: EditCounts
+            var segmentationAwareEditDistance: Int
+            var wordBoundaryOnlyEdits: Int
+            var character: EditCounts
+            var primaryMetric: String
+            var primaryErrors: Int
+        }
+
+        struct FixtureCase: Decodable {
+            var id: String
+            var language: String
+            var reference: String
+            var hypothesis: String
+            var phase: String
+            var expected: Expected
+        }
+
+        var normalizationVersion: String
+        var accuracyMetricVersion: String
+        var cases: [FixtureCase]
+    }
+
     func testLanguageASRGateResultMapsVerifierOutcomeAndConsensus() throws {
         let script = "Hello world"
         let matching = (1 ... 3).map { pass(index: $0, transcript: script) }
@@ -814,7 +966,7 @@ final class WordErrorRateTests: XCTestCase {
         let gate = passing.languageASRGateResult(evidenceDigest: digest)
         XCTAssertEqual(gate.gate, .languageASR)
         XCTAssertEqual(gate.outcome, .pass)
-        XCTAssertEqual(gate.algorithmVersion, 5)
+        XCTAssertEqual(gate.algorithmVersion, 6)
         XCTAssertEqual(gate.evidenceDigest, digest)
         XCTAssertEqual(
             gate.measurements.first { $0.key == .consensusPassCount }?.value,
@@ -825,7 +977,7 @@ final class WordErrorRateTests: XCTestCase {
             0
         )
 
-        // Gate v5 reports the rate its outcome reads: a word-boundary merge the
+        // Since gate v5 the gate reports the rate its outcome reads: a word-boundary merge the
         // v1 rate charges (0.4) is not what a passing WER v2 gate measured.
         var merged = passing
         merged.wordErrorRate = 0.4
@@ -836,7 +988,7 @@ final class WordErrorRateTests: XCTestCase {
             mergedGate.measurements.first { $0.key == .wordErrorRate }?.value,
             0.05
         )
-        // Chinese and Japanese gate on the character rate, under its own key.
+        // Chinese, Japanese and Korean gate on the character rate, under its own key.
         var characters = passing
         characters.accuracyMetric = .characterErrorRate
         characters.accuracyValue = 0.08

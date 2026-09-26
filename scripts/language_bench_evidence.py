@@ -20,16 +20,23 @@ import shutil
 import sys
 import tempfile
 from typing import Any, Iterable
-import unicodedata
 import wave
 from lib import jsonio  # noqa: E402
+from lib.language_metrics import (  # noqa: E402
+    CHARACTER_ERROR_LANGUAGES,
+    character_units,
+    normalized_tokens,
+    script_lint_issues,
+)
 
 
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,159}\Z")
 UINT64_MAX = (1 << 64) - 1
 MIN_ALPHABETIC_WORDS = 15
 MIN_CJK_CHARACTERS = 24
-CJK_LANGUAGES = {"chinese", "japanese"}
+# The languages gated by their character rate (Chinese, Japanese and, since
+# normalization v2, Korean) need the character minimum.
+CJK_LANGUAGES = CHARACTER_ERROR_LANGUAGES
 SPEAKER_CONTRACT_PATH = (
     Path(__file__).resolve().parents[1]
     / "Sources"
@@ -132,19 +139,10 @@ def stable_default_seed(cell: dict[str, Any]) -> int:
 
 
 def normalized_script_unit_count(text: str, language: str) -> int:
-    folded = unicodedata.normalize("NFKC", text).lower()
-    if language in CJK_LANGUAGES:
-        return sum(character.isalnum() for character in folded)
-    count = 0
-    in_token = False
-    for character in folded:
-        if character.isalnum():
-            if not in_token:
-                count += 1
-                in_token = True
-        else:
-            in_token = False
-    return count
+    """The script's units under the gated metric's normalization (v2): words, or
+    characters for the character-rate languages."""
+    tokens = normalized_tokens(text, language)
+    return len(character_units(tokens)) if language in CJK_LANGUAGES else len(tokens)
 
 
 def supported_custom_speaker_ids() -> set[str]:
@@ -202,6 +200,10 @@ def build_plan(
             raise EvidenceError(
                 f"{language}: Custom speaker {speaker!r} is absent from qwenvoice_contract.json"
             )
+        # The corpus lint (AQ-02): a gated script holds no digits, brackets,
+        # symbols or abbreviations, which recognizers write inconsistently.
+        if lint := script_lint_issues(script):
+            raise EvidenceError(f"{language}: gated script fails the corpus lint: {', '.join(lint)}")
         unit_count = normalized_script_unit_count(script, language)
         minimum = MIN_CJK_CHARACTERS if language in CJK_LANGUAGES else MIN_ALPHABETIC_WORDS
         if unit_count < minimum:

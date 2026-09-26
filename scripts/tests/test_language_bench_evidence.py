@@ -277,6 +277,28 @@ class LanguageBenchEvidenceTests(unittest.TestCase):
                     cohort_path=None,
                 )
 
+    def test_plan_refuses_a_script_that_fails_the_corpus_lint(self) -> None:
+        # AQ-02: digits and brackets never reach a gated script.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            corpus_path = root / "corpus.json"
+            for index, (script_edit, code) in enumerate((
+                (lambda script: script.replace("on time", "at 9"), "digit"),
+                (lambda script: script.replace("the quiet station", "the (quiet) station"), "bracket"),
+            )):
+                corpus = json.loads(CORPUS.read_text(encoding="utf-8"))
+                english = next(entry for entry in corpus["languages"] if entry["id"] == "english")
+                english["script"] = script_edit(english["script"])
+                write_json_atomic(corpus_path, corpus)
+                with self.subTest(code=code), self.assertRaisesRegex(EvidenceError, f"corpus lint: {code}"):
+                    build_plan(
+                        run_id=f"lint-fixture-{index}",
+                        matrix_path=MATRIX,
+                        corpus_path=corpus_path,
+                        subset="quick",
+                        cohort_path=None,
+                    )
+
     def test_diagnostic_cohort_has_all_fifteen_predeclared_takes(self) -> None:
         plan = build_plan(
             run_id="cohort-fixture",

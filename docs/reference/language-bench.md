@@ -1,11 +1,12 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-09-25
 summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
 sourceOfTruth:
   - scripts/check_language_hints.py
   - scripts/check_language_output.py
+  - scripts/lib/language_metrics.py
   - config/language-bench-matrix.json
 ---
 # Language bench (Phases 2–3)
@@ -28,8 +29,9 @@ Cells tagged `"quick": true` form the **quick** subset (English + French + negat
 **full** runs all 19 cells (6 languages × Custom pinned/Auto + Design explicit-language + negative).
 
 The version-2 corpus is deliberately longer than the original smoke snippets: each alphabetic
-script contains at least 15 normalized words and each Chinese/Japanese script contains at least 24
-normalized characters. Design always receives the known target language explicitly. Custom uses a
+script contains at least 15 normalized words and each Chinese, Japanese (and, once scripted, Korean)
+script contains at least 24 normalized characters. The plan refuses a script that fails the corpus
+lint (below). Design always receives the known target language explicitly. Custom uses a
 native-language speaker where the Qwen speaker contract provides one (Chinese `vivian`, Japanese
 `ono_anna`); the remaining languages use the contract's stable `aiden` fixture.
 
@@ -63,7 +65,7 @@ error, inconsistent transcripts, or failed WER/CER are distinct machine failures
 with a fabricated score or a listening judgment.
 
 The versioned accuracy contract uses **WER ≤ 0.15** for languages with word boundaries and
-**CER ≤ 0.15** for Chinese and Japanese; both scores and both word/character edit-count
+**CER ≤ 0.15** for Chinese and Japanese (and Korean since accuracy metric v3); both scores and both word/character edit-count
 decompositions remain evidence. The Python gate and history publisher independently recompute the
 metrics from the tracked corpus and untracked consensus transcript before accepting the Swift
 verdict.
@@ -88,6 +90,42 @@ committed, so the next lang-bench measures them under v2. The app's `languageASR
 reports the rate its outcome reads since gate composition 5 (the v2 word rate as `word_error_rate`,
 or the character rate as `character_error_rate`; through version 4 it reported the v1 word rate),
 and the delivery cascade records the `accuracyMetricVersion` it scored each recognition under.
+
+Since 2026-09-25 (AQ-02 phase P2a, from the audio QC audit the maintainer accepted) the contract is
+`normalization-v2-edit-rate-v3`: the same WER v2 and character rates, scored under text
+normalization v2 (`normalized_tokens` in `scripts/lib/language_metrics.py`, mirrored step for step
+by `VoiceClipTranscriber.normalizedWordTokens`). It applies NFKC (NFC for Korean) and case folding,
+strips recognizer tags (`<|…|>`), keeps v1's diacritic fold for the Latin and Cyrillic languages and
+adds ß, æ, œ, ø and ł, and in English, French and Italian joins a word across an inner apostrophe
+(l'homme, dell'autunno, don't) without scoring the apostrophe, so a recognizer that splits the
+elision makes a boundary edit WER v2 credits. Bracket contents and fillers stay words (Whisper's
+normalizers delete both); fillers beyond the script's are also counted per family
+(`excessFillerCount`, `independentExcessFillerCount`) and never gate. Korean gates its space-free
+syllable rate, never NFKD jamo (audit AQ-F21). The character rate is space- and punctuation-free in
+every version. The language tables cover the product's ten languages, so Italian, Portuguese,
+Russian and Korean cells no longer fail closed; the corpus still scripts six. Korean jamo CER and a
+diacritic-preserving WER (French, German, Spanish, Italian, Portuguese) are Python diagnostics that
+never gate. Swift and Python score every case of
+`scripts/tests/fixtures/language_normalization_v2.json` identically (`WordErrorRateTests` and
+`test_language_metrics.py`). The package-backed steps (OpenCC t2s and cn2an for Chinese, num2words
+digit diagnostics, a fugashi kana-reading CER for Japanese, Whisper's English spelling map) are
+phase P2b: named slots in `NORMALIZATION_EXTENSION_SLOTS`, fixtures marked `P2b`, and a new
+normalization and metric version when they land. The corpus lint refuses digits, brackets, symbols
+and spoken punctuation, and abbreviations in a gated script (`script_lint_issues`): the plan builder
+applies it and the Python suite lints the tracked corpus. The in-app `languageASR` gate is
+composition 6 and the language kinds' measurement version is 4. v1 and v2 records keep validating
+and rescoring under their own normalization; filler counts are refused on them.
+
+Replayed offline over the 45 committed scored family-takes (5 of the 8 language records; no record
+is rewritten), 34 are determined by their published evidence and none changes verdict: 25 with no
+edit score 0; the 6 Chinese and Japanese Apple takes keep their character rate (the same NFKC code
+points); the 3 German Apple takes (CER 0) score 0 because their word errors are two-word merges.
+The other 11 need their untracked transcripts: the 2026-07-14 English Apple take (1 of 7 words,
+0.007 below the gate), its two French Apple takes (1 of 9 words; the v1-corpus script's l'aube
+joins, so 1 of 8, 0.125, when the transcript keeps the elision), five French whisper passes (1 or 2
+of 32 words) and three accuracy controls (0.56 to 1.09). Besides the new folds, which only merge
+spellings, only an apostrophe the recognizer wrote inside a word can move them, by at most one
+edit each, so a control would need at least 14 to pass. The next lang-bench measures them under v3.
 
 Each family's alignment also yields `longestDeletionRun`, the longest run of consecutive reference
 units the recognizer deleted on the primary metric's units (a match, substitution or insertion ends

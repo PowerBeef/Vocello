@@ -97,6 +97,7 @@ NATIVE_LANES = ("swift", "ios", "python")
 # Under Packages/ the iOS compile reads the package sources and manifests; the
 # governance JSON is a contract-gate input (macOS job) and the markdown is prose.
 PACKAGE_MANIFESTS = ("Package.swift", "Package.resolved")
+SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization_v2.json",)
 BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capability-matrix.json",
                  "config/toolchain.json")
 # Validated on Linux by the contracts job; the macOS gate does not need them.
@@ -193,6 +194,9 @@ def _is_swift(path: str) -> bool:
         return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
     # A Swift test pins the shipping iPhone memory bands to this contract (V-4).
     if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json"):
+        return True
+    # Parity fixtures a Swift test scores beside its Python mirror (AQ-02).
+    if path in SWIFT_PARITY_FIXTURES:
         return True
     if path in MACOS_LANE_SCRIPTS or path in python_import_closure(MACOS_LANE_SCRIPTS):
         return True

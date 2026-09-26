@@ -1,0 +1,1432 @@
+{
+  "schemaVersion": 1,
+  "normalizationVersion": "text-normalization-v2",
+  "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
+  "description": "Normalization v2 parity fixtures (AQ-02 P2a). scripts/tests/test_language_metrics.py and Tests/VocelloCoreTests/WordErrorRateTests.swift both score every case and must reproduce `expected` exactly. `primaryErrors` is the gated edit count: the segmentation-aware word distance, or the character edits for Chinese, Japanese and Korean. `pythonDiagnostics` never gate and are Python-only. A `P2b` case needs a package step (its `slot` in language_metrics.NORMALIZATION_EXTENSION_SLOTS); `expected` pins today's score and `expectedAfterP2b` what the step will change.",
+  "cases": [
+    {
+      "id": "en-case-punctuation",
+      "language": "english",
+      "reference": "The Quiet Garden, open today!",
+      "hypothesis": "the quiet garden open today",
+      "note": "Case folding and punctuation boundaries.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "quiet",
+          "garden",
+          "open",
+          "today"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "quiet",
+          "garden",
+          "open",
+          "today"
+        ],
+        "referenceCharacters": "thequietgardenopentoday",
+        "hypothesisCharacters": "thequietgardenopentoday",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-brackets-kept",
+      "language": "english",
+      "reference": "The train (the red one) left at dawn.",
+      "hypothesis": "The train the red one left at dawn",
+      "note": "Bracket characters are boundaries; their contents stay (Qwen3-TTS speaks them).",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "train",
+          "the",
+          "red",
+          "one",
+          "left",
+          "at",
+          "dawn"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "train",
+          "the",
+          "red",
+          "one",
+          "left",
+          "at",
+          "dawn"
+        ],
+        "referenceCharacters": "thetraintheredoneleftatdawn",
+        "hypothesisCharacters": "thetraintheredoneleftatdawn",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-bracketed-insertion-charged",
+      "language": "english",
+      "reference": "The train left.",
+      "hypothesis": "The train [laughs] left.",
+      "note": "A recognizer's bracketed annotation is kept and charged, never deleted as Whisper's normalizer does.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "train",
+          "left"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "train",
+          "laughs",
+          "left"
+        ],
+        "referenceCharacters": "thetrainleft",
+        "hypothesisCharacters": "thetrainlaughsleft",
+        "word": {
+          "substitutions": 0,
+          "insertions": 1,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 6,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-apostrophes-join",
+      "language": "english",
+      "reference": "Don't stop the train's engine.",
+      "hypothesis": "dont stop the train’s engine",
+      "note": "An intra-word apostrophe (straight, curly or none) joins the word and is not scored.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "dont",
+          "stop",
+          "the",
+          "trains",
+          "engine"
+        ],
+        "hypothesisTokens": [
+          "dont",
+          "stop",
+          "the",
+          "trains",
+          "engine"
+        ],
+        "referenceCharacters": "dontstopthetrainsengine",
+        "hypothesisCharacters": "dontstopthetrainsengine",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-edge-apostrophes-split",
+      "language": "english",
+      "reference": "The drivers' 'night' train",
+      "hypothesis": "the drivers night train",
+      "note": "An apostrophe at a word edge is a boundary, like a quote mark.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "drivers",
+          "night",
+          "train"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "drivers",
+          "night",
+          "train"
+        ],
+        "referenceCharacters": "thedriversnighttrain",
+        "hypothesisCharacters": "thedriversnighttrain",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-fillers-kept",
+      "language": "english",
+      "reference": "The train left the station",
+      "hypothesis": "The um train uh left the station",
+      "note": "Fillers are never erased: both are charged as insertions and counted.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "train",
+          "left",
+          "the",
+          "station"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "um",
+          "train",
+          "uh",
+          "left",
+          "the",
+          "station"
+        ],
+        "referenceCharacters": "thetrainleftthestation",
+        "hypothesisCharacters": "theumtrainuhleftthestation",
+        "word": {
+          "substitutions": 0,
+          "insertions": 2,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 2,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 4,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 2
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 2
+      }
+    },
+    {
+      "id": "en-tags-stripped",
+      "language": "english",
+      "reference": "The train left.",
+      "hypothesis": "<|en|><|NEUTRAL|><|Speech|><|woitn|>the train left",
+      "note": "SenseVoice and Whisper <|...|> tags are stripped.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "the",
+          "train",
+          "left"
+        ],
+        "hypothesisTokens": [
+          "the",
+          "train",
+          "left"
+        ],
+        "referenceCharacters": "thetrainleft",
+        "hypothesisCharacters": "thetrainleft",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-digits-kept",
+      "language": "english",
+      "reference": "Gate twelve is open",
+      "hypothesis": "Gate 12 is open",
+      "note": "Digits stay words in P2a; the corpus lint keeps them out of gated scripts.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "gate",
+          "twelve",
+          "is",
+          "open"
+        ],
+        "hypothesisTokens": [
+          "gate",
+          "12",
+          "is",
+          "open"
+        ],
+        "referenceCharacters": "gatetwelveisopen",
+        "hypothesisCharacters": "gate12isopen",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 2,
+          "insertions": 0,
+          "deletions": 4,
+          "longestDeletionRun": 2
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "fr-elision-split-credited",
+      "language": "french",
+      "reference": "L'homme arrive à l'heure aujourd'hui.",
+      "hypothesis": "l homme arrive a l’heure aujourd'hui",
+      "note": "Elisions join; a split elision is a word-boundary choice WER v2 credits.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "lhomme",
+          "arrive",
+          "a",
+          "lheure",
+          "aujourdhui"
+        ],
+        "hypothesisTokens": [
+          "l",
+          "homme",
+          "arrive",
+          "a",
+          "lheure",
+          "aujourdhui"
+        ],
+        "referenceCharacters": "lhommearrivealheureaujourdhui",
+        "hypothesisCharacters": "lhommearrivealheureaujourdhui",
+        "word": {
+          "substitutions": 1,
+          "insertions": 1,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 2,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.2
+      }
+    },
+    {
+      "id": "fr-ligature-fold",
+      "language": "french",
+      "reference": "Le cœur de l'œuvre",
+      "hypothesis": "le coeur de l'oeuvre",
+      "note": "œ folds to oe.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "le",
+          "coeur",
+          "de",
+          "loeuvre"
+        ],
+        "hypothesisTokens": [
+          "le",
+          "coeur",
+          "de",
+          "loeuvre"
+        ],
+        "referenceCharacters": "lecoeurdeloeuvre",
+        "hypothesisCharacters": "lecoeurdeloeuvre",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.5
+      }
+    },
+    {
+      "id": "de-eszett-fold",
+      "language": "german",
+      "reference": "Die Straßen sind groß, die GRÖẞE auch.",
+      "hypothesis": "die strassen sind gross die grosse auch",
+      "note": "ß and ẞ fold to ss; umlauts fold to their base letter.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "die",
+          "strassen",
+          "sind",
+          "gross",
+          "die",
+          "grosse",
+          "auch"
+        ],
+        "hypothesisTokens": [
+          "die",
+          "strassen",
+          "sind",
+          "gross",
+          "die",
+          "grosse",
+          "auch"
+        ],
+        "referenceCharacters": "diestrassensindgrossdiegrosseauch",
+        "hypothesisCharacters": "diestrassensindgrossdiegrosseauch",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.14285714285714285
+      }
+    },
+    {
+      "id": "de-compound-boundary",
+      "language": "german",
+      "reference": "Er kommt vor Mittag an",
+      "hypothesis": "Er kommt Vormittag an",
+      "note": "WER v2 still credits a compound merge under normalization v2.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "er",
+          "kommt",
+          "vor",
+          "mittag",
+          "an"
+        ],
+        "hypothesisTokens": [
+          "er",
+          "kommt",
+          "vormittag",
+          "an"
+        ],
+        "referenceCharacters": "erkommtvormittagan",
+        "hypothesisCharacters": "erkommtvormittagan",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 1,
+          "longestDeletionRun": 1
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 2,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.0
+      }
+    },
+    {
+      "id": "es-inverted-punctuation",
+      "language": "spanish",
+      "reference": "¿Dónde está la estación? ¡Aquí, mañana!",
+      "hypothesis": "donde esta la estacion aqui manana",
+      "note": "¿ and ¡ are punctuation; accents and ñ fold.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "donde",
+          "esta",
+          "la",
+          "estacion",
+          "aqui",
+          "manana"
+        ],
+        "hypothesisTokens": [
+          "donde",
+          "esta",
+          "la",
+          "estacion",
+          "aqui",
+          "manana"
+        ],
+        "referenceCharacters": "dondeestalaestacionaquimanana",
+        "hypothesisCharacters": "dondeestalaestacionaquimanana",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.8333333333333334
+      }
+    },
+    {
+      "id": "it-elision-split-credited",
+      "language": "italian",
+      "reference": "L'arrivo dell'autunno è vicino",
+      "hypothesis": "l'arrivo dell autunno e vicino",
+      "note": "Italian elisions join like French ones.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "larrivo",
+          "dellautunno",
+          "e",
+          "vicino"
+        ],
+        "hypothesisTokens": [
+          "larrivo",
+          "dell",
+          "autunno",
+          "e",
+          "vicino"
+        ],
+        "referenceCharacters": "larrivodellautunnoevicino",
+        "hypothesisCharacters": "larrivodellautunnoevicino",
+        "word": {
+          "substitutions": 1,
+          "insertions": 1,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 2,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.25
+      }
+    },
+    {
+      "id": "pt-cedilla-tilde-fold",
+      "language": "portuguese",
+      "reference": "A estação não fica longe.",
+      "hypothesis": "a estacao nao fica longe",
+      "note": "ç and ã fold.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "a",
+          "estacao",
+          "nao",
+          "fica",
+          "longe"
+        ],
+        "hypothesisTokens": [
+          "a",
+          "estacao",
+          "nao",
+          "fica",
+          "longe"
+        ],
+        "referenceCharacters": "aestacaonaoficalonge",
+        "hypothesisCharacters": "aestacaonaoficalonge",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.4
+      }
+    },
+    {
+      "id": "ru-yo-short-i-fold",
+      "language": "russian",
+      "reference": "Ёлка и чай стоят на столе.",
+      "hypothesis": "елка и чаи стоят на столе",
+      "note": "ё to е and й to и fold (symmetric), and Cyrillic capitals fold.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "елка",
+          "и",
+          "чаи",
+          "стоят",
+          "на",
+          "столе"
+        ],
+        "hypothesisTokens": [
+          "елка",
+          "и",
+          "чаи",
+          "стоят",
+          "на",
+          "столе"
+        ],
+        "referenceCharacters": "елкаичаистоятнастоле",
+        "hypothesisCharacters": "елкаичаистоятнастоле",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "en-extra-latin-folds",
+      "language": "english",
+      "reference": "Æsop and Øster met Łukasz",
+      "hypothesis": "aesop and oster met lukasz",
+      "note": "The extra Latin folds: æ, ø and ł.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "aesop",
+          "and",
+          "oster",
+          "met",
+          "lukasz"
+        ],
+        "hypothesisTokens": [
+          "aesop",
+          "and",
+          "oster",
+          "met",
+          "lukasz"
+        ],
+        "referenceCharacters": "aesopandostermetlukasz",
+        "hypothesisCharacters": "aesopandostermetlukasz",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "ko-syllable-cer-spacing",
+      "language": "korean",
+      "reference": "기차는 조용한 역을 제시간에 떠났습니다.",
+      "hypothesis": "기차는 조용한역을 제 시간에 떠났습니다",
+      "note": "Korean gates the space-free syllable rate: eojeol spacing costs nothing.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "기차는",
+          "조용한",
+          "역을",
+          "제시간에",
+          "떠났습니다"
+        ],
+        "hypothesisTokens": [
+          "기차는",
+          "조용한역을",
+          "제",
+          "시간에",
+          "떠났습니다"
+        ],
+        "referenceCharacters": "기차는조용한역을제시간에떠났습니다",
+        "hypothesisCharacters": "기차는조용한역을제시간에떠났습니다",
+        "word": {
+          "substitutions": 3,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 3,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "jamoCharacterErrorRate": 0.0
+      }
+    },
+    {
+      "id": "ko-syllable-substitution",
+      "language": "korean",
+      "reference": "가다",
+      "hypothesis": "거다",
+      "note": "Syllables are units, never NFKD jamo (one substitution of two).",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "가다"
+        ],
+        "hypothesisTokens": [
+          "거다"
+        ],
+        "referenceCharacters": "가다",
+        "hypothesisCharacters": "거다",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "jamoCharacterErrorRate": 0.25
+      }
+    },
+    {
+      "id": "ko-compatibility-jamo-not-composed",
+      "language": "korean",
+      "reference": "가방",
+      "hypothesis": "ㄱㅏ방",
+      "note": "Korean uses NFC, so compatibility jamo are never composed into a syllable the recognizer did not write.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "가방"
+        ],
+        "hypothesisTokens": [
+          "ㄱㅏ방"
+        ],
+        "referenceCharacters": "가방",
+        "hypothesisCharacters": "ㄱㅏ방",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 1,
+          "insertions": 1,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 2
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "jamoCharacterErrorRate": 0.4
+      }
+    },
+    {
+      "id": "en-fullwidth-latin",
+      "language": "english",
+      "reference": "Platform ＡＢＣ is open",
+      "hypothesis": "platform abc is open",
+      "note": "Full-width Latin folds to ASCII under NFKC.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "platform",
+          "abc",
+          "is",
+          "open"
+        ],
+        "hypothesisTokens": [
+          "platform",
+          "abc",
+          "is",
+          "open"
+        ],
+        "referenceCharacters": "platformabcisopen",
+        "hypothesisCharacters": "platformabcisopen",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "de-apostrophe-splits",
+      "language": "german",
+      "reference": "Wie geht's dir heute",
+      "hypothesis": "wie gehts dir heute",
+      "note": "German splits at an apostrophe, as v1 did; WER v2 credits the merge.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "wie",
+          "geht",
+          "s",
+          "dir",
+          "heute"
+        ],
+        "hypothesisTokens": [
+          "wie",
+          "gehts",
+          "dir",
+          "heute"
+        ],
+        "referenceCharacters": "wiegehtsdirheute",
+        "hypothesisCharacters": "wiegehtsdirheute",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 1,
+          "longestDeletionRun": 1
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 2,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "diacriticPreservingWordErrorRate": 0.0
+      }
+    },
+    {
+      "id": "ko-latin-casefold",
+      "language": "korean",
+      "reference": "KTX 열차가 도착했습니다",
+      "hypothesis": "ktx 열차가 도착했습니다",
+      "note": "Latin inside Korean text is case folded.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "ktx",
+          "열차가",
+          "도착했습니다"
+        ],
+        "hypothesisTokens": [
+          "ktx",
+          "열차가",
+          "도착했습니다"
+        ],
+        "referenceCharacters": "ktx열차가도착했습니다",
+        "hypothesisCharacters": "ktx열차가도착했습니다",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0,
+        "jamoCharacterErrorRate": 0.0
+      }
+    },
+    {
+      "id": "ja-dakuten-kept",
+      "language": "japanese",
+      "reference": "かきくけこ",
+      "hypothesis": "がきくけこ",
+      "note": "Dakuten stay distinct.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "かきくけこ"
+        ],
+        "hypothesisTokens": [
+          "がきくけこ"
+        ],
+        "referenceCharacters": "かきくけこ",
+        "hypothesisCharacters": "がきくけこ",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "ja-halfwidth-katakana",
+      "language": "japanese",
+      "reference": "カタカナの駅",
+      "hypothesis": "ｶﾀｶﾅの駅",
+      "note": "Half-width katakana compose to full width under NFKC.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "カタカナの駅"
+        ],
+        "hypothesisTokens": [
+          "カタカナの駅"
+        ],
+        "referenceCharacters": "カタカナの駅",
+        "hypothesisCharacters": "カタカナの駅",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "ja-filler-counted",
+      "language": "japanese",
+      "reference": "えーと、今日は晴れです",
+      "hypothesis": "えーと えーと今日は晴れです",
+      "note": "A Japanese filler beyond the script's is counted and charged.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "えーと",
+          "今日は晴れです"
+        ],
+        "hypothesisTokens": [
+          "えーと",
+          "えーと今日は晴れです"
+        ],
+        "referenceCharacters": "えーと今日は晴れです",
+        "hypothesisCharacters": "えーとえーと今日は晴れです",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 3,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 3
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 1
+      }
+    },
+    {
+      "id": "zh-fullwidth-punctuation-and-tags",
+      "language": "chinese",
+      "reference": "今天天气很好，火车离开车站。",
+      "hypothesis": "<|zh|><|NEUTRAL|><|Speech|><|withitn|>今天天气很好 火车离开车站",
+      "note": "Chinese scores space-free characters; tags and full-width punctuation are boundaries.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "今天天气很好",
+          "火车离开车站"
+        ],
+        "hypothesisTokens": [
+          "今天天气很好",
+          "火车离开车站"
+        ],
+        "referenceCharacters": "今天天气很好火车离开车站",
+        "hypothesisCharacters": "今天天气很好火车离开车站",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "auto-default-profile",
+      "language": "auto",
+      "reference": "Café Straße",
+      "hypothesis": "cafe strasse",
+      "note": "A language outside the table (Auto) uses the folded Latin profile.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "cafe",
+          "strasse"
+        ],
+        "hypothesisTokens": [
+          "cafe",
+          "strasse"
+        ],
+        "referenceCharacters": "cafestrasse",
+        "hypothesisCharacters": "cafestrasse",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 0
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "empty-hypothesis",
+      "language": "english",
+      "reference": "a b c",
+      "hypothesis": "",
+      "note": "Everything deleted: the run spans the reference.",
+      "phase": "P2a",
+      "expected": {
+        "referenceTokens": [
+          "a",
+          "b",
+          "c"
+        ],
+        "hypothesisTokens": [],
+        "referenceCharacters": "abc",
+        "hypothesisCharacters": "",
+        "word": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 3,
+          "longestDeletionRun": 3
+        },
+        "segmentationAwareEditDistance": 3,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 0,
+          "insertions": 0,
+          "deletions": 3,
+          "longestDeletionRun": 3
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 3
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      }
+    },
+    {
+      "id": "p2b-zh-traditional",
+      "language": "chinese",
+      "reference": "火车离开车站",
+      "hypothesis": "火車離開車站",
+      "note": "Traditional characters pay CER until OpenCC t2s folds both sides.",
+      "phase": "P2b",
+      "slot": "script-variant",
+      "expected": {
+        "referenceTokens": [
+          "火车离开车站"
+        ],
+        "hypothesisTokens": [
+          "火車離開車站"
+        ],
+        "referenceCharacters": "火车离开车站",
+        "hypothesisCharacters": "火車離開車站",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 4,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 4
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      },
+      "expectedAfterP2b": {
+        "primaryErrors": 0
+      }
+    },
+    {
+      "id": "p2b-zh-digits",
+      "language": "chinese",
+      "reference": "三个苹果",
+      "hypothesis": "3个苹果",
+      "note": "Arabic digits pay CER until cn2an verbalizes both sides.",
+      "phase": "P2b",
+      "slot": "digit-verbalization",
+      "expected": {
+        "referenceTokens": [
+          "三个苹果"
+        ],
+        "hypothesisTokens": [
+          "3个苹果"
+        ],
+        "referenceCharacters": "三个苹果",
+        "hypothesisCharacters": "3个苹果",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      },
+      "expectedAfterP2b": {
+        "primaryErrors": 0
+      }
+    },
+    {
+      "id": "p2b-ja-reading",
+      "language": "japanese",
+      "reference": "今日は晴れ",
+      "hypothesis": "きょうは晴れ",
+      "note": "Orthographic variants pay CER; a kana-reading CER diagnostic (fugashi) will read them alike.",
+      "phase": "P2b",
+      "slot": "reading-diagnostic",
+      "expected": {
+        "referenceTokens": [
+          "今日は晴れ"
+        ],
+        "hypothesisTokens": [
+          "きょうは晴れ"
+        ],
+        "referenceCharacters": "今日は晴れ",
+        "hypothesisCharacters": "きょうは晴れ",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 2,
+          "insertions": 1,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "primaryMetric": "characterErrorRate",
+        "primaryErrors": 3
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      },
+      "expectedAfterP2b": {
+        "readingErrors": 0
+      }
+    },
+    {
+      "id": "p2b-en-digits",
+      "language": "english",
+      "reference": "Gate twelve is open",
+      "hypothesis": "Gate 12 is open",
+      "note": "A verbalized-digit WER diagnostic (num2words) will read 12 as twelve.",
+      "phase": "P2b",
+      "slot": "digit-diagnostic",
+      "expected": {
+        "referenceTokens": [
+          "gate",
+          "twelve",
+          "is",
+          "open"
+        ],
+        "hypothesisTokens": [
+          "gate",
+          "12",
+          "is",
+          "open"
+        ],
+        "referenceCharacters": "gatetwelveisopen",
+        "hypothesisCharacters": "gate12isopen",
+        "word": {
+          "substitutions": 1,
+          "insertions": 0,
+          "deletions": 0,
+          "longestDeletionRun": 0
+        },
+        "segmentationAwareEditDistance": 1,
+        "wordBoundaryOnlyEdits": 0,
+        "character": {
+          "substitutions": 2,
+          "insertions": 0,
+          "deletions": 4,
+          "longestDeletionRun": 2
+        },
+        "primaryMetric": "wordErrorRate",
+        "primaryErrors": 1
+      },
+      "pythonDiagnostics": {
+        "excessFillerCount": 0
+      },
+      "expectedAfterP2b": {
+        "verbalizedDigitErrors": 0
+      }
+    }
+  ]
+}

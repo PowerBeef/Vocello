@@ -3604,7 +3604,8 @@ class PublisherTests(unittest.TestCase):
             )
 
     @staticmethod
-    def interval_export(*, generated_tokens: int, dropped: int = 0) -> str:
+    def interval_export(*, generated_tokens: int, dropped: int = 0,
+                        schema_name: str = "os-signpost-interval") -> str:
         """An os-signpost-interval export shaped like xctrace's: a column schema,
         values defined once with `id` and reused with `ref`, one correlated
         generation-stream interval and the engine loop inside it."""
@@ -3662,7 +3663,7 @@ class PublisherTests(unittest.TestCase):
             start += 1_000_000
         return (
             "<trace-query-result><node>"
-            f"<schema name='os-signpost-interval'>{schema}</schema>"
+            f"<schema name='{schema_name}'>{schema}</schema>"
             + "".join(rows)
             + "</node></trace-query-result>"
         )
@@ -3670,6 +3671,7 @@ class PublisherTests(unittest.TestCase):
     def extract_intervals(
         self, *, dropped: int = 0, require_complete: bool = True,
         schemas: set[str] | None = None, require_cpu_samples: bool = True,
+        interval_schema: str = "os-signpost-interval",
     ) -> dict:
         trace = self.root / "profile-intervals.trace"
         trace.mkdir(exist_ok=True)
@@ -3683,8 +3685,10 @@ class PublisherTests(unittest.TestCase):
                 <row><process pid='4242'/><sample-time>1000000</sample-time><weight>1000000</weight></row>
                 <row><process pid='4242'/><sample-time>4000000</sample-time><weight>1000000</weight></row>
                 </trace-query-result>"""
-            elif "os-signpost-interval" in xpath:
-                xml = self.interval_export(generated_tokens=2, dropped=dropped)
+            elif f'@schema="{interval_schema}"' in xpath:
+                xml = self.interval_export(
+                    generated_tokens=2, dropped=dropped, schema_name=interval_schema,
+                )
             else:
                 xml = f"""<trace-query-result><node>
                 <schema name='os-signpost'><col><mnemonic>time</mnemonic></col>
@@ -3782,6 +3786,16 @@ class PublisherTests(unittest.TestCase):
         # A witness trace that did record CPU samples is not a witness.
         with self.assertRaises(publisher.PublicationError):
             self.extract_intervals(require_cpu_samples=False)
+
+    def test_xcode_27_names_the_interval_table_ossignpostintervals(self) -> None:
+        # A real M6 witness trace (Xcode 27) exports its paired intervals as
+        # OSSignpostIntervals, not os-signpost-interval; both are interval tables.
+        summary = self.extract_intervals(
+            schemas={"os-signpost", "OSSignpostIntervals"}, require_cpu_samples=False,
+            interval_schema="OSSignpostIntervals",
+        )
+        self.assertEqual(summary["signpostIntervalCount"], 2 + 3 * 37)
+        self.assertTrue(summary["intervalStatistics"]["takes"][0]["complete"])
 
     def test_profile_takes_name_the_capture_that_perturbed_them(self) -> None:
         # audit #50/#69: a profile keeps its memory qualification, and each

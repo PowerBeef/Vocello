@@ -3784,7 +3784,9 @@ class _TraceTableScan:
         self.target_pid = target_pid
         self.expected_correlations = expected_correlations
         self.signposts = "signpost" in schema.lower()
-        self.intervals = schema.lower() == "os-signpost-interval"
+        # Older xctrace exports name the paired-interval table
+        # os-signpost-interval; Xcode 27's names it OSSignpostIntervals.
+        self.intervals = schema.lower() in {"os-signpost-interval", "ossignpostintervals"}
         self.events = schema.lower() == "os-signpost"
         self.cpu = schema in {"cpu-profile", "time-profile"}
         self.rows = 0

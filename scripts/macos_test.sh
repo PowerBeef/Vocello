@@ -399,16 +399,21 @@ cmd_logs() {
 # Sets PROFILE_INSTRUMENT_ARGS, the xctrace record instrument arguments of a
 # profile KIND (cpu|memory|witness), and PROFILE_CAPTURE_INSTRUMENTS, the capture
 # label publication checks. Every kind records os_signpost. The CPU and memory
-# kinds add CPU Profiler; the witness perturbs only by emitting its signposts, no
-# CPU sampler (audit #50: the CPU Profiler cost warm tokens/s 29-80%). A memory
-# profile records Allocations and VM Tracker through Apple's Allocations
-# template, which configures VM Tracker with automatic snapshots disabled. A
+# kinds add the Time Profiler sampler; the witness perturbs only by emitting its
+# signposts, no CPU sampler (audit #50: the CPU Profiler cost warm tokens/s
+# 29-80%). Time Profiler replaced CPU Profiler on 2026-09-26 (instrument-profile
+# measurement version 4 on macOS): CPU Profiler programs the hardware counters
+# (kpc), which needs root on macOS 27, while Time Profiler's timer sampling
+# records unprivileged. Its trace exports time-profile rows (sample time and
+# weight) instead of cpu-profile cycles. A memory profile records Allocations
+# and VM Tracker through Apple's Allocations template, which configures VM
+# Tracker with automatic snapshots disabled. A
 # standalone VM Tracker instrument on a Blank trace enables stop-the-world
 # automatic snapshots, which can suspend the exact target for 1-2 seconds and
 # leave its in-process sampler blind for longer than the memory contract's
 # unobserved-gap gate allows.
 profile_instrument_args() {
-  local kind="$1" cpu_instrument="CPU Profiler"
+  local kind="$1" cpu_instrument="Time Profiler"
   case "$kind" in
     memory)
       PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
@@ -426,6 +431,35 @@ profile_instrument_args() {
   PROFILE_INSTRUMENT_ARGS+=(--instrument os_signpost)
 }
 
+# require_profile_instruments
+# Refuses, before any build or launch, a profile whose PROFILE_INSTRUMENT_ARGS
+# name a template or instrument this Xcode's xctrace does not list. Listing
+# does not prove an instrument records (CPU Profiler is listed on macOS 27 yet
+# fails without root), but an unlisted one never does.
+require_profile_instruments() {
+  local templates instruments flag name i=0
+  templates="$(xcrun xctrace list templates 2>/dev/null)" \
+    || die "xctrace could not list its templates; check the selected Xcode (xcode-select -p)"
+  instruments="$(xcrun xctrace list instruments 2>/dev/null)" \
+    || die "xctrace could not list its instruments; check the selected Xcode (xcode-select -p)"
+  while (( i < ${#PROFILE_INSTRUMENT_ARGS[@]} )); do
+    flag="${PROFILE_INSTRUMENT_ARGS[i]}"
+    name="${PROFILE_INSTRUMENT_ARGS[i + 1]:-}"
+    case "$flag" in
+      --template)
+        grep -Fxq -- "$name" <<<"$templates" \
+          || die "profile needs the Instruments template '$name', which 'xcrun xctrace list templates' does not list"
+        ;;
+      --instrument)
+        grep -Fxq -- "$name" <<<"$instruments" \
+          || die "profile needs the Instruments instrument '$name', which 'xcrun xctrace list instruments' does not list"
+        ;;
+      *) die "unexpected xctrace record argument: $flag" ;;
+    esac
+    i=$((i + 2))
+  done
+}
+
 # profile [--kind cpu|memory|witness] [--keep-trace] [--allow-dirty] [spec]: Instruments/xctrace trace
 # of a headless generation via the `vocello` CLI (engine in-process, the same engine code the
 # app runs). The engine emits os_signpost intervals under subsystem com.qwenvoice.engine
@@ -434,8 +468,9 @@ profile_instrument_args() {
 # intervals per step plus Token Read). The record publishes per-take statistics of those
 # loop intervals, which must keep 36 per decode step: tokens + 1 steps for an EOS take,
 # tokens for a token-capped one (audit #12).
-# The CPU lane records CPU Profiler + os_signpost over one cold and three warm medium takes
-# (audit #99). The memory lane also records Allocations + VM Tracker in that same trace.
+# The CPU lane records Time Profiler + os_signpost over one cold and three warm medium takes
+# (audit #99; CPU Profiler until 2026-09-26, see profile_instrument_args). The memory lane
+# also records Allocations + VM Tracker in that same trace.
 # The witness lane records os_signpost alone, no sampler, over the CPU lane's takes on the
 # gate bench's seed: the low-perturbation timing witness (audit #50) whose warm tokens/s can
 # be set against the gate bench's. Every kind needs a quiet host and a clean tree
@@ -506,6 +541,7 @@ cmd_profile() {
     --root "$ROOT_DIR" --kind "$kind" >/dev/null \
     || die "profile disk-space preflight failed before launching the target"
   command -v xctrace >/dev/null 2>&1 || die "xctrace not found — install Xcode and use Instruments for native profiling"
+  require_profile_instruments
   # Rebuild immediately before provenance capture so the recorded source and
   # executable identity cannot describe a stale CLI binary.
   "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
@@ -618,7 +654,7 @@ cmd_profile() {
     (( SECONDS < tracer_start_deadline )) || die "xctrace did not report tracing startup within ${tracer_start_timeout}s"
     sleep 0.1
   done
-  (( tracer_started == 1 )) || die "xctrace exited before reporting tracing startup"
+  (( tracer_started == 1 )) || die "xctrace exited before reporting tracing startup (see $artifacts/xctrace.log)"
   kill -CONT "$target_pid" >/dev/null 2>&1 || die "could not resume exact profiling target PID $target_pid"
   local profiled_pid="$target_pid"
   local target_status=0 tracer_status=0

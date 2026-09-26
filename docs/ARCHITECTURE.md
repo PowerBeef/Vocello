@@ -1087,8 +1087,9 @@ Retained-memory qualification is separate from Instruments profiling. The versio
 within-mode first-to-last retained-take physical-footprint growth to 5% of physical RAM; the same run
 reports `retained-memory-v2`, within-mode growth of the end-of-take MLX active memory, which gates only
 once a consented run calibrates its per-mode bounds. Successful lanes
-publish `memory-qualification`; `profile --kind memory` records exact-PID CPU Profiler,
-Allocations, VM Tracker, and signposts. iOS MetricKit daily aggregates are bounded, local-only field
+publish `memory-qualification`; `profile --kind memory` records an exact-PID CPU sampler (Time
+Profiler on the Mac since 2026-09-26, CPU Profiler on the iPhone), Allocations, VM Tracker, and
+signposts. iOS MetricKit daily aggregates are bounded, local-only field
 diagnostics and are never attributed to a benchmark take.
 
 ---

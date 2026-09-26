@@ -1333,8 +1333,10 @@ def label_instrumented_takes(takes: list[dict[str, Any]], trace: dict[str, Any] 
 
     A profile keeps its memory qualification, but its sampler and timing
     metrics were measured under Instruments: `trace.instrumented:<kind>` says
-    which capture (cpu: CPU Profiler; memory: CPU Profiler, Allocations and VM
-    Tracker; witness: os_signpost alone) wherever the take's metrics travel."""
+    which capture (cpu: the CPU sampler; memory: the CPU sampler, Allocations
+    and VM Tracker; witness: os_signpost alone) wherever the take's metrics
+    travel. The sampler is the one `trace.template` names: Time Profiler on
+    the Mac since 2026-09-26, CPU Profiler before it and on the iPhone."""
     if trace is None:
         return
     settings = trace.get("captureSettings")
@@ -1349,7 +1351,8 @@ def label_instrumented_takes(takes: list[dict[str, Any]], trace: dict[str, Any] 
     for take in takes:
         labels = {f"trace.instrumented:{kind}"}
         # The CPU Profiler's cycles disagree with the take's rusage CPU time
-        # (audit #97): a warning, never a failure.
+        # (audit #97): a warning, never a failure. A Time Profiler capture
+        # records no cycles, so it publishes no plausibility block.
         if take.get("takeIndex") in implausible:
             labels.add("trace.cpu-cycles-implausible")
         take["warnings"] = sorted(set(take.get("warnings", [])) | labels)
@@ -3991,7 +3994,12 @@ def extract_trace_data_summary(
 ) -> dict[str, Any]:
     """`require_cpu_samples` is False only for the os_signpost-only witness
     profile (audit #50), which records no sampler: its summary then carries no
-    CPU fields at all rather than zeros."""
+    CPU fields at all rather than zeros.
+
+    The CPU sampler table is CPU Profiler's cpu-profile (cycle weights) or Time
+    Profiler's time-profile (sampled-time weights, the Mac lane since
+    2026-09-26). Time Profiler's raw time-sample table is not read: its timer
+    samples are the time-profile rows, without their weight."""
     relevant = sorted({
         schema for schema in schemas
         if re.fullmatch(r"[A-Za-z0-9._-]+", schema)

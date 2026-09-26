@@ -535,11 +535,25 @@ ran: `tokens + 1` for an EOS take, whose last step samples EOS, and `tokens` for
 the token cap (a QC warning, still published). A macOS take short of 36 per step fails
 publication; an iPhone take is published with `complete: false`.
 Each take also reports how many interval sums drifted from the engine's own JSONL totals
-(`scripts/lib/trace_intervals.py`); that witness only reports. A trace with CPU Profiler cycles also
+(`scripts/lib/trace_intervals.py`); that witness only reports.
+
+The CPU and memory kinds sample with Time Profiler since 2026-09-26 (macOS `instrument-profile`
+measurement version 4): CPU Profiler programs the hardware counters (kpc), which needs root on
+macOS 27 even with Developer Tools access, while Time Profiler's timer sampling records
+unprivileged. Its trace exports `time-profile` rows (sample time and sampled-time weight, published
+as `cpuSampleCount`, `cpuSampleSpanMS` and `cpuSampleWeightMS`) and a raw `time-sample` table the
+publisher does not read; the schema names are lowercase and case-sensitive. Before it builds, the
+lane refuses a template or instrument that `xcrun xctrace list templates` or `list instruments`
+does not list. Earlier Mac records and the iPhone lane keep CPU Profiler's `cpu-profile` cycles;
+the validator refuses a Mac CPU Profiler capture from version 4 on and a Time Profiler one before
+it, so the two never share a comparison key and are never compared.
+
+A trace with CPU Profiler cycles also
 publishes `cpuPlausibility` (`scripts/lib/trace_cpu.py`, audit #97): per take, the cycles inside its
 generation window against its own rusage CPU seconds, in gigacycles per CPU-second, judged against a
 provisional 0.8-5 GHz band, and the count of target CPU rows whose time or weight could not be
-resolved. An implausible take carries `trace.cpu-cycles-implausible`; it never fails publication and
+resolved. A Time Profiler trace has no cycles and publishes no such block. An implausible take
+carries `trace.cpu-cycles-implausible`; it never fails publication and
 never keeps the trace by itself. Every profile take also carries `trace.instrumented:<kind>`, naming
 the capture its metrics were measured under.
 
@@ -561,7 +575,7 @@ every memory-qualified take (no gap above the policy bound: twice the cadence, a
 memory profile's default 180-second safety cap is only a maximum; exact-target exit ends the recording
 early. The separate `scripts/macos_test.sh memory` lane owns repeated retained growth.
 
-Produces `build/artifacts/macos/profiles/<run-id>/<run-id>.trace` containing CPU Profiler samples and
+Produces `build/artifacts/macos/profiles/<run-id>/<run-id>.trace` containing Time Profiler samples and
 `os_signpost` rows in one capture; the memory kind adds Allocations and VM Tracker. **In-process
 only** — the CLI process rather than
 the app. The lane is PASS-only: a tracer failure, benchmark failure, invalid trace, or failed publication

@@ -424,6 +424,13 @@ CPU_TRACE_SUMMARY_KEYS = frozenset({"cpuSampleCount", "cpuSampleSpanMS"})
 CPU_SAMPLER_TRACE_SUMMARY_KEYS = CPU_TRACE_SUMMARY_KEYS | {
     "cpuCycleWeight", "cpuSampleWeightMS", "cpuPlausibility",
 }
+# The CPU sampler table each capture instrument exports: CPU Profiler's
+# hardware-counter cycles (cpu-profile) or Time Profiler's timer samples with a
+# sampled-time weight (time-profile). A macOS profile samples with Time
+# Profiler from instrument-profile measurement version 4 (2026-09-26: kpc needs
+# root on macOS 27) and with CPU Profiler before it.
+TRACE_CPU_SAMPLER_SCHEMAS = {"cpu-profile": "CPU Profiler", "time-profile": "Time Profiler"}
+MACOS_TIME_PROFILER_MEASUREMENT_VERSION = 4
 
 
 def schema_required_keys(version: int) -> dict[str, set[str]]:
@@ -2772,6 +2779,25 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         raise HistoryError("trace summary schema-row counts are invalid")
     if not any(rows.values()):
         raise HistoryError("trace summary contains no target-process schema rows")
+    # The capture label names the sampler whose table the CPU rows came from,
+    # and on the Mac the sampler follows the measurement version, so a CPU
+    # Profiler and a Time Profiler capture never share a comparison key.
+    template = str(trace.get("template", ""))
+    named = {name for name in TRACE_CPU_SAMPLER_SCHEMAS.values() if name in template}
+    sampled = {name for schema, name in TRACE_CPU_SAMPLER_SCHEMAS.items() if rows.get(schema)}
+    if named != sampled:
+        raise HistoryError("trace CPU sampler rows do not match the sampler its template names")
+    if named and (record.get("run") or {}).get("platform") == "macos":
+        measurement = (record.get("inputs") or {}).get("lineageMeasurementVersion")
+        time_profiler_era = (
+            isinstance(measurement, int) and not isinstance(measurement, bool)
+            and measurement >= MACOS_TIME_PROFILER_MEASUREMENT_VERSION
+        )
+        if named != {"Time Profiler" if time_profiler_era else "CPU Profiler"}:
+            raise HistoryError(
+                "a macOS profile samples with Time Profiler from instrument-profile measurement "
+                f"version {MACOS_TIME_PROFILER_MEASUREMENT_VERSION} and with CPU Profiler before it"
+            )
     memory_profile = (
         record.get("schemaVersion", 0) >= 2
         and "allocations" in str(trace.get("template", "")).lower()

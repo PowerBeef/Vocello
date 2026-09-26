@@ -346,7 +346,7 @@ single-process/crash-delta checks; it does not claim the benchmark's per-take te
 # CPU/signpost profile (default)
 scripts/macos_test.sh profile custom:speed:
 
-# CPU + Allocations + VM Tracker + signposts (keeps its raw trace by default)
+# Time Profiler + Allocations + VM Tracker + signposts (keeps its raw trace by default)
 scripts/macos_test.sh profile --kind memory custom:speed:
 
 # Explicit diagnostic exception: retain a CPU profile's raw Instruments document.
@@ -363,6 +363,11 @@ would legitimately blind its 500 ms sampler. Publication verifies that setting f
 trace and still enforces the unobserved-gap gate unmodified. The default 180-second safety
 cap accommodates a cold long take, while target exit ends recording early. `scripts/macos_test.sh
 memory` owns the repeated retained-growth qualification.
+
+The CPU and memory kinds sample with Time Profiler (since 2026-09-26, measurement version 4):
+CPU Profiler's hardware counters need root on macOS 27, and its records are never compared with
+Time Profiler's. Every kind first refuses a template or instrument that `xcrun xctrace list`
+does not list.
 
 Both commands build the exact CLI, suspend one owned process, attach Instruments to that exact PID,
 resume it only after xctrace reports recording, and validate the exported trace table of contents.

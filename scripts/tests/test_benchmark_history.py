@@ -22,9 +22,11 @@ import publish_benchmark_history as publisher
 
 
 DIGEST = "d" * 64
-# Frozen copies of two published records (audit #94): a new publication or a
+# Frozen copies of published records (audit #94): a new publication or a
 # pruned record never changes a test input.
 FROZEN_RECORDS = Path(__file__).resolve().parent / "fixtures" / "benchmark-records"
+# A real Xcode 27 Time Profiler capture's exports (2026-09-26, the M6).
+XCTRACE_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "xctrace"
 
 
 def generation_take(index: int = 1, *, length: str = "long", warning: bool = False) -> dict:
@@ -240,6 +242,14 @@ def trace_summary(take_count: int = 1) -> dict:
         "targetProcess": "vocello",
         "tocDigest": "f" * 64,
     }
+
+
+def time_profiler_trace_summary(take_count: int = 1) -> dict:
+    """A Time Profiler capture's summary (macOS measurement version 4 on):
+    time-profile rows with a sampled-time weight instead of CPU Profiler cycles."""
+    summary = {key: value for key, value in trace_summary(take_count).items() if key != "cpuCycleWeight"}
+    summary.update(capturedRowsBySchema={"time-profile": 12, "os-signpost": 4}, cpuSampleWeightMS=12.0)
+    return summary
 
 
 def telemetry_overhead_takes() -> list[dict]:
@@ -1929,9 +1939,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
             if kind == "instrument-profile":
                 record["run"]["matrixScope"] = "instrumented"
                 record["run"]["classification"] = "instrumented"
+                # A schema-v1 Mac record predates the lineage stamp: CPU Profiler.
                 record["evidence"]["trace"] = {
                     "digest": "f" * 64,
-                    "template": "Time Profiler",
+                    "template": "CPU Profiler + os_signpost",
                     "durationSeconds": 10,
                     "validated": True,
                     "summary": trace_summary(len(takes)),
@@ -2076,10 +2087,13 @@ class BenchmarkHistoryTests(unittest.TestCase):
 
     def profile_producer_manifest(
         self, run_id: str, *, quality: bool, policy: str,
-        profile_kind: str = "cpu", template: str = "CPU Profiler + os_signpost",
+        profile_kind: str = "cpu", template: str = "Time Profiler + os_signpost",
         summary: dict | None = None,
     ) -> dict:
-        """Exercise the production schema selector and retention writer together."""
+        """Exercise the production schema selector and retention writer together.
+
+        The record is stamped with the working tree's lineage identity, so a Mac
+        CPU profile samples with Time Profiler (measurement version 4 on)."""
         fixture = record_fixture(run_id=run_id, kind="instrument-profile")
         take = fixture["takes"][0]
         take.update(memoryStatus="qualified", sampleSidecarDigest="b" * 64)
@@ -2096,7 +2110,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         trace_path = self.root / "build" / f"{run_id}.trace"
         trace_path.mkdir(parents=True)
         (trace_path / "fixture.data").write_bytes(b"synthetic trace")
-        summary = {**(summary or trace_summary()), "artifact": f"build/{run_id}.trace"}
+        summary = {**(summary or time_profiler_trace_summary()), "artifact": f"build/{run_id}.trace"}
         args = SimpleNamespace(
             trace=trace_path, run_id=run_id, template=template,
             duration=10.0, target_process="vocello", profile_kind=profile_kind,
@@ -2190,6 +2204,125 @@ class BenchmarkHistoryTests(unittest.TestCase):
         record = json.loads(history.record_manifest(self.write_manifest(manifest, run_id)).read_text())
         self.assertIn("OSSignpostIntervals", record["evidence"]["trace"]["summary"]["capturedRowsBySchema"])
 
+    def real_time_profiler_evidence(self) -> tuple[dict, set[str]]:
+        """The publisher's trace evidence of a real Xcode 27 Time Profiler capture:
+        its table of contents and time-profile table as xctrace exported them,
+        plus one synthetic correlated signpost of the /bin/sleep target."""
+        toc = self.root / "trace-toc.xml"
+        toc.write_bytes((XCTRACE_FIXTURES / "time-profiler-toc.xml").read_bytes())
+        trace = self.root / "build" / "time-profiler.trace"
+        trace.mkdir(parents=True)
+        (trace / "fixture.data").write_bytes(b"synthetic trace")
+        exported: set[str] = set()
+
+        def fake_export(command, **_kwargs):
+            xpath = command[command.index("--xpath") + 1]
+            schema = xpath.split('@schema="', 1)[1].split('"', 1)[0]
+            exported.add(schema)
+            output = Path(command[command.index("--output") + 1])
+            if schema == "time-profile":
+                output.write_bytes((XCTRACE_FIXTURES / "time-profile-table.xml").read_bytes())
+            elif schema == "os-signpost":
+                output.write_text(
+                    "<trace-query-result><row><process pid='82861'/><string>runID=profile-run "
+                    "generationID=gen-1 takeIndex=1 cell=custom/speed/medium/warm#0</string></row>"
+                    "</trace-query-result>",
+                    encoding="utf-8",
+                )
+            else:
+                output.write_text("<trace-query-result/>", encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        args = SimpleNamespace(
+            trace=trace, toc=toc, template="Time Profiler + os_signpost", duration=3.0,
+            target_process="sleep", target_pid=82861, run_id="profile-run", profile_kind="cpu",
+            retention_policy="summaryOnly",
+            summary_artifact=self.root / "build" / "time-profiler-summary.json",
+        )
+        with (
+            mock.patch.object(publisher, "ROOT", self.root),
+            mock.patch.object(publisher.subprocess, "run", side_effect=fake_export),
+        ):
+            evidence = publisher.trace_evidence(
+                args, expected_correlations={("gen-1", 1, "custom/speed/medium/warm#0")},
+            )
+        return evidence, exported
+
+    def test_a_real_xcode_27_time_profiler_trace_validates_as_a_mac_cpu_profile(self) -> None:
+        # Time Profiler exports time-profile (sample time and a sampled-time
+        # weight) beside the raw time-sample table, never CPU Profiler's
+        # cpu-profile; schema names keep their case (OSSignpostIntervals).
+        evidence, exported = self.real_time_profiler_evidence()
+        self.assertEqual(
+            exported, {"time-profile", "os-signpost", "os-signpost-arg", "OSSignpostIntervals"},
+        )
+        summary = evidence["summary"]
+        self.assertEqual(summary["capturedRowsBySchema"]["time-profile"], 3)
+        self.assertEqual(summary["cpuSampleCount"], 3)
+        self.assertEqual(summary["cpuSampleWeightMS"], 3.0)
+        self.assertEqual(summary["cpuSampleSpanMS"], 2007.003208)
+        self.assertFalse({"cpuCycleWeight", "cpuPlausibility"} & set(summary))
+
+        def record(trace: dict, measurement: int | None) -> dict:
+            return {
+                "schemaVersion": 2,
+                "run": {"platform": "macos"},
+                "inputs": {} if measurement is None else {"lineageMeasurementVersion": measurement},
+                "takes": [{"takeIndex": 1}],
+                "evidence": {"trace": trace},
+            }
+
+        first = history.MACOS_TIME_PROFILER_MEASUREMENT_VERSION
+        history.validate_trace_summary(record(evidence, first))
+        # A Time Profiler capture never carries a CPU Profiler era's identity.
+        for measurement in (first - 1, None):
+            with self.subTest(measurement=measurement), self.assertRaises(history.HistoryError):
+                history.validate_trace_summary(record(evidence, measurement))
+        # Nor names a sampler other than the one whose table it exported.
+        mislabeled = {
+            "digest": evidence["digest"], "template": "CPU Profiler + os_signpost",
+            "durationSeconds": evidence["durationSeconds"], "validated": True, "summary": summary,
+        }
+        for measurement in (first, first - 1):
+            with self.subTest(mislabeled=measurement), self.assertRaises(history.HistoryError):
+                history.validate_trace_summary(record(mislabeled, measurement))
+
+    def test_cpu_profiler_records_stay_valid_and_never_share_a_key_with_time_profiler(self) -> None:
+        # A frozen copy of the last Mac CPU Profiler record
+        # (mac-cpu-profile-20260905-045133-ea3bfd91): unstamped, it keeps its
+        # legacy key byte for byte.
+        legacy = json.loads((FROZEN_RECORDS / "macos-cpu-profiler-profile.json").read_text())
+        self.assertEqual(legacy["evidence"]["trace"]["template"], "CPU Profiler + os_signpost")
+        self.assertFalse(history.LINEAGE_INPUT_KEYS & set(legacy["inputs"]))
+        history.validate_record(legacy)
+        self.assertEqual(history.comparison_key(legacy), legacy["comparison"]["key"])
+
+        run_id = "profile-time-profiler"
+        manifest = self.profile_producer_manifest(run_id, quality=True, policy="summaryOnly")
+        record = json.loads(history.record_manifest(self.write_manifest(manifest, run_id)).read_text())
+        measurement = record["inputs"]["lineageMeasurementVersion"]
+        self.assertEqual(
+            measurement,
+            history.lineage_identity.LINEAGE_MEASUREMENT_VERSIONS[("instrument-profile", "macos")],
+        )
+        self.assertGreaterEqual(measurement, history.MACOS_TIME_PROFILER_MEASUREMENT_VERSION)
+        key = history.comparison_key(record)
+        self.assertNotEqual(key, history.comparison_key(legacy))
+        cpu_profiler_era = copy.deepcopy(record)
+        cpu_profiler_era["inputs"]["lineageMeasurementVersion"] = (
+            history.MACOS_TIME_PROFILER_MEASUREMENT_VERSION - 1
+        )
+        self.assertNotEqual(history.comparison_key(cpu_profiler_era), key)
+        # A CPU Profiler capture published now would join the Time Profiler
+        # lineage, so it is refused.
+        run_id = "profile-cpu-profiler-now"
+        manifest = self.profile_producer_manifest(
+            run_id, quality=True, policy="summaryOnly",
+            template="CPU Profiler + os_signpost", summary=trace_summary(),
+        )
+        with self.assertRaisesRegex(history.HistoryError, "Time Profiler"):
+            history.record_manifest(self.write_manifest(manifest, run_id))
+
     def test_a_witness_profile_publishes_without_cpu_fields_and_only_as_a_witness(self) -> None:
         run_id = "profile-witness"
         manifest = self.profile_producer_manifest(
@@ -2201,7 +2334,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertNotIn("cpuSampleCount", record["evidence"]["trace"]["summary"])
 
         def cpu_summary_without(key: str) -> dict:
-            summary = trace_summary()
+            summary = time_profiler_trace_summary()
             summary.pop(key)
             return summary
 
@@ -2221,7 +2354,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             }),
             # The capture template decides the kind.
             ("witness-cpu-template", {
-                "profile_kind": "witness", "template": "CPU Profiler + os_signpost",
+                "profile_kind": "witness", "template": "Time Profiler + os_signpost",
                 "summary": self.witness_trace_summary(),
             }),
             # Every other kind still needs its CPU sampler fields.
@@ -2309,7 +2442,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "mlxPeakMB": 110.0,
         })
         summary = {
-            **trace_summary(),
+            **time_profiler_trace_summary(),
             "memoryTraceEvidenceVersion": 2,
             "allocationTargetDataBytes": 4096,
             "allocationTrackPresent": True,
@@ -2325,9 +2458,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
         # yields no rows. Zero is valid for an ancillary schema; aggregate CPU,
         # signpost, allocation, and VM requirements remain independently strict.
         summary["capturedRowsBySchema"]["kdebug-signpost"] = 0
+        # Published now, the record carries macOS measurement version 4: Time Profiler.
         record["evidence"]["trace"] = {
             "digest": "f" * 64,
-            "template": "CPU Profiler + Allocations + VM Tracker + os_signpost",
+            "template": "Time Profiler + Allocations + VM Tracker + os_signpost",
             "durationSeconds": 10,
             "validated": True,
             "summary": summary,

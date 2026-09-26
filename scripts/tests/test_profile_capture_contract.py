@@ -151,27 +151,85 @@ class ProfileCaptureContractTests(unittest.TestCase):
         return arguments, label
 
     def test_profile_kinds_pass_their_instruments_to_xctrace(self) -> None:
-        cpu = ["--instrument", "CPU Profiler", "--instrument", "os_signpost"]
+        def cpu(sampler: str) -> list[str]:
+            return ["--instrument", sampler, "--instrument", "os_signpost"]
+
         # A memory profile records Allocations and VM Tracker only through Apple's
         # Allocations template, whose VM Tracker takes no automatic snapshots;
         # standalone instruments would (audit #51, d52340a0).
-        memory = ["--template", "Allocations", "--instrument", "CPU Profiler",
-                  "--instrument", "os_signpost"]
+        def memory(sampler: str) -> list[str]:
+            return ["--template", "Allocations", "--instrument", sampler,
+                    "--instrument", "os_signpost"]
+
         cases = {
-            ("macos_test.sh", "cpu"): (cpu, "CPU Profiler + os_signpost"),
+            # The Mac samples with Time Profiler since 2026-09-26: CPU Profiler's
+            # hardware counters need root on macOS 27 (measurement version 4).
+            ("macos_test.sh", "cpu"): (cpu("Time Profiler"), "Time Profiler + os_signpost"),
             ("macos_test.sh", "memory"): (
-                memory, "CPU Profiler + Allocations + VM Tracker + os_signpost",
+                memory("Time Profiler"), "Time Profiler + Allocations + VM Tracker + os_signpost",
             ),
             # The witness records signposts alone, no sampler (audit #50).
             ("macos_test.sh", "witness"): (["--instrument", "os_signpost"], "os_signpost"),
-            ("ios_device.sh", "cpu"): (cpu, "CPU Profiler + os_signpost"),
+            ("ios_device.sh", "cpu"): (cpu("CPU Profiler"), "CPU Profiler + os_signpost"),
             ("ios_device.sh", "memory"): (
-                memory, "CPU Profiler + Allocations + VM Tracker + os_signpost",
+                memory("CPU Profiler"), "CPU Profiler + Allocations + VM Tracker + os_signpost",
             ),
         }
         for (script, kind), expected in cases.items():
             with self.subTest(script=script, kind=kind):
                 self.assertEqual(self.profile_instruments(script, kind), expected)
+
+    def test_macos_profile_refuses_an_unlisted_template_or_instrument_before_building(self) -> None:
+        text = (REPO / "scripts" / "macos_test.sh").read_text(encoding="utf-8")
+        profile = shell_function(text, "cmd_profile")
+        self.assertLess(
+            profile.index("require_profile_instruments"),
+            profile.index('"$SCRIPT_DIR/build.sh" cli-optimized'),
+        )
+        helpers = "\n".join(
+            shell_function(text, name)
+            for name in ("profile_instrument_args", "require_profile_instruments")
+        )
+        # The shape `xcrun xctrace list` prints (Xcode 27): a header, one name per line.
+        listed = {
+            "templates": ["Allocations", "CPU Profiler", "Time Profiler"],
+            "instruments": ["Allocations", "CPU Profiler", "Time Profiler", "VM Tracker", "os_signpost"],
+        }
+
+        def preflight(kind: str, *, drop: str | None = None) -> int:
+            with tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                for listing, names in listed.items():
+                    lines = [f"== Standard {listing.title()} ==", *(n for n in names if n != drop)]
+                    (directory / listing).write_text("\n".join(lines) + "\n", encoding="utf-8")
+                xcrun = directory / "xcrun"
+                xcrun.write_text(
+                    "#!/bin/sh\n"
+                    '[ "$1 $2" = "xctrace list" ] || exit 64\n'
+                    f'cat "{directory}/$3"\n',
+                    encoding="utf-8",
+                )
+                xcrun.chmod(0o755)
+                completed = subprocess.run(
+                    [
+                        "bash", "-c",
+                        "set -euo pipefail; die() { echo \"$*\" >&2; exit 1; }\n"
+                        + helpers + '\nprofile_instrument_args "$1"; require_profile_instruments',
+                        "test", kind,
+                    ],
+                    text=True, capture_output=True, check=False,
+                    env={**os.environ, "PATH": f"{directory}{os.pathsep}{os.environ['PATH']}"},
+                )
+                return completed.returncode
+
+        for kind in ("cpu", "memory", "witness"):
+            with self.subTest(kind=kind):
+                self.assertEqual(preflight(kind), 0)
+        for kind, missing in (
+            ("cpu", "Time Profiler"), ("memory", "Allocations"), ("witness", "os_signpost"),
+        ):
+            with self.subTest(kind=kind, missing=missing):
+                self.assertNotEqual(preflight(kind, drop=missing), 0)
 
     def test_memory_qualification_is_separate_from_instruments_profiles(self) -> None:
         mac = (REPO / "scripts" / "macos_test.sh").read_text(encoding="utf-8")

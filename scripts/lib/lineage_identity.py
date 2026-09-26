@@ -255,7 +255,13 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # profile kind, so a witness, CPU or memory profile never shares a lineage,
     # and a CPU trace reports each take's cycles per rusage CPU-second. No
     # record of the kind carried the lineage stamp yet.
-    ("instrument-profile", "macos"): 3,
+    # 4 (2026-09-26): Time Profiler replaces CPU Profiler; kpc needs root on
+    # macOS 27. The CPU and memory kinds sample with Time Profiler (time-profile
+    # rows: sample time and sampled-time weight, no cycles, so no cpuPlausibility);
+    # benchmark_history refuses a CPU Profiler capture from this version on and
+    # a Time Profiler one before it. The witness records no sampler but rides
+    # the kind-wide version, so it starts a new lineage too.
+    ("instrument-profile", "macos"): 4,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.

@@ -6,6 +6,10 @@ pseudo-text whose letter count sets a plausible speaking rate) rendered by a
 *voice* (F0, formant scale, level, breathiness). Voiced syllables are additive
 harmonic "glottal" series shaped by five-vowel formant envelopes, some onsets
 carry a fricative noise burst, and a -80 dBFS room tone fills every pause.
+Fricative and aspiration noise is band-limited around a quarter of the sample
+rate (6 kHz at 24 kHz, where sibilant energy sits) with nulls at DC and
+Nyquist; version 1 used a first difference, whose energy peaks at Nyquist and
+whose sample-to-sample steps no natural fricative has.
 
 The script is the source family: its injections and its re-renders by another
 voice (the time-aligned donors of identity splices) are one unit of
@@ -24,7 +28,7 @@ import numpy as np
 
 from .pcm import ENGINE_SAMPLE_RATE, SeededStream, pcm_digest
 
-FIXTURE_VERSION = 1
+FIXTURE_VERSION = 2
 ROOM_TONE_RMS = 1.0e-4
 VOWEL_FORMANTS = {
     "a": (730.0, 1090.0, 2440.0),
@@ -211,9 +215,26 @@ def _raised_cosine_envelope(length: int, attack: int, release: int) -> np.ndarra
     return envelope
 
 
-def _high_passed_noise(rng: SeededStream, count: int) -> np.ndarray:
-    noise = rng.normal(count + 1)
-    return np.diff(noise) / math.sqrt(2.0)
+def _fricative_noise(rng: SeededStream, count: int) -> np.ndarray:
+    """Unit-variance noise through (1 - z^-2) / sqrt(2): a band-pass peaking at a
+    quarter of the sample rate, with nulls at DC and Nyquist."""
+    noise = rng.normal(count + 2)
+    return (noise[2:] - noise[:-2]) / math.sqrt(2.0)
+
+
+def _voiced_start(syllable: Syllable) -> int:
+    return syllable.start + (int(0.3 * (syllable.end - syllable.start)) if syllable.fricative_onset else 0)
+
+
+def _burst_length(syllable: Syllable, rate: int) -> int:
+    return min(_voiced_start(syllable) - syllable.start + int(0.01 * rate), syllable.end - syllable.start)
+
+
+def fricative_bursts(script: Script) -> list[tuple[int, int]]:
+    """[start, end) of every fricative-onset noise burst `render` writes."""
+    return [(syllable.start, syllable.start + _burst_length(syllable, script.sample_rate))
+            for syllable in script.syllables
+            if syllable.fricative_onset and _voiced_start(syllable) > syllable.start]
 
 
 def render(script: Script, voice: Voice, *, render_seed: int = 0) -> np.ndarray:
@@ -241,7 +262,7 @@ def render(script: Script, voice: Voice, *, render_seed: int = 0) -> np.ndarray:
     for syllable in script.syllables:
         start, end = syllable.start, syllable.end
         speech_mask[start:end] = True
-        voiced_start = start + (int(0.3 * (end - start)) if syllable.fricative_onset else 0)
+        voiced_start = _voiced_start(syllable)
         length = end - voiced_start
         envelope = _raised_cosine_envelope(length, int(0.015 * rate), int(0.03 * rate))
         segment_f0 = float(np.mean(f0[voiced_start:end]))
@@ -254,13 +275,12 @@ def render(script: Script, voice: Voice, *, render_seed: int = 0) -> np.ndarray:
         waves = np.sin(np.outer(harmonics, phase[voiced_start:end]))
         voiced = (amplitudes[:, None] * waves).sum(axis=0) * envelope
         level = float(np.sqrt(np.mean(voiced ** 2))) if length else 0.0
-        aspiration = _high_passed_noise(rng, length) * envelope * level
+        aspiration = _fricative_noise(rng, length) * envelope * level
         output[voiced_start:end] += (1.0 - voice.breathiness) * voiced + voice.breathiness * aspiration
         if syllable.fricative_onset and voiced_start > start:
-            burst = voiced_start - start + int(0.01 * rate)
-            burst = min(burst, end - start)
+            burst = _burst_length(syllable, rate)
             burst_envelope = _raised_cosine_envelope(burst, int(0.005 * rate), int(0.012 * rate))
-            output[start:start + burst] += 0.35 * level * _high_passed_noise(rng, burst) * burst_envelope
+            output[start:start + burst] += 0.35 * level * _fricative_noise(rng, burst) * burst_envelope
     speech = output[speech_mask]
     rms = float(np.sqrt(np.mean(speech ** 2))) if speech.size else 0.0
     if rms > 0:

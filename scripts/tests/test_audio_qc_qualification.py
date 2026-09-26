@@ -18,10 +18,11 @@ from lib.qc_qualification import injectors  # noqa: E402
 
 
 def take(index: int, *, version: int, verdict: str = "pass", codes: list[str] | None = None,
-         seed: int | None = None, discontinuity: float = 0.0, duration: float = 4.0) -> dict:
+         seed: int | None = None, discontinuity: float = 0.0, duration: float = 4.0,
+         digest: str | None = None) -> dict:
     entry = {
         "cell": "custom/medium", "takeIndex": index, "generationID": f"G{index}",
-        "output": {"durationSeconds": duration},
+        "output": {"durationSeconds": duration, **({"fileDigest": digest} if digest else {})},
         "audioQC": {"algorithmVersion": version, "verdict": verdict, "warningCodes": codes or [],
                     "metrics": {"discontinuityCount": discontinuity, "clipCount": 0.0, "dcOffset": 0.001,
                                 "longestSilenceMS": 300.0, "nonFiniteCount": 0.0}},
@@ -39,6 +40,8 @@ def write_records(root: Path) -> None:
     ]}
     second = {"historyRecord": {"run": {"id": "run-b"}, "takes": [
         take(5, version=8, seed=11), take(6, version=8, seed=11), {"cell": "no-qc"},
+        # The same published WAV in two records is one family, whatever its take ids.
+        take(7, version=8, digest="d" * 64, discontinuity=100.0), take(8, version=8, digest="d" * 64),
     ]}}
     (root / "engine-generation" / "a.json").write_text(json.dumps(first), encoding="utf-8")
     (root / "engine-generation" / "b.json").write_text(json.dumps(second), encoding="utf-8")
@@ -75,7 +78,10 @@ class MetaEvaluationTests(unittest.TestCase):
     def test_measured_facts_about_fast_qc_v8(self) -> None:
         rows = {(row["injector"], row["variant"]): row for row in self.report["procedural"]["detection"]}
         # A 2 s zeroed span fails; clicks at full scale and 50/s fail; a 10 s tail fails.
-        self.assertEqual(rows[("SIG-DROP@1", "severe")]["fail"]["events"], 3)
+        self.assertEqual(rows[("SIG-DROP@2", "severe")]["fail"]["events"], 3)
+        # Flattening below full scale is invisible to v8, which counts samples beyond it.
+        self.assertEqual(rows[("SIG-CLIP@2", "severe")]["alarm"]["events"], 0)
+        self.assertEqual(rows[("SIG-CLIP@2", "over-range-moderate")]["target"]["events"], 3)
         self.assertEqual(rows[("SIG-CLICK@1", "severe")]["target"]["events"], 3)
         self.assertEqual(rows[("SIG-SIL@1", "severe")]["target"]["events"], 3)
         # Amplitude-only: truncation, deletions and identity swaps are invisible to v8.
@@ -89,19 +95,41 @@ class MetaEvaluationTests(unittest.TestCase):
         self.assertEqual(abstention["digital-silence"]["verdict"], "fail")
         self.assertEqual(abstention["nan-bearing"]["flags"], ["nonfinite"])
 
+    def test_a4_compares_target_flags_on_the_same_sources(self) -> None:
+        shams = {(row["injector"], row["variant"]): row for row in self.report["procedural"]["shams"]}
+        # The clipping sham is the identity; peak normalization is a labeled control.
+        self.assertEqual(shams[("SIG-CLIP@2", "sham")]["alarm"]["events"], 0)
+        control = shams[("SIG-CLIP@2", "control-peak-normalized")]
+        self.assertEqual((control["severity"], control["a4"]["basis"]), ("control", "target-flags"))
+        self.assertEqual(control["target"]["events"], 0)
+        clamped = control.get("clickClampedSamples")
+        if clamped:
+            self.assertLessEqual(clamped["insideFricativeBursts"], clamped["clamped"])
+        # Source 0 declares no pause, so the natural-pause control runs on the other two only.
+        pause = shams[("SIG-DROP@2", "control-natural-pause")]
+        self.assertEqual((pause["units"], pause["notApplicable"]), (2, 1))
+        self.assertEqual(pause["a4"]["cleanTarget"]["units"], 2)
+        self.assertEqual(shams[("BND-TRUNC@1", "sham")]["a4"]["basis"], "not-applicable")
+        self.assertIsNone(shams[("BND-TRUNC@1", "sham")]["a4"]["overlaps"])
+        self.assertEqual(self.report["procedural"]["shamsPooled"]["basis"], "target-flags")
+
     def test_committed_evidence_is_replayed_read_only(self) -> None:
         committed = self.report["committed"]
-        self.assertEqual((committed["records"], committed["takes"]), (2, 6))
+        self.assertEqual((committed["records"], committed["takes"]), (2, 8))
         v8 = committed["byAlgorithmVersion"]["8"]
-        # Two seeded takes of one cell, seed and model are one family.
-        self.assertEqual((v8["takes"], v8["families"]), (5, 4))
-        self.assertEqual(v8["publishedVerdicts"], {"pass": 4, "warn": 1})
-        self.assertEqual(v8["flags"]["dropout"]["events"], 1)
+        # Two seeded takes of one cell, seed and model are one family; two takes of
+        # one published WAV digest merge into one.
+        self.assertEqual((v8["takes"], v8["declaredFamilies"], v8["families"]), (7, 6, 5))
+        self.assertEqual((v8["takesWithDigest"], v8["distinctDigests"]), (2, 1))
+        self.assertEqual(v8["publishedVerdicts"], {"pass": 6, "warn": 1})
+        self.assertEqual((v8["flags"]["dropout"]["events"], v8["flags"]["dropout"]["units"]), (1, 5))
         self.assertNotIn("written-output-warn", v8["flags"])
-        self.assertEqual((v8["warn"]["familyLevel"]["events"], v8["warn"]["familyLevel"]["units"]), (1, 4))
+        self.assertEqual((v8["warn"]["familyLevel"]["events"], v8["warn"]["familyLevel"]["units"]), (1, 5))
         # 100 clamped samples in 4 s is a 0.1% fraction: above the warn bound, under the fail bound.
+        # Take 3 and the merged digest family each carry one: two families of five.
         clicks = v8["v8BoundReplay"]["clicks"]
-        self.assertEqual((clicks["warnOrWorse"]["events"], clicks["fail"]["events"]), (1, 0))
+        self.assertEqual((clicks["takes"], clicks["warnOrWorse"]["events"], clicks["warnOrWorse"]["units"],
+                          clicks["fail"]["events"]), (7, 2, 5, 0))
         self.assertEqual(committed["byAlgorithmVersion"]["3"]["takes"], 1)
 
     def test_the_report_is_deterministic_and_renders(self) -> None:

@@ -65,7 +65,7 @@
     "unitOfIndependence": "source-family",
     "familyRule": "crops, injections and resyntheses of one utterance are one family; one script x voice x seed is one Vocello family, deduplicated by PCM digest",
     "clusterBootstrap": {"resamples": 2000, "seed": 20260925},
-    "multiplicity": {"method": "bonferroni", "simultaneousLanguages": 10, "zeroErrorUnitsPerLanguageAtFivePercent": 104},
+    "multiplicity": {"method": "bonferroni", "simultaneousLanguages": 10, "zeroErrorUnitsPerLanguageAtFivePercent": 104, "perLanguageRule": "a per-language bound is a simultaneous claim over the languages it covers, so it holds at 1 - (1 - confidence) / languages; each operating point states that confidence for its minimum language count, and a claim over more languages uses more"},
     "sampleSizeTable": [
       {"target": 0.20, "clopperPearson": {"0": 14, "1": 22, "2": 30, "5": 50}, "wilsonTwoSidedZeroErrors": 16},
       {"target": 0.10, "clopperPearson": {"0": 29, "1": 46, "2": 61, "5": 103}, "wilsonTwoSidedZeroErrors": 35},
@@ -80,6 +80,7 @@
       "farPerLanguageMax": 0.20,
       "tprSevereMin": 0.70,
       "cleanAbstentionMax": 0.10,
+      "perLanguageConfidence": 0.983333,
       "minimumUnits": {"calibration": 60, "good": 60, "bad": 60, "speakers": 3, "scripts": 3, "languages": 3}
     },
     "fail": {
@@ -87,7 +88,9 @@
       "farPopulation": "N2",
       "farPooledMax": 0.01,
       "farPerLanguageMax": 0.05,
+      "perLanguageConfidence": 0.995,
       "n3FlagRateMax": 0.05,
+      "n3FlagRateScope": "pooled",
       "tprSevereMin": 0.90,
       "tprModerateMin": 0.70,
       "mechanismsMin": 2,
@@ -100,18 +103,23 @@
       "farPopulation": "N2",
       "farPooledMax": 0.02,
       "farPerLanguageMax": 0.10,
+      "perLanguageConfidence": 0.995,
       "n3FlagRateMax": 0.05,
+      "n3FlagRateScope": "pooled",
       "tprSevereMin": 0.90,
       "tprModerateMin": 0.70,
       "mechanismsMin": 2,
       "cleanAbstentionMax": 0.05,
-      "minimumUnits": {"n2Negatives": 290, "n2NegativesPerLanguage": 29, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
+      "minimumUnits": {"n2Negatives": 510, "n2NegativesPerLanguage": 51, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
     },
     "shadow": {"blocks": false, "countsAsPass": false},
     "physicalEventsT1Only": ["non-finite samples", "digital silence", "clipping above full scale", "dc offset"]
   },
   "thresholdDerivation": {
     "split": "calibration and confirmation cohorts disjoint by family, speaker and script",
+    "unitOfRates": "source family: a family counts once, as an error if any of its clips errs (a false alarm on a negative, a miss or an abstention on a positive)",
+    "commitment": "the plan file is committed in Git under config/audio-qc-preregistrations/ before any confirmation score exists; the derivation reads it",
+    "confirmationLedger": "one record per plan digest under config/audio-qc-preregistrations/, created exclusively, qualified or refused; a second confirmation of a digest is refused",
     "fitOn": "clean-negatives-only",
     "singleThresholdRule": "split-conformal",
     "multiParameterRule": "learn-then-test-fixed-sequence",

@@ -7,10 +7,13 @@ recorded. Each unit is one labeled item that both judges saw; "failed" means the
 judge got that item wrong (a miss on a positive or a false alarm on a
 negative), never that it raised an alarm.
 
-The audit reports the 2 x 2 table, the phi coefficient, each judge's failure
-rate, the conditional failure rates, the joint failure rate with its exact
-bound, and the joint rate independence would predict. It decides nothing: the
-policy names what a recorded audit must show before two judges vote jointly.
+The audit reports the 2 x 2 table, the phi coefficient (with a family-cluster
+bootstrap), each judge's failure rate, the conditional failure rates and the
+joint rate independence would predict, all descriptive and per unit; and the
+joint failure rate with its exact bound, a claim, so it counts source families
+(a family is a joint failure if both judges failed on one of its units). It
+decides nothing: the policy names what a recorded audit must show before two
+judges vote jointly.
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ import numpy as np
 
 from .pcm import SeededStream
 from .resampling import DEFAULT_RESAMPLES, DEFAULT_SEED
-from .stats import DEFAULT_CONFIDENCE, Rate
+from .stats import DEFAULT_CONFIDENCE, family_rate
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:
@@ -40,19 +43,19 @@ def phi_coefficient(both: int, only_a: int, only_b: int, neither: int) -> float 
 
 
 def failure_correlation(a_failed: Sequence[bool], b_failed: Sequence[bool], *,
-                        families: Sequence[Hashable] | None = None,
+                        families: Sequence[Hashable],
                         judges: tuple[str, str] = ("a", "b"),
                         confidence: float = DEFAULT_CONFIDENCE,
                         resamples: int = DEFAULT_RESAMPLES, seed: int = DEFAULT_SEED) -> dict:
-    """Audit two judges' failures over the same units.
+    """Audit two judges' failures over the same units, one source family per unit.
 
-    With `families`, phi also gets a family-cluster bootstrap interval, since
-    clips of one family fail together for reasons that have nothing to do with
-    the judges.
+    Phi gets a family-cluster bootstrap interval, since clips of one family
+    fail together for reasons that have nothing to do with the judges, and the
+    joint failure bound counts families.
     """
     if len(a_failed) != len(b_failed):
         raise ValueError("both judges must be scored on the same units")
-    if families is not None and len(families) != len(a_failed):
+    if len(families) != len(a_failed):
         raise ValueError("one family per unit")
     both = only_a = only_b = neither = 0
     for a, b in zip(a_failed, b_failed):
@@ -68,10 +71,12 @@ def failure_correlation(a_failed: Sequence[bool], b_failed: Sequence[bool], *,
     a_fail, b_fail = both + only_a, both + only_b
     phi = phi_coefficient(both, only_a, only_b, neither)
     expected_joint = (a_fail / total) * (b_fail / total) if total else None
-    joint = Rate(both, total, confidence) if total else Rate(0, 0)
+    joint = family_rate(((family, bool(a) and bool(b)) for family, a, b in zip(families, a_failed, b_failed)),
+                        confidence)
     report = {
         "judges": list(judges),
         "units": total,
+        "families": joint.units,
         "table": {"bothFailed": both, "onlyFirstFailed": only_a, "onlySecondFailed": only_b,
                   "neitherFailed": neither},
         "phi": None if phi is None else round(phi, 6),
@@ -82,11 +87,14 @@ def failure_correlation(a_failed: Sequence[bool], b_failed: Sequence[bool], *,
             f"{judges[0]}|{judges[1]}Failed": _ratio(both, b_fail),
             f"{judges[0]}|{judges[1]}Passed": _ratio(only_a, only_a + neither),
         },
-        "jointFailure": joint.as_dict(),
-        "jointFailureIfIndependent": None if expected_joint is None else round(expected_joint, 6),
-        "jointFailureLift": (None if not expected_joint else round((both / total) / expected_joint, 6)),
+        "jointFailure": {**joint.as_dict(), "unit": "source-family"},
+        "jointFailurePerUnit": {
+            "rate": _ratio(both, total),
+            "ifIndependent": None if expected_joint is None else round(expected_joint, 6),
+            "lift": None if not expected_joint else round((both / total) / expected_joint, 6),
+        },
     }
-    if families is not None and total:
+    if total:
         report["phiClusterBootstrap"] = _phi_bootstrap(a_failed, b_failed, families, confidence,
                                                        resamples, seed)
     return report

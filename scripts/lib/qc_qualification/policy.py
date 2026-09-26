@@ -6,7 +6,9 @@ operating point (A8), every declared minimum can meet its own bound with
 perfect results (a floor that cannot is refused, as the prosody holdout policy
 refuses one), the sample-size table equals the exact Clopper-Pearson
 recomputation, and the verdict vocabulary and lane gating sets are the ones
-the composer implements.
+the composer implements. A per-language bound is a simultaneous claim over the
+operating point's languages, so its floor is checked at the Bonferroni
+confidence the operating point states; the N3 flag-rate bound is pooled.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import composer
-from .stats import cp_lower, cp_upper, minimum_units
+from .stats import bonferroni_confidence, cp_lower, cp_upper, minimum_units
 
 REPO = Path(__file__).resolve().parents[3]
 POLICY_PATH = REPO / "config" / "audio-qc-qualification-policy.json"
@@ -73,8 +75,24 @@ def _count(errors: list[str], where: str, value: Any) -> bool:
 def _feasible_far(errors: list[str], where: str, units: int, bound: float, confidence: float) -> None:
     ceiling = cp_upper(0, units, confidence)
     if ceiling > bound:
-        errors.append(f"{where}: {units} units with zero errors bound FAR at {ceiling:.4f}, above {bound}; "
-                      f"the floor needs {minimum_units(bound, 0, confidence)}")
+        errors.append(f"{where}: {units} units with zero errors bound FAR at {ceiling:.4f} "
+                      f"(confidence {confidence:g}), above {bound}; the floor needs "
+                      f"{minimum_units(bound, 0, confidence)}")
+
+
+def per_language_confidence(confidence: float, languages: int) -> float:
+    """The Bonferroni confidence of a simultaneous per-language claim over `languages`."""
+    return bonferroni_confidence(confidence, languages)
+
+
+def _stated_confidence(errors: list[str], name: str, point: dict, confidence: float, languages: int) -> float:
+    """The exact per-language confidence, after checking the one the policy states (6 decimals)."""
+    exact = per_language_confidence(confidence, languages)
+    stated = point.get("perLanguageConfidence")
+    if not _number(stated) or abs(stated - exact) > 5e-7:
+        errors.append(f"operatingPoints.{name}.perLanguageConfidence must state the Bonferroni confidence over "
+                      f"its {languages} languages, {round(exact, 6)}")
+    return exact
 
 
 def _feasible_tpr(errors: list[str], where: str, units: int, bound: float, confidence: float) -> None:
@@ -103,11 +121,14 @@ def _check_fail_like(errors: list[str], name: str, point: dict, confidence: floa
         return
     if units["n2Negatives"] < units["n2NegativesPerLanguage"] * units["languages"]:
         errors.append(f"operatingPoints.{name}: pooled N2 negatives are fewer than the per-language floors")
+    if point.get("n3FlagRateScope") != "pooled":
+        errors.append(f"operatingPoints.{name}.n3FlagRateScope must be pooled (600 N3 at ten languages, decision 5)")
+    per_language = _stated_confidence(errors, name, point, confidence, units["languages"])
     _feasible_far(errors, f"operatingPoints.{name} pooled N2", units["n2Negatives"], point["farPooledMax"],
                   confidence)
     _feasible_far(errors, f"operatingPoints.{name} per-language N2", units["n2NegativesPerLanguage"],
-                  point["farPerLanguageMax"], confidence)
-    _feasible_far(errors, f"operatingPoints.{name} per-language N3", units["n3NegativesPerLanguage"],
+                  point["farPerLanguageMax"], per_language)
+    _feasible_far(errors, f"operatingPoints.{name} pooled N3", units["n3NegativesPerLanguage"] * units["languages"],
                   point["n3FlagRateMax"], confidence)
     _feasible_tpr(errors, f"operatingPoints.{name} severe positives", units["positivesPerCell"],
                   point["tprSevereMin"], confidence)
@@ -199,12 +220,19 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
            for key in ("calibration", "good", "bad", "speakers", "scripts", "languages")) \
             and all(_number(warn.get(key)) for key in ("farPooledMax", "farPerLanguageMax", "tprSevereMin")):
         _feasible_far(errors, "operatingPoints.warn pooled", warn_units["good"], warn["farPooledMax"], confidence)
+        warn_language = _stated_confidence(errors, "warn", warn, confidence, warn_units["languages"])
         _feasible_far(errors, "operatingPoints.warn per-language", warn_units["good"] // warn_units["languages"],
-                      warn["farPerLanguageMax"], confidence)
+                      warn["farPerLanguageMax"], warn_language)
         _feasible_tpr(errors, "operatingPoints.warn severe positives", warn_units["bad"], warn["tprSevereMin"],
                       confidence)
     _check_fail_like(errors, "fail", fail, confidence)
     _check_fail_like(errors, "evidenceLaneFail", lane, confidence)
+    for name, point in (("fail", fail), ("evidenceLaneFail", lane)):
+        covered = (point.get("minimumUnits") or {}).get("languages") if isinstance(point.get("minimumUnits"), dict) \
+            else None
+        if isinstance(languages, int) and covered != languages:
+            errors.append(f"operatingPoints.{name} covers {covered} languages, not the "
+                          f"{languages} of statistics.multiplicity")
     if lane.get("productAffecting") is not False or lane.get("appliesTo") != ["evidence-lane"]:
         errors.append("operatingPoints.evidenceLaneFail applies to evidence lanes only, never to a product verdict")
     comparable = all(_number(point.get(key)) for point in (warn, fail, lane)

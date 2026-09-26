@@ -40,6 +40,8 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(fail["minimumUnits"]["n2NegativesPerLanguage"], 124)
         warn = self.committed["operatingPoints"]["warn"]["minimumUnits"]
         self.assertEqual((warn["calibration"], warn["good"], warn["bad"]), (60, 60, 60))
+        lane = self.committed["operatingPoints"]["evidenceLaneFail"]
+        self.assertEqual((lane["farPooledMax"], lane["farPerLanguageMax"]), (0.02, 0.10))
 
     def test_the_authority_rules_stay_verbatim(self) -> None:
         errors = self.mutated(lambda value: value["authorityRules"].update(automaticMetricsMayScreenOnly=False))
@@ -64,7 +66,8 @@ class PolicyTests(unittest.TestCase):
     def test_floors_that_cannot_meet_their_bound_are_refused(self) -> None:
         errors = self.mutated(
             lambda value: value["operatingPoints"]["fail"]["minimumUnits"].update(n2NegativesPerLanguage=50))
-        self.assertTrue(any("per-language N2" in error and "59" in error for error in errors), errors)
+        # A simultaneous ten-language claim at 5% needs 104 per language, not the 95% table's 59.
+        self.assertTrue(any("per-language N2" in error and "needs 104" in error for error in errors), errors)
         errors = self.mutated(lambda value: value["operatingPoints"]["warn"]["minimumUnits"].update(good=20))
         self.assertTrue(any("warn pooled" in error for error in errors), errors)
         errors = self.mutated(
@@ -72,6 +75,24 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(any("severe positives" in error for error in errors), errors)
         errors = self.mutated(lambda value: value["operatingPoints"]["fail"]["minimumUnits"].update(n2Negatives=600))
         self.assertTrue(any("fewer than the per-language floors" in error for error in errors), errors)
+
+    def test_per_language_floors_hold_at_the_bonferroni_confidence(self) -> None:
+        points = self.committed["operatingPoints"]
+        self.assertEqual(points["fail"]["perLanguageConfidence"], 0.995)
+        self.assertEqual(points["evidenceLaneFail"]["perLanguageConfidence"], 0.995)
+        self.assertAlmostEqual(points["warn"]["perLanguageConfidence"], 1 - 0.05 / 3, places=6)
+        # 29 per language bound FAR at 0.167 at 99.5%, above the 10% evidence-lane bound; 51 is the floor.
+        errors = self.mutated(lambda value: value["operatingPoints"]["evidenceLaneFail"]["minimumUnits"].update(
+            n2Negatives=290, n2NegativesPerLanguage=29))
+        self.assertTrue(any("evidenceLaneFail per-language N2" in error and "needs 51" in error
+                            for error in errors), errors)
+        self.assertEqual(points["evidenceLaneFail"]["minimumUnits"]["n2NegativesPerLanguage"], 51)
+        errors = self.mutated(lambda value: value["operatingPoints"]["fail"].update(perLanguageConfidence=0.95))
+        self.assertTrue(any("perLanguageConfidence" in error for error in errors), errors)
+        errors = self.mutated(lambda value: value["operatingPoints"]["fail"].update(n3FlagRateScope="per-language"))
+        self.assertTrue(any("n3FlagRateScope" in error for error in errors), errors)
+        errors = self.mutated(lambda value: value["operatingPoints"]["fail"]["minimumUnits"].update(languages=9))
+        self.assertTrue(any("covers 9 languages" in error for error in errors), errors)
 
     def test_the_sample_size_table_is_recomputed(self) -> None:
         errors = self.mutated(lambda value: value["statistics"]["sampleSizeTable"][4]["clopperPearson"].update({"0": 300}))

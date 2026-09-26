@@ -19,95 +19,98 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib.qc_qualification import fixtures, injectors, pcm  # noqa: E402
 
 SEED = 7
-SOURCE_DIGEST = "bde6268d7471968ad162374db3e3eaf8598eb4394aaa4b88369005bdf30847c1"
+# Source 1 declares one punctuation pause, which the natural-pause control needs.
+SOURCE_INDEX = 1
+SOURCE_DIGEST = "d0f9db35ba8a45aa0e8ff6d2802c71bb20ab4d41b5db0a4f5f34cf1b78b2964f"
 GOLDENS = {
     ("SIG-CLICK@1", "sham"): SOURCE_DIGEST,
-    ("SIG-CLICK@1", "mild"): "b3aba73e828f33f054733aa0b9af4b234c4dfe36bc8a916fae18a016ebed8124",
-    ("SIG-CLICK@1", "moderate"): "b54ed8fa1cb82a334ad798678c63c5986390a279ad78a623e695f3c522214517",
-    ("SIG-CLICK@1", "severe"): "7ffd02422f1da49d32fb23ff55737ddd466f0ac22c3ac1fc4f3557ece3794f37",
-    ("SIG-CLICK@1", "quiet-clustered"): "be807902a1232889750827a428882878fbb9a772d8f0e4e613a0985cdac86efe",
-    ("SIG-DROP@1", "sham"): SOURCE_DIGEST,
-    ("SIG-DROP@1", "control-natural-pause"): "9dfc2321e8ba241a3b92459401d0f33d64e35e879d2a1a040ea5b8d0fa09167e",
-    ("SIG-DROP@1", "mild"): "0005331909761b54553c56e5b862876d3a6d49f21f836462962247f9bbfc951e",
-    ("SIG-DROP@1", "moderate"): "616a32afd5c078efbd7e31e9cfba344a6f0748e5914cdf34d71493fa37378dd8",
-    ("SIG-DROP@1", "severe"): "52413029787581befdf199fa8106e0682782992f157192d1821d2feabc1c28eb",
-    ("SIG-DROP@1", "attenuated-ramped"): "d9fb93e3a2ebcc4249292efa250ffc09d1093f3f06df7e2bf58cfd74049e9a72",
-    ("SIG-CLIP@1", "sham"): "167ee54f190ab4cc5fa6a2e9899c029bf1515b26c3201bbce74a85b4d47c5d1c",
-    ("SIG-CLIP@1", "mild"): "609c81f432d1970b082f52727571f86ac184064752d7668efed1f2afdd1996dd",
-    ("SIG-CLIP@1", "moderate"): "863116d6afa18e9b9575ae029a82789a94caf0a047fd1b7785233a59f5789dc5",
-    ("SIG-CLIP@1", "severe"): "b0f11a0b8a11ac18ddc33226904c3ed83205fd59c336044a325354579088e154",
-    ("SIG-CLIP@1", "tanh-moderate"): "15147ea96f6203eb023e9abf52cf3e2c1e95c4291ce344f8f8026cedb3b9dd07",
-    ("SIG-CLIP@1", "overdrive-moderate"): "1bab426718816f14f465ab5e94cdbd2d5726cb7caf18b281fa6393eb547d3394",
+    ("SIG-CLICK@1", "mild"): "72c6e432ba6e42ed19b58bdf98f1ed497c5fe9cc856f00c2d876e2a369154534",
+    ("SIG-CLICK@1", "moderate"): "fa108b3ac0c4d8dc8488eeb529567182ed8b85e3d9f919cd931424b5557691b5",
+    ("SIG-CLICK@1", "severe"): "242f54bcbadb7a0a2220ea3b3982ed6f24fc7cb74062fae82a152cc6bf251d91",
+    ("SIG-CLICK@1", "quiet-clustered"): "78dfb62facb5bfa7c70911d5b71263c62a8d9284b160c38cdd74a966eef4d921",
+    ("SIG-DROP@2", "sham"): SOURCE_DIGEST,
+    ("SIG-DROP@2", "control-natural-pause"): "fe53b9010dc31aa391f10160edc0a4a9d3cd733cdc4846f1f3ec5564aa706e4a",
+    ("SIG-DROP@2", "mild"): "77675efb952caa13a8d22dfab290cdd2990fdc45c22ab3c0a130e0490ba19e56",
+    ("SIG-DROP@2", "moderate"): "75e3e36bcc228d01b1bc3875a6afe107bd0d0e435f6fbb9953882dcfb458a925",
+    ("SIG-DROP@2", "severe"): "19d3f0bdfa7b033464b98536508cb41571188bf74bce636cbb59454a507b87c5",
+    ("SIG-DROP@2", "attenuated-ramped"): "391d32d460d3094ded4e7e943dcf5c70f22fffa496b031385c3bc75286efa826",
+    ("SIG-CLIP@2", "sham"): SOURCE_DIGEST,
+    ("SIG-CLIP@2", "control-peak-normalized"): "2002eb222544617610366fa604007dbc1473678bdd1208a3cd6081e20bdc3412",
+    ("SIG-CLIP@2", "mild"): "2ce789192a9499184d6f9c1cd6427766dbac72943a17947802cff4498a7f706c",
+    ("SIG-CLIP@2", "moderate"): "7fadcb94442be058cb27b89f4996828f878b3bb20db4884adc26a716c3ecaa07",
+    ("SIG-CLIP@2", "severe"): "60c00262ac6df8821e3e7170d99085180c113fc39c6169522caf77a4595f637d",
+    ("SIG-CLIP@2", "soft-knee-moderate"): "01b16918c59eabf1c22821c4701a19bf3e8a4d88a66841636034a73e7a04e7d7",
+    ("SIG-CLIP@2", "over-range-moderate"): "4c157091a072ec7d5cb43da3b0567e88d520ec63d3c9b3943c1d9a613eeb9084",
     ("SIG-DC@1", "sham"): SOURCE_DIGEST,
-    ("SIG-DC@1", "mild"): "acbb2620b03134bf43e05f74c4f570b32516e017cce88a3e0483765bb20fc380",
-    ("SIG-DC@1", "moderate"): "8954c1504f297f4c75c4901598c49be9fdefe24eae4460d915299689a3ba457e",
-    ("SIG-DC@1", "severe"): "bae21695ea566601a8ba740ee0568d3f5aaadebd23c52f75b7606b46a6e117d8",
+    ("SIG-DC@1", "mild"): "f6751102acfc6bfb8cf0efb213780d80782445d7ad5c1604c43d67137a5b4330",
+    ("SIG-DC@1", "moderate"): "777c9bc2c435a8ae25e765224d8efd7c2bb627ba867bac4dcbde2faa50ae8547",
+    ("SIG-DC@1", "severe"): "ef06eda8d6b063842fe54a8ee857f8a6f41766390783fcf25293e44044553f2f",
     ("SIG-LEVEL@1", "sham"): SOURCE_DIGEST,
-    ("SIG-LEVEL@1", "mild"): "961e2346bd5a851631882df5514b6e0021b9bafd8fce9c339ce4eeae79653a34",
-    ("SIG-LEVEL@1", "moderate"): "cfc2a769acc92f3001c1d5421a4bcfeef263914ad9f51f444f17b9c6fcc52f47",
-    ("SIG-LEVEL@1", "severe"): "1f0a4539121f8cf0117f724e92ff0fe0ae3a4c29c5f797c4f61fbdbdb4417037",
+    ("SIG-LEVEL@1", "mild"): "00262ab4ccddd940ea58a4ce0bdad6e9d8d53f90e509028a90559efcfdada96a",
+    ("SIG-LEVEL@1", "moderate"): "f3914d3aab15522bfb2645ab1608d8c536e8535bca0312f06e416a295c3425c0",
+    ("SIG-LEVEL@1", "severe"): "9c0c7dfbf249b7b30f6674665f2b766ff10f3d399fa95ad6f858d191e8bff63d",
     ("SIG-NOISE@1", "sham"): SOURCE_DIGEST,
-    ("SIG-NOISE@1", "control-80db"): "f86ce0f2602d9a2da8233d9099ca1124db28c0d420637b9a1ee59d8fb0e90076",
-    ("SIG-NOISE@1", "mild"): "a52086b1382bfc878e4284518a91ffa071b614db50c69ad12bbd08255d0da5a1",
-    ("SIG-NOISE@1", "moderate"): "f2f294b3820e283c00f58023f7761da07e62c3775ce4faaa6213872724d13b23",
-    ("SIG-NOISE@1", "severe"): "0af080bf11d961686a07a5022a1cd3091193e7690567f59f1a8fd33dd35a8c03",
-    ("SIG-NOISE@1", "hum-moderate"): "373df0d5d984e86c1ff8cc7633ca8988023c6c63952a72c506323c26af673893",
+    ("SIG-NOISE@1", "control-80db"): "13d45f113918f5216d98f90258111a2104e68fd55992d364461edf0403d3a7b5",
+    ("SIG-NOISE@1", "mild"): "f2d275a8faf01210a35d15664e7c10e0b4bba8410f95835abd2cdf11ff199fe2",
+    ("SIG-NOISE@1", "moderate"): "744c29e5531ca01d88753ce51897180da681356a3b3f565aa0da90301e796a19",
+    ("SIG-NOISE@1", "severe"): "135a35f44933d872e0c7f84bdb329030a316ba437a8819c303bdad50822775f5",
+    ("SIG-NOISE@1", "hum-moderate"): "533d7260f68216e7d3341b864a86bf58a38b78ff1bce30b72f09cf7a45728fe1",
     ("SIG-SIL@1", "sham"): SOURCE_DIGEST,
-    ("SIG-SIL@1", "mild"): "deccca1ef863c034b90c372853736727d1b003b38efb81183516b4de9e4bc011",
-    ("SIG-SIL@1", "moderate"): "9609ed4755fa62206dd75ed886b520eadb67d01913382271e2d13e9ac8d0edba",
-    ("SIG-SIL@1", "severe"): "ad0e92049fcbf8d2e9bff79f327fa9b98efdc3fe69dfa5c90a7ca0da930fb311",
-    ("SIG-SIL@1", "leading-moderate"): "efe355a5f2d14455b541ded46817aaf77de23972d4d83d0c927501cdfe6addfd",
-    ("BND-TRUNC@1", "sham"): "1dfd31ea6b918c545f7fca9f22fb0e416e2ceeaa6c310d1c3354c8e6a61481c7",
-    ("BND-TRUNC@1", "mild"): "8e5a6d40497958c9c788ba071f8ee6f92d586494327e58870387165c48f9258e",
-    ("BND-TRUNC@1", "moderate"): "731159b2fef70e2dda386f960b9db9a267504da7e2bbf6b8aa97e53f80e7f81d",
-    ("BND-TRUNC@1", "severe"): "43a454d0568aa4788480e2a53f5b08a8b4b67df861a31e43aa25543630a876fa",
-    ("BND-RUNON@1", "sham"): "fefce421e35ac575b0b8a7bcb2281ba91ce433b9bb79a8d9ba03d5cc6f3512b6",
-    ("BND-RUNON@1", "mild"): "e10e7693b2c2aafe3201af0b99b5594513d67220458af7eda45bcbe8ed31348d",
-    ("BND-RUNON@1", "moderate"): "f08c9d426167f4497949aab1f26cbab5fd910b980a96cf101789f614917461f1",
-    ("BND-RUNON@1", "severe"): "b4678f5d55faf758f6510f5c05d2242ebb1d540f45c2e9aebfa41d7d106777f8",
-    ("BND-RUNON@1", "reversed-moderate"): "54f84a5c3325ba74a962c5d5e73f1710141f7934d144e2d0e5f68b13a965dc5d",
-    ("CNT-REP@1", "sham"): "4fbb82dc2e0e588765baf9aabc7542b5677e0b5a6ba1877c463998d1db9099b3",
-    ("CNT-REP@1", "mild"): "3778ecec77fe46b712254c6c7e5d1528465281134bf1c131c74f4c0819e6eaaf",
-    ("CNT-REP@1", "moderate"): "79898352b6ae4ed4ad20d1b0a96d69f8723ae56ed36282b9c66d802be88053cf",
-    ("CNT-REP@1", "severe"): "21d6107beef6cf47ab738e1d8ae954982eb720cb36db8ec599f9ea79320ddc3d",
-    ("CNT-DEL@1", "sham"): "8dce5fba12118020f974ff520306f0747734418f1522ca542b67884f88d35b38",
-    ("CNT-DEL@1", "mild"): "929666389fedc4d4cfa9ebe72c59400748cd3a38bc017585a8db35861dbe90be",
-    ("CNT-DEL@1", "moderate"): "7278737a2a75b6c4a9b37acd547f0e2d8a7e2ffeac1b2d65222135f2a7cda799",
-    ("CNT-DEL@1", "severe"): "6b4a4b56bbd7bd2addec82600fd5f7a4208db435e53262eb910ebd747b39ae7a",
-    ("CNT-INS@1", "sham"): "15884bfa9644f480330bc9f359ec9e82ba20b089a2ac376faf62cf44943ca374",
-    ("CNT-INS@1", "mild"): "f9ca1e8d1b1b200c2e03f9faba5679c34510a1c619b46a68e3d23ab7ae0923f9",
-    ("CNT-INS@1", "moderate"): "fcfe050340f0bc5fe9132cfce1ff6ff4f7a90cc278f939a802e6703920b97b7c",
-    ("CNT-INS@1", "severe"): "50a69122dd44fb18d67113a518e26b4870cad1751c02457c0ff721fc97880420",
+    ("SIG-SIL@1", "mild"): "965bb1c9b9147824e7d2f39d8119c25678cda210b6f74cfe57230ad45205dbf6",
+    ("SIG-SIL@1", "moderate"): "fd3db5899f705638f16de0453fa60e0b583c87b3f4229602e71aaf58f1d92cdf",
+    ("SIG-SIL@1", "severe"): "d7cb4fb8838f9d0cbaedc6ed6f687c2d0b9b205284de343d8853d5bd21685360",
+    ("SIG-SIL@1", "leading-moderate"): "7344a86741888f8509b0f193ad4e7eb486cf13ef7352ec83791bc9c99d12dd83",
+    ("BND-TRUNC@1", "sham"): "8c25c70082e5a51e89db4cec38a9f12fda7350a268e8f06a963af7da78cb7eec",
+    ("BND-TRUNC@1", "mild"): "72eaeecdfce67249fedd672d9161427c74574113fca504c33118015cb050e497",
+    ("BND-TRUNC@1", "moderate"): "8a3fa23cf2742c680b3918147cb18d65377383706ed291496e1bade0f1ba8d34",
+    ("BND-TRUNC@1", "severe"): "faff2ef72fd012b6bdcfbd1281a73681b58d3acf6dc912c3d5f57aa7bcce2428",
+    ("BND-RUNON@1", "sham"): "64d879e08bce8f7759398bf51100a7bfcb6a5a224cc4539c18331953a5ea2dfa",
+    ("BND-RUNON@1", "mild"): "ba0011182b3413c775c8332b1c2bdf7fe4ee929c86a898f0e1909b64644b7c98",
+    ("BND-RUNON@1", "moderate"): "42225b62eedd2ca744420b4627174e1e523fe0a6a7caf7dd71a223d8ee6725f8",
+    ("BND-RUNON@1", "severe"): "fd32c544019944d49541e550e04055d6801ad82032dc9fde5f14aef7519c89ca",
+    ("BND-RUNON@1", "reversed-moderate"): "a7132e0365984c66b26e8714bd8570b0fc97bf574cf13a4424e5c8ca12356072",
+    ("CNT-REP@1", "sham"): "115d10cf4f8ed761934f452c5c091871520489068adf3346df0710cefaa55427",
+    ("CNT-REP@1", "mild"): "d5159277968cf136fa1aa81c5ed9edf3b96c20f252822d84899f0580a935ba9d",
+    ("CNT-REP@1", "moderate"): "d50e480ef6925a949cbdcff04fd5d676681bd7b79dcfbfc63a054b4bbeaa91d1",
+    ("CNT-REP@1", "severe"): "346e68b6d28c4c884b87190f49d5efd2e5f307909f20f1c52f55c26061cfd8e7",
+    ("CNT-DEL@1", "sham"): "1e620171e0394c26a45cdde0623206bfc98f7d99d59dae3d774f4e4274457528",
+    ("CNT-DEL@1", "mild"): "f0e5de2b947b7297bcc202b8a9e3754ef21cc1bbcc24fc89a2ec1199b0acad25",
+    ("CNT-DEL@1", "moderate"): "4716dbe5e47b2add3f7c1d87f33480ddd83c9832d2f02d24a46b1fe27877224d",
+    ("CNT-DEL@1", "severe"): "1fdd3d9b2752b6f3142b4a2d721389f1bd51c6f50b168493d2e642dd06d2fb85",
+    ("CNT-INS@1", "sham"): "24038a7393ac18804265d68e8c8bb584ba4782c4b51be449160e8810941f873d",
+    ("CNT-INS@1", "mild"): "b94bf6bdb29d72677dc1c3369974685b0923e8ca7792e0478c2d6f855fb82591",
+    ("CNT-INS@1", "moderate"): "38991ceba8e51495e0aea6aef1018c38707f84e859064fa085c3b76c0defb156",
+    ("CNT-INS@1", "severe"): "a85a75bb2e72316ca9ba41c539f79a9c4c0c3780d6a584b182c8758b1f76bbb6",
     ("PRS-OCT@1", "sham"): SOURCE_DIGEST,
-    ("PRS-OCT@1", "mild"): "4e91eb2970c943cfcebe8fff3d03209583b15041820eda029c1768d87539dca1",
-    ("PRS-OCT@1", "moderate"): "2e1ff9405549ab6b4b4e90c9b5343112567d222a34c1e9b711c0317624722017",
-    ("PRS-OCT@1", "severe"): "e0726e69394af157592705d3dbf7305186b45643073d530c66a7695897b4b56e",
-    ("PRS-OCT@1", "down-moderate"): "37eebc5632ea8d8431dce8abd1087fcc3a305f1cd3f0ce966b08f84a21637a98",
+    ("PRS-OCT@1", "mild"): "a22e2f675fbf86bf78c8e8d0125f9d789f2a70a601b96dd685f946579693c25c",
+    ("PRS-OCT@1", "moderate"): "78bc9bf35273af92a1a4f28220f9136f42cbb5d590e1be5e6db663b61ba4c3ca",
+    ("PRS-OCT@1", "severe"): "b0f7e8deece07848a5a53a7bf6feb499f314fcd71b934d089137af94d9bcf2ae",
+    ("PRS-OCT@1", "down-moderate"): "871c3e89d5c5e265cdb38162348658ff509b3fcb4e8b845912bb33aab1e8781b",
     ("PRS-BRK@1", "sham"): SOURCE_DIGEST,
-    ("PRS-BRK@1", "mild"): "07f3e09008bad2cab5d4658aeccf4b2954edd61d9f4b9cf5f66fcb55bc56ea82",
-    ("PRS-BRK@1", "moderate"): "c0e163587fd95c136ad70198786b7fc8ee2aa25c14a78dc6f587ee7d8703da59",
-    ("PRS-BRK@1", "severe"): "40ff5b5c277685d56d25c0f5158bab2e3a16e7dcfc67375c6056e56b896bb060",
+    ("PRS-BRK@1", "mild"): "2953b3e51d8d596de4be25853a113ef2bbaa6c8cd493abe0b8c383d0deecd520",
+    ("PRS-BRK@1", "moderate"): "442f915e417c7ce022503610bee618399f8401890d417a27a9e3c238d8665894",
+    ("PRS-BRK@1", "severe"): "7e278f2dfcc2ddcc428bbd0d0cb47051f62c3254bcd8f77553e8bfdc97d137a4",
     ("PRS-RATE@1", "sham"): SOURCE_DIGEST,
-    ("PRS-RATE@1", "mild"): "bc130c8cb87e6e7b13157878e7f59c6329ab51654c9700ec444ce968d4da6877",
-    ("PRS-RATE@1", "moderate"): "5bf90e6f12d8e02c9e1ce1461cc54f1ad6aa635d8907f9ba4db1266f30363a26",
-    ("PRS-RATE@1", "severe"): "bda564253a7a6d9d1bbb761ce36bd50221a515568cc31dd06d56e3e6f38acb4f",
-    ("PRS-RATE@1", "fast-severe"): "c4687e05aa3049736d222ceef3f65e3e7f6ccc7cb117625b3149351a69e225c7",
+    ("PRS-RATE@1", "mild"): "d76661056e7d5b3f4cef1eefe13353653c56b25ed42648ec1f6ba013773b90b9",
+    ("PRS-RATE@1", "moderate"): "b2875618a6335de60363f122ba1a5a2ecaa8d0a04fdd60f6bbc1d2dfe87bd838",
+    ("PRS-RATE@1", "severe"): "984444c12049306d25f129c1bca9aaa736b1beaaae9a5dd1c5b185e7da5427d7",
+    ("PRS-RATE@1", "fast-severe"): "f802899d67d6be5d0e18c64a53175e9bfa8827310f80f7fef266768878cbad72",
     ("IDN-SHIFT@1", "sham"): SOURCE_DIGEST,
-    ("IDN-SHIFT@1", "mild"): "ff880e83263eef01f6f654d3e521136a2d09d78cb80624623bbeffd5cbee826d",
-    ("IDN-SHIFT@1", "moderate"): "8caf54490a7acf39a48e2e947ec74dc28740af63f22693f0fac9ff36c0631c17",
-    ("IDN-SHIFT@1", "severe"): "3a002158b5b38623fe21b1443284df4b27db4d3a577b4ef6f79fbb8da51c1e90",
+    ("IDN-SHIFT@1", "mild"): "a953b1d33cc911ca7f02d6982aad7f7de87388e10d8348457fb8b4b4f0fe6b2c",
+    ("IDN-SHIFT@1", "moderate"): "b4bdeda2056d87cd60b9208b27d2e74048ebceb0d55d014977579a20b228eb7b",
+    ("IDN-SHIFT@1", "severe"): "f85290cf9092ea9f6887ab4234874434de1213839d383928df3f4716f1009800",
     ("IDN-SWAP@1", "sham"): SOURCE_DIGEST,
-    ("IDN-SWAP@1", "control-same-speaker"): "9b86826c3413e6597f8b52561d5bdf8659e83c895c676b1d4b3023cb862d8ecf",
-    ("IDN-SWAP@1", "mild"): "0eda0143daf113f16419317618dba19657f85ed5ad0a31174586fd309e433bac",
-    ("IDN-SWAP@1", "moderate"): "edead46a736634476ff0ccfdab3c0b3faeeae827f98f2bde0598162d86eb0641",
-    ("IDN-SWAP@1", "severe"): "3f86dcf3fd8f1b03d21576378153ff559bd882ebf4a70965b9b1d9900e00f3e4",
+    ("IDN-SWAP@1", "control-same-speaker"): "865000434717bdd6137c627b03483a5b27bef1b79b54257c9a64fc3696e32bcd",
+    ("IDN-SWAP@1", "mild"): "41700d37903aed530175e39e53350da8a0b419511556a8098ba96d692f752aa7",
+    ("IDN-SWAP@1", "moderate"): "ab3f8c289044138ee43b03db4201b8b547828152d562570a89391ec7f4a1ff4b",
+    ("IDN-SWAP@1", "severe"): "356ab34f0563912d608852091f5c3d04cb605e85f12c313c94b6d17554cc86c1",
 }
 FIXTURE_GOLDENS = {
-    "modal": "08a40198714b6b152e1694c97a5f71d6873ad9265a966692e81a492ba7410111",
-    "quiet": "5734b4c5d89e951027708fa79fd5f3f19a9356f3ad0bbcff238ac90e6ed983a2",
-    "breathy": "53db81fa0a39f14ef871fad8016d0c2679cc9bf6e9433acbc344bf9cf394f28d",
-    "long-pause": "e5fa0637af6bbe9a7f3b88e147b34cbe39ab1125afaa6cc7a79249e845bdd0c9",
-    "high-f0": "0601268f10225643080aba5f169ac69cfe1a245958ec5c113b16c995d2837529",
+    "modal": "b47b989b559c93adc985a3ec55a25fca0257d7b14185f2c596ed31d84272210e",
+    "quiet": "7772ebeeeee00f477912ec27d57adf66fb4484d07022c8c070a0ea2b5ba51e5f",
+    "breathy": "b4b71cf3c576dfd389c8229341e939806cb5e36eb28b290d3fe24264ec912ab6",
+    "long-pause": "5bdd3ad3238ec45d4152413c06ba5a48757a6b2ce3f4de176ad4e0fadd0d09d2",
+    "high-f0": "d7eb1a67bd5d38977919adf83279998373f72b39549d90067a05a4df86ee4b09",
 }
 # The families the task and the audit's section 5.2 require of the T1 catalog.
 REQUIRED_FAMILIES = {
@@ -121,7 +124,7 @@ class InjectorTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.source = fixtures.clean_fixture(0, "modal")
+        cls.source = fixtures.clean_fixture(SOURCE_INDEX, "modal")
 
     def test_the_catalog_covers_the_defect_families(self) -> None:
         self.assertTrue(REQUIRED_FAMILIES <= set(injectors.CATALOG))
@@ -179,6 +182,30 @@ class InjectorTests(unittest.TestCase):
         self.assertEqual(label["endSample"] - label["startSample"], 14_400)
         self.assertTrue(np.all(dropout.samples[label["startSample"]:label["endSample"]] == 0.0))
         self.assertTrue(np.array_equal(dropout.samples[:label["startSample"]], source.samples[:label["startSample"]]))
+        ramped = injectors.inject("SIG-DROP", "attenuated-ramped", source, SEED)
+        (label,) = ramped.labels
+        changed = np.flatnonzero(ramped.samples != source.samples)
+        # The label covers the 5 ms ramps (120 samples each side) as well as the full-depth span.
+        self.assertEqual((label["startSample"], label["endSample"]), (int(changed[0]), int(changed[-1]) + 1))
+        self.assertEqual((label["fullDepthStartSample"] - label["startSample"],
+                          label["endSample"] - label["fullDepthEndSample"]), (120, 120))
+        for variant in ("mild", "moderate", "severe", "soft-knee-moderate"):
+            clipped = injectors.inject("SIG-CLIP", variant, source, SEED)
+            (label,) = clipped.labels
+            changed = np.flatnonzero(clipped.samples != source.samples)
+            self.assertEqual((label["startSample"], label["endSample"], label["clippedSamples"]),
+                             (int(changed[0]), int(changed[-1]) + 1, changed.size), variant)
+        soft = injectors.inject("SIG-CLIP", "soft-knee-moderate", source, SEED)
+        level = 10.0 ** (soft.labels[0]["levelDBFS"] / 20.0)
+        # A soft knee is bounded: nothing exceeds the asymptote, and it is continuous at the knee.
+        self.assertLess(np.max(np.abs(soft.samples)), level * (1.0 + injectors.SOFT_KNEE_HEADROOM))
+        self.assertTrue(np.array_equal(injectors.inject("SIG-CLIP", "sham", source, SEED).samples, source.samples))
+        over = injectors.inject("SIG-CLIP", "over-range-moderate", source, SEED)
+        self.assertEqual((over.labels[0]["startSample"], over.labels[0]["endSample"]), (0, source.samples.size))
+        self.assertEqual(int(np.count_nonzero(np.abs(over.samples) > 1.0)), over.labels[0]["overRangeSamples"])
+        normalized = injectors.inject("SIG-CLIP", "control-peak-normalized", source, SEED)
+        self.assertEqual((normalized.severity, normalized.labels), ("control", ()))
+        self.assertAlmostEqual(float(np.max(np.abs(normalized.samples))), 1.0, places=12)
         truncation = injectors.inject("BND-TRUNC", "moderate", source, SEED)
         (cut,) = truncation.labels
         self.assertEqual(truncation.samples.size, cut["startSample"])
@@ -191,6 +218,19 @@ class InjectorTests(unittest.TestCase):
         self.assertEqual(span["startSample"], source.words[0][0])
         outside = np.r_[0:span["startSample"], span["endSample"]:source.samples.size]
         self.assertTrue(np.array_equal(swap.samples[outside], source.samples[outside]))
+
+    def test_the_natural_pause_control_needs_a_declared_pause(self) -> None:
+        source = self.source
+        (first, last), = source.pauses
+        control = injectors.inject("SIG-DROP", "control-natural-pause", source, SEED)
+        # The declared pause is re-timed to the dropout's 600 ms, not lengthened by it.
+        self.assertEqual(control.samples.size - source.samples.size, 14_400 - (last - first))
+        self.assertTrue(np.array_equal(control.samples[:first], source.samples[:first]))
+        self.assertTrue(np.array_equal(control.samples[first + 14_400:], source.samples[last:]))
+        bare = fixtures.clean_fixture(0, "modal")
+        self.assertEqual(bare.pauses, ())
+        with self.assertRaises(injectors.InjectorNotApplicable):
+            injectors.inject("SIG-DROP", "control-natural-pause", bare, SEED)
 
     def test_splices_change_length_by_the_edited_content(self) -> None:
         source = self.source
@@ -226,7 +266,7 @@ class InjectorTests(unittest.TestCase):
         recipe = injection.recipe()
         self.assertEqual(recipe["sourcePCMSHA256"], SOURCE_DIGEST)
         self.assertEqual(recipe["outputPCMSHA256"], GOLDENS[("SIG-NOISE@1", "moderate")])
-        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]), ("SIG-NOISE@1", 1, SEED))
+        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]), ("SIG-NOISE@1", 2, SEED))
         self.assertEqual(recipe["mechanism"], "T1-pcm-construction")
         description = injectors.catalog_description()
         self.assertEqual(len(description["injectors"]), len(injectors.CATALOG))

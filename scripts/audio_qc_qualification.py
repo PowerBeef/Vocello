@@ -76,8 +76,8 @@ META_CODES = frozenset({"instability-warn", "written-output-warn"})
 # Procedural evidence
 # --------------------------------------------------------------------------- #
 
-def _qc(samples: np.ndarray, text: str) -> dict[str, Any]:
-    return audio_qc.fast_qc_v8(samples, sample_rate=ENGINE_SAMPLE_RATE, text=text)
+def _qc(samples: np.ndarray, text: str, *, slew_positions: bool = False) -> dict[str, Any]:
+    return audio_qc.fast_qc_v8(samples, sample_rate=ENGINE_SAMPLE_RATE, text=text, slew_positions=slew_positions)
 
 
 def _families(report: dict[str, Any]) -> set[str]:
@@ -87,6 +87,11 @@ def _families(report: dict[str, Any]) -> set[str]:
 def _rate(flags: Iterable[bool]) -> dict:
     values = list(flags)
     return Rate(sum(values), len(values)).as_dict()
+
+
+def _family_rate(units: Iterable[tuple[str, bool]]) -> dict:
+    """One unit per source family: a family counts once, as an event if any of its units is."""
+    return Rate(*resampling.family_level_events(list(units))).as_dict()
 
 
 def _flag_table(reports: list[dict[str, Any]]) -> dict[str, dict]:
@@ -115,6 +120,10 @@ def _overlap(first: dict, second: dict) -> bool:
     return first["lower"] <= second["upper"] and second["lower"] <= first["upper"]
 
 
+def _targeted(report: dict[str, Any], targets: tuple[str, ...]) -> bool:
+    return bool(_families(report) & set(targets))
+
+
 def _summary(values: list[float]) -> dict | None:
     if not values:
         return None
@@ -123,6 +132,14 @@ def _summary(values: list[float]) -> dict | None:
         return round(ordered[min(len(ordered) - 1, int(fraction * len(ordered)))], 6)
     return {"count": len(ordered), "median": round(statistics.median(ordered), 6), "p90": at(0.9),
             "p99": at(0.99), "max": round(ordered[-1], 6)}
+
+
+def _clamped_in_bursts(fixture: fixtures.Fixture, report: dict[str, Any]) -> tuple[int, int]:
+    """(clamped samples, of them inside the fixture's fricative-noise bursts), same timeline only."""
+    positions = report.get("slewLimitedSampleIndices") or []
+    bursts = fixtures.fricative_bursts(fixture.script) if fixture.script else []
+    inside = sum(1 for position in positions if any(start <= position < end for start, end in bursts))
+    return len(positions), inside
 
 
 def procedural_evidence(sources: int, stratum_sources: int, seed: int) -> dict:
@@ -134,37 +151,65 @@ def procedural_evidence(sources: int, stratum_sources: int, seed: int) -> dict:
         clean_reports[stratum] = [_qc(fixture.samples, fixture.text) for fixture in pool]
     clean = {stratum: _clean(reports) for stratum, reports in clean_reports.items()}
     pooled_clean = [report for reports in clean_reports.values() for report in reports]
-    modal_alarm = clean["modal"]["alarm"]
+    modal_reports = clean_reports["modal"]
 
     rows = []
     shams = []
-    click_rates: dict[str, list[float]] = {"clean": [report["clickEventsPerSecond"]
-                                                     for report in clean_reports["modal"]]}
+    click_rates: dict[str, list[float]] = {"clean": [report["clickEventsPerSecond"] for report in modal_reports]}
     pooled_sham_units: list[tuple[str, bool]] = []
     for injector in injectors.CATALOG.values():
         targets = TARGETS[injector.injector_id]
         for variant in injector.variants:
-            reports = []
-            for fixture in modal:
-                injection = injectors.inject(injector.injector_id, variant.name, fixture, seed)
-                reports.append(_qc(injection.samples, fixture.text))
+            non_defect = variant.severity in injectors.NON_DEFECT_SEVERITIES
+            reports, used, skipped = [], [], []
+            clamped = inside = 0
+            for index, fixture in enumerate(modal):
+                try:
+                    injection = injectors.inject(injector.injector_id, variant.name, fixture, seed)
+                except injectors.InjectorNotApplicable:
+                    skipped.append(fixture.family)
+                    continue
+                same_timeline = injection.samples.size == fixture.samples.size
+                report = _qc(injection.samples, fixture.text, slew_positions=non_defect and same_timeline)
+                if non_defect and same_timeline:
+                    counted, within = _clamped_in_bursts(fixture, report)
+                    clamped, inside = clamped + counted, inside + within
+                    report.pop("slewLimitedSampleIndices", None)
+                reports.append(report)
+                used.append(index)
             alarms = [report["verdict"] != "pass" for report in reports]
             row = {
                 "injector": injector.key, "variant": variant.name, "severity": variant.severity,
                 "classes": list(injector.classes), "parameters": dict(variant.parameters),
-                "targets": list(targets), "units": len(reports),
+                "targets": list(targets), "units": len(reports), "notApplicable": len(skipped),
                 "alarm": _rate(alarms),
                 "fail": _rate(report["verdict"] == "fail" for report in reports),
-                "target": _rate(bool(_families(report) & set(targets)) for report in reports) if targets else None,
+                "target": _rate(_targeted(report, targets) for report in reports) if targets else None,
                 "flags": {family: sum(1 for report in reports if family in report["flagLevels"])
                           for family in sorted({family for report in reports for family in report["flagLevels"]})},
             }
             if injector.injector_id == "SIG-CLICK":
                 click_rates[f"{injector.key} {variant.name}"] = [report["clickEventsPerSecond"] for report in reports]
-            if variant.severity in injectors.NON_DEFECT_SEVERITIES:
-                row["a4"] = {"cleanModalAlarm": modal_alarm, "overlaps": _overlap(row["alarm"], modal_alarm)}
+            if non_defect:
+                # A4 compares the sham's rate on the family's own target flags
+                # with the clean rate on the same sources; alarms of other flag
+                # families are incidental and reported beside it.
+                if not reports:
+                    row["a4"] = {"basis": "not-applicable", "reason": "no source this variant applies to",
+                                 "overlaps": None}
+                elif targets:
+                    clean_target = _rate(_targeted(modal_reports[index], targets) for index in used)
+                    row["a4"] = {"basis": "target-flags", "cleanTarget": clean_target,
+                                 "overlaps": _overlap(row["target"], clean_target)}
+                    pooled_sham_units += [(modal[index].family, _targeted(report, targets))
+                                          for index, report in zip(used, reports)]
+                else:
+                    row["a4"] = {"basis": "not-applicable", "reason": "v8 has no detector for this family",
+                                 "overlaps": None}
+                row["cleanAlarmSameSources"] = _rate(modal_reports[index]["verdict"] != "pass" for index in used)
+                if clamped:
+                    row["clickClampedSamples"] = {"clamped": clamped, "insideFricativeBursts": inside}
                 shams.append(row)
-                pooled_sham_units += [(fixture.family, alarm) for fixture, alarm in zip(modal, alarms)]
             else:
                 rows.append(row)
 
@@ -197,6 +242,7 @@ def procedural_evidence(sources: int, stratum_sources: int, seed: int) -> dict:
         "detection": rows,
         "shams": shams,
         "shamsPooled": {**resampling.cluster_bootstrap_rate(pooled_sham_units, label="shams"),
+                        "basis": "target-flags",
                         "familyLevel": Rate(*resampling.family_level_events(pooled_sham_units)).as_dict()},
         "blindSpots": blind,
         "abstention": abstention,
@@ -263,23 +309,37 @@ def _replay(metrics: dict[str, Any], duration: float) -> dict[str, str]:
     return levels
 
 
+def _file_digest(take: dict[str, Any]) -> str | None:
+    output = take.get("output") if isinstance(take.get("output"), dict) else {}
+    digest = output.get("fileDigest")
+    return digest if isinstance(digest, str) and digest else None
+
+
 def committed_evidence(root: Path) -> dict:
     records = load_records(root)
-    by_version: dict[int, list[dict]] = {}
+    collected = []
     for name, record in records:
         for take in record.get("takes") or []:
             qc = take.get("audioQC")
-            if not isinstance(qc, dict):
-                continue
-            duration = _duration(take)
-            codes = [str(code) for code in qc.get("warningCodes") or [] if str(code) not in META_CODES]
-            by_version.setdefault(int(qc.get("algorithmVersion", 1)), []).append({
-                "family": _take_family(name, take),
-                "verdict": str(qc.get("verdict")),
-                "families": sorted({audio_qc.flag_family(code) for code in codes}),
-                "replay": _replay(qc.get("metrics") or {}, duration) if duration else {},
-                "clickEventsPerSecond": audio_qc.finite_number((qc.get("metrics") or {}).get("clickEventsPerSecond")),
-            })
+            if isinstance(qc, dict):
+                collected.append((_take_family(name, take), _file_digest(take), take, qc))
+    # Takes that share a published WAV digest are one family: a copy is not
+    # new evidence (audit 5.4).
+    merged = resampling.merge_families_by_digest((digest, family) for family, digest, _, _ in collected
+                                                 if digest is not None)
+    by_version: dict[int, list[dict]] = {}
+    for declared, digest, take, qc in collected:
+        duration = _duration(take)
+        codes = [str(code) for code in qc.get("warningCodes") or [] if str(code) not in META_CODES]
+        by_version.setdefault(int(qc.get("algorithmVersion", 1)), []).append({
+            "family": merged.get(declared, declared),
+            "declaredFamily": declared,
+            "digest": digest,
+            "verdict": str(qc.get("verdict")),
+            "families": sorted({audio_qc.flag_family(code) for code in codes}),
+            "replay": _replay(qc.get("metrics") or {}, duration) if duration else {},
+            "clickEventsPerSecond": audio_qc.finite_number((qc.get("metrics") or {}).get("clickEventsPerSecond")),
+        })
     versions = {}
     for version, takes in sorted(by_version.items()):
         flag_names = sorted({family for take in takes for family in take["families"]})
@@ -291,17 +351,23 @@ def committed_evidence(root: Path) -> dict:
                 continue
             replay[bound] = {
                 "takes": len(judged),
-                "warnOrWorse": _rate(take["replay"][bound] != "pass" for take in judged),
-                "fail": _rate(take["replay"][bound] == "fail" for take in judged),
+                "warnOrWorse": _family_rate((take["family"], take["replay"][bound] != "pass") for take in judged),
+                "fail": _family_rate((take["family"], take["replay"][bound] == "fail") for take in judged),
             }
+        declared = {take["declaredFamily"] for take in takes}
+        families = {take["family"] for take in takes}
         versions[str(version)] = {
             "takes": len(takes),
-            "families": len({take["family"] for take in takes}),
+            "families": len(families),
+            "declaredFamilies": len(declared),
+            "takesWithDigest": sum(1 for take in takes if take["digest"]),
+            "distinctDigests": len({take["digest"] for take in takes if take["digest"]}),
             "publishedVerdicts": {verdict: sum(1 for take in takes if take["verdict"] == verdict)
                                   for verdict in sorted({take["verdict"] for take in takes})},
             "warn": {**resampling.cluster_bootstrap_rate(warn_units, label=f"committed-v{version}"),
                      "familyLevel": Rate(*resampling.family_level_events(warn_units)).as_dict()},
-            "flags": {family: _rate(family in take["families"] for take in takes) for family in flag_names},
+            "flags": {family: _family_rate((take["family"], family in take["families"]) for take in takes)
+                      for family in flag_names},
             "v8BoundReplay": replay,
             "clickEventsPerSecond": _summary([take["clickEventsPerSecond"] for take in takes
                                               if take["clickEventsPerSecond"] is not None]),
@@ -310,6 +376,7 @@ def committed_evidence(root: Path) -> dict:
                           for name, record in records])
     return {
         "population": "N3: natural Vocello takes in committed benchmark records (read-only)",
+        "unit": "source family: a seeded cell x seed x model, else one take; families sharing a WAV digest merge",
         "records": len(records),
         "recordSetSHA256": digest,
         "takes": sum(version["takes"] for version in versions.values()),
@@ -319,8 +386,15 @@ def committed_evidence(root: Path) -> dict:
             "construction and bounds nothing.",
             "Takes carry no labels: a flag rate f bounds FAR only as f / (1 - pi_max), pi_max being the "
             "defect prevalence.",
-            "The v8 bound replay applies today's bounds to each version's recorded metric vector; the "
-            "dropout replay cannot see the text's pause budget, so 1.2-2.0 s reads at-least-warn.",
+            "Every rate counts source families, not takes: a family counts once, flagged if any of its takes "
+            "is, and families whose takes share a published WAV digest are merged first.",
+            "The v8 bound replay applies today's bounds to each version's recorded metric vector. Its dropout "
+            "replay sees only the longest silence, never the text's pause budget or the pause count: a "
+            "1.2-2.0 s gap reads at-least-warn (v8 fails it when the text declares no pause, warns on it "
+            "otherwise); a 0.9-1.2 s gap reads pass although v8 warns on it when the text declares no pause; "
+            "excess-pause fails (two or more suspicious pauses beyond the budget, below 2.0 s) and cadence "
+            "warnings (excess pauses of 350 ms or more) are invisible to it; takes of 45 s or more use other "
+            "bounds (1.5 s suspicious, 600 ms cadence).",
             "Unseeded takes are their own family; seeded takes share one per cell, seed and model.",
         ],
     }
@@ -347,8 +421,9 @@ def headline(report: dict) -> list[str]:
     modal = procedural["clean"]["modal"]
     lines = [
         f"Clean procedural speech: v8 alarmed on {_fraction(modal['alarm'])} modal sources "
-        f"(FAR <= {_bound(modal['alarm'])}, one-sided CP 95%) and on "
-        f"{_fraction(procedural['cleanPooled']['alarm'])} across all five strata; the long-pause stratum "
+        f"(alarm rate <= {_bound(modal['alarm'])}, one-sided CP 95%, on these fixtures only) and on "
+        f"{_fraction(procedural['cleanPooled']['alarm'])} across all five strata; the long-pause stratum, "
+        f"whose declared pauses of 0.9-1.5 s straddle v8's 1.2 s declared-pause bound by construction, "
         f"alone: {_fraction(procedural['clean']['long-pause']['alarm'])}.",
     ]
     for row in procedural["detection"]:
@@ -360,21 +435,37 @@ def headline(report: dict) -> list[str]:
     silent = [entry["injector"] for entry in procedural["blindSpots"] if entry["hasV8Detector"]]
     lines.append(f"Blind spots: {len(missing)} of {len(injectors.CATALOG)} injector families have no v8 "
                  f"detector ({', '.join(missing) or 'none'})"
-                 + (f", and {', '.join(silent)} never trips its target flag at severe." if silent else "."))
+                 + (f", and at severe {', '.join(silent)} "
+                    f"{'never trips its target flags' if len(silent) == 1 else 'never trip their target flags'} "
+                    f"(see the detection table for the variants that do)." if silent else "."))
     passing = [entry["fixture"] for entry in procedural["abstention"] if entry["passes"]]
     lines.append(f"Abstention fixtures v8 passes (it cannot abstain): {len(passing)} of "
                  f"{len(procedural['abstention'])} ({', '.join(passing)}).")
-    shams = [row for row in procedural["shams"] if not row["a4"]["overlaps"]]
-    if shams:
-        lines.append("Shams outside the clean interval (A4 would refuse the detector for these families): "
-                     + ", ".join(f"{row['injector']} {row['variant']} {_fraction(row['alarm'])}" for row in shams)
-                     + ".")
+    departing = [row for row in procedural["shams"] if row["a4"]["overlaps"] is False]
+    judged = [row for row in procedural["shams"] if row["a4"]["overlaps"] is not None]
+    lines.append(f"A4 on each family's target flags: {len(departing)} of {len(judged)} shams and controls depart "
+                 f"from the clean rate on the same sources"
+                 + (": " + ", ".join(f"{row['injector']} {row['variant']} {_fraction(row['target'])}"
+                                     for row in departing) if departing else "")
+                 + ".")
+    for row in procedural["shams"]:
+        incidental = {family: count for family, count in row["flags"].items() if family not in row["targets"]}
+        if row["severity"] != "control" or not incidental:
+            continue
+        clamped = row.get("clickClampedSamples")
+        where = (f"; {clamped['insideFricativeBursts']} of its {clamped['clamped']} clamped samples lie in the "
+                 f"fixtures' fricative-noise bursts" if clamped else "")
+        lines.append(f"Control {row['injector']} {row['variant']} (not a sham) raised non-target flags "
+                     + ", ".join(f"{family} {count}/{row['units']}" for family, count in sorted(incidental.items()))
+                     + where + ": a response to this procedural construction, not a false-alarm rate on "
+                     "speech (A2).")
     committed = report.get("committed")
     if committed:
         v8 = committed["byAlgorithmVersion"].get("8")
         lines.append(f"Committed evidence: {committed['takes']} takes in {committed['records']} records."
-                     + (f" QC v8: {v8['takes']} takes, warn {_fraction(v8['warn']['familyLevel'])} families "
-                        f"(flag-rate bound {_bound(v8['warn']['familyLevel'])})." if v8 else ""))
+                     + (f" QC v8: {v8['takes']} takes in {v8['families']} families, warn "
+                        f"{_fraction(v8['warn']['familyLevel'])} families (flag-rate bound "
+                        f"{_bound(v8['warn']['familyLevel'])})." if v8 else ""))
     return lines
 
 
@@ -386,7 +477,8 @@ def markdown(report: dict) -> str:
         "",
         f"Subject `{report['subject']['detector']}` through `{report['subject']['mirror']}`; calibration "
         f"`{report['subject']['calibration']}` (A10). Report-only: nothing here qualifies a bound. "
-        f"Rates are k/n with one-sided Clopper-Pearson 95% bounds; one procedural source is one family.",
+        f"Rates are k/n with one-sided Clopper-Pearson 95% bounds; one procedural source is one family, "
+        f"and committed takes count once per family.",
         "",
         "### Headline",
         "",
@@ -409,11 +501,15 @@ def markdown(report: dict) -> str:
         out.append(f"| {row['injector']} | {row['variant']} | {row['severity']} | {target} | "
                    f"{_fraction(row['target'])} | {_bound(row['target'], 'lower')} | {_fraction(row['alarm'])} | "
                    f"{_fraction(row['fail'])} |")
-    out += ["", "### Shams and controls (A4)", "",
-            "| Injector | Variant | Alarm | Clean modal alarm | Intervals overlap |", "|---|---|---|---|---|"]
+    out += ["", "### Shams and controls (A4, on each family's target flags)", "",
+            "| Injector | Variant | Kind | Units | Not applicable | Target flags | Sham or control | "
+            "Clean, same sources | Overlap | Any alarm |", "|---|---|---|---|---|---|---|---|---|---|"]
     for row in procedural["shams"]:
-        out.append(f"| {row['injector']} | {row['variant']} | {_fraction(row['alarm'])} | "
-                   f"{_fraction(row['a4']['cleanModalAlarm'])} | {'yes' if row['a4']['overlaps'] else 'NO'} |")
+        overlap = {True: "yes", False: "NO", None: "n/a"}[row["a4"]["overlaps"]]
+        clean_target = row["a4"].get("cleanTarget")
+        out.append(f"| {row['injector']} | {row['variant']} | {row['severity']} | {row['units']} | "
+                   f"{row['notApplicable']} | {', '.join(row['targets']) or 'none'} | {_fraction(row['target'])} | "
+                   f"{_fraction(clean_target)} | {overlap} | {_fraction(row['alarm'])} |")
     out += ["", "### Abstention fixtures (a judge must never pass these)", "",
             "| Fixture | Seconds | v8 verdict | Flags |", "|---|---|---|---|"]
     for entry in procedural["abstention"]:
@@ -424,8 +520,8 @@ def markdown(report: dict) -> str:
         out += ["", "### Committed evidence (N3, read-only)", "",
                 f"{committed['takes']} takes with audio QC in {committed['records']} records "
                 f"(record set `{committed['recordSetSHA256'][:12]}`).", "",
-                "| QC version | Takes | Families | Warn (families) | Flag-rate upper | Replayed v8 clicks warn+ | "
-                "Replayed v8 clicks fail |", "|---|---|---|---|---|---|---|"]
+                "| QC version | Takes | Families | Warn (families) | Flag-rate upper | Replayed v8 clicks warn+ "
+                "(families) | Replayed v8 clicks fail (families) |", "|---|---|---|---|---|---|---|"]
         for version, entry in committed["byAlgorithmVersion"].items():
             clicks = entry["v8BoundReplay"].get("clicks")
             out.append(f"| {version} | {entry['takes']} | {entry['families']} | "

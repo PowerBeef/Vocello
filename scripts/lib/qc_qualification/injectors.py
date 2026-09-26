@@ -5,9 +5,13 @@ source PCM, parameters and seed give byte-identical output, pinned by a golden
 PCM16 digest per variant. Every family has a `sham`, the same processing at
 zero magnitude, drawing the same positions from the same seeded stream as its
 positives, plus a mild / moderate / severe sweep; a `control` is a non-identity
-matched sham the audit names (a natural pause of equal length, a same-speaker
-splice). Positives emit the exact labeled interval in the output timeline;
-shams and controls emit none.
+matched processing the audit names (a natural pause of equal length at
+punctuation, a same-speaker splice, a peak normalization without clipping).
+Positives emit a labeled interval in the output timeline that covers every
+sample the injection changed; shams and controls emit none. A variant that
+needs something its source lacks (a pause control on a source that declares
+no pause) raises `InjectorNotApplicable` instead of substituting another
+construction.
 
 Word-aligned edits (deletion, insertion, repetition, truncation) use the
 source's exact word intervals, which procedural fixtures carry by construction;
@@ -33,7 +37,7 @@ import numpy as np
 from .fixtures import ROOM_TONE_RMS, Fixture, donor_voice, rerender
 from .pcm import SeededStream, pcm_digest
 
-CATALOG_VERSION = 1
+CATALOG_VERSION = 2
 MECHANISM = "T1-pcm-construction"
 SEVERITIES = ("sham", "control", "mild", "moderate", "severe")
 NON_DEFECT_SEVERITIES = frozenset({"sham", "control"})
@@ -41,6 +45,13 @@ SPLICE_FADE_MS = 5.0
 OLA_WINDOW = 960
 OLA_HOP = 240
 SINC_HALF_WIDTH = 16
+# Soft-knee clipping: samples above the knee are squashed by tanh toward an
+# asymptote this far above it (about +1 dB), so the output never exceeds it.
+SOFT_KNEE_HEADROOM = 0.12
+
+
+class InjectorNotApplicable(ValueError):
+    """The variant needs something this source lacks; it is not run on it."""
 
 
 @dataclass(frozen=True)
@@ -283,9 +294,13 @@ def _dropout(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
     rate = source.sample_rate
     length = _samples(parameters["durationMS"], rate)
     if parameters.get("mode") == "natural-pause":
-        cut = source.pauses[0][0] + (source.pauses[0][1] - source.pauses[0][0]) // 2 if source.pauses \
-            else boundaries(source)[len(source.words) // 2]
-        output, _ = join([source.samples[:cut], _room_tone(rng, length), source.samples[cut:]], 0)
+        # The matched control: the source's first declared (punctuation) pause
+        # re-timed to exactly the dropout's length, room tone throughout, so a
+        # natural pause of equal length sits where the text puts a pause.
+        if not source.pauses:
+            raise InjectorNotApplicable(f"{source.fixture_id} declares no pause")
+        first, last = source.pauses[0]
+        output, _ = join([source.samples[:first], _room_tone(rng, length), source.samples[last:]], 0)
         return output, []
     placement = parameters["placement"]
     if placement == "intra-word":
@@ -295,7 +310,9 @@ def _dropout(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
         first, last = source.words[0][0], source.words[-1][1]
         start = (first + last) // 2 - length // 2
     elif placement == "pause":
-        first, last = source.pauses[0] if source.pauses else (source.words[0][1], source.words[1][0])
+        if not source.pauses:
+            raise InjectorNotApplicable(f"{source.fixture_id} declares no pause")
+        first, last = source.pauses[0]
         start = (first + last) // 2 - length // 2
     else:
         raise ValueError(f"unknown placement {placement!r}")
@@ -310,6 +327,7 @@ def _dropout(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
     multiplier = np.ones(size)
     multiplier[start:end] = gain
     ramp = _samples(parameters["rampMS"], rate)
+    lead, trail = start, end
     if ramp:
         steps = np.arange(1, ramp + 1) / (ramp + 1)
         lead = max(0, start - ramp)
@@ -317,29 +335,57 @@ def _dropout(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
         trail = min(size, end + ramp)
         multiplier[end:trail] = (gain + steps * (1.0 - gain))[:trail - end]
     output = source.samples * multiplier
-    labels = [{"kind": "dropout", "startSample": start, "endSample": end}] if gain < 1.0 else []
+    # The label covers every sample the multiplier moves, ramps included; the
+    # full-depth span is recorded beside it.
+    labels = [{"kind": "dropout", "startSample": lead, "endSample": trail,
+               "fullDepthStartSample": start, "fullDepthEndSample": end}] if gain < 1.0 else []
     return output, labels
 
 
-def _clip(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
-    magnitude = np.sort(np.abs(source.samples))[::-1]
-    fraction = parameters["clippedFraction"]
+def _clip_level(samples: np.ndarray, fraction: float) -> tuple[float, int]:
+    """The magnitude that `fraction` of the samples exceed, and how many do."""
+    magnitude = np.sort(np.abs(samples))[::-1]
     beyond = int(math.ceil(fraction * magnitude.size))
-    level = magnitude[min(beyond, magnitude.size - 1)]
-    driven = source.samples / max(float(level), 1e-12)
+    level = float(magnitude[min(beyond, magnitude.size - 1)])
+    return level, int(np.count_nonzero(np.abs(samples) > level))
+
+
+def _clip(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    samples = source.samples
     mode = parameters["mode"]
+    if mode == "peak-normalize":
+        # The level control: a whole-file gain that brings the peak to full
+        # scale and clips nothing. It is not a sham (every sample moves); it
+        # separates a detector's response to level from its response to clipping.
+        peak = float(np.max(np.abs(samples)))
+        return samples * (parameters["targetPeak"] / max(peak, 1e-12)), []
+    level, over = _clip_level(samples, parameters["clippedFraction"])
+    magnitude = np.abs(samples)
+    if mode == "overdrive":
+        # Level beyond full scale, nothing flattened: the physical over-range
+        # event. The gain moves every sample, so the label is the whole take.
+        gain = 1.0 / max(level, 1e-12)
+        output = samples * gain
+        labels = [{"kind": "over-range", "startSample": 0, "endSample": samples.size,
+                   "gainDB": round(20.0 * math.log10(gain), 6), "overRangeSamples": over}] if over else []
+        return output, labels
     if mode == "hard":
-        output = np.clip(driven, -1.0, 1.0)
-    elif mode == "tanh":
-        output = np.tanh(driven) / math.tanh(1.0) if beyond else driven
-        output = np.clip(output, -1.0, 1.0)
-    elif mode == "overdrive":
-        output = driven
+        # Flat tops at the level the fraction exceeds, no gain: exactly the
+        # samples above it change. Fraction 0 changes nothing (the sham).
+        output = np.clip(samples, -level, level)
+    elif mode == "soft-knee":
+        # Identity up to the knee (the same level), then a tanh squash toward
+        # an asymptote SOFT_KNEE_HEADROOM above it: continuous in value and
+        # slope, bounded, and it changes exactly the samples above the knee.
+        span = SOFT_KNEE_HEADROOM * level
+        squashed = level + span * np.tanh((magnitude - level) / max(span, 1e-12))
+        output = np.where(magnitude > level, np.sign(samples) * squashed, samples)
     else:
         raise ValueError(f"unknown clipping mode {mode!r}")
-    over = np.flatnonzero(np.abs(driven) > 1.0)
-    labels = [{"kind": "clipping", "startSample": int(over[0]), "endSample": int(over[-1]) + 1,
-               "drivenSamples": int(over.size)}] if beyond and over.size else []
+    changed = np.flatnonzero(magnitude > level)
+    labels = [{"kind": "clipping", "startSample": int(changed[0]), "endSample": int(changed[-1]) + 1,
+               "clippedSamples": int(changed.size), "mode": mode,
+               "levelDBFS": round(20.0 * math.log10(max(level, 1e-12)), 6)}] if changed.size else []
     return output, labels
 
 
@@ -559,9 +605,10 @@ def _catalog() -> dict[str, Injector]:
                                                                    "clustered": True, "amplitude": 0.5,
                                                                    "ratePerSecond": 5.0})}),
                  _click),
-        Injector("SIG-DROP", 1, "dropout", ("A", "C"),
-                 "A span zeroed or attenuated inside a word, the interior or a pause; sham: the moderate "
-                 "span at 0 dB; control: a natural pause of equal length at punctuation.",
+        Injector("SIG-DROP", 2, "dropout", ("A", "C"),
+                 "A span zeroed or attenuated inside a word, the interior or a pause, with optional ramps "
+                 "that the label includes; sham: the moderate span at 0 dB; control: the first declared "
+                 "punctuation pause re-timed to the same length (sources with a declared pause only).",
                  _variants({**drop, "durationMS": 600.0, "attenuationDB": 0.0},
                            {"mild": {**drop, "durationMS": 150.0, "placement": "intra-word"},
                             "moderate": {**drop, "durationMS": 600.0},
@@ -571,16 +618,21 @@ def _catalog() -> dict[str, Injector]:
                            extra={"attenuated-ramped": ("moderate", {**drop, "durationMS": 600.0,
                                                                      "attenuationDB": -60.0, "rampMS": 5.0})}),
                  _dropout),
-        Injector("SIG-CLIP", 1, "clipping", ("A",),
-                 "Gain that drives a fraction of samples beyond full scale, then hard, tanh or no "
-                 "clipping; sham: the same gain at fraction 0 (peak normalized, nothing clipped).",
+        Injector("SIG-CLIP", 2, "clipping", ("A",),
+                 "The loudest fraction of samples flattened at the level they exceed (hard) or squashed "
+                 "above it by a soft knee, with no gain, so the label covers exactly the changed samples; "
+                 "over-range: a gain that drives the fraction beyond full scale unflattened (labeled whole "
+                 "take); sham: fraction 0 (identity); control: peak normalization to full scale, nothing "
+                 "clipped.",
                  _variants({"clippedFraction": 0.0, "mode": "hard"},
                            {"mild": {"clippedFraction": 0.001, "mode": "hard"},
                             "moderate": {"clippedFraction": 0.01, "mode": "hard"},
                             "severe": {"clippedFraction": 0.05, "mode": "hard"}},
-                           extra={"tanh-moderate": ("moderate", {"clippedFraction": 0.01, "mode": "tanh"}),
-                                  "overdrive-moderate": ("moderate", {"clippedFraction": 0.01,
-                                                                      "mode": "overdrive"})}),
+                           controls={"control-peak-normalized": {"mode": "peak-normalize", "targetPeak": 1.0}},
+                           extra={"soft-knee-moderate": ("moderate", {"clippedFraction": 0.01,
+                                                                      "mode": "soft-knee"}),
+                                  "over-range-moderate": ("moderate", {"clippedFraction": 0.01,
+                                                                       "mode": "overdrive"})}),
                  _clip),
         Injector("SIG-DC", 1, "dc offset", ("A",), "A constant offset; sham: offset 0.",
                  _variants({"offset": 0.0}, {"mild": {"offset": 0.02}, "moderate": {"offset": 0.08},

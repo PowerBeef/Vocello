@@ -173,12 +173,25 @@ def history_record_schema_version(takes: list[dict[str, Any]]) -> int:
 # the PCM16 it wrote, and `makeAudioQCReport` (algorithm v8). It exists so the
 # qualification engine can measure the v8 flags on constructed fixtures; the
 # engine's report stays the only product verdict. Swift owns every value in
-# FASTQC_V8: this mirror never reads Swift source, the replay constants are
-# listed in docs/reference/audio-qc-engineering.md, and a test pins them. The
+# FASTQC_V8: this mirror never reads Swift source. Both sides are pinned to
+# the calibration record config/audio-qc-stage0-calibration.json, Swift by
+# AudioQCStage0CalibrationTests and this dict by test_audio_qc.py. The
 # Swift limiter runs in Float32 and releases its gain sample by sample; this
 # mirror computes the same recurrence in float64, so a decision within Float32
-# rounding of a boundary can differ. Chunk QC and WAV-format checks are out of
-# scope (a fixture has neither). NumPy is imported only when the mirror runs.
+# rounding of a boundary can differ.
+#
+# PCM16 scale. Both write at x 32767 (Int16.max). The mirror reads the
+# persisted PCM16 back at 1/32767; the engine reads its WAV through
+# AVAudioFile's float processing format, whose Int16 conversion Core Audio does
+# at 1/32768 (only its Int16 fallback path divides by Int16.max). The persisted
+# pass supplies only the output sums and the silence runs, so the difference
+# scales RMS and DC by 32767/32768 (-0.00027 dB); no PCM16 value falls on the
+# other side of the 0.001 silence floor under either scale (32.767 and 32.768
+# LSB); no written value reaches the 0.965 ceiling; and a persisted-pass step
+# can be clamped differently only within one LSB of the 0.42 slew bound.
+#
+# Chunk QC and WAV-format checks are out of scope (a fixture has neither).
+# NumPy is imported only when the mirror runs.
 
 FASTQC_V8_ALGORITHM_VERSION = 8
 FASTQC_V8_MIRROR = "fastqc-v8-numpy/1"
@@ -347,6 +360,7 @@ def _limiter_pass(np: Any, raw: Any) -> tuple[dict[str, Any], Any]:
         slewed.append(sample)
         position = sample + 1
     metrics["slewLimitedSamples"] = len(slewed)
+    metrics["slewLimitedSampleIndices"] = slewed
     # Step bursts: the densest 20 ms cluster of pre-clamp steps above the threshold.
     steps = np.flatnonzero(np.abs(limited[1:] - output[:-1]) > constants["stepBurstStepThreshold"]) + 1
     metrics["stepBurstPeakCount"] = 0
@@ -381,12 +395,14 @@ def _limiter_pass(np: Any, raw: Any) -> tuple[dict[str, Any], Any]:
 
 
 def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = None,
-               expected_pauses: int | None = None) -> dict[str, Any]:
+               expected_pauses: int | None = None, slew_positions: bool = False) -> dict[str, Any]:
     """The v8 `audioQC` report the engine would write for this float output.
 
     `text` is the spoken request text: it sets the pause budget (unless
     `expected_pauses` is given) and the speaking-rate check, which is skipped
-    without it, as for a bare persisted file.
+    without it, as for a bare persisted file. `slew_positions` adds the
+    mirror-only `slewLimitedSampleIndices` (the samples the click counter
+    clamped), for locating what a click alarm responded to.
     """
     import numpy as np
 
@@ -400,8 +416,11 @@ def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = No
         combined[key] = persisted[key]
     pauses = expected_pauses if expected_pauses is not None else (expected_pause_count(text) if text else 0)
     duration = raw.size / sample_rate if sample_rate > 0 else 0.0
-    return fast_qc_v8_report(combined, sample_rate=sample_rate, duration_seconds=duration,
-                             expected_pauses=pauses, text=text)
+    report = fast_qc_v8_report(combined, sample_rate=sample_rate, duration_seconds=duration,
+                               expected_pauses=pauses, text=text)
+    if slew_positions:
+        report["slewLimitedSampleIndices"] = list(stream["slewLimitedSampleIndices"])
+    return report
 
 
 def _ms(samples: int, sample_rate: int) -> int:

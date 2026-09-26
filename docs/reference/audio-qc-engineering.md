@@ -22,6 +22,7 @@ sourceOfTruth:
   - scripts/audio_qc_qualification.py
   - scripts/lib/qc_qualification/composer.py
   - config/audio-qc-qualification-policy.json
+  - config/audio-qc-stage0-calibration.json
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -851,15 +852,24 @@ qualified change edits the Swift source, this list and the mirror together:
 
 The whole Fast QC v8 has one more mirror, `FASTQC_V8` with `fast_qc_v8()` in
 `scripts/lib/audio_qc.py`, which the qualification engine runs over constructed fixtures. It mirrors
-the values above plus the rest of `PCM16StreamLimiter` and `makeAudioQCReport`, and
-`scripts/tests/test_audio_qc.py` pins them: ceiling 0.965 with a 0.002 per-sample gain release;
+the values above plus the rest of `PCM16StreamLimiter` and `makeAudioQCReport`. Both sides are
+pinned to one calibration record, `config/audio-qc-stage0-calibration.json` (algorithm v8,
+`legacy-unqualified`, audit section 5.5): the Swift `AudioQCStage0CalibrationTests` asserts the
+limiter constants, `StreamingExecutionContext.AudioQCThresholds` and the speaking-rate bands equal it,
+and `scripts/tests/test_audio_qc.py` asserts `FASTQC_V8` does, so neither reads the other's source.
+The values: ceiling 0.965 with a 0.002 per-sample gain release;
 step bursts of steps above 0.25 in 480 samples, warning `onset_step_burst` from 3 steps starting
 in the first 50 ms; silence below 0.001, interior runs recorded from 2,400 samples (at most 256);
 `near_silent` below -60 dBFS and `low_level` below -45 dBFS; clipping failing above a 0.001
 fraction and warning on any sample beyond full scale; `hot` above a 0.02 fraction; DC warning
 above 0.05 and failing above 0.20; the pause budget from the text's punctuation runs, a cadence
 pause of 350 ms (600 ms from 45 s), an egregious gap of 1,200 ms without a declared pause and
-2,000 ms with one or from 45 s, and a suspicious single pause of 900, 1,200 or 1,500 ms.
+2,000 ms with one or from 45 s, and a suspicious single pause of 900, 1,200 or 1,500 ms. One known
+difference: both sides write PCM16 at x 32767, but the mirror reads the persisted PCM16 back at
+1/32767 while the engine's `AVAudioFile` float processing format converts at Core Audio's 1/32768.
+The persisted pass supplies only the output sums and silence runs, so RMS and DC differ by a factor
+of 32767/32768 (-0.00027 dB), no PCM16 value changes side of the 0.001 silence floor, and a
+persisted-pass step can clamp differently only within one LSB of the 0.42 slew bound.
 
 ### Threshold-change authority
 
@@ -889,23 +899,42 @@ the existing Fast QC fail bounds kept as `legacy-unqualified` until a qualified 
 them. Its operating points are decision 5: warn at the 60/60/60 floor (FAR at most 0.10 pooled);
 fail at a one-sided Clopper-Pearson FAR of at most 1% pooled and 5% per language on N2 (1,240 N2 and
 600 N3 negatives, 60 positives per subtype, severity and mechanism) for any product-affecting fail,
-with 2% pooled and 10% per language accepted for evidence-lane gating only. New claims use one-sided
-Clopper-Pearson; the Wilson figures above stay for legacy records.
+with 2% pooled and 10% per language accepted for evidence-lane gating only. A per-language bound is
+a simultaneous claim over the languages it covers, so it holds at the Bonferroni confidence the
+policy states per operating point: 0.995 over the ten fail languages, about 0.983 over warn's three.
+At 0.995 the evidence-lane floor is 51 N2 negatives per language (510 pooled), since 29 bound the
+per-language FAR only at 0.167; the fail floor of 124 per language holds (104 needed with zero
+alarms). The N3 flag-rate bound is pooled over the 600 N3 negatives; the 60 per language are
+coverage. Every rate counts source families, not clips. New claims use one-sided Clopper-Pearson;
+the Wilson figures above stay for legacy records.
 `scripts/audio_qc_qualification.py validate-policy` runs in the contract gate: it recomputes the
-sample-size table, refuses a floor that cannot meet its own bound with zero errors, requires fail to
-be stricter than warn, and holds the verdict vocabulary and lane gating sets to the composer's.
+sample-size table, refuses a floor that cannot meet its own bound with zero errors at the confidence
+that bound is claimed at, requires fail to be stricter than warn, and holds the verdict vocabulary and
+lane gating sets to the composer's.
 
 ### Qualification engine and the first measurement of Fast QC v8 (AQ-03, 2026-09-25)
 
 The engine lives in `scripts/lib/qc_qualification/`: exact one-sided Clopper-Pearson bounds and
-rates at a declared operating point (`stats`); a cluster bootstrap that draws whole source families
-(`resampling`); the correlated-failure audit between two judges, with phi and conditional and joint
-failure rates (`correlation`); threshold derivation from clean negatives only, under a plan whose
-digest is committed first, by the split-conformal quantile or fixed-sequence Learn-then-Test, with
-one confirmation per plan (`thresholds`); procedural speech-like sources and the abstention fixtures
-(`fixtures`); the T1 injector catalog (`injectors`); the Stage 3 composer (`composer`); and the policy
-validator (`policy`). No WAV is committed: fixtures are generated from seeds, and randomness comes from
+rates at a declared operating point, counted per source family, an abstention on a positive being a
+miss (`stats`); a cluster bootstrap that draws whole source families (`resampling`); the
+correlated-failure audit between two judges, with phi and conditional failure rates per unit and the
+joint failure bound per family (`correlation`); and threshold derivation from clean negatives only
+(`thresholds`). A derivation reads its plan back from a committed plan file
+(`config/audio-qc-preregistrations/plan-<digest>.json`, which must exist at HEAD unmodified), so a
+plan held only in memory is refused (A5); it takes one score per family, by the split-conformal
+quantile or fixed-sequence Learn-then-Test; the calibration and confirmation cohorts are split by
+connected component of family, speaker and script, so they share none of the three; and the one
+confirmation per plan checks every requirement of the chosen operating point (pooled and
+per-language N2 FAR, the pooled N3 flag rate, clean abstention, detection per severity cell on two
+mechanisms, the minimum units and a matched sham per mechanism, A4) and records its outcome, qualified
+or refused, in a ledger file created exclusively beside the plan, so no process can confirm the plan
+again. The rest: procedural speech-like sources and the abstention fixtures (`fixtures`); the T1
+injector catalog (`injectors`); the Stage 3 composer (`composer`); and the policy validator
+(`policy`). No WAV is committed: fixtures are generated from seeds, and randomness comes from
 `PCG64.random_raw()` words, the part of NumPy's random API that stays stable across releases.
+Fixture version 2 band-limits the fricative and aspiration noise around 6 kHz, with nulls at DC and
+Nyquist; version 1's first difference put the noise energy, and the largest sample-to-sample steps,
+at Nyquist.
 
 The T1 catalog has 17 families: clicks, dropouts, clipping, DC, level, additive noise and hum,
 leading or terminal silence, truncation, run-on, repetition, word deletion and insertion by
@@ -913,8 +942,14 @@ splicing, octave jumps, pitch breaks, tempo change, pitch-and-formant shift and 
 splices a second voice rendering the same script. Each is a pure function of source, parameters and
 seed with a golden PCM16 digest per variant (`scripts/tests/test_qc_qualification_injectors.py`),
 a zero-magnitude sham that draws the same positions as its positives, a mild, moderate and severe
-sweep, and an exact labeled interval. Pitch and tempo use a windowed-sinc resampler and plain
-overlap-add, so they are signal-level constructions, not natural prosody.
+sweep, and a labeled interval covering every sample the injection changed. Controls are matched
+processings that are not identities: the natural-pause control re-times a source's declared
+punctuation pause to the dropout's length and runs only on sources that declare one; the
+peak-normalization control of the clipping family is a whole-file gain to full scale that clips
+nothing. Clipping (v2) flattens or soft-knee squashes the loudest fraction of samples with no gain,
+so its label is exactly the changed samples; its over-range variant is the gain that drives that
+fraction beyond full scale, labeled as the whole take. Pitch and tempo use a windowed-sinc resampler
+and plain overlap-add, so they are signal-level constructions, not natural prosody.
 
 The composer is pure and never cached. It emits `pass`, `warn`, `fail`, `inconclusive` (a gating
 abstention), `uncalibrated` or `unavailable`, in that corrected precedence: fail, unavailable,
@@ -933,30 +968,41 @@ committed benchmark records read-only. It writes `meta-evaluation.json` and `met
 deterministic for a given tree, so it is not a registered `scripts/dev.sh regen` artifact; publishing
 it as a tracked `qc-calibration` record needs that record kind first. It is report-only:
 procedural sources are T1 construction, neither N1 nor N2, so under A2 they never qualify a fail
-bound. The first run (2026-09-25, seed 7) measured:
+bound, and a rate on them describes the fixtures as much as the detector. The run of 2026-09-25
+(seed 7, injector catalog 2, fixtures 2) measured:
 
-- clean modal speech: 0 of 60 alarms (FAR at most 0.049); every alarm on clean speech (17 of 180)
-  was a `dropout` warning on a declared punctuation pause of 0.9-1.5 s;
+- clean modal speech: 0 of 60 alarms (at most 0.049 on these fixtures); every alarm on clean speech
+  (17 of 180) was a `dropout` warning in the long-pause stratum, whose declared pauses of 0.9-1.5 s
+  straddle v8's 1.2 s bound for a declared pause by construction;
 - clicks: 0 of 60 detected at 0.2 FS once per second or 0.5 FS five times per second, 60 of 60 at
   full scale 50 times per second, the per-sample fraction bound growing with take length as audit
   #85 found;
 - dropouts: 0 of 60 at 150 ms inside a word, 22 of 60 (a cadence warning) at 600 ms, 60 of 60 failed
   at 2 s; terminal silence: 9 of 60 at 1 s, 60 of 60 from 2.5 s; 2.5 s of leading silence never reads
   as silence (16 of 60 warned only through the speaking rate);
+- clipping: flattening or soft-knee squashing up to 5% of samples below full scale raised nothing
+  (0 of 60 at every severity), since v8's clipping flag counts float samples beyond full scale and
+  flat tops below full scale have none; driving 1% of samples beyond full scale failed 60 of 60;
 - run-on: 0 of 60 at 0.5 s, 1 of 60 at 1.5 s and 49 of 60 at 4 s of repeated tail speech, the
   speaking-rate warning firing only once a take nearly doubles; a 0.7x tempo never reaches it;
 - no v8 detector for additive noise, truncation, word deletion, octave jumps, pitch breaks, pitch and
-  formant shift or an identity swap: 0 of 60 alarms at severe for each, except noise at 0 dB SNR,
-  which trips `clicks` incidentally;
-- shams: the clipping sham (peak normalization to full scale, nothing clipped) raised `clicks` on
-  52 of 60 clean sources, so the v8 click bound also fires on loud clean speech, and the
-  natural-pause control raised a cadence warning on 9 of 60; A4 would refuse the detector for both
-  families;
+  formant shift or an identity swap: 0 of 60 alarms at severe for each, except white noise at 0 dB
+  SNR, which trips `clicks` incidentally;
+- shams and controls, compared under A4 on each family's own target flags with the clean rate on the
+  same sources: none departs (0 of 12 with a v8 detector). The shams are identities (the clipping
+  sham included), and the natural-pause control raised nothing on the 51 sources that declare a
+  pause. The peak-normalization control (a labeled control, not a sham) raised no clipping or `hot`
+  flag but raised `clicks` on 31 of 60; all 4,042 clamped samples lie in the fixtures' fricative-noise
+  bursts driven to full scale, so it measures that construction, not a false-alarm rate on speech;
+  whether natural speech at full scale trips the 0.42 slew clamp needs N1 or N2 (A2);
 - abstention fixtures: v8 passes 6 of 12 (a chord, a clip under 1 s, a 64 s take, whisper phonation,
   a 650 Hz F0 and a repeated-word script), as an amplitude-only gate that cannot abstain;
-- committed evidence: 3,817 takes with audio QC in 349 records, published PASS or WARN only, so a
-  fail rate there bounds nothing; QC v3 warned on 53 of 3,282 families, and the 63 QC v8 takes (23
-  families) carry no warning.
+- committed evidence, counted per family (a seeded cell, seed and model, else one take, with families
+  that share a published WAV digest merged): 3,817 takes with audio QC in 349 records, published PASS
+  or WARN only, so a fail rate there bounds nothing; QC v3 warned on 49 of 2,930 families (3,287
+  takes), and the 63 QC v8 takes (23 families) carry no warning. The v8 bound replay sees only each
+  take's longest silence, never its pause budget or pause count, so its dropout column misses v8's
+  0.9-1.2 s warnings without a declared pause, its excess-pause fails and its cadence warnings.
 
 ### Speech/defect calibration: independent references, no required listening
 

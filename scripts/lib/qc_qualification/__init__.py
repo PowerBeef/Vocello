@@ -5,12 +5,17 @@ listening. Nothing here runs a model, reads a private file or writes tracked
 evidence.
 
 - `stats`: exact one-sided Clopper-Pearson bounds, the legacy Wilson bound,
-  sample sizes, and false-alarm / miss rates at a declared operating point.
-- `resampling`: cluster bootstrap by source family (the unit of independence).
+  sample sizes, and false-alarm / miss rates at a declared operating point,
+  counted per source family (the unit of independence).
+- `resampling`: cluster bootstrap by source family and digest-based family
+  merging.
 - `correlation`: the correlated-failure audit between two judges (phi,
-  conditional and joint failure rates).
-- `thresholds`: pre-registered threshold derivation from clean clips only
-  (split-conformal quantile, fixed-sequence Learn-then-Test, confirm once).
+  conditional failure rates, and the joint failure bound per family).
+- `thresholds`: pre-registered threshold derivation from clean clips only:
+  plans committed as files and read back (A5), a split disjoint by family,
+  speaker and script, the split-conformal quantile or fixed-sequence
+  Learn-then-Test, and one confirmation per plan against every requirement of
+  a policy operating point, recorded in an exclusive ledger file.
 - `pcm`: canonical PCM16 digests and seeded randomness that is stable across
   NumPy releases.
 - `fixtures`: procedural speech-like sources and abstention fixtures.

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Hashable, Iterable, Sequence
 
 DEFAULT_CONFIDENCE = 0.95
 # Two-sided 95% normal quantile, as `prosody_holdout_validation.py` uses it.
@@ -187,6 +187,18 @@ def rate_of(flags: Iterable[bool], confidence: float = DEFAULT_CONFIDENCE) -> Ra
     return Rate(sum(values), len(values), confidence)
 
 
+def family_rate(units: Iterable[tuple[Hashable, bool]], confidence: float = DEFAULT_CONFIDENCE) -> Rate:
+    """One unit per source family (audit 5.4): a family is an event if any of its units is.
+
+    Clips of one family (crops, injections, resyntheses, or takes of one script,
+    voice and seed) are not independent, so every claimed rate counts families.
+    """
+    events: dict[Hashable, bool] = {}
+    for family, event in units:
+        events[family] = events.get(family, False) or bool(event)
+    return Rate(sum(events.values()), len(events), confidence)
+
+
 def alarms(scores: Iterable[float | None], threshold: float, direction: str) -> list[bool | None]:
     """Per-unit alarm at a threshold: `above` alarms when score > threshold, `below` when <.
 
@@ -205,29 +217,38 @@ def alarms(scores: Iterable[float | None], threshold: float, direction: str) -> 
     return result
 
 
-def operating_point(negative_scores: Sequence[float | None], positive_scores: Sequence[float | None],
+def operating_point(negatives: Sequence[tuple[Hashable, float | None]],
+                    positives: Sequence[tuple[Hashable, float | None]],
                     threshold: float, direction: str = "above",
                     confidence: float = DEFAULT_CONFIDENCE) -> dict:
-    """FAR on negatives and FRR/TPR on positives at one declared threshold.
+    """FAR on negatives and TPR/FRR on positives at one declared threshold, per source family.
 
-    Abstentions (None scores) are counted apart and excluded from both rates;
-    the clean abstention rate is reported, since the policy bounds it too.
+    Each unit is (family, score); a None score is an abstention. A negative
+    family is a false alarm if any of its judged clips alarms; a family whose
+    clips all abstained is not judged, and the clean abstention rate (families
+    with any abstention) is reported apart, since the policy bounds it. A
+    positive family is detected only if every one of its clips alarms: an
+    abstention on a positive is a miss, because abstaining is not detecting.
     """
-    negative = alarms(negative_scores, threshold, direction)
-    positive = alarms(positive_scores, threshold, direction)
-    judged_negative = [flag for flag in negative if flag is not None]
-    judged_positive = [flag for flag in positive if flag is not None]
-    far = rate_of(judged_negative, confidence)
-    frr = Rate(sum(1 for flag in judged_positive if not flag), len(judged_positive), confidence)
-    tpr = Rate(sum(1 for flag in judged_positive if flag), len(judged_positive), confidence)
+    negative = list(zip([family for family, _ in negatives],
+                        alarms([score for _, score in negatives], threshold, direction)))
+    positive = list(zip([family for family, _ in positives],
+                        alarms([score for _, score in positives], threshold, direction)))
+    far = family_rate(((family, flag) for family, flag in negative if flag is not None), confidence)
+    frr = family_rate(((family, flag is not True) for family, flag in positive), confidence)
+    tpr = Rate(frr.units - frr.events, frr.units, confidence)
     return {
         "threshold": threshold,
         "direction": direction,
+        "unit": "source-family",
+        "negativeClips": len(negative),
+        "positiveClips": len(positive),
         "far": far.as_dict(),
         "frr": frr.as_dict(),
         "tpr": tpr.as_dict(),
-        "cleanAbstention": Rate(len(negative) - len(judged_negative), len(negative), confidence).as_dict()
-        if negative else Rate(0, 0).as_dict(),
+        "cleanAbstention": family_rate(((family, flag is None) for family, flag in negative), confidence).as_dict(),
+        "positiveAbstention": family_rate(((family, flag is None) for family, flag in positive),
+                                          confidence).as_dict(),
     }
 
 

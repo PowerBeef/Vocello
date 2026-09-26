@@ -241,6 +241,8 @@ class ClassificationTests(unittest.TestCase):
             "config/ios-memory-budget-policy.json": {"swift", "python"},
             "scripts/tests/fixtures/language_normalization_v2.json": {"swift", "python"},
             "config/audio-qc-stage0-calibration.json": {"swift", "python"},
+            "config/audio-qc-stage0-observations.json": {"swift", "python"},
+            "scripts/tests/fixtures/audio_qc_stage0_observations.json": {"swift", "python", "research"},
             "config/orchestration-contract.json": {"python"},
             "scripts/tests/test_benchmark_history.py": {"python"},
             "scripts/tests/conftest.py": {"python"},

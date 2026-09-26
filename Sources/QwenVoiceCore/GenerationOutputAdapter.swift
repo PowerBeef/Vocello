@@ -1559,6 +1559,10 @@ struct StreamingExecutionContext: Sendable {
         var chunkIndex = 0
         var publishedChunkIndex = 0
         var totalFramesWritten: Int64 = 0
+        // Where each published chunk after the first begins in the written WAV:
+        // the streaming seams the observational seam measure reads (AQ-04).
+        // One entry per chunk, never per sample or token.
+        var seamFrameOffsets: [Int] = []
         var nextAudioFrame: UInt64 = 0
         var chunkObservations: [ShippingChunkObservationV9] = []
         var rawCodecReplayRanges: [StartupReliabilityCodecFrameRange] = []
@@ -1676,6 +1680,9 @@ struct StreamingExecutionContext: Sendable {
 
                     let transportSequence = publishedChunkIndex
                     let frameOffset = totalFramesWritten
+                    if transportSequence > 0 {
+                        seamFrameOffsets.append(Int(frameOffset))
+                    }
                     let materializedAtNS = DispatchTime.now().uptimeNanoseconds
                     let previewAudio: StreamingAudioChunk?
                     if !request.shouldStream
@@ -1885,7 +1892,8 @@ struct StreamingExecutionContext: Sendable {
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
                     productOutcome: error is CancellationError ? .cancelled : .failed
-                )
+                ),
+                engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: sessionDirectory)
@@ -1933,7 +1941,8 @@ struct StreamingExecutionContext: Sendable {
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
                     productOutcome: .failed
-                )
+                ),
+                engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: sessionDirectory)
@@ -2015,7 +2024,8 @@ struct StreamingExecutionContext: Sendable {
                 expectedSampleRate: sampleRate,
                 expectedChannelCount: 1,
                 expectedFrameCount: Int(totalFramesWritten),
-                speakingRateText: spokenText
+                speakingRateText: spokenText,
+                seamFrameOffsets: seamFrameOffsets
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
@@ -2068,7 +2078,8 @@ struct StreamingExecutionContext: Sendable {
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
                     productOutcome: .failed
-                )
+                ),
+                engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
             throw error
         }
@@ -2213,7 +2224,8 @@ struct StreamingExecutionContext: Sendable {
                 productTerminalAtNS: productTerminalAtNS,
                 modelOutcome: modelOutcomeV9,
                 productOutcome: .completed
-            )
+            ),
+            engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
         )
 
         terminalCleanup = GenerationOutputAdapter.terminalCleanup(
@@ -2351,7 +2363,8 @@ struct StreamingExecutionContext: Sendable {
         chunkTimeline: [GenerationChunkTelemetry]? = nil,
         streamingChunkObservations: [ShippingChunkObservationV9] = [],
         streamingAudioChannel: AudioChannelSummaryV9? = nil,
-        streamingTerminals: GenerationTerminalTimelineV9? = nil
+        streamingTerminals: GenerationTerminalTimelineV9? = nil,
+        engineIntrospection: GenerationEngineIntrospection? = nil
     ) async {
         let reason = NativeGenerationTerminalClassifier.reason(for: error)
         await telemetrySampler?.captureBoundary(
@@ -2392,7 +2405,8 @@ struct StreamingExecutionContext: Sendable {
             rawSamples: NativeTelemetryMode.current().persistsRawSamples ? rawSamples : nil,
             streamingChunkObservations: streamingChunkObservations,
             streamingAudioChannel: streamingAudioChannel,
-            streamingTerminals: streamingTerminals
+            streamingTerminals: streamingTerminals,
+            engineIntrospection: engineIntrospection
         )
     }
 
@@ -2443,7 +2457,8 @@ struct StreamingExecutionContext: Sendable {
         rawSamples: [TelemetrySample]? = nil,
         streamingChunkObservations: [ShippingChunkObservationV9] = [],
         streamingAudioChannel: AudioChannelSummaryV9? = nil,
-        streamingTerminals: GenerationTerminalTimelineV9? = nil
+        streamingTerminals: GenerationTerminalTimelineV9? = nil,
+        engineIntrospection: GenerationEngineIntrospection? = nil
     ) async {
         guard telemetryWorkPlan.writesSink else { return }
         guard let appSupportDirectory = diagnosticAppSupportBox?.url else { return }
@@ -2698,7 +2713,8 @@ struct StreamingExecutionContext: Sendable {
                 fixtureDigest: fixtureDigest
             ),
             streamingTelemetryV9: nestedStreamingV9,
-            requestReceipt: requestReceipt
+            requestReceipt: requestReceipt,
+            engineIntrospection: engineIntrospection
         )
         await GenerationTelemetryJSONLSink.shared.write(
             record: record,
@@ -2747,6 +2763,9 @@ struct StreamingExecutionContext: Sendable {
     ///     rewritten to a shorter, consistent length is caught here.
     ///   - speakingRateText: the spoken request text, for the v8 speaking-rate
     ///     check; nil skips it (no text is known for a bare persisted file).
+    ///   - seamFrameOffsets: frame offsets in the written file where one
+    ///     streamed chunk ends and the next begins, for the observational seam
+    ///     measure (AQ-04); empty for a bare persisted file.
     static func makePersistedWAVAudioQCReport(
         at url: URL,
         preWriteMetrics: PCM16StreamLimiter.Metrics? = nil,
@@ -2755,7 +2774,8 @@ struct StreamingExecutionContext: Sendable {
         expectedSampleRate: Int? = nil,
         expectedChannelCount: Int? = nil,
         expectedFrameCount: Int? = nil,
-        speakingRateText: String? = nil
+        speakingRateText: String? = nil,
+        seamFrameOffsets: [Int] = []
     ) throws -> AudioQCReport {
         let file = try AVAudioFile(forReading: url)
         let frameCount = Int(file.length)
@@ -2791,6 +2811,12 @@ struct StreamingExecutionContext: Sendable {
         var persistedLimiter = PCM16StreamLimiter()
         var discardedPCM: [Int16] = []
         discardedPCM.reserveCapacity(blockFrameCount)
+        // AQ-04: the Stage 0 observational measures read the same persisted
+        // blocks in order; they change no flag or verdict.
+        let signalObserver = AudioQCSignalObserver(
+            sampleRate: fileSampleRate,
+            seamFrameOffsets: seamFrameOffsets
+        )
         var observedFrameCount = 0
         while observedFrameCount < frameCount {
             buffer.frameLength = 0
@@ -2812,6 +2838,7 @@ struct StreamingExecutionContext: Sendable {
             }
             discardedPCM.removeAll(keepingCapacity: true)
             persistedLimiter.append(persistedSamples, into: &discardedPCM)
+            signalObserver.append(persistedSamples)
             observedFrameCount += count
         }
         guard observedFrameCount == frameCount else {
@@ -2837,7 +2864,8 @@ struct StreamingExecutionContext: Sendable {
             expectedPauseCount: expectedPauseCount,
             chunkQC: chunkQC,
             formatIssues: formatIssues,
-            speakingRateText: speakingRateText
+            speakingRateText: speakingRateText,
+            signal: signalObserver.finish()
         )
     }
 
@@ -2882,7 +2910,8 @@ struct StreamingExecutionContext: Sendable {
         expectedPauseCount: Int,
         chunkQC: [AudioQCChunkReport]? = nil,
         formatIssues: [String] = [],
-        speakingRateText: String? = nil
+        speakingRateText: String? = nil,
+        signal: AudioQCSignalObservations? = nil
     ) -> AudioQCReport {
         let n = metrics.processedSamples
         let rms = n > 0 ? (metrics.outputSumOfSquares / Double(n)).squareRoot() : 0
@@ -3133,7 +3162,8 @@ struct StreamingExecutionContext: Sendable {
             secondsPerTextUnit: secondsPerTextUnit,
             clickEventCount: metrics.clickEventCount,
             lowEnergyClickEventCount: metrics.lowEnergyClickEventCount,
-            clickEventsPerSecond: clickEventsPerSecond
+            clickEventsPerSecond: clickEventsPerSecond,
+            signal: signal
         )
     }
 
@@ -3346,17 +3376,44 @@ struct StreamingExecutionContext: Sendable {
     }
 }
 
+extension GenerationEngineIntrospection {
+    /// The telemetry copy of the facade's introspection summary (AQ-04).
+    init(_ value: VocelloQwen3GenerationIntrospection) {
+        self.init(
+            algorithmVersion: value.algorithmVersion,
+            codecFrameCount: value.codecFrameCount,
+            longestRepeatedTokenRunFrames: value.longestRepeatedTokenRunFrames,
+            tokenCyclePeriod: value.tokenCyclePeriod,
+            tokenCycleSpanFrames: value.tokenCycleSpanFrames,
+            tokenCycleRepeats: value.tokenCycleRepeats,
+            tokenCycleStartFrame: value.tokenCycleStartFrame,
+            observedStepCount: value.observedStepCount,
+            entropyMeanNats: value.entropyMeanNats,
+            entropyP95Nats: value.entropyP95Nats,
+            longestHighEntropyRunSteps: value.longestHighEntropyRunSteps,
+            eosProbabilityFinal: value.eosProbabilityFinal,
+            eosProbabilityMax: value.eosProbabilityMax,
+            eosProbabilityMaxStep: value.eosProbabilityMaxStep,
+            eosFirstLikelyStep: value.eosFirstLikelyStep,
+            eosLikelyStepsWithoutStop: value.eosLikelyStepsWithoutStop,
+            seamCodecFrames: value.seamCodecFrames
+        )
+    }
+}
+
 /// Canonical persisted-output QC entry point for app-level batch validation and
 /// deterministic tests. Generation passes its pre-limiter metrics internally so
 /// the same report also retains upstream instability evidence.
 public enum PersistedWAVAudioQCAnalyzer {
     public static func evaluate(
         url: URL,
-        expectedPauseCount: Int = 0
+        expectedPauseCount: Int = 0,
+        seamFrameOffsets: [Int] = []
     ) throws -> AudioQCReport {
         try StreamingExecutionContext.makePersistedWAVAudioQCReport(
             at: url,
-            expectedPauseCount: expectedPauseCount
+            expectedPauseCount: expectedPauseCount,
+            seamFrameOffsets: seamFrameOffsets
         )
     }
 

@@ -1,0 +1,938 @@
+{
+ "schemaVersion": 1,
+ "record": "audio-qc-stage0-observation-fixtures",
+ "algorithmVersion": 1,
+ "introspectionAlgorithmVersion": 1,
+ "sampleRate": 24000,
+ "note": "Shared parity fixtures (AQ-04). Swift (AudioQCSignalObservationTests, Qwen3GenerationIntrospectionTests) and Python (test_audio_qc_observations.py) synthesize each recipe the same way and score it; integers must match exactly and reals within one rounding step (1e-4). Expected values come from scripts/lib/audio_qc_observations.py.",
+ "signalFixtures": [
+  {
+   "id": "silence",
+   "segments": [
+    {
+     "kind": "silence",
+     "samples": 48000
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": null,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": null,
+    "wadaSNRDB": null,
+    "noiseFloorDBFS": -120.0,
+    "codecFrameModulationIndex": null,
+    "effectiveBandwidthHz": null,
+    "spectralFluxEventCount": 0,
+    "spectralFluxEventsPerSecond": 0.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "sine-997hz-minus20dbfs",
+   "note": "known loudness reference: -23.01 LUFS mono",
+   "segments": [
+    {
+     "kind": "sine",
+     "samples": 96000,
+     "frequencyHz": 997.0,
+     "amplitude": 0.1
+    }
+   ],
+   "sampleCount": 96000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -22.9846,
+    "shortTermLoudnessMaxLUFS": -22.9846,
+    "loudnessRangeLU": 0.0,
+    "truePeakDBTP": -19.9991,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -23.0231,
+    "codecFrameModulationIndex": 0.0,
+    "effectiveBandwidthHz": 1171.875,
+    "spectralFluxEventCount": 0,
+    "spectralFluxEventsPerSecond": 0.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "sine-750hz-bin-centered",
+   "note": "bandwidth is bin 17 of 512 (Hann leakage reaches one bin)",
+   "segments": [
+    {
+     "kind": "sine",
+     "samples": 48000,
+     "frequencyHz": 750.0,
+     "amplitude": 0.25
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -15.4486,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -12.0412,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -15.052,
+    "codecFrameModulationIndex": 0.0,
+    "effectiveBandwidthHz": 796.875,
+    "spectralFluxEventCount": 0,
+    "spectralFluxEventsPerSecond": 0.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "quarter-rate-tone-45deg",
+   "note": "samples sit 3.01 dB under the waveform's peak",
+   "segments": [
+    {
+     "kind": "sine",
+     "samples": 24000,
+     "frequencyHz": 6000.0,
+     "amplitude": 0.5,
+     "phase": 0.7853981633974483
+    }
+   ],
+   "sampleCount": 24000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -5.6426,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -5.9173,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -9.0311,
+    "codecFrameModulationIndex": 0.0,
+    "effectiveBandwidthHz": 6046.875,
+    "spectralFluxEventCount": 0,
+    "spectralFluxEventsPerSecond": 0.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "clicks-in-silence",
+   "note": "eight impulses, 250 ms apart",
+   "segments": [
+    {
+     "kind": "silence",
+     "samples": 48000
+    },
+    {
+     "kind": "impulses",
+     "amplitude": 0.5,
+     "positions": [
+      3000,
+      9000,
+      15000,
+      21000,
+      27000,
+      33000,
+      39000,
+      45000
+     ]
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -40.7136,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -6.0206,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -120.0,
+    "codecFrameModulationIndex": 0.0,
+    "effectiveBandwidthHz": 12000.0,
+    "spectralFluxEventCount": 8,
+    "spectralFluxEventsPerSecond": 4.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "clicks-on-tone",
+   "note": "eight irregular impulses on a steady 440 Hz tone",
+   "segments": [
+    {
+     "kind": "sine",
+     "samples": 48000,
+     "frequencyHz": 440.0,
+     "amplitude": 0.2
+    },
+    {
+     "kind": "impulses",
+     "amplitude": 0.6,
+     "positions": [
+      3000,
+      8500,
+      15000,
+      20100,
+      27000,
+      31800,
+      38500,
+      45000
+     ]
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -17.6025,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -4.4373,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -17.0829,
+    "codecFrameModulationIndex": 0.0009,
+    "effectiveBandwidthHz": 12000.0,
+    "spectralFluxEventCount": 8,
+    "spectralFluxEventsPerSecond": 4.0,
+    "repetitionStripeLongestMS": 520,
+    "repetitionStripeLagMS": 480,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "repeated-noise-segment",
+   "note": "an 800 ms noise segment and its exact copy",
+   "segments": [
+    {
+     "kind": "silence",
+     "samples": 4800
+    },
+    {
+     "kind": "noise",
+     "samples": 19200,
+     "amplitude": 0.3,
+     "seed": 12345
+    },
+    {
+     "kind": "copy",
+     "start": 4800,
+     "samples": 19200
+    },
+    {
+     "kind": "silence",
+     "samples": 4800
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -12.6681,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -6.8024,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -120.0,
+    "codecFrameModulationIndex": 0.0036,
+    "effectiveBandwidthHz": 12000.0,
+    "spectralFluxEventCount": 1,
+    "spectralFluxEventsPerSecond": 0.5,
+    "repetitionStripeLongestMS": 760,
+    "repetitionStripeLagMS": 800,
+    "repetitionStripeCount": 1,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "repeated-chirp-three-times",
+   "note": "a 720 ms chirp said three times",
+   "segments": [
+    {
+     "kind": "chirp",
+     "samples": 17280,
+     "startHz": 300.0,
+     "endHz": 3000.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "copy",
+     "start": 0,
+     "samples": 17280
+    },
+    {
+     "kind": "copy",
+     "start": 0,
+     "samples": 17280
+    }
+   ],
+   "sampleCount": 51840,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -11.8369,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -10.4509,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -13.5056,
+    "codecFrameModulationIndex": 0.0001,
+    "effectiveBandwidthHz": 5062.5,
+    "spectralFluxEventCount": 2,
+    "spectralFluxEventsPerSecond": 0.9259,
+    "repetitionStripeLongestMS": 1400,
+    "repetitionStripeLagMS": 720,
+    "repetitionStripeCount": 2,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "am-12p5hz",
+   "note": "a 1 kHz carrier at depth 0.5, 12.5 Hz",
+   "segments": [
+    {
+     "kind": "am",
+     "samples": 61440,
+     "frequencyHz": 1000.0,
+     "amplitude": 0.4,
+     "modulationHz": 12.5,
+     "depth": 0.5
+    }
+   ],
+   "sampleCount": 61440,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -10.4253,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -4.4378,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -16.1372,
+    "codecFrameModulationIndex": 0.4847,
+    "effectiveBandwidthHz": 1171.875,
+    "spectralFluxEventCount": 0,
+    "spectralFluxEventsPerSecond": 0.0,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  },
+  {
+   "id": "seam-phase-jump",
+   "note": "a quarter-cycle phase jump at the first seam, none at the second",
+   "seams": [
+    24000,
+    36000
+   ],
+   "segments": [
+    {
+     "kind": "sine",
+     "samples": 24000,
+     "frequencyHz": 440.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "sine",
+     "samples": 24000,
+     "frequencyHz": 440.0,
+     "amplitude": 0.3,
+     "phase": 1.5707963267948966
+    }
+   ],
+   "sampleCount": 48000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -14.1084,
+    "shortTermLoudnessMaxLUFS": null,
+    "loudnessRangeLU": null,
+    "truePeakDBTP": -9.3651,
+    "wadaSNRDB": -20.0,
+    "noiseFloorDBFS": -13.5611,
+    "codecFrameModulationIndex": 0.0003,
+    "effectiveBandwidthHz": 984.375,
+    "spectralFluxEventCount": 1,
+    "spectralFluxEventsPerSecond": 0.5,
+    "repetitionStripeLongestMS": 0,
+    "repetitionStripeLagMS": null,
+    "repetitionStripeCount": 0,
+    "seamCount": 2,
+    "seamDiscontinuityMaxZ": 29.5078,
+    "seamDiscontinuityMaxZStartMS": 1000
+   }
+  },
+  {
+   "id": "tone-bursts-in-noise",
+   "note": "300 ms bursts between 200 ms pauses of low noise",
+   "segments": [
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 7
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 8
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 9
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 10
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 11
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 12
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 13
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    },
+    {
+     "kind": "noise",
+     "samples": 4800,
+     "amplitude": 0.002,
+     "seed": 14
+    },
+    {
+     "kind": "sine",
+     "samples": 7200,
+     "frequencyHz": 997.0,
+     "amplitude": 0.3
+    }
+   ],
+   "sampleCount": 96000,
+   "expected": {
+    "algorithmVersion": 1,
+    "integratedLoudnessLUFS": -15.6517,
+    "shortTermLoudnessMaxLUFS": -15.6615,
+    "loudnessRangeLU": 0.0,
+    "truePeakDBTP": -10.4576,
+    "wadaSNRDB": 100.0,
+    "noiseFloorDBFS": -58.9244,
+    "codecFrameModulationIndex": 0.0,
+    "effectiveBandwidthHz": 1921.875,
+    "spectralFluxEventCount": 15,
+    "spectralFluxEventsPerSecond": 3.75,
+    "repetitionStripeLongestMS": 360,
+    "repetitionStripeLagMS": 1000,
+    "repetitionStripeCount": 0,
+    "seamCount": 0,
+    "seamDiscontinuityMaxZ": null,
+    "seamDiscontinuityMaxZStartMS": null
+   }
+  }
+ ],
+ "introspectionFixtures": [
+  {
+   "id": "no-cycle",
+   "tokens": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 40,
+    "longestRepeatedTokenRunFrames": 1,
+    "tokenCyclePeriod": null,
+    "tokenCycleSpanFrames": null,
+    "tokenCycleRepeats": null,
+    "tokenCycleStartFrame": null,
+    "observedStepCount": 0,
+    "entropyMeanNats": null,
+    "entropyP95Nats": null,
+    "longestHighEntropyRunSteps": 0,
+    "eosProbabilityFinal": null,
+    "eosProbabilityMax": null,
+    "eosProbabilityMaxStep": null,
+    "eosFirstLikelyStep": null,
+    "eosLikelyStepsWithoutStop": 0,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "stuck-token",
+   "tokens": [
+    5,
+    6,
+    7,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    1,
+    2,
+    3
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 26,
+    "longestRepeatedTokenRunFrames": 20,
+    "tokenCyclePeriod": null,
+    "tokenCycleSpanFrames": null,
+    "tokenCycleRepeats": null,
+    "tokenCycleStartFrame": null,
+    "observedStepCount": 0,
+    "entropyMeanNats": null,
+    "entropyP95Nats": null,
+    "longestHighEntropyRunSteps": 0,
+    "eosProbabilityFinal": null,
+    "eosProbabilityMax": null,
+    "eosProbabilityMaxStep": null,
+    "eosFirstLikelyStep": null,
+    "eosLikelyStepsWithoutStop": 0,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "eight-gram-three-times",
+   "tokens": [
+    1,
+    2,
+    3,
+    4,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    5,
+    6,
+    7,
+    8
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 32,
+    "longestRepeatedTokenRunFrames": 1,
+    "tokenCyclePeriod": 8,
+    "tokenCycleSpanFrames": 24,
+    "tokenCycleRepeats": 3,
+    "tokenCycleStartFrame": 4,
+    "observedStepCount": 0,
+    "entropyMeanNats": null,
+    "entropyP95Nats": null,
+    "longestHighEntropyRunSteps": 0,
+    "eosProbabilityFinal": null,
+    "eosProbabilityMax": null,
+    "eosProbabilityMaxStep": null,
+    "eosFirstLikelyStep": null,
+    "eosLikelyStepsWithoutStop": 0,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "two-gram-loop",
+   "tokens": [
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2,
+    1,
+    2
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 20,
+    "longestRepeatedTokenRunFrames": 1,
+    "tokenCyclePeriod": 2,
+    "tokenCycleSpanFrames": 20,
+    "tokenCycleRepeats": 10,
+    "tokenCycleStartFrame": 0,
+    "observedStepCount": 0,
+    "entropyMeanNats": null,
+    "entropyP95Nats": null,
+    "longestHighEntropyRunSteps": 0,
+    "eosProbabilityFinal": null,
+    "eosProbabilityMax": null,
+    "eosProbabilityMaxStep": null,
+    "eosFirstLikelyStep": null,
+    "eosLikelyStepsWithoutStop": 0,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "loop-after-pause",
+   "note": "a stuck token, then an 8-gram loop: each is reported apart",
+   "tokens": [
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 49,
+    "longestRepeatedTokenRunFrames": 25,
+    "tokenCyclePeriod": 8,
+    "tokenCycleSpanFrames": 24,
+    "tokenCycleRepeats": 3,
+    "tokenCycleStartFrame": 25,
+    "observedStepCount": 0,
+    "entropyMeanNats": null,
+    "entropyP95Nats": null,
+    "longestHighEntropyRunSteps": 0,
+    "eosProbabilityFinal": null,
+    "eosProbabilityMax": null,
+    "eosProbabilityMaxStep": null,
+    "eosFirstLikelyStep": null,
+    "eosLikelyStepsWithoutStop": 0,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "entropy-and-eos",
+   "tokens": [
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "entropies": [
+    1.0,
+    2.0,
+    4.5,
+    4.625,
+    4.75,
+    3.875,
+    4.125,
+    4.25,
+    1.5,
+    0.5,
+    0.25
+   ],
+   "eosProbabilities": [
+    0.0009765625,
+    0.001953125,
+    0.0078125,
+    0.625,
+    0.25,
+    0.5625,
+    0.125,
+    0.0625,
+    0.3125,
+    0.75,
+    0.875
+   ],
+   "stoppedAtEOS": true,
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 10,
+    "longestRepeatedTokenRunFrames": 1,
+    "tokenCyclePeriod": null,
+    "tokenCycleSpanFrames": null,
+    "tokenCycleRepeats": null,
+    "tokenCycleStartFrame": null,
+    "observedStepCount": 11,
+    "entropyMeanNats": 2.8523,
+    "entropyP95Nats": 4.78125,
+    "longestHighEntropyRunSteps": 3,
+    "eosProbabilityFinal": 0.875,
+    "eosProbabilityMax": 0.875,
+    "eosProbabilityMaxStep": 10,
+    "eosFirstLikelyStep": 3,
+    "eosLikelyStepsWithoutStop": 3,
+    "seamCodecFrames": []
+   }
+  },
+  {
+   "id": "token-cap-no-eos",
+   "tokens": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "entropies": [
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0,
+    6.0
+   ],
+   "eosProbabilities": [
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5
+   ],
+   "stoppedAtEOS": false,
+   "seamFrames": [
+    4,
+    8,
+    12,
+    0
+   ],
+   "expected": {
+    "algorithmVersion": 1,
+    "codecFrameCount": 12,
+    "longestRepeatedTokenRunFrames": 1,
+    "tokenCyclePeriod": null,
+    "tokenCycleSpanFrames": null,
+    "tokenCycleRepeats": null,
+    "tokenCycleStartFrame": null,
+    "observedStepCount": 12,
+    "entropyMeanNats": 6.0,
+    "entropyP95Nats": 6.03125,
+    "longestHighEntropyRunSteps": 12,
+    "eosProbabilityFinal": 0.5,
+    "eosProbabilityMax": 0.5,
+    "eosProbabilityMaxStep": 0,
+    "eosFirstLikelyStep": 0,
+    "eosLikelyStepsWithoutStop": 12,
+    "seamCodecFrames": [
+     4,
+     8
+    ]
+   }
+  }
+ ]
+}

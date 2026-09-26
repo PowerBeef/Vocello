@@ -130,6 +130,7 @@
 		239B41803755A4BB2741E159 /* LongFormPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8C767365384FC934F4D47C /* LongFormPlanningTests.swift */; };
 		23DFB3B449A2808FA7329F18 /* AudioPlaybackResumePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB99DD50D5BC43C30438BD6 /* AudioPlaybackResumePolicy.swift */; };
 		2415FDE0E4276148A849EE15 /* IOSLongFormSegmentsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2EE7A73D3869F8639CB553 /* IOSLongFormSegmentsPanel.swift */; };
+		245637A68EA368DA7F7CCA9B /* AudioQCSignalObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D840D605F0A1D2463C6FA564 /* AudioQCSignalObserver.swift */; };
 		24D67D71A0F2D68254B92739 /* IOSCommerceErrorDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC8B80ED42BB880C0EC78E9 /* IOSCommerceErrorDiagnostics.swift */; };
 		25053A56CB221EA70CEF940F /* IOSStartupReliabilityPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6950C3F6A3E9FBF80D2529F5 /* IOSStartupReliabilityPlanTests.swift */; };
 		2589BEF4455DB23814489EF1 /* CLIRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C15F6A1291506C7D8605BB /* CLIRuntime.swift */; };
@@ -262,6 +263,7 @@
 		4B63A6F9B72FA50A8105DDA9 /* ModesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447411D60FB5B62ACB81DD90 /* ModesCommand.swift */; };
 		4C400D6AE3BD3DB276F5A7DF /* IOSCommerceErrorDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC8B80ED42BB880C0EC78E9 /* IOSCommerceErrorDiagnostics.swift */; };
 		4CE5B8F81A5CA14230CEDBCF /* AnyTTSEngineBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F7D8151835CEF746B90F5C /* AnyTTSEngineBackend.swift */; };
+		4D105AE000278D7E6A6F39ED /* AudioQCSignalObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61780FF2CC7C534675701972 /* AudioQCSignalObservationTests.swift */; };
 		4D36767BB44DED2C578163E0 /* ModelManagerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E29A8F18ADF5E5C68E11E1 /* ModelManagerViewModel.swift */; };
 		4D3A4E2A76336F5016FD81FF /* VocelloSetupChipPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 502FFC4850553C7A898324D4 /* VocelloSetupChipPill.swift */; };
 		4D9146CA233F1E1EBF657D97 /* LongFormAssemblyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A704D0B6ADBAF007042048C /* LongFormAssemblyTests.swift */; };
@@ -1082,6 +1084,7 @@
 		5FE1F38468644CF05238B665 /* TimingExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingExtensionsTests.swift; sourceTree = "<group>"; };
 		60063661FA117455600430A7 /* MacLineBatchRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLineBatchRequest.swift; sourceTree = "<group>"; };
 		60F1987DEC429D7F5536E4B5 /* MacGenerationDraftSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacGenerationDraftSupport.swift; sourceTree = "<group>"; };
+		61780FF2CC7C534675701972 /* AudioQCSignalObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQCSignalObservationTests.swift; sourceTree = "<group>"; };
 		617BE72142511CD5043C341E /* qwenvoice_contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = qwenvoice_contract.json; sourceTree = "<group>"; };
 		6192F80DEA6E70A576CC05C7 /* AtomicWAVPublicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtomicWAVPublicationTests.swift; sourceTree = "<group>"; };
 		61F0E0A52622B4B7DFAF4271 /* MacHistoryFileActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacHistoryFileActions.swift; sourceTree = "<group>"; };
@@ -1311,6 +1314,7 @@
 		D6AFCD5DBEA3DCE816F44221 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
 		D727A36AC299F613E0481B66 /* IOSStudioDraftPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSStudioDraftPersistenceTests.swift; sourceTree = "<group>"; };
 		D738D05E515954D25851533F /* VocelloStaticWaveformThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloStaticWaveformThumbnail.swift; sourceTree = "<group>"; };
+		D840D605F0A1D2463C6FA564 /* AudioQCSignalObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioQCSignalObserver.swift; sourceTree = "<group>"; };
 		D85B6FF61D3859AF28D781B7 /* MacStudioSingleTakeGenerationHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStudioSingleTakeGenerationHooks.swift; sourceTree = "<group>"; };
 		D8C3DAC6B72B4D38C5870A78 /* VocelloiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VocelloiOS.entitlements; sourceTree = "<group>"; };
 		D9637F02989DF955F5EC0E5A /* CLIVoiceCloningConsent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIVoiceCloningConsent.swift; sourceTree = "<group>"; };
@@ -1523,6 +1527,7 @@
 				47AAE4913A8F370AAEEE21BC /* AtomicWAVGenerationOutputSink.swift */,
 				6CA6871405D0795C9867A2F7 /* AudioPreparation.swift */,
 				8DB84B7955531BBC1528ADE4 /* AudioPublicationMarking.swift */,
+				D840D605F0A1D2463C6FA564 /* AudioQCSignalObserver.swift */,
 				2A2B5A146112AE2692112CDD /* BenchForceColdPolicy.swift */,
 				669B831BA8E23D3DC59C2339 /* BenchMatrixSpec.swift */,
 				E4C9A2BB14FBE32D8BA298A6 /* BenchRunContext.swift */,
@@ -2116,6 +2121,7 @@
 				6192F80DEA6E70A576CC05C7 /* AtomicWAVPublicationTests.swift */,
 				B334C843B0A20A8A58583994 /* AudioPlaybackResumePolicyTests.swift */,
 				2F49E8A10700979413F41F03 /* AudioPublicationMarkingTests.swift */,
+				61780FF2CC7C534675701972 /* AudioQCSignalObservationTests.swift */,
 				5DCDF50676948EC2787C23A3 /* AudioQCStepBurstTests.swift */,
 				CE196A716B4B837835C9F67F /* CLIExecutionTests.swift */,
 				2FAD9B60876A8B2E5F9FCBC2 /* CloneConditioningContractTests.swift */,
@@ -2772,6 +2778,7 @@
 				30BFDA12D196717AD4B54BFA /* AtomicWAVGenerationOutputSink.swift in Sources */,
 				EE9C991DADF85B8748E2B82B /* AudioPreparation.swift in Sources */,
 				2AEEBACD4D503E5DC28AD224 /* AudioPublicationMarking.swift in Sources */,
+				245637A68EA368DA7F7CCA9B /* AudioQCSignalObserver.swift in Sources */,
 				EA3615A11F0E955F678E431C /* BenchForceColdPolicy.swift in Sources */,
 				239559E64242761BAE36E4E5 /* BenchMatrixSpec.swift in Sources */,
 				1640CBD407460564083AC883 /* BenchRunContext.swift in Sources */,
@@ -3031,6 +3038,7 @@
 				CFF5C36393CCB036F7908A3E /* AudioPlaybackResumePolicy.swift in Sources */,
 				E19B905D11F87544587EB7B4 /* AudioPlaybackResumePolicyTests.swift in Sources */,
 				13C6FCBB5682C2675967254A /* AudioPublicationMarkingTests.swift in Sources */,
+				4D105AE000278D7E6A6F39ED /* AudioQCSignalObservationTests.swift in Sources */,
 				2C5409D8D9A33A9A272F24EC /* AudioQCStepBurstTests.swift in Sources */,
 				5F6E15607422F473BC4E4E5C /* AudioQualityGate.swift in Sources */,
 				7BFB123069CFDB62A000E6AA /* CLIBatchExecution.swift in Sources */,

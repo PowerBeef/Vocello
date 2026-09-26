@@ -601,6 +601,33 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             with self.subTest(key=key, invalid=invalid), self.assertRaises(MODULE.ContractError):
                 MODULE.validate_audio_qc({**qc, key: invalid}, "take.audioQC")
 
+    def test_audio_qc_accepts_the_stage0_signal_observations(self):
+        # AQ-04: QC v8 reports add the observational `signal` block; Swift Codable
+        # omits its nil fields, so a silent or short take carries fewer keys.
+        fixtures = json.loads((ROOT / "scripts/tests/fixtures/audio_qc_stage0_observations.json").read_text())
+        full = {key: value for key, value in fixtures["signalFixtures"][1]["expected"].items() if value is not None}
+        silent = {key: value for key, value in fixtures["signalFixtures"][0]["expected"].items() if value is not None}
+        base = {
+            "algorithmVersion": 8, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "pass", "verdict": "pass",
+            "flags": [], "peak": 0.1, "clippedSamples": 0,
+            "hotSamples": 0, "nonFiniteSamples": 0, "clickEvents": 0,
+            "longestSilenceMS": 0, "durationSeconds": 4.0,
+        }
+        schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        for signal in (full, silent, None):
+            MODULE.validate_audio_qc({**base, "signal": signal}, "take.audioQC")
+        self.assertIn("signal", schema["$defs"]["audioQC"]["properties"])
+        self.assertLessEqual(set(full), set(schema["$defs"]["audioQCSignal"]["properties"]))
+        for key, invalid in (
+            ("seamCount", -1), ("repetitionStripeLongestMS", 1.5), ("truePeakDBTP", float("nan")),
+            ("effectiveBandwidthHz", -1.0), ("wadaSNRDB", True), ("unexpected", 1),
+        ):
+            with self.subTest(key=key, invalid=invalid), self.assertRaises(MODULE.ContractError):
+                MODULE.validate_audio_qc({**base, "signal": {**full, key: invalid}}, "take.audioQC")
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.validate_audio_qc({**base, "signal": {"seamCount": 0}}, "take.audioQC")
+
     def test_audio_qc_accepts_v7_step_burst_and_v8_speaking_rate(self):
         # AudioQCReport always encodes stepBurstPeakCount since QC v7 and adds the
         # speaking-rate pair in v8; the closed contract must accept what it encodes.

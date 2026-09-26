@@ -63,7 +63,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/ModelDiagnostics.swift",
-      "sha256": "35caced9381881da14169ffa21c60712132c463a3ec8e59114ea0762fc019175",
+      "sha256": "0a62bd931d64cf60351833ab9cfc90bcb1c74aaaf8896a67f79a8e3d48a7791a",
       "upstreamStatus": "added"
     },
     {
@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "c8a253a6c1d63dec6f0f1867c9abfab6dbceb77648e2e831141a3510db1773be",
+      "sha256": "65066cbb3024e016696469398a1e68b7b9ae4d1fd65a98176c36c77ba684f63c",
       "upstreamStatus": "modified"
     },
     {
@@ -163,7 +163,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "84280859655db126c0cdd130e8b36deed10cd7534b87736de0cf78c189734485",
+      "sha256": "b742b672ade6278c8de743cc8be6ca44d96ac55216787b92be584a4981c92a52",
       "upstreamStatus": "added"
     },
     {
@@ -207,6 +207,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Tests/Qwen3RuntimeTests/Qwen3GenerationIntrospectionTests.swift",
+      "sha256": "f66e4d9cffe07dda7095222290fedfd433bb753a3ad2ad8920e981aa9b19a398",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
       "sha256": "3e25f3ed7f906de56df9a76b7a68f74f6381c6310846b16a48b023bbdc0e4b7f",
       "upstreamStatus": "added"
@@ -238,7 +243,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "ed5cc3e5c08624c149edb3d92070e934e5fa75b80e4a18e0a5be6709bf0d579c",
+      "sha256": "00481a14e2c28290b3daf6ecd24ff775150dec09ae84e985bcd95672be1634a9",
       "upstreamStatus": "added"
     },
     {
@@ -267,11 +272,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 33,
+    "added": 34,
     "identical": 6,
     "modified": 12,
     "removed": 0,
-    "retained": 51
+    "retained": 52
   },
   "upstreamBaselineSHA256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
 }

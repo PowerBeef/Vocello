@@ -97,7 +97,8 @@ NATIVE_LANES = ("swift", "ios", "python")
 # Under Packages/ the iOS compile reads the package sources and manifests; the
 # governance JSON is a contract-gate input (macOS job) and the markdown is prose.
 PACKAGE_MANIFESTS = ("Package.swift", "Package.resolved")
-SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization_v2.json",)
+SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization_v2.json",
+                         "scripts/tests/fixtures/audio_qc_stage0_observations.json")
 BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capability-matrix.json",
                  "config/toolchain.json")
 # Validated on Linux by the contracts job; the macOS gate does not need them.
@@ -192,10 +193,11 @@ def _is_swift(path: str) -> bool:
         return True
     if path.startswith("Packages/"):
         return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
-    # Swift tests pin the shipping iPhone memory bands (V-4) and the Fast QC
-    # Stage 0 constants (audio QC audit 5.5) to these records.
+    # Swift tests pin the shipping iPhone memory bands (V-4), the Fast QC
+    # Stage 0 constants (audio QC audit 5.5) and the Stage 0 observational
+    # measures (AQ-04) to these records.
     if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json",
-                "config/audio-qc-stage0-calibration.json"):
+                "config/audio-qc-stage0-calibration.json", "config/audio-qc-stage0-observations.json"):
         return True
     # Parity fixtures a Swift test scores beside its Python mirror (AQ-02).
     if path in SWIFT_PARITY_FIXTURES:

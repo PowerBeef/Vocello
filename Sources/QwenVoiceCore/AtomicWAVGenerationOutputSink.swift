@@ -30,6 +30,9 @@ final class AtomicWAVGenerationOutputSink: VocelloQwen3ProductOutputSink, Sendab
         private let writer: IncrementalPCM16WAVFileWriter
         private let scratch = PCM16ScratchBuffer()
         private var frameCount = 0
+        /// Where each appended chunk after the first begins: the streaming seams
+        /// of the observational seam measure (AQ-04), one entry per chunk.
+        private var seamFrameOffsets: [Int] = []
         private var generationID: UUID?
         private var nextSequence = 0
         private var finalized: AtomicWAVGenerationOutputResult?
@@ -79,6 +82,9 @@ final class AtomicWAVGenerationOutputSink: VocelloQwen3ProductOutputSink, Sendab
             }
             let limitedPCM = scratch.convertLimited(chunk.samples)
             try writer.append(pcmSamples: limitedPCM)
+            if frameCount > 0, !limitedPCM.isEmpty {
+                seamFrameOffsets.append(frameCount)
+            }
             frameCount += limitedPCM.count
             nextSequence += 1
             return VocelloQwen3PreviewAudioChunk(
@@ -114,7 +120,8 @@ final class AtomicWAVGenerationOutputSink: VocelloQwen3ProductOutputSink, Sendab
                 expectedPauseCount: expectedPauseCount,
                 expectedSampleRate: sampleRate,
                 expectedChannelCount: 1,
-                expectedFrameCount: frameCount
+                expectedFrameCount: frameCount,
+                seamFrameOffsets: seamFrameOffsets
             )
             guard report.verdict != .fail else {
                 writer.discard()

@@ -860,6 +860,9 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
     /// Privacy-safe startup/request identity. Optional so every historical
     /// schema-v1...v8 row remains decodable without migration.
     public let requestReceipt: GenerationRequestReceipt?
+    /// AQ-04 (engine layer, additive on schema v8): the talker's own signals over
+    /// the generation. Optional so every earlier row decodes unchanged.
+    public let engineIntrospection: GenerationEngineIntrospection?
 
     public init(
         generationID: String,
@@ -888,6 +891,7 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
         memoryMetrics: GenerationMemoryMetrics? = nil,
         streamingTelemetryV9: GenerationStreamingTelemetryTransitionV9? = nil,
         requestReceipt: GenerationRequestReceipt? = nil,
+        engineIntrospection: GenerationEngineIntrospection? = nil,
         clockSource: String? = "mach_absolute_time",
         schemaVersion: Int = GenerationTelemetryRecord.currentSchemaVersion,
         processName: String = ProcessInfo.processInfo.processName,
@@ -980,6 +984,99 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
                 transport: self.transportMetrics
             )
         self.requestReceipt = requestReceipt
+        self.engineIntrospection = engineIntrospection
+    }
+}
+
+/// The engine's own signals over one generation (AQ-04, audit 2026-09-25,
+/// AQ-F09): codebook-0 token cycles, the per-step entropy and EOS probability of
+/// the talker distribution, and the streaming seams. Product-owned copy of the
+/// facade's `VocelloQwen3GenerationIntrospection`, so the telemetry schema never
+/// follows a facade change silently. Observational: no gate reads it yet.
+public struct GenerationEngineIntrospection: Hashable, Codable, Sendable {
+    public let algorithmVersion: Int
+    public let codecFrameCount: Int
+    public let longestRepeatedTokenRunFrames: Int
+    public let tokenCyclePeriod: Int?
+    public let tokenCycleSpanFrames: Int?
+    public let tokenCycleRepeats: Int?
+    public let tokenCycleStartFrame: Int?
+    public let observedStepCount: Int
+    public let entropyMeanNats: Double?
+    public let entropyP95Nats: Double?
+    public let longestHighEntropyRunSteps: Int
+    public let eosProbabilityFinal: Double?
+    public let eosProbabilityMax: Double?
+    public let eosProbabilityMaxStep: Int?
+    public let eosFirstLikelyStep: Int?
+    public let eosLikelyStepsWithoutStop: Int
+    public let seamCodecFrames: [Int]
+
+    public init(
+        algorithmVersion: Int,
+        codecFrameCount: Int,
+        longestRepeatedTokenRunFrames: Int,
+        tokenCyclePeriod: Int?,
+        tokenCycleSpanFrames: Int?,
+        tokenCycleRepeats: Int?,
+        tokenCycleStartFrame: Int?,
+        observedStepCount: Int,
+        entropyMeanNats: Double?,
+        entropyP95Nats: Double?,
+        longestHighEntropyRunSteps: Int,
+        eosProbabilityFinal: Double?,
+        eosProbabilityMax: Double?,
+        eosProbabilityMaxStep: Int?,
+        eosFirstLikelyStep: Int?,
+        eosLikelyStepsWithoutStop: Int,
+        seamCodecFrames: [Int]
+    ) {
+        self.algorithmVersion = algorithmVersion
+        self.codecFrameCount = codecFrameCount
+        self.longestRepeatedTokenRunFrames = longestRepeatedTokenRunFrames
+        self.tokenCyclePeriod = tokenCyclePeriod
+        self.tokenCycleSpanFrames = tokenCycleSpanFrames
+        self.tokenCycleRepeats = tokenCycleRepeats
+        self.tokenCycleStartFrame = tokenCycleStartFrame
+        self.observedStepCount = observedStepCount
+        self.entropyMeanNats = entropyMeanNats
+        self.entropyP95Nats = entropyP95Nats
+        self.longestHighEntropyRunSteps = longestHighEntropyRunSteps
+        self.eosProbabilityFinal = eosProbabilityFinal
+        self.eosProbabilityMax = eosProbabilityMax
+        self.eosProbabilityMaxStep = eosProbabilityMaxStep
+        self.eosFirstLikelyStep = eosFirstLikelyStep
+        self.eosLikelyStepsWithoutStop = eosLikelyStepsWithoutStop
+        self.seamCodecFrames = seamCodecFrames
+    }
+
+    /// Tolerant like the rest of the v8 row: a block from a later version with
+    /// missing fields still decodes, so it never makes the row unreadable.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        algorithmVersion = try container.decodeIfPresent(Int.self, forKey: .algorithmVersion) ?? 1
+        codecFrameCount = try container.decodeIfPresent(Int.self, forKey: .codecFrameCount) ?? 0
+        longestRepeatedTokenRunFrames = try container.decodeIfPresent(
+            Int.self, forKey: .longestRepeatedTokenRunFrames
+        ) ?? 0
+        tokenCyclePeriod = try container.decodeIfPresent(Int.self, forKey: .tokenCyclePeriod)
+        tokenCycleSpanFrames = try container.decodeIfPresent(Int.self, forKey: .tokenCycleSpanFrames)
+        tokenCycleRepeats = try container.decodeIfPresent(Int.self, forKey: .tokenCycleRepeats)
+        tokenCycleStartFrame = try container.decodeIfPresent(Int.self, forKey: .tokenCycleStartFrame)
+        observedStepCount = try container.decodeIfPresent(Int.self, forKey: .observedStepCount) ?? 0
+        entropyMeanNats = try container.decodeIfPresent(Double.self, forKey: .entropyMeanNats)
+        entropyP95Nats = try container.decodeIfPresent(Double.self, forKey: .entropyP95Nats)
+        longestHighEntropyRunSteps = try container.decodeIfPresent(
+            Int.self, forKey: .longestHighEntropyRunSteps
+        ) ?? 0
+        eosProbabilityFinal = try container.decodeIfPresent(Double.self, forKey: .eosProbabilityFinal)
+        eosProbabilityMax = try container.decodeIfPresent(Double.self, forKey: .eosProbabilityMax)
+        eosProbabilityMaxStep = try container.decodeIfPresent(Int.self, forKey: .eosProbabilityMaxStep)
+        eosFirstLikelyStep = try container.decodeIfPresent(Int.self, forKey: .eosFirstLikelyStep)
+        eosLikelyStepsWithoutStop = try container.decodeIfPresent(
+            Int.self, forKey: .eosLikelyStepsWithoutStop
+        ) ?? 0
+        seamCodecFrames = try container.decodeIfPresent([Int].self, forKey: .seamCodecFrames) ?? []
     }
 }
 
@@ -1083,6 +1180,10 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// flag or verdict boundary moves, and their presence marks them. The version
     /// stays 8 because the gate's baseline identity binds it; a bump for fields
     /// that change no verdict would force a re-seed of the M6 gate baseline.
+    /// The Stage 0 signal observations (AQ-04: loudness, true peak, noise floor,
+    /// WADA-SNR, bandwidth, spectral-flux events, codec-frame modulation, seam
+    /// discontinuity and repetition stripe) join v8 the same way, under their own
+    /// version in `signal`.
     public static let currentAlgorithmVersion = 8
 
     public enum Verdict: String, Hashable, Codable, Sendable {
@@ -1152,6 +1253,10 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     public let clickEventCount: Int?
     public let lowEnergyClickEventCount: Int?
     public let clickEventsPerSecond: Double?
+    /// AQ-04 (additive on v8): the Stage 0 observational signal measures of the
+    /// persisted WAV. Observational: no flag or verdict reads them. nil on rows
+    /// written before 2026-09-26 and on chunk snapshots.
+    public let signal: AudioQCSignalObservations?
 
     public init(
         algorithmVersion: Int = AudioQCReport.currentAlgorithmVersion,
@@ -1181,7 +1286,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         secondsPerTextUnit: Double? = nil,
         clickEventCount: Int? = nil,
         lowEnergyClickEventCount: Int? = nil,
-        clickEventsPerSecond: Double? = nil
+        clickEventsPerSecond: Double? = nil,
+        signal: AudioQCSignalObservations? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.instabilityVerdict = instabilityVerdict ?? verdict
@@ -1211,6 +1317,7 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.clickEventCount = clickEventCount
         self.lowEnergyClickEventCount = lowEnergyClickEventCount
         self.clickEventsPerSecond = clickEventsPerSecond
+        self.signal = signal
     }
 
     /// Backward-compatible decoding: older JSONL rows written before Phase 4
@@ -1245,6 +1352,111 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.clickEventCount = try container.decodeIfPresent(Int.self, forKey: .clickEventCount)
         self.lowEnergyClickEventCount = try container.decodeIfPresent(Int.self, forKey: .lowEnergyClickEventCount)
         self.clickEventsPerSecond = try container.decodeIfPresent(Double.self, forKey: .clickEventsPerSecond)
+        self.signal = try container.decodeIfPresent(AudioQCSignalObservations.self, forKey: .signal)
+    }
+}
+
+/// Stage 0 observational signal measures of one persisted take (AQ-04, audit
+/// 2026-09-25, AQ-F08 to AQ-F12 and AQ-F49), produced by
+/// `AudioQCSignalObserver` during the persisted-WAV Fast QC pass and mirrored by
+/// `scripts/lib/audio_qc_observations.py`. Observational: no flag, verdict or
+/// Fast QC version reads them; a measure gates only after a qualified record.
+/// Reals are rounded to four decimals; a field is nil when the take is too
+/// short or silent for it (for example short-term loudness below 3 s).
+public struct AudioQCSignalObservations: Hashable, Codable, Sendable {
+    /// Version of the measure definitions in `config/audio-qc-stage0-observations.json`.
+    public static let currentAlgorithmVersion = 1
+
+    public let algorithmVersion: Int
+    /// BS.1770-4 gated integrated loudness of the mono take (LUFS).
+    public let integratedLoudnessLUFS: Double?
+    /// Maximum 3 s short-term loudness, every 100 ms (LUFS).
+    public let shortTermLoudnessMaxLUFS: Double?
+    /// EBU Tech 3342 loudness range (LU).
+    public let loudnessRangeLU: Double?
+    /// 4x oversampled true peak (dBTP).
+    public let truePeakDBTP: Double?
+    /// 10th percentile of 10 ms frame levels (dBFS, floored at -120).
+    public let noiseFloorDBFS: Double?
+    /// WADA-SNR over the nonzero samples (dB, -20...100).
+    public let wadaSNRDB: Double?
+    /// Highest long-term spectrum bin within 50 dB of its maximum (Hz).
+    public let effectiveBandwidthHz: Double?
+    /// Clustered log-spectral-flux events (a mean rise of at least 10 dB per bin
+    /// between 10 ms frames; rises within 50 ms are one event) and their rate.
+    public let spectralFluxEventCount: Int?
+    public let spectralFluxEventsPerSecond: Double?
+    /// Envelope modulation at the tokenizer's 12.5 Hz frame rate:
+    /// 2 |DFT at 12.5 Hz| / sum of the 10 ms RMS envelope.
+    public let codecFrameModulationIndex: Double?
+    /// Streaming seams evaluated, the largest first-difference z-score at one,
+    /// and where that seam starts.
+    public let seamCount: Int
+    public let seamDiscontinuityMaxZ: Double?
+    public let seamDiscontinuityMaxZStartMS: Int?
+    /// Longest self-similarity stripe (40 ms frames, cosine >= 0.95, at least two
+    /// spectral changes), its lag, and the stripes of 600 ms or more.
+    public let repetitionStripeLongestMS: Int?
+    public let repetitionStripeLagMS: Int?
+    public let repetitionStripeCount: Int?
+
+    public init(
+        algorithmVersion: Int = AudioQCSignalObservations.currentAlgorithmVersion,
+        integratedLoudnessLUFS: Double?,
+        shortTermLoudnessMaxLUFS: Double?,
+        loudnessRangeLU: Double?,
+        truePeakDBTP: Double?,
+        noiseFloorDBFS: Double?,
+        wadaSNRDB: Double?,
+        effectiveBandwidthHz: Double?,
+        spectralFluxEventCount: Int?,
+        spectralFluxEventsPerSecond: Double?,
+        codecFrameModulationIndex: Double?,
+        seamCount: Int,
+        seamDiscontinuityMaxZ: Double?,
+        seamDiscontinuityMaxZStartMS: Int?,
+        repetitionStripeLongestMS: Int?,
+        repetitionStripeLagMS: Int?,
+        repetitionStripeCount: Int?
+    ) {
+        self.algorithmVersion = algorithmVersion
+        self.integratedLoudnessLUFS = integratedLoudnessLUFS
+        self.shortTermLoudnessMaxLUFS = shortTermLoudnessMaxLUFS
+        self.loudnessRangeLU = loudnessRangeLU
+        self.truePeakDBTP = truePeakDBTP
+        self.noiseFloorDBFS = noiseFloorDBFS
+        self.wadaSNRDB = wadaSNRDB
+        self.effectiveBandwidthHz = effectiveBandwidthHz
+        self.spectralFluxEventCount = spectralFluxEventCount
+        self.spectralFluxEventsPerSecond = spectralFluxEventsPerSecond
+        self.codecFrameModulationIndex = codecFrameModulationIndex
+        self.seamCount = seamCount
+        self.seamDiscontinuityMaxZ = seamDiscontinuityMaxZ
+        self.seamDiscontinuityMaxZStartMS = seamDiscontinuityMaxZStartMS
+        self.repetitionStripeLongestMS = repetitionStripeLongestMS
+        self.repetitionStripeLagMS = repetitionStripeLagMS
+        self.repetitionStripeCount = repetitionStripeCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        algorithmVersion = try container.decodeIfPresent(Int.self, forKey: .algorithmVersion) ?? 1
+        integratedLoudnessLUFS = try container.decodeIfPresent(Double.self, forKey: .integratedLoudnessLUFS)
+        shortTermLoudnessMaxLUFS = try container.decodeIfPresent(Double.self, forKey: .shortTermLoudnessMaxLUFS)
+        loudnessRangeLU = try container.decodeIfPresent(Double.self, forKey: .loudnessRangeLU)
+        truePeakDBTP = try container.decodeIfPresent(Double.self, forKey: .truePeakDBTP)
+        noiseFloorDBFS = try container.decodeIfPresent(Double.self, forKey: .noiseFloorDBFS)
+        wadaSNRDB = try container.decodeIfPresent(Double.self, forKey: .wadaSNRDB)
+        effectiveBandwidthHz = try container.decodeIfPresent(Double.self, forKey: .effectiveBandwidthHz)
+        spectralFluxEventCount = try container.decodeIfPresent(Int.self, forKey: .spectralFluxEventCount)
+        spectralFluxEventsPerSecond = try container.decodeIfPresent(Double.self, forKey: .spectralFluxEventsPerSecond)
+        codecFrameModulationIndex = try container.decodeIfPresent(Double.self, forKey: .codecFrameModulationIndex)
+        seamCount = try container.decodeIfPresent(Int.self, forKey: .seamCount) ?? 0
+        seamDiscontinuityMaxZ = try container.decodeIfPresent(Double.self, forKey: .seamDiscontinuityMaxZ)
+        seamDiscontinuityMaxZStartMS = try container.decodeIfPresent(Int.self, forKey: .seamDiscontinuityMaxZStartMS)
+        repetitionStripeLongestMS = try container.decodeIfPresent(Int.self, forKey: .repetitionStripeLongestMS)
+        repetitionStripeLagMS = try container.decodeIfPresent(Int.self, forKey: .repetitionStripeLagMS)
+        repetitionStripeCount = try container.decodeIfPresent(Int.self, forKey: .repetitionStripeCount)
     }
 }
 

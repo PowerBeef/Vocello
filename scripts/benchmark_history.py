@@ -566,6 +566,14 @@ METRIC_KEYS = {
     # Clustered click events (audit #85, additive on audio QC v8): the count, the low-energy
     # subcount and events per second of audio. Observational.
     "clickEventCount", "lowEnergyClickEventCount", "clickEventsPerSecond",
+    # Stage 0 observational signal measures (AQ-04, additive on audio QC v8):
+    # BS.1770 loudness and true peak, the pause-percentile noise floor, WADA-SNR,
+    # effective bandwidth, spectral-flux events per second, the 12.5 Hz
+    # codec-frame modulation index, the largest seam z-score and the longest
+    # repetition stripe. Observational.
+    "integratedLoudnessLUFS", "shortTermLoudnessMaxLUFS", "loudnessRangeLU", "truePeakDBTP",
+    "noiseFloorDBFS", "wadaSNRDB", "effectiveBandwidthHz", "spectralFluxEventsPerSecond",
+    "codecFrameModulationIndex", "seamDiscontinuityMaxZ", "repetitionStripeLongestMS",
     # Played-audio capture (PC-01, 2026-09): the app's rendered output compared with the take.
     "playbackCaptureAlignmentMS", "playbackCaptureResidualDBFS", "playbackCaptureDropoutCount",
     "playbackCaptureMaxGapMS", "playbackCaptureFirstAudibleMS", "playbackCaptureCoverage",

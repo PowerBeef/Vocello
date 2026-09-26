@@ -84,15 +84,78 @@ public struct VocelloQwen3GenerationDiagnostics: Codable, Hashable, Sendable {
     public let timingsMilliseconds: [String: Int]
     public let booleanFlags: [String: Bool]
     public let stringFlags: [String: String]
+    /// The engine's own signals for this generation (AQ-04). nil when the model
+    /// produced none.
+    public let introspection: VocelloQwen3GenerationIntrospection?
 
     public init(
         timingsMilliseconds: [String: Int] = [:],
         booleanFlags: [String: Bool] = [:],
-        stringFlags: [String: String] = [:]
+        stringFlags: [String: String] = [:],
+        introspection: VocelloQwen3GenerationIntrospection? = nil
     ) {
         self.timingsMilliseconds = timingsMilliseconds
         self.booleanFlags = booleanFlags
         self.stringFlags = stringFlags
+        self.introspection = introspection
+    }
+}
+
+/// Privacy-safe summary of the talker's own signals over one generation
+/// (AQ-04, audit 2026-09-25, AQ-F09): codebook-0 token cycles, the per-step
+/// entropy and EOS probability of the talker distribution, and the streaming
+/// seams. Scalars and codec frame indices only; no token ids, text or tensors
+/// cross the boundary. Observational: no gate reads it yet.
+public struct VocelloQwen3GenerationIntrospection: Codable, Hashable, Sendable {
+    public static let currentAlgorithmVersion = 1
+
+    public let algorithmVersion: Int
+    /// Codebook-0 codec tokens generated.
+    public let codecFrameCount: Int
+    /// Longest run of one repeated token, in frames.
+    public let longestRepeatedTokenRunFrames: Int
+    /// The longest exact token cycle of period 2...32: period, frames covered,
+    /// whole repeats and first frame; nil when no n-gram repeats back to back.
+    public let tokenCyclePeriod: Int?
+    public let tokenCycleSpanFrames: Int?
+    public let tokenCycleRepeats: Int?
+    public let tokenCycleStartFrame: Int?
+    /// Talker steps with an entropy, its mean and 95th percentile in nats, and
+    /// the longest run of steps at or above 4 nats.
+    public let observedStepCount: Int
+    public let entropyMeanNats: Double?
+    public let entropyP95Nats: Double?
+    public let longestHighEntropyRunSteps: Int
+    /// EOS probability at the last step, its maximum and first step there, the
+    /// first step at or above 0.5, and the steps at or above 0.5 that went on.
+    public let eosProbabilityFinal: Double?
+    public let eosProbabilityMax: Double?
+    public let eosProbabilityMaxStep: Int?
+    public let eosFirstLikelyStep: Int?
+    public let eosLikelyStepsWithoutStop: Int
+    /// Codec frames where one streamed chunk ended and the next began.
+    public let seamCodecFrames: [Int]
+
+    /// `currentAlgorithmVersion` equals the engine summary's version
+    /// (`Qwen3GenerationIntrospectionTests` asserts it).
+    init(_ value: Qwen3GenerationIntrospectionSummary) {
+        algorithmVersion = Self.currentAlgorithmVersion
+        codecFrameCount = value.codecFrameCount
+        longestRepeatedTokenRunFrames = value.longestRepeatedTokenRunFrames
+        tokenCyclePeriod = value.tokenCyclePeriod
+        tokenCycleSpanFrames = value.tokenCycleSpanFrames
+        tokenCycleRepeats = value.tokenCycleRepeats
+        tokenCycleStartFrame = value.tokenCycleStartFrame
+        observedStepCount = value.observedStepCount
+        entropyMeanNats = value.entropyMeanNats
+        entropyP95Nats = value.entropyP95Nats
+        longestHighEntropyRunSteps = value.longestHighEntropyRunSteps
+        eosProbabilityFinal = value.eosProbabilityFinal
+        eosProbabilityMax = value.eosProbabilityMax
+        eosProbabilityMaxStep = value.eosProbabilityMaxStep
+        eosFirstLikelyStep = value.eosFirstLikelyStep
+        eosLikelyStepsWithoutStop = value.eosLikelyStepsWithoutStop
+        seamCodecFrames = value.seamCodecFrames
     }
 }
 
@@ -422,7 +485,8 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         return VocelloQwen3GenerationDiagnostics(
             timingsMilliseconds: provider?.latestPreparationTimingsMS ?? [:],
             booleanFlags: provider?.latestPreparationBooleanFlags ?? [:],
-            stringFlags: provider?.latestPreparationStringFlags ?? [:]
+            stringFlags: provider?.latestPreparationStringFlags ?? [:],
+            introspection: provider?.latestGenerationIntrospection.map(VocelloQwen3GenerationIntrospection.init)
         )
     }
 

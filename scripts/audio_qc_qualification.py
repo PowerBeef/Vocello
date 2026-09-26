@@ -77,7 +77,9 @@ META_CODES = frozenset({"instability-warn", "written-output-warn"})
 # --------------------------------------------------------------------------- #
 
 def _qc(samples: np.ndarray, text: str, *, slew_positions: bool = False) -> dict[str, Any]:
-    return audio_qc.fast_qc_v8(samples, sample_rate=ENGINE_SAMPLE_RATE, text=text, slew_positions=slew_positions)
+    # M1 scores the v8 flags; the observational `signal` block (AQ-04) moves none.
+    return audio_qc.fast_qc_v8(samples, sample_rate=ENGINE_SAMPLE_RATE, text=text, slew_positions=slew_positions,
+                               signal=False)
 
 
 def _families(report: dict[str, Any]) -> set[str]:

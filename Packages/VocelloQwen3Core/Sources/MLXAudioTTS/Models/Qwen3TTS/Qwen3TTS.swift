@@ -1376,6 +1376,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     private var storedPreparationTimingsMS: [String: Int] = [:]
     private var storedPreparationBooleanFlags: [String: Bool] = [:]
     private var storedPreparationStringFlags: [String: String] = [:]
+    private var storedGenerationIntrospection: Qwen3GenerationIntrospectionSummary?
     private let generationGate = Qwen3TTSGenerationGate()
 
     public var sampleRate: Int { config.sampleRate }
@@ -1409,11 +1410,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         return storedPreparationStringFlags
     }
 
+    public var latestGenerationIntrospection: Qwen3GenerationIntrospectionSummary? {
+        diagnosticsLock.lock()
+        defer { diagnosticsLock.unlock() }
+        return storedGenerationIntrospection
+    }
+
     public func resetPreparationDiagnostics() {
         diagnosticsLock.lock()
         storedPreparationTimingsMS = [:]
         storedPreparationBooleanFlags = [:]
         storedPreparationStringFlags = [:]
+        storedGenerationIntrospection = nil
         diagnosticsLock.unlock()
     }
 
@@ -3575,6 +3583,32 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // allocation-free entry point: no per-token allocation, lock or string
         // formatting.
         let stepSignpostLog = Qwen3Signposts.makeStepLog()
+        // AQ-04 engine introspection: fixed-state bookkeeping fed values the
+        // step already holds, summarized once when the loop exits (including a
+        // cancelled or failed one). The talker vocabulary is the codec codebook
+        // followed by the 1 024 special ids, EOS among them.
+        var generationIntrospector = Qwen3GenerationIntrospector()
+        let introspectionCodecVocabularySize = talkerConfig.vocabSize - 1024
+        // The step scalars need EOS outside the codebook and inside the
+        // vocabulary; a configuration without that records token cycles and
+        // seams only. The diagnostic `.deferred` policy evaluates nothing with
+        // the step, so the scalars would add their own syncs there: skipped.
+        // The scalar graph is compiled once per generation, so each step adds
+        // a few fused kernels to its own evaluation, not a dozen ops.
+        let introspectionStepScalars: (@Sendable ([MLXArray]) -> [MLXArray])? =
+            introspectionCodecVocabularySize > 0
+                && eosTokenId >= introspectionCodecVocabularySize
+                && eosTokenId < talkerConfig.vocabSize
+                && streamStepEvalPolicy != .deferred
+            ? Self.compiledIntrospectionScalars(
+                codecVocabularySize: introspectionCodecVocabularySize,
+                eosTokenId: eosTokenId
+            )
+            : nil
+        storeGenerationIntrospection(nil)
+        defer {
+            storeGenerationIntrospection(generationIntrospector.summary())
+        }
 
         if isStreaming {
             speechTokenizer.decoder.resetStreamingState()
@@ -3684,6 +3718,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
             // Defer sync to the eval boundary with inputEmbeds.
             let isEOS = nextToken .== eosTokenArray
+            // AQ-04: the entropy and EOS probability of this step's talker
+            // distribution, two scalars built from the logits already computed
+            // and evaluated with the step below (no extra synchronization).
+            let stepIntrospection: (entropy: MLXArray, eosProbability: MLXArray)? =
+                introspectionStepScalars.map { scalars in
+                    let values = scalars([logits])
+                    return (entropy: values[0], eosProbability: values[1])
+                }
             // Measured do-NOT (2026-07-26): submitting the talker+sampling
             // subgraph here with asyncEval to overlap the CP-loop graph build
             // regressed warm RTF (custom/long −3.9%) — the extra command
@@ -3769,14 +3811,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             codecEmbeddingAssemblyTotal += codecEmbeddingStartedAt.elapsed
             let streamStepEvalStartedAt = ContinuousClock.now
             os_signpost(.begin, log: stepSignpostLog, name: "Step Eval Flush")
-            switch streamStepEvalPolicy {
-            case .full:
+            switch (streamStepEvalPolicy, stepIntrospection) {
+            case (.full, let introspection?):
+                eval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
+            case (.full, nil):
                 eval(inputEmbeds, isEOS)
-            case .pipelined:
+            case (.pipelined, let introspection?):
+                asyncEval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
+            case (.pipelined, nil):
                 asyncEval(inputEmbeds, isEOS)
-            case .eosOnly:
+            case (.eosOnly, let introspection?):
+                eval(isEOS, introspection.entropy, introspection.eosProbability)
+            case (.eosOnly, nil):
                 eval(isEOS)
-            case .deferred:
+            case (.deferred, _):
                 break
             }
             os_signpost(.end, log: stepSignpostLog, name: "Step Eval Flush")
@@ -3838,6 +3886,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             } else if isVoiceCloneGeneration {
                 cloneStreamStepEOSReadTotal += eosReadElapsed
             }
+            // Both scalars were evaluated with the step, so these are reads.
+            if let stepIntrospection {
+                generationIntrospector.observeStep(
+                    entropy: stepIntrospection.entropy.item(Float.self),
+                    eosProbability: stepIntrospection.eosProbability.item(Float.self),
+                    stopped: reachedEOS
+                )
+            }
             if reachedEOS {
                 generationEndReason = "eos"
                 break
@@ -3864,6 +3920,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 try Task.checkCancellation()
             }
             samplerScratch.appendRepetitionTokenID(tokenId)
+            generationIntrospector.observeCodecToken(tokenId)
             generatedCodeCount += 1
             if isStreaming {
                 pendingStreamCodes.append(allCodes)
@@ -3933,6 +3990,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     pendingStreamCodes.removeAll(keepingCapacity: true)
                     streamChunkSchedule.didEmit()
                     emittedCodecFrameCount = chunkCodecEnd
+                    generationIntrospector.recordSeam(codecFrame: Int(chunkCodecEnd))
                     // `.pipelined`: leave the chunk lazily submitted and flush
                     // it at the top of the next token step. The flush point
                     // runs before every assembly, so at most one chunk is ever
@@ -4879,6 +4937,43 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             eosIndexCache = index
             eosIndexValue = tokenID
             return index
+        }
+    }
+
+    /// AQ-04: the entropy (nats) and EOS probability of one step's talker
+    /// distribution over the codec codebook and EOS, from the raw logits (before
+    /// suppression, repetition penalty, temperature or truncation): the model's
+    /// own belief, whatever the sampler then does. Two lazy scalars; the caller
+    /// evaluates them with the step's graph. Sampling never reads them.
+    static func introspectionScalars(
+        _ logits: MLXArray,
+        codecVocabularySize: Int,
+        eosTokenId: Int
+    ) -> (entropy: MLXArray, eosProbability: MLXArray) {
+        let step = logits[0..., (-1)..., 0...].squeezed(axis: 1).asType(.float32)
+        let joint = concatenated(
+            [step[0..., 0 ..< codecVocabularySize], step[0..., eosTokenId ..< (eosTokenId + 1)]],
+            axis: -1
+        )
+        let logProbabilities = joint - logSumExp(joint, axis: -1, keepDims: true)
+        let entropy = -(exp(logProbabilities) * logProbabilities).sum()
+        let eosProbability = exp(logProbabilities[0..., codecVocabularySize...]).sum()
+        return (entropy, eosProbability)
+    }
+
+    /// `introspectionScalars` compiled for one generation's vocabulary layout:
+    /// `[logits]` in, `[entropy, eosProbability]` out. Built once per generation.
+    static func compiledIntrospectionScalars(
+        codecVocabularySize: Int,
+        eosTokenId: Int
+    ) -> @Sendable ([MLXArray]) -> [MLXArray] {
+        compile { (arrays: [MLXArray]) -> [MLXArray] in
+            let scalars = Qwen3TTSModel.introspectionScalars(
+                arrays[0],
+                codecVocabularySize: codecVocabularySize,
+                eosTokenId: eosTokenId
+            )
+            return [scalars.entropy, scalars.eosProbability]
         }
     }
 
@@ -5947,6 +6042,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     private func mergePreparationStringFlags(_ flags: [String: String]) {
         diagnosticsLock.lock()
         storedPreparationStringFlags.merge(flags) { _, rhs in rhs }
+        diagnosticsLock.unlock()
+    }
+
+    /// Once per generation, when its loop exits (never per token).
+    private func storeGenerationIntrospection(_ summary: Qwen3GenerationIntrospectionSummary?) {
+        diagnosticsLock.lock()
+        storedGenerationIntrospection = summary
         diagnosticsLock.unlock()
     }
 

@@ -387,6 +387,42 @@ def validate_preparation_evidence(value: Any, field: str) -> None:
         raise ContractError(f"{field}.violations is not a sorted allowlisted set")
 
 
+AUDIO_QC_SIGNAL_INTEGERS = (
+    "spectralFluxEventCount", "seamDiscontinuityMaxZStartMS", "repetitionStripeLongestMS",
+    "repetitionStripeLagMS", "repetitionStripeCount",
+)
+AUDIO_QC_SIGNAL_NONNEGATIVE = (
+    "loudnessRangeLU", "effectiveBandwidthHz", "spectralFluxEventsPerSecond", "codecFrameModulationIndex",
+)
+AUDIO_QC_SIGNAL_REALS = (
+    "integratedLoudnessLUFS", "shortTermLoudnessMaxLUFS", "truePeakDBTP", "noiseFloorDBFS", "wadaSNRDB",
+    "seamDiscontinuityMaxZ", *AUDIO_QC_SIGNAL_NONNEGATIVE,
+)
+
+
+def validate_audio_qc_signal(value: Any, field: str) -> None:
+    """AudioQCSignalObservations (AQ-04): Swift Codable omits the nil fields."""
+    if value is None:
+        return
+    allowed = {"algorithmVersion", "seamCount", *AUDIO_QC_SIGNAL_INTEGERS, *AUDIO_QC_SIGNAL_REALS}
+    if not isinstance(value, dict) or not {"algorithmVersion", "seamCount"}.issubset(value) or set(value) - allowed:
+        raise ContractError(f"{field} does not match AudioQCSignalObservations")
+    if type(value["algorithmVersion"]) is not int or value["algorithmVersion"] < 1:
+        raise ContractError(f"{field}.algorithmVersion is invalid")
+    for key in ("seamCount", *AUDIO_QC_SIGNAL_INTEGERS):
+        observed = value.get(key)
+        if observed is not None and (type(observed) is not int or observed < 0):
+            raise ContractError(f"{field}.{key} is invalid")
+    for key in AUDIO_QC_SIGNAL_REALS:
+        observed = value.get(key)
+        if observed is None:
+            continue
+        if isinstance(observed, bool) or not isinstance(observed, (int, float)) or not math.isfinite(float(observed)):
+            raise ContractError(f"{field}.{key} is invalid")
+        if key in AUDIO_QC_SIGNAL_NONNEGATIVE and observed < 0:
+            raise ContractError(f"{field}.{key} is invalid")
+
+
 def validate_audio_qc(value: Any, field: str) -> None:
     required = {
         "algorithmVersion", "instabilityVerdict", "writtenOutputVerdict", "verdict",
@@ -403,9 +439,12 @@ def validate_audio_qc(value: Any, field: str) -> None:
         "stepBurstPeakCount", "stepBurstPeakStartMS",
         "speakingRateTextUnits", "secondsPerTextUnit",
         "clickEventCount", "lowEnergyClickEventCount", "clickEventsPerSecond",
+        # Since 2026-09-26 (AQ-04): the observational Stage 0 signal measures.
+        "signal",
     }
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ContractError(f"{field} does not match complete AudioQCReport")
+    validate_audio_qc_signal(value.get("signal"), f"{field}.signal")
     for key in (
         "stepBurstPeakCount", "stepBurstPeakStartMS", "speakingRateTextUnits",
         "clickEventCount", "lowEnergyClickEventCount",

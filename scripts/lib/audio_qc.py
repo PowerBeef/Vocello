@@ -44,6 +44,23 @@ QC_METRIC_MAP = (
     ("lowEnergyClickEventCount", "lowEnergyClickEventCount"),
     ("clickEventsPerSecond", "clickEventsPerSecond"),
 )
+# Since 2026-09-26 (AQ-04, additive on QC v8): the Stage 0 observational signal
+# measures, read from the report's `signal` block (AudioQCSignalObservations,
+# mirrored by lib/audio_qc_observations.py) under the same names. Observational;
+# no verdict reads them. Absent on older rows.
+QC_SIGNAL_METRIC_MAP = (
+    ("integratedLoudnessLUFS", "integratedLoudnessLUFS"),
+    ("shortTermLoudnessMaxLUFS", "shortTermLoudnessMaxLUFS"),
+    ("loudnessRangeLU", "loudnessRangeLU"),
+    ("truePeakDBTP", "truePeakDBTP"),
+    ("noiseFloorDBFS", "noiseFloorDBFS"),
+    ("wadaSNRDB", "wadaSNRDB"),
+    ("effectiveBandwidthHz", "effectiveBandwidthHz"),
+    ("spectralFluxEventsPerSecond", "spectralFluxEventsPerSecond"),
+    ("codecFrameModulationIndex", "codecFrameModulationIndex"),
+    ("seamDiscontinuityMaxZ", "seamDiscontinuityMaxZ"),
+    ("repetitionStripeLongestMS", "repetitionStripeLongestMS"),
+)
 VERDICT_KEYS = ("verdict", "instabilityVerdict", "writtenOutputVerdict")
 VERDICT_RANK = {"pass": 0, "warn": 1, "fail": 2}
 
@@ -70,6 +87,10 @@ def qc_metrics(raw_qc: dict[str, Any]) -> dict[str, float]:
     metrics: dict[str, float] = {}
     for source, target in QC_METRIC_MAP:
         if (value := finite_number(raw_qc.get(source))) is not None:
+            metrics[target] = value
+    signal = raw_qc.get("signal") if isinstance(raw_qc.get("signal"), dict) else {}
+    for source, target in QC_SIGNAL_METRIC_MAP:
+        if (value := finite_number(signal.get(source))) is not None:
             metrics[target] = value
     return metrics
 
@@ -395,14 +416,18 @@ def _limiter_pass(np: Any, raw: Any) -> tuple[dict[str, Any], Any]:
 
 
 def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = None,
-               expected_pauses: int | None = None, slew_positions: bool = False) -> dict[str, Any]:
+               expected_pauses: int | None = None, slew_positions: bool = False,
+               signal: bool = True, seam_offsets: Any = ()) -> dict[str, Any]:
     """The v8 `audioQC` report the engine would write for this float output.
 
     `text` is the spoken request text: it sets the pause budget (unless
     `expected_pauses` is given) and the speaking-rate check, which is skipped
     without it, as for a bare persisted file. `slew_positions` adds the
     mirror-only `slewLimitedSampleIndices` (the samples the click counter
-    clamped), for locating what a click alarm responded to.
+    clamped), for locating what a click alarm responded to. `signal` adds the
+    report's observational `signal` block (AQ-04) over the persisted PCM16,
+    with `seam_offsets` the streaming seams in the written file; it moves no
+    flag or verdict, so callers that score only the v8 flags may skip it.
     """
     import numpy as np
 
@@ -420,6 +445,12 @@ def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = No
                                expected_pauses=pauses, text=text)
     if slew_positions:
         report["slewLimitedSampleIndices"] = list(stream["slewLimitedSampleIndices"])
+    if signal:
+        from lib import audio_qc_observations
+
+        report["signal"] = audio_qc_observations.signal_observations(
+            pcm16, sample_rate=sample_rate, seam_offsets=seam_offsets
+        )
     return report
 
 

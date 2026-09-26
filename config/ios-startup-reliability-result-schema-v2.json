@@ -119,7 +119,31 @@
         "secondsPerTextUnit": {"type": ["number", "null"], "exclusiveMinimum": 0},
         "clickEventCount": {"type": ["integer", "null"], "minimum": 0},
         "lowEnergyClickEventCount": {"type": ["integer", "null"], "minimum": 0},
-        "clickEventsPerSecond": {"type": ["number", "null"], "minimum": 0}
+        "clickEventsPerSecond": {"type": ["number", "null"], "minimum": 0},
+        "signal": {"oneOf": [{"$ref": "#/$defs/audioQCSignal"}, {"type": "null"}]}
+      }
+    },
+    "audioQCSignal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithmVersion", "seamCount"],
+      "properties": {
+        "algorithmVersion": {"type": "integer", "minimum": 1},
+        "integratedLoudnessLUFS": {"type": ["number", "null"]},
+        "shortTermLoudnessMaxLUFS": {"type": ["number", "null"]},
+        "loudnessRangeLU": {"type": ["number", "null"], "minimum": 0},
+        "truePeakDBTP": {"type": ["number", "null"]},
+        "noiseFloorDBFS": {"type": ["number", "null"]},
+        "wadaSNRDB": {"type": ["number", "null"]},
+        "effectiveBandwidthHz": {"type": ["number", "null"], "minimum": 0},
+        "spectralFluxEventCount": {"type": ["integer", "null"], "minimum": 0},
+        "spectralFluxEventsPerSecond": {"type": ["number", "null"], "minimum": 0},
+        "codecFrameModulationIndex": {"type": ["number", "null"], "minimum": 0},
+        "seamCount": {"type": "integer", "minimum": 0},
+        "seamDiscontinuityMaxZ": {"type": ["number", "null"]},
+        "seamDiscontinuityMaxZStartMS": {"type": ["integer", "null"], "minimum": 0},
+        "repetitionStripeLongestMS": {"type": ["integer", "null"], "minimum": 0},
+        "repetitionStripeLagMS": {"type": ["integer", "null"], "minimum": 0},
+        "repetitionStripeCount": {"type": ["integer", "null"], "minimum": 0}
       }
     },
     "audioCadenceQC": {

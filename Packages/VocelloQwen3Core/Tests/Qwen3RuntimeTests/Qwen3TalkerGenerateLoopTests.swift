@@ -460,4 +460,36 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let take = try await generate(model, seed: 0x5EED_0006, maximumCodecTokens: 3)
         XCTAssertGreaterThanOrEqual(take.frames.count, 2)
     }
+
+    /// AQ-04: the loop records its own signals without changing what it samples.
+    func testGenerationRecordsItsIntrospection() async throws {
+        let model = try Self.makeModel()
+        let take = try await generate(model, seed: 0x5EED_0007)
+        let summary = try XCTUnwrap(model.latestGenerationIntrospection)
+        XCTAssertEqual(summary.codecFrameCount, take.frames.count)
+        // One observed step per codec frame, plus the step that sampled EOS.
+        XCTAssertEqual(summary.observedStepCount, take.frames.count + (take.finishReason == .eos ? 1 : 0))
+        let entropy = try XCTUnwrap(summary.entropyMeanNats)
+        XCTAssertGreaterThanOrEqual(entropy, 0)
+        XCTAssertLessThanOrEqual(entropy, log(Double(Self.codebookSize + 1)) + 1e-3)
+        let eos = try XCTUnwrap(summary.eosProbabilityMax)
+        XCTAssertTrue((0 ... 1).contains(eos))
+        XCTAssertEqual(summary.seamCodecFrames, [], "quality-first decodes once, with no seam")
+        // The token statistics are those of the codebook-0 trace itself.
+        var replay = Qwen3GenerationIntrospector()
+        for frame in take.frames {
+            replay.observeCodecToken(Int(frame[0]))
+        }
+        let expected = replay.summary()
+        XCTAssertEqual(summary.longestRepeatedTokenRunFrames, expected.longestRepeatedTokenRunFrames)
+        XCTAssertEqual(summary.tokenCyclePeriod, expected.tokenCyclePeriod)
+        XCTAssertEqual(summary.tokenCycleSpanFrames, expected.tokenCycleSpanFrames)
+        // With introspection on, the same seed still replays the same codes. That
+        // sampling never reads the scalars is by construction (they are separate
+        // outputs of the step's evaluation), not something this replay proves.
+        let replayTake = try await generate(model, seed: 0x5EED_0007)
+        XCTAssertEqual(replayTake.frames, take.frames)
+        model.resetPreparationDiagnostics()
+        XCTAssertNil(model.latestGenerationIntrospection)
+    }
 }

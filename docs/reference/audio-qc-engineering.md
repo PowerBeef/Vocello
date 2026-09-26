@@ -5,6 +5,7 @@ reviewed: 2026-09-26
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
+  - Sources/QwenVoiceCore/AudioQCSignalObserver.swift
   - Sources/QwenVoiceCore/GenerationQualityComposition.swift
   - Sources/SharedSupport/Services/VoiceClipTranscriber.swift
   - scripts/analyze_prosody.py
@@ -18,6 +19,7 @@ sourceOfTruth:
   - scripts/independent_asr.py
   - scripts/lib/language_metrics.py
   - scripts/lib/audio_qc.py
+  - scripts/lib/audio_qc_observations.py
   - scripts/derive_audio_qc_bounds.py
   - scripts/audio_qc_qualification.py
   - scripts/lib/qc_qualification/composer.py
@@ -30,6 +32,7 @@ sourceOfTruth:
   - config/audio-qc-judges.json
   - config/audio-qc-qualification-policy.json
   - config/audio-qc-stage0-calibration.json
+  - config/audio-qc-stage0-observations.json
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -877,6 +880,76 @@ difference: both sides write PCM16 at x 32767, but the mirror reads the persiste
 The persisted pass supplies only the output sums and silence runs, so RMS and DC differ by a factor
 of 32767/32768 (-0.00027 dB), no PCM16 value changes side of the 0.001 silence floor, and a
 persisted-pass step can clamp differently only within one LSB of the 0.42 slew bound.
+
+### Stage 0 observational measures and engine introspection (AQ-04, 2026-09-26)
+
+Fast QC reads amplitude and waveform shape only (audit AQ-F08). AQ-04 adds the audit's Stage 0
+candidates (section 4.5) as observations: no flag, verdict or Fast QC version reads them, they join
+QC v8 additively like the clustered click events (decision 8(a): the M6 gate baseline binds v8),
+and a measure gates only after a qualified record under the authority below.
+
+**Signal measures** (`AudioQCSignalObserver`, `AudioQCReport.signal`, own `algorithmVersion` 1).
+The persisted-WAV pass feeds the observer the exact blocks it verifies, so every published take
+(the streaming adapter and the atomic WAV sink) carries them; streamed takes pass the frame offsets
+where one published chunk ends and the next begins.
+
+- BS.1770-4 loudness of the mono take: K-weighting designed at the take's rate from the analog
+  prototype (libebur128's design; at 48 kHz it reproduces the published coefficients), integrated
+  loudness over 400 ms blocks every 100 ms gated at -70 LUFS and -10 LU, the maximum 3 s short-term
+  loudness every 100 ms, and the EBU Tech 3342 loudness range (3 s every second, -70 LUFS and
+  -20 LU, 10th to 95th percentile). A -20 dBFS 997 Hz tone reads -22.98 LUFS at 24 kHz.
+- 4x true peak (dBTP) through a 49-tap Hann-windowed sinc (libebur128's design; phase 0 is the input).
+- Noise floor: the nearest-rank 10th percentile of 10 ms frame levels, floored at -120 dBFS.
+- WADA-SNR (Kim and Stern 2008) over the nonzero samples: the paper's 1e-10 floor would read any take
+  with digital silence as the table's 100 dB ceiling. The Gamma (alpha 0.4) table is derived by
+  quadrature of the paper's model (`wada_gamma_table`, within 0.0053 of the published simulation)
+  and stored in the record. A pure tone reads the table floor, -20 dB.
+- Effective bandwidth: the highest bin of the active frames' long-term spectrum (Hann 512 at 24 kHz,
+  10 ms hop, frames at or above -60 dBFS) within 50 dB of its maximum.
+- Spectral-flux events per second: frames whose mean positive dB rise per bin over the previous
+  frame reaches 10 dB; rises within 50 ms are one event. Speech onsets count as well as clicks.
+- Codec-frame modulation index: 2 |DFT at 12.5 Hz| / sum of the 10 ms RMS envelope over whole
+  periods (the tokenizer frame rate is exactly 8 frames).
+- Seam discontinuity: at each streaming seam, the first difference against the 10 ms either side,
+  (d - mean) / max(std, 1 LSB); the maximum and where it starts.
+- Repetition stripe: 40 ms frames of 16 mean-removed log band levels; the longest run along one lag
+  (200 ms to 15 s) of active frames with cosine at least 0.95 that holds two or more spectral changes
+  (so a steady tone forms none), its lag, and the count of runs of 600 ms or more.
+
+Eleven of them reach the tracked take as `audioQC.metrics` (`QC_SIGNAL_METRIC_MAP`: the three
+loudness values, true peak, noise floor, WADA-SNR, bandwidth, flux events per second, modulation
+index, seam maximum z and the longest stripe), which answers AQ-F11's "loudness never reaches
+history". Cost: fixed scratch per take, per-block temporaries and one scalar per 10 ms frame,
+100 ms loudness block and 40 ms feature frame, well under 1 MB for a two-minute take; the FFT,
+K-weighting and true-peak filters run in Accelerate and the stripe search is linear in take length
+(at most 375 lags). Estimated at a few milliseconds per 10 s take in an optimized build; the
+development build's scalar loops cost more. The time falls inside the request window, so it is
+product work that RTF deltas measure; what the engine-generation kind measures does not change, and
+its measurement version stays 2.
+
+**Engine introspection** (`Qwen3GenerationIntrospector`, the facade's
+`VocelloQwen3GenerationIntrospection`, the engine row's `engineIntrospection`, own version 1). The
+generate loop builds two lazy scalars from the talker logits it already holds, the entropy and EOS
+probability of the distribution over the codec codebook and EOS before suppression, penalty,
+temperature or truncation, through a graph compiled once per generation, and evaluates them with
+the step's own graph, so the reads after the token read add no synchronization and sampling never
+sees them. The diagnostic `.deferred` step policy, which evaluates nothing with the step, skips them.
+The added GPU work is a few fused kernels per step; its RTF cost is for the gate bench to measure. Per step it updates fixed state
+allocated once: a 32-token ring with 32 run counters (the longest exact cycle of period 2 to 32,
+ties to the shortest period, so a stuck token counts as a run), a 1/32-nat entropy histogram (mean,
+nearest-rank p95, the longest run at or above 4 nats), the EOS maximum, final value, first step at
+or above 0.5 and the steps at or above 0.5 that did not stop, and at most 256 seam frames. The loop
+takes no lock and formats no string per token; the summary is stored once, when the loop exits,
+cancelled or not.
+
+**Parity.** Swift owns every constant; `config/audio-qc-stage0-observations.json` pins both sides
+(`AudioQCSignalObservationTests`, `Qwen3GenerationIntrospectionTests`,
+`scripts/tests/test_audio_qc_observations.py`), and the shared fixtures
+`scripts/tests/fixtures/audio_qc_stage0_observations.json` (tones, silence, clicks, repeated
+segments, 12.5 Hz modulation, seams, token loops and step trajectories) hold the expected values of
+the float64 mirror `scripts/lib/audio_qc_observations.py`: integers must match exactly, reals within
+one four-decimal rounding step. `fast_qc_v8()` adds the `signal` block unless asked not to; the
+qualification engine's M1 skips it because it scores only the v8 flags.
 
 ### Threshold-change authority
 

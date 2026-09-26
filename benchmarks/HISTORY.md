@@ -1012,6 +1012,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-26 | [`mac-witness-profile-20260926-015308-67e3045b`](runs/instrument-profile/mac-witness-profile-20260926-015308-67e3045b.json) | instrumented | instrumented | passedWithWarnings | qualified | 4 | 0.27 | `f40381eb9080` | `excluded` | baseline | instrument-witness-profile |
 
+## instrument-profile / macos / mac-mini-m6-16gb / config `5777a9c126b0`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-26 | [`mac-cpu-profile-20260926-181200-bfb871c8`](runs/instrument-profile/mac-cpu-profile-20260926-181200-bfb871c8.json) | instrumented | instrumented | passedWithWarnings | qualified | 4 | 0.27 | `18d3bf9fdb51` | `excluded` | baseline | instrument-cpu-profile |
+
 ## language / ios / iphone-17-pro / config `12e46802c192`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -1,5 +1,5 @@
 import Foundation
-import QwenVoiceCore
+@testable import QwenVoiceCore
 import XCTest
 
 final class GenerationSemanticsLanguageTests: XCTestCase {
@@ -238,6 +238,40 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
                 "expected \(expected.rawValue) for script snippet"
             )
         }
+    }
+
+    /// CORE-11: a script decides Auto only when it carries most of the text.
+    func testStrayNonLatinWordsDoNotRedirectAutoLanguage() {
+        let cases: [(String, Qwen3SupportedLanguage)] = [
+            ("The capital of Japan is 東京, a city of many trains.", .english),
+            ("Our friend Сергей will visit the museum tomorrow morning.", .english),
+            ("Nous avons visité Séoul (서울) pendant les vacances d'été.", .french),
+            ("我喜欢用iPhone拍照片。", .chinese),
+            ("今日はAppleのiPhoneを買いました。", .japanese),
+            ("오늘 서울에서 iPhone을 샀습니다.", .korean),
+            ("Я купил новый iPhone в Москве.", .russian),
+        ]
+        for (text, expected) in cases {
+            let request = LanguageTestSupport.makeRequest(
+                mode: .custom,
+                text: text,
+                languageHint: Qwen3SupportedLanguage.auto.rawValue
+            )
+            XCTAssertEqual(
+                GenerationSemantics.qwenLanguageHint(for: request),
+                expected.rawValue,
+                text
+            )
+        }
+    }
+
+    func testScriptUnitsCountCharactersAndWords() {
+        let units = GenerationSemantics.ScriptUnits(counting: "Tokyo 東京, Café\u{301} and Москва 2026!")
+        XCTAssertEqual(units.han, 2)
+        XCTAssertEqual(units.otherWords, 3, "a combining mark continues its word")
+        XCTAssertEqual(units.cyrillicWords, 1)
+        XCTAssertEqual(units.total, 6)
+        XCTAssertEqual(GenerationSemantics.ScriptUnits(counting: "12:30 — !?").total, 0)
     }
 
     func testOmittedLanguageHintBehavesLikeAutoForCustom() {

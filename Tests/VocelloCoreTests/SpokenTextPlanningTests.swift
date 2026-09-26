@@ -116,6 +116,36 @@ final class SpokenTextPlanningTests: XCTestCase {
         )
     }
 
+    /// CORE-10: a Windows CRLF is one line break, not a paragraph break, so it
+    /// plans the 80 ms whitespace pause and not the 500 ms paragraph pause.
+    func testWindowsLineBreaksCountAsOneLineBreak() throws {
+        XCTAssertEqual(
+            try SpokenTextPlanner.plan(originalText: "First line.\r\nSecond line.").spokenText,
+            "First line. Second line."
+        )
+        XCTAssertEqual(
+            try SpokenTextPlanner.plan(originalText: "First line.\nSecond line.").spokenText,
+            "First line. Second line."
+        )
+        XCTAssertEqual(
+            try SpokenTextPlanner.plan(originalText: "One.\r\n\r\nTwo.").spokenText,
+            "One.\n\nTwo."
+        )
+        XCTAssertEqual(
+            try SpokenTextPlanner.plan(originalText: "One.\r\rTwo.").spokenText,
+            "One.\n\nTwo."
+        )
+
+        let plan = try LongFormPlanner.plan(
+            spokenTextPlan: SpokenTextPlanner.plan(
+                originalText: "The first sentence runs on.\r\nThe second sentence runs on too."
+            ),
+            configuration: LongFormPlanningConfiguration(runtimeTokenLimit: 12, baseSeed: 1)
+        )
+        XCTAssertGreaterThan(plan.segments.count, 1)
+        XCTAssertFalse(plan.evidence.segments.contains { $0.boundary == .paragraph })
+    }
+
     func testNormalizationIsIdempotent() throws {
         let original = "  Cafe\u{301}\u{00A0}\u{00A0}\u{201C}hello\u{201D}\r\n\r\n\u{FF11}\u{FF12}\u{FF13}\u{FF0E}  "
         let first = try SpokenTextPlanner.plan(originalText: original)

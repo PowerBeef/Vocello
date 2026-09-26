@@ -1141,17 +1141,18 @@ public enum GenerationSemantics {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        if trimmed.unicodeScalars.contains(where: \.isJapaneseScalar) {
-            return .japanese
+        // A script decides the take's language only when it carries most of
+        // the text (CORE-11): one stray "東京" in an English sentence must not
+        // send the whole take as Chinese.
+        let units = ScriptUnits(counting: trimmed)
+        if units.eastAsian * 2 > units.total {
+            if units.kana > 0, units.kana >= units.hangul {
+                return .japanese
+            }
+            return units.hangul > 0 ? .korean : .chinese
         }
-        if trimmed.unicodeScalars.contains(where: \.isHangulScalar) {
-            return .korean
-        }
-        if trimmed.unicodeScalars.contains(where: \.isCyrillicScalar) {
+        if units.cyrillicWords * 2 > units.total {
             return .russian
-        }
-        if trimmed.unicodeScalars.contains(where: \.isCJKScalar) {
-            return .chinese
         }
         // Latin scripts are indistinguishable by Unicode range — resolve
         // French/German/Spanish/Portuguese/Italian/English via the shared
@@ -1163,6 +1164,57 @@ public enum GenerationSemantics {
         // an explicit language outperforms Auto.)
         let recognized = PromptLanguageDetector.detect(trimmed)
         return recognized == .auto ? nil : recognized
+    }
+
+    /// Script proportions of a text, in comparable units: one per Han, kana
+    /// or Hangul character (each is about a syllable or a short word) and one
+    /// per run of Cyrillic or other letters (a word). Digits, punctuation and
+    /// spaces do not count; combining marks continue the current word.
+    struct ScriptUnits: Equatable {
+        private(set) var han = 0
+        private(set) var kana = 0
+        private(set) var hangul = 0
+        private(set) var cyrillicWords = 0
+        private(set) var otherWords = 0
+
+        var eastAsian: Int { han + kana + hangul }
+        var total: Int { eastAsian + cyrillicWords + otherWords }
+
+        init(counting text: String) {
+            enum Run { case idle, cyrillic, other }
+            var run = Run.idle
+            for scalar in text.unicodeScalars {
+                if scalar.isJapaneseScalar {
+                    kana += 1
+                    run = .idle
+                } else if scalar.isHangulScalar {
+                    hangul += 1
+                    run = .idle
+                } else if scalar.isCJKScalar {
+                    han += 1
+                    run = .idle
+                } else if scalar.isCyrillicScalar {
+                    if run != .cyrillic { cyrillicWords += 1 }
+                    run = .cyrillic
+                } else if scalar.properties.isAlphabetic {
+                    if run != .other { otherWords += 1 }
+                    run = .other
+                } else if Self.isCombiningMark(scalar) {
+                    continue
+                } else {
+                    run = .idle
+                }
+            }
+        }
+
+        private static func isCombiningMark(_ scalar: Unicode.Scalar) -> Bool {
+            switch scalar.properties.generalCategory {
+            case .nonspacingMark, .spacingMark, .enclosingMark:
+                return true
+            default:
+                return false
+            }
+        }
     }
 }
 

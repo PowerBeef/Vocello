@@ -109,6 +109,68 @@ final class LongFormAssemblyTests: XCTestCase {
         )
     }
 
+    /// CORE-12: a quiet segment with a near-ceiling peak is boosted only up to
+    /// the limiter's ceiling, never clipped at full scale; a quiet segment
+    /// without such a peak still gets the full loudness gain.
+    func testLoudnessGainNeverPushesAPeakPastTheCeiling() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let peak: Int16 = 31_000
+        var peaky = (0..<2_000).map { frame -> Int16 in frame.isMultiple(of: 2) ? 1_000 : -1_000 }
+        for index in stride(from: 100, to: 2_000, by: 400) {
+            peaky[index] = peak
+            peaky[index + 1] = -peak
+        }
+        let peakyURL = fixture.directory.appendingPathComponent("peaky.wav")
+        try AtomicPCM16WAVWriter.write(
+            pcmSamples: peaky,
+            sampleRate: fixture.configuration.sampleRate,
+            outputURL: peakyURL
+        )
+        let quietURL = try fixture.makeAudioFile(
+            name: "quiet",
+            audibleFrames: 2_000,
+            edgeSilence: 0,
+            amplitude: 1_000
+        )
+        let output = fixture.directory.appendingPathComponent("joined.wav")
+        let evidence = try await BoundedLongFormAssembler.assemble(
+            segments: [
+                LongFormAssemblySegmentSource(
+                    segmentID: "peaky",
+                    audioURL: peakyURL,
+                    boundary: .sentence,
+                    intendedPauseMilliseconds: 0
+                ),
+                LongFormAssemblySegmentSource(
+                    segmentID: "quiet",
+                    audioURL: quietURL,
+                    boundary: .endOfText,
+                    intendedPauseMilliseconds: 0
+                ),
+            ],
+            outputURL: output,
+            configuration: fixture.configuration
+        )
+
+        let ceiling = Double(PCM16StreamLimiter.ceiling) * Double(Int16.max)
+        let peakyGain = evidence.segments[0].appliedGain
+        XCTAssertGreaterThan(peakyGain, 1, "the quiet body still gets a boost")
+        XCTAssertLessThan(peakyGain, fixture.configuration.maximumGain)
+        XCTAssertLessThanOrEqual(Double(peak) * peakyGain, ceiling + 0.5)
+        XCTAssertEqual(evidence.segments[1].appliedGain, fixture.configuration.maximumGain)
+
+        let file = try AVAudioFile(forReading: output, commonFormat: .pcmFormatInt16, interleaved: false)
+        let buffer = try XCTUnwrap(
+            AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
+        )
+        try file.read(into: buffer)
+        let samples = try XCTUnwrap(buffer.int16ChannelData?[0])
+        let maximum = (0..<Int(buffer.frameLength)).map { abs(Int(samples[$0])) }.max() ?? 0
+        XCTAssertLessThanOrEqual(Double(maximum), ceiling + 0.5)
+        XCTAssertLessThan(maximum, Int(Int16.max), "no sample reaches the 16-bit clamp")
+    }
+
     func testSmoothJoinRecordsNoAdvisoryAndOldEvidenceDecodesWithoutTheField() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

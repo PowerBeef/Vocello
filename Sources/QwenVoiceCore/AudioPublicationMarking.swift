@@ -142,6 +142,12 @@ public enum AudioPublicationMarker {
 /// file. Both product writers emit the canonical 44-byte layout; the walk
 /// keeps the marker correct if a writer ever adds a chunk before `data`.
 struct WAVDataLayout {
+    /// One scale both ways, the one the product writers quantize with
+    /// (`Float(Int16.max)`), so a sample the marker leaves unchanged is written
+    /// back bit for bit (CORE-22: reading /32768 and writing *32767 moved
+    /// large samples by one LSB).
+    static let pcm16Scale: Float = 32_767
+
     let dataOffset: UInt64
     let sampleCount: Int
 
@@ -197,7 +203,7 @@ struct WAVDataLayout {
         raw.withUnsafeBytes { bytes in
             let int16 = bytes.bindMemory(to: Int16.self)
             for index in 0 ..< sampleCount {
-                samples[index] = Float(Int16(littleEndian: int16[index])) / 32768.0
+                samples[index] = Float(Int16(littleEndian: int16[index])) / Self.pcm16Scale
             }
         }
         return samples
@@ -207,8 +213,8 @@ struct WAVDataLayout {
         precondition(samples.count == sampleCount)
         var raw = Data(capacity: sampleCount * 2)
         for value in samples {
-            let clamped = max(-1.0, min(1.0, value))
-            let quantized = Int16(max(-32768.0, min(32767.0, (clamped * 32767.0).rounded())))
+            let scaled = value.isNaN ? 0 : (value * Self.pcm16Scale).rounded()
+            let quantized = Int16(max(-32768.0, min(32767.0, scaled)))
             withUnsafeBytes(of: quantized.littleEndian) { raw.append(contentsOf: $0) }
         }
         let handle = try FileHandle(forUpdating: url)

@@ -59,8 +59,8 @@ final class AudioPublicationMarkingTests: XCTestCase {
         for (index, original) in samples.enumerated() where index % 977 == 0 {
             XCTAssertEqual(
                 rewritten[index],
-                Float(Int16((Float(original) / 32768.0 * 0.5 * 32767.0).rounded())) / 32768.0,
-                accuracy: 1.0 / 32768.0,
+                Float(Int16((Float(original) * 0.5).rounded())) / 32767.0,
+                accuracy: 1.0 / 32767.0,
                 "transform must land in the data chunk"
             )
         }
@@ -80,6 +80,32 @@ final class AudioPublicationMarkingTests: XCTestCase {
         let riffSize = UInt32(bytes[4]) | UInt32(bytes[5]) << 8
             | UInt32(bytes[6]) << 16 | UInt32(bytes[7]) << 24
         XCTAssertEqual(Int(riffSize), bytes.count - 8)
+    }
+
+    /// CORE-22: reading and writing use one scale, so samples an identity
+    /// transform leaves alone are written back bit for bit, including both
+    /// extremes.
+    func testIdentityTransformRewritesTheDataChunkBitForBit() throws {
+        var samples: [Int16] = [.min, .min + 1, -32_000, -1, 0, 1, 16_384, 31_620, 32_000, .max - 1, .max]
+        samples += (0 ..< 4_800).map { Int16(truncatingIfNeeded: $0 &* 13_579) }
+        let url = try makeWAV(samples: samples)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let layout = try WAVDataLayout(contentsOf: url)
+        let before = try Data(contentsOf: url).subdata(
+            in: Int(layout.dataOffset) ..< Int(layout.dataOffset) + samples.count * 2
+        )
+
+        XCTAssertTrue(try AudioPublicationMarker.markStagedWAV(
+            at: url,
+            configuration: configuration,
+            environment: [:],
+            transform: { $0 }
+        ))
+
+        let after = try Data(contentsOf: url).subdata(
+            in: Int(layout.dataOffset) ..< Int(layout.dataOffset) + samples.count * 2
+        )
+        XCTAssertEqual(after, before)
     }
 
     func testRegisteredOverrideDisablesBothMarks() throws {

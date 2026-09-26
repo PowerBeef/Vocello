@@ -388,9 +388,12 @@ public enum SpokenTextPlanner {
                     TextUTF8Range(lowerBound: $0.lowerBound, upperBound: sourceRange.upperBound)
                 } ?? sourceRange
                 pendingWhitespaceText.append(raw)
-                pendingNewlineCount += raw.unicodeScalars.filter {
-                    CharacterSet.newlines.contains($0)
-                }.count
+                // One line break per grapheme: a Windows CRLF pair is a single
+                // grapheme of two newline scalars, and counting scalars turned
+                // every CRLF line break into a paragraph break (CORE-10).
+                if raw.unicodeScalars.contains(where: { CharacterSet.newlines.contains($0) }) {
+                    pendingNewlineCount += 1
+                }
                 cursor = next
                 continue
             }

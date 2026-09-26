@@ -342,6 +342,10 @@ public enum BoundedLongFormAssembler {
 }
 
 private extension BoundedLongFormAssembler {
+    /// The per-take limiter's output ceiling in PCM16 units; joined segments
+    /// are never boosted past it.
+    static let peakCeilingAmplitude = Double(PCM16StreamLimiter.ceiling) * Double(Int16.max)
+
     struct SegmentAnalysis {
         let sourceFrameCount: Int64
         let contentStart: Int64
@@ -386,6 +390,7 @@ private extension BoundedLongFormAssembler {
         var lastAudibleExclusive: Int64?
         var audibleSquareSum = 0.0
         var audibleCount = 0
+        var peakMagnitude = 0
         let threshold = Int(configuration.silenceThreshold)
 
         while absoluteFrame < file.length {
@@ -400,6 +405,7 @@ private extension BoundedLongFormAssembler {
             }
             for offset in 0..<Int(buffer.frameLength) {
                 let value = Int(samples[offset])
+                peakMagnitude = max(peakMagnitude, abs(value))
                 if abs(value) > threshold {
                     let position = absoluteFrame + Int64(offset)
                     if firstAudible == nil { firstAudible = position }
@@ -425,7 +431,13 @@ private extension BoundedLongFormAssembler {
         let contentEnd = file.length - min(trailingSilence, maximumTrimFrames)
         let rms = sqrt(audibleSquareSum / Double(audibleCount))
         let unclampedGain = configuration.targetRMS / max(rms, Double.leastNonzeroMagnitude)
-        let gain = min(configuration.maximumGain, max(configuration.minimumGain, unclampedGain))
+        let loudnessGain = min(configuration.maximumGain, max(configuration.minimumGain, unclampedGain))
+        // CORE-12: the RMS gain alone can lift a near-ceiling peak past full
+        // scale, where the 16-bit clamp below clips it. A boost never takes the
+        // segment's peak above the per-take limiter's ceiling; a gain at or
+        // below 1 cannot clip, so it is never raised or lowered here.
+        let headroomGain = max(1.0, peakCeilingAmplitude / Double(max(peakMagnitude, 1)))
+        let gain = min(loudnessGain, headroomGain)
 
         let remainingLeadingSilence = max(0, firstAudible - contentStart)
         let remainingTrailingSilence = max(0, contentEnd - lastAudibleExclusive)

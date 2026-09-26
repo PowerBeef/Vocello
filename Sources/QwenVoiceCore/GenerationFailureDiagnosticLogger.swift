@@ -262,6 +262,8 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .audio)
             case .generationIncomplete:
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .model)
+            case .scriptTooLongForTake:
+                return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .invalidRequest)
             case .runtimeFailed:
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .runtime)
             case .memoryPressure:
@@ -390,6 +392,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     case runtimeFailure = "runtime.failed"
     case preparationFailure = "runtime.preparation_failed"
     case generationLimit = "generation.incomplete"
+    case scriptTooLongForTake = "generation.script_too_long"
     case audioSilentGap = "audio.quality_rejected.silent_gap"
     case audioNoSpeech = "audio.quality_rejected.no_speech"
     case audioUnstable = "audio.quality_rejected.unstable"
@@ -439,6 +442,8 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
             return .memoryPressure
         case .generationIncomplete:
             return .generationLimit
+        case .scriptTooLongForTake:
+            return .scriptTooLongForTake
         case .audioQualityRejected:
             switch NativeAudioQualityRejection(diagnosticDetail: runtimeError.diagnosticDetail) {
             case .silentGap: return .audioSilentGap

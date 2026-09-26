@@ -534,6 +534,33 @@ public enum LongFormPlanner {
     }
 }
 
+/// Single-take budget pre-check (CORE-19). A take that cannot finish inside its
+/// codec-token budget otherwise fails only after spending the whole budget
+/// (2,048 tokens, about 170 s of generation). It is refused up front when even
+/// an implausibly fast delivery would overrun: codec tokens run 12 per second
+/// of audio, about 2.6 per conservative text-token estimate unit at canonical
+/// pace and 3.6 slow (`shippingRuntimeTokenLimit`); 1.5 sits below any
+/// measured pace, so a script that might still finish is never refused.
+/// Long-form segments stay far below the bound by construction.
+public enum SingleTakeCodecBudget {
+    /// Fewest codec tokens one estimate unit produces, as a ratio.
+    static let fastestCodecTokensPerEstimateUnit = (numerator: 3, denominator: 2)
+
+    /// The conservative text-token estimate the long-form planner budgets with.
+    public static func conservativeTokenEstimate(of text: String) -> Int {
+        ConservativeTokenEstimator.estimate(text)
+    }
+
+    /// Whether a single take of `text` certainly needs more than
+    /// `maximumCodecTokens` codec tokens.
+    public static func certainlyExceeds(text: String, maximumCodecTokens: Int) -> Bool {
+        guard maximumCodecTokens > 0 else { return false }
+        let ratio = fastestCodecTokensPerEstimateUnit
+        return conservativeTokenEstimate(of: text) * ratio.numerator
+            > maximumCodecTokens * ratio.denominator
+    }
+}
+
 private enum ConservativeTokenEstimator {
     struct State {
         private(set) var estimate = 0

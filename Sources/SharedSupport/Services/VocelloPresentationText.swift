@@ -596,6 +596,10 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.error.generation_incomplete",
                 defaultValue: "This take reached its generation limit before it finished, so the incomplete audio was not saved. Retry to generate a new take.",
                 comment: "Studio error when a take reached the model's generation limit before it finished.")
+        case .scriptTooLongForTake:
+            return localization.string(localized: "vocello.error.generation_script_too_long",
+                defaultValue: "This script is too long to speak in one take. Shorten it, or split it into shorter takes.",
+                comment: "Studio error when a script is far too long for one take, refused before generation starts.")
         case .audioSilentGap:
             return localization.string(localized: "vocello.error.audio_qc_silent_gap",
                 defaultValue: "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take.",

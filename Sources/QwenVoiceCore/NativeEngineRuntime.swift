@@ -95,6 +95,9 @@ enum NativeRuntimeFailureCode: String, Sendable {
     case runtimeFailed = "runtime.failed"
     case audioQualityRejected = "audio.quality_rejected"
     case generationIncomplete = "generation.incomplete"
+    /// The script certainly cannot finish in one take's codec-token budget,
+    /// refused before generation (CORE-19).
+    case scriptTooLongForTake = "generation.script_too_long"
     /// MLX or Metal could not allocate memory (a captured
     /// `VocelloQwen3RuntimeFailure.allocation`), retryable or not.
     case memoryPressure = "runtime.memory_pressure"
@@ -229,6 +232,17 @@ struct NativeRuntimeError: LocalizedError, Sendable {
             notes["audioQCFlags"] = diagnosticDetail
         }
         return notes
+    }
+
+    /// CORE-19: refused at request validation, before any model work, when
+    /// even a fast delivery of the script would overrun the take's budget.
+    static func scriptTooLongForTake() -> NativeRuntimeError {
+        NativeRuntimeError(
+            stage: .requestValidation,
+            message: "This script is too long to speak in one take. Shorten it, or split it into shorter takes.",
+            failureCode: .scriptTooLongForTake,
+            diagnosticDetail: "script_exceeds_single_take_budget"
+        )
     }
 
     static func maximumTokenLimit() -> NativeRuntimeError {
@@ -751,6 +765,14 @@ actor NativeEngineRuntime {
                 requestedSeed: request.seed,
                 variation: request.variation
             )
+        // CORE-19: refuse a take that cannot finish before loading or spending
+        // its whole token budget on it.
+        if SingleTakeCodecBudget.certainlyExceeds(
+            text: request.text,
+            maximumCodecTokens: samplingConfiguration.maxNewTokens
+        ) {
+            throw NativeRuntimeError.scriptTooLongForTake()
+        }
         let receiptWarmState: EngineWarmState = activeModelID == request.modelID ? .warm : .cold
         // Fresh per-generation stage recorder, started at prepare entry (before model
         // load / prewarm) so the full backend timeline is measured from one origin.

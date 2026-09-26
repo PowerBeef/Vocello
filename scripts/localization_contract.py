@@ -57,6 +57,7 @@ REQUIRED_KEYS = {
     "vocello.error.generation_memory_pressure",
     "vocello.error.generation_preparation_failed",
     "vocello.error.generation_runtime_failed",
+    "vocello.error.generation_script_too_long",
     "vocello.error.insufficient_memory",
     "vocello.error.model_unavailable",
     "vocello.error.reference_audio_missing",

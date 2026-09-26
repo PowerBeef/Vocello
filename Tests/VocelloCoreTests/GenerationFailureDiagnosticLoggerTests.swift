@@ -208,6 +208,18 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
     func testPresentationReasonKeysOnTheTypedEngineFailureCode() {
         typealias Reason = GenerationFailurePresentationReason
         XCTAssertEqual(Reason(NativeRuntimeError.maximumTokenLimit()), .generationLimit)
+        // CORE-19: the up-front refusal keeps its own reason and a validation stage.
+        let tooLong = NativeRuntimeError.scriptTooLongForTake()
+        XCTAssertEqual(Reason(tooLong), .scriptTooLongForTake)
+        XCTAssertEqual(tooLong.stage, .requestValidation)
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: tooLong).code,
+            "generation.script_too_long"
+        )
+        XCTAssertEqual(
+            Reason(MLXTTSEngine.surfacedGenerationError(tooLong, allocationRetryAttempted: false)),
+            .scriptTooLongForTake
+        )
         XCTAssertEqual(
             Reason(NativeRuntimeError.capturedRuntimeFailure(.allocation, stage: .streamFailed, audioPublished: true)),
             .memoryPressure

@@ -67813,6 +67813,72 @@
         }
       }
     },
+    "vocello.error.generation_script_too_long": {
+      "comment": "Studio error when a script is far too long for one take: the engine refused it before generation started, because even a fast delivery would exceed the take's generation limit. Engine failure code generation.script_too_long.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This script is too long to speak in one take. Shorten it, or split it into shorter takes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce texte est trop long pour être dit en une seule prise. Raccourcissez-le ou découpez-le en prises plus courtes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este guion es demasiado largo para decirlo en una sola toma. Acórtalo o divídelo en tomas más cortas."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Skript ist zu lang für eine einzige Aufnahme. Kürze es oder teile es in kürzere Aufnahmen auf."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo testo è troppo lungo per un solo take. Accorcialo o dividilo in take più brevi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este roteiro é longo demais para uma única tomada. Encurte-o ou divida-o em tomadas mais curtas."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文本太长，无法在一次生成中读完。请缩短文本，或将其拆分为多段较短的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このスクリプトは長すぎて1回のテイクでは読み上げられません。短くするか、短いテイクに分割してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 스크립트는 너무 길어 한 번의 테이크로 읽을 수 없습니다. 줄이거나 더 짧은 테이크로 나누세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот текст слишком длинный для одного дубля. Сократите его или разделите на более короткие дубли."
+          }
+        }
+      }
+    },
     "vocello.error.audio_qc_silent_gap": {
       "comment": "Studio error when the automatic audio-quality check rejected a finished take because it contained an unusually long silence. The take was discarded; retrying generates a new one.",
       "extractionState": "manual",

@@ -197,6 +197,45 @@ final class LongFormPlanningTests: XCTestCase {
         }
     }
 
+    /// CORE-19: only a script that would overrun even at a fast pace is refused
+    /// before generation; every script the apps send as one take, and every
+    /// planned long-form segment, stays well inside the bound.
+    func testSingleTakeBudgetRefusesOnlyScriptsThatCannotFinish() throws {
+        let cap = Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens
+        let englishSentence = "The narrator kept a steady, unhurried pace through the winding chapters. "
+        let english900 = String(String(repeating: englishSentence, count: 13).prefix(900))
+        let chinese900 = String(repeating: "火车在黎明时分离开了车站。", count: 70).prefix(900)
+        let chinese1500 = String(repeating: "火车在黎明时分离开了车站。", count: 116)
+        let english6000 = String(repeating: englishSentence, count: 82)
+
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: english900, maximumCodecTokens: cap))
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: String(chinese900), maximumCodecTokens: cap))
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: chinese1500, maximumCodecTokens: cap))
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: english6000, maximumCodecTokens: cap))
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: english6000, maximumCodecTokens: 0))
+
+        // The bound sits at 2/3 of the cap in estimate units.
+        let limit = cap * 2 / 3
+        let atLimit = String(repeating: "火", count: limit)
+        XCTAssertEqual(SingleTakeCodecBudget.conservativeTokenEstimate(of: atLimit), limit)
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: atLimit, maximumCodecTokens: cap))
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: atLimit + "火", maximumCodecTokens: cap))
+
+        let plan = try LongFormPlanner.plan(
+            spokenTextPlan: SpokenTextPlanner.plan(originalText: english6000),
+            configuration: LongFormPlanningConfiguration(
+                runtimeTokenLimit: LongFormPlanningConfiguration.shippingRuntimeTokenLimit,
+                baseSeed: 3
+            )
+        )
+        for segment in plan.segments {
+            XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(
+                text: segment.spokenTextForGeneration,
+                maximumCodecTokens: cap
+            ))
+        }
+    }
+
     func testSchemaV4RoundTripIsPrivacySafe() throws {
         let rawText = "Private long-form text with QA@example.com. Another sentence."
         let plan = try makePlan(rawText, tokenLimit: 8)

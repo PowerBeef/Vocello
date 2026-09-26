@@ -737,7 +737,7 @@ enum IOSDeviceDiagnosticsRunner {
                     expectedLanguage: expectedLanguage
                 )
                 record.outputVerification = verification
-                // The rate `pass` reads (WER v2, or CER for Chinese and Japanese).
+                // The rate `pass` reads (WER v2, or CER for Chinese, Japanese and Korean).
                 let gatedRateLabel = verification.accuracyMetric == .characterErrorRate ? "cer" : "wer"
                 let gatedRate = verification.accuracyValue.map { String(format: "%.2f", $0) } ?? "unavailable"
                 print(

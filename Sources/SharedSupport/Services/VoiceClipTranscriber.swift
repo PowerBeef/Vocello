@@ -664,8 +664,8 @@ enum VoiceClipTranscriber {
         expectedLanguage: Qwen3SupportedLanguage = .auto
     ) -> EditMetrics {
         editMetrics(
-            lhs: normalizedWordTokens(reference, language: expectedLanguage),
-            rhs: normalizedWordTokens(hypothesis, language: expectedLanguage)
+            lhs: scalarWords(reference, language: expectedLanguage),
+            rhs: scalarWords(hypothesis, language: expectedLanguage)
         )
     }
 
@@ -700,8 +700,8 @@ enum VoiceClipTranscriber {
         hypothesis: String,
         expectedLanguage: Qwen3SupportedLanguage = .auto
     ) -> SegmentationAwareMetrics {
-        let lhs = normalizedWordTokens(reference, language: expectedLanguage)
-        let rhs = normalizedWordTokens(hypothesis, language: expectedLanguage)
+        let lhs = scalarWords(reference, language: expectedLanguage)
+        let rhs = scalarWords(hypothesis, language: expectedLanguage)
         let plainDistance = editMetrics(lhs: lhs, rhs: rhs).editDistance
         let distance = segmentationAwareDistance(lhs: lhs, rhs: rhs)
         let rate: Double
@@ -877,6 +877,12 @@ enum VoiceClipTranscriber {
         normalizedWordTokens(text, language: language).flatMap { Array($0.unicodeScalars) }
     }
 
+    /// Normalized words as scalar arrays, the unit every word metric compares: `String`
+    /// equality is canonical equivalence, while the Python mirror compares code points.
+    private static func scalarWords(_ text: String, language: Qwen3SupportedLanguage) -> [[Unicode.Scalar]] {
+        normalizedWordTokens(text, language: language).map { Array($0.unicodeScalars) }
+    }
+
     private static func normalizedScalars(_ text: String, language: Qwen3SupportedLanguage) -> [Unicode.Scalar] {
         let profile = normalizationProfile(for: language)
         let composed = profile == .hangul
@@ -987,15 +993,16 @@ enum VoiceClipTranscriber {
 
     /// The minimum edit distance under the WER v2 operation set. The minimum is unique, so
     /// the Python mirror agrees exactly although it walks the table the same way only by
-    /// convention.
-    private static func segmentationAwareDistance(lhs: [String], rhs: [String]) -> Int {
+    /// convention. Words and spellings are scalar arrays: `String` equality is canonical
+    /// equivalence, so a spelling such as か + U+3099 would equal が here but not in Python.
+    private static func segmentationAwareDistance(lhs: [[Unicode.Scalar]], rhs: [[Unicode.Scalar]]) -> Int {
         if lhs.isEmpty { return rhs.count }
         if rhs.isEmpty { return lhs.count }
         let limit = wordBoundarySpanLimit
         // Every hypothesis block by spelling: the block ending at `end` holding `length` words.
-        var hypothesisBlocks: [String: [(end: Int, length: Int)]] = [:]
+        var hypothesisBlocks: [[Unicode.Scalar]: [(end: Int, length: Int)]] = [:]
         for end in 1 ... rhs.count {
-            var spelling = ""
+            var spelling: [Unicode.Scalar] = []
             for length in 1 ... min(limit, end) {
                 spelling = rhs[end - length] + spelling
                 hypothesisBlocks[spelling, default: []].append((end: end, length: length))
@@ -1005,7 +1012,7 @@ enum VoiceClipTranscriber {
         table.reserveCapacity(lhs.count + 1)
         for row in 1 ... lhs.count {
             var credited = [Int](repeating: Int.max, count: rhs.count + 1)
-            var spelling = ""
+            var spelling: [Unicode.Scalar] = []
             for length in 1 ... min(limit, row) {
                 spelling = lhs[row - length] + spelling
                 guard let blocks = hypothesisBlocks[spelling] else { continue }

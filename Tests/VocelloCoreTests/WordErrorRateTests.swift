@@ -140,35 +140,33 @@ final class WordErrorRateTests: XCTestCase {
         let covered = Set(fixtures.cases.filter { $0.phase == "P2a" }.map(\.language))
         XCTAssertTrue(Set(Qwen3SupportedLanguage.selectableCases.map(\.rawValue)).isSubset(of: covered))
 
+        // Scalars, never `String` equality: Swift compares strings by canonical equivalence,
+        // Python by code points, and publication checks the counts exactly.
         for fixture in fixtures.cases {
             let language = try XCTUnwrap(Qwen3SupportedLanguage(rawValue: fixture.language), fixture.id)
             let expected = fixture.expected
             XCTAssertEqual(
-                VoiceClipTranscriber.normalizedWordTokens(fixture.reference, language: language),
-                expected.referenceTokens,
+                scalars(VoiceClipTranscriber.normalizedWordTokens(fixture.reference, language: language)),
+                scalars(expected.referenceTokens),
                 fixture.id
             )
             XCTAssertEqual(
-                VoiceClipTranscriber.normalizedWordTokens(fixture.hypothesis, language: language),
-                expected.hypothesisTokens,
+                scalars(VoiceClipTranscriber.normalizedWordTokens(fixture.hypothesis, language: language)),
+                scalars(expected.hypothesisTokens),
                 fixture.id
             )
-            XCTAssertEqual(
-                scalarString(VoiceClipTranscriber.normalizedCharacterUnits(fixture.reference, language: language)),
-                expected.referenceCharacters,
-                fixture.id
-            )
-            XCTAssertEqual(
-                scalarString(VoiceClipTranscriber.normalizedCharacterUnits(fixture.hypothesis, language: language)),
-                expected.hypothesisCharacters,
-                fixture.id
-            )
+            let referenceUnits = VoiceClipTranscriber.normalizedCharacterUnits(fixture.reference, language: language)
+            let hypothesisUnits = VoiceClipTranscriber.normalizedCharacterUnits(fixture.hypothesis, language: language)
+            XCTAssertEqual(referenceUnits, Array(expected.referenceCharacters.unicodeScalars), fixture.id)
+            XCTAssertEqual(hypothesisUnits, Array(expected.hypothesisCharacters.unicodeScalars), fixture.id)
             let word = VoiceClipTranscriber.wordErrorMetrics(
                 reference: fixture.reference,
                 hypothesis: fixture.hypothesis,
                 expectedLanguage: language
             )
             assertCounts(word, expected.word, fixture.id + " word")
+            XCTAssertEqual(word.referenceCount, expected.referenceTokens.count, fixture.id)
+            XCTAssertEqual(word.hypothesisCount, expected.hypothesisTokens.count, fixture.id)
             let aware = VoiceClipTranscriber.segmentationAwareWordMetrics(
                 reference: fixture.reference,
                 hypothesis: fixture.hypothesis,
@@ -182,6 +180,8 @@ final class WordErrorRateTests: XCTestCase {
                 expectedLanguage: language
             )
             assertCounts(character, expected.character, fixture.id + " character")
+            XCTAssertEqual(character.referenceCount, expected.referenceCharacters.unicodeScalars.count, fixture.id)
+            XCTAssertEqual(character.hypothesisCount, expected.hypothesisCharacters.unicodeScalars.count, fixture.id)
             let metric = GenerationOutputVerifier.accuracyMetric(for: language)
             XCTAssertEqual(metric.rawValue, expected.primaryMetric, fixture.id)
             let primaryErrors = metric == .characterErrorRate ? character.editDistance : aware.editDistance
@@ -889,10 +889,8 @@ final class WordErrorRateTests: XCTestCase {
         )
     }
 
-    private func scalarString(_ scalars: [Unicode.Scalar]) -> String {
-        var view = String.UnicodeScalarView()
-        view.append(contentsOf: scalars)
-        return String(view)
+    private func scalars(_ words: [String]) -> [[Unicode.Scalar]] {
+        words.map { Array($0.unicodeScalars) }
     }
 
     private func assertCounts(

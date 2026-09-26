@@ -229,6 +229,8 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: "storage.source_missing", classification: .storage)
             case .failedToCreateDirectory, .failedToCopy:
                 return ErrorMetadata(code: "storage.write_failed", classification: .storage)
+            case .referenceTooLarge:
+                return ErrorMetadata(code: "audio.input_too_large", classification: .audio)
             }
         }
 

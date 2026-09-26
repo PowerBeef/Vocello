@@ -206,15 +206,23 @@ struct IOSVoicesView: View {
         switch result {
         case .success(let urls):
             guard let sourceURL = urls.first else { return }
-            do {
-                // Keep the picker-provided URL intact so LocalDocumentIO can consume its
-                // security-scoped grant before materializing both audio and any .txt sidecar.
-                let validatedURL = try IOSReferenceAudioImportPolicy.validatedSourceURL(sourceURL)
-                let imported = try ttsEngine.importReferenceAudio(from: validatedURL)
-                importErrorMessage = nil
-                onImportNewVoice(imported)
-            } catch {
-                importErrorMessage = error.localizedDescription
+            // Keep the picker-provided URL intact so LocalDocumentIO can consume its
+            // security-scoped grant before materializing both audio and any .txt sidecar.
+            // The copy runs off the main actor and refuses an oversized file (CORE-16).
+            Task {
+                do {
+                    let imported = try await IOSReferenceAudioImportPolicy.importReference(
+                        from: sourceURL,
+                        into: AppPaths.importedReferenceAudioDir
+                    )
+                    importErrorMessage = nil
+                    onImportNewVoice(imported)
+                } catch {
+                    importErrorMessage = IOSReferenceAudioImportPolicy.failureMessage(
+                        for: error,
+                        presentation: IOSAppLanguage.shared.presentation
+                    ) ?? IOSInterfaceText.importFailedDetail
+                }
             }
         case .failure(let error):
             if (error as? CocoaError)?.code != .userCancelled {

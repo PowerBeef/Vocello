@@ -1,17 +1,88 @@
 import Foundation
+import QwenVoiceCore
 import XCTest
 
 final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     func testSupportedImportTypesShareOnePolicy() throws {
         XCTAssertEqual(
             IOSReferenceAudioImportPolicy.supportedExtensions,
-            ["wav", "mp3", "aiff", "m4a"]
+            ["wav", "mp3", "aiff", "aif", "m4a"]
         )
         XCTAssertEqual(IOSReferenceAudioImportPolicy.allowedContentTypes.count, 4)
         XCTAssertThrowsError(
             try IOSReferenceAudioImportPolicy.validatedSourceURL(
                 URL(fileURLWithPath: "/tmp/reference.txt")
             )
+        )
+        XCTAssertNoThrow(
+            try IOSReferenceAudioImportPolicy.validatedSourceURL(URL(fileURLWithPath: "/tmp/reference.AIF")),
+            "The AIFF type's other extension is accepted"
+        )
+    }
+
+    /// IOS-23: Files offers Vocello only for the formats the import accepts.
+    func testTheDocumentTypesListTheImportFormats() throws {
+        let infoPlist = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/iOS/Info.plist")
+        guard FileManager.default.fileExists(atPath: infoPlist.path) else {
+            throw XCTSkip("The repository sources are not on this host")
+        }
+        let plist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: Data(contentsOf: infoPlist), format: nil) as? [String: Any]
+        )
+        let documentTypes = try XCTUnwrap(plist["CFBundleDocumentTypes"] as? [[String: Any]])
+        let declared = documentTypes.flatMap { $0["LSItemContentTypes"] as? [String] ?? [] }
+        XCTAssertEqual(declared, IOSReferenceAudioImportPolicy.allowedContentTypes.map(\.identifier))
+        XCTAssertFalse(declared.contains("public.audio"))
+    }
+
+    /// CORE-16: the copy runs off the main actor and refuses a file larger
+    /// than audio preparation accepts before copying it.
+    func testAnOversizedImportIsRefusedWithInterfaceCopy() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IOSReferenceImport-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("long.wav")
+        XCTAssertTrue(FileManager.default.createFile(atPath: source.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: source)
+        // Sparse: the size is logical, no bytes are written.
+        try handle.truncate(atOffset: UInt64(AudioPreparationLimits.defaults.maxInputFileSizeBytes + 1))
+        try handle.close()
+        let destination = root.appendingPathComponent("imported", isDirectory: true)
+
+        do {
+            _ = try await IOSReferenceAudioImportPolicy.importReference(from: source, into: destination)
+            XCTFail("An oversized reference must be refused")
+        } catch {
+            guard case .referenceTooLarge? = error as? DocumentIOError else {
+                return XCTFail("Unexpected \(error)")
+            }
+            let presentation = VocelloPresentationText()
+            XCTAssertEqual(
+                IOSReferenceAudioImportPolicy.failureMessage(for: error, presentation: presentation),
+                presentation.generationFailureMessage(.referenceAudioTooLong)
+            )
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path), "Nothing is copied")
+    }
+
+    func testImportFailuresReachTheAlertInTheInterfaceLanguage() {
+        let presentation = VocelloPresentationText()
+        XCTAssertEqual(
+            IOSReferenceAudioImportPolicy.failureMessage(
+                for: IOSReferenceAudioImportPolicy.ValidationError.unsupportedType,
+                presentation: presentation
+            ),
+            presentation.importReferenceAudioDetail
+        )
+        XCTAssertNil(
+            IOSReferenceAudioImportPolicy.failureMessage(
+                for: DocumentIOError.failedToCopy("/private/path/voice.wav"),
+                presentation: presentation
+            ),
+            "A copy failure shows the alert's generic detail, never a path"
         )
     }
 

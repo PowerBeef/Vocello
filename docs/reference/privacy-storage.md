@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-24
+reviewed: 2026-09-26
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -52,17 +52,19 @@ Maintained macOS subtrees and preferences:
   for a later pass, except the deleted model's own blobs, which its delete reclaims at once. The
   rebuildable prepared-model overlay (symlinks to the model's files plus its sanitized config) lives
   in `cache/native_mlx/prepared_models/`, never in the model folder, and is removed with its model.
+  A rebuild stages in `<model folder>.tmp.<UUID>/` beside it; each engine start removes one a crash
+  interrupted once untouched for an hour (CORE-15).
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and completed-range sidecars while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB. A failure is its typed error summary, so error text, raw URLs and absolute paths are excluded (see [Diagnostics](#diagnostics)).
-- `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
+- `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder. A take is written to a hidden staging file beside its final name (`.<name>.<UUID>.tmp.wav`) and renamed into place; each engine start removes the staging files a crash left under `outputs/` once untouched for an hour (CORE-15). A user-chosen output folder is not walked.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
-- `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
+- `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). WAV, MP3, AIFF, and M4A are kept as they are; any other readable format (FLAC, Ogg, AIF, CAF) is converted to canonical WAV before the candidate is staged, through a transient `cache/normalized_clone_refs/saved-voice-import-<UUID>.wav` removed once the candidate holds its copy (MAC-09). Voices saved by earlier builds are not rewritten. Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
   A saved voice's prepared clone prompts (`<id>.clone_prompt/`) are deleted with it. Prompts derived
   from a one-off reference (speaker embedding and codec tokens) are transient: `voices/.qvoice_clone_prompts/`
   keeps only the 8 most recently used. Moving them out of the backed-up `voices/` tree is ASR-06's
   backup classification.
 - `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it. Reconciliation ignores hidden and non-directory entries (such as `.DS_Store`) moves a journal it cannot interpret, with every asset it holds, to `voice-transactions-quarantine/` instead of deleting it, and leaves a journal from a newer Vocello build in place. The store lock is shared with the CLI: a busy or unreconcilable store never fails engine startup, and Saved Voices report the busy state and retry.
-- Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories inside the recording process's own folder under the system temporary directory, `vocello-reference-recordings/<bundle identifier>_<process identifier>_<start time>/`: `voice-clone-references/` holds the in-progress capture, deleted when the record sheet closes, and `voice-enroll/` holds a stable copy while the private candidate is prepared. The Saved Voices sheet deletes the copies it recorded when it closes, after enrollment or Cancel (once a save still reading one ends); a clip recorded as a one-off Voice Cloning reference stays while the session can use it. The Mac app is unsandboxed, so every running copy (a development build, the installed release, a UI-lane launch) shares the per-user temporary directory. At launch and at quit a copy deletes its own folder and the folder of every process that has ended (no process holds its identifier, or a later process with a different start time does), never a running copy's (MAC-25). The flat `voice-enroll/` and `voice-clone-references/` folders earlier builds shared name no owner, so they are deleted only when no other copy of the app is running. Only an explicitly committed candidate moves into `voices/`.
+- Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories inside the recording process's own folder under the system temporary directory, `vocello-reference-recordings/<bundle identifier>_<process identifier>_<start time>/`: `voice-clone-references/` holds the in-progress capture, deleted when the record sheet closes, and `voice-enroll/` holds a stable copy while the private candidate is prepared. The Saved Voices sheet deletes the copies it recorded when it closes, after enrollment or Cancel (once a save still reading one ends); a clip recorded as a one-off Voice Cloning reference stays while the session can use it. The Mac app is unsandboxed, so every running copy (a development build, the installed release, a UI-lane launch) shares the per-user temporary directory. At launch and at quit a copy deletes its own folder and the folder of every process that has ended (no process holds its identifier, or a later process with a different start time does), never a running copy's (MAC-25). The flat `voice-enroll/` and `voice-clone-references/` folders earlier builds shared name no owner and have generic names in a directory every unsandboxed app shares, so only when no other copy of the app is running, and only the clips those builds wrote go: regular files named `<UUID>.wav` or `reference-<time>.wav`, untouched for an hour. A folder goes only once empty, and a link in its place is never followed. Only an explicitly committed candidate moves into `voices/`.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state and disables
   destructive history actions instead of presenting an unavailable database as empty.
@@ -163,13 +165,23 @@ Maintained iPhone subtrees:
   Prompts derived from one-off references follow the same bounded retention as on macOS.
 - `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations. `voice-transactions-quarantine/` keeps journals reconciliation could not interpret, with the assets they hold; nothing is deleted from it automatically. Journals written by a newer Vocello build (a newer schema version) stay in `voice-transactions/` untouched.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files
-  selected directly from Studio Clone, selected from Voices, or opened through Files, plus an
-  adjacent `.txt` sidecar when supplied. A sidecar is preferred; otherwise on-device recognition
-  produces an editable review without uploading audio. Enrollment stages the selected reference as
+  selected directly from Studio Clone, selected from Voices, or opened through Files (the app's
+  document types list those four formats, IOS-23), plus an adjacent `.txt` sidecar when it can be
+  read. The copy runs off the main actor and refuses a file larger than audio preparation accepts
+  (250 MiB, CORE-16). The sidecar is best effort (CORE-17): a Files picker grants access to the
+  chosen audio alone, so an unreadable sidecar never fails the import. A sidecar is preferred;
+  otherwise on-device recognition produces an editable review without uploading audio. Enrollment stages the selected reference as
   a private candidate and copies it into `voices/` only after the user confirms Save. Picker
   cancellation, import failure, enrollment cancellation, and candidate discard do not publish a
   Saved Voice or replace the current Clone draft.
 - Other `cache/` subtrees store required runtime cache data.
+- Reference-clip recording uses the app's own temporary directory with the macOS layout
+  (`vocello-reference-recordings/<process folder>/`). The record sheet stashes the finished capture
+  and deletes the capture itself; the stash copy goes when the flow closes, once a save still
+  reading it ends. Each launch deletes every earlier launch's folder, so a clip a crash or jetsam
+  kill stranded does not wait for the system to purge the directory. Staging files a crash left
+  under `outputs/` (which is backed up) and interrupted overlay rebuilds are swept at engine start
+  as on macOS (CORE-15).
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state with a visible
   Retry action and disables destructive history actions instead of presenting an unavailable database

@@ -15,7 +15,10 @@
 			<string>Alternate</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.audio</string>
+				<string>com.microsoft.waveform-audio</string>
+				<string>public.mp3</string>
+				<string>public.aiff-audio</string>
+				<string>public.mpeg-4-audio</string>
 			</array>
 		</dict>
 	</array>
@@ -61,7 +64,7 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Vocello records reference clips you use to clone voices on-device. Recordings stay on this iPhone.</string>
+	<string>Vocello records reference clips to clone voices on-device and never uploads them. Saved voices are included in your iPhone backups.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Vocello transcribes your reference recording on-device to improve clone quality. Audio never leaves your iPhone.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

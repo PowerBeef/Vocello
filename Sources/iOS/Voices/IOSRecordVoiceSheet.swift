@@ -40,6 +40,14 @@ struct IOSRecordVoiceSheet: View {
     @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var transcriptionTask: Task<Void, Never>?
+    /// MAC-25 on the iPhone: the stash copies this flow recorded. They go when the
+    /// flow closes, or when a save still reading one ends; the private candidate
+    /// holds its own copy.
+    @State private var recordedClips = ReferenceClipStashTracker { path in
+        ReferenceClipRecordingStash.discard(path)
+        // A clip whose stash copy failed is the recorder's own capture.
+        ReferenceClipRecordingStash.discard(path, in: ReferenceClipRecordingStash.captureDirectory)
+    }
 
     private enum Phase { case recording, naming }
 
@@ -83,10 +91,18 @@ struct IOSRecordVoiceSheet: View {
                         ? nil
                         : IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
                     onComplete: { url in
-                        // The recorder deletes its temp WAV on `.onDisappear` (stopWithoutSaving),
-                        // which fires the moment we switch to `.naming`. Copy it out FIRST so the
-                        // file still exists when the user taps Save.
+                        // Copy the capture into the stash so the file the user
+                        // reviews and saves is this flow's own, then remove the
+                        // capture: the overlay keeps a handed-off clip on
+                        // `.onDisappear`, so nothing else would delete it.
                         let stable = ReferenceClipRecordingStash.copyToStableTemp(url) ?? url
+                        if stable != url {
+                            ReferenceClipRecordingStash.discard(
+                                url.path,
+                                in: ReferenceClipRecordingStash.captureDirectory
+                            )
+                        }
+                        recordedClips.record(stable.path)
                         capturedURL = stable
                         suggestedName = ""
                         transcript = ""
@@ -127,14 +143,19 @@ struct IOSRecordVoiceSheet: View {
                 referenceLanguage: $detectedLanguage,
                 requiresReferenceLanguageConfirmation: requiresReferenceLanguageConfirmation,
                 errorMessage: enrollError,
-                isSaving: isSaving,
+                // A save or a Keep/Discard decision in flight holds the sheet
+                // open: Cancel would otherwise delete the clip under the save
+                // and close a flow that still enrolls the voice.
+                isSaving: isSaving || isReviewDecisionInFlight,
                 clipAudioURL: capturedURL,
                 onTranscriptEdited: handleTranscriptEdit,
                 onUseAudioOnly: confirmAudioOnly,
                 onCancel: {
+                    guard !isSaving, !isReviewDecisionInFlight else { return }
                     cancelTranscription()
                     isNamingPresented = false
                     cleanupCapturedFile()
+                    recordedClips.close()
                     onDismiss()
                 },
                 onSave: {
@@ -181,6 +202,9 @@ struct IOSRecordVoiceSheet: View {
         }
         .onDisappear {
             cancelTranscription()
+            // However the flow closes (a host dismissal included), its clips go
+            // once no save still reads them.
+            recordedClips.close()
         }
     }
 
@@ -291,6 +315,9 @@ struct IOSRecordVoiceSheet: View {
             return
         }
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The candidate copies the clip; until then the clip must outlive a close.
+        recordedClips.beginUse()
+        defer { recordedClips.endUse() }
         do {
             let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
                 name: name,
@@ -367,6 +394,7 @@ struct IOSRecordVoiceSheet: View {
         let language = detectedLanguage
         savedVoicesViewModel.insertOrReplace(voice)
         cleanupCapturedFile()
+        recordedClips.close()
         isNamingPresented = false
         Task {
             await savedVoicesViewModel.refresh(using: ttsEngine)
@@ -385,14 +413,9 @@ struct IOSRecordVoiceSheet: View {
     private func cleanupCapturedFile() {
         // Imported references live in the shared cache and may also back an in-progress Clone
         // draft. Enrollment copies them into Saved Voices, but this flow must not invalidate
-        // another consumer of the same fingerprinted cache entry.
-        guard importedReference == nil else {
-            capturedURL = nil
-            return
-        }
-        if let url = capturedURL {
-            try? FileManager.default.removeItem(at: url)
-        }
+        // another consumer of the same fingerprinted cache entry. A recording is this flow's
+        // own stash copy: `recordedClips` removes it when the flow closes, never under a
+        // save that is still copying it.
         capturedURL = nil
     }
 

@@ -346,7 +346,9 @@ struct IOSSaveVoiceSheet: View {
     let errorMessage: String?
     /// IOS-21: the host's save is in flight. Save stays disabled so a second
     /// tap cannot enroll the same name again and report a failure after the
-    /// first save succeeded.
+    /// first save succeeded, and the sheet's close control is disabled so
+    /// Cancel cannot delete the clip under the save or close a flow that still
+    /// saves the voice.
     var isSaving = false
     /// When present, show the clip-review card (review the recording before saving).
     var clipAudioURL: URL? = nil
@@ -395,7 +397,13 @@ struct IOSSaveVoiceSheet: View {
     }
 
     var body: some View {
-        IOSBottomSheetSurface(title: title, tint: tint, presentation: .system, onDismiss: onCancel) {
+        IOSBottomSheetSurface(
+            title: title,
+            tint: tint,
+            presentation: .system,
+            onDismiss: onCancel,
+            isDismissDisabled: isSaving
+        ) {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 18) {
                     if !cloneConsentAcknowledged {

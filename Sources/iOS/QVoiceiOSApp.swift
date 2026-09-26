@@ -39,6 +39,8 @@ struct QVoiceiOSApp: App {
         configureNativeRuntimeMemoryCacheIfNeeded()
         IOSCrashObserver.shared.start()
         IOSMetricKitMemoryReporter.shared.start()
+        // IOS-22: the app-switcher privacy cover covers presented sheets too.
+        IOSAppSwitcherPrivacyCoverWindows.shared.install()
         // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their
         // registered knobs): seed History before any navigation can reach it,
         // then start the frame probe so its display link spans the launch.

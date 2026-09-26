@@ -829,10 +829,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             appSupportDirectory: appSupportDirectory,
             supportedAudioExtensions: Self.supportedSavedVoiceAudioExtensions
         )
-        let normalizedCloneReferenceDirectory = appSupportDirectory.appendingPathComponent(
-            "cache/normalized_clone_refs",
-            isDirectory: true
-        )
+        let normalizedCloneReferenceDirectory = Self.normalizedCloneReferenceDirectory(in: appSupportDirectory)
         let streamSessionsDirectory = self.streamSessionsDirectory
         try await Task.detached(priority: .utility) {
             try FileManager.default.createDirectory(
@@ -885,7 +882,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         Self.scheduleStartupStorageReclamation(
             modelsDirectory: modelAssetStore.rootDirectory,
             voicesDirectory: voicesDirectory,
-            normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory
+            normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory,
+            outputsDirectory: appSupportDirectory.appendingPathComponent("outputs", isDirectory: true)
         )
         startMemoryPressureMonitorIfNeeded()
         isInitialized = true
@@ -899,10 +897,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// transient clone-prompt artifacts to their retention bound. Both are best
     /// effort and protect in-flight work; a model delete does the same
     /// reclamation immediately.
+    ///
+    /// CORE-15: it also removes what a crash or jetsam kill stranded mid-write,
+    /// once untouched for an hour (live work is far younger): a take's hidden
+    /// staging WAV under `outputs/` (backed up on the iPhone), an interrupted
+    /// prepared-model overlay rebuild, and a saved-voice enrollment conversion.
     nonisolated private static func scheduleStartupStorageReclamation(
         modelsDirectory: URL,
         voicesDirectory: URL,
-        normalizedCloneReferenceDirectory: URL
+        normalizedCloneReferenceDirectory: URL,
+        outputsDirectory: URL
     ) {
         Task.detached(priority: .background) {
             _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
@@ -911,11 +915,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 in: voicesDirectory
             )
             sweepAbandonedConversionTemporaries(in: normalizedCloneReferenceDirectory)
+            PreparedModelOverlay.removeAbandonedRebuilds(modelsRoot: modelsDirectory)
+            GenerationOutputStagingSweep.removeAbandonedStagingFiles(under: outputsDirectory)
         }
     }
 
     /// A conversion killed mid-write leaves `.<stem>.converting-<uuid>.wav` beside its
-    /// target; remove those older than an hour (a live conversion is far younger).
+    /// target, and an enrollment interrupted between its conversion and the candidate copy
+    /// leaves `saved-voice-import-<uuid>.wav`; remove those older than an hour (a live
+    /// conversion is far younger).
     nonisolated static func sweepAbandonedConversionTemporaries(
         in directory: URL,
         olderThan age: TimeInterval = 3600,
@@ -929,7 +937,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         ) else { return }
         for entry in entries {
             let name = entry.lastPathComponent
-            guard name.hasPrefix("."), name.contains(".converting-"), name.hasSuffix(".wav") else { continue }
+            let isConversionTemporary = name.hasPrefix(".") && name.contains(".converting-") && name.hasSuffix(".wav")
+            guard isConversionTemporary || isSavedVoiceConversionName(name) else { continue }
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
             if now.timeIntervalSince(modified) > age {
@@ -1817,13 +1826,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     public func listPreparedVoices() async throws -> [PreparedVoice] {
         try ensureInitialized()
         let repository = try requirePreparedVoiceRepository()
+        let records: [PreparedVoiceStorageRecord]
         do {
-            let records = try await repository.list()
+            records = try await repository.list()
             clearSavedVoiceStoreStartupIssue(after: repository)
-            return records.map(Self.preparedVoice(from:))
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
+        // CORE-16: each voice's quality warnings open its audio file; that runs
+        // off the main actor, not once per saved voice on it.
+        return await SavedVoiceAudioReads.preparedVoices(from: records)
     }
 
     /// Cheap duration-only probe of a saved-voice reference WAV used at
@@ -1861,6 +1873,34 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         return Double(file.length) / sampleRate
     }
 
+    /// `cache/normalized_clone_refs` under an engine root: normalized clone references,
+    /// and the transient conversions of saved-voice enrollment.
+    nonisolated static func normalizedCloneReferenceDirectory(in appSupportDirectory: URL) -> URL {
+        appSupportDirectory.appendingPathComponent("cache/normalized_clone_refs", isDirectory: true)
+    }
+
+    nonisolated static let savedVoiceConversionPrefix = "saved-voice-import-"
+
+    /// Where enrollment converts a source whose format the saved-voice store does not
+    /// name (MAC-09); `nil` when the store keeps the source as it is.
+    nonisolated static func savedVoiceConversionURL(for sourceURL: URL, in directory: URL) -> URL? {
+        guard !supportedSavedVoiceAudioExtensions.contains(sourceURL.pathExtension.lowercased()) else {
+            return nil
+        }
+        return directory.appendingPathComponent(
+            "\(savedVoiceConversionPrefix)\(UUID().uuidString).wav",
+            isDirectory: false
+        )
+    }
+
+    /// Exactly `saved-voice-import-<UUID>.wav`: a normalized reference is named
+    /// `<stem>_<fingerprint>.wav`, so no reference name matches.
+    nonisolated static func isSavedVoiceConversionName(_ name: String) -> Bool {
+        guard name.hasPrefix(savedVoiceConversionPrefix), name.hasSuffix(".wav") else { return false }
+        let identifier = name.dropFirst(savedVoiceConversionPrefix.count).dropLast(4)
+        return UUID(uuidString: String(identifier)) != nil
+    }
+
     public func preparePreparedVoiceCandidate(
         name: String,
         audioPath: String,
@@ -1884,9 +1924,31 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
     ) async throws -> PreparedVoiceCandidate {
         try ensureInitialized()
-        let sourceURL = URL(fileURLWithPath: audioPath)
+        let requestedURL = URL(fileURLWithPath: audioPath)
         let repository = try requirePreparedVoiceRepository()
-        let warnings = Self.savedReferenceQualityWarnings(forAudioAt: sourceURL.path)
+        // MAC-09: the store keeps a voice's audio under its own extension, so a
+        // format it does not name (FLAC, Ogg, AIF, CAF) is converted to canonical
+        // WAV first instead of being copied byte for byte under a `.wav` name.
+        // The conversion runs off the main actor and is removed once the
+        // candidate holds its copy; a typed preparation error surfaces as is.
+        var sourceURL = requestedURL
+        var conversionURL: URL?
+        if let appSupportDirectoryURL,
+           let target = Self.savedVoiceConversionURL(
+               for: requestedURL,
+               in: Self.normalizedCloneReferenceDirectory(in: appSupportDirectoryURL)
+           ) {
+            conversionURL = target
+            sourceURL = try await audioPreparationService.normalizeAudio(
+                AudioPreparationRequest(inputURL: requestedURL, outputURL: target)
+            ).normalizedURL
+        }
+        defer {
+            if let conversionURL {
+                try? FileManager.default.removeItem(at: conversionURL)
+            }
+        }
+        let warnings = await SavedVoiceAudioReads.qualityWarnings(forAudioAt: sourceURL.path)
         do {
             let candidate = try await repository.prepare(
                 name: name,
@@ -1970,7 +2032,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
-    private static func preparedVoice(from record: PreparedVoiceStorageRecord) -> PreparedVoice {
+    nonisolated fileprivate static func preparedVoice(from record: PreparedVoiceStorageRecord) -> PreparedVoice {
         PreparedVoice(
             id: record.id,
             name: record.name,
@@ -2253,6 +2315,20 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             details: details,
             appSupportDirectoryURL: appSupportDirectoryURL
         )
+    }
+}
+
+/// CORE-16: saved-voice audio reads the engine keeps off the main actor. Each
+/// reads one file's header (`AVAudioFile`), once per saved voice when listing.
+private enum SavedVoiceAudioReads {
+    @concurrent
+    static func qualityWarnings(forAudioAt path: String) async -> [String] {
+        MLXTTSEngine.savedReferenceQualityWarnings(forAudioAt: path)
+    }
+
+    @concurrent
+    static func preparedVoices(from records: [PreparedVoiceStorageRecord]) async -> [PreparedVoice] {
+        records.map(MLXTTSEngine.preparedVoice(from:))
     }
 }
 

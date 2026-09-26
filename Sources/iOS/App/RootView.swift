@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import QwenVoiceCore
 
 /// Top-level iOS root view. Replaces the legacy `QVoiceiOSRootView`
@@ -24,7 +25,6 @@ struct RootView: View {
 
     @Environment(AppModel.self) private var appModel
     @StateObject private var performanceGate: IOSGenerationPerformanceGateModel
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
@@ -100,16 +100,9 @@ struct RootView: View {
             bottomPanelOverlay
             deleteModelSheetOverlay
         }
-        // App-switcher privacy: when the app is not active, cover the content so the
-        // script/transcript being composed isn't captured in the multitasking snapshot.
-        .overlay {
-            if scenePhase != .active {
-                IOSAppSwitcherPrivacyCover()
-                    .transition(.opacity)
-                    .zIndex(100)
-            }
-        }
-        .iosAppAnimation(Theme.Motion.easeOut, value: scenePhase)
+        // App-switcher privacy is a window above every presentation
+        // (`IOSAppSwitcherPrivacyCoverWindows`, IOS-22), not an overlay here:
+        // sheets and full-screen covers draw above this view.
         .iosAppAnimation(Theme.Motion.sheetSlideUp, value: isFocusBackdropActive)
         .environment(\.presentIOSPlayerSheet) { item in
             appModel.playerSheetItem = item
@@ -323,38 +316,63 @@ struct RootView: View {
     }
 
     private func openExternalAudio(_ sourceURL: URL) {
-        do {
-            // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
-            // security-scoped grant before copying audio and any adjacent transcript sidecar.
-            let validatedURL = try IOSReferenceAudioImportPolicy.validatedSourceURL(sourceURL)
-            let imported = try ttsEngine.importReferenceAudio(from: validatedURL)
-            importErrorMessage = nil
-            appModel.playerSheetItem = nil
-            appModel.cancelCloneReferenceRecording()
-            appModel.cancelCloneReferenceImport()
-            appModel.dismissBottomPanel()
-            appModel.dismissDeleteModelSheet()
-            appModel.tab = .voices
-            importedVoicePresentation = ImportedVoicePresentation(reference: imported)
-        } catch {
-            importErrorMessage = error.localizedDescription
+        // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
+        // security-scoped grant before copying audio and any adjacent transcript sidecar.
+        // The copy runs off the main actor and refuses an oversized file (CORE-16).
+        Task {
+            do {
+                let imported = try await IOSReferenceAudioImportPolicy.importReference(
+                    from: sourceURL,
+                    into: AppPaths.importedReferenceAudioDir
+                )
+                importErrorMessage = nil
+                appModel.playerSheetItem = nil
+                appModel.cancelCloneReferenceRecording()
+                appModel.cancelCloneReferenceImport()
+                appModel.dismissBottomPanel()
+                appModel.dismissDeleteModelSheet()
+                appModel.tab = .voices
+                importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+            } catch {
+                importErrorMessage = importFailureMessage(error)
+            }
         }
     }
 
     private func handleCloneReferenceImport(_ result: Result<[URL], Error>) {
         appModel.cancelCloneReferenceImport()
+        let sourceURL: URL
         do {
             // Preserve the picker URL exactly so the document layer can consume its
             // security-scoped grant before materializing the audio and optional sidecar.
-            guard let sourceURL = try IOSReferenceAudioImportPolicy.selectedSourceURL(from: result) else {
+            guard let selected = try IOSReferenceAudioImportPolicy.selectedSourceURL(from: result) else {
                 return
             }
-            let imported = try ttsEngine.importReferenceAudio(from: sourceURL)
-            importErrorMessage = nil
-            importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+            sourceURL = selected
         } catch {
-            importErrorMessage = error.localizedDescription
+            importErrorMessage = importFailureMessage(error)
+            return
         }
+        Task {
+            do {
+                let imported = try await IOSReferenceAudioImportPolicy.importReference(
+                    from: sourceURL,
+                    into: AppPaths.importedReferenceAudioDir
+                )
+                importErrorMessage = nil
+                importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+            } catch {
+                importErrorMessage = importFailureMessage(error)
+            }
+        }
+    }
+
+    /// Interface-language copy for a failed import; the alert's generic detail otherwise.
+    private func importFailureMessage(_ error: Error) -> String {
+        IOSReferenceAudioImportPolicy.failureMessage(
+            for: error,
+            presentation: IOSAppLanguage.shared.presentation
+        ) ?? IOSInterfaceText.importFailedDetail
     }
 
     private var effectiveReduceMotion: Bool {
@@ -376,9 +394,11 @@ private struct ImportedVoicePresentation: Identifiable {
 /// multitasking snapshot doesn't reveal the user's in-progress script or
 /// transcript. Mirrors the launch screen so the transition reads as intentional.
 private struct IOSAppSwitcherPrivacyCover: View {
+    static let background = Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255)
+
     var body: some View {
         ZStack {
-            Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255)
+            Self.background
                 .ignoresSafeArea()
             Image("VocelloLaunchLogo")
                 .renderingMode(.original)
@@ -388,6 +408,70 @@ private struct IOSAppSwitcherPrivacyCover: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// IOS-22: the app-switcher privacy cover lives in a window of its own above
+/// every presentation. An overlay on the root view sat below the sheets and
+/// full-screen covers where scripts and transcripts are edited, so the
+/// multitasking snapshot still showed them.
+///
+/// The cover is shown synchronously when a scene resigns active (or enters the
+/// background) and hidden when it is active again. It is never made key, so the
+/// focused field and its keyboard survive the round trip, and it draws nothing
+/// while the scene is active.
+@MainActor
+final class IOSAppSwitcherPrivacyCoverWindows: NSObject {
+    static let shared = IOSAppSwitcherPrivacyCoverWindows()
+
+    private var windows: [ObjectIdentifier: UIWindow] = [:]
+    private var isInstalled = false
+
+    /// Starts following scene activation. Call once at launch, before the
+    /// first scene can resign active.
+    func install() {
+        guard !isInstalled else { return }
+        isInstalled = true
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(sceneWillLeaveActive(_:)),
+                           name: UIScene.willDeactivateNotification, object: nil)
+        center.addObserver(self, selector: #selector(sceneWillLeaveActive(_:)),
+                           name: UIScene.didEnterBackgroundNotification, object: nil)
+        center.addObserver(self, selector: #selector(sceneDidActivate(_:)),
+                           name: UIScene.didActivateNotification, object: nil)
+        center.addObserver(self, selector: #selector(sceneDidDisconnect(_:)),
+                           name: UIScene.didDisconnectNotification, object: nil)
+    }
+
+    @objc private func sceneWillLeaveActive(_ notification: Notification) {
+        guard let scene = notification.object as? UIWindowScene else { return }
+        coverWindow(for: scene).isHidden = false
+    }
+
+    @objc private func sceneDidActivate(_ notification: Notification) {
+        guard let scene = notification.object as? UIWindowScene else { return }
+        windows[ObjectIdentifier(scene)]?.isHidden = true
+    }
+
+    @objc private func sceneDidDisconnect(_ notification: Notification) {
+        guard let scene = notification.object as? UIWindowScene else { return }
+        windows.removeValue(forKey: ObjectIdentifier(scene))?.isHidden = true
+    }
+
+    private func coverWindow(for scene: UIWindowScene) -> UIWindow {
+        if let window = windows[ObjectIdentifier(scene)] {
+            return window
+        }
+        let window = UIWindow(windowScene: scene)
+        // Sheets, full-screen covers and in-app alerts are all presented inside
+        // the app's normal-level window, so any higher level covers them.
+        window.windowLevel = .statusBar + 1
+        let host = UIHostingController(rootView: IOSAppSwitcherPrivacyCover())
+        host.view.backgroundColor = UIColor(IOSAppSwitcherPrivacyCover.background)
+        window.rootViewController = host
+        window.overrideUserInterfaceStyle = .dark
+        windows[ObjectIdentifier(scene)] = window
+        return window
     }
 }
 

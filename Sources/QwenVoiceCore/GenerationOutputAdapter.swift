@@ -568,6 +568,55 @@ private enum AtomicFilePublisher {
     }
 }
 
+/// CORE-15: the hidden staging files `AtomicFilePublisher` writes beside a take
+/// (`.<name>.<UUID>.tmp` or `.<name>.<UUID>.tmp.<extension>`) outlive a crash or
+/// jetsam kill, and on the iPhone `outputs/` is backed up. Each engine start
+/// removes the ones untouched for `age` below the app's own outputs folder; a
+/// live writer touches its file with every write, so it is far younger. A
+/// user-chosen macOS output folder is not walked.
+enum GenerationOutputStagingSweep {
+    static func removeAbandonedStagingFiles(
+        under root: URL,
+        olderThan age: TimeInterval = 3600,
+        now: Date = Date(),
+        fileManager: FileManager = .default
+    ) {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: [.skipsPackageDescendants]
+        ) else {
+            return
+        }
+        for case let url as URL in enumerator where isStagingFileName(url.lastPathComponent) {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                  values.isRegularFile == true,
+                  let modified = values.contentModificationDate,
+                  now.timeIntervalSince(modified) > age else { continue }
+            try? fileManager.removeItem(at: url)
+        }
+    }
+
+    /// The name `AtomicFilePublisher.temporaryURL(for:)` gives: a leading dot, the
+    /// final file's stem, a UUID, `tmp`, then the final extension when it has one.
+    static func isStagingFileName(_ name: String) -> Bool {
+        guard name.hasPrefix(".") else { return false }
+        var body = name.dropFirst()
+        if body.hasSuffix(".tmp") {
+            body = body.dropLast(".tmp".count)
+        } else if let marker = body.range(of: ".tmp.", options: .backwards),
+                  !body[marker.upperBound...].isEmpty,
+                  !body[marker.upperBound...].contains(".") {
+            body = body[..<marker.lowerBound]
+        } else {
+            return false
+        }
+        guard let dot = body.lastIndex(of: "."), dot > body.startIndex else { return false }
+        return UUID(uuidString: String(body[body.index(after: dot)...])) != nil
+    }
+}
+
 enum AtomicPCM16WAVWriter {
     static func write(
         pcmSamples: [Int16],

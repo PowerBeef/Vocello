@@ -731,9 +731,13 @@ struct IOSVoiceDesignView: View {
                         suggestedName: $saveSheetSuggestedName,
                         transcript: $saveSheetTranscript,
                         errorMessage: saveError,
-                        isSaving: isSavingVoice,
+                        // A save or a review decision in flight holds the
+                        // sheet open, so Cancel never closes a save that still
+                        // commits the voice.
+                        isSaving: isSavingVoice || isVoiceReviewDecisionInFlight,
                         clipAudioURL: URL(fileURLWithPath: saveSheetAudioPath),
                         onCancel: {
+                            guard !isSavingVoice, !isVoiceReviewDecisionInFlight else { return }
                             isSaveSheetPresented = false
                             saveSheetSuggestedName = ""
                             saveSheetTranscript = ""

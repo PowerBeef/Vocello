@@ -170,12 +170,14 @@ final class ReferenceClipRecordingStashTests: XCTestCase {
         try FileManager.default.createDirectory(at: legacyCapture, withIntermediateDirectories: true)
         try Data("capture".utf8).write(to: legacyCapture.appendingPathComponent("reference-2026-09-26T14-03-07Z.wav"))
         let live = try makeFolder(of: .current)
+        let later = Date().addingTimeInterval(2 * ReferenceClipRecordingStash.legacyRecordingMinimumAge)
 
         ReferenceClipRecordingStash.removeLeftoverRecordings(
             anotherCopyIsRunning: true,
             root: recordings,
             currentOwner: ReferenceClipRecordingOwner(bundleIdentifier: "com.qwenvoice.app", processIdentifier: 1, startTime: 1),
-            legacyDirectories: [legacyStash, legacyCapture]
+            legacyDirectories: [legacyStash, legacyCapture],
+            now: later
         )
         XCTAssertTrue(exists(legacyStash), "A running copy of the earlier build may still use them")
         XCTAssertTrue(exists(legacyCapture))
@@ -184,11 +186,87 @@ final class ReferenceClipRecordingStashTests: XCTestCase {
             anotherCopyIsRunning: false,
             root: recordings,
             currentOwner: ReferenceClipRecordingOwner(bundleIdentifier: "com.qwenvoice.app", processIdentifier: 1, startTime: 1),
-            legacyDirectories: [legacyStash, legacyCapture]
+            legacyDirectories: [legacyStash, legacyCapture],
+            now: later
         )
         XCTAssertFalse(exists(legacyStash))
         XCTAssertFalse(exists(legacyCapture))
         XCTAssertTrue(exists(live), "The legacy sweep never reaches a process folder")
+    }
+
+    /// B3 review: the flat folders have generic names in the per-user
+    /// temporary directory every unsandboxed Mac app shares.
+    func testTheLegacySweepRemovesOnlyTheClipsAnEarlierBuildWrote() throws {
+        let legacyStash = root.appendingPathComponent("voice-enroll", isDirectory: true)
+        let stashCopy = try XCTUnwrap(ReferenceClipRecordingStash.copyToStableTemp(try source(), in: legacyStash))
+        let recent = try XCTUnwrap(ReferenceClipRecordingStash.copyToStableTemp(try source(), in: legacyStash))
+        let foreign = legacyStash.appendingPathComponent("take.wav")
+        try Data("another app".utf8).write(to: foreign)
+        let foreignFolder = legacyStash.appendingPathComponent("\(UUID().uuidString).wav", isDirectory: true)
+        try FileManager.default.createDirectory(at: foreignFolder, withIntermediateDirectories: true)
+        let old = Date().addingTimeInterval(-2 * ReferenceClipRecordingStash.legacyRecordingMinimumAge)
+        for url in [stashCopy, foreign] {
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+        }
+
+        ReferenceClipRecordingStash.removeLegacyRecordings(in: legacyStash)
+
+        XCTAssertFalse(exists(stashCopy), "An earlier build's stale stash copy goes")
+        XCTAssertTrue(exists(recent), "A clip touched within the hour may still be in use")
+        XCTAssertTrue(exists(foreign), "A file the earlier build did not name is never removed")
+        XCTAssertTrue(exists(foreignFolder), "Only regular files are removed")
+        XCTAssertTrue(exists(legacyStash), "A folder that still holds anything stays")
+
+        try FileManager.default.removeItem(at: recent)
+        try FileManager.default.removeItem(at: foreign)
+        try FileManager.default.removeItem(at: foreignFolder)
+        ReferenceClipRecordingStash.removeLegacyRecordings(in: legacyStash)
+        XCTAssertFalse(exists(legacyStash), "An emptied folder goes")
+    }
+
+    func testTheLegacySweepNeverFollowsALinkInPlaceOfTheFolder() throws {
+        let elsewhere = root.appendingPathComponent("elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        let target = elsewhere.appendingPathComponent("\(UUID().uuidString).wav")
+        try Data("clip".utf8).write(to: target)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-2 * ReferenceClipRecordingStash.legacyRecordingMinimumAge)],
+            ofItemAtPath: target.path
+        )
+        let link = root.appendingPathComponent("voice-enroll", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: elsewhere)
+
+        ReferenceClipRecordingStash.removeLegacyRecordings(in: link)
+
+        XCTAssertTrue(exists(target))
+        XCTAssertTrue(exists(elsewhere))
+    }
+
+    func testLegacyClipNamesAreTheOnesEarlierBuildsWrote() {
+        for name in ["\(UUID().uuidString).wav", "reference-2026-09-26T14-03-07Z.wav"] {
+            XCTAssertTrue(ReferenceClipRecordingStash.isLegacyRecordingName(name), name)
+        }
+        for name in ["take.wav", "reference.wav", "reference-2026-09-26T14:03:07Z.wav", "reference-2026-09-26.wav",
+                     "\(UUID().uuidString).m4a", "notes.txt", "reference-2026-09-26T14-03-07Z.wav.part"] {
+            XCTAssertFalse(ReferenceClipRecordingStash.isLegacyRecordingName(name), name)
+        }
+    }
+
+    /// The iPhone clears every earlier launch's folder: its sandbox need not
+    /// report another process identifier, which would keep them all.
+    func testTheIPhoneSweepRemovesEveryEarlierLaunchFolder() throws {
+        let earlier = ReferenceClipRecordingOwner(bundleIdentifier: "com.patricedery.vocello", processIdentifier: 4242, startTime: 7)
+        let earlierFolder = try makeFolder(of: earlier)
+
+        ReferenceClipRecordingStash.removeLeftoverRecordings(
+            anotherCopyIsRunning: false,
+            root: recordings,
+            currentOwner: .current,
+            legacyDirectories: [],
+            ownerHasEnded: { _ in true }
+        )
+
+        XCTAssertFalse(exists(earlierFolder))
     }
 
     @MainActor

@@ -5,6 +5,9 @@ public enum DocumentIOError: LocalizedError, Equatable {
     case missingSource(String)
     case failedToCreateDirectory(String)
     case failedToCopy(String)
+    /// CORE-16: a reference larger than audio preparation accepts is refused
+    /// before it is copied, instead of being copied only to fail later.
+    case referenceTooLarge(maxBytes: Int64, actualBytes: Int64)
 
     public var errorDescription: String? {
         switch self {
@@ -14,6 +17,8 @@ public enum DocumentIOError: LocalizedError, Equatable {
             return "Couldn't create document directory at \(path)."
         case .failedToCopy(let path):
             return "Couldn't copy the document to \(path)."
+        case .referenceTooLarge(let maxBytes, let actualBytes):
+            return "The reference audio is \(actualBytes) bytes; the limit is \(maxBytes) bytes."
         }
     }
 }
@@ -75,9 +80,16 @@ public protocol DocumentIO: Sendable {
 
 public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
     public let importedReferenceDirectory: URL
+    /// The largest reference this imports (CORE-16). It defaults to what audio
+    /// preparation accepts, so no file is copied that could never be prepared.
+    public let maximumReferenceBytes: Int64
 
-    public init(importedReferenceDirectory: URL) {
+    public init(
+        importedReferenceDirectory: URL,
+        maximumReferenceBytes: Int64 = AudioPreparationLimits.defaults.maxInputFileSizeBytes
+    ) {
         self.importedReferenceDirectory = importedReferenceDirectory
+        self.maximumReferenceBytes = maximumReferenceBytes
     }
 
     public func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio {
@@ -103,6 +115,11 @@ public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
         guard fileManager.fileExists(atPath: sourceURL.path) else {
             throw DocumentIOError.missingSource(sourceURL.path)
         }
+        if maximumReferenceBytes > 0,
+           let size = (try? sourceURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+           Int64(size) > maximumReferenceBytes {
+            throw DocumentIOError.referenceTooLarge(maxBytes: maximumReferenceBytes, actualBytes: Int64(size))
+        }
 
         do {
             try fileManager.createDirectory(at: importedReferenceDirectory, withIntermediateDirectories: true)
@@ -116,20 +133,22 @@ public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
         )
         try Self.copyReplacingIfNeeded(sourceURL, to: destinationURL)
 
+        // CORE-17: the transcript sidecar is best effort. A Files picker grants
+        // access to the chosen audio alone, so a sibling `.txt` may be visible
+        // but unreadable; the audio still imports, and enrollment transcribes it.
+        // A sidecar this import could not copy never leaves a stale one behind.
         let sourceSidecarURL = sourceURL.deletingPathExtension().appendingPathExtension("txt")
         let destinationSidecarURL = destinationURL.deletingPathExtension().appendingPathExtension("txt")
-        if fileManager.fileExists(atPath: sourceSidecarURL.path) {
-            try Self.copyReplacingIfNeeded(sourceSidecarURL, to: destinationSidecarURL)
-        } else if fileManager.fileExists(atPath: destinationSidecarURL.path) {
+        let copiedSidecar = fileManager.fileExists(atPath: sourceSidecarURL.path)
+            && (try? Self.copyReplacingIfNeeded(sourceSidecarURL, to: destinationSidecarURL)) != nil
+        if !copiedSidecar, fileManager.fileExists(atPath: destinationSidecarURL.path) {
             try? fileManager.removeItem(at: destinationSidecarURL)
         }
 
         return ImportedReferenceAudio(
             originalPath: sourceURL.path,
             materializedPath: destinationURL.path,
-            transcriptSidecarPath: fileManager.fileExists(atPath: destinationSidecarURL.path)
-                ? destinationSidecarURL.path
-                : nil,
+            transcriptSidecarPath: copiedSidecar ? destinationSidecarURL.path : nil,
             fingerprint: fingerprint
         )
     }

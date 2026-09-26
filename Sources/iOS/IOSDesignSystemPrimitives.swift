@@ -340,6 +340,10 @@ struct IOSBottomSheetSurface<Content: View>: View {
     let tint: Color
     let presentation: IOSBottomSheetPresentationStyle
     let onDismiss: (() -> Void)?
+    /// Holds the sheet open: its close control is disabled and a drag does not
+    /// dismiss it (for example while a save that the dismissal would undo is in
+    /// flight).
+    let isDismissDisabled: Bool
     let headerLeading: AnyView?
     let headerTrailing: AnyView?
     let content: Content
@@ -349,12 +353,14 @@ struct IOSBottomSheetSurface<Content: View>: View {
         tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.tint = tint
         self.presentation = presentation
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = nil
         self.content = content()
@@ -365,6 +371,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
         tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
     ) {
@@ -372,6 +379,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
         self.tint = tint
         self.presentation = presentation
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -382,6 +390,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
         tint: Color = Theme.Brand.gold,
         presentation: IOSBottomSheetPresentationStyle = .system,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerLeading: () -> Leading,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
@@ -390,6 +399,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
         self.tint = tint
         self.presentation = presentation
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = AnyView(headerLeading())
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -403,17 +413,24 @@ struct IOSBottomSheetSurface<Content: View>: View {
                     title: title,
                     tint: tint,
                     onDismiss: onDismiss,
+                    isDismissDisabled: isDismissDisabled,
                     headerLeading: { headerLeading },
                     headerTrailing: { headerTrailing }
                 ) {
                     content
                 }
             } else if let headerTrailing {
-                IOSBottomSheet(title: title, tint: tint, onDismiss: onDismiss, headerTrailing: { headerTrailing }) {
+                IOSBottomSheet(
+                    title: title,
+                    tint: tint,
+                    onDismiss: onDismiss,
+                    isDismissDisabled: isDismissDisabled,
+                    headerTrailing: { headerTrailing }
+                ) {
                     content
                 }
             } else {
-                IOSBottomSheet(title: title, tint: tint, onDismiss: onDismiss) {
+                IOSBottomSheet(title: title, tint: tint, onDismiss: onDismiss, isDismissDisabled: isDismissDisabled) {
                     content
                 }
             }
@@ -425,6 +442,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
                     bottomSafeAreaInset: bottomSafeAreaInset,
                     height: height,
                     onDismiss: { onDismiss?() },
+                    isDismissDisabled: isDismissDisabled,
                     headerLeading: { headerLeading },
                     headerTrailing: { headerTrailing }
                 ) {
@@ -437,6 +455,7 @@ struct IOSBottomSheetSurface<Content: View>: View {
                     bottomSafeAreaInset: bottomSafeAreaInset,
                     height: height,
                     onDismiss: { onDismiss?() },
+                    isDismissDisabled: isDismissDisabled,
                     headerTrailing: { headerTrailing }
                 ) {
                     content
@@ -447,7 +466,8 @@ struct IOSBottomSheetSurface<Content: View>: View {
                     tint: tint,
                     bottomSafeAreaInset: bottomSafeAreaInset,
                     height: height,
-                    onDismiss: { onDismiss?() }
+                    onDismiss: { onDismiss?() },
+                    isDismissDisabled: isDismissDisabled
                 ) {
                     content
                 }
@@ -494,6 +514,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
     let bottomSafeAreaInset: CGFloat
     let height: CGFloat?
     let onDismiss: () -> Void
+    let isDismissDisabled: Bool
     let headerLeading: AnyView?
     let headerTrailing: AnyView?
     let content: Content
@@ -504,6 +525,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
+        isDismissDisabled: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -511,6 +533,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         self.bottomSafeAreaInset = bottomSafeAreaInset
         self.height = height
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = nil
         self.content = content()
@@ -522,6 +545,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
     ) {
@@ -530,6 +554,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         self.bottomSafeAreaInset = bottomSafeAreaInset
         self.height = height
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -541,6 +566,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         bottomSafeAreaInset: CGFloat,
         height: CGFloat? = nil,
         onDismiss: @escaping () -> Void,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerLeading: () -> Leading,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
@@ -550,6 +576,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
         self.bottomSafeAreaInset = bottomSafeAreaInset
         self.height = height
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = AnyView(headerLeading())
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -616,6 +643,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
     private var dismissDragGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onEnded { value in
+                guard !isDismissDisabled else { return }
                 if value.translation.height > 48 || value.predictedEndTranslation.height > 120 {
                     onDismiss()
                 }
@@ -642,6 +670,7 @@ struct IOSBottomEdgeSheet<Content: View>: View {
                 headerTrailing
             } else {
                 Button {
+                    guard !isDismissDisabled else { return }
                     onDismiss()
                 } label: {
                     Image(systemName: "xmark")
@@ -663,6 +692,8 @@ struct IOSBottomEdgeSheet<Content: View>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .disabled(isDismissDisabled)
+                .opacity(isDismissDisabled ? 0.4 : 1)
                 .accessibilityLabel(IOSInterfaceText.close)
                 .accessibilityIdentifier("bottomSheet_close")
             }
@@ -681,6 +712,7 @@ struct IOSBottomSheet<Content: View>: View {
     let title: String
     let tint: Color
     let onDismiss: (() -> Void)?
+    let isDismissDisabled: Bool
     let headerLeading: AnyView?
     let headerTrailing: AnyView?
     let content: Content
@@ -691,11 +723,13 @@ struct IOSBottomSheet<Content: View>: View {
         title: String,
         tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.tint = tint
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = nil
         self.content = content()
@@ -705,12 +739,14 @@ struct IOSBottomSheet<Content: View>: View {
         title: String,
         tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.tint = tint
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = nil
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -720,6 +756,7 @@ struct IOSBottomSheet<Content: View>: View {
         title: String,
         tint: Color = Theme.Brand.gold,
         onDismiss: (() -> Void)? = nil,
+        isDismissDisabled: Bool = false,
         @ViewBuilder headerLeading: () -> Leading,
         @ViewBuilder headerTrailing: () -> Trailing,
         @ViewBuilder content: () -> Content
@@ -727,6 +764,7 @@ struct IOSBottomSheet<Content: View>: View {
         self.title = title
         self.tint = tint
         self.onDismiss = onDismiss
+        self.isDismissDisabled = isDismissDisabled
         self.headerLeading = AnyView(headerLeading())
         self.headerTrailing = AnyView(headerTrailing())
         self.content = content()
@@ -781,6 +819,7 @@ struct IOSBottomSheet<Content: View>: View {
                 headerTrailing
             } else {
                 Button {
+                    guard !isDismissDisabled else { return }
                     onDismiss?()
                     dismiss()
                 } label: {
@@ -802,6 +841,8 @@ struct IOSBottomSheet<Content: View>: View {
                                 .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
                         }
                 }
+                .disabled(isDismissDisabled)
+                .opacity(isDismissDisabled ? 0.4 : 1)
                 .accessibilityLabel(IOSInterfaceText.close)
                 .accessibilityIdentifier("bottomSheet_close")
             }

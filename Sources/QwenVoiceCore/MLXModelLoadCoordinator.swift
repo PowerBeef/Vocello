@@ -1432,6 +1432,45 @@ enum PreparedModelOverlay {
         try? fileManager.removeItem(at: overlay)
     }
 
+    /// CORE-15: removes the overlay rebuilds a crash or jetsam kill interrupted
+    /// (`prepared_models/<model folder>.tmp.<uuid>`) once untouched for `age`; a live
+    /// rebuild takes seconds. Found from the models root as `removeCachedOverlay` finds an
+    /// overlay; a completed overlay and anything else in the folder are never touched, and
+    /// the symlinks inside a rebuild are unlinked, never followed. Best effort.
+    static func removeAbandonedRebuilds(
+        modelsRoot: URL,
+        olderThan age: TimeInterval = 3600,
+        now: Date = Date(),
+        fileManager: FileManager = .default
+    ) {
+        let modelsRoot = modelsRoot.standardizedFileURL
+        let paths = NativeRuntimePaths.rooted(at: modelsRoot.deletingLastPathComponent())
+        guard paths.modelsDirectory.standardizedFileURL.path == modelsRoot.path else { return }
+        let overlays = paths.hubCacheDirectory.appendingPathComponent(cacheSubdirectoryName, isDirectory: true)
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: overlays,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: []
+        ) else {
+            return
+        }
+        for entry in entries where isRebuildName(entry.lastPathComponent) {
+            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            if now.timeIntervalSince(modified) > age {
+                try? fileManager.removeItem(at: entry)
+            }
+        }
+    }
+
+    /// `<model folder>.tmp.<UUID>`: the name a rebuild stages under before it replaces
+    /// the overlay.
+    static func isRebuildName(_ name: String) -> Bool {
+        guard let marker = name.range(of: ".tmp.", options: .backwards),
+              marker.lowerBound > name.startIndex else { return false }
+        return UUID(uuidString: String(name[marker.upperBound...])) != nil
+    }
+
     /// Removes a legacy in-folder overlay and any interrupted rebuild of it
     /// (`.qvoice_prepared_model.tmp.<uuid>`). Only the overlay's own entries are removed; the
     /// symlinks inside it are unlinked, never followed. Idempotent and best effort.

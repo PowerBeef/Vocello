@@ -8,61 +8,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello records reference clips you use to clone voices on-device. Recordings stay on this iPhone."
+            "value": "Vocello records reference clips to clone voices on-device and never uploads them. Saved voices are included in your iPhone backups."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello enregistre les clips de référence utilisés pour cloner des voix sur l’appareil. Les enregistrements restent sur cet iPhone."
+            "value": "Vocello enregistre des clips de référence pour cloner des voix sur l’appareil et ne les envoie jamais. Les voix enregistrées sont incluses dans les sauvegardes de votre iPhone."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello graba clips de referencia para clonar voces en el dispositivo. Las grabaciones permanecen en este iPhone."
+            "value": "Vocello graba clips de referencia para clonar voces en el dispositivo y nunca los sube. Las voces guardadas se incluyen en las copias de seguridad de tu iPhone."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello nimmt Referenzclips auf, mit denen du Stimmen auf dem Gerät klonst. Die Aufnahmen bleiben auf diesem iPhone."
+            "value": "Vocello nimmt Referenzclips auf, um Stimmen auf dem Gerät zu klonen, und lädt sie nie hoch. Gespeicherte Stimmen sind in den Backups deines iPhone enthalten."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello registra clip di riferimento per clonare voci sul dispositivo. Le registrazioni restano su questo iPhone."
+            "value": "Vocello registra clip di riferimento per clonare voci sul dispositivo e non le carica mai. Le voci salvate sono incluse nei backup del tuo iPhone."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Vocello grava referências que você usa para clonar vozes no dispositivo. As gravações ficam neste iPhone."
+            "value": "O Vocello grava referências para clonar vozes no dispositivo e nunca as envia. As vozes salvas são incluídas nos backups do seu iPhone."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello 录制参考音频，用于在设备上克隆声音。录音始终保留在此 iPhone 上。"
+            "value": "Vocello 录制参考音频，用于在设备上克隆声音，且从不上传。已保存的声音会包含在你的 iPhone 备份中。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello はデバイス上で声をクローンするための参照音声を録音します。録音はこの iPhone に保存されます。"
+            "value": "Vocello はデバイス上で声をクローンするための参照音声を録音し、アップロードすることはありません。保存済みの声は iPhone のバックアップに含まれます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello는 기기에서 음성을 복제하는 데 사용할 참조 오디오를 녹음합니다. 녹음은 이 iPhone에 보관됩니다."
+            "value": "Vocello는 기기에서 음성을 복제하는 데 사용할 참조 오디오를 녹음하며 업로드하지 않습니다. 저장된 음성은 iPhone 백업에 포함됩니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vocello записывает образцы для клонирования голосов на устройстве. Записи остаются на этом iPhone."
+            "value": "Vocello записывает образцы для клонирования голосов на устройстве и никогда их не выгружает. Сохранённые голоса входят в резервные копии iPhone."
           }
         }
       }

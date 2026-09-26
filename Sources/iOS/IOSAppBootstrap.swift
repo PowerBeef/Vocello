@@ -39,7 +39,16 @@ final class IOSAppDependenciesContainer: ObservableObject {
         isStarting = true
         bootstrapTask = Task { [weak self] in
             let protection = await Task.detached(priority: .userInitiated) {
-                Result { try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir) }
+                // MAC-25 on the iPhone: reference clips an earlier launch recorded
+                // (a crash or jetsam kill stranded them) go before any sheet can
+                // record again. One app process owns this temporary directory.
+                ReferenceClipRecordingStash.removeLeftoverRecordings(
+                    anotherCopyIsRunning: false,
+                    ownerHasEnded: { _ in true }
+                )
+                return Result<IOSStorageProtectionPolicy.ApplyReport, any Error> {
+                    try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)
+                }
             }.value
             self?.finishStart(protection: protection)
         }

@@ -878,8 +878,8 @@ final class ModelManagerViewModel {
 
     /// MAC-20: never removes files the engine is using. A take, a line batch or
     /// long-form project between two takes, or a load, warm or prime blocks the
-    /// deletion; the package's weights are released first when they are
-    /// loaded, and a refused unload keeps the files (`MacModelDeletionSequence`).
+    /// deletion; unless another model is loaded the engine is unloaded first,
+    /// and a refused unload keeps the files (`MacModelDeletionSequence`).
     @discardableResult
     func delete(_ model: TTSModel) async -> DeletionOutcome {
         let modelDir = model.installDirectory(in: modelsDirectory)
@@ -891,11 +891,13 @@ final class ModelManagerViewModel {
             stopDownloads: {
                 await stopAndClear(for: model.id)
                 stoppedDownloads = true
-                // Staging first: its reuse pins would otherwise keep the blobs
-                // the delete releases. The downloader is already stopped.
-                HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
             },
             removeFiles: {
+                // Staging first: its reuse pins would otherwise keep the blobs
+                // the delete releases. The downloader is already stopped, and a
+                // blocked deletion never gets here, so it keeps a partial
+                // download.
+                HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
                 do {
                     try SharedModelComponentStore(modelsRoot: modelsDirectory).deleteModel(
                         modelFolder: modelDir.lastPathComponent,

@@ -3,10 +3,12 @@ import QwenVoiceCore
 import XCTest
 
 /// MAC-20: a model deletion never removes files the engine is using. A take, a
-/// line batch or long-form project between two takes, or a load, warm or prime
-/// blocks it; the weights are released first when the model is loaded; a
-/// refused unload keeps the files; and the engine is read again after every
-/// await, so a take or warm that starts meanwhile keeps the files too.
+/// line batch or long-form project between two takes, or a published load, warm
+/// or prime blocks it; unless another model is loaded the engine is unloaded
+/// first (a model-only warm publishes nothing, and weights a failure left
+/// resident name no model); a refused unload keeps the files; and the engine is
+/// read again after every await, so a take or warm that starts meanwhile keeps
+/// the files too.
 @MainActor
 final class MacModelDeletionSequenceTests: XCTestCase {
     private struct UnloadRefused: Error {}
@@ -31,7 +33,20 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         let outcome = await run(engine: engine)
 
         XCTAssertEqual(outcome, .deleted)
-        XCTAssertEqual(engine.log, ["unload", "stopDownloads", "removeFiles"])
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload", "removeFiles"])
+    }
+
+    func testAnEngineThatNamesNoModelIsUnloadedBeforeTheFilesGo() async {
+        // A model-only warm (`ensureModelLoadedIfNeeded`) publishes no state
+        // while it loads, and weights a failure left resident show `.failed`
+        // or a dismissed `.idle` (PA-32): both read as no loaded model. The
+        // explicit unload waits out the first and releases the second.
+        let engine = FakeDeletionEngine(loadedModelID: nil)
+
+        let outcome = await run(engine: engine)
+
+        XCTAssertEqual(outcome, .deleted)
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload", "removeFiles"])
     }
 
     func testWithoutAnEngineTheFilesAreRemoved() async {
@@ -73,7 +88,7 @@ final class MacModelDeletionSequenceTests: XCTestCase {
     }
 
     func testAColdLoadThatNamesNoModelBlocks() async {
-        // A Studio warm publishes `.starting`, whose model ID is nil.
+        // A cold load publishes `.starting`, whose model ID is nil.
         let engine = FakeDeletionEngine(loadedModelID: nil)
         engine.hasModelOperationInFlight = true
 
@@ -99,7 +114,7 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         )
 
         XCTAssertEqual(outcome, .failed(.engineRelease))
-        XCTAssertEqual(engine.log, ["unload"], "The files and the download stay as they were")
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload"], "The files stay")
         XCTAssertNotNil(reported as? UnloadRefused, "The refusal reaches the diagnostics hook")
         XCTAssertTrue(outcome.showsEngineBusyAlert, "The localized busy alert explains the refusal")
     }
@@ -113,7 +128,7 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         let outcome = await run(engine: engine)
 
         XCTAssertEqual(outcome, .blockedByActiveGeneration)
-        XCTAssertEqual(engine.log, ["unload"])
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload"])
     }
 
     func testAWarmThatStartsWhileDownloadsStopKeepsTheFiles() async {
@@ -127,15 +142,14 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         XCTAssertEqual(engine.log, ["stopDownloads"], "Nothing is removed after the last read saw a warm")
     }
 
-    func testAModelReloadedWhileDownloadsStopKeepsTheFiles() async {
+    func testAModelReloadedDuringTheUnloadKeepsTheFiles() async {
         let engine = FakeDeletionEngine(loadedModelID: modelID)
+        engine.onUnload = { [weak engine, modelID] in engine?.loadedModelID = modelID }
 
-        let outcome = await run(engine: engine) {
-            engine.loadedModelID = self.modelID
-        }
+        let outcome = await run(engine: engine)
 
         XCTAssertEqual(outcome, .blockedByActiveGeneration)
-        XCTAssertEqual(engine.log, ["unload", "stopDownloads"])
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload"])
     }
 
     func testAMultiTakeRunThatStartsWhileDownloadsStopKeepsTheFiles() async {

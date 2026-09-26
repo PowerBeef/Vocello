@@ -4101,6 +4101,20 @@
       "notes": "Closed 2026-09-26 (wave 10; decisions 5a and 7). scripts/lib/qc_qualification: exact Clopper-Pearson bounds, family resampling, correlated-failure audit, threshold derivation from clean clips, persisted pre-registration and confirm-once; 17 seeded injector families with identity shams and golden digests; a pure verdict composer; config/audio-qc-qualification-policy.json (A1-A10, Bonferroni per-language confidence); Swift .abstained, which the bench reports as inconclusive; Stage 0 constants pinned to config/audio-qc-stage0-calibration.json. M1 on Fast QC v8: 0/60 clean false alarms and no sham departs, but realistic clicks, sub-full-scale clipping, noise, truncation, word deletion, pitch breaks and identity swaps go undetected; an adversarial review removed construction artifacts first. Follow-ups: a tracked qc-calibration record kind (AQ-07/AQ-09) and keeping failed-run archives when the bench is inconclusive.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-26"
+    },
+    {
+      "id": "PA-32",
+      "plan": "project-audit-2026-09",
+      "title": "A failed model operation that leaves weights loaded still unloads after idle",
+      "status": "done",
+      "gate": "After a non-cancelled failure that leaves a model resident (a clone prime whose reference cannot be conditioned, a failed prewarm, a generation failure that is not a captured MLX failure), idle unload still releases the weights on every tier, and the user still sees the failure; the maintainer chooses how the failure stays visible once the engine settles.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/Services/MacGenerationWarmupCoordinator.swift",
+        "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
+      ],
+      "notes": "Closed 2026-09-26 (wave 11; maintainer decision 2026-09-25). A non-cancelled failure that leaves a model resident (failed load, ensure-load, prewarm, prefetch, clone prime, either generation path) arms the normal per-tier idle unload; from .failed (or the .idle a dismiss leaves) it releases the weights under the admission gate and keeps the failed state, message, latest event and a failed clone preparation until the user's next action (dismiss, a take, a load or leaving Clone); a stale .primed resets. Relief reopening admission re-arms it, and a cancelled take now re-arms idle unload too. Captured MLX failures and cancellations never arm it; the Mac warmup coordinator still does not warm from .failed, so after a failure a mode change warms only once the user dismisses or generates. Tests over the real engine behind the store (TTSEngineStoreTests) cover each failure kind, the next action, cancellation and the snapshot bridge.",
+      "updated": "2026-09-26"
     }
   ]
 }

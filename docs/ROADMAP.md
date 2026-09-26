@@ -24,7 +24,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 21/33 (64%) |
+| `project-audit-2026-09` | active | backend-and-platform | 22/33 (67%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -512,10 +512,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-19` | in-flight | Orchestrators and the generate loop have unit coverage | — |
 | `PA-20` | in-flight | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
-| `PA-26` | planned | Low-severity backlog from the external audit | — |
+| `PA-26` | in-flight | Low-severity backlog from the external audit | — |
 | `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
 | `PA-31` | in-flight | The engine store reports frontend state changes with the streaming engine | — |
-| `PA-32` | planned | A failed model operation that leaves weights loaded still unloads after idle | — |
 
 ### Open items in detail
 
@@ -543,7 +542,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-25`** (planned) — Docs and tooling stay proportional.
   gate: Resume now keeps only current checkpoints, dated reports move out of docs/reference with an index, research-only scripts run outside the product gate with their own environment, source-text tests are replaced, and a contract lands only when another retires.
 
-- **`PA-26`** (planned) — Low-severity backlog from the external audit.
+- **`PA-26`** (in-flight) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
 - **`PA-30`** (in-flight) — Leftovers from PA-21, PA-22 and AUD-05.
@@ -551,9 +550,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-31`** (in-flight) — The engine store reports frontend state changes with the streaming engine.
   gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
-
-- **`PA-32`** (planned) — A failed model operation that leaves weights loaded still unloads after idle.
-  gate: After a non-cancelled failure that leaves a model resident (a clone prime whose reference cannot be conditioned, a failed prewarm, a generation failure that is not a captured MLX failure), idle unload still releases the weights on every tier, and the user still sees the failure; the maintainer chooses how the failure stays visible once the engine settles.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

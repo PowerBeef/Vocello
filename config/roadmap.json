@@ -1405,14 +1405,14 @@
     {
       "id": "PA-26",
       "title": "Low-severity backlog from the external audit",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.",
       "sourceOfTruth": [
         "docs/audits/2026-09-22-project-audit.md"
       ],
-      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed. From AUD-08: console-only error prints (not persisted) in IOSAudioSessionOwner, QVoiceiOSApp, IOSGenerationModeViews, IOSVoicePreviewPlayer, MacVoiceCloningScreen, MacStudioGenerationActions, LivePreviewDiagnostics and the package's stderr paths.",
+      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed. From AUD-08: console-only error prints (not persisted) in IOSAudioSessionOwner, QVoiceiOSApp, IOSGenerationModeViews, IOSVoicePreviewPlayer, MacVoiceCloningScreen, MacStudioGenerationActions, LivePreviewDiagnostics and the package's stderr paths. 2026-09-26: B5 fixed WEB-02 (AVIF screenshots, lazy loading, 32/180 px icons, four unused assets removed; first load 0.46 MB from 5.6), WEB-06, WEB-07, WEB-08, the Discussions links (REPO-05), SEC-11 scanner tokens, SEC-17 checkout credentials, CI-11, CI-14 (ubuntu-24.04), CI-15, CI-18, DOC-05, DOC-09; B4 fixed IOS-18, IOS-19, IOS-21, IOS-25b, IOS-25c (Studio shows no take-time copy failure) and the iOS AUD-08 prints. Open: B1-B3, B6, CI-16, CI-21, DOC-10 (3.0 README), Cancel during an iOS save.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-09-26"
     },
     {
       "id": "PA-30",
@@ -1444,20 +1444,6 @@
       ],
       "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only). 2026-09-24: landed (f46aa2ee); its macOS smoke check waits on the same Automation Mode setup as AUD-03.",
       "updated": "2026-09-24"
-    },
-    {
-      "id": "PA-32",
-      "plan": "project-audit-2026-09",
-      "title": "A failed model operation that leaves weights loaded still unloads after idle",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "After a non-cancelled failure that leaves a model resident (a clone prime whose reference cannot be conditioned, a failed prewarm, a generation failure that is not a captured MLX failure), idle unload still releases the weights on every tier, and the user still sees the failure; the maintainer chooses how the failure stays visible once the engine settles.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Sources/Services/MacGenerationWarmupCoordinator.swift"
-      ],
-      "notes": "Found by the AUD-10 review on 2026-09-25. These paths publish .failed and never schedule idle unload; performIdleUnloadIfStillIdle clears loadState, clonePreparationState and visibleErrorMessage, so letting it run from .failed would make a surfaced failure disappear after the idle window (30 s on iPhone), while publishing .loaded would need the failure kept elsewhere. Only the store's critical-band full unload, a later model operation or stop() release the weights today, and the Mac warmup coordinator will not warm from .failed. Needs a product decision on how the failure stays visible. Maintainer decision 2026-09-25: unload after the normal idle window, and keep the failure visible until the user's next action.",
-      "updated": "2026-09-25"
     },
     {
       "id": "BT-01",

@@ -177,6 +177,9 @@ struct MacVoiceDesignScreen: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // A container, so the screen identifier stays on the screen and does not
+        // replace its descendants' own identifiers (the player card names its take).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen_voiceDesign")
         .onAppear {
             reconcileGenerationVariantSelection()

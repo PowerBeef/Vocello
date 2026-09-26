@@ -237,6 +237,9 @@ struct MacVoiceCloningScreen: View {
         .onDrop(of: [.fileURL], isTargeted: $session.isDragOver) { providers in
             handleDrop(providers)
         }
+        // A container, so the screen identifier stays on the screen and does not
+        // replace its descendants' own identifiers (the player card names its take).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen_voiceCloning")
         .onAppear {
             reconcileGenerationVariantSelection()

@@ -4,12 +4,12 @@
 The evaluator is intentionally a post-generation research tool.  It fits a
 small regularized dimensional model over deterministic acoustic features,
 validates it with speaker/script-grouped folds, emits uncertainty and
-abstention, and joins the independent QC/ASR/identity/MOS/SER layers without
-turning any advisory model into semantic authority.
+abstention, and joins the independent QC/ASR/identity layers without turning
+any advisory model into semantic authority.
 
 Generated audio is never embedded in model or report JSON.  Heavy ML scorers
-remain separate subprocesses and must run sequentially after the TTS engine
-exits on the canonical 8 GB Mac.
+remain separate subprocesses: no evaluator runs beside a resident generator,
+and after the generator exits the canonical host's measured budget governs.
 """
 
 from __future__ import annotations
@@ -36,7 +36,9 @@ DEFAULT_RIDGE_GRID = (0.01, 0.1, 1.0, 10.0)
 DEFAULT_ABSTAIN_RMSE = 0.45
 DEFAULT_EXTRAPOLATION_Z = 3.0
 REQUIRED_LAYERS = ("acoustic",)
-OPTIONAL_LAYERS = ("asr", "identity", "mos", "ser")
+# The MOS (UTMOSv2) and SER layers were retired with their judges on
+# 2026-09-25 (audit decision 1a; config/audio-qc-judges.json).
+OPTIONAL_LAYERS = ("asr", "identity")
 CHALLENGER_LAYER = "challenger"
 
 
@@ -459,7 +461,7 @@ def validate_challenger_layer(payload: dict[str, Any]) -> dict[str, Any]:
     peak_rss = provenance.get("peakRSSBytes")
     if isinstance(peak_rss, bool) or not isinstance(peak_rss, int) or peak_rss <= 0:
         raise EvaluatorError("challenger peakRSSBytes must be a positive integer")
-    for field in ("eightGigabyteHostCompatible", "offlineAfterAcquisition", "sequentialMemoryReleased"):
+    for field in ("canonicalHostQualified", "offlineAfterAcquisition", "sequentialMemoryReleased"):
         if provenance.get(field) is not True:
             raise EvaluatorError(f"challenger provenance requires {field}=true")
     _layer_rows(payload, CHALLENGER_LAYER)
@@ -470,6 +472,11 @@ def compose_layers(layers: dict[str, dict[str, Any]], dimensional: dict[str, Any
     missing_required = [name for name in REQUIRED_LAYERS if name not in layers]
     if missing_required:
         raise EvaluatorError(f"missing required evaluator layer(s): {missing_required}")
+    unknown_layers = sorted(set(layers) - set(REQUIRED_LAYERS + OPTIONAL_LAYERS + (CHALLENGER_LAYER,)))
+    if unknown_layers:
+        # Includes the retired MOS and SER layers: a retired judge's column
+        # cannot re-enter composition under its old name.
+        raise EvaluatorError(f"unregistered evaluator layer(s): {unknown_layers}")
     if CHALLENGER_LAYER in layers:
         validate_challenger_layer(layers[CHALLENGER_LAYER])
     indexed = {name: _layer_rows(payload, name) for name, payload in layers.items()}
@@ -483,7 +490,6 @@ def compose_layers(layers: dict[str, dict[str, Any]], dimensional: dict[str, Any
         raise EvaluatorError("dimensional layer contains cross-run identities")
 
     rows = []
-    disagreement_count = 0
     for generation_id in sorted(acoustic_ids):
         entry = {
             "generationID": generation_id,
@@ -495,22 +501,6 @@ def compose_layers(layers: dict[str, dict[str, Any]], dimensional: dict[str, Any
         }
         if generation_id in dimension_rows:
             entry["layers"]["dimensional"] = dimension_rows[generation_id]
-        disagreements: list[str] = []
-        ser = entry["layers"].get("ser")
-        vad = entry["layers"].get("dimensional")
-        if ser and vad and not ser.get("abstained"):
-            top = ser.get("topEmotion")
-            valence = vad.get("dimensions", {}).get("valence", {})
-            if not valence.get("abstained"):
-                value = valence.get("value")
-                if top in {"happy"} and isinstance(value, (int, float)) and value < 0:
-                    disagreements.append("ser-happy-vs-negative-valence")
-                if top in {"angry", "sad", "fearful", "disgust"} and isinstance(
-                    value, (int, float)
-                ) and value > 0:
-                    disagreements.append("ser-negative-vs-positive-valence")
-        entry["disagreements"] = disagreements
-        disagreement_count += bool(disagreements)
         rows.append(entry)
     present = sorted(indexed)
     if dimensional:
@@ -534,7 +524,6 @@ def compose_layers(layers: dict[str, dict[str, Any]], dimensional: dict[str, Any
             if CHALLENGER_LAYER in layers else None
         ),
         "rowCount": len(rows),
-        "disagreementCount": disagreement_count,
         "peakRSSBytes": (
             resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             if sys.platform == "darwin"
@@ -590,8 +579,6 @@ def main() -> int:
     compose.add_argument("--acoustic", required=True, type=Path)
     compose.add_argument("--asr", type=Path)
     compose.add_argument("--identity", type=Path)
-    compose.add_argument("--mos", type=Path)
-    compose.add_argument("--ser", type=Path)
     compose.add_argument("--challenger", type=Path)
     compose.add_argument("--dimensional", type=Path)
     compose.add_argument("--out", required=True, type=Path)

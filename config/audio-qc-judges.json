@@ -1,0 +1,497 @@
+{
+  "schemaVersion": 1,
+  "kind": "audio-qc-judge-registry",
+  "phase": "M0-describe",
+  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+  "summary": "Every judge the audio QC and speech-analysis harness runs or has run, as it is today: pins, weight and training-data licenses, license tier, independence, identity split and status. Describes; qualifies nothing. Calibration stays legacy-unqualified until a qualification record exists (AQ-03, AQ-07).",
+  "decisions": {
+    "1": {"option": "a", "date": "2026-09-25", "summary": "Correct the registry and retire NISQA, UTMOSv2 and the SER from every QC path; the relative-UTMOS guardrail is dropped until the section 4.6 composite passes its ladder test."},
+    "2": {"option": "a", "date": "2026-09-25", "summary": "Tier B is accepted for internal evaluation that never ships, recorded per judge."},
+    "3": {"option": "a", "date": "2026-09-25", "summary": "Judges from the generator's lab never vote: an adjudicator only corroborates, an aligner only supplies intervals, and neither provides labels."},
+    "7": {"option": "adopted", "date": "2026-09-25", "summary": "Adoption requires two clean canonical-host runs; the 8 GB Mac and iPhone floors are product constraints, not evaluator constraints."}
+  },
+  "tiers": {
+    "A": "Permissive weights, and training data whose terms allow commercial use, or no learned weights at all.",
+    "B": "Permissive weights, but training data includes scraped web audio or corpora whose rights stay with the original owners, with no explicit non-commercial term. Internal, never-shipped evaluation only (decision 2a).",
+    "C": "Non-commercial weights, or training data under an explicit non-commercial or research-only term. Never runs in a QC path."
+  },
+  "statuses": {
+    "candidate": "Registered with pins, a tier and independence fields; research use only.",
+    "shadow": "Runs beside the current judges; its verdicts are uncalibrated and never block.",
+    "advisory": "Reported beside verdicts; never gates.",
+    "warn": "Feeds a detector qualified at its warn operating point.",
+    "gating": "Feeds a verdict that can fail a take or a lane.",
+    "retired": "Removed from every QC path; only what reads legacy records remains.",
+    "quarantined": "A license, terms or provenance problem blocks execution until a maintainer decision."
+  },
+  "adoption": {
+    "requirement": "two-clean-canonical-host-runs",
+    "hardwareProfiles": "benchmarks/hardware-profiles.json",
+    "profileSelector": {"platform": "macos", "canonical": true},
+    "note": "The qualifier attests the live host against the one canonical macOS profile. The 8 GB Mac and the iPhone remain product floors, not evaluator hosts."
+  },
+  "identitySplit": {
+    "output": "Everything that can change a judge's output: model, weights and runtime digests, the worker or adapter source, label map, decode options and preprocessing. It keys caches and calibration records.",
+    "envelope": "How a run was supervised: the resource supervisor's source, its probe and options, the host. Provenance only; a change never invalidates a cache entry or a calibration."
+  },
+  "judges": {
+    "asr.whisper-small@1": {
+      "role": "Mac recognizer family 'whisper': locale-locked full-file transcript and first-30-second language identification, after the generator exits.",
+      "kind": "neural",
+      "status": "gating",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "whisper",
+      "ships": false,
+      "legacyIdentifiers": {
+        "adapterIDs": ["whisper-small-mlx"],
+        "modelFamilies": ["whisper"],
+        "algorithms": ["mlx-whisper-locked-decode-v1"],
+        "sources": ["scripts/independent_asr.py", "scripts/independent_asr_worker.py"]
+      },
+      "pins": {
+        "repository": "mlx-community/whisper-small-mlx",
+        "revision": "45f3915923c7a79a5a5b5a7d909d39aeb0e5630e",
+        "files": {
+          "weights.npz": "55b6674c9b339702d486e2b1573839a66f8ec8f821ed2886993ef717a86b09f5",
+          "config.json": "e8f58e638208af66d5d5d67801259dc7a12d199e971967a9f9d33a8e3635668e"
+        },
+        "digestStatus": "pinned",
+        "verification": "prepare_delivery_compact_model_config.py verifies every file at preparation; the adapter re-verifies the weights and runtime binary before each launch; nothing is downloaded.",
+        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#whisper-small-mlx",
+        "runtime": {"mlx": "0.32.0", "mlx-whisper": "0.4.3", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "MIT (OpenAI Whisper release); Apache-2.0 on the mlx-community conversion card",
+        "code": "MIT (mlx-whisper)",
+        "trainingData": "680,000 hours of weakly supervised multilingual web audio; rights stay with the original owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "sources": ["https://github.com/openai/whisper", "https://huggingface.co/mlx-community/whisper-small-mlx"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "OpenAI (weights); mlx-community (conversion)",
+        "architecture": "encoder-decoder transformer, 244M parameters",
+        "trainingData": "Whisper web audio",
+        "labelLineage": "weakly supervised web transcripts",
+        "generatorLabCorrelated": false
+      },
+      "identity": {
+        "output": ["modelID", "sourceRevision", "weightsSHA256", "labelMapDigest", "binarySHA256", "runtimeDependencies", "workerSourceSHA256", "algorithm", "decodeOptions", "lockedLanguage", "preprocessingConfigDigest"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+      },
+      "resources": {
+        "provisionalCeilingBytes": 2684354560,
+        "ceilingBasis": "Set before any canonical-host measurement (AQ-F43); about 0.85 GB was measured on the M2.",
+        "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)",
+        "canonicalHostPeakBytes": null
+      },
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "asr.apple-speech-consensus@2": {
+      "role": "iPhone recognizer family 'apple-speech': three locale-locked on-device passes (repeatability of one recognizer) plus a transcript language-consistency check.",
+      "kind": "platform",
+      "status": "gating",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "apple-speech",
+      "ships": true,
+      "legacyIdentifiers": {
+        "modelFamilies": ["apple-speech"],
+        "sources": ["Sources/SharedSupport/Services/VoiceClipTranscriber.swift"]
+      },
+      "pins": {
+        "digestStatus": "platform-managed",
+        "framework": "Speech (SFSpeechRecognizer, on-device) and NaturalLanguage (NLLanguageRecognizer)",
+        "verification": "The operating system owns the model; each record carries the OS build that ran it."
+      },
+      "license": {
+        "weights": "Apple platform framework used under the Apple Developer Program License Agreement; no weights are redistributed",
+        "code": "Apple platform framework",
+        "trainingData": "Undisclosed and vendor-owned; the vendor licenses commercial use of the framework",
+        "tier": "A",
+        "tierBasis": "vendor-licensed platform service; nothing is redistributed",
+        "trainingDataRisk": "undisclosed-vendor-licensed",
+        "commercialUseCompatible": true,
+        "sources": ["https://developer.apple.com/documentation/speech"]
+      },
+      "independence": {
+        "vendor": "Apple",
+        "architecture": "on-device Speech framework recognizer (undisclosed)",
+        "trainingData": "undisclosed",
+        "labelLineage": "undisclosed",
+        "generatorLabCorrelated": false
+      },
+      "identity": {
+        "output": ["osBuild", "deviceProfile", "locale", "onDeviceRecognition", "passCount", "verdictAlgorithmVersion"],
+        "envelope": ["diagnosticsRunnerSource"]
+      },
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "In-app; bounded by the product's memory budget.", "ceilingPolicy": "product memory contract", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "fastqc@8": {
+      "role": "Stage 0 Fast QC inside the engine: amplitude and waveform-shape measures on every take; the only product publication gate.",
+      "kind": "dsp",
+      "status": "gating",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": null,
+      "ships": true,
+      "legacyIdentifiers": {
+        "algorithms": ["qcAlgorithmVersion 8"],
+        "sources": ["Sources/QwenVoiceCore/GenerationOutputAdapter.swift", "scripts/lib/audio_qc.py"]
+      },
+      "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code; the algorithm version is part of the gate baseline identity."},
+      "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
+      "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
+      "identity": {"output": ["qcAlgorithmVersion", "pcmSHA256"], "envelope": []},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded, file-bound streaming inside the engine.", "ceilingPolicy": "engine memory contract", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "prosody@3": {
+      "role": "Bounded reference-free prosody analyzer (pitch, cadence, pauses, energy, voice quality, spectral balance) feeding the warn-first prosody and delivery gates.",
+      "kind": "dsp",
+      "status": "advisory",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "legacyIdentifiers": {"algorithms": ["analyzerAlgorithmVersion 3"], "sources": ["scripts/analyze_prosody.py"]},
+      "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code bound by source digest in every cache identity."},
+      "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
+      "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
+      "identity": {"output": ["analyzerSourceSHA256", "analyzerAlgorithmVersion", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory analyzer.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "temporal-contour@1": {
+      "role": "Five-region temporal contour analyzer and its paired instructed-minus-neutral deltas in the delivery cascade.",
+      "kind": "dsp",
+      "status": "advisory",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "legacyIdentifiers": {"cascadeLayers": ["temporal-contour"], "sources": ["scripts/delivery_temporal_features.py"]},
+      "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code bound by source digest in every cache identity."},
+      "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
+      "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
+      "identity": {"output": ["analyzerSourceSHA256", "layerVersion", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory analyzer.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "reference.acoustic-emotion-base@1": {
+      "role": "Digest-pinned numerical comparison of paired acoustic deltas against a licensed acted-emotion reference base; descriptive only.",
+      "kind": "dsp",
+      "status": "advisory",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "legacyIdentifiers": {"sources": ["scripts/delivery_acoustic_reference.py", "config/delivery-acoustic-reference-base.json"]},
+      "pins": {"digestStatus": "no-learned-weights", "verification": "The reference base manifest and its source files are digest-pinned; no recording is redistributed."},
+      "license": {
+        "weights": "none",
+        "code": "Vocello (owned)",
+        "trainingData": "CREMA-D derived features (ODbL 1.0, contents DbCL 1.0) and Thorsten (CC0 1.0); development-only exposure",
+        "tier": "A",
+        "trainingDataRisk": "share-alike-database-internal-only",
+        "commercialUseCompatible": true,
+        "notices": ["CREMA-D attribution: Cheyney Computer Science and CREMA-D contributors; the derived database stays ODbL if ever distributed"],
+        "sources": ["https://github.com/CheyneyComputerScience/CREMA-D", "https://huggingface.co/datasets/Thorsten-Voice/TV-44kHz-Full"]
+      },
+      "independence": {"vendor": "Vocello", "architecture": "deterministic DSP against a reference base", "trainingData": "acted emotion corpora", "labelLineage": "corpus actor labels", "generatorLabCorrelated": false},
+      "identity": {"output": ["referenceBaseSHA256", "comparatorSourceSHA256", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory comparator.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "compact.sensevoice-small-q8@1": {
+      "role": "Compact research representation in the delivery cascade: coarse language, emotion and event tags plus a transcript.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "legacyIdentifiers": {"adapterIDs": ["sensevoice-small-q8"], "modelFamilies": ["sensevoice"], "cascadeLayers": ["coarse-ser-asr"]},
+      "pins": {
+        "repository": "FunAudioLLM/SenseVoiceSmall-GGUF",
+        "revision": "90c1c61912018b70ada0fcc024ea24aca62f2e63",
+        "files": {
+          "sensevoice-small-q8.gguf": "4ae45c94422de949b387e2e0fb10d7e14e4c42c69db30c3444ecc7d4b844b7c5",
+          "funasr-llamacpp-macos-arm64.tar.gz": "2d5786784ad09d8f4def1d942f678728638fe601d00acf0dad7cf094a9328363",
+          "llama-funasr-sensevoice": "49d66b2f79d439e2db7933627e1deb9eb7f3ebf0d708473757828130f3619435"
+        },
+        "digestStatus": "pinned",
+        "verification": "prepare_delivery_compact_model_config.py verifies weights, runtime archive and binary; the adapter re-verifies weights and binary before each launch.",
+        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#sensevoice-small-q8",
+        "runtime": {"release": "QwenAudio/SenseVoice:runtime-llamacpp-v0.1.9"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (GGUF model card); upstream weights keep FunASR Model License v1.1 attribution and model-name obligations",
+        "code": "The pinned QwenAudio/SenseVoice llama.cpp runtime release, under the terms published with it",
+        "trainingData": "More than 400,000 hours across more than 50 languages (vendor-declared; composition undisclosed)",
+        "tier": "A",
+        "tierBasis": "audit section 4.1: A, with notices",
+        "trainingDataRisk": "vendor-declared-undisclosed",
+        "commercialUseCompatible": true,
+        "notices": ["FunASR Model License v1.1: attribution and model-name obligations"],
+        "sources": ["https://github.com/FunAudioLLM/SenseVoice", "https://huggingface.co/FunAudioLLM/SenseVoiceSmall-GGUF"]
+      },
+      "independence": {
+        "vendor": "Alibaba Tongyi Lab (FunAudioLLM)",
+        "architecture": "non-autoregressive encoder (SenseVoice Small), Q8 GGUF",
+        "trainingData": "SenseVoice multilingual corpus",
+        "labelLineage": "vendor-internal",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "Same company as the generator's lab and as Paraformer; a different lab. Counts toward the error-correlation audit before any consensus gates."
+      },
+      "identity": {
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+      },
+      "resources": {
+        "provisionalCeilingBytes": 5368709120,
+        "ceilingBasis": "The shared provisional compact-adapter ceiling, set for the 8 GB floor before any canonical-host measurement (AQ-F43).",
+        "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)",
+        "canonicalHostPeakBytes": null
+      },
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "compact.distilhubert@1": {
+      "role": "Compact research representation in the delivery cascade: a frozen 128-dimensional projection; transcribes nothing.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "plannedRetirement": {"item": "AQ-05", "reason": "No QC measurand; the fitted heads were never calibrated (audit sections 4.9 and 7.1)."},
+      "legacyIdentifiers": {"adapterIDs": ["distilhubert"]},
+      "pins": {
+        "repository": "ntu-spml/distilhubert",
+        "revision": "fa87d96265d6b7af66e112faff6ff44df419cec9",
+        "files": {
+          "model.safetensors": "77ad8f985c97750d8d27d6950c917800d80732a141370bf316058bded71a6cbe",
+          "config.json": "0427043d1c4c8d58298d2050420a0c2ce85c8b92ec3865eaecc62c3fc5a97006",
+          "preprocessor_config.json": "7a8f0fc8ee1272ed28a8b468e183c56a19329a92babd3ca8d4d21ae02ba511cd"
+        },
+        "digestStatus": "pinned",
+        "verification": "prepare_delivery_compact_model_config.py verifies every file; the adapter re-verifies the weights before each launch; the runtime loads local files only.",
+        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#distilhubert",
+        "runtime": {"numpy": "2.5.2", "python": "3.14.4", "safetensors": "0.7.0", "torch": "2.13.0", "transformers": "4.57.6"}
+      },
+      "license": {
+        "weights": "Apache-2.0",
+        "code": "Vocello runtime (owned); transformers Apache-2.0",
+        "trainingData": "LibriSpeech (CC BY 4.0), distilled from HuBERT",
+        "tier": "A",
+        "trainingDataRisk": "none",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/ntu-spml/distilhubert"]
+      },
+      "independence": {"vendor": "National Taiwan University SPML", "architecture": "distilled HuBERT encoder", "trainingData": "LibriSpeech", "labelLineage": "self-supervised distillation", "generatorLabCorrelated": false},
+      "identity": {
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+      },
+      "resources": {
+        "provisionalCeilingBytes": 5368709120,
+        "ceilingBasis": "The shared provisional compact-adapter ceiling, set for the 8 GB floor before any canonical-host measurement (AQ-F43).",
+        "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)",
+        "canonicalHostPeakBytes": null
+      },
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "speaker.ecapa-voxceleb@1": {
+      "role": "Clone identity cosine (clone fidelity lane, reference-bank selection, long-form carry-over probe); advisory bands, uncalibrated.",
+      "kind": "neural",
+      "status": "advisory",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": "speaker-ecapa",
+      "ships": false,
+      "plannedRetirement": {"item": "AQ-07", "reason": "Shadow for one cycle, then retired once the CAM++ and ResNet293 families qualify (audit section 4.3)."},
+      "legacyIdentifiers": {"sources": ["scripts/clone_speaker_similarity.py"], "reportFields": ["speakerSimilarity", "identityCosine"]},
+      "pins": {
+        "repository": "speechbrain/spkrec-ecapa-voxceleb",
+        "revision": "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286",
+        "files": {},
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "Loaded from the local Hugging Face cache only; before each load every snapshot file is checked against its content address (SHA-256 for large files, the git blob SHA-1 otherwise) and against any per-file pin recorded here. Per-file SHA-256 pins are recorded at acquisition (AQ-06).",
+        "runtime": {"speechbrain": "operator-local", "torch": "operator-local"}
+      },
+      "license": {
+        "weights": "Apache-2.0",
+        "code": "Apache-2.0 (SpeechBrain)",
+        "trainingData": "VoxCeleb 1 and 2: YouTube-derived celebrity speech; copyright stays with the owners; no explicit non-commercial term on the audio",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb", "https://www.robots.ox.ac.uk/~vgg/data/voxceleb/"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {"vendor": "SpeechBrain", "architecture": "ECAPA-TDNN", "trainingData": "VoxCeleb", "labelLineage": "speaker identity labels", "generatorLabCorrelated": false},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "preprocessing"],
+        "envelope": ["torchVersion", "hostProfile"]
+      },
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Unsupervised in-process CPU scorer today; about 0.4-0.6 GB (audit estimate).", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "quality.nisqa-v2@1": {
+      "role": "Former clip-quality screen (MV-06): five NISQA dimensions against a calibrated MOS warn floor in the delivery cascade and clip_quality_screen.py.",
+      "kind": "neural",
+      "status": "retired",
+      "calibration": "none",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "retirement": {"date": "2026-09-25", "decision": "1a", "finding": "AQ-F01", "reason": "The released weights (nisqa.tar) are CC BY-NC-SA 4.0; the registry recorded MIT and commercial compatibility. Weak on clean TTS (onset-cluster AUC 0.54).", "successor": "Audiobox Aesthetics and DNSMOS advisory columns after a ladder test (AQ-08)"},
+      "legacyIdentifiers": {
+        "adapterIDs": ["nisqa-v2"],
+        "cascadeLayers": ["clip-quality-screen"],
+        "reportFields": ["clipQualityScreen"],
+        "sources": ["scripts/clip_quality_screen.py"],
+        "pythonModules": ["torchmetrics.functional.audio.nisqa"]
+      },
+      "pins": {
+        "repository": "gabrielmittag/NISQA",
+        "revision": "fe84f0f252abec382b24367d5b22498a7ce34dbb",
+        "files": {"nisqa.tar": "7ec4cf937514dd3f8860b21e66fabd8ca87a168572675ef8d979c4c4ad2e805c"},
+        "digestStatus": "pinned",
+        "verification": "Retired: no QC path loads it.",
+        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#retiredCandidates.nisqa-v2"
+      },
+      "license": {
+        "weights": "CC BY-NC-SA 4.0 (nisqa.tar); the torchmetrics port downloads the same checkpoint",
+        "code": "MIT (NISQA); Apache-2.0 (torchmetrics port)",
+        "trainingData": "NISQA Corpus (non-commercial research) and the listed public listening-test datasets",
+        "tier": "C",
+        "trainingDataRisk": "non-commercial",
+        "commercialUseCompatible": false,
+        "sources": ["https://github.com/gabrielmittag/NISQA", "https://github.com/gabrielmittag/NISQA/wiki/NISQA-Corpus", "https://github.com/Lightning-AI/torchmetrics/blob/master/src/torchmetrics/functional/audio/nisqa.py"]
+      },
+      "independence": {"vendor": "TU Berlin (Mittag et al.)", "architecture": "CNN-self-attention MOS predictor", "trainingData": "NISQA Corpus", "labelLineage": "crowdsourced MOS", "generatorLabCorrelated": false},
+      "identity": {
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "runtimeDependenciesDigest", "preprocessingConfigDigest"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion"]
+      },
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Retired; about 403 MB peak RSS in its 2026-09-14 qualification.", "ceilingPolicy": "retired", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "quality.utmosv2@1": {
+      "role": "Former naturalness MOS-proxy advisory (mos_advisory.py) and the relative-UTMOS promotion guardrail and cascade finalist layer.",
+      "kind": "neural",
+      "status": "retired",
+      "calibration": "none",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "retirement": {"date": "2026-09-25", "decision": "1a", "finding": "AQ-F02", "reason": "Trained on SOMOS (CC BY-NC-SA 4.0) and Blizzard Challenge samples that may not be redistributed; out of domain for this engine.", "successor": "The section 4.6 composite, as a DP-31/DP-32 guardrail only once it passes its ladder test (AQ-08); until then no relative-quality guardrail"},
+      "legacyIdentifiers": {
+        "evaluatorLayers": ["mos"],
+        "cascadeLayers": ["utmos"],
+        "guardrails": ["relativeUTMOSDelta", "maximumMedianRelativeUTMOSRegression"],
+        "sources": ["scripts/mos_advisory.py"],
+        "pythonModules": ["utmosv2"]
+      },
+      "pins": {
+        "repository": "sarulab-speech/UTMOSv2",
+        "revision": "cc2700db57bb83ee13dc31ebe1b868c254e15d09",
+        "files": {"fold0_s42_best_model.pth": "c8149d988e4bbf3f347e6966b5d769de347a5f8c59ffca1dc4bd4bf5b8585e57"},
+        "weightsSource": "huggingface.co/sarulab-speech/UTMOSv2 (fusion_stage3, fold 0, seed 42); the revision is the GitHub code commit",
+        "digestStatus": "pinned",
+        "verification": "Retired: no QC path loads it. Its former loader verified the digest only when the file already existed and otherwise let the library download (AQ-F04).",
+        "configuration": {"config": "fusion_stage3", "fold": 0, "seed": 42, "device": "cpu"}
+      },
+      "license": {
+        "weights": "MIT (model card)",
+        "code": "MIT",
+        "trainingData": "VoiceMOS Challenge data: BVCC, SOMOS (CC BY-NC-SA 4.0) and Blizzard Challenge samples (no redistribution)",
+        "tier": "C",
+        "trainingDataRisk": "non-commercial",
+        "commercialUseCompatible": false,
+        "sources": ["https://github.com/sarulab-speech/UTMOSv2/blob/main/docs/datasets.md", "https://zenodo.org/records/10691660"]
+      },
+      "independence": {"vendor": "University of Tokyo (Saruwatari lab)", "architecture": "SSL plus spectrogram fusion MOS predictor", "trainingData": "VoiceMOS Challenge corpora", "labelLineage": "listening-test MOS", "generatorLabCorrelated": false},
+      "identity": {"output": ["repository", "revision", "weightsSHA256", "configuration"], "envelope": ["peakRSSBytes"]},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Retired; 3.6 GB peak RSS on the M2 (CM-6).", "ceilingPolicy": "retired", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "emotion.ser-wav2vec2-xlsr@2": {
+      "role": "Former speech-emotion agreement advisory (emotion_advisory.py): reference-bank eligibility, the clone lane's third analyzer and the evaluator's SER layer.",
+      "kind": "neural",
+      "status": "retired",
+      "calibration": "none",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "retirement": {"date": "2026-09-25", "decision": "1a", "finding": "AQ-F03", "reason": "Trained on RAVDESS (CC BY-NC-SA 4.0), TESS (CC BY-NC-ND 4.0) and SAVEE (research use); its docstring called it permissively licensed. It also resampled with np.interp and ran outside the supervisor.", "successor": "Paired, speaker-normalized arousal and prosody deltas now; the owned Whisper-encoder probe later (AQ-08)"},
+      "legacyIdentifiers": {
+        "evaluatorLayers": ["ser"],
+        "cascadeLayers": ["legacy-ser-during-bakeoff"],
+        "reportFields": ["emotionAdvisory", "ser"],
+        "sources": ["scripts/emotion_advisory.py"]
+      },
+      "pins": {
+        "repository": "firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53",
+        "revision": "611e6db8ee667aa07fe66596f9fc761e036ff5b9",
+        "files": {},
+        "digestStatus": "unpinned-retired",
+        "verification": "Retired: no QC path loads it. It loaded by revision with no file digest (AQ-F04)."
+      },
+      "license": {
+        "weights": "Fine-tune of facebook/wav2vec2-large-xlsr-53 (Apache-2.0); the fine-tuned weights inherit the terms of their training data",
+        "code": "transformers (Apache-2.0)",
+        "trainingData": "RAVDESS (CC BY-NC-SA 4.0), TESS (CC BY-NC-ND 4.0) and SAVEE (research use)",
+        "tier": "C",
+        "trainingDataRisk": "non-commercial",
+        "commercialUseCompatible": false,
+        "sources": ["https://huggingface.co/firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53", "https://zenodo.org/records/1188976"]
+      },
+      "independence": {"vendor": "community fine-tune", "architecture": "wav2vec2-large XLSR-53 classifier", "trainingData": "acted English emotion corpora", "labelLineage": "actor emotion labels", "generatorLabCorrelated": false},
+      "identity": {"output": ["repository", "revision", "labelSet", "resampler"], "envelope": ["peakRSSBytes"]},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Retired; about 1.3 GB fp32 weights on CPU, unsupervised.", "ceilingPolicy": "retired", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    }
+  },
+  "excluded": [
+    {"id": "nisqa", "category": "license", "tier": "C", "reason": "Weights CC BY-NC-SA 4.0; weak on clean TTS (TTSDS2 correlations 0.05 to -0.64; onset-cluster AUC 0.54).", "models": ["gabrielmittag/NISQA*", "*NISQA-TTS*"], "packages": ["nisqa"], "pythonModules": ["nisqa", "torchmetrics.functional.audio.nisqa", "torchmetrics.audio.nisqa"]},
+    {"id": "utmosv2", "category": "license", "tier": "C", "reason": "SOMOS (CC BY-NC-SA) and Blizzard samples in training; 3.6 GB; out of domain.", "models": ["sarulab-speech/UTMOSv2*"], "packages": ["utmosv2"], "pythonModules": ["utmosv2"]},
+    {"id": "ser-wav2vec2-xlsr-firdhokk", "category": "license", "tier": "C", "reason": "Trained on RAVDESS, TESS and SAVEE (non-commercial or research use).", "models": ["firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53"], "packages": [], "pythonModules": []},
+    {"id": "dimensional-and-podcast-emotion-models", "category": "license", "tier": "C", "reason": "audeering dimensional, emotion2vec+, 3loi Odyssey and tiantiaf MSP-Podcast models: CC BY-NC-SA or MSP-Podcast academic data; emotion2vec+ pseudo-labels undisclosed.", "models": ["audeering/*", "emotion2vec/*", "3loi/*", "tiantiaf/*"], "packages": [], "pythonModules": []},
+    {"id": "nc-judges-and-omni-graders", "category": "license", "tier": "C", "reason": "TorchAudio-SQUIM Subjective, SpeechJudge-GRM, Qwen2.5-Omni-3B and Audio Flamingo 3: CC BY-NC, the Qwen Research License or NVIDIA non-commercial terms.", "models": ["*SpeechJudge-GRM*", "Qwen/Qwen2.5-Omni-*", "nvidia/audio-flamingo-3*"], "packages": [], "pythonModules": ["torchaudio.pipelines.SQUIM_SUBJECTIVE"]},
+    {"id": "mms-and-voxpopuli-aligners", "category": "license", "tier": "C", "reason": "MMS-1B-all, MMS-LID, MMS-FA, the ctc-forced-aligner default, the torchaudio VoxPopuli aligners and Moonshine legacy non-English models: CC BY-NC 4.0 or a non-commercial community license.", "models": ["facebook/mms-*"], "packages": ["ctc-forced-aligner"], "pythonModules": ["torchaudio.pipelines.MMS_FA", "torchaudio.pipelines.VOXPOPULI_*", "ctc_forced_aligner"]},
+    {"id": "mhubert-147-and-versa", "category": "license", "tier": "C", "reason": "mHuBERT-147 (TTSDS2 multilingual) is CC BY-NC-SA; VERSA wraps non-commercial models without per-metric licenses and installs unpinned backends.", "models": ["utter-project/mHuBERT-147*"], "packages": ["versa"], "pythonModules": ["versa"]},
+    {"id": "scoreq", "category": "license", "tier": "C", "reason": "Weights CC BY 4.0 but trained on the NISQA corpus and other research data; reported to be gameable.", "models": ["*scoreq*"], "packages": ["scoreq"], "pythonModules": ["scoreq"]},
+    {"id": "utmos22", "category": "license", "tier": "C", "reason": "BVCC and Blizzard training data (Blizzard samples cannot be redistributed); a research column at most.", "models": ["*UTMOS22*", "tarepan/SpeechMOS*"], "packages": [], "pythonModules": []},
+    {"id": "swiftf0", "category": "license", "tier": "C", "reason": "Trained on the CC BY-NC-SA 4.0 pitch benchmark; pYIN replaces it.", "models": ["lars76/swift-f0*"], "packages": ["swift-f0"], "pythonModules": ["swift_f0"]},
+    {"id": "distill-mos", "category": "license", "tier": "C", "reason": "Trained on the NISQA corpus (non-commercial research) and VoiceMOS labels; DNSMOS replaces it.", "models": ["*distill-mos*", "*distillmos*"], "packages": ["distillmos"], "pythonModules": ["distillmos"]},
+    {"id": "wavlm-large-sv", "category": "license", "tier": "C", "reason": "The seed-tts-eval WavLM-large speaker-verification checkpoint: GigaSpeech pretraining, only for non-commercial research. ResNet293 replaces it as the second speaker family.", "models": ["microsoft/wavlm-large*", "*wavlm_large_finetune*"], "packages": [], "pythonModules": []},
+    {"id": "whisper-derivatives", "category": "independence", "tier": null, "reason": "Kotoba-Whisper and distil-whisper are the Whisper family, so not an independent family, and not better on read speech.", "models": ["kotoba-tech/kotoba-whisper*", "distil-whisper/*"], "packages": [], "pythonModules": []},
+    {"id": "qwen3-omni-per-take-judge", "category": "resources", "tier": null, "reason": "Qwen3-Omni-30B-A3B does not fit 16 GB; an omni model as a per-take judge samples (determinism class D2).", "models": ["Qwen/Qwen3-Omni-*"], "packages": [], "pythonModules": []},
+    {"id": "lightning-whisper-mlx", "category": "maintenance", "tier": null, "reason": "Unmaintained since 2024-04; no license metadata.", "models": [], "packages": ["lightning-whisper-mlx"], "pythonModules": ["lightning_whisper_mlx"]},
+    {"id": "cohere-transcribe", "category": "license", "tier": null, "reason": "Gated click-through terms; no Russian (watch-list).", "models": ["CohereLabs/*transcribe*"], "packages": [], "pythonModules": []},
+    {"id": "nvidia-ambernet", "category": "license", "tier": null, "reason": "NGC terms, not a clear permissive license; needs NeMo.", "models": ["*ambernet*"], "packages": [], "pythonModules": []},
+    {"id": "deepfake-detectors", "category": "measurand", "tier": null, "reason": "AASIST and deepfake detectors: every output is synthetic, so the score measures detector domain, not defects.", "models": ["*aasist*"], "packages": [], "pythonModules": []},
+    {"id": "resemblyzer", "category": "measurand", "tier": null, "reason": "Optimized for English speaker similarity.", "models": [], "packages": ["resemblyzer"], "pythonModules": ["resemblyzer"]},
+    {"id": "oas-alignment-metric", "category": "measurand", "tier": null, "reason": "Paper withdrawn (arXiv 2509.19852).", "models": [], "packages": [], "pythonModules": []},
+    {"id": "gpl-and-linux-only-text-normalizers", "category": "license", "tier": null, "reason": "zhconv (GPL-2.0+), pykakasi (GPL-3.0), soynlp (GPL-3.0, pulled in by qwen-asr); nemo-text-processing and WeTextProcessing need pynini wheels that are Linux-only.", "models": [], "packages": ["zhconv", "pykakasi", "soynlp", "nemo-text-processing", "WeTextProcessing"], "pythonModules": ["zhconv", "pykakasi", "soynlp", "nemo_text_processing"]},
+    {"id": "jsut-and-jvs-audio", "category": "license", "tier": "C", "reason": "JSUT and JVS audio are non-commercial; Japanese corpora come from FLEURS, Common Voice, Kokoro, CSS10 and JVNV instead.", "models": ["*jsut*", "*jvs_corpus*"], "packages": [], "pythonModules": []}
+  ]
+}

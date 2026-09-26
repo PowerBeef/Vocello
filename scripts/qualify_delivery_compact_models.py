@@ -20,6 +20,7 @@ from delivery_compact_model_adapter import run_compact_adapter
 
 
 SCHEMA_VERSION = 1
+ADOPTION_REQUIREMENT = "two-clean-canonical-host-runs"
 
 
 class QualificationError(ValueError):
@@ -85,14 +86,6 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
             "transcriptSHA256": hashlib.sha256(transcript).hexdigest(),
             "transcriptByteCount": len(transcript),
         }
-    if payload["adapterID"] == "nisqa-v2":
-        scores = {}
-        for name in ("mos", "noisiness", "discontinuity", "coloration", "loudness"):
-            value = outputs.get(name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                raise QualificationError(f"NISQA did not emit a finite {name}")
-            scores[name] = round(float(value), 4)
-        return {**scores, "sampleRateHz": outputs.get("sampleRateHz"), "chunkCount": outputs.get("chunkCount")}
     embedding = outputs.get("embedding")
     if not isinstance(embedding, list) or not embedding:
         raise QualificationError("DistilHuBERT did not emit an embedding")
@@ -144,6 +137,8 @@ def qualify(
             "audioSHA256": audio_sha,
             "output": _summary(payload),
             "resourceEnvelope": envelope,
+            # Provenance only: the supervisor that measured this run.
+            "envelopeIdentity": (payload.get("modelProvenance") or {}).get("envelopeIdentity"),
         })
         if envelope.get("qualified") is not True:
             break
@@ -151,6 +146,7 @@ def qualify(
         f"run-{row['run']}:" + ",".join(row["resourceEnvelope"].get("qualificationFailures", []))
         for row in runs if row["resourceEnvelope"].get("qualified") is not True
     ]
+    clean = len(runs) == 2 and not qualification_failures
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "delivery-compact-model-live-qualification",
@@ -158,12 +154,12 @@ def qualify(
         "qualifierSHA256": file_sha256(Path(__file__).resolve()),
         "hardware": hardware,
         "adapterID": config["adapterID"],
+        # The output identity only: a supervisor fix never changes what was qualified.
         "modelProvenance": {
             key: config[key] for key in (
                 "modelID", "sourceRevision", "weightsSHA256", "binarySHA256",
                 "adapterSourceSHA256", "runtimeDependenciesDigest", "labelMapDigest",
-                "preprocessingConfigDigest", "adapterLayerSHA256",
-                "resourceSupervisorSHA256",
+                "preprocessingConfigDigest", "adapterLayerSHA256", "outputIdentityDigest",
             )
         },
         "configSHA256": file_sha256(config_path),
@@ -171,7 +167,11 @@ def qualify(
         "runs": runs,
         "serialRunCount": len(runs),
         "qualificationFailures": qualification_failures,
-        "qualifiedForHoldoutBakeoff": len(runs) == 2 and not qualification_failures,
+        "qualifiedForHoldoutBakeoff": clean,
+        # The adoption requirement names the canonical host (audit AQ-F40):
+        # two clean runs on the attested canonical macOS profile.
+        "adoptionRequirement": {"id": ADOPTION_REQUIREMENT, "satisfied": clean,
+                                "hardwareProfileID": hardware["profileID"]},
         "adopted": False,
     }
     report["reportDigest"] = digest(report)

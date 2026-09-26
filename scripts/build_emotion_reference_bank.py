@@ -12,23 +12,27 @@ review predicted (`docs/reference/delivery-control-audit-2026-08.md`, F8/R3):
 generate several candidates per emotion, keep only the ones that measurably
 land, and verify the persona's identity stays coherent across the bank.
 
-What `build` does, in two strictly ordered phases (8 GB rule: the engine and
-the ML scorers never run concurrently):
+What `build` does, in two strictly ordered phases (no scorer runs beside a
+resident generator; after the generator exits the canonical host's budget
+governs):
 
 1. **Generate** — a neutral anchor take plus N VoiceDesign candidates per
    emotion, same brief, same transcript, distinct fixed seeds, streaming
    (the app-matched chunk path; also immune to CM-7, fixed 2026-08-04, which
    made `--no-stream` publish nothing). Audio QC is fail-closed inside
    the engine, so every surviving candidate already passed it.
-2. **Score and select** — per candidate: the pinned SER advisory
-   (`scripts/emotion_advisory.py` checkpoint), ECAPA identity cosine against
-   the anchor (`scripts/clone_speaker_similarity.py` backend), and paired
-   prosody deltas versus the anchor (`scripts/analyze_prosody.py`). A
-   candidate is eligible when its SER top-1 agrees with the target emotion
-   (whisper abstains from SER and is judged by its voiced-fraction drop
-   instead); among eligible candidates the winner is the one **most similar
-   to the anchor** — the nearest-to-anchor selection that keeps the persona's
-   identity coherent across emotions rather than chasing peak expressiveness.
+2. **Score and select** — per candidate: ECAPA identity cosine against the
+   anchor (`scripts/clone_speaker_similarity.py` backend) and the paired,
+   same-voice arousal and prosody deltas versus the neutral anchor
+   (`scripts/analyze_prosody.py` features judged by the per-preset
+   expectations of `scripts/delivery_quality_gate.py`). A candidate is
+   eligible when its paired delivery adherence passes (whisper is judged by
+   its voiced-fraction drop instead); among eligible candidates the winner is
+   the one **most similar to the anchor** — the nearest-to-anchor selection
+   that keeps the persona's identity coherent across emotions rather than
+   chasing peak expressiveness. The speech-emotion classifier that used to
+   decide eligibility was retired on 2026-09-25 (audit AQ-F03: trained on
+   non-commercial corpora).
 
 Winners (and the anchor) are enrolled as ordinary saved voices —
 "<Persona>" and "<Persona> (Angry)" etc. — so every existing surface that
@@ -37,10 +41,11 @@ request machinery already accepts any reference plus transcript. A manifest
 with every candidate's scores, the pinned scorer identities, and the
 selection reasons is written beside the work files.
 
-Advisory posture: SER and ECAPA remain advisory instruments (never CI, never
-benchmark history). The bank builder uses them to *rank our own candidates
-against each other* — the relative use the audit's judge review endorsed —
-and records everything so a selection can be re-litigated.
+Advisory posture: ECAPA and the paired adherence verdict remain advisory
+instruments (never CI, never benchmark history). The bank builder uses them to
+*rank our own candidates against each other* — the relative use the audit's
+judge review endorsed — and records everything so a selection can be
+re-litigated.
 
 Usage:
   .venv/bin/python3 scripts/build_emotion_reference_bank.py build \
@@ -64,16 +69,18 @@ from typing import Any, Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-BANK_VERSION = 1
+# 2 (2026-09-25): eligibility is the paired delivery adherence verdict, not
+# the retired speech-emotion classifier's top-1 agreement.
+BANK_VERSION = 2
 DEFAULT_EMOTIONS = ["happy", "sad", "angry", "whisper"]
 DEFAULT_CANDIDATES = 4
 DEFAULT_BASE_SEED = 42_000
 ANCHOR_SEED_RETRIES = 3
 
 # A candidate must be at least this much less voiced than the anchor to count
-# as whispered (whisper abstains from SER: whispered speech is
-# out-of-distribution for emotion corpora).
+# as whispered; whisper is judged by phonation, not by the adherence verdict.
 WHISPER_VOICED_DELTA_MAX = -0.05
+VOICED_FRACTION_PRESETS = frozenset({"whisper"})
 
 # Same neutral-content passage the bench corpus uses for its long cell: known
 # clean, semantically neutral (an emotional transcript would leak semantics
@@ -183,15 +190,27 @@ def run_generation(
     return anchor_path, generated, failed
 
 
+def _adherence(metrics: dict[str, Any], anchor_metrics: dict[str, Any], emotion: str) -> dict[str, Any]:
+    """The paired, same-voice delivery verdict of one candidate against the neutral anchor."""
+    from delivery_quality_gate import evaluate_delivery
+
+    verdict = evaluate_delivery(metrics, anchor_metrics, f"{emotion}.strong")
+    return {
+        "passed": verdict["passed"],
+        "flags": verdict["flags"],
+        "algorithmVersion": verdict["algorithmVersion"],
+        "unavailableFeatures": verdict.get("unavailableFeatures", []),
+        "arousalScore": verdict["metrics"].get("arousal_score"),
+    }
+
+
 def score_candidates(
     anchor_path: str,
     candidates: list[dict[str, Any]],
-    classify: Callable[[str], dict[str, float]],
     embed: Callable[[str], list[float]],
     analyze: Callable[[str], dict[str, Any]],
 ) -> list[dict[str, Any]]:
     from clone_speaker_similarity import advisory_band, cosine_similarity, load_similarity_profile
-    from emotion_advisory import evaluate_agreement
 
     profile = load_similarity_profile(None)
     anchor_embedding = embed(anchor_path)
@@ -202,7 +221,6 @@ def score_candidates(
         path = candidate["path"]
         metrics = analyze(path)
         similarity = cosine_similarity(anchor_embedding, embed(path))
-        ser = evaluate_agreement(classify(path), f"{emotion}.strong")
         # The analyzer flattens its F0 group with an `f0_` prefix; the bare
         # key is kept as a fallback for any older flat producer.
         voiced = metrics.get("f0_voiced_frac", metrics.get("voiced_frac"))
@@ -211,7 +229,7 @@ def score_candidates(
             "emotion": emotion,
             "seed": candidate["seed"],
             "path": path,
-            "ser": ser,
+            "deliveryAdherence": _adherence(metrics, anchor_metrics, emotion),
             "identityCosine": round(similarity, 4),
             "identityBand": advisory_band(similarity, profile),
             "voicedFrac": voiced,
@@ -235,21 +253,19 @@ def select_winners(
     """Pure selection: emotion criterion first, then nearest-to-anchor
     identity. Never peak expressiveness — overshoot is the documented
     reference-bank failure mode."""
-    from emotion_advisory import ABSTAIN_PRESETS
-
     selection: dict[str, dict[str, Any]] = {}
     for emotion in emotions:
         rows = [row for row in scored if row["emotion"] == emotion]
-        if emotion in ABSTAIN_PRESETS:
+        if emotion in VOICED_FRACTION_PRESETS:
             eligible = [
                 row for row in rows
                 if isinstance(row["voicedFracDelta"], (int, float))
                 and row["voicedFracDelta"] <= WHISPER_VOICED_DELTA_MAX
             ]
-            criterion = f"voicedFracDelta <= {WHISPER_VOICED_DELTA_MAX} (SER abstains)"
+            criterion = f"voicedFracDelta <= {WHISPER_VOICED_DELTA_MAX}"
         else:
-            eligible = [row for row in rows if row["ser"].get("agreement") is True]
-            criterion = "SER top-1 agreement"
+            eligible = [row for row in rows if row["deliveryAdherence"].get("passed") is True]
+            criterion = "paired delivery adherence against the neutral anchor"
         if not eligible:
             selection[emotion] = {
                 "winner": None,
@@ -360,19 +376,18 @@ def build(arguments: argparse.Namespace) -> int:
         return result.returncode == 0
 
     # Phase 1: every generation completes (and each CLI process exits) before
-    # any ML scorer loads — the 8 GB rule, structurally.
+    # any ML scorer loads — no scorer beside a resident generator, structurally.
     print(f"generating: anchor + {arguments.candidates} candidates × {len(emotions)} emotions …")
     anchor_path, generated, failed = run_generation(plan, runner)
     print(f"  anchor: {pathlib.Path(anchor_path).name}; candidates: {len(generated)} ok, {len(failed)} failed QC")
 
     # Phase 2: scorers (operator-local heavy deps, loaded once, CPU).
-    print("scoring: SER advisory + ECAPA identity + prosody deltas …")
+    print("scoring: ECAPA identity + paired delivery adherence …")
     from clone_speaker_similarity import ecapa_embedder
-    from emotion_advisory import hf_classifier
 
     from bench_delivery_prosody import analyze
 
-    scored = score_candidates(anchor_path, generated, hf_classifier(), ecapa_embedder(), analyze)
+    scored = score_candidates(anchor_path, generated, ecapa_embedder(), analyze)
     selection = select_winners(scored, emotions)
 
     enrolled: list[str] = []
@@ -383,7 +398,7 @@ def build(arguments: argparse.Namespace) -> int:
         )
 
     from clone_speaker_similarity import ECAPA_PREPROCESSING, ECAPA_REVISION, ECAPA_SOURCE
-    from emotion_advisory import EMOTION_MODEL_REVISION, EMOTION_MODEL_SOURCE
+    from delivery_quality_gate import DELIVERY_GATE_ALGORITHM_VERSION
 
     manifest = {
         "bankVersion": BANK_VERSION,
@@ -402,7 +417,7 @@ def build(arguments: argparse.Namespace) -> int:
                     "path": value["path"],
                     "identityCosine": value["identityCosine"],
                     "identityBand": value["identityBand"],
-                    "ser": value["ser"],
+                    "deliveryAdherence": value["deliveryAdherence"],
                     "voicedFracDelta": value["voicedFracDelta"],
                 })
                 for key, value in entry.items()
@@ -411,7 +426,8 @@ def build(arguments: argparse.Namespace) -> int:
         },
         "enrolledVoices": enrolled,
         "scorers": {
-            "ser": {"source": EMOTION_MODEL_SOURCE, "revision": EMOTION_MODEL_REVISION},
+            "deliveryAdherence": {"algorithmVersion": DELIVERY_GATE_ALGORITHM_VERSION,
+                                  "tier": "strong", "reference": "neutral anchor"},
             "identity": {"source": ECAPA_SOURCE, "revision": ECAPA_REVISION,
                          "preprocessing": dict(ECAPA_PREPROCESSING)},
         },
@@ -426,14 +442,10 @@ def build(arguments: argparse.Namespace) -> int:
         if winner is None:
             print(f"  {emotion:10} NO WINNER ({entry['reason']}; {entry['candidateCount']} candidates)")
         else:
-            ser = winner["ser"]
-            ser_note = (
-                f"SER {ser['topEmotion']}:{ser['topProbability']}"
-                if ser.get("topEmotion") else "SER abstained"
-            )
+            adherence = winner["deliveryAdherence"]
             print(
                 f"  {emotion:10} seed {winner['seed']}  identity {winner['identityCosine']}"
-                f" ({winner['identityBand']})  {ser_note}"
+                f" ({winner['identityBand']})  arousal {adherence.get('arousalScore')}"
             )
     if enrolled:
         print("enrolled voices: " + ", ".join(enrolled))

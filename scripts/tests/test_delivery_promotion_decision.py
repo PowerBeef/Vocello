@@ -35,7 +35,7 @@ def passing_fixture() -> dict:
         "instructedVersusNeutral2AFC": two_afc,
         "automaticGuardrails": {
             "newHardAudioQCFailures": 0, "werCERAbsoluteDelta": 0.0,
-            "medianSpeakerSimilarityDelta": 0.0, "relativeUTMOSDelta": 0.0,
+            "medianSpeakerSimilarityDelta": 0.0,
         },
         "runtimeInvariants": {
             "memoryQualified": True, "cancellationValid": True,
@@ -94,7 +94,7 @@ class DeliveryPromotionDecisionTests(unittest.TestCase):
             with self.assertRaises(DecisionError):
                 decide(payload)
         for key, value in (('newHardAudioQCFailures', 1), ('werCERAbsoluteDelta', .011),
-                           ('medianSpeakerSimilarityDelta', -.021), ('relativeUTMOSDelta', -.101)):
+                           ('medianSpeakerSimilarityDelta', -.021)):
             payload = copy.deepcopy(original)
             payload['automaticGuardrails'][key] = value
             self.assertEqual(decide(payload)['verdict'], 'does-not-qualify')
@@ -111,10 +111,26 @@ class DeliveryPromotionDecisionTests(unittest.TestCase):
 
     def test_automatic_regression_rejects(self) -> None:
         fixture = passing_fixture()
-        fixture["automaticGuardrails"]["relativeUTMOSDelta"] = -0.11
+        fixture["automaticGuardrails"]["medianSpeakerSimilarityDelta"] = -0.03
         report = decide(fixture)
         self.assertEqual(report["verdict"], "does-not-qualify")
-        self.assertIn("automatic-guardrail:relativeUTMOSDelta", report["failures"])
+        self.assertIn("automatic-guardrail:medianSpeakerSimilarityDelta", report["failures"])
+
+    def test_retired_utmos_guardrail_is_read_from_legacy_input_but_never_gates(self) -> None:
+        # Audit decision 1a: UTMOSv2 trains on non-commercial data, so its
+        # relative delta no longer gates; older inputs that carry it still load.
+        for payload in (passing_fixture(), self.automated_fixture()):
+            self.assertEqual(decide(payload)["retiredGuardrails"], {})
+            payload["automaticGuardrails"]["relativeUTMOSDelta"] = -0.5
+            report = decide(payload)
+            self.assertEqual(report["verdict"], "qualifies")
+            self.assertNotIn("relativeUTMOSDelta", report["automaticGuardrails"])
+            self.assertEqual(report["retiredGuardrails"]["relativeUTMOSDelta"], {
+                "value": -0.5, "retiredJudge": "quality.utmosv2@1", "gating": False,
+            })
+            payload["automaticGuardrails"]["relativeUTMOSDelta"] = float("nan")
+            with self.assertRaisesRegex(DecisionError, "relativeUTMOSDelta"):
+                decide(payload)
 
     def test_single_speaker_gain_rejects_as_concentrated(self) -> None:
         fixture = passing_fixture()

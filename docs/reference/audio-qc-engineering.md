@@ -206,7 +206,7 @@ QC, prompts, models, seeds, personal data and the release queue are unchanged.
 | Spoken content | `VoiceClipTranscriber.swift` (Apple Speech, three locale-locked passes), `scripts/independent_asr.py` (whisper-small MLX, after the generator exits), `scripts/lib/language_metrics.py`, `check_language_output.py` | Locale-locked full-WAV recognition, edge evidence, WER/CER (0.15 threshold). One family is one witness; two families must agree for consensus. |
 | Acoustic measurement | `analyze_prosody.py` v3, `delivery_temporal_features.py` v1 | Two bounded passes each: global features and five-region contours. Measures signal properties, not listener-recognized emotion. |
 | Acoustic decisions | `prosody_quality_gate.py`, `delivery_quality_gate.py`, frozen profile | Warn-first heuristics; incomplete measurement must not become PASS. AV-07's independent calibration is still missing. |
-| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; native QC and independent ASR evidence compose separately from optional heads. Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR/UTMOS evidence. No listener-proven semantic claim. |
+| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; native QC and independent ASR evidence compose separately from optional heads. Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR evidence. Every judge is registered in `config/audio-qc-judges.json` with its license tier; NISQA, UTMOSv2 and the speech-emotion classifier are retired (non-commercial terms). No listener-proven semantic claim. |
 | Release composition | typed quality producer/composer, specialized benchmark and promotion validators | Required missing/warning/failure evidence remains blocking. An experimental cascade completing is not release PASS. |
 
 The existing production safety core is already shared and file-bounded. A second Python
@@ -667,9 +667,11 @@ errors require separate diagnostics; do not turn consensus or Chinese script con
 intelligibility waiver. Research illustrates WER's sensitivity to reference/scoring choices.
 [ASR benchmark scoring study](https://www.isca-archive.org/interspeech_2022/faria22_interspeech.html)
 
-Keep UTMOS as a relative finalist-only signal. Published TTS evaluation shows weaker correlation
-out of domain; it is not a universal MOS oracle. Keep frozen speaker similarity separate from
-pitch/cadence and transcript accuracy. [SpeechBERTScore evaluation](https://www.isca-archive.org/interspeech_2024/saeki24_interspeech.pdf)
+No reference-free MOS judge runs today. UTMOSv2 and NISQA were retired on 2026-09-25 because they
+train on, or ship as, non-commercial material (`config/audio-qc-judges.json`); published TTS
+evaluation also shows weak out-of-domain correlation, so neither was a MOS oracle. A relative
+quality column returns only as the audio QC audit's composite, after its ladder test (AQ-08). Keep
+frozen speaker similarity separate from pitch/cadence and transcript accuracy. [SpeechBERTScore evaluation](https://www.isca-archive.org/interspeech_2024/saeki24_interspeech.pdf)
 
 ### Legacy and orchestration debt
 
@@ -764,17 +766,20 @@ judge would be invalid. French disagreement remains open; no extra recognizer wa
 steps above a quarter of full scale. On the clone short cell the generator places such a cluster
 150 to 250 ms into the take (8 to 32 steps in 11 of 88 fixed-seed takes on artifactVersion
 2026.09.14.1; a count above zero in 63 of 88); it is model-intrinsic (present under either codec
-and in the 2.4.0 binary, sample-identically). The NISQA clip-quality judge (MV-06) does not
-register it: full-clip MOS of the 11 cluster takes has median 4.82 against 4.90 for the 52 clean
-takes (rank AUC 0.54, Spearman with the count 0.00), and a 300 ms onset window moves only modestly
+and in the 2.4.0 binary, sample-identically). The NISQA clip-quality judge (MV-06) did not
+register it: full-clip MOS of the 11 cluster takes had median 4.82 against 4.90 for the 52 clean
+takes (rank AUC 0.54, Spearman with the count 0.00), and a 300 ms onset window moved only modestly
 (median 3.29 against 3.72, AUC 0.71, Spearman −0.18) inside a range clean takes also cover. The
-four takes below the warn floor in that set all carry counts of one or two. The recorded
-judgement is therefore: the cluster is a measured, monitored artefact with a minor perceptual
-footprint, not a QC defect; QC v7 keeps counting it, `scripts/clip_quality_screen.py` reproduces
-the judgement (`--onset-window-ms 300`, separation block), and the machine gate a reproduction
-must pass is the clip-quality warn floor. No onset-window warning was added because the window
+four takes below the warn floor in that set all carried counts of one or two. The judgement
+recorded then: the cluster is a measured, monitored artefact with a minor perceptual footprint,
+not a QC defect; QC v7 keeps counting it. No onset-window warning was added because the window
 does not separate the classes. The Python detector in `lib/playback_capture.py` matches the
 Swift count within ±1 on 60 of 60 takes (54 exact), a windowing boundary difference.
+
+That judgement rested on NISQA, which was retired on 2026-09-25: its weights are CC BY-NC-SA 4.0,
+and it was never qualified on clean TTS. The audio QC audit reopens the cluster (AQ-F12) as a
+signal-class and identity-onset qualification under AQ-07; until then no clip-quality gate exists
+for a reproduction to pass, and the cluster stays counted and unjudged.
 
 ### Speaking-rate plausibility (QC v8, audit #10, 2026-09-25)
 
@@ -1088,13 +1093,16 @@ generator, evaluator service, cloud processing or evaluator bundled into the app
 - Optional compact features and fitted heads do not create a mandatory listener dependency.
   Missing heads report semantic delivery **unmeasured**. Their uncertainty never requests a human
   as the only continuation; bounded automatic evidence collection or a recorded inconclusive
-  decision replaces manual-listening routing. Requested ASR/UTMOS layers are not automatically
+  decision replaces manual-listening routing. Requested ASR layers are not automatically
   launched by this composer. Neural execution stays serial under the existing supervisor after
-  TTS exits; cache hits do not launch models; UTMOS is finalist-only.
+  TTS exits; cache hits do not launch models; no retired judge (NISQA, UTMOSv2, the SER) is
+  requested or run.
 - `delivery_promotion_decision.py` schema 2 requires a frozen named metric/protocol, complete
   untouched holdout, independent-reference qualification, independent judge families, consistent
   reverse-order judgments, paired improvement/2AFC, distributed gains and unchanged quality/runtime
-  guardrails. It can qualify **measured automatic improvement**, never listener-proven emotion.
+  guardrails. The relative-UTMOS guardrail is retired: a legacy input that carries it is reported
+  under `retiredGuardrails` and never gates. It can qualify **measured automatic improvement**,
+  never listener-proven emotion.
   Schema 1 preserves the optional historical listening interpretation. Neither authorizes release,
   edits production copy, or waives the iOS acceptance campaign.
 

@@ -17,6 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from prepare_delivery_compact_model_config import (  # noqa: E402
+    DEFAULT_CONTRACT,
     PreparationError,
     validate_candidate_contract,
     prepare,
@@ -28,6 +29,10 @@ from delivery_analysis_cache import (  # noqa: E402
 from delivery_compact_model_adapter import run_compact_adapter, validate_adapter_config  # noqa: E402
 from delivery_resource_supervisor import SupervisedResult  # noqa: E402
 from run_local_delivery_cascade import run_cascade  # noqa: E402
+import delivery_resource_supervisor  # noqa: E402
+import independent_asr  # noqa: E402
+
+SUPERVISOR = Path(delivery_resource_supervisor.__file__)
 
 
 class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
@@ -80,6 +85,19 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             self.assertTrue(config["commandTemplate"][1].endswith("independent_asr_worker.py"))
             self.assertEqual(config["commandTemplate"][2], "--weights")
             self.assertIs(validate_adapter_config(config), config)
+            self.assertEqual(config["executionIdentityVersion"], 3)
+            self.assertNotIn("resourceSupervisorSHA256", json.dumps(config))
+
+            changed = root / "delivery_resource_supervisor.py"
+            changed.write_bytes(SUPERVISOR.read_bytes() + b"\n# a supervisor-only fix\n")
+            with patch("delivery_compact_model_adapter.SUPERVISOR_SOURCE", changed), \
+                    patch("prepare_delivery_compact_model_config._whisper_runtime_versions",
+                          return_value=dict(pins)):
+                again = prepare("whisper-small-mlx", contract_path=contract_path, model_root=root)
+                self.assertIs(validate_adapter_config(config), config)
+            self.assertEqual(again, config)
+            self.assertEqual(independent_asr._provenance(again, language_code="en"),
+                             independent_asr._provenance(config, language_code="en"))
 
             drifted = dict(pins, **{"mlx-whisper": "0.0.1"})
             with patch("prepare_delivery_compact_model_config._whisper_runtime_versions", return_value=drifted):
@@ -94,44 +112,36 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(PreparationError, "lock the language"):
                 validate_candidate_contract(unlocked)
 
-    def test_nisqa_candidate_prepares_from_the_owned_model_root_with_its_warn_floor(self) -> None:
+    def test_retired_nisqa_keeps_corrected_provenance_and_never_prepares(self) -> None:
+        retired = self.contract["retiredCandidates"]["nisqa-v2"]
+        self.assertNotIn("nisqa-v2", self.contract["candidateOrder"])
+        self.assertFalse(retired["commercialUseCompatible"])
+        self.assertIn("CC BY-NC-SA 4.0", retired["license"])
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            contract = copy.deepcopy(self.contract)
-            candidate = contract["candidates"]["nisqa-v2"]
-            (root / "nisqa").mkdir()
-            (root / "nisqa/nisqa.tar").write_bytes(b"fixture nisqa checkpoint")
-            candidate["weightsSHA256"] = file_sha256(root / "nisqa/nisqa.tar")
-            runtime = root / "nisqa-runtime-py314/bin"
-            runtime.mkdir(parents=True)
-            (runtime / "python").write_bytes(b"#!/bin/sh\n")
-            contract_path = root / "contract.json"
-            contract_path.write_text(json.dumps(contract))
-            pins = candidate["runtimeDependencies"]
-            with patch("prepare_delivery_compact_model_config._nisqa_runtime_versions", return_value=dict(pins)):
-                config = prepare("nisqa-v2", contract_path=contract_path, model_root=root)
-            self.assertEqual(config["outputFormat"], "json")
-            self.assertEqual(config["warnFloor"]["mos"], candidate["warnFloor"]["mos"])
-            self.assertEqual(config["preprocessingConfig"]["inputAudio"], "original")
-            self.assertEqual(config["commandTemplate"][2], "nisqa")
-            self.assertIn("delivery_compact_model_runtime.py", config["commandTemplate"][1])
-            self.assertIs(validate_adapter_config(config), config)
+            with self.assertRaisesRegex(PreparationError, "not registered"):
+                prepare("nisqa-v2", contract_path=DEFAULT_CONTRACT, model_root=Path(temporary))
+        for mutate, message in (
+            (lambda c: c["retiredCandidates"]["nisqa-v2"].update(commercialUseCompatible=True),
+             "status and license"),
+            (lambda c: c["retiredCandidates"]["nisqa-v2"].pop("retiredOn"), "retiredOn"),
+            (lambda c: c["candidates"].update({"nisqa-v2": c["retiredCandidates"]["nisqa-v2"]}),
+             "coverage|both executable and retired"),
+            (lambda c: c.pop("retiredCandidates"), "retired candidate provenance"),
+        ):
+            broken = copy.deepcopy(self.contract)
+            mutate(broken)
+            with self.assertRaisesRegex(PreparationError, message):
+                validate_candidate_contract(broken)
 
-            drifted = dict(pins, torchmetrics="0.0.1")
-            with patch("prepare_delivery_compact_model_config._nisqa_runtime_versions", return_value=drifted):
-                with self.assertRaisesRegex(PreparationError, "dependency versions drifted"):
-                    prepare("nisqa-v2", contract_path=contract_path, model_root=root)
-            for mutate, message in (
-                (lambda c: c["warnFloor"].update(mos=0.5), "MOS between 1 and 5"),
-                (lambda c: c["warnFloor"]["calibration"].pop("corpusSHA256"), "SHA-256"),
-                (lambda c: c["preprocessingConfig"].update(inputAudio="canonical"), "original audio"),
-                (lambda c: c["labelMap"].update(dimensions=["mos"]), "five quality dimensions"),
-                (lambda c: c["runtimeDependencies"].pop("torchmetrics"), "dependency pins"),
-            ):
-                broken = copy.deepcopy(contract)
-                mutate(broken["candidates"]["nisqa-v2"])
-                with self.assertRaisesRegex(PreparationError, message):
-                    validate_candidate_contract(broken)
+    def test_adoption_names_the_canonical_host(self) -> None:
+        self.assertIn("two-clean-canonical-host-runs", self.contract["adoptionRequirements"])
+        stale = copy.deepcopy(self.contract)
+        stale["adoptionRequirements"] = [
+            "two-clean-eight-gib-host-runs" if item == "two-clean-canonical-host-runs" else item
+            for item in stale["adoptionRequirements"]
+        ]
+        with self.assertRaisesRegex(PreparationError, "adoption requirements"):
+            validate_candidate_contract(stale)
 
     def test_prepared_config_cache_adapter_and_cascade_agree_on_actual_model_input(self) -> None:
         # Only the external model process is a fixture. Exercise the real config
@@ -222,6 +232,24 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             self.assertEqual(report["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
             self.assertEqual(report["rows"][0]["route"], "abstained")  # no calibrated heads
             self.assertNotIn(str(root), json.dumps(report))
+            self.assertEqual(report["rows"][0]["alwaysLayers"]["compactRepresentation"]["outputIdentityDigest"],
+                             config["outputIdentityDigest"])
+
+            # Offline replay (audit AQ-F47): after a supervisor-only change the
+            # re-prepared config is identical and the cached representation is
+            # served without launching anything.
+            changed = root / "delivery_resource_supervisor.py"
+            changed.write_bytes(SUPERVISOR.read_bytes() + b"\n# a supervisor-only fix\n")
+            with patch("delivery_compact_model_adapter.SUPERVISOR_SOURCE", changed):
+                replay_config = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root)
+                self.assertEqual(replay_config, config)
+                replayed, hit = run_compact_adapter(
+                    wav_path=audio, config=replay_config, cache=cache, lock_root=root,
+                    supervisor=never_launch,
+                )
+            self.assertTrue(hit)
+            self.assertEqual(replayed, payload)
+            never_launch.assert_not_called()
 
             legacy = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root,
                              resampler_version=LEGACY_RESAMPLER_VERSION)

@@ -7,9 +7,10 @@ B-seed — control (custom, fresh context) vs carry (clone ICL conditioned on A'
 full audio + exact text). Measures boundary-local prosody deltas (last 3 s of A
 vs first 3 s of B via analyze_delivery), ECAPA identity cosine A↔B, and B wall
 time. Generations run strictly sequentially; ECAPA runs only after all
-generation completes (8 GB rule). Publishes nothing; artifacts stay local under
-build/artifacts/macos/carryover-probe/. The ECAPA phase requires the .venv ML
-environment (torch/speechbrain): run with .venv/bin/python3.
+generation completes (no evaluator beside a resident generator). Publishes
+nothing; artifacts stay local under build/artifacts/macos/carryover-probe/. The
+ECAPA phase requires the .venv ML environment (torch/speechbrain): run with
+.venv/bin/python3.
 """
 
 from __future__ import annotations

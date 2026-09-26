@@ -54,6 +54,10 @@ REPO = Path(__file__).resolve().parents[1]
 GLOBAL_ANALYZER = REPO / "scripts/analyze_prosody.py"
 TEMPORAL_ANALYZER = REPO / "scripts/delivery_temporal_features.py"
 CASCADE_SOURCE = Path(__file__).resolve()
+# Layers a row may request beyond the always-on ones. They match the evaluator
+# contract's cascade lists; no retired judge (audio QC registry) appears here.
+AMBIGUOUS_LAYERS = ("coarse-ser-asr", "extra-identity")
+FINALIST_LAYERS = ("complete-multilingual-asr-cer", "automated-untouched-holdout")
 DEFAULT_CACHE_ROOT = Path(os.environ.get(
     "QVOICE_DELIVERY_ANALYSIS_CACHE", REPO / "build/cache/delivery-analysis"
 ))
@@ -278,7 +282,7 @@ def _compact_delta(
         "weightsSHA256": config.get("weightsSHA256"),
         "preprocessingConfigDigest": config.get("preprocessingConfigDigest"),
         "adapterLayerSHA256": config.get("adapterLayerSHA256"),
-        "resourceSupervisorSHA256": config.get("resourceSupervisorSHA256"),
+        "outputIdentityDigest": config.get("outputIdentityDigest"),
         "featureVector": features,
     }
 
@@ -440,54 +444,14 @@ def _validate_manifest(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _clip_quality_floor(config: dict[str, Any] | None) -> dict[str, Any] | None:
-    if config is None:
-        return None
-    floor = config.get("warnFloor")
-    if not isinstance(floor, dict) or isinstance(floor.get("mos"), bool) or not isinstance(
-        floor.get("mos"), (int, float)
-    ):
-        raise CascadeError("clip-quality screen requires a calibrated warn floor")
-    return {"mos": float(floor["mos"]), "calibration": floor.get("calibration")}
-
-
-def _clip_quality_verdict(report: dict[str, Any], floor: dict[str, Any] | None, *, cache_hit: bool) -> dict[str, Any]:
-    outputs = report.get("outputs") or {}
-    scores = {}
-    for name in ("mos", "noisiness", "discontinuity", "coloration", "loudness"):
-        value = outputs.get(name)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-            raise CascadeError(f"clip-quality screen returned no finite {name}")
-        scores[name] = round(float(value), 4)
-    minimum = outputs.get("minimumChunkMOS")
-    if isinstance(minimum, (int, float)) and not isinstance(minimum, bool) and math.isfinite(float(minimum)):
-        scores["minimumChunkMOS"] = round(float(minimum), 4)
-    below = floor is not None and scores["mos"] < floor["mos"]
-    return {
-        "adapterID": report.get("adapterID"),
-        "scores": scores,
-        "warnFloorMOS": None if floor is None else floor["mos"],
-        "belowWarnFloor": bool(below),
-        "cacheHit": bool(cache_hit),
-        "promotionAuthority": False,
-    }
-
-
 def run_cascade(
     *, manifest: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path,
     compact_config: dict[str, Any] | None = None,
     evaluator_model: dict[str, Any] | None = None,
     compact_supervisor_options: dict[str, Any] | None = None,
     reference_audio_dir: Path | None = None,
-    clip_quality_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     select_resampler(cache.resampler_version, compact_config)
-    if clip_quality_config is not None:
-        select_resampler(cache.resampler_version, clip_quality_config)
-        if clip_quality_config.get("adapterID") != "nisqa-v2":
-            raise CascadeError("clip-quality screen requires the nisqa-v2 adapter configuration")
-    warn_floor = _clip_quality_floor(clip_quality_config)
-    below_floor_rows = 0
     rows = _validate_manifest(manifest)
     output_rows = []
     cache_hits = 0
@@ -575,23 +539,6 @@ def run_cascade(
                 per_audio[role]["compact"] = compact_report
                 per_audio[role]["compactCacheHit"] = compact_hit
                 cache_hits += bool(compact_hit); cache_misses += not bool(compact_hit)
-        # Clip-level quality screen (MV-06): a reference-free judge of each side
-        # against a corpus-calibrated warn floor. Below the floor the pair is
-        # abstained, never rejected: the screen warns, native QC decides.
-        clip_quality: dict[str, Any] | None = None
-        if route != "rejected" and clip_quality_config is not None:
-            clip_quality = {}
-            for role, field in (("instructed", "instructedWAV"), ("neutral", "neutralWAV")):
-                report, hit = run_compact_adapter(
-                    wav_path=Path(row[field]), config=clip_quality_config, cache=cache,
-                    lock_root=lock_root, supervisor_options=compact_supervisor_options,
-                )
-                cache_hits += bool(hit); cache_misses += not bool(hit)
-                clip_quality[role] = _clip_quality_verdict(report, warn_floor, cache_hit=hit)
-            if any(value["belowWarnFloor"] for value in clip_quality.values()):
-                below_floor_rows += 1
-                route = "abstained"
-                reasons.append("clip-quality-below-warn-floor")
         global_delta = _numeric_delta(
             per_audio["instructed"]["global"].get("features", {}),
             per_audio["neutral"]["global"].get("features", {}),
@@ -687,16 +634,15 @@ def run_cascade(
                 "globalAcoustics": global_delta,
                 "temporalAcoustics": temporal_delta,
                 "compactRepresentation": compact_delta if compact_delta is not None else "unavailable",
-                "clipQualityScreen": clip_quality if clip_quality is not None else "unavailable",
                 "tinyLocalHeads": evaluation,
             },
             "ambiguousLayers": {
                 "required": ambiguous,
-                "requested": ["coarse-ser-asr", "extra-identity", "legacy-ser-during-bakeoff"] if ambiguous else [],
+                "requested": list(AMBIGUOUS_LAYERS) if ambiguous else [],
             },
             "finalistLayers": {
                 "required": finalist,
-                "requested": ["utmos", "complete-multilingual-asr-cer", "automated-untouched-holdout"] if finalist else [],
+                "requested": list(FINALIST_LAYERS) if finalist else [],
             },
         })
     report = {
@@ -715,17 +661,6 @@ def run_cascade(
         "acousticReferenceBase": reference_status,
         "acousticReferenceComparatorSHA256": file_sha256(Path(acoustic_reference.__file__)),
         "cache": {"hits": cache_hits, "misses": cache_misses},
-        "clipQualityScreen": (
-            {
-                "adapterID": clip_quality_config["adapterID"],
-                "modelID": clip_quality_config.get("modelID"),
-                "weightsSHA256": clip_quality_config.get("weightsSHA256"),
-                "warnFloor": warn_floor,
-                "rowsBelowWarnFloor": below_floor_rows,
-                "promotionAuthority": False,
-            }
-            if clip_quality_config is not None else "unavailable"
-        ),
         "rowCount": len(output_rows),
         "reviewCounts": {route: sum(row['route'] == route for row in output_rows) for route in
                          ('accepted-for-continued-screening', 'rejected', 'abstained')},
@@ -742,8 +677,6 @@ def main() -> int:
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
-    parser.add_argument("--clip-quality-config", type=Path,
-                        help="prepared nisqa-v2 adapter config; scores both sides against its calibrated warn floor")
     parser.add_argument("--evaluator-model", type=Path)
     parser.add_argument("--review-evidence", type=Path, help="untracked, run-bound full-file ASR receipts; never listener responses")
     parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
@@ -753,7 +686,6 @@ def main() -> int:
     args = parser.parse_args()
     try:
         compact = _read(args.compact_adapter_config) if args.compact_adapter_config else None
-        clip_quality = _read(args.clip_quality_config) if args.clip_quality_config else None
         resampler = select_resampler(args.resampler, compact)
         result = run_cascade(
             manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir,
@@ -762,7 +694,6 @@ def main() -> int:
             compact_config=compact,
             evaluator_model=_read(args.evaluator_model) if args.evaluator_model else None,
             reference_audio_dir=args.reference_audio_dir,
-            clip_quality_config=clip_quality,
         )
         atomic_json(args.out, result)
         print(json.dumps({"status": "COMPLETED", "rows": result["rowCount"],

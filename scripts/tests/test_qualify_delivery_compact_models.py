@@ -41,7 +41,7 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
             "runtimeDependenciesDigest": "4" * 64, "labelMapDigest": "5" * 64,
             "preprocessingConfigDigest": "6" * 64,
             "adapterLayerSHA256": "7" * 64,
-            "resourceSupervisorSHA256": "8" * 64,
+            "outputIdentityDigest": "8" * 64,
             "preprocessingConfig": {"canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION)},
         }), encoding="utf-8")
         self.audio = [self._wav(f"{index}.wav", index + 1) for index in range(2)]
@@ -83,6 +83,13 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
         self.assertNotIn(str(self.root), serialized)
         self.assertEqual(report["serialRunCount"], 2)
         self.assertEqual(report["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
+        # Adoption names the canonical host (AQ-F40); the supervisor is envelope provenance.
+        self.assertEqual(report["adoptionRequirement"], {
+            "id": "two-clean-canonical-host-runs", "satisfied": True,
+            "hardwareProfileID": "fixture-host",
+        })
+        self.assertNotIn("resourceSupervisorSHA256", report["modelProvenance"])
+        self.assertEqual(report["modelProvenance"]["outputIdentityDigest"], "8" * 64)
 
     def test_legacy_config_cannot_silently_select_historical_preprocessing(self) -> None:
         config = json.loads(self.config.read_text())
@@ -169,20 +176,6 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
             side_effect=("Mac99,1", str(8 * 1024**3)),
         ), self.assertRaisesRegex(QualificationError, "does not match"):
             canonical_hardware_attestation()
-
-    def test_nisqa_summary_keeps_scores_and_rejects_non_finite_dimensions(self) -> None:
-        import qualify_delivery_compact_models as qualifier
-
-        payload = {"adapterID": "nisqa-v2", "outputs": {
-            "mos": 4.6123456, "noisiness": 4.4, "discontinuity": 4.7, "coloration": 4.5,
-            "loudness": 4.6, "sampleRateHz": 24000, "chunkCount": 1}}
-        summary = qualifier._summary(payload)
-        self.assertEqual(summary["mos"], 4.6123)
-        self.assertEqual((summary["sampleRateHz"], summary["chunkCount"]), (24000, 1))
-        broken = {"adapterID": "nisqa-v2", "outputs": {**payload["outputs"], "coloration": float("nan")}}
-        with self.assertRaisesRegex(qualifier.QualificationError, "finite coloration"):
-            qualifier._summary(broken)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Verify pinned local evaluator assets and emit an untracked adapter config."""
+"""Verify pinned local evaluator assets and emit an untracked adapter config.
+
+Only a registered, runnable judge (`config/audio-qc-judges.json`: tier A or B,
+neither retired nor quarantined) is prepared. The emitted configuration binds
+its output identity (execution identity v3); the resource supervisor is
+envelope provenance and never enters it.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +17,12 @@ import subprocess
 import sys
 from typing import Any
 
+from audio_qc_judges import JudgeRegistryError, judge_for_adapter, require_executable
 from delivery_analysis_cache import (
     atomic_json, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION,
     SUPPORTED_RESAMPLERS, select_resampler, AnalysisCacheError,
 )
+from delivery_compact_model_adapter import bind_output_identity
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -22,13 +30,15 @@ DEFAULT_CONTRACT = REPO / "config/delivery-evaluator-v2-candidates.json"
 DEFAULT_MODEL_ROOT = REPO / "build/cache/delivery-analysis/external-models"
 RUNTIME_SOURCE = REPO / "scripts/delivery_compact_model_runtime.py"
 ADAPTER_LAYER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
-SUPERVISOR_SOURCE = REPO / "scripts/delivery_resource_supervisor.py"
 # The recognizer child alone: its digest is the whisper adapter's source identity.
 INDEPENDENT_ASR_WORKER_SOURCE = REPO / "scripts/independent_asr_worker.py"
-CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
+CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
 WHISPER_RUNTIME_PINS = ("mlx", "mlx-whisper", "numpy")
-NISQA_RUNTIME_PINS = ("python", "torch", "torchmetrics", "librosa", "numpy")
-NISQA_DIMENSIONS = ("mos", "noisiness", "discontinuity", "coloration", "loudness")
+ADOPTION_REQUIREMENTS = frozenset({
+    "two-clean-canonical-host-runs", "serial-process-isolation",
+    "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
+    "no-vad-dimension-regression", "no-preset-regression",
+})
 
 
 class PreparationError(ValueError):
@@ -112,31 +122,21 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         not isinstance(code, str) or not code.isalpha() for code in languages.values()
     ):
         raise PreparationError("whisper label map must name the corpus languages")
-    nisqa = candidates["nisqa-v2"]
-    nisqa_dependencies = nisqa.get("runtimeDependencies")
-    if not isinstance(nisqa_dependencies, dict) or set(nisqa_dependencies) != set(NISQA_RUNTIME_PINS) or any(
-        not isinstance(value, str) or not value for value in nisqa_dependencies.values()
-    ):
-        raise PreparationError("NISQA runtime dependency pins are incomplete")
-    if nisqa["labelMap"].get("dimensions") != list(NISQA_DIMENSIONS):
-        raise PreparationError("NISQA label map must list the five quality dimensions in model order")
-    if nisqa["preprocessingConfig"].get("inputAudio") != "original":
-        raise PreparationError("NISQA must score the original audio bytes")
-    floor = nisqa.get("warnFloor")
-    if not isinstance(floor, dict) or isinstance(floor.get("mos"), bool) or not isinstance(
-        floor.get("mos"), (int, float)
-    ) or not 1.0 <= float(floor["mos"]) <= 5.0:
-        raise PreparationError("NISQA warn floor must carry a MOS between 1 and 5")
-    calibration = floor.get("calibration")
-    if not isinstance(calibration, dict) or not isinstance(calibration.get("takes"), int) or calibration["takes"] < 1:
-        raise PreparationError("NISQA warn floor must record its calibration corpus")
-    _sha(calibration.get("corpusSHA256"), "nisqa.warnFloor.calibration.corpusSHA256")
-    required_gates = {
-        "two-clean-eight-gib-host-runs", "serial-process-isolation",
-        "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
-        "no-vad-dimension-regression", "no-preset-regression",
-    }
-    if set(contract.get("adoptionRequirements", [])) != required_gates:
+    # Retired candidates stay as provenance for the evidence that cites them;
+    # none is executable, and each records the corrected license.
+    retired = contract.get("retiredCandidates")
+    if not isinstance(retired, dict):
+        raise PreparationError("retired candidate provenance is missing")
+    for adapter_id, candidate in retired.items():
+        if adapter_id in candidates or not isinstance(candidate, dict):
+            raise PreparationError(f"{adapter_id} cannot be both executable and retired")
+        if candidate.get("status") != "retired" or candidate.get("commercialUseCompatible") is not False:
+            raise PreparationError(f"retired candidate {adapter_id} must record status and license")
+        for field in ("license", "trainingDataDeclaration", "retiredOn", "decision", "registryJudge"):
+            if not isinstance(candidate.get(field), str) or not candidate[field].strip():
+                raise PreparationError(f"retired candidate {adapter_id} requires {field}")
+        _sha(candidate.get("weightsSHA256"), f"{adapter_id}.weightsSHA256")
+    if set(contract.get("adoptionRequirements", [])) != ADOPTION_REQUIREMENTS:
         raise PreparationError("candidate adoption requirements drifted")
     return contract
 
@@ -212,24 +212,6 @@ def _runtime_versions(python: Path) -> dict[str, str]:
     return value
 
 
-def _nisqa_runtime_versions(python: Path) -> dict[str, str]:
-    command = [str(python), "-c", (
-        "import json,sys;from importlib import metadata;"
-        "print(json.dumps({'python':'.'.join(map(str,sys.version_info[:3])),"
-        "**{name: metadata.version(name) for name in ('torch','torchmetrics','librosa','numpy')}},sort_keys=True))"
-    )]
-    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        raise PreparationError("NISQA runtime dependencies cannot be inspected")
-    try:
-        value = json.loads(result.stdout)
-    except json.JSONDecodeError as error:
-        raise PreparationError("NISQA runtime dependency output is invalid") from error
-    if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
-        raise PreparationError("NISQA runtime dependency inventory is invalid")
-    return value
-
-
 def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             resampler_version: str = RESAMPLER_VERSION) -> dict[str, Any]:
     try:
@@ -243,6 +225,10 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
     candidate = candidates.get(adapter_id)
     if not isinstance(candidate, dict):
         raise PreparationError("candidate is not registered")
+    try:
+        require_executable(*judge_for_adapter(adapter_id))
+    except JudgeRegistryError as error:
+        raise PreparationError(str(error)) from None
     label_map = candidate["labelMap"]
     label_digest = digest(label_map)
     if adapter_id == "sensevoice-small-q8":
@@ -307,41 +293,15 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             "{binary}", str(INDEPENDENT_ASR_WORKER_SOURCE),
             "--weights", "{weights}", "--audio", "{audio}",
         ]
-    elif adapter_id == "nisqa-v2":
-        weights = _verified(
-            model_root / "nisqa" / candidate["weightsFile"], candidate["weightsSHA256"],
-            "NISQA v2 checkpoint (owned model root; nothing is downloaded)",
-        )
-        binary = model_root / "nisqa-runtime-py314/bin/python"
-        if not binary.is_file():
-            raise PreparationError("NISQA Python runtime is missing")
-        dependencies = _nisqa_runtime_versions(binary)
-        if dependencies != candidate["runtimeDependencies"]:
-            raise PreparationError("NISQA runtime dependency versions drifted from the contract pins")
-        source_digest = file_sha256(RUNTIME_SOURCE)
-        output_format = "json"
-        command = [
-            "{binary}", str(RUNTIME_SOURCE), "nisqa",
-            "--weights", "{weights}", "--audio", "{audio}",
-        ]
     else:  # pragma: no cover - contract owns this branch
         raise PreparationError("unsupported candidate")
-    dependency_digest = digest(dependencies)
     preprocessing = dict(candidate["preprocessingConfig"])
     preprocessing["canonicalizationIdentity"] = canonicalization_identity(resampler_version)
-    layer_digest = file_sha256(ADAPTER_LAYER_SOURCE)
-    supervisor_digest = file_sha256(SUPERVISOR_SOURCE)
-    preprocessing["executionIdentity"] = {
-        "adapterSourceSHA256": source_digest,
-        "adapterLayerSHA256": layer_digest,
-        "resourceSupervisorSHA256": supervisor_digest,
-        "runtimeDependenciesDigest": dependency_digest,
-        "labelMapDigest": label_digest,
-        "outputFormat": output_format,
-    }
-    return {
+    # The output identity (execution identity v3) binds everything that can
+    # change the adapter's output into the preprocessing digest, the cache key.
+    # The resource supervisor is envelope provenance recorded with each run.
+    return bind_output_identity({
         "schemaVersion": 1,
-        "executionIdentityVersion": 2,
         "adapterID": adapter_id,
         "modelID": candidate["modelID"],
         "sourceRevision": candidate["sourceRevision"],
@@ -350,10 +310,9 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         "binaryPath": str(binary),
         "binarySHA256": file_sha256(binary),
         "adapterSourceSHA256": source_digest,
-        "adapterLayerSHA256": layer_digest,
-        "resourceSupervisorSHA256": supervisor_digest,
+        "adapterLayerSHA256": file_sha256(ADAPTER_LAYER_SOURCE),
         "runtimeDependencies": dependencies,
-        "runtimeDependenciesDigest": dependency_digest,
+        "runtimeDependenciesDigest": digest(dependencies),
         "license": candidate["license"],
         "commercialUseCompatible": candidate["commercialUseCompatible"],
         "trainingDataDeclaration": candidate["trainingDataDeclaration"],
@@ -362,13 +321,11 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         "labelMap": label_map,
         "labelMapDigest": label_digest,
         "preprocessingConfig": preprocessing,
-        "preprocessingConfigDigest": digest(preprocessing),
         "offlineAfterAcquisition": True,
         "outputFormat": output_format,
         "commandTemplate": command,
         **({"decodeOptions": candidate["decodeOptions"]} if adapter_id == "whisper-small-mlx" else {}),
-        **({"warnFloor": candidate["warnFloor"]} if adapter_id == "nisqa-v2" else {}),
-    }
+    })
 
 
 def main() -> int:

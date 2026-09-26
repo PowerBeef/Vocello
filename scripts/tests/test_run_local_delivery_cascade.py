@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from delivery_analysis_cache import (  # noqa: E402
     DeliveryAnalysisCache, digest, canonicalization_identity, RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION,
 )
+import run_local_delivery_cascade as cascade  # noqa: E402
 from run_local_delivery_cascade import (  # noqa: E402
     CascadeError,
     GLOBAL_ANALYZER,
@@ -279,54 +280,28 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
                 self.assertFalse(result["rows"][0]["finalistLayers"]["required"])
                 self.assertFalse(result["promotionAuthority"])
 
-    def test_clip_quality_screen_abstains_below_its_floor_and_never_rejects(self) -> None:
-        config = {
-            "adapterID": "nisqa-v2", "modelID": "nisqa-fixture", "weightsSHA256": "9" * 64,
-            "warnFloor": {"mos": 3.81, "calibration": {"takes": 54}},
-            "preprocessingConfig": {
-                "inputAudio": "original",
-                "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
-            },
+    def test_requested_layers_are_contract_layers_and_no_retired_judge_returns(self) -> None:
+        """Audit decision 1a: NISQA, UTMOS and the SER never re-enter the cascade."""
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads((root / "config/delivery-evaluator-v2-contract.json").read_text(encoding="utf-8"))
+        registry = json.loads((root / "config/audio-qc-judges.json").read_text(encoding="utf-8"))
+        retired_layers = {
+            layer for judge in registry["judges"].values() if judge["status"] == "retired"
+            for layer in judge["legacyIdentifiers"].get("cascadeLayers", [])
         }
-        scores = {"one": 4.6, "two": 3.2, str(self.neutral): 4.9}
-
-        def judge(*, wav_path, config, cache, lock_root, supervisor_options=None):
-            key = "one" if wav_path == self.one else "two" if wav_path == self.two else str(wav_path)
-            return ({"adapterID": "nisqa-v2", "outputs": {
-                "mos": scores[key], "noisiness": 4.0, "discontinuity": 4.5, "coloration": 4.4,
-                "loudness": 4.3, "minimumChunkMOS": scores[key]}}, False)
-
-        with mock.patch("run_local_delivery_cascade.run_compact_adapter", side_effect=judge) as adapter:
-            result = run_cascade(
-                manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
-                clip_quality_config=config,
-            )
-        self.assertEqual(adapter.call_count, 4)
-        by_id = {row["generationID"]: row for row in result["rows"]}
-        screen_one = by_id["one"]["alwaysLayers"]["clipQualityScreen"]
-        self.assertFalse(screen_one["instructed"]["belowWarnFloor"])
-        self.assertFalse(screen_one["neutral"]["belowWarnFloor"])
-        self.assertEqual(screen_one["instructed"]["scores"]["mos"], 4.6)
-        self.assertNotIn("clip-quality-below-warn-floor", by_id["one"]["reasons"])
-        screen_two = by_id["two"]["alwaysLayers"]["clipQualityScreen"]
-        self.assertTrue(screen_two["instructed"]["belowWarnFloor"])
-        self.assertEqual(by_id["two"]["route"], "abstained")
-        self.assertIn("clip-quality-below-warn-floor", by_id["two"]["reasons"])
-        self.assertEqual(result["clipQualityScreen"]["rowsBelowWarnFloor"], 1)
-        self.assertEqual(result["clipQualityScreen"]["warnFloor"]["mos"], 3.81)
-        self.assertFalse(result["clipQualityScreen"]["promotionAuthority"])
-        # No floor, wrong adapter, or a judge without finite scores fail closed.
-        with self.assertRaisesRegex(CascadeError, "calibrated warn floor"):
+        self.assertEqual(retired_layers, {"clip-quality-screen", "utmos", "legacy-ser-during-bakeoff"})
+        self.assertLessEqual(set(cascade.AMBIGUOUS_LAYERS), set(contract["cascade"]["ambiguousOnly"]))
+        self.assertLessEqual(set(cascade.FINALIST_LAYERS), set(contract["cascade"]["finalistsOnly"]))
+        self.assertFalse(retired_layers & (set(cascade.AMBIGUOUS_LAYERS) | set(cascade.FINALIST_LAYERS)))
+        result = run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock")
+        self.assertNotIn("clipQualityScreen", result)
+        for row in result["rows"]:
+            self.assertNotIn("clipQualityScreen", row["alwaysLayers"])
+            requested = set(row["ambiguousLayers"]["requested"]) | set(row["finalistLayers"]["requested"])
+            self.assertFalse(requested & retired_layers)
+        with self.assertRaises(TypeError):
             run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
-                        clip_quality_config={**config, "warnFloor": {}})
-        with self.assertRaisesRegex(CascadeError, "nisqa-v2"):
-            run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
-                        clip_quality_config={**config, "adapterID": "distilhubert"})
-        with mock.patch("run_local_delivery_cascade.run_compact_adapter",
-                        return_value=({"adapterID": "nisqa-v2", "outputs": {"mos": "high"}}, False)):
-            with self.assertRaisesRegex(CascadeError, "no finite mos"):
-                run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
-                            clip_quality_config=config)
+                        clip_quality_config={"adapterID": "nisqa-v2"})
 
     def test_temporal_cache_binds_its_imported_global_analyzer(self) -> None:
         canonical = self.cache.canonicalize(self.one)

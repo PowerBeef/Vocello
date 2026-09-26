@@ -3,9 +3,10 @@
 
 Everything below the backend boundary runs with injected scorers and a fake
 generation runner — no torch, no speechbrain, no CLI. The selection contract
-under test: emotion criterion first (SER agreement; whisper by voiced-fraction
-drop), then nearest-to-anchor identity, never peak expressiveness; and the
-generation plan must never use the silent no-stream path (CM-7).
+under test: emotion criterion first (paired delivery adherence against the
+neutral anchor; whisper by voiced-fraction drop), then nearest-to-anchor
+identity, never peak expressiveness; and the generation plan must never use
+the silent no-stream path (CM-7).
 """
 from __future__ import annotations
 
@@ -29,7 +30,21 @@ from build_emotion_reference_bank import (
     voice_name,
     write_manifest,
 )
-from emotion_advisory import EMOTION_LABELS
+
+# Analyzer-shaped metrics: a neutral anchor, a livelier take and a flatter one.
+ANCHOR_METRICS = {
+    "f0_median_hz": 120.0, "f0_range_hz": 60.0, "f0_range_semitones": 8.0, "f0_std_hz": 20.0,
+    "f0_voiced_frac": 0.70, "rate_syllable_rate_hz": 4.0, "rate_cv": 0.3, "pause_ratio": 0.2,
+    "energy_roughness": 0.1, "durationSec": 20.0,
+}
+LIVELY_METRICS = dict(
+    ANCHOR_METRICS, f0_median_hz=140.0, f0_range_hz=90.0, f0_range_semitones=11.0, f0_std_hz=30.0,
+    rate_syllable_rate_hz=4.6, energy_roughness=0.15, f0_voiced_frac=0.65,
+)
+FLAT_METRICS = dict(
+    ANCHOR_METRICS, f0_median_hz=110.0, f0_range_hz=40.0, f0_range_semitones=5.0, f0_std_hz=12.0,
+    rate_syllable_rate_hz=3.6, energy_roughness=0.08,
+)
 
 
 def plan(work_dir: pathlib.Path, emotions=("happy", "whisper"), candidates=2):
@@ -93,13 +108,12 @@ class GenerationPlanTests(unittest.TestCase):
 class SelectionTests(unittest.TestCase):
     @staticmethod
     def scored_rows():
-        def row(emotion, seed, top, prob, identity, voiced_delta):
-            agreement = None if emotion == "whisper" else top == emotion
+        def row(emotion, seed, adherent, arousal, identity, voiced_delta):
             return {
                 "emotion": emotion,
                 "seed": seed,
                 "path": f"/work/{emotion}_s{seed}.wav",
-                "ser": {"topEmotion": top, "topProbability": prob, "agreement": agreement},
+                "deliveryAdherence": {"passed": adherent, "flags": [], "arousalScore": arousal},
                 "identityCosine": identity,
                 "identityBand": "acceptable",
                 "voicedFrac": 0.6,
@@ -108,16 +122,16 @@ class SelectionTests(unittest.TestCase):
             }
 
         return [
-            # happy: two agreeing candidates; the *more anchor-like* one wins
-            # even though the other has the higher SER probability.
-            row("happy", 1, "happy", 0.95, 0.55, 0.01),
-            row("happy", 2, "happy", 0.70, 0.72, 0.02),
-            row("happy", 3, "surprised", 0.90, 0.90, 0.00),  # ineligible
-            # sad: nothing agrees.
-            row("sad", 4, "neutral", 0.80, 0.80, 0.00),
-            # whisper: judged by voiced-fraction drop, not SER.
-            row("whisper", 5, "sad", 0.40, 0.60, -0.20),
-            row("whisper", 6, "sad", 0.45, 0.75, -0.01),  # not whispered enough
+            # happy: two adherent candidates; the *more anchor-like* one wins
+            # even though the other moved arousal further.
+            row("happy", 1, True, 6.0, 0.55, 0.01),
+            row("happy", 2, True, 2.0, 0.72, 0.02),
+            row("happy", 3, False, -1.0, 0.90, 0.00),  # ineligible
+            # sad: nothing adheres.
+            row("sad", 4, False, 1.0, 0.80, 0.00),
+            # whisper: judged by voiced-fraction drop, not the adherence verdict.
+            row("whisper", 5, False, -1.0, 0.60, -0.20),
+            row("whisper", 6, True, -1.0, 0.75, -0.01),  # not whispered enough
         ]
 
     def test_selection_filters_then_prefers_anchor_identity(self) -> None:
@@ -128,39 +142,52 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selection["sad"]["reason"], "no_eligible_candidate")
         self.assertEqual(selection["whisper"]["winner"]["seed"], 5)
         self.assertIn(str(WHISPER_VOICED_DELTA_MAX), selection["whisper"]["criterion"])
+        self.assertEqual(selection["happy"]["criterion"],
+                         "paired delivery adherence against the neutral anchor")
 
     def test_score_candidates_pairs_against_the_anchor(self) -> None:
         embeddings = {
             "/work/anchor.wav": [1.0, 0.0],
             "/work/happy_s1.wav": [1.0, 0.0],
             "/work/happy_s2.wav": [0.0, 1.0],
+            "/work/happy_s3.wav": [0.6, 0.8],
         }
+        fallback = {key: value for key, value in LIVELY_METRICS.items() if key != "f0_voiced_frac"}
         metrics = {
             # The analyzer's real flat key is f0_voiced_frac; one row uses the
             # bare fallback so the compatibility path stays covered.
-            "/work/anchor.wav": {"f0_voiced_frac": 0.70, "f0_std_hz": 20.0},
-            "/work/happy_s1.wav": {"f0_voiced_frac": 0.65, "f0_std_hz": 26.0},
-            "/work/happy_s2.wav": {"voiced_frac": 0.72, "f0_std_hz": 31.0},
+            "/work/anchor.wav": ANCHOR_METRICS,
+            "/work/happy_s1.wav": LIVELY_METRICS,
+            "/work/happy_s2.wav": {**fallback, "voiced_frac": 0.72},
+            "/work/happy_s3.wav": FLAT_METRICS,
         }
         candidates = [
             {"emotion": "happy", "seed": 1, "path": "/work/happy_s1.wav"},
             {"emotion": "happy", "seed": 2, "path": "/work/happy_s2.wav"},
+            {"emotion": "happy", "seed": 3, "path": "/work/happy_s3.wav"},
         ]
         scored = score_candidates(
             "/work/anchor.wav",
             candidates,
-            classify=lambda path: {
-                label: (0.9 if label == "happy" else 0.1 / (len(EMOTION_LABELS) - 1))
-                for label in EMOTION_LABELS
-            },
             embed=lambda path: embeddings[path],
             analyze=lambda path: metrics[path],
         )
         self.assertEqual(scored[0]["identityCosine"], 1.0)
         self.assertEqual(scored[1]["identityCosine"], 0.0)
         self.assertEqual(scored[0]["voicedFracDelta"], -0.05)
-        self.assertEqual(scored[0]["f0StdDelta"], 6.0)
-        self.assertTrue(all(row["ser"]["agreement"] for row in scored))
+        self.assertEqual(scored[0]["f0StdDelta"], 10.0)
+        # The paired, same-voice arousal and prosody deltas decide eligibility:
+        # the livelier take adheres to happy, the flatter one does not.
+        self.assertEqual(scored[1]["voicedFracDelta"], 0.02)
+        self.assertTrue(scored[0]["deliveryAdherence"]["passed"])
+        self.assertGreater(scored[0]["deliveryAdherence"]["arousalScore"], 0)
+        # Incomplete analyzer metrics fail closed rather than pass.
+        self.assertEqual(scored[1]["deliveryAdherence"]["flags"], ["metrics_incomplete"])
+        self.assertFalse(scored[2]["deliveryAdherence"]["passed"])
+        self.assertIn("delivery_supporting_miss_arousal_score", scored[2]["deliveryAdherence"]["flags"])
+        selection = select_winners(scored, ["happy"])
+        self.assertEqual(selection["happy"]["winner"]["seed"], 1)
+        self.assertNotIn("ser", json.dumps(scored))
 
 
 class NamingAndManifestTests(unittest.TestCase):

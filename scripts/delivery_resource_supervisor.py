@@ -2,9 +2,12 @@
 """Serial resource supervisor for operator-local delivery analyzers.
 
 It enforces one governed child at a time and records a compact, privacy-safe
-resource envelope. The 5 GiB ceiling is sized for the 8 GB support floor and is
-provisional until two clean runs on the canonical benchmark host (the Mac mini M6,
-roadmap AV-17) qualify a final policy.
+resource envelope. The 5 GiB ceiling is provisional: it predates any
+canonical-host measurement, and per-judge ceilings (the measured peak on the
+canonical Mac mini M6 times 1.2) replace it once each judge has two clean
+canonical-host runs (audit AQ-F43; `config/audio-qc-judges.json`). The 8 GB Mac
+is a product floor, not an evaluator host. This module's source is envelope
+identity: it is recorded with each run and never keys a cache entry.
 
 ``owned-process-probe-v3`` (audit #7, #38, #101, #102):
 

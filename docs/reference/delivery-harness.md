@@ -75,23 +75,21 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
-| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT, whisper-small MLX or NISQA v2 candidates (NISQA scores the original bytes at their native rate; the others receive the canonical derivative); no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
+| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates, each a runnable judge of `config/audio-qc-judges.json`; every adapter receives the canonical derivative; execution identity v3 keys the cache by output identity and records the resource supervisor as envelope provenance; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
 | `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess (`scripts/independent_asr_worker.py`, the only place MLX loads and the recognizer's source identity) after the generator has exited; `manifest` (`--platform macos\|ios\|cascade`; the cascade form takes `--cascade-input`) → `transcribe --manifest … --adapter-config <whisper-small-mlx config> --output …` → cached, digest-bound, transcript-carrying recognitions for the language lanes and the cascade's `--review-evidence` | `test_independent_asr.py` |
 | `scripts/lib/language_metrics.py` | The one tokenizer, edit distance, locale table, threshold set and family-consensus rule shared by the output gate, the publisher, the cascade and the producer | `test_language_metrics.py` |
-| `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for DistilHuBERT (one deterministic, normalized 128-dimensional frozen representation) and NISQA v2 (`nisqa`: MOS, noisiness, discontinuity, coloration and loudness of one clip, chunked at 52 s and averaged by duration); never receives a requested label | `test_delivery_compact_model_runtime.py` |
+| `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for DistilHuBERT (one deterministic, normalized 128-dimensional frozen representation); never receives a requested label | `test_delivery_compact_model_runtime.py` |
+| `scripts/audio_qc_judges.py` | Validator and execution gate of the audio QC judge registry (`config/audio-qc-judges.json`): license tiers of weights and data, the exclusion list (models, packages and imports), retired judges kept out of every QC path, canonical-host adoption, and snapshot digest verification before a judge loads | `test_audio_qc_judges.py` |
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
-| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, the `--clip-quality-config` NISQA screen (both sides scored against the registry's calibrated warn floor; below it the pair abstains, never rejects), rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
-| `scripts/clip_quality_screen.py` | The NISQA judge over any WAV set: five dimensions, the calibrated warn floor, QC v7's step-burst figures, optional `--onset-window-ms` scoring, and rank statistics (AUC, Spearman) separating onset-cluster takes from clean ones; evidence carries names, digests and numbers, never paths | `test_clip_quality_screen.py` |
+| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_acoustic_reference.py` | Default digest-pinned numerical reference comparison in the cascade: same-language paired deltas, unpaired style context, warning retention and flagged-exclusion sensitivity; descriptive only, no downloads or quality authority | `test_delivery_acoustic_reference.py` |
 | `scripts/delivery_promotion_decision.py` | Automatic measured-claim decision (schema 2); schema 1 is the optional historical listener reader. Paired statistics, independent judges, multiplicity correction and runtime/quality guardrails | `test_delivery_promotion_decision.py` |
 | `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |
 | `scripts/delivery_separability.py` | Cross-preset separability: ridge-LDA over paired signed features, seed-grouped CV, UAR, computed chance floor, permutation null, Wilson intervals, per-cell BH-FDR, `--presets` subset probes | `test_delivery_separability.py` |
 | `scripts/bench_delivery_prosody.py` | Post-processes the current `vocello bench --delivery` run from its immutable manifest into `bench-prosody.json`; fail-closed instruction-receipt provenance (§4) | via `test_bench_command_contract.py` |
 | `scripts/build_emotion_reference_bank.py` | Generate → score → select → enroll curated per-emotion VoiceDesign reference banks (design-then-clone) → [`emotion-reference-banks.md`](emotion-reference-banks.md) | `test_build_emotion_reference_bank.py` |
-| `scripts/emotion_advisory.py` | Advisory SER agreement column (pinned wav2vec2-XLSR checkpoint + revision); advisory-only, runs after the engine has exited from a local `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`; see the script header); never CI, packaging or benchmark-history input | `test_emotion_advisory.py` |
-| `scripts/mos_advisory.py` | Advisory naturalness MOS-proxy column (UTMOSv2 pinned by commit + weights digest, CPU, relative signal only); advisory-only, runs after the engine has exited from the same `.venv` plus the pinned `utmosv2` install named in the script header; never CI, packaging or benchmark-history input | `test_mos_advisory.py` |
 | `scripts/delivery_quality_gate.py` | Per-preset delivery-adherence verdict (per take, diagnostic since gate v3; per cell, the adherence verdict, §5.1) + neutral-cohort dispersion, thresholds from the versioned prosody profile | `test_delivery_quality_gate.py` |
 | `scripts/delivery_statistics.py` | Library: Wilcoxon, Cohen's d_z, BCa bootstrap, Wilson, Benjamini-Hochberg, required-pairs power | `test_delivery_statistics.py` |
 | `scripts/delivery_matrix_report.py` | Matrix-level report over paired delivery rows | `test_delivery_matrix_report.py` |
@@ -115,8 +113,8 @@ and `analyze --plan ... --run-dir ...` commands own execution and acoustics. Nev
 
 The planner refuses shipped prompt drift. French rows require language, target-text and model
 receipts, retained alongside native QC. Keep all raw evidence untracked. Compare full-file French
-ASR and paired acoustic deltas separately from clip-quality warnings; neither acoustics nor NISQA
-establishes semantic emotion correctness. This development pilot has no promotion authority and
+ASR and paired acoustic deltas; neither establishes semantic emotion correctness. This development
+pilot has no promotion authority and
 leaves the multilingual confirmation corpus and production prompts unchanged.
 
 ### Clone identity, enrollment transcription, and French Design reliability
@@ -418,22 +416,18 @@ python3 scripts/independent_asr.py transcribe \
   --manifest build/artifacts/macos/delivery-experiment/calibration/asr-manifest.json \
   --adapter-config build/cache/delivery-analysis/whisper-small-mlx.json \
   --output build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json
-python3 scripts/prepare_delivery_compact_model_config.py nisqa-v2 \
-  --output build/cache/delivery-analysis/nisqa-v2.json
 python3 scripts/run_local_delivery_cascade.py \
   --plan build/artifacts/macos/delivery-experiment/calibration/plan.json \
   --run-dir build/artifacts/macos/delivery-experiment/calibration/run \
   --review-evidence build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json \
-  --clip-quality-config build/cache/delivery-analysis/nisqa-v2.json \
   --out build/artifacts/macos/delivery-experiment/cascade-report.json
 ```
 
-`--clip-quality-config` is the second machine judge (MV-06): NISQA v2 scores every take on both
-sides of a pair, on the original 24 kHz bytes, and a take below the registry's calibrated warn
-floor abstains the pair with `clip-quality-below-warn-floor`. The floor is the tenth percentile of
-a neutral PASS corpus (54 takes on 2026-09-14: the speed benchmark matrix plus the 28-seed clone
-short matrix, MOS median 4.77, floor 3.81); the registry records the corpus digest, so a re-pin of
-the codec or the model re-calibrates it. The head warns and abstains; native QC still decides.
+No clip-quality judge runs in the cascade. NISQA v2, the former screen, was retired on 2026-09-25
+with UTMOSv2 and the speech-emotion classifier: its weights are CC BY-NC-SA 4.0 and the others train
+on non-commercial data (audit decision 1a; `config/audio-qc-judges.json` records each retired
+judge, its corrected license and why). A relative-quality column returns only as the audit's
+Audiobox and DNSMOS composite, after its ladder test (AQ-08).
 
 The prepare step only validates already-present pinned local weights and emits an untracked
 path-bearing config; nothing is downloaded automatically. Without `--review-evidence` the cascade
@@ -446,7 +440,7 @@ and completes deterministic checks for both paired files before starting a neura
 
 The cascade derives its input from the runner's retained plan, execution state, acoustic layer,
 source identities and exact WAV digests after the generator has exited, then reuses neutral
-controls through `build/cache/delivery-analysis` (bounded for the 8 GB support floor with
+controls through `build/cache/delivery-analysis` (bounded with
 `python3 scripts/delivery_analysis_cache.py prune --keep-newest N`; a pruned entry is recomputed
 on its next use). The default root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
 cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. All heavy
@@ -478,11 +472,21 @@ External candidates are governed separately by
 [`config/delivery-evaluator-v2-candidates.json`](../../config/delivery-evaluator-v2-candidates.json).
 The tracked contract pins the exact SenseVoiceSmall Q8 model revision, GGUF and runtime archive/
 binary digests, the exact DistilHuBERT revision, safetensors/support-file digests and Python,
-Torch, Transformers, safetensors and NumPy versions, and the NISQA v2 checkpoint (`nisqa.tar`,
-digest `7ec4cf93…`, upstream commit `fe84f0f2`) with its Python, Torch, torchmetrics, librosa and
-NumPy versions plus the calibrated warn floor. The local configuration additionally binds
-the adapter layer and resource-supervisor source bytes into the preprocessing/cache identity.
-No model file or absolute path is tracked:
+Torch, Transformers, safetensors and NumPy versions, and the whisper-small MLX weights. Each
+candidate is a judge of the audio QC registry
+([`config/audio-qc-judges.json`](../../config/audio-qc-judges.json)), which records the license
+of its weights and training data, its tier, its independence and its status; the prepare step and
+the adapter refuse a retired, quarantined, tier-C or unknown-tier judge. The retired NISQA v2
+candidate stays in the contract's `retiredCandidates` as provenance for the evidence that cites it,
+with its corrected CC BY-NC-SA 4.0 license, and can no longer be prepared.
+
+The local configuration (execution identity v3) binds its output identity (model, weights,
+runtime binary and dependencies, adapter and adapter-layer source, label map, output format and
+preprocessing) into the preprocessing digest that keys the cache, plus an `outputIdentityDigest`
+for calibration. The resource supervisor's source is envelope identity: each run records it as
+provenance, and a supervisor-only change neither refuses a prepared configuration nor misses a
+cache entry. A version-2 configuration, which bound the supervisor into the cache key, is refused
+with a request to prepare it again. No model file or absolute path is tracked:
 
 ```sh
 python3 scripts/prepare_delivery_compact_model_config.py --validate-only
@@ -490,25 +494,7 @@ python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
   --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/sensevoice.json
 python3 scripts/prepare_delivery_compact_model_config.py distilhubert \
   --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/distilhubert.json
-python3 scripts/prepare_delivery_compact_model_config.py nisqa-v2 \
-  --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/nisqa-v2.json
 ```
-
-The NISQA runtime is an operator-provisioned venv under the owned model root, pinned by the
-registry's `runtimeDependencies` (the prepare step refuses any drift), and the checkpoint is
-fetched once by hand and verified by digest:
-
-```sh
-M=build/cache/delivery-analysis/external-models
-python3 -m venv --system-site-packages "$M/nisqa-runtime-py314"
-"$M/nisqa-runtime-py314/bin/pip" install "torchmetrics==1.9.0" "librosa==1.0.0"
-mkdir -p "$M/nisqa" && curl -sSL -o "$M/nisqa/nisqa.tar" \
-  https://github.com/gabrielmittag/NISQA/raw/fe84f0f252abec382b24367d5b22498a7ce34dbb/weights/nisqa.tar
-shasum -a 256 "$M/nisqa/nisqa.tar"   # 7ec4cf93…e805c
-```
-
-Its two-run qualification on 2026-09-14 (`qualify_delivery_compact_models.py`, two byte-distinct
-clone takes) passed with about 403 MB peak RSS and 1.6 s wall per probe.
 
 Qualification uses two byte-distinct real clips, one candidate at a time. It records peak process
 RSS, wall time, pressure before/after, swap delta, clean exit and bounded post-exit recovery. An
@@ -516,7 +502,10 @@ unqualified result is returned for forensics but never cached and the next heavy
 start. Post-exit recovery samples for up to 15 seconds because one immediate host-free-percentage
 sample proved too noisy; the five-point recovery threshold itself remains fail closed. The runner
 does not accept a caller-authored host label: it checks `hw.model` and `hw.memsize` against the
-tracked canonical macOS hardware profile and binds the qualifier source in its report.
+tracked canonical macOS hardware profile and binds the qualifier source in its report. Adoption
+requires two clean canonical-host runs (`adoptionRequirement` in the report); the 8 GB Mac and the
+iPhone stay product floors, not evaluator hosts. The report binds the output identity; each run
+records the envelope identity that measured it.
 
 RSS does not measure total MLX/Metal residency. MLX callers (`independent_asr.py` and the
 `whisper-small-mlx` compact adapter) pass `measure_physical_footprint=True`; other callers may
@@ -961,10 +950,11 @@ annotated defects, or listener-recognized emotion. Separability can therefore sh
 presets make different acoustic regions without proving that they sound like the named
 delivery. The layered evaluator and its fail-closed schemas are now present, but AV-07 remains
 open until independent reference evidence calibrates the actual decision consumer on grouped
-folds and an untouched multi-speaker/script/language holdout validates its named claims. The SER
-layer records its full posterior, entropy and top-two margin: calm-to-neutral is a hypothesis, not
-a truth label, and whisper abstains from categorical emotion. Automatic comparisons can qualify a
-named measured improvement under the current experiment contract; they do not prove what listeners hear.
+folds and an untouched multi-speaker/script/language holdout validates its named claims. No
+categorical emotion classifier runs: the SER layer was retired on 2026-09-25 with its judge
+(trained on non-commercial corpora), and the evaluator refuses a `ser` or `mos` layer. Automatic
+comparisons can qualify a named measured improvement under the current experiment contract; they
+do not prove what listeners hear.
 
 AV-07's source boundary is now executable rather than prose-only. A calibration run stamps the
 digest of every labelled WAV plus every non-path split field into the frozen profile. Then
@@ -1035,13 +1025,10 @@ ready; AV-07 remains open until an independently labelled real corpus produces a
   schema 1 remains readable for historical listener results; no setup exists for a lane that
   does not exist.
 - **Reference bank**: [`emotion-reference-banks.md`](emotion-reference-banks.md) —
-  generation strictly before scorers (the 8 GB support-floor rule, on every host); SER + identity +
-  prosody scoring; honest refusal when no candidate passes.
-- **SER and MOS advisories**: pinned model/revision, after-generation only, from a local untracked
-  `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`, plus the pinned
-  `utmosv2` install named in the `mos_advisory.py` header); never CI, packaging or
-  benchmark-history input.
+  generation strictly before scorers; identity plus paired delivery-adherence scoring; honest
+  refusal when no candidate passes.
 
-Constraint that governs all of the above: the 8 GB Mac support floor. Even on the 16 GB
-canonical Mac mini M6, never run analyzer models concurrently with the engine; generate first,
-score after.
+Constraint that governs all of the above: no analyzer model runs beside a resident generator, on
+any host; generate first, score after. After the generator exits, the canonical Mac mini M6's
+measured budget governs (per-judge ceilings from measured canonical-host peaks, AQ-06); the 8 GB
+Mac is a product floor, not an evaluator host.

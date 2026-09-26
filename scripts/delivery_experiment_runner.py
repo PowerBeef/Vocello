@@ -2,8 +2,8 @@
 """Plan, run, resume, and acoustically analyze delivery experiments.
 
 This operator-local harness invokes ``vocello generate`` once per take.  Each
-process exits before the next take or analyzer starts, preventing concurrent
-TTS/evaluator residency on the canonical 8 GB Mac.  Plans are source-bound,
+process exits before the next take or analyzer starts: no evaluator runs
+beside a resident generator, on any host.  Plans are source-bound,
 failures are retained, completed cells are resumable, and no result is
 published automatically.
 """

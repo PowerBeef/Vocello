@@ -137,12 +137,9 @@ class DeliveryEvaluatorTests(unittest.TestCase):
             outlier["dimensions"]["valence"]["abstainReasons"],
         )
 
-    def test_layer_composition_preserves_missing_and_disagreement(self) -> None:
+    def test_layer_composition_preserves_missing_layers(self) -> None:
         acoustic = {"schemaVersion": 1, "rows": [{"generationID": "g1", "passed": True}]}
-        ser = {
-            "schemaVersion": 1,
-            "rows": [{"generationID": "g1", "topEmotion": "happy", "abstained": False}],
-        }
+        identity = {"schemaVersion": 1, "rows": [{"generationID": "g1", "cosine": 0.7}]}
         dimensional = {
             "schemaVersion": 1,
             "rows": [{
@@ -150,19 +147,24 @@ class DeliveryEvaluatorTests(unittest.TestCase):
                 "dimensions": {"valence": {"value": -0.5, "abstained": False}},
             }],
         }
-        report = compose_layers({"acoustic": acoustic, "ser": ser}, dimensional)
+        report = compose_layers({"acoustic": acoustic, "identity": identity}, dimensional)
         self.assertEqual(report["rowCount"], 1)
-        self.assertEqual(report["disagreementCount"], 1)
-        self.assertIn("asr", report["missingAdvisoryLayers"])
-        self.assertIn(
-            "ser-happy-vs-negative-valence", report["rows"][0]["disagreements"]
-        )
+        self.assertEqual(report["missingAdvisoryLayers"], ["asr", "challenger"])
+        self.assertEqual(report["rows"][0]["layers"]["dimensional"]["dimensions"]["valence"]["value"], -0.5)
+
+    def test_retired_mos_and_ser_layers_never_compose(self) -> None:
+        # Audit decision 1a: UTMOSv2 and the SER trained on non-commercial data.
+        acoustic = {"schemaVersion": 1, "rows": [{"generationID": "g1"}]}
+        for name in ("mos", "ser"):
+            layer = {"schemaVersion": 1, "rows": [{"generationID": "g1"}]}
+            with self.assertRaisesRegex(EvaluatorError, "unregistered evaluator layer"):
+                compose_layers({"acoustic": acoustic, name: layer}, None)
 
     def test_layer_composition_rejects_cross_run_identity(self) -> None:
         acoustic = {"schemaVersion": 1, "rows": [{"generationID": "g1"}]}
-        ser = {"schemaVersion": 1, "rows": [{"generationID": "other"}]}
+        asr = {"schemaVersion": 1, "rows": [{"generationID": "other"}]}
         with self.assertRaisesRegex(EvaluatorError, "cross-run identities"):
-            compose_layers({"acoustic": acoustic, "ser": ser}, None)
+            compose_layers({"acoustic": acoustic, "asr": asr}, None)
 
     def test_challenger_requires_licensed_better_calibrated_offline_model(self) -> None:
         challenger = {
@@ -178,7 +180,7 @@ class DeliveryEvaluatorTests(unittest.TestCase):
                 "baselineHoldoutCalibrationError": 0.4,
                 "challengerHoldoutCalibrationError": 0.3,
                 "peakRSSBytes": 1_000_000,
-                "eightGigabyteHostCompatible": True,
+                "canonicalHostQualified": True,
                 "offlineAfterAcquisition": True,
                 "sequentialMemoryReleased": True,
             },

@@ -39,6 +39,9 @@ from typing import Any, Callable
 # compared within one embedding-model identity.
 ECAPA_SOURCE = "speechbrain/spkrec-ecapa-voxceleb"
 ECAPA_REVISION = "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286"
+# The registry judge this backend is (`config/audio-qc-judges.json`): tier B,
+# accepted for internal evaluation only; its snapshot is verified before loading.
+ECAPA_JUDGE_ID = "speaker.ecapa-voxceleb@1"
 # Waveform preprocessing is part of the score's identity (audit #103): takes
 # arrive at 24 kHz and ECAPA reads 16 kHz. The pinned anti-aliased polyphase
 # resampler (`scripts/audio_resampling.py`, the one the delivery cache uses)
@@ -238,6 +241,23 @@ def pinned_ecapa_snapshot(snapshot_download: Callable[..., str]) -> str:
         ) from error
 
 
+def verify_ecapa_snapshot(local_source: str) -> dict[str, str]:
+    """Verify the cached snapshot against the judge registry before it loads (audit AQ-F04).
+
+    The registry must still let the judge run and name the same repository and
+    revision; every snapshot file must match its content address and any
+    per-file pin. Returns each file's SHA-256.
+    """
+    from audio_qc_judges import JudgeRegistryError, verify_judge_snapshot
+
+    try:
+        return verify_judge_snapshot(
+            ECAPA_JUDGE_ID, Path(local_source), repository=ECAPA_SOURCE, revision=ECAPA_REVISION,
+        )
+    except JudgeRegistryError as error:
+        raise RuntimeError(f"the pinned ECAPA snapshot failed verification: {error}") from error
+
+
 def ecapa_embedder() -> Callable[[str], list[float]]:
     """Load the pinned ECAPA backend. Operator-local heavy dependency.
 
@@ -245,6 +265,7 @@ def ecapa_embedder() -> Callable[[str], list[float]]:
     (``local_files_only``), so the pin holds regardless of whether the installed
     speechbrain still forwards a ``revision`` argument (1.x dropped it), and a run
     never fetches a model (audit #103). The maintainer caches the snapshot once.
+    Its bytes are verified against the judge registry before every load.
     """
     import wave  # noqa: PLC0415
 
@@ -254,6 +275,7 @@ def ecapa_embedder() -> Callable[[str], list[float]]:
     from speechbrain.inference.speaker import EncoderClassifier  # noqa: PLC0415
 
     local_source = pinned_ecapa_snapshot(snapshot_download)
+    verify_ecapa_snapshot(local_source)
     classifier = EncoderClassifier.from_hparams(
         source=local_source,
         run_opts={"device": "cpu"},

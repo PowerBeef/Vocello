@@ -86,7 +86,7 @@ Homebrew marks its Python as externally managed; `--user` installs the pins into
 site-packages without touching Homebrew's files (CI passes the same flag). The scripts always run
 `python3 -m pytest`, so the user `bin` directory does not need to be on `PATH`. After a Homebrew Python
 upgrade to a new minor version, run the command again. The research-only `.venv` for advisory
-speech-emotion and MOS scoring is optional and never part of the ordinary loop; see
+speaker-identity scoring is optional and never part of the ordinary loop; see
 [`delivery-harness.md`](delivery-harness.md) and [`emotion-reference-banks.md`](emotion-reference-banks.md).
 
 ## 4. Website

@@ -99,19 +99,21 @@
     ],
     "adopted": [],
     "requiredBeforeExecution": [
+      "registered-judge-tier-a-or-b",
       "commercially-compatible-license",
       "declared-training-data",
       "immutable-revision",
       "binary-sha256",
       "weights-sha256",
       "adapter-layer-sha256",
-      "resource-supervisor-sha256",
       "runtime-dependency-digest",
       "preprocessing-config-digest",
+      "output-identity-digest",
+      "envelope-identity-provenance",
       "offline-after-acquisition"
     ],
     "requiredBeforeAdoption": [
-      "two-clean-eight-gigabyte-runs",
+      "two-clean-canonical-host-runs",
       "clean-post-exit-memory-release",
       "untouched-independent-reference-holdout-improvement"
     ]
@@ -130,11 +132,9 @@
     ],
     "ambiguousOnly": [
       "coarse-ser-asr",
-      "extra-identity",
-      "legacy-ser-during-bakeoff"
+      "extra-identity"
     ],
     "finalistsOnly": [
-      "utmos",
       "complete-multilingual-asr-cer",
       "optional-semantic-reviewer",
       "automated-untouched-holdout"

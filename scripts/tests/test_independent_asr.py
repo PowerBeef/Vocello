@@ -177,6 +177,50 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(again["producer"]["cacheHits"], 1)
         self.assertEqual(again["cells"], evidence["cells"])
 
+    def test_supervisor_only_change_replays_cached_recognitions_offline(self) -> None:
+        """Audit AQ-F47: the supervisor is envelope provenance; it never keys the cache."""
+        import delivery_compact_model_adapter as adapter
+        import delivery_resource_supervisor
+
+        dependencies = {"mlx": "fixture", "mlx-whisper": "fixture", "numpy": "fixture"}
+        config = adapter.bind_output_identity({
+            **self.config,
+            "sourceURI": "https://example.invalid/whisper",
+            "trainingDataSourceURI": "https://example.invalid/whisper-data",
+            "runtimeDependencies": dependencies,
+            "runtimeDependenciesDigest": digest(dependencies),
+            "adapterSourceSHA256": file_sha256(independent_asr.WORKER_SOURCE),
+            "adapterLayerSHA256": file_sha256(Path(adapter.__file__)),
+        })
+        first = independent_asr.transcribe_manifest(
+            manifest=self.manifest, config=config, cache=self.cache,
+            lock_root=self.root, supervisor=self.supervisor,
+        )
+        self.assertEqual(first["producer"]["modelLaunches"], 1)
+        changed = self.root / "delivery_resource_supervisor.py"
+        changed.write_bytes(Path(delivery_resource_supervisor.__file__).read_bytes()
+                            + b"\n# a supervisor-only fix\n")
+
+        def must_not_launch(*_args, **_kwargs):
+            raise AssertionError("a supervisor-only change launched the recognizer")
+
+        with mock.patch.object(adapter, "SUPERVISOR_SOURCE", changed):
+            replayed = independent_asr.transcribe_manifest(
+                manifest=self.manifest, config=config, cache=self.cache,
+                lock_root=self.root, supervisor=must_not_launch,
+            )
+        self.assertEqual(replayed["producer"]["modelLaunches"], 0)
+        self.assertEqual(replayed["producer"]["cacheHits"], 1)
+        self.assertEqual(replayed["cells"], first["cells"])
+        # A decode-option change is an output-identity change: a new recognition.
+        relocked = adapter.bind_output_identity({**config, "decodeOptions": {**config["decodeOptions"], "fp16": False}})
+        self.assertNotEqual(relocked["outputIdentityDigest"], config["outputIdentityDigest"])
+        again = independent_asr.transcribe_manifest(
+            manifest=self.manifest, config=relocked, cache=self.cache,
+            lock_root=self.root, supervisor=self.supervisor,
+        )
+        self.assertEqual(again["producer"]["modelLaunches"], 1)
+
     def test_cache_holds_the_worker_result_and_a_hit_is_derived_by_current_code(self) -> None:
         """The derivation lives in the producer, outside the cache identity, so a
         hit must re-derive rather than serve a stored derivation (review of #89)."""

@@ -35,12 +35,12 @@ and emotion carry into the take.
 
 ## Building a bank
 
-The builder and its scorers run from a local, untracked virtual environment:
-`python3 -m venv .venv && .venv/bin/pip install torch transformers speechbrain` (the headers of
-`scripts/emotion_advisory.py` and `scripts/clone_speaker_similarity.py` name the exact
-wav2vec2 and ECAPA backends; the ECAPA identity scorer imports `speechbrain` and loads its pinned
-snapshot from the local Hugging Face cache only, so the maintainer caches it once). Never install these into the system interpreter and never run
-them while the engine is generating.
+The builder and its identity scorer run from a local, untracked virtual environment:
+`python3 -m venv .venv && .venv/bin/pip install torch speechbrain` (the header of
+`scripts/clone_speaker_similarity.py` names the exact ECAPA backend; it loads its pinned snapshot
+from the local Hugging Face cache only, so the maintainer caches it once, and verifies every
+snapshot file against the judge registry, `config/audio-qc-judges.json`, before loading). Never
+install these into the system interpreter and never run them while the engine is generating.
 
 ```sh
 .venv/bin/python3 scripts/build_emotion_reference_bank.py build \
@@ -49,8 +49,7 @@ them while the engine is generating.
     --work-dir "$HOME/Library/Application Support/QwenVoice-Debug/emotion-banks/warm-narrator"
 ```
 
-Two strictly ordered phases (8 GB rule — the engine and the ML scorers never
-run concurrently):
+Two strictly ordered phases (no scorer ever runs beside a resident generator):
 
 1. **Generate.** A neutral anchor take plus N candidates per emotion
    (default 4 × happy/sad/angry/whisper), same brief, same neutral-content
@@ -60,12 +59,13 @@ run concurrently):
    made `--no-stream` publish nothing). Audio QC is fail-closed inside the
    engine; a QC casualty
    costs one candidate, never the build.
-2. **Score and select.** Per candidate: the pinned SER advisory
-   (`scripts/emotion_advisory.py` checkpoint), ECAPA identity cosine against
-   the anchor (`scripts/clone_speaker_similarity.py` backend), and prosody
-   deltas versus the anchor. Eligibility is the emotion criterion — SER top-1
-   agreement, or for whisper (which abstains from SER) a voiced-fraction drop
-   of at least 0.05 against the anchor. Among eligible candidates the winner
+2. **Score and select.** Per candidate: ECAPA identity cosine against the
+   anchor (`scripts/clone_speaker_similarity.py` backend) and the paired,
+   same-voice arousal and prosody deltas against the neutral anchor.
+   Eligibility is the emotion criterion — the paired delivery adherence
+   verdict for the preset's strong tier (`scripts/delivery_quality_gate.py`
+   expectations), or for whisper a voiced-fraction drop of at least 0.05
+   against the anchor. Among eligible candidates the winner
    is the one **nearest the anchor in speaker identity**, never the most
    extreme take: overshoot and identity drift are the documented
    reference-bank failure modes, and each VoiceDesign call re-invents the
@@ -80,12 +80,14 @@ bank is honest; a padded one is not.
 
 ## Advisory posture
 
-SER agreement and ECAPA cosine remain **advisory** instruments: never CI,
-never a packaging input, never benchmark history. The builder uses them the
-one way the audit's judge review endorsed — ranking our own candidates against
-each other under a pinned model identity — and everything it decides is
-recorded in the manifest. Absolute SER rates on synthesized speech stay
-uninterpretable; relative comparisons within one build are the signal.
+The paired adherence verdict and ECAPA cosine remain **advisory**
+instruments: never CI, never a packaging input, never benchmark history. The
+builder uses them the one way the audit's judge review endorsed — ranking our
+own candidates against each other under a pinned identity — and everything it
+decides is recorded in the manifest (bank version 2). The speech-emotion
+classifier that used to decide eligibility was retired on 2026-09-25: it was
+trained on non-commercial corpora (audio QC audit AQ-F03, decision 1a). An
+owned probe on the pinned recognizer's encoder may join later (AQ-08).
 
 ## Known limits
 

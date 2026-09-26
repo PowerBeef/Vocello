@@ -2,9 +2,18 @@
 """Pinned subprocess adapter for compact local delivery representations.
 
 No external checkpoint is selected or acquired here. A caller must provide a
-fully pinned, commercially compatible configuration. SenseVoiceSmall Q8 is the
-first permitted candidate; DistilHuBERT is the second. Neither is adopted until
-the separate untouched-human-holdout and two-run resource gates pass.
+fully pinned, commercially compatible configuration of a registered judge
+(`config/audio-qc-judges.json`). SenseVoiceSmall Q8 is the first permitted
+candidate; DistilHuBERT is the second. Neither is adopted until the separate
+untouched-holdout and two-clean-canonical-host-run gates pass.
+
+Identity v3 (audit AQ-F47) splits what a run produced from how it was
+supervised. The output identity (model, weights, runtime binary and
+dependencies, adapter and adapter-layer source, label map, output format,
+preprocessing) lives in the preprocessing digest, so it keys the cache and any
+calibration. The envelope identity (the resource supervisor's source and
+probe) is provenance recorded with each run; a supervisor-only change neither
+refuses a prepared configuration nor misses a cache entry.
 """
 
 from __future__ import annotations
@@ -26,17 +35,29 @@ from delivery_analysis_cache import (
     file_sha256,
     configured_resampler,
 )
+from audio_qc_judges import JudgeRegistryError, judge_for_adapter, require_executable
 from delivery_resource_supervisor import SupervisedResult, run_supervised
 import delivery_resource_supervisor
 
 
 SCHEMA_VERSION = 1
-PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
+PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
 # Adapters whose runtime allocates on the GPU through MLX; their supervised
 # envelope measures physical footprint by default.
 MLX_ADAPTERS = frozenset({"whisper-small-mlx"})
-NISQA_OUTPUT_FIELDS = ("mos", "noisiness", "discontinuity", "coloration", "loudness")
-EXECUTION_IDENTITY_VERSION = 2
+# 1: historical, unbound. 2 bound the resource supervisor into the output
+# identity, so a supervisor fix invalidated every prepared config and cache
+# entry; it is refused and must be prepared again. 3: output and envelope split.
+EXECUTION_IDENTITY_VERSION = 3
+SUPERVISOR_BOUND_IDENTITY_VERSION = 2
+# Every field that can change what an adapter emits; bound into the
+# preprocessing digest, which keys the cache.
+OUTPUT_IDENTITY_FIELDS = (
+    "adapterSourceSHA256", "adapterLayerSHA256", "runtimeDependenciesDigest",
+    "labelMapDigest", "outputFormat",
+)
+ADAPTER_LAYER_SOURCE = Path(__file__).resolve()
+SUPERVISOR_SOURCE = Path(delivery_resource_supervisor.__file__).resolve()
 SENSEVOICE_OUTPUT = re.compile(
     r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
     r"<\|(?P<event>[^|]+)\|><\|(?P<textnorm>[^|]+)\|>(?P<transcript>.*)$",
@@ -54,12 +75,54 @@ def _sha(value: Any, label: str) -> str:
     return value
 
 
+def envelope_identity() -> dict[str, str]:
+    """How a run is supervised. Provenance only: never part of a cache key."""
+    return {
+        "resourceSupervisorSHA256": file_sha256(SUPERVISOR_SOURCE),
+        "probeAlgorithmVersion": delivery_resource_supervisor.PROBE_ALGORITHM_VERSION,
+    }
+
+
+def output_identity_digest(config: dict[str, Any]) -> str:
+    """The digest that keys caches and calibration records for one adapter configuration."""
+    return digest({
+        field: config.get(field) for field in (
+            "adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256",
+            "preprocessingConfigDigest", "decodeOptions",
+        )
+    })
+
+
+def bind_output_identity(config: dict[str, Any]) -> dict[str, Any]:
+    """Bind a configuration's output identity into its preprocessing digest (identity v3).
+
+    The configuration must already carry every `OUTPUT_IDENTITY_FIELDS` value.
+    Returns a new configuration; the supervisor never enters it.
+    """
+    bound = dict(config)
+    preprocessing = dict(bound.get("preprocessingConfig") or {})
+    preprocessing.pop("executionIdentity", None)
+    preprocessing["outputIdentity"] = {field: bound[field] for field in OUTPUT_IDENTITY_FIELDS}
+    bound["preprocessingConfig"] = preprocessing
+    bound["preprocessingConfigDigest"] = digest(preprocessing)
+    bound["executionIdentityVersion"] = EXECUTION_IDENTITY_VERSION
+    bound.pop("resourceSupervisorSHA256", None)
+    bound["outputIdentityDigest"] = output_identity_digest(bound)
+    return bound
+
+
 def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(config, dict) or config.get("schemaVersion") != SCHEMA_VERSION:
         raise CompactAdapterError("compact adapter schemaVersion must be 1")
     adapter_id = config.get("adapterID")
     if adapter_id not in PERMITTED_ADAPTERS:
         raise CompactAdapterError("compact adapter is not in the contract candidate order")
+    try:
+        # The registry is the execution gate: a retired, quarantined, tier-C or
+        # unknown-tier judge never launches, whatever its prepared config says.
+        require_executable(*judge_for_adapter(adapter_id))
+    except JudgeRegistryError as error:
+        raise CompactAdapterError(str(error)) from None
     for field in ("modelID", "sourceRevision", "license", "trainingDataDeclaration"):
         if not isinstance(config.get(field), str) or not config[field].strip():
             raise CompactAdapterError(f"compact adapter requires {field}")
@@ -93,15 +156,19 @@ def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
     if adapter_id == "sensevoice-small-q8" and "q8" not in config["modelID"].lower():
         raise CompactAdapterError("SenseVoice first candidate must identify a Q8 artifact")
     identity_version = config.get("executionIdentityVersion", 1)
+    if identity_version == SUPERVISOR_BOUND_IDENTITY_VERSION:
+        raise CompactAdapterError(
+            "compact adapter execution identity v2 binds the resource supervisor into the cache key; "
+            "prepare the configuration again (identity v3)"
+        )
     if identity_version not in (1, EXECUTION_IDENTITY_VERSION):
         raise CompactAdapterError("compact adapter execution identity version is unsupported")
     if identity_version == EXECUTION_IDENTITY_VERSION:
         for field in ("sourceURI", "trainingDataSourceURI"):
             if not isinstance(config.get(field), str) or not config[field].strip():
-                raise CompactAdapterError(f"v2 compact adapter requires {field}")
-        output_format = config.get("outputFormat")
-        if output_format not in {"json", "sensevoice-tagged-text", "whisper-json"}:
-            raise CompactAdapterError("v2 compact adapter output format is unsupported")
+                raise CompactAdapterError(f"v3 compact adapter requires {field}")
+        if config.get("outputFormat") not in {"json", "sensevoice-tagged-text", "whisper-json"}:
+            raise CompactAdapterError("v3 compact adapter output format is unsupported")
         label_map = config.get("labelMap")
         if not isinstance(label_map, dict) or digest(label_map) != label_digest:
             raise CompactAdapterError("compact adapter label map drifted")
@@ -110,27 +177,16 @@ def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
             config.get("runtimeDependenciesDigest"), "runtimeDependenciesDigest"
         ):
             raise CompactAdapterError("compact adapter runtime dependency identity drifted")
-        source_digest = _sha(config.get("adapterSourceSHA256"), "adapterSourceSHA256")
-        layer_digest = _sha(config.get("adapterLayerSHA256"), "adapterLayerSHA256")
-        supervisor_digest = _sha(
-            config.get("resourceSupervisorSHA256"), "resourceSupervisorSHA256"
-        )
-        if layer_digest != file_sha256(Path(__file__)):
+        _sha(config.get("adapterSourceSHA256"), "adapterSourceSHA256")
+        if _sha(config.get("adapterLayerSHA256"), "adapterLayerSHA256") != file_sha256(ADAPTER_LAYER_SOURCE):
             raise CompactAdapterError("compact adapter layer source drifted")
-        if supervisor_digest != file_sha256(Path(delivery_resource_supervisor.__file__)):
-            raise CompactAdapterError("compact adapter supervisor source drifted")
-        bound = preprocessing.get("executionIdentity")
-        expected = {
-            "adapterSourceSHA256": source_digest,
-            "adapterLayerSHA256": layer_digest,
-            "resourceSupervisorSHA256": supervisor_digest,
-            "runtimeDependenciesDigest": config["runtimeDependenciesDigest"],
-            "labelMapDigest": label_digest,
-            "outputFormat": output_format,
-        }
-        if bound != expected:
-            raise CompactAdapterError("compact adapter preprocessing does not bind execution identity")
-    _ = label_digest
+        if "executionIdentity" in preprocessing or "resourceSupervisorSHA256" in config:
+            raise CompactAdapterError("the resource supervisor is envelope identity, never output identity")
+        expected = {field: config[field] for field in OUTPUT_IDENTITY_FIELDS}
+        if preprocessing.get("outputIdentity") != expected:
+            raise CompactAdapterError("compact adapter preprocessing does not bind its output identity")
+        if _sha(config.get("outputIdentityDigest"), "outputIdentityDigest") != output_identity_digest(config):
+            raise CompactAdapterError("compact adapter output identity digest drifted")
     return config
 
 
@@ -179,18 +235,11 @@ def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
         required = ("transcript", "languageTag", "emotionTag", "eventTag")
     elif config["adapterID"] == "whisper-small-mlx":
         required = ("transcript", "language", "detectedLanguage", "segments")
-    elif config["adapterID"] == "nisqa-v2":
-        required = NISQA_OUTPUT_FIELDS
     else:
         required = ("embedding",)
     for field in required:
         if field not in payload:
             raise CompactAdapterError(f"compact adapter output lacks {field}")
-    if config["adapterID"] == "nisqa-v2":
-        for field in NISQA_OUTPUT_FIELDS:
-            value = payload[field]
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 6.0:
-                raise CompactAdapterError(f"NISQA {field} is not a finite score on the 1-5 scale")
     # Paths, raw bytes and non-finite values are rejected again by the cache.
     return payload
 
@@ -220,15 +269,10 @@ def run_compact_adapter(
     retained = cache.load(identity)
     if retained is not None:
         return retained, True
+    envelope = envelope_identity()
     with tempfile.TemporaryDirectory(prefix="vocello-compact-adapter-") as temporary:
         model_input = Path(temporary) / "canonical.wav"
-        if config["preprocessingConfig"].get("inputAudio") == "original":
-            # The clip-quality screen scores the original bytes at their native
-            # rate; the identity above still binds the canonical derivative.
-            model_input = Path(temporary) / "original.wav"
-            model_input.write_bytes(wav_path.read_bytes())
-        else:
-            _canonical_wav(canonical, model_input)
+        _canonical_wav(canonical, model_input)
         substitutions = {
             "binary": str(config["binaryPath"]),
             "audio": str(model_input),
@@ -276,7 +320,10 @@ def run_compact_adapter(
             "runtimeDependenciesDigest": config.get("runtimeDependenciesDigest"),
             "adapterSourceSHA256": config.get("adapterSourceSHA256"),
             "adapterLayerSHA256": config.get("adapterLayerSHA256"),
-            "resourceSupervisorSHA256": config.get("resourceSupervisorSHA256"),
+            "outputIdentityDigest": config.get("outputIdentityDigest"),
+            # The supervisor that ran this measurement: provenance of the
+            # cached result, never part of its key.
+            "envelopeIdentity": envelope,
             "executionIdentityVersion": config.get("executionIdentityVersion", 1),
             "outputFormat": config.get("outputFormat", "json"),
             "offlineAfterAcquisition": True,

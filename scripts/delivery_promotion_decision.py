@@ -3,9 +3,14 @@
 
 Current decisions use frozen automatic measurements, never required listening.
 Historical schema-v1 listener evidence remains readable with its original meaning.
-Both modes enforce the pre-registered regression,
-intelligibility, identity, naturalness, memory, seed, and receipt limits.  It
-never generates audio or publishes evidence.
+Both modes enforce the pre-registered regression, intelligibility, identity,
+memory, seed, and receipt limits.  It never generates audio or publishes evidence.
+
+The relative-UTMOS naturalness guardrail was retired with its judge on
+2026-09-25 (audit decision 1a: UTMOSv2 trains on non-commercial data). An input
+that still carries the value stays readable; the value is reported under
+`retiredGuardrails` and never gates. A relative-quality guardrail returns only
+as the audit's section 4.6 composite, once it passes its ladder test (AQ-08).
 """
 
 from __future__ import annotations
@@ -25,6 +30,9 @@ from delivery_statistics import holm_bonferroni, paired_bootstrap_delta
 # Automated measured-claim decisions. Schema 1 is the historical listener-session
 # reader retained for old evidence files; nothing produces it any more.
 SCHEMA_VERSION = 2
+# Guardrail columns of retired judges (config/audio-qc-judges.json): accepted
+# from legacy inputs, reported, never gating.
+RETIRED_GUARDRAILS = {"relativeUTMOSDelta": "quality.utmosv2@1"}
 PRESETS = ("neutral", "happy", "sad", "angry", "fearful", "surprised", "calm", "whisper")
 
 
@@ -183,7 +191,6 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
         "newHardAudioQCFailures": (0, lambda value: value == 0),
         "werCERAbsoluteDelta": (0.01, lambda value: value <= 0.01),
         "medianSpeakerSimilarityDelta": (-0.02, lambda value: value >= -0.02),
-        "relativeUTMOSDelta": (-0.10, lambda value: value >= -0.10),
     }
     metric_results = {}
     for name, (limit, predicate) in expected_metrics.items():
@@ -191,6 +198,14 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise DecisionError(f"{name} must be finite numeric evidence")
         metric_results[name] = {"value": value, "limit": limit, "passed": predicate(value)}
+    retired_results = {}
+    for name, judge in RETIRED_GUARDRAILS.items():
+        if name not in metrics:
+            continue
+        value = metrics[name]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise DecisionError(f"{name} must be finite numeric evidence when present")
+        retired_results[name] = {"value": value, "retiredJudge": judge, "gating": False}
 
     invariants = payload.get("runtimeInvariants")
     required_invariants = ("memoryQualified", "cancellationValid", "seedIdentityValid", "instructionReceiptsValid")
@@ -236,6 +251,7 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
         "speakerBalance": speaker_balance, "scriptBalance": script_balance,
         "presetRegressionTests": preset_rows, "twoAFC": two_afc_rows,
         "automaticGuardrails": metric_results,
+        "retiredGuardrails": retired_results,
         "runtimeInvariants": {name: invariants[name] for name in required_invariants},
         ("automatedAuthority" if automated else "listenerAuthority"):
             {**(authority if automated else listener_authority), "passed": authority_passed},

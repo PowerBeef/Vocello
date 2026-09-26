@@ -8,8 +8,6 @@ the layered analyzers against the voice's reference clip:
                                     (warn-first bounds from the prosody profile)
   2. ``clone_speaker_similarity`` — ECAPA identity cosine (advisory bands);
                                     skipped with a note when torch is absent
-  3. ``emotion_advisory``         — reference-vs-take top-emotion match;
-                                    skipped with a note when torch is absent
 
 Generates negative controls of the same text so the identity bands can be
 calibrated from measured same-voice vs different-voice separations instead of
@@ -28,10 +26,10 @@ lists the voices directory to find more, and generates no cross-clone take by
 default.
 
 ADVISORY dev lane: not a CI gate, not a packaging prerequisite, never
-publishes benchmark history. Memory rule (M2 8 GB): generation and the ML
-analyzers run strictly sequentially — takes are generated one process at a
-time, and the torch-backed analyzers start only after the last generation
-process has exited.
+publishes benchmark history. Evidence-lane rule: no analyzer beside a resident
+generator — takes are generated one process at a time, and the torch-backed
+analyzers start only after the last generation process has exited; after
+that the canonical host's measured budget governs.
 
 Usage:
   python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman \
@@ -56,7 +54,9 @@ from clone_prosody_fidelity import evaluate_takes
 # 2 (audit #103): gender-matched controls by default, and cross-clone negatives.
 # 3 (2026-09-25 review): cross-clone negatives only for voices the operator names;
 # none by default, and no discovery of the other saved voices.
-LANE_VERSION = 3
+# 4 (2026-09-25, audit decision 1a): the speech-emotion column is gone with its
+# retired judge (trained on non-commercial corpora).
+LANE_VERSION = 4
 FIXED_TEXT = (
     "The harbor lights flickered as the evening ferry pulled away, and she "
     "wondered how many more crossings the old captain had left in him."
@@ -263,37 +263,6 @@ def ecapa_section(reference, clone_paths, control_paths, cross_clone_paths=()):
     return section
 
 
-def emotion_section(reference, clone_paths):
-    """Reference-vs-take top-emotion agreement (advisory)."""
-    try:
-        from emotion_advisory import hf_classifier
-    except Exception as error:  # pragma: no cover - import shape guard
-        return {"skipped": f"emotion_advisory unavailable: {error}"}
-    try:
-        classify = hf_classifier()
-    except Exception as error:
-        return {"skipped": f"torch/transformers not installed: {error}"}
-    reference_probabilities = classify(reference)
-    reference_top = max(reference_probabilities.items(), key=lambda item: item[1])[0]
-    takes = []
-    matches = 0
-    for path in clone_paths:
-        probabilities = classify(path)
-        top = max(probabilities.items(), key=lambda item: item[1])[0]
-        matched = top == reference_top
-        matches += int(matched)
-        takes.append({
-            "clip": os.path.basename(path),
-            "topEmotion": top,
-            "matchesReference": matched,
-        })
-    return {
-        "referenceTopEmotion": reference_top,
-        "takes": takes,
-        "matchRate": round(matches / len(takes), 3) if takes else None,
-    }
-
-
 def main():
     parser = argparse.ArgumentParser(description="Clone fidelity lane (advisory).")
     parser.add_argument("--voice", default="A_warm_elderly_woman")
@@ -384,7 +353,6 @@ def main():
             "crossCloneVoicesNamed": len(cross_clone_voices),
         },
         "speakerSimilarity": ecapa_section(reference, clone_paths, control_paths, cross_clone_paths),
-        "emotionAdvisory": emotion_section(reference, clone_paths),
     }
     report_path = os.path.join(run_dir, "clone-fidelity-report.json")
     with open(report_path, "w", encoding="utf-8") as handle:
@@ -395,8 +363,6 @@ def main():
         "prosody": fidelity["aggregate"],
         "similarity": report["speakerSimilarity"].get("clones", {}).get("aggregate")
         if isinstance(report["speakerSimilarity"], dict) else None,
-        "emotionMatchRate": report["emotionAdvisory"].get("matchRate")
-        if isinstance(report["emotionAdvisory"], dict) else None,
     }, indent=2))
 
 

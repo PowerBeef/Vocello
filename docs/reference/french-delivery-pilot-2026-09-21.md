@@ -7,7 +7,7 @@ sourceOfTruth:
   - config/delivery-french-pilot.json
   - scripts/delivery_experiment_runner.py
   - scripts/independent_asr.py
-  - scripts/clip_quality_screen.py
+  - config/audio-qc-judges.json
 ---
 # French delivery instruction pilot — September 21, 2026
 
@@ -86,7 +86,11 @@ detected as French. Accent, French nativeness, and Quebec pronunciation were not
 
 ### Advisory clip quality versus delivery strength
 
-NISQA v2 scored all 216 clips using the existing pinned weights and warning floor of **3.81**.
+NISQA v2 was retired on 2026-09-25, after this pilot: its released weights are CC BY-NC-SA 4.0
+(audio QC audit AQ-F01, decision 1a; `config/audio-qc-judges.json`). The figures below are the
+historical record of this run and support no current decision.
+
+NISQA v2 scored all 216 clips using the then-pinned weights and warning floor of **3.81**.
 Across the 192 treatments, mean predicted MOS was **3.875 for English instructions versus 4.197
 for French**. The warning floor caught **42/96 English** and **16/96 French** treatment clips,
 plus one Neutral control. These are model predictions, not listener MOS ratings or hard failures.

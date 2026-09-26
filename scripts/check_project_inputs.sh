@@ -77,6 +77,7 @@ python3 "$SCRIPT_DIR/delivery_evaluator.py" validate-v2-contract \
     --contract "$PROJECT_DIR/config/delivery-evaluator-v2-contract.json"
 python3 "$SCRIPT_DIR/prosody_holdout_validation.py" validate-contract
 python3 "$SCRIPT_DIR/audio_qc_qualification.py" validate-policy
+python3 "$SCRIPT_DIR/audio_qc_judges.py" validate
 python3 "$SCRIPT_DIR/prepare_delivery_compact_model_config.py" --validate-only
 
 # Work authority: schema, blockers and a fresh render.

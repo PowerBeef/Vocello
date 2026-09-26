@@ -7,8 +7,7 @@
   "candidateOrder": [
     "sensevoice-small-q8",
     "distilhubert",
-    "whisper-small-mlx",
-    "nisqa-v2"
+    "whisper-small-mlx"
   ],
   "candidates": {
     "sensevoice-small-q8": {
@@ -160,16 +159,24 @@
         "modelLoadsPerRun": 1,
         "runsAfterGenerationExit": true
       }
-    },
+    }
+  },
+  "registry": "config/audio-qc-judges.json",
+  "retiredCandidates": {
     "nisqa-v2": {
+      "status": "retired",
+      "retiredOn": "2026-09-25",
+      "licenseTier": "C",
+      "registryJudge": "quality.nisqa-v2@1",
+      "decision": "Audio QC audit 2026-09-25, decision 1(a): the registry is corrected and NISQA leaves every QC path (AQ-F01). Kept only as provenance for the pilots and decisions that cite it.",
       "modelID": "gabrielmittag/NISQA:nisqa.tar",
       "sourceRevision": "fe84f0f252abec382b24367d5b22498a7ce34dbb",
       "sourceURI": "https://github.com/gabrielmittag/NISQA/tree/fe84f0f252abec382b24367d5b22498a7ce34dbb",
       "weightsFile": "nisqa.tar",
       "weightsSHA256": "7ec4cf937514dd3f8860b21e66fabd8ca87a168572675ef8d979c4c4ad2e805c",
-      "license": "MIT (NISQA model code and released weights); the runtime executes the Apache-2.0 torchmetrics port of the same architecture",
-      "commercialUseCompatible": true,
-      "trainingDataDeclaration": "NISQA v2 (Mittag, Naderi, Chehadi, Moeller, INTERSPEECH 2021) was trained on the crowdsourced NISQA Corpus of simulated and live-condition speech rated for overall MOS plus noisiness, coloration, discontinuity and loudness, together with the public listening-test datasets the paper lists; no Vocello audio.",
+      "license": "CC BY-NC-SA 4.0 for the released weights (nisqa.tar); MIT covers only the NISQA code. The Apache-2.0 torchmetrics port runs the same architecture and downloads the same non-commercial checkpoint.",
+      "commercialUseCompatible": false,
+      "trainingDataDeclaration": "NISQA v2 (Mittag, Naderi, Chehadi, Moeller, INTERSPEECH 2021) was trained on the crowdsourced NISQA Corpus of simulated and live-condition speech (released for non-commercial research) rated for overall MOS plus noisiness, coloration, discontinuity and loudness, together with the public listening-test datasets the paper lists; no Vocello audio.",
       "trainingDataSourceURI": "https://github.com/gabrielmittag/NISQA",
       "role": "clip-quality-screen",
       "labelMap": {
@@ -223,7 +230,7 @@
     }
   },
   "adoptionRequirements": [
-    "two-clean-eight-gib-host-runs",
+    "two-clean-canonical-host-runs",
     "serial-process-isolation",
     "post-exit-memory-recovery",
     "untouched-independent-reference-holdout-gain",

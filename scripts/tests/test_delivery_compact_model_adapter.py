@@ -11,6 +11,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -20,6 +21,7 @@ from delivery_analysis_cache import (  # noqa: E402
 )
 from delivery_compact_model_adapter import (  # noqa: E402
     CompactAdapterError,
+    bind_output_identity,
     run_compact_adapter,
     validate_adapter_config,
 )
@@ -175,16 +177,14 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         )
         self.assertFalse(hit)
 
-    def test_v2_tagged_output_binds_runtime_and_label_map(self) -> None:
+    def _v3_config(self) -> dict:
         config = copy.deepcopy(self.config)
         labels = {
             "languages": ["en"], "emotions": ["NEUTRAL"],
             "events": ["Speech"], "textNormalization": ["withitn"],
         }
         dependencies = {"runtime": "fixture-v1"}
-        source_digest = file_sha256(Path(sys.executable))
         config.update({
-            "executionIdentityVersion": 2,
             "outputFormat": "sensevoice-tagged-text",
             "sourceURI": "https://example.invalid/model/revision",
             "trainingDataSourceURI": "https://example.invalid/training-data",
@@ -192,21 +192,17 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
             "labelMapDigest": digest(labels),
             "runtimeDependencies": dependencies,
             "runtimeDependenciesDigest": digest(dependencies),
-            "adapterSourceSHA256": source_digest,
+            "adapterSourceSHA256": file_sha256(Path(sys.executable)),
             "adapterLayerSHA256": file_sha256(Path(delivery_compact_model_adapter.__file__)),
-            "resourceSupervisorSHA256": file_sha256(Path(delivery_resource_supervisor.__file__)),
         })
-        config["preprocessingConfig"]["executionIdentity"] = {
-            "adapterSourceSHA256": source_digest,
-            "adapterLayerSHA256": config["adapterLayerSHA256"],
-            "resourceSupervisorSHA256": config["resourceSupervisorSHA256"],
-            "runtimeDependenciesDigest": digest(dependencies),
-            "labelMapDigest": digest(labels),
-            "outputFormat": "sensevoice-tagged-text",
-        }
-        config["preprocessingConfigDigest"] = digest(config["preprocessingConfig"])
         code = "print('<|en|><|NEUTRAL|><|Speech|><|withitn|>hello')"
         config["commandTemplate"] = ["{binary}", "-c", code, "{audio}", "{weights}"]
+        return bind_output_identity(config)
+
+    def test_v3_tagged_output_binds_runtime_and_label_map(self) -> None:
+        config = self._v3_config()
+        self.assertEqual(config["executionIdentityVersion"], 3)
+        self.assertNotIn("resourceSupervisorSHA256", json.dumps(config["preprocessingConfig"]))
         payload, hit = run_compact_adapter(
             wav_path=self.audio, config=config, cache=self.cache,
             lock_root=self.root / "lock", supervisor=self._supervisor,
@@ -214,10 +210,69 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         self.assertFalse(hit)
         self.assertEqual(payload["outputs"]["emotionTag"], "NEUTRAL")
         self.assertEqual(payload["outputs"]["transcript"], "hello")
+        provenance = payload["modelProvenance"]
+        self.assertEqual(provenance["outputIdentityDigest"], config["outputIdentityDigest"])
+        self.assertEqual(provenance["envelopeIdentity"]["resourceSupervisorSHA256"],
+                         file_sha256(Path(delivery_resource_supervisor.__file__)))
         drifted = copy.deepcopy(config)
         drifted["runtimeDependencies"]["runtime"] = "fixture-v2"
         with self.assertRaisesRegex(CompactAdapterError, "dependency identity"):
             validate_adapter_config(drifted)
+        unbound = copy.deepcopy(config)
+        unbound["outputIdentityDigest"] = "0" * 64
+        with self.assertRaisesRegex(CompactAdapterError, "output identity digest"):
+            validate_adapter_config(unbound)
+        # The resource supervisor never enters the output identity.
+        leaked = copy.deepcopy(config)
+        leaked["resourceSupervisorSHA256"] = "1" * 64
+        with self.assertRaisesRegex(CompactAdapterError, "envelope identity"):
+            validate_adapter_config(leaked)
+
+    def test_supervisor_bound_v2_configs_must_be_prepared_again(self) -> None:
+        legacy = copy.deepcopy(self._v3_config())
+        legacy["executionIdentityVersion"] = 2
+        with self.assertRaisesRegex(CompactAdapterError, "prepare the configuration again"):
+            validate_adapter_config(legacy)
+
+    def test_supervisor_only_change_replays_the_cache_offline(self) -> None:
+        """Audit AQ-F47: a supervisor fix is envelope provenance, not a new output identity."""
+        config = self._v3_config()
+        first, hit = run_compact_adapter(
+            wav_path=self.audio, config=config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertFalse(hit)
+        # A supervisor-only change: same code plus a fix, at a different digest.
+        changed = self.root / "delivery_resource_supervisor.py"
+        changed.write_bytes(Path(delivery_resource_supervisor.__file__).read_bytes()
+                            + b"\n# a supervisor-only fix\n")
+        original_envelope = delivery_compact_model_adapter.envelope_identity()
+
+        def must_not_launch(*_args, **_kwargs):
+            raise AssertionError("a supervisor-only change launched the model")
+
+        with mock.patch.object(delivery_compact_model_adapter, "SUPERVISOR_SOURCE", changed):
+            self.assertNotEqual(delivery_compact_model_adapter.envelope_identity(), original_envelope)
+            self.assertIs(validate_adapter_config(config), config)
+            replayed, hit = run_compact_adapter(
+                wav_path=self.audio, config=config, cache=self.cache,
+                lock_root=self.root / "lock", supervisor=must_not_launch,
+            )
+        self.assertTrue(hit)
+        self.assertEqual(replayed, first)
+        # The cached result keeps the envelope that measured it.
+        self.assertEqual(replayed["modelProvenance"]["envelopeIdentity"], original_envelope)
+        # An output-identity change is still a new measurement.
+        runtime = copy.deepcopy(config)
+        runtime["runtimeDependencies"] = {"runtime": "fixture-v2"}
+        runtime["runtimeDependenciesDigest"] = digest(runtime["runtimeDependencies"])
+        runtime = bind_output_identity(runtime)
+        self.assertNotEqual(runtime["outputIdentityDigest"], config["outputIdentityDigest"])
+        _payload, hit = run_compact_adapter(
+            wav_path=self.audio, config=runtime, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertFalse(hit)
 
     def test_unqualified_output_can_be_returned_for_forensics_but_is_not_cached(self) -> None:
         def unqualified(_command, **_kwargs):
@@ -246,56 +301,18 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         )
         self.assertFalse(second_hit)
 
-    def test_nisqa_scores_the_original_bytes_and_requires_five_finite_dimensions(self) -> None:
-        # A 24 kHz original: the clip-quality screen must receive it untouched
-        # while every other adapter still receives the canonical 16 kHz derivative.
-        original = self.root / "original.wav"
-        with wave.open(str(original), "wb") as output:
-            output.setnchannels(1); output.setsampwidth(2); output.setframerate(24_000)
-            output.writeframes(struct.pack("<h", 900) * 4800)
-        code = (
-            "import json,sys,wave; r=wave.open(sys.argv[1]); "
-            "print(json.dumps({'mos':4.61,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6,"
-            "'sampleRateHz':r.getframerate(),'frames':r.getnframes()}))"
-        )
-        preprocessing = dict(self.config["preprocessingConfig"], inputAudio="original")
-        config = dict(
-            self.config, adapterID="nisqa-v2", modelID="nisqa-fixture", preprocessingConfig=preprocessing,
-            preprocessingConfigDigest=digest(preprocessing),
-            commandTemplate=["{binary}", "-c", code, "{audio}", "{weights}"],
-        )
-        payload, hit = run_compact_adapter(
-            wav_path=original, config=config, cache=self.cache,
-            lock_root=self.root / "lock", supervisor=self._supervisor,
-        )
-        self.assertFalse(hit)
-        self.assertEqual(payload["outputs"]["sampleRateHz"], 24_000)
-        self.assertEqual(payload["outputs"]["frames"], 4800)
-        self.assertEqual(payload["outputs"]["mos"], 4.61)
-        _payload, second_hit = run_compact_adapter(
-            wav_path=original, config=config, cache=self.cache,
-            lock_root=self.root / "lock", supervisor=self._supervisor,
-        )
-        self.assertTrue(second_hit)
-        canonical = dict(config, preprocessingConfig=self.config["preprocessingConfig"],
-                         preprocessingConfigDigest=self.config["preprocessingConfigDigest"])
-        payload, _hit = run_compact_adapter(
-            wav_path=original, config=canonical, cache=self.cache,
-            lock_root=self.root / "lock", supervisor=self._supervisor,
-        )
-        self.assertEqual(payload["outputs"]["sampleRateHz"], 16_000)
-        for broken in (
-            "print(json.dumps({'mos':4.6,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5}))",
-            "print(json.dumps({'mos':'4.6','noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6}))",
-            "print(json.dumps({'mos':9.0,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6}))",
-        ):
-            invalid = dict(config, modelID="nisqa-broken-" + hashlib.sha256(broken.encode()).hexdigest()[:8],
-                           commandTemplate=["{binary}", "-c", "import json; " + broken, "{audio}", "{weights}"])
-            with self.assertRaisesRegex(CompactAdapterError, "NISQA|lacks"):
-                run_compact_adapter(
-                    wav_path=original, config=invalid, cache=self.cache,
-                    lock_root=self.root / "lock", supervisor=self._supervisor,
-                )
+    def test_retired_judges_never_launch(self) -> None:
+        retired = copy.deepcopy(self.config)
+        retired["adapterID"] = "nisqa-v2"
+        with self.assertRaisesRegex(CompactAdapterError, "candidate order"):
+            validate_adapter_config(retired)
+        # The registry is the execution gate even for a permitted adapter id.
+        registry = json.loads((Path(__file__).resolve().parents[2]
+                               / "config/audio-qc-judges.json").read_text(encoding="utf-8"))
+        registry["judges"]["compact.sensevoice-small-q8@1"]["status"] = "quarantined"
+        with mock.patch("audio_qc_judges.load_registry", return_value=registry):
+            with self.assertRaisesRegex(CompactAdapterError, "quarantined"):
+                validate_adapter_config(copy.deepcopy(self.config))
 
 
 if __name__ == "__main__":

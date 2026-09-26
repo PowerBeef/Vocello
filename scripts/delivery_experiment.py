@@ -46,7 +46,7 @@ EXPECTED_EXTERNAL_MODEL_REQUIREMENTS = (
     "immutable-revision-and-weight-digest",
     "declared-training-data-and-label-map",
     "untouched-holdout-calibration-improvement",
-    "measured-eight-gigabyte-memory-compatibility",
+    "two-clean-canonical-host-runs",
     "offline-after-approved-acquisition",
     "sequential-subprocess-memory-release",
 )
@@ -142,7 +142,6 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "holmAlpha": 0.05,
         "maximumAbsoluteWEROrCERRegression": 0.01,
         "maximumMedianSpeakerSimilarityRegression": 0.02,
-        "maximumMedianRelativeUTMOSRegression": 0.1,
         "maximumNewHardAudioQCFailures": 0,
         "minimumIndependentJudgeFamilies": 2,
         "humanListeningRequired": False,

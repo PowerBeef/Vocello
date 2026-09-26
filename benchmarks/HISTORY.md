@@ -968,6 +968,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-26 | [`mac-gate-bench-20260926-001256-5767891a`](runs/engine-generation/mac-gate-bench-20260926-001256-5767891a.json) | focused | focused | passed | qualified | 6 | 0.27 | `f157be4cf8e5` | `7ede380f740e` | baseline | mac-gate-bench |
+| 2026-09-26 | [`mac-gate-bench-20260926-180734-fe43583b`](runs/engine-generation/mac-gate-bench-20260926-180734-fe43583b.json) | focused | focused | passed | qualified | 6 | 0.27 | `6b95eb80147e` | `7ede380f740e` | vs mac-gate-bench-20260926-001256-5767891a: RTF -1.8% (within noise), TTFC -2.0% (within noise), RAM -1.7% (within noise), harness changed | mac-gate-bench |
 
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 

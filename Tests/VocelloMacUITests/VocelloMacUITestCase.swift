@@ -801,6 +801,14 @@ class VocelloMacUITestCase: XCTestCase {
         let player = button("studio_inlinePlayer_playPause")
         let backendError = element("sidebar_backendStatus_error")
         let backendCrash = element("sidebar_backendStatus_crashed")
+        // A completed card names its take (`studio_inlinePlayer_generation_<id>`).
+        // A warm short take on a fast Mac can start and finish between two polls,
+        // leaving Generate enabled again, so a card for a take that was not
+        // there before the click also proves the generation started.
+        let completedCards = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "studio_inlinePlayer_generation_")
+        )
+        let cardsBeforeClick = Set(completedCards.allElementsBoundByIndex.map(\.identifier))
 
         // The played-audio capture stamps its submit time here, right before the
         // genuine click, so first-audible latency is measured on one clock.
@@ -811,6 +819,8 @@ class VocelloMacUITestCase: XCTestCase {
         XCTAssertTrue(
             VocelloUIWait.condition("generation to visibly start", timeout: 30) {
                 cancel.exists || !generate.exists || !generate.isEnabled
+                    || !Set(completedCards.allElementsBoundByIndex.map(\.identifier))
+                        .subtracting(cardsBeforeClick).isEmpty
             }
         )
         // Diagnostic: hide the app (the genuine ⌘H user action) for the take

@@ -179,6 +179,97 @@ ROOT = Path(__file__).resolve().parents[2]
 # keeps the tracked copies clean before any run.
 GATED_SCRIPT_CORPORA = (ROOT / "config" / "language-bench-corpus.json",)
 
+# The code point sweep. Swift reads its Unicode data from the stdlib (lowercase
+# mapping, general category) and Foundation (normalization forms), whose
+# versions need not match Python's unicodedata, so every code point of these
+# blocks is scored by both runtimes through the generated `sweep-` fixture
+# cases: Basic Latin to Latin Extended-B, Latin Extended Additional, Cyrillic,
+# kana, a CJK and a Hangul sample, the half- and full-width forms and the
+# Hangul compatibility jamo. Regenerate with
+# `python3 scripts/tests/test_language_metrics.py --write-sweep-cases`.
+SWEEP_BLOCKS = ((0x20, 0x250), (0x1E00, 0x1F00), (0x400, 0x500), (0x3040, 0x3100),
+                (0x4E00, 0x4F00), (0xAC00, 0xAD00), (0xFF00, 0xFFF0), (0x3130, 0x3190))
+# One language per normalization profile: folded, compatibility and Hangul.
+SWEEP_LANGUAGES = ("english", "japanese", "korean")
+SWEEP_CASE_SIZE = 64
+SWEEP_PREFIX = "sweep-"
+# Code points left out of the sweep, each with the reason the two runtimes
+# disagree on it. None is known: Python's Unicode 13.0 and 16.0 generate
+# identical cases.
+SWEEP_EXCLUSIONS: dict[int, str] = {}
+
+
+def pinned_scores(reference: str, hypothesis: str, language: str) -> dict:
+    """A fixture case's `expected` block, as the parity tests read it."""
+    reference_tokens = metrics.normalized_tokens(reference, language)
+    hypothesis_tokens = metrics.normalized_tokens(hypothesis, language)
+    word, character = metrics.recomputed_accuracy(reference, hypothesis, language)
+    primary = metrics.primary_accuracy_metric(language)
+    counts = ("substitutions", "insertions", "deletions", "longestDeletionRun")
+    return {
+        "referenceTokens": reference_tokens,
+        "hypothesisTokens": hypothesis_tokens,
+        "referenceCharacters": "".join(metrics.character_units(reference_tokens)),
+        "hypothesisCharacters": "".join(metrics.character_units(hypothesis_tokens)),
+        "word": {key: word[key] for key in counts},
+        "segmentationAwareEditDistance": word["segmentationAwareEditDistance"],
+        "wordBoundaryOnlyEdits": word["wordBoundaryOnlyEdits"],
+        "character": {key: character[key] for key in counts},
+        "primaryMetric": primary,
+        "primaryErrors": (
+            character["substitutions"] + character["insertions"] + character["deletions"]
+            if primary == "characterErrorRate" else word["segmentationAwareEditDistance"]
+        ),
+    }
+
+
+def sweep_cases() -> list[dict]:
+    """The `sweep-` cases: each block's code points, space-separated,
+    SWEEP_CASE_SIZE to a case, in every SWEEP_LANGUAGES profile, against their
+    NFD spelling (canonically equivalent, so every edit count is zero)."""
+    cases = []
+    for language in SWEEP_LANGUAGES:
+        for start, end in SWEEP_BLOCKS:
+            code_points = [point for point in range(start, end) if point not in SWEEP_EXCLUSIONS]
+            for offset in range(0, len(code_points), SWEEP_CASE_SIZE):
+                chunk = code_points[offset:offset + SWEEP_CASE_SIZE]
+                reference = " ".join(map(chr, chunk))
+                hypothesis = unicodedata.normalize("NFD", reference)
+                diagnostics = {
+                    "excessFillerCount": metrics.filler_counts(reference, hypothesis, language)["excessFillerCount"],
+                }
+                diagnostics.update(metrics.normalization_diagnostics(reference, hypothesis, language))
+                cases.append({
+                    "id": f"{SWEEP_PREFIX}{language}-{chunk[0]:04x}-{chunk[-1]:04x}",
+                    "language": language,
+                    "reference": reference,
+                    "hypothesis": hypothesis,
+                    "note": f"Generated sweep of U+{chunk[0]:04X}..U+{chunk[-1]:04X} against its NFD spelling.",
+                    "phase": "P2a",
+                    "expected": pinned_scores(reference, hypothesis, language),
+                    "pythonDiagnostics": diagnostics,
+                })
+    return cases
+
+
+def write_sweep_cases() -> None:
+    """Replace the fixture's `sweep-` cases; the authored cases stay as they are."""
+    document = json.loads(FIXTURES.read_text(encoding="utf-8"))
+    document["cases"] = [
+        case for case in document["cases"] if not case["id"].startswith(SWEEP_PREFIX)
+    ] + sweep_cases()
+    text = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+    # Controls, format characters, unassigned code points and spaces other than
+    # U+0020 are written as escapes, so the fixture stays plain readable text.
+    escaped = []
+    for character in text:
+        if ord(character) > 0x7E and unicodedata.category(character)[0] in "CZ":
+            assert ord(character) <= 0xFFFF, "the swept blocks are in the BMP"
+            escaped.append(f"\\u{ord(character):04x}")
+        else:
+            escaped.append(character)
+    FIXTURES.write_text("".join(escaped), encoding="utf-8")
+
 
 class NormalizationV2ParityTests(unittest.TestCase):
     """AQ-02 P2a: text normalization v2 on the fixtures the Swift verifier's
@@ -245,12 +336,24 @@ class NormalizationV2ParityTests(unittest.TestCase):
                     self.assertNotIn("slot", case)
                     self.assertNotIn("expectedAfterP2b", case)
 
+    def test_the_generated_sweep_scores_every_swept_code_point(self) -> None:
+        # Swift scores the same cases in WordErrorRateTests.testNormalizationV2ParityFixtures.
+        generated = [case for case in self.cases if case["id"].startswith(SWEEP_PREFIX)]
+        self.assertEqual(generated, sweep_cases(), "regenerate with --write-sweep-cases")
+        swept = {point for start, end in SWEEP_BLOCKS for point in range(start, end)}
+        for point, reason in SWEEP_EXCLUSIONS.items():
+            self.assertIn(point, swept, hex(point))
+            self.assertTrue(reason.strip(), hex(point))
+        for language in SWEEP_LANGUAGES:
+            with self.subTest(language=language):
+                scored = {
+                    ord(character) for case in generated if case["language"] == language
+                    for character in case["reference"]
+                }
+                self.assertEqual(scored, swept - set(SWEEP_EXCLUSIONS))
+
     def test_case_folding_equals_unicode_folding_for_the_ten_languages(self) -> None:
-        # Basic Latin to Latin Extended-B, Latin Extended Additional, Cyrillic,
-        # kana, a CJK and a Hangul sample, and the half- and full-width forms.
-        blocks = [(0x20, 0x250), (0x1E00, 0x1F00), (0x400, 0x500), (0x3040, 0x3100),
-                  (0x4E00, 0x4F00), (0xAC00, 0xAD00), (0xFF00, 0xFFF0)]
-        for start, end in blocks:
+        for start, end in SWEEP_BLOCKS:
             for code_point in range(start, end):
                 character = unicodedata.normalize("NFKC", chr(code_point))
                 self.assertEqual(
@@ -310,24 +413,63 @@ class CorpusLintTests(unittest.TestCase):
             "The BBC reported it": ["abbreviation"],
             "Wir fahren z.B. heute": ["abbreviation"],
             "Приехал из США вчера": ["abbreviation"],
+            # A letter number is a number: recognizers write this year as 2026年.
+            "二〇二六年，火车准时开往远处的城市。": ["digit"],
         }
         for script, issues in cases.items():
             with self.subTest(script=script):
                 self.assertEqual(metrics.script_lint_issues(script), issues)
 
+    def test_each_language_refuses_its_short_forms(self) -> None:
+        cases = (
+            ("english", "Mr. Smith took the morning train."),
+            ("english", "Mr Smith took the morning train."),
+            ("english", "Trains, buses, ferries, etc. left on time."),
+            ("german", "Dr. Weber fährt heute nach Hause."),
+            ("german", "Züge, Busse, Fähren usw. fahren heute."),
+            ("german", "Der Zug Nr. sieben fährt heute."),
+            ("german", "Wir fahren z. B. heute nach Hause."),
+            ("spanish", "El Sr. García llegó a la estación."),
+            ("french", "M. Dupont arrive à la gare."),
+            ("french", "Mme Dupont arrive à la gare."),
+            ("french", "Des trains, des bus, etc. partent."),
+            ("italian", "Il sig. Rossi arriva alla stazione."),
+            ("portuguese", "A Sra. Silva chegou cedo."),
+            ("russian", "Поезд ушёл, т. е. мы опоздали."),
+            ("russian", "Он живёт на ул. Ленина."),
+        )
+        for language, script in cases:
+            with self.subTest(language=language, script=script):
+                self.assertEqual(metrics.script_lint_issues(script, language), ["abbreviation"])
+                # Without a language, every language's forms apply.
+                self.assertEqual(metrics.script_lint_issues(script), ["abbreviation"])
+
+    def test_words_and_letters_that_share_a_short_form_pass(self) -> None:
+        # French m' is M. without its full stop; "No." (number) is not listed,
+        # because "no." ends English sentences; one-letter words are not initials.
+        for language, script in (
+            ("french", "Il m'a vu à la gare."),
+            ("english", "The answer was no."),
+            ("russian", "Мы шли к дому, и я увидел поезд."),
+        ):
+            with self.subTest(language=language):
+                self.assertEqual(metrics.script_lint_issues(script, language), [])
+
     def test_spelled_scripts_pass(self) -> None:
-        for script in (
-            "The morning train left the quiet station on time.",
-            "¿Dónde está la estación? ¡Aquí!",
-            "L'homme arrive à l'heure, n'est-ce pas ?",
-            "Viele Menschen sehen Häuser, Straßen und Bäume.",
-            "二〇二六年，火车准时开往远处的城市。",
-            "今日は天気がよく、赤い列車が駅を出発します。",
-            "아침 열차는 조용한 역을 제시간에 떠났습니다.",
-            "Утренний поезд вовремя покинул тихую станцию.",
-            "A estação não fica longe.",
+        for language, script in (
+            ("english", "The morning train left the quiet station on time."),
+            ("spanish", "¿Dónde está la estación? ¡Aquí!"),
+            ("french", "L'homme arrive à l'heure, n'est-ce pas ?"),
+            ("german", "Viele Menschen sehen Häuser, Straßen und Bäume."),
+            ("chinese", "今天天气很好，火车准时开往远处的城市。"),
+            ("japanese", "今日は天気がよく、赤い列車が駅を出発します。"),
+            ("korean", "아침 열차는 조용한 역을 제시간에 떠났습니다."),
+            ("russian", "Утренний поезд вовремя покинул тихую станцию."),
+            ("portuguese", "A estação não fica longe."),
+            ("italian", "Il treno del mattino arriva in orario."),
         ):
             with self.subTest(script=script):
+                self.assertEqual(metrics.script_lint_issues(script, language), [])
                 self.assertEqual(metrics.script_lint_issues(script), [])
 
     def test_the_tracked_gated_corpora_are_clean(self) -> None:
@@ -336,7 +478,7 @@ class CorpusLintTests(unittest.TestCase):
             for entry in corpus["languages"]:
                 with self.subTest(corpus=corpus_path.name, language=entry["id"]):
                     self.assertIn(entry["id"], metrics.PRODUCT_LANGUAGES)
-                    self.assertEqual(metrics.script_lint_issues(entry["script"]), [])
+                    self.assertEqual(metrics.script_lint_issues(entry["script"], entry["id"]), [])
 
 
 class EdgeCoverageTests(unittest.TestCase):
@@ -580,4 +722,7 @@ class ChannelConsensusTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if sys.argv[1:] == ["--write-sweep-cases"]:
+        write_sweep_cases()
+    else:
+        unittest.main()

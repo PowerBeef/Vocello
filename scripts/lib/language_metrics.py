@@ -415,30 +415,89 @@ def normalization_diagnostics(reference: str, hypothesis: str, language: str) ->
 # recognizer writes one way. Digits (every recognizer writes some numbers as
 # digits and others as words, and Russian numerals inflect), brackets (the
 # model may or may not speak their contents), symbols and spoken punctuation,
-# and abbreviations (all-capital acronyms and dotted forms such as "z.B.")
-# are refused. `language_bench_evidence.build_plan` refuses a corpus with any
-# issue, and the tracked gated corpora are linted by the Python suite.
+# and abbreviations (all-capital acronyms, dotted forms such as "z.B." and the
+# language's short forms in ABBREVIATIONS) are refused.
+# `language_bench_evidence.build_plan` refuses a corpus with any issue, and the
+# tracked gated corpora are linted by the Python suite.
 SPOKEN_PUNCTUATION = frozenset("@#%&*/\\§¶‰‱†‡′″")
 _DOTTED_ABBREVIATION = re.compile(r"(?<![^\W\d_])[^\W\d_]\.[^\W\d_]")
+_LETTER_RUN = re.compile(r"[^\W\d_]+")
+# Titles and short forms a recognizer expands, keeps or drops at will, by
+# language, as lowercase letter runs: `always` forms are refused wherever they
+# stand (no word of the language is spelled so: "Mme", "Mr Smith", "usw."),
+# `dotted` forms only before a full stop (bare, they are words or letters:
+# French "M." for Monsieur, Russian "т. е."). A script in a language outside
+# the table is linted against every language's forms.
+ABBREVIATIONS: dict[str, dict[str, frozenset[str]]] = {
+    "english": {
+        "always": frozenset({"mr", "mrs", "ms", "dr", "st", "jr", "vs", "etc"}),
+        "dotted": frozenset(),
+    },
+    "french": {
+        "always": frozenset({"mme", "mmes", "mlle", "mlles", "mm", "dr", "cf", "etc"}),
+        "dotted": frozenset({"m"}),
+    },
+    "german": {
+        "always": frozenset({"dr", "nr", "usw", "bzw", "ca", "str", "evtl", "ggf", "inkl", "etc"}),
+        "dotted": frozenset({"z", "d", "u"}),  # z. B., d. h., u. a.
+    },
+    "spanish": {
+        "always": frozenset({"sr", "sra", "srta", "dr", "dra", "ud", "uds", "etc"}),
+        "dotted": frozenset(),
+    },
+    "italian": {
+        "always": frozenset({"sig", "sigg", "dott", "dr", "ecc", "etc"}),
+        "dotted": frozenset(),
+    },
+    "portuguese": {
+        "always": frozenset({"sr", "sra", "srta", "dr", "dra", "etc"}),
+        "dotted": frozenset(),
+    },
+    "russian": {
+        "always": frozenset({"ул", "тыс", "млн", "млрд", "руб", "коп", "см", "стр", "др"}),
+        "dotted": frozenset({"г", "гг", "т", "д", "п"}),  # г., т. е., т. д., т. п.
+    },
+    "chinese": {"always": frozenset(), "dotted": frozenset()},
+    "japanese": {"always": frozenset(), "dotted": frozenset()},
+    "korean": {"always": frozenset(), "dotted": frozenset()},
+}
 
 
-def script_lint_issues(script: str) -> list[str]:
-    """Why a script may not be gated (empty when it may). Codes are sorted."""
+def _abbreviation_forms(language: str | None) -> tuple[frozenset[str], frozenset[str]]:
+    tables = [ABBREVIATIONS[language]] if language in ABBREVIATIONS else list(ABBREVIATIONS.values())
+    return (
+        frozenset().union(*(table["always"] for table in tables)),
+        frozenset().union(*(table["dotted"] for table in tables)),
+    )
+
+
+def script_lint_issues(script: str, language: str | None = None) -> list[str]:
+    """Why a script may not be gated (empty when it may). Codes are sorted.
+
+    `language` selects its ABBREVIATIONS; None, or a language outside the
+    table, applies every language's."""
     issues: set[str] = set()
     text = unicodedata.normalize("NFKC", script)
     for character in script + text:
         category = unicodedata.category(character)
-        # Nd and No (1, ２, ², ½, ①). Letter numbers (Nl) are words: 〇 is how
-        # Chinese writes zero, and NFKC spells Roman numerals as capitals,
-        # which the abbreviation rule refuses.
-        if category in ("Nd", "No"):
+        # Every number: Nd, Nl and No (1, ２, ², ½, ①, Ⅻ, 〇); recognizers
+        # write "二〇二六年" as "2026年". Han numerals such as 二 are letters
+        # this lint cannot tell from words, so gated scripts spell no numbers.
+        if category[0] == "N":
             issues.add("digit")
         elif category in ("Ps", "Pe"):
             issues.add("bracket")
         elif category[0] == "S" or character in SPOKEN_PUNCTUATION:
             issues.add("symbol")
-    for run in re.findall(r"[^\W\d_]+", text):
-        if len(run) >= 2 and run.isupper():
+    always, dotted = _abbreviation_forms(language)
+    for match in _LETTER_RUN.finditer(text):
+        run = match.group()
+        form = run.lower()
+        if (
+            (len(run) >= 2 and run.isupper())
+            or form in always
+            or (form in dotted and text.startswith(".", match.end()))
+        ):
             issues.add("abbreviation")
     if _DOTTED_ABBREVIATION.search(text):
         issues.add("abbreviation")

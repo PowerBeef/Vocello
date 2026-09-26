@@ -202,7 +202,7 @@ def build_plan(
             )
         # The corpus lint (AQ-02): a gated script holds no digits, brackets,
         # symbols or abbreviations, which recognizers write inconsistently.
-        if lint := script_lint_issues(script):
+        if lint := script_lint_issues(script, language):
             raise EvidenceError(f"{language}: gated script fails the corpus lint: {', '.join(lint)}")
         unit_count = normalized_script_unit_count(script, language)
         minimum = MIN_CJK_CHARACTERS if language in CJK_LANGUAGES else MIN_ALPHABETIC_WORDS

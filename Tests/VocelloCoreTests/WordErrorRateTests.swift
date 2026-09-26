@@ -122,7 +122,9 @@ final class WordErrorRateTests: XCTestCase {
     /// Normalization v2 parity (AQ-02 P2a): every case of the fixtures shared with
     /// `scripts/tests/test_language_metrics.py` scores to the same tokens, character units and
     /// edit counts here. P2b cases pin today's scores as well; their `expectedAfterP2b` belongs
-    /// to the package steps P2b adds.
+    /// to the package steps P2b adds. The generated `sweep-` cases hold every code point of the
+    /// Python sweep's blocks in each normalization profile, so the stdlib's case mapping and
+    /// categories and Foundation's normalization forms answer to Python's `unicodedata`.
     func testNormalizationV2ParityFixtures() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

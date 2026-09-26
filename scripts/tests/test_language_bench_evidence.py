@@ -278,13 +278,14 @@ class LanguageBenchEvidenceTests(unittest.TestCase):
                 )
 
     def test_plan_refuses_a_script_that_fails_the_corpus_lint(self) -> None:
-        # AQ-02: digits and brackets never reach a gated script.
+        # AQ-02: digits, brackets and abbreviations never reach a gated script.
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             corpus_path = root / "corpus.json"
             for index, (script_edit, code) in enumerate((
                 (lambda script: script.replace("on time", "at 9"), "digit"),
                 (lambda script: script.replace("the quiet station", "the (quiet) station"), "bracket"),
+                (lambda script: script.replace("The morning train", "Mr. Smith's train"), "abbreviation"),
             )):
                 corpus = json.loads(CORPUS.read_text(encoding="utf-8"))
                 english = next(entry for entry in corpus["languages"] if entry["id"] == "english")

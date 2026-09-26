@@ -8,6 +8,7 @@
     "1": {"option": "a", "date": "2026-09-25", "summary": "Correct the registry and retire NISQA, UTMOSv2 and the SER from every QC path; the relative-UTMOS guardrail is dropped until the section 4.6 composite passes its ladder test."},
     "2": {"option": "a", "date": "2026-09-25", "summary": "Tier B is accepted for internal evaluation that never ships, recorded per judge."},
     "3": {"option": "a", "date": "2026-09-25", "summary": "Judges from the generator's lab never vote: an adjudicator only corroborates, an aligner only supplies intervals, and neither provides labels."},
+    "4": {"option": "b", "date": "2026-09-25", "summary": "Downloads are staged: the panel judges the current languages need first, then the rest; the maintainer runs every download (scripts/acquire_audio_qc_judges.py)."},
     "7": {"option": "adopted", "date": "2026-09-25", "summary": "Adoption requires two clean canonical-host runs; the 8 GB Mac and iPhone floors are product constraints, not evaluator constraints."},
     "9": {"option": "a", "date": "2026-09-25", "summary": "A budgeted admission semaphore after the generator exits replaces the host-wide single-analyzer flock for the orchestrator's workers; the child-attributed post-exit recovery rule becomes binding once M6 evidence supports it and stays report-only until then."}
   },
@@ -68,6 +69,42 @@
         ],
         "evidence": []
       }
+    }
+  },
+  "acquisition": {
+    "item": "AQ-06",
+    "decision": "4b",
+    "script": "scripts/acquire_audio_qc_judges.py",
+    "modelRoot": "build/cache/delivery-analysis/external-models",
+    "outputPolicyEntry": "delivery-analysis-cache",
+    "stages": {
+      "1": "The content voters for the six current languages (Whisper large-v3, Parakeet v3, Paraformer-zh, SenseVoice f16), the language-ID vote, speaker family 1 and pYIN.",
+      "2": "The non-voting adjudicator and aligner and the advisory quality judge; speaker family 2 once its quarantine lifts."
+    },
+    "interpreter": {
+      "id": "cpython-3.14.4+20260414",
+      "archive": "cpython-3.14.4+20260414-aarch64-apple-darwin-install_only.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260414/cpython-3.14.4%2B20260414-aarch64-apple-darwin-install_only.tar.gz",
+      "sha256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "size": 18423586,
+      "archiveDirectory": "python-3.14.4",
+      "directory": "audio-qc-python-3.14.4",
+      "executable": "python/bin/python3.14",
+      "source": "python-build-standalone release 20260414; the digest matches that release's SHA256SUMS and the archive already under the model root (the interpreter of the existing evaluator runtimes)."
+    },
+    "runtimes": {
+      "whisper-mlx": {"kind": "venv", "lock": "config/audio-qc-runtimes/whisper-mlx.txt", "lockSHA256": "cdcef4165c16f6b8db9edd266922ab2792db69d7c377ebccb1a45ec4ee475bf8", "packages": 36, "downloadBytes": 243701110, "sourceBuilds": [], "venv": "audio-qc-runtime-whisper-mlx-py314", "importProbe": ["mlx.core", "mlx_whisper"]},
+      "parakeet-mlx": {"kind": "venv", "lock": "config/audio-qc-runtimes/parakeet-mlx.txt", "lockSHA256": "a3ff575855d65c121beca439a837a448cd33adf42ea88c50f6cffab8c5ce2130", "packages": 54, "downloadBytes": 163463245, "sourceBuilds": [], "venv": "audio-qc-runtime-parakeet-mlx-py314", "importProbe": ["mlx.core", "parakeet_mlx"]},
+      "mlx-audio": {"kind": "venv", "lock": "config/audio-qc-runtimes/mlx-audio.txt", "lockSHA256": "373f3934a2a66189e40db3bd4202719de1d6c89b0736de97c59fcacbcb43c955", "packages": 35, "downloadBytes": 128530906, "sourceBuilds": [], "venv": "audio-qc-runtime-mlx-audio-py314", "importProbe": ["mlx.core", "mlx_audio.stt.utils"]},
+      "funasr-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/funasr-torch.txt", "lockSHA256": "b1ecb8dd052e354ef531a885b5bad9d67e2aeb0a0b8f7221b7eb821082ae405e", "packages": 88, "downloadBytes": 254042833, "sourceBuilds": ["antlr4-python3-runtime", "crcmod", "jieba", "oss2"], "venv": "audio-qc-runtime-funasr-torch-py314", "importProbe": ["torch", "torchaudio", "funasr"]},
+      "speechbrain-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/speechbrain-torch.txt", "lockSHA256": "47e8c7c155eee7d81e102731fa91de38c93858dc7dea7bbc09da18b47f29f0d8", "packages": 39, "downloadBytes": 148024547, "sourceBuilds": [], "venv": "audio-qc-runtime-speechbrain-torch-py314", "importProbe": ["torch", "torchaudio", "speechbrain.inference.classifiers"]},
+      "audiobox-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/audiobox-torch.txt", "lockSHA256": "51e1ad40299a122add1688e7ac93c36bac2922e69cc8aaad63d2b388f4c5dc71", "packages": 32, "downloadBytes": 114454742, "sourceBuilds": [], "venv": "audio-qc-runtime-audiobox-torch-py314", "importProbe": ["torch", "torchaudio", "audiobox_aesthetics.infer"]},
+      "onnx-cpu": {"kind": "venv", "lock": "config/audio-qc-runtimes/onnx-cpu.txt", "lockSHA256": "d9328ed263b6818cbce98894e98a2bd38b7eb00d741f2751ebda56fab4224dd3", "packages": 6, "downloadBytes": 37091817, "sourceBuilds": [], "venv": "audio-qc-runtime-onnx-cpu-py314", "importProbe": ["onnxruntime", "kaldi_native_fbank", "numpy"]},
+      "librosa-dsp": {"kind": "venv", "lock": "config/audio-qc-runtimes/librosa-dsp.txt", "lockSHA256": "bb585a7a43ff7521cc2d8368bf7e2a0cc62581ba182f35dbb142fc5c8eba8f51", "packages": 31, "downloadBytes": 98754182, "sourceBuilds": [], "venv": "audio-qc-runtime-librosa-dsp-py314", "importProbe": ["librosa", "numpy"]},
+      "sensevoice-llamacpp": {"kind": "native", "artifact": "sensevoice-llamacpp-runtime-v0.1.9", "binary": "llama-funasr-sensevoice", "note": "The worker runs on the standalone interpreter itself (standard library only); the model runs in the pinned native binary."}
+    },
+    "artifacts": {
+      "sensevoice-llamacpp-runtime-v0.1.9": {"url": "https://github.com/QwenAudio/SenseVoice/releases/download/runtime-llamacpp-v0.1.9/funasr-llamacpp-macos-arm64.tar.gz", "archive": "funasr-llamacpp-macos-arm64.tar.gz", "sha256": "2d5786784ad09d8f4def1d942f678728638fe601d00acf0dad7cf094a9328363", "size": 7017860, "directory": "runtime-v0.1.9", "members": {"llama-funasr-sensevoice": "49d66b2f79d439e2db7933627e1deb9eb7f3ebf0d708473757828130f3619435"}, "executionRegistry": "config/delivery-evaluator-v2-candidates.json#sensevoice-small-q8.runtime"}
     }
   },
   "judges": {
@@ -566,6 +603,614 @@
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Retired; about 1.3 GB fp32 weights on CPU, unsupervised.", "ceilingPolicy": "retired", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
+    },
+    "asr.whisper-large-v3@1": {
+      "role": "Content voter for en, de, fr, es, it, pt, ru, ja and ko and secondary voter for zh (audit section 4.1): a language-locked full-file transcript, plus audio language identification from the same process (language-ID vote 2, section 4.2), after the generator exits. Succeeds asr.whisper-small@1 only after the dual run records every flip (audit section 7.1).",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "whisper",
+      "ships": false,
+      "panel": {"audit": "4.1, 4.2", "languages": {"voter": ["en", "de", "fr", "es", "it", "pt", "ru", "ja", "ko"], "secondary": ["zh"]}},
+      "pins": {
+        "repository": "mlx-community/whisper-large-v3-mlx",
+        "revision": "49e6aa286ad60c14352c404340ded53710378a11",
+        "files": {
+          ".gitattributes": {"gitBlobID": "a6344aac8c09253b3b630fb776ae94478aa0275b", "size": 1519},
+          "README.md": {"gitBlobID": "aa6058f979bed0dce9307e6e2ce8c0764824f855", "size": 283},
+          "config.json": {"gitBlobID": "2c626df3c540bdc0287b11725441d10e1af73680", "size": 269},
+          "weights.npz": {"lfsSHA256": "05ff791ce3630fae47e7c51004e9666204d786246ec07cac6110af768099b40d", "size": 3083520416}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"mlx": "0.32.0", "mlx-whisper": "0.4.3", "numpy": "2.4.6", "torch": "2.11.0"}
+      },
+      "license": {
+        "weights": "MIT (OpenAI Whisper release and the mlx-community conversion card)",
+        "code": "MIT (mlx-whisper)",
+        "trainingData": "Whisper large-v3: about 1 million hours of weakly labeled and 4 million hours of Whisper large-v2 pseudo-labeled web audio (OpenAI model card); rights stay with the original owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/mlx-community/whisper-large-v3-mlx", "https://huggingface.co/openai/whisper-large-v3", "https://github.com/openai/whisper"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "OpenAI (weights); mlx-community (conversion)",
+        "architecture": "encoder-decoder transformer, 1.55B parameters, 128 mel bins, fp16",
+        "trainingData": "Whisper web audio",
+        "labelLineage": "weakly supervised web transcripts and Whisper large-v2 pseudo-labels",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "The same family as asr.whisper-small@1, so the two never count as two families. Parakeet's training labels include Whisper pseudo-labels (Granary), so the pair's error correlation is audited before any consensus gates (AQ-F35)."
+      },
+      "decodeOptions": {"temperature": 0.0, "conditionOnPreviousText": false, "fp16": true, "wordTimestamps": false, "initialPrompt": null, "noSpeechThreshold": null, "languageLock": "expected-language", "languageDetection": "first-30-seconds-mel-argmax"},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "lockedLanguage", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "whisper-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
+      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (about 4-4.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D1",
+      "canary": null,
+      "acquisition": {"directory": "whisper-large-v3-mlx", "stage": 1, "runtime": "whisper-mlx"}
+    },
+    "asr.parakeet-tdt-0.6b-v3@1": {
+      "role": "Secondary literal voter for en, de, fr, es, it, pt and ru (audit section 4.1): a transducer transcript beside Whisper's, which bounds Whisper's hallucination on non-speech.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "parakeet",
+      "ships": false,
+      "panel": {"audit": "4.1", "languages": {"voter": ["en", "de", "fr", "es", "it", "pt", "ru"]}},
+      "pins": {
+        "repository": "mlx-community/parakeet-tdt-0.6b-v3",
+        "revision": "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15",
+        "files": {
+          ".gitattributes": {"gitBlobID": "a6344aac8c09253b3b630fb776ae94478aa0275b", "size": 1519},
+          "README.md": {"gitBlobID": "2775a7563b1df0f1a13291973a3985163b88725f", "size": 1081},
+          "config.json": {"gitBlobID": "4f469c2e92c981861f7ce6bcd940e608401d931e", "size": 244093},
+          "model.safetensors": {"lfsSHA256": "05e01c7f396c298cf7d23f61da7b504adeab698f0aaeafd9c82d198625464592", "size": 2508288736},
+          "tokenizer.model": {"lfsSHA256": "eacec2b0a77f336d4a2ca4a25a7047575d3c2b74de47e997f4c205126ed3135e", "size": 360916},
+          "tokenizer.vocab": {"gitBlobID": "3fa4c819f33b03e876ce33c0aa34866ed2b5e17a", "size": 101024},
+          "vocab.txt": {"gitBlobID": "d2fc51742d86127c241018b728e72b3a336225a1", "size": 46772}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"mlx": "0.32.0", "parakeet-mlx": "0.5.2", "numpy": "2.4.6", "librosa": "0.11.0"},
+        "upstream": {"repository": "nvidia/parakeet-tdt-0.6b-v3", "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b", "note": "The card's base model at its current revision (read 2026-09-26); the conversion predates it and is what is pinned."}
+      },
+      "license": {
+        "weights": "CC BY 4.0 (NVIDIA parakeet-tdt-0.6b-v3 and the mlx-community conversion card)",
+        "code": "Apache-2.0 (parakeet-mlx)",
+        "trainingData": "Granary (YODAS and other scraped web audio) with NVIDIA's ASR sets; rights stay with the original owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "notices": ["CC BY 4.0 attribution: NVIDIA, parakeet-tdt-0.6b-v3"],
+        "sources": ["https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3", "https://arxiv.org/html/2505.13404v1"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "NVIDIA (weights); mlx-community (conversion)",
+        "architecture": "FastConformer encoder with a token-and-duration transducer decoder, 0.6B parameters",
+        "trainingData": "Granary multilingual corpus",
+        "labelLineage": "Whisper pseudo-labels (Granary)",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "Its labels descend from Whisper, so its agreement with Whisper is audited (phi and joint misses) before it gates (AQ-F35)."
+      },
+      "decodeOptions": {"decoding": "greedy", "dtype": "bfloat16", "chunking": "none", "maximumUnchunkedSeconds": 120},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "parakeet-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
+      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D1",
+      "canary": null,
+      "acquisition": {"directory": "parakeet-tdt-0.6b-v3-mlx", "stage": 1, "runtime": "parakeet-mlx"}
+    },
+    "asr.paraformer-zh@1": {
+      "role": "Content voter for zh (audit section 4.1): a non-autoregressive transcript with no hotwords, punctuation or VAD model.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "paraformer",
+      "ships": false,
+      "panel": {"audit": "4.1", "languages": {"voter": ["zh"]}},
+      "pins": {
+        "repository": "funasr/paraformer-zh",
+        "revision": "d7811ee3ac581fbcfdeb37c98c6ba674028433dc",
+        "files": {
+          ".gitattributes": {"gitBlobID": "684ad6fd2c6e1825ace7def3199262793a149622", "size": 1579},
+          "README.md": {"gitBlobID": "09724db9b2a03c1db73149e85e4bd03a6a1f279e", "size": 3537},
+          "am.mvn": {"gitBlobID": "681910cd1ab6458b61474cdbf0d1ac5e810f7b0d", "size": 11203},
+          "config.yaml": {"gitBlobID": "c0a9f403c8e62017afcd765e13006617f3e43471", "size": 2509},
+          "configuration.json": {"gitBlobID": "6f77310bef84268f6c82ca0adf36a43d695a50ea", "size": 472},
+          "example/asr_example.wav": {"lfsSHA256": "732f28a4445eb2b656675b946695e59752b7df824d475c4bc531c441f43b30f9", "size": 417742},
+          "fig/struct.png": {"gitBlobID": "4c3d7855faae8b59f20ac14eb5416d5e99f998cd", "size": 49870},
+          "model.pt": {"lfsSHA256": "5bba782a5e9196166233b9ab12ba04cadff9ef9212b4ff6153ed9290ff679025", "size": 880502012},
+          "seg_dict": {"gitBlobID": "fb19e07f2870b09b08226a42d7d5d6d26a3f3a16", "size": 8287834},
+          "tokens.json": {"gitBlobID": "f8bc9c31ab1ba458aee5423fa24164958153f923", "size": 93676}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"funasr": "1.4.16", "torch": "2.11.0", "torchaudio": "2.11.0", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (Hugging Face card); the upstream FunASR model license's attribution and model-name obligations are kept as notices",
+        "code": "MIT (FunASR)",
+        "trainingData": "60,000+ hours of Mandarin speech (vendor-declared; composition undisclosed)",
+        "tier": "A",
+        "tierBasis": "audit section 4.1: A, with notices",
+        "trainingDataRisk": "vendor-declared-undisclosed",
+        "commercialUseCompatible": true,
+        "notices": ["FunASR model license: attribution and model-name obligations"],
+        "sources": ["https://huggingface.co/funasr/paraformer-zh", "https://github.com/modelscope/FunASR"]
+      },
+      "independence": {
+        "vendor": "Alibaba (FunASR)",
+        "architecture": "Paraformer: SAN-M encoder, CIF predictor and non-autoregressive decoder, 220M parameters",
+        "trainingData": "vendor Mandarin corpus",
+        "labelLineage": "vendor-internal",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "The same company as SenseVoice and as the generator's lab, but a different lab; counts toward the error-correlation audit before any consensus gates (AQ-F35)."
+      },
+      "decodeOptions": {"hotwords": null, "punctuationModel": null, "vadModel": null, "batchSize": 1, "device": "cpu"},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "funasr-paraformer", "worker": "scripts/audio_qc_worker.py", "threads": 3, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 2684354560, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (1.2-1.8 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "paraformer-zh", "stage": 1, "runtime": "funasr-torch"}
+    },
+    "asr.sensevoice-small-f16@1": {
+      "role": "Secondary content voter for ja and ko (audit section 4.1), replacing the q8 compact representation: the f16 GGUF on the pinned llama.cpp runtime.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "sensevoice",
+      "ships": false,
+      "panel": {"audit": "4.1", "languages": {"secondary": ["ja", "ko"]}},
+      "pins": {
+        "repository": "FunAudioLLM/SenseVoiceSmall-GGUF",
+        "revision": "90c1c61912018b70ada0fcc024ea24aca62f2e63",
+        "files": {
+          "README.md": {"gitBlobID": "02b2849ff7a26a4323657c7ddcf3fce592f34e3f", "size": 2500},
+          "sensevoice-small-f16.gguf": {"lfsSHA256": "2389039651f4574dbd674f1f1e296b8b1147b2e19a5fd9c2cd69e82669c78d8e", "size": 470197600}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Only the f16 GGUF and the card are pinned and fetched: the q8 file stays compact.sensevoice-small-q8@1's and the f32 file is not used.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"release": "QwenAudio/SenseVoice:runtime-llamacpp-v0.1.9"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (GGUF model card); upstream weights keep FunASR Model License v1.1 attribution and model-name obligations",
+        "code": "The pinned QwenAudio/SenseVoice llama.cpp runtime release, under the terms published with it",
+        "trainingData": "More than 400,000 hours across more than 50 languages (vendor-declared; composition undisclosed)",
+        "tier": "A",
+        "tierBasis": "audit section 4.1: A, with notices",
+        "trainingDataRisk": "vendor-declared-undisclosed",
+        "commercialUseCompatible": true,
+        "notices": ["FunASR Model License v1.1: attribution and model-name obligations"],
+        "sources": ["https://huggingface.co/FunAudioLLM/SenseVoiceSmall-GGUF", "https://github.com/FunAudioLLM/SenseVoice"]
+      },
+      "independence": {
+        "vendor": "Alibaba Tongyi Lab (FunAudioLLM)",
+        "architecture": "SenseVoice Small: SAN-M encoder with CTC, f16 GGUF",
+        "trainingData": "SenseVoice multilingual corpus",
+        "labelLineage": "vendor-internal",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "The same company as Paraformer and as the generator's lab, but a different lab; counts toward the error-correlation audit before any consensus gates."
+      },
+      "decodeOptions": {"backend": "cpu", "keepTags": true, "languageLock": "unavailable", "inverseTextNormalization": "runtime-default", "note": "The pinned runtime's command line (-m, -a, --vad, --backend, --ids, --keep-tags) has no language, ITN or thread option, so the audit's ja/ko lock and use_itn=False cannot be set: the judge keeps the emitted language and ITN tags, and a take whose emitted language differs from the expected one abstains rather than being re-scored."},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "binarySHA256", "runtimeDependencies", "commandTemplate", "workerSourceSHA256", "engine", "decodeOptions", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "sensevoice-llamacpp", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu", "note": "The native binary reads no thread flag, so its own default on the recorded host applies (hostProfile is output identity), and it reloads its model on every invocation."},
+      "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "sensevoice-small-f16-gguf", "stage": 1, "runtime": "sensevoice-llamacpp"}
+    },
+    "asr.qwen3-asr-1.7b@1": {
+      "role": "Adjudicator, non-voting (decision 3a; audit sections 4.1 and 4.2): transcribes inconclusive rows only and may corroborate a fail as diagnostic-corroborated, never turn a disagreement into a pass; a language=None pass is its language-ID adjudication.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": "qwen3-asr",
+      "ships": false,
+      "panel": {"audit": "4.1, 4.2", "languages": {"adjudicates": ["en", "de", "fr", "es", "it", "pt", "ru", "zh", "ja", "ko"]}},
+      "pins": {
+        "repository": "mlx-community/Qwen3-ASR-1.7B-bf16",
+        "revision": "e1f6c266914abc5a46e8756e02580f834a6cf8a7",
+        "files": {
+          ".gitattributes": {"gitBlobID": "a6344aac8c09253b3b630fb776ae94478aa0275b", "size": 1519},
+          "README.md": {"gitBlobID": "71c41cef2dfed48e63ff757911ec5cbaa8c9914f", "size": 1008},
+          "chat_template.json": {"gitBlobID": "c44736493efd71ec96218cc626904698cdb13235", "size": 1161},
+          "config.json": {"gitBlobID": "37b61780349564636d63dccd167b26e14d590c48", "size": 6983},
+          "generation_config.json": {"gitBlobID": "7382a4d347c0a865b76bb1b8277f66a5ac312854", "size": 142},
+          "merges.txt": {"gitBlobID": "31349551d90c7606f325fe0f11bbb8bd5fa0d7c7", "size": 1671853},
+          "model.safetensors": {"lfsSHA256": "2f080a3b769ae469aeaaa2dcb9e13a94141e54c9e6d5a7aa63392e0dc5a51789", "size": 4076186653},
+          "model.safetensors.index.json": {"gitBlobID": "0ed946ae9d91b091a0f6ff1f12398787e4984a3f", "size": 51384},
+          "preprocessor_config.json": {"gitBlobID": "8f7f07346466d5d494ec0d4969d1c3d0190eed72", "size": 330},
+          "tokenizer_config.json": {"gitBlobID": "b93109843922a40c6654c5449d3bf95372267c66", "size": 12487},
+          "vocab.json": {"gitBlobID": "4783fe10ac3adce15ac8f358ef5462739852c569", "size": 2776833}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"mlx": "0.32.0", "mlx-audio": "0.5.6", "numpy": "2.4.6", "transformers": "5.17.0"},
+        "upstream": {"repository": "Qwen/Qwen3-ASR-1.7B", "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (Qwen card and the mlx-community conversion card)",
+        "code": "MIT (mlx-audio)",
+        "trainingData": "Vendor-declared multilingual ASR data (Qwen3-ASR technical report); composition undisclosed",
+        "tier": "A",
+        "tierBasis": "audit section 4.1: A",
+        "trainingDataRisk": "vendor-declared-undisclosed",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16", "https://huggingface.co/Qwen/Qwen3-ASR-1.7B", "https://arxiv.org/html/2601.21337v1"]
+      },
+      "independence": {
+        "vendor": "Alibaba Qwen (weights); mlx-community (conversion)",
+        "architecture": "Qwen3-ASR 1.7B audio-language model, bf16",
+        "trainingData": "Qwen3-ASR corpus",
+        "labelLineage": "vendor-internal",
+        "generatorLabCorrelated": true,
+        "correlationNotes": "The generator's own lab (Qwen3-TTS): it never votes and never provides labels (decision 3a)."
+      },
+      "decodeOptions": {"decoding": "greedy", "context": null, "languageLock": "expected-language", "languageDetectionPass": "language=None"},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "lockedLanguage", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "qwen3-asr-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
+      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (3.5-4 GB resident, section 4.1); admitted only beside CPU judges of 2.5 GB or less; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D1",
+      "canary": null,
+      "acquisition": {"directory": "qwen3-asr-1.7b-bf16-mlx", "stage": 2, "runtime": "mlx-audio"}
+    },
+    "align.qwen3-forcedaligner-0.6b@1": {
+      "role": "Timing instrument, non-voting (decision 3a; audit section 4.1): word intervals for alphabetic languages and character intervals for zh and ja, whitespace eojeol for ko (no soynlp), supplied only to class B, C and F detectors that already have content consensus.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": "qwen3-aligner",
+      "ships": false,
+      "panel": {"audit": "4.1", "languages": {"aligns": ["en", "de", "fr", "es", "it", "pt", "ru", "zh", "ja", "ko"]}},
+      "pins": {
+        "repository": "mlx-community/Qwen3-ForcedAligner-0.6B-bf16",
+        "revision": "53c8c0e46733eec430e4b53dd6471d0e5dee45f8",
+        "files": {
+          ".gitattributes": {"gitBlobID": "a6344aac8c09253b3b630fb776ae94478aa0275b", "size": 1519},
+          "README.md": {"gitBlobID": "9956259fa50a8bfa9c2a25b32a203b0d7cb50c9c", "size": 1068},
+          "chat_template.json": {"gitBlobID": "c44736493efd71ec96218cc626904698cdb13235", "size": 1161},
+          "config.json": {"gitBlobID": "d37a92d4b3792df0abcefd60c20e63f404216925", "size": 6735},
+          "generation_config.json": {"gitBlobID": "b0a540032cf7b6b5ba1438d04ab69b7e787d9b8e", "size": 115},
+          "merges.txt": {"gitBlobID": "31349551d90c7606f325fe0f11bbb8bd5fa0d7c7", "size": 1671853},
+          "model.safetensors": {"lfsSHA256": "9d0728e17e28ee122c366bfaa9748ccbbb8fc3df4c0ce09dd8a5eac8202989e8", "size": 1835539240},
+          "model.safetensors.index.json": {"gitBlobID": "31f1561137d88a00691b2c3569963d9de1b52ef3", "size": 51430},
+          "preprocessor_config.json": {"gitBlobID": "8f7f07346466d5d494ec0d4969d1c3d0190eed72", "size": 330},
+          "tokenizer_config.json": {"gitBlobID": "3df92df83b22342e36a7b11cf9a70de2a2996bec", "size": 12666},
+          "vocab.json": {"gitBlobID": "4783fe10ac3adce15ac8f358ef5462739852c569", "size": 2776833}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"mlx": "0.32.0", "mlx-audio": "0.5.6", "numpy": "2.4.6", "transformers": "5.17.0"},
+        "upstream": {"repository": "Qwen/Qwen3-ForcedAligner-0.6B", "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (Qwen card and the mlx-community conversion card)",
+        "code": "MIT (mlx-audio)",
+        "trainingData": "Vendor-declared alignment data (Qwen3-ASR technical report); composition undisclosed",
+        "tier": "A",
+        "tierBasis": "audit section 4.1: A",
+        "trainingDataRisk": "vendor-declared-undisclosed",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/mlx-community/Qwen3-ForcedAligner-0.6B-bf16", "https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B"]
+      },
+      "independence": {
+        "vendor": "Alibaba Qwen (weights); mlx-community (conversion)",
+        "architecture": "Qwen3-ForcedAligner 0.6B, bf16",
+        "trainingData": "Qwen3-ASR alignment corpus",
+        "labelLineage": "vendor-internal",
+        "generatorLabCorrelated": true,
+        "correlationNotes": "The generator's own lab: it supplies intervals only, never a vote or a label (decision 3a)."
+      },
+      "decodeOptions": {"language": "explicit", "units": {"alphabetic": "word", "zh": "character", "ja": "character", "ko": "whitespace-eojeol"}},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "lockedLanguage", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "qwen3-aligner-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
+      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (2-2.4 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D1",
+      "canary": null,
+      "acquisition": {"directory": "qwen3-forcedaligner-0.6b-bf16-mlx", "stage": 2, "runtime": "mlx-audio"}
+    },
+    "lid.voxlingua107-ecapa@1": {
+      "role": "Audio language-ID vote 1 (audit section 4.2): posteriors over 107 languages, restricted downstream to the ten product languages plus an other mass; warn-only until calibrated per language and voice.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "lid-voxlingua107",
+      "ships": false,
+      "panel": {"audit": "4.2", "languages": {"identifies": ["en", "de", "fr", "es", "it", "pt", "ru", "zh", "ja", "ko"]}},
+      "pins": {
+        "repository": "speechbrain/lang-id-voxlingua107-ecapa",
+        "revision": "0253049ae131d6a4be1c4f0d8b0ff483a0f8c8e9",
+        "files": {
+          ".gitattributes": {"gitBlobID": "feb65239285b042cfef21ce9af0e5fb376c075b2", "size": 1223},
+          "README.md": {"gitBlobID": "a40a50dc26b99cbc5c0e44d3155755ff5c261b35", "size": 9538},
+          "classifier.ckpt": {"lfsSHA256": "a50d9024ff58d317031c9787d4c6c614d454a87a8ef32f9d36338cd3ff57adbc", "size": 762555},
+          "config.json": {"gitBlobID": "6fad8e826fd6808012326b33e4beb8d4e083d808", "size": 51},
+          "embedding_model.ckpt": {"lfsSHA256": "ab750d5c06d713477045fa798fab5d33e959dbc0dfe4de510a9a47844c79a19a", "size": 84474355},
+          "hyperparams.yaml": {"gitBlobID": "27d80047d277c45575779937a92cb829d4158528", "size": 1519},
+          "label_encoder.txt": {"gitBlobID": "addb319892122ba2e7ddb4d01e0c87c4833dab38", "size": 2204},
+          "normalizer.ckpt": {"lfsSHA256": "c369e01dfa2e0d84c6b116f33c7b94f1fe28c061642086538e93cde3d97c26ef", "size": 1063},
+          "udhr_th.wav": {"lfsSHA256": "5bdc3a0a686eed58c6ccff264c5605a3c245e6598610dcc6e355104758acc6d7", "size": 1146684}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Every file of the revision is pinned and fetched.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"speechbrain": "1.1.1", "torch": "2.11.0", "torchaudio": "2.11.0", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "Apache-2.0",
+        "code": "Apache-2.0 (SpeechBrain)",
+        "trainingData": "VoxLingua107: 6,628 hours of YouTube-derived speech in 107 languages, labeled from video titles and descriptions; copyright stays with the owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa", "https://bark.phon.ioc.ee/voxlingua107/"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "SpeechBrain (VoxLingua107, TalTech)",
+        "architecture": "ECAPA-TDNN language classifier (60 mel bins, 256-dimensional embedding)",
+        "trainingData": "VoxLingua107",
+        "labelLineage": "video-metadata language labels; volunteer-validated development set",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "Its card reports a 6.7% development error and weaker accented and female speech; Aiden speaking French and the Vivian and Ono Anna fixtures are mandatory negatives (audit section 4.2)."
+      },
+      "decodeOptions": {"pretrainedPath": "the verified snapshot (overrides the card's Hub path)", "labelSet": "label_encoder.txt (107 languages; he appears as iw, jv as jw)"},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "decodeOptions", "labelSet", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "speechbrain-lid", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "lang-id-voxlingua107-ecapa", "stage": 1, "runtime": "speechbrain-torch"}
+    },
+    "speaker.campplus-voxceleb@1": {
+      "role": "Speaker-identity family 1 (audit section 4.3): whole-take and windowed (2 s, 0.5 s hop) embeddings for clone identity and drift; it fails a take only jointly with family 2, once both are calibrated.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": true,
+      "family": "speaker-campplus",
+      "ships": false,
+      "panel": {"audit": "4.3"},
+      "pins": {
+        "repository": "Wespeaker/wespeaker-voxceleb-campplus-LM",
+        "revision": "c5e01c6fcffcce160861e7e79782828320192b5c",
+        "files": {
+          "README.md": {"gitBlobID": "7b95401dc46245ac339fc25059d4a56d90b4cde5", "size": 31},
+          "config.yaml": {"gitBlobID": "8b7af85851bdd19562022746adb4bbdd50e34ec6", "size": 1705},
+          "voxceleb_CAM++_LM.onnx": {"lfsSHA256": "1068e4ac3a76bb9c769e6816ef30bf89363f6e966f1d938210cb8ed4038f8e93", "size": 29292449}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Only the ONNX export, its training config and the card are pinned and fetched; the PyTorch checkpoint (avg_model.pt) is not used.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"onnxruntime": "1.30.0", "kaldi-native-fbank": "1.22.3", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "Apache-2.0 (Hugging Face card); WeSpeaker's pretrained-model notes say VoxCeleb-trained models follow the dataset's CC BY 4.0",
+        "code": "Apache-2.0 (WeSpeaker export); the feature and embedding code is owned",
+        "trainingData": "VoxCeleb 1 and 2: YouTube-derived celebrity speech; copyright stays with the owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "sources": ["https://huggingface.co/Wespeaker/wespeaker-voxceleb-campplus-LM", "https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "WeSpeaker (wenet-e2e)",
+        "architecture": "CAM++ speaker embedding (512-dimensional, large-margin fine-tuned), ONNX",
+        "trainingData": "VoxCeleb",
+        "labelLineage": "speaker identity labels",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "The same VoxCeleb training data as ResNet293 and the legacy ECAPA; the correlated-failure audit must pass before two families vote jointly (audit section 4.3)."
+      },
+      "preprocessing": {"features": "kaldi fbank: 80 mel bins, 25 ms frames, 10 ms shift, hamming window, dither 0, snip edges, int16-scaled samples, per-utterance mean normalization", "windows": {"seconds": 2.0, "hopSeconds": 0.5}},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit estimate 0.12-0.2 GB resident (section 4.3), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "wespeaker-voxceleb-campplus-lm", "stage": 1, "runtime": "onnx-cpu"}
+    },
+    "speaker.resnet293-voxceleb@1": {
+      "role": "Speaker-identity family 2 (audit section 4.3): a second architecture on the same VoxCeleb data, replacing the excluded WavLM-large SV checkpoint.",
+      "kind": "neural",
+      "status": "quarantined",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": "speaker-resnet293",
+      "ships": false,
+      "quarantine": {
+        "date": "2026-09-26",
+        "item": "AQ-06",
+        "reason": "The model card at the pinned revision declares CC BY 4.0, while the audit (section 4.3) recorded an Apache-2.0 card. The tier would stay B (permissive weights, VoxCeleb training audio), and WeSpeaker's pretrained-model notes say VoxCeleb models follow the dataset's CC BY 4.0, but a license that differs from the audit is not adopted without a decision.",
+        "lift": "A maintainer decision accepting CC BY 4.0 (attribution) for this tier-B judge: set status to candidate and voting to true, and move plannedExecution to execution. Its pins are complete, so acquisition then fetches it with stage 2."
+      },
+      "panel": {"audit": "4.3"},
+      "pins": {
+        "repository": "Wespeaker/wespeaker-voxceleb-resnet293-LM",
+        "revision": "6e6bffe5bf3d772a1f143dc6dbfea58a0799ea83",
+        "files": {
+          "README.md": {"gitBlobID": "4ef54d5fa65e34053983879c00232262e93df290", "size": 2893},
+          "config.yaml": {"gitBlobID": "4366128f5c5be8f7c6d3b9df3ff17a95658d7746", "size": 1538},
+          "voxceleb_resnet293_LM.onnx": {"lfsSHA256": "dbb1ccc7754caff552ebc46347a51aaee2669bb24efc740e665d1a1133d20e98", "size": 114336285}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Only the ONNX export, its training config and the card are pinned; the PyTorch checkpoint (avg_model.pt) is not used.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"onnxruntime": "1.30.0", "kaldi-native-fbank": "1.22.3", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "CC BY 4.0 (Hugging Face card at the pinned revision; the audit recorded Apache-2.0)",
+        "code": "Apache-2.0 (WeSpeaker export); the feature and embedding code is owned",
+        "trainingData": "VoxCeleb 2 development set (5,994 speakers): YouTube-derived celebrity speech; copyright stays with the owners; no explicit non-commercial term",
+        "tier": "B",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "notices": ["CC BY 4.0 attribution: WeSpeaker, ResNet293-LM (Wang et al., ICASSP 2023)"],
+        "sources": ["https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM", "https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "WeSpeaker (wenet-e2e)",
+        "architecture": "ResNet293 r-vector (256-dimensional, large-margin fine-tuned), ONNX",
+        "trainingData": "VoxCeleb",
+        "labelLineage": "speaker identity labels",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "The same VoxCeleb training data as CAM++; the correlated-failure audit must pass before the two vote jointly (audit section 4.3)."
+      },
+      "preprocessing": {"features": "kaldi fbank: 80 mel bins, 25 ms frames, 10 ms shift, hamming window, dither 0, snip edges, int16-scaled samples, per-utterance mean normalization", "windows": {"seconds": 2.0, "hopSeconds": 0.5}},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "plannedExecution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit estimate about 0.3 GB (section 3.4), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "wespeaker-voxceleb-resnet293-lm", "stage": 2, "runtime": "onnx-cpu"}
+    },
+    "pitch.pyin@1": {
+      "role": "Pitch tracker (audit section 4.4): probabilistic YIN over the full 50-1,000 Hz range with a fixed frame and hop, voicing probabilities kept; feeds class E and F detectors.",
+      "kind": "dsp",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "panel": {"audit": "4.4"},
+      "pins": {
+        "digestStatus": "no-learned-weights",
+        "verification": "Owned configuration of librosa's pYIN; the runtime lock pins librosa and every dependency by hash, and no learned weights load. The worker refuses an excluded runtime package before it runs.",
+        "runtime": {"librosa": "0.11.0", "numpy": "2.4.6", "numba": "0.67.0", "scipy": "1.18.1"}
+      },
+      "license": {
+        "weights": "none",
+        "code": "ISC (librosa); the configuration is owned",
+        "trainingData": "none",
+        "tier": "A",
+        "trainingDataRisk": "none",
+        "commercialUseCompatible": true,
+        "notices": ["soxr (LGPL-2.1-or-later), a librosa dependency, runs unmodified inside the internal, never-shipped runtime venv"],
+        "sources": ["https://librosa.org/doc/latest/generated/librosa.pyin.html"]
+      },
+      "independence": {
+        "vendor": "librosa (pYIN, Mauch and Dixon 2014)",
+        "architecture": "probabilistic YIN with HMM voicing decoding",
+        "trainingData": "none",
+        "labelLineage": "none",
+        "generatorLabCorrelated": false
+      },
+      "configuration": {"sampleRateHz": 16000, "fmin": 50.0, "fmax": 1000.0, "frameLength": 1024, "hopLength": 160, "center": true, "padMode": "constant", "nThresholds": 100, "betaParameters": [2, 18], "boltzmannParameter": 2, "resolution": 0.1, "maxTransitionRate": 35.92, "switchProb": 0.01, "noTroughProb": 0.01},
+      "identity": {
+        "output": ["workerSourceSHA256", "engine", "configuration", "runtimeDependenciesDigest", "runtimeVersions", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 1, "lane": "dsp", "orchestrated": true, "engine": "pyin-librosa", "worker": "scripts/audio_qc_worker.py", "threads": 1, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 DSP-pool estimate (0.3 GB), raised to 512 MiB for librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "pitch-pyin", "stage": 1, "runtime": "librosa-dsp"}
+    },
+    "quality.audiobox-aesthetics@1": {
+      "role": "Primary relative quality, advisory (audit section 4.6): production quality (PQ) and content enjoyment (CE) as deltas against the cell baseline, with duration as a covariate; never reaches warn.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "panel": {"audit": "4.6"},
+      "pins": {
+        "repository": "facebook/audiobox-aesthetics",
+        "revision": "9b1dd8e5df9af7216e836a98974fe3b82c56ded6",
+        "files": {
+          "README.md": {"gitBlobID": "a85863984931090ef1f207e264f9a824861a629c", "size": 5924},
+          "config.json": {"gitBlobID": "e2b5a9ece8c3db1cffec3bef4c63bf678fbcaf4e", "size": 492},
+          "model.safetensors": {"lfsSHA256": "a5a3c2412649cc2384ec525ffd5180ce6c4778f43bed6108e0a1303de04d014e", "size": 415472992}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-26, no download): the LFS SHA-256 of each large file and the git blob ID of every other file, with its size. Only the safetensors weights, their config and the card are pinned and fetched; the duplicate pickle checkpoint (checkpoint.pt) and the figure are not used.",
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files at the pinned revision into the owned model root, refusing any size or digest mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"audiobox-aesthetics": "0.0.4", "torch": "2.11.0", "torchaudio": "2.11.0", "numpy": "2.4.6"}
+      },
+      "license": {
+        "weights": "CC BY 4.0 (Hugging Face card and the repository license)",
+        "code": "CC BY 4.0 (audiobox-aesthetics), with WavLM-derived portions under MIT",
+        "trainingData": "Vendor-declared human aesthetic annotations (arXiv 2502.05139); the released evaluation annotations cover LibriTTS, Common Voice 13, EARS, MUSDB18, MusicCaps, AudioSet and PAM",
+        "tier": "A",
+        "tierBasis": "audit section 4.6: A",
+        "trainingDataRisk": "vendor-declared",
+        "commercialUseCompatible": true,
+        "notices": ["CC BY 4.0 attribution: Meta Audiobox Aesthetics (Tjandra et al., 2025)"],
+        "sources": ["https://huggingface.co/facebook/audiobox-aesthetics", "https://github.com/facebookresearch/audiobox-aesthetics"]
+      },
+      "independence": {
+        "vendor": "Meta FAIR",
+        "architecture": "WavLM-style transformer encoder with four regression heads (CE, CU, PC, PQ)",
+        "trainingData": "Meta aesthetic annotations",
+        "labelLineage": "human aesthetic ratings",
+        "generatorLabCorrelated": false
+      },
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "preprocessing", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "audiobox-aesthetics", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 1288490189, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.8-1.2 GB, section 4.6); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "audiobox-aesthetics", "stage": 2, "runtime": "audiobox-torch"}
     }
   },
   "excluded": [
@@ -596,5 +1241,8 @@
   ],
   "useRestrictions": [
     {"id": "qwen2-audio-per-take-judge", "reason": "Qwen2-Audio shares the generator's lab (decision 3a) and samples its answers (determinism class D2), so a per-take verdict is neither independent nor repeatable (audit section 4.9).", "models": ["*Qwen2-Audio*"], "forbiddenUse": "A per-take judge, a vote or a verdict.", "permittedUse": "Research only: pairwise A/B per cell in both orders, scored by answer log-probabilities (audit section 4.7); a matching judge records this restriction as its useRestriction, never votes and is never warn or gating."}
+  ],
+  "acquisitionBlocked": [
+    {"id": "quality.dnsmos-p835", "judge": "quality.dnsmos-p835@1", "role": "Secondary advisory quality screen (audit section 4.6): DNSMOS P.835 OVRL, SIG and BAK.", "status": "blocked", "date": "2026-09-26", "reason": "Its only official source is the microsoft/DNS-Challenge GitHub repository (DNSMOS ONNX files); no Microsoft-owned Hugging Face repository holds it and community mirrors are not the audited source, so no revision or file digest could be pinned from Hugging Face metadata. The audit also leaves its training-data terms to confirm at acquisition.", "unblock": "Pin the DNS-Challenge commit and each ONNX file's digest from the repository's own metadata, confirm the DNSMOS training-data terms, then register it as a candidate with an ONNX Runtime engine."}
   ]
 }

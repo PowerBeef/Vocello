@@ -34,6 +34,13 @@ module validates it and is the load-time gate for registered judges:
   `recovery-report` files, each bound by its file SHA-256, whose own counts,
   host and separate sessions meet the promotion. `load_registry` runs this
   admission gate, so a local flip without that evidence never takes effect.
+- Acquisition (AQ-06, decision 4b) is pinned end to end: the standalone
+  interpreter and every native runtime archive by SHA-256, and each runtime
+  venv by a committed hash lock (`config/audio-qc-runtimes/<family>.txt`)
+  whose own digest the registry records. Every package of every lock is
+  checked against the exclusion list, and a judge's runtime pins must be the
+  versions its lock installs. A panel judge that could not be pinned is listed
+  in `acquisitionBlocked` with its reason, never substituted.
 
 Commands:
   validate   check the registry against the repository (the contract gate)
@@ -117,6 +124,12 @@ RECOVERY_REPORT_KIND = "delivery-analyzer-recovery-report"
 RECOVERY_REPORT_SCHEMA_VERSION = 1
 MINIMUM_RECOVERY_REPORTS = 2
 SNAPSHOT_STATUS = "content-addressed-snapshot"
+# Acquisition (AQ-06): runtime families are hash-locked venvs or pinned native archives.
+RUNTIME_KINDS = ("venv", "native")
+LOCK_REQUIREMENT = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9.+!_-]*)$")
+LOCK_HASH = re.compile(r"^--hash=sha256:([0-9a-f]{64})$")
+MODULE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
+SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 JUDGE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+$")
 ROADMAP_ITEM = re.compile(r"^[A-Z]+-[0-9]+$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -257,6 +270,7 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
     for judge_id, judge in judges.items():
         errors.extend(_judge_errors(judge_id, judge, exclusions, restrictions, root))
     errors.extend(admission_errors(registry, root=root))
+    errors.extend(acquisition_errors(registry, root=root))
     return errors
 
 
@@ -442,6 +456,217 @@ def admission_errors(registry: dict[str, Any], *, root: Path = REPO) -> list[str
         elif budget and ceiling + reservation > budget:
             errors.append(f"{label}: its ceiling never fits the admission budget")
     return errors
+
+
+def canonical_package(name: str) -> str:
+    """A distribution name as pip compares it (PEP 503)."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def parse_lock(text: str) -> dict[str, dict[str, Any]]:
+    """A hash lock: `name==version` pins, each followed by one or more `--hash=sha256:` digests.
+
+    Comment lines and blank lines are ignored and a trailing backslash continues
+    a pin. Anything else, an unpinned or unhashed requirement, or a package
+    pinned twice is refused.
+    """
+    logical: list[str] = []
+    pending = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not pending and (not line or line.startswith("#")):
+            continue
+        if line.endswith("\\"):
+            pending += line[:-1] + " "
+            continue
+        logical.append(pending + line)
+        pending = ""
+    if pending.strip():
+        raise JudgeRegistryError("the lock ends inside a continued requirement")
+    entries: dict[str, dict[str, Any]] = {}
+    for statement in logical:
+        tokens = statement.split()
+        match = LOCK_REQUIREMENT.match(tokens[0]) if tokens else None
+        if match is None:
+            raise JudgeRegistryError(f"lock line is not an exact pin: {statement[:60]}")
+        hashes = []
+        for token in tokens[1:]:
+            digest = LOCK_HASH.match(token)
+            if digest is None:
+                raise JudgeRegistryError(f"lock pin {tokens[0]} carries something other than SHA-256 hashes")
+            hashes.append(digest.group(1))
+        if not hashes:
+            raise JudgeRegistryError(f"lock pin {tokens[0]} has no hash")
+        name = canonical_package(match.group(1))
+        if name in entries:
+            raise JudgeRegistryError(f"lock pins {name} twice")
+        entries[name] = {"version": match.group(2), "hashes": hashes}
+    if not entries:
+        raise JudgeRegistryError("the lock pins nothing")
+    return entries
+
+
+def _safe_relative(value: Any) -> bool:
+    """One path component, or a relative path of them, that never climbs out of its root."""
+    if not isinstance(value, str) or not value or value.startswith("/"):
+        return False
+    return all(SAFE_NAME.match(part) and part not in (".", "..") for part in value.split("/"))
+
+
+def _archive_errors(label: str, spec: Any, name_fields: tuple[str, ...]) -> list[str]:
+    if not isinstance(spec, dict):
+        return [f"{label} must be an object"]
+    errors = []
+    if not isinstance(spec.get("url"), str) or not spec["url"].startswith("https://"):
+        errors.append(f"{label} downloads over https")
+    if not SHA256.match(str(spec.get("sha256", ""))):
+        errors.append(f"{label} pins its archive by SHA-256")
+    if not _positive_int(spec.get("size")):
+        errors.append(f"{label} records its archive size")
+    for field in name_fields:
+        if not _safe_relative(spec.get(field)):
+            errors.append(f"{label} names a safe relative {field}")
+    return errors
+
+
+def runtime_lock(registry: dict[str, Any], family: str, *, root: Path = REPO) -> dict[str, dict[str, Any]]:
+    """A venv runtime family's lock, verified against the digest the registry records."""
+    runtimes = ((registry.get("acquisition") or {}).get("runtimes") or {})
+    spec = runtimes.get(family)
+    if not isinstance(spec, dict) or spec.get("kind") != "venv":
+        raise JudgeRegistryError(f"runtime family {family} is not a registered venv family")
+    relative = spec.get("lock")
+    if not isinstance(relative, str) or not _safe_relative(relative):
+        raise JudgeRegistryError(f"runtime family {family} names no repository lock")
+    path = root / relative
+    if not path.is_file():
+        raise JudgeRegistryError(f"runtime family {family}: {relative} does not exist")
+    if _sha256(path) != spec.get("lockSHA256"):
+        raise JudgeRegistryError(f"runtime family {family}: {relative} does not match its recorded SHA-256")
+    return parse_lock(path.read_text(encoding="utf-8"))
+
+
+def acquisition_errors(registry: dict[str, Any], *, root: Path = REPO) -> list[str]:
+    """The pinned acquisition of the judge panel (AQ-06): interpreter, runtimes, artifacts, judges."""
+    acquisition = registry.get("acquisition")
+    if not isinstance(acquisition, dict):
+        return ["the registry declares how its judges are acquired (acquisition)"]
+    errors: list[str] = []
+    exclusions = [entry for entry in registry.get("excluded") or [] if isinstance(entry, dict)]
+    if not _safe_relative(acquisition.get("modelRoot")):
+        errors.append("acquisition names a repository-relative model root")
+    stages = acquisition.get("stages")
+    if not isinstance(stages, dict) or not stages or any(
+        not isinstance(key, str) or not key.isdigit() or not isinstance(value, str) or not value.strip()
+        for key, value in stages.items()
+    ):
+        errors.append("acquisition stages are numbered and described")
+        stages = {}
+    errors.extend(_archive_errors("the acquisition interpreter", acquisition.get("interpreter"),
+                                  ("archive", "archiveDirectory", "directory", "executable")))
+    artifacts = acquisition.get("artifacts") if isinstance(acquisition.get("artifacts"), dict) else {}
+    for artifact_id, spec in artifacts.items():
+        label = f"acquisition artifact {artifact_id}"
+        errors.extend(_archive_errors(label, spec, ("archive", "directory")))
+        members = spec.get("members") if isinstance(spec, dict) else None
+        if not isinstance(members, dict) or not members or any(
+            not _safe_relative(name) or not SHA256.match(str(digest)) for name, digest in members.items()
+        ):
+            errors.append(f"{label} pins every member it extracts by SHA-256")
+    runtimes = acquisition.get("runtimes")
+    if not isinstance(runtimes, dict) or not runtimes:
+        return errors + ["acquisition declares its runtime families"]
+    locks: dict[str, dict[str, dict[str, Any]]] = {}
+    for family, spec in runtimes.items():
+        label = f"runtime family {family}"
+        if not SAFE_NAME.match(family) or not isinstance(spec, dict) or spec.get("kind") not in RUNTIME_KINDS:
+            errors.append(f"{label} is a venv or native family")
+            continue
+        if spec["kind"] == "native":
+            artifact = artifacts.get(spec.get("artifact"))
+            if not isinstance(artifact, dict) or spec.get("binary") not in (artifact.get("members") or {}):
+                errors.append(f"{label} runs a pinned member of a registered artifact")
+            continue
+        try:
+            lock = runtime_lock(registry, family, root=root)
+        except JudgeRegistryError as error:
+            errors.append(str(error))
+            continue
+        locks[family] = lock
+        if spec.get("packages") != len(lock):
+            errors.append(f"{label} records {spec.get('packages')} packages; its lock pins {len(lock)}")
+        if not _safe_relative(spec.get("venv")) or "/" in str(spec.get("venv")):
+            errors.append(f"{label} names its venv directory")
+        builds = spec.get("sourceBuilds")
+        if not isinstance(builds, list) or any(canonical_package(str(name)) not in lock for name in builds):
+            errors.append(f"{label}: every source build is a package its lock pins")
+        probe = spec.get("importProbe")
+        if not isinstance(probe, list) or not probe or any(not MODULE_NAME.match(str(name)) for name in probe):
+            errors.append(f"{label} names the modules its import probe loads")
+        errors.extend(_exclusion_errors(label, [], list(lock), exclusions))
+    directories: set[str] = set()
+    judges = registry.get("judges") or {}
+    for judge_id, judge in judges.items():
+        spec = judge.get("acquisition") if isinstance(judge, dict) else None
+        if spec is None:
+            continue
+        label = f"judge {judge_id}"
+        if not isinstance(spec, dict):
+            errors.append(f"{label}: acquisition must be an object")
+            continue
+        directory = spec.get("directory")
+        if not _safe_relative(directory) or "/" in str(directory) or directory in directories:
+            errors.append(f"{label}: acquisition names its own directory under the model root")
+        directories.add(str(directory))
+        if str(spec.get("stage")) not in stages:
+            errors.append(f"{label}: acquisition names a declared stage")
+        family = spec.get("runtime")
+        if family not in runtimes:
+            errors.append(f"{label}: acquisition names a registered runtime family")
+            continue
+        if judge.get("status") in BLOCKED_STATUSES or family not in locks:
+            continue
+        pins = judge.get("pins") if isinstance(judge.get("pins"), dict) else {}
+        for package, version in (pins.get("runtime") or {}).items():
+            locked = locks[family].get(canonical_package(package))
+            if locked is None or locked["version"] != version:
+                errors.append(f"{label}: runtime pin {package}=={version} is not what the {family} lock installs")
+    blocked = registry.get("acquisitionBlocked")
+    if not isinstance(blocked, list):
+        return errors + ["acquisitionBlocked lists the panel judges that could not be pinned"]
+    seen: set[str] = set()
+    for entry in blocked:
+        identity = entry.get("judge") if isinstance(entry, dict) else None
+        if not isinstance(identity, str) or not JUDGE_ID.match(identity) or identity in seen:
+            errors.append("every acquisitionBlocked entry names a unique judge id")
+            continue
+        seen.add(identity)
+        if identity in judges:
+            errors.append(f"acquisitionBlocked {identity} is also a registered judge")
+        if entry.get("status") != "blocked" or any(
+            not isinstance(entry.get(field), str) or not entry[field].strip() for field in ("reason", "unblock", "date")
+        ):
+            errors.append(f"acquisitionBlocked {identity} records its status, date, reason and how it unblocks")
+    return errors
+
+
+def require_runnable(judge_id: str, *, packages: Iterable[str] = (),
+                     registry: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The load-time gate for a judge with no learned weights (pYIN): registered,
+    executable, and no excluded runtime package. A neural judge uses
+    `require_loadable`, which also binds its repository and revision."""
+    registry = registry if registry is not None else load_registry()
+    judge = (registry.get("judges") or {}).get(judge_id)
+    if not isinstance(judge, dict):
+        raise JudgeRegistryError(f"audio QC judge {judge_id} is not registered; it may not run")
+    if judge.get("kind") == "neural":
+        raise JudgeRegistryError(f"audio QC judge {judge_id} loads weights; it runs only through require_loadable")
+    require_executable(judge_id, judge)
+    exclusions = [entry for entry in registry.get("excluded") or [] if isinstance(entry, dict)]
+    refused = _exclusion_errors(f"audio QC judge {judge_id}", [], list(packages), exclusions)
+    if refused:
+        raise JudgeRegistryError(refused[0] + "; it may not run")
+    return judge
 
 
 def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]],
@@ -818,6 +1043,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def snapshot_file_digest(path: Path, pin: dict[str, Any]) -> str | None:
+    """The file's SHA-256 when its bytes match a snapshot pin, else None.
+
+    The size (when recorded) is compared first; then the LFS SHA-256 of a large
+    file or the git blob ID of any other. The pin is the only authority: nothing
+    about the file is trusted until its bytes match.
+    """
+    if not _snapshot_pin(pin) or not path.is_file():
+        return None
+    if "size" in pin and path.stat().st_size != pin["size"]:
+        return None
+    sha256 = _sha256(path)
+    verified = (sha256 == pin["lfsSHA256"]) if "lfsSHA256" in pin else (_git_blob_sha1(path) == pin["gitBlobID"])
+    return sha256 if verified else None
+
+
 def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revision: str) -> dict[str, str]:
     """Verify a local Hugging Face snapshot against its registry pins; return file SHA-256s.
 
@@ -896,6 +1137,8 @@ def main() -> int:
         "status": "PASS",
         "judges": len(judges),
         "retired": sorted(judge_id for judge_id, judge in judges.items() if judge.get("status") == "retired"),
+        "quarantined": sorted(judge_id for judge_id, judge in judges.items() if judge.get("status") == "quarantined"),
+        "acquisitionBlocked": sorted(entry["judge"] for entry in registry["acquisitionBlocked"]),
         "excluded": len(registry["excluded"]),
         "useRestrictions": len(registry["useRestrictions"]),
     }, sort_keys=True))

@@ -19,8 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from audio_qc_judges import (  # noqa: E402
     JudgeRegistryError,
     load_registry,
+    parse_lock,
     require_executable,
     require_loadable,
+    require_runnable,
+    runtime_lock,
     validate_registry,
     validate_repository,
     verify_hub_snapshot,
@@ -56,8 +59,9 @@ class JudgeRegistryTests(unittest.TestCase):
         return validate_registry(registry, root=REPO)
 
     def _repository_copy(self) -> Path:
-        """A minimal repository: the contracts and the files the registry names."""
-        for relative in CONTRACTS:
+        """A minimal repository: the contracts, the runtime locks and the files the registry names."""
+        locks = [spec["lock"] for spec in self.registry["acquisition"]["runtimes"].values() if "lock" in spec]
+        for relative in (*CONTRACTS, *locks):
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(REPO / relative, target)
@@ -431,6 +435,133 @@ class JudgeRegistryTests(unittest.TestCase):
             require_loadable(WHISPER, "moonshine-ai/moonshine-tiny", pins["revision"], registry=self.registry)
 
 
+class PanelAcquisitionTests(unittest.TestCase):
+    """AQ-06: the panel is pinned end to end, its runtimes are hash-locked, and nothing is substituted."""
+
+    def setUp(self) -> None:
+        self.registry = load_registry()
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def _errors(self, mutate, *, root: Path = REPO) -> list[str]:
+        registry = copy.deepcopy(self.registry)
+        mutate(registry)
+        return validate_registry(registry, root=root)
+
+    def test_the_panel_is_pinned_candidates_with_provisional_resources(self) -> None:
+        panel = {judge_id: judge for judge_id, judge in self.registry["judges"].items() if "acquisition" in judge}
+        self.assertEqual(len(panel), 11)
+        for judge_id, judge in panel.items():
+            with self.subTest(judge=judge_id):
+                self.assertIn(judge["status"], ("candidate", "quarantined"))
+                self.assertEqual((judge["determinismClass"], judge["canary"]), ("unmeasured", None))
+                self.assertEqual(judge["resources"]["ceilingStatus"], "provisional")
+                self.assertIsNone(judge["resources"]["canonicalHostPeakBytes"])
+                execution = judge.get("execution") or judge["plannedExecution"]
+                self.assertEqual(execution["threadsStatus"], "provisional")
+                self.assertIn("threads", judge["identity"]["output"])
+                if judge["kind"] == "neural":
+                    pins = judge["pins"]
+                    self.assertEqual(pins["digestStatus"], "content-addressed-snapshot")
+                    self.assertTrue(all("size" in pin for pin in pins["files"].values()))
+                    self.assertIn("hostProfile", judge["identity"]["output"])
+        # Same-lab judges never vote (decision 3a); the adjudicator and aligner are Qwen's.
+        for judge_id in ("asr.qwen3-asr-1.7b@1", "align.qwen3-forcedaligner-0.6b@1"):
+            self.assertEqual((panel[judge_id]["voting"], panel[judge_id]["independence"]["generatorLabCorrelated"]),
+                             (False, True))
+        # A license that differs from the audit quarantines the judge instead of adopting it.
+        resnet = panel["speaker.resnet293-voxceleb@1"]
+        self.assertEqual((resnet["status"], resnet["voting"]), ("quarantined", False))
+        self.assertNotIn("execution", resnet)
+        self.assertIn("CC BY 4.0", resnet["license"]["weights"])
+        with self.assertRaisesRegex(JudgeRegistryError, "quarantined"):
+            require_loadable("speaker.resnet293-voxceleb@1", resnet["pins"]["repository"], resnet["pins"]["revision"],
+                             registry=self.registry)
+
+    def test_a_runtime_lock_is_digest_bound_exact_and_license_checked(self) -> None:
+        registry = copy.deepcopy(self.registry)
+        lock = runtime_lock(registry, "onnx-cpu")
+        self.assertEqual(lock["onnxruntime"]["version"], "1.30.0")
+        root = self.root
+        for spec in registry["acquisition"]["runtimes"].values():
+            if "lock" in spec:
+                (root / spec["lock"]).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPO / spec["lock"], root / spec["lock"])
+        relative = registry["acquisition"]["runtimes"]["onnx-cpu"]["lock"]
+        path = root / relative
+        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        errors = self._errors(lambda _registry: None, root=root)
+        self.assertIn(f"runtime family onnx-cpu: {relative} does not match its recorded SHA-256", errors)
+        # An excluded package in a lock is refused even when its digest is recorded.
+        path.write_text(path.read_text(encoding="utf-8") + "soynlp==0.0.493 \\\n    --hash=sha256:" + "a" * 64 + "\n",
+                        encoding="utf-8")
+
+        def rebound(value):
+            spec = value["acquisition"]["runtimes"]["onnx-cpu"]
+            spec["lockSHA256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+            spec["packages"] += 1
+        self.assertIn("runtime family onnx-cpu: package soynlp is excluded (gpl-and-linux-only-text-normalizers)",
+                      self._errors(rebound, root=root))
+
+        def repinned(value):
+            value["judges"]["speaker.campplus-voxceleb@1"]["pins"]["runtime"]["onnxruntime"] = "1.29.0"
+        self.assertIn("judge speaker.campplus-voxceleb@1: runtime pin onnxruntime==1.29.0 is not what the "
+                      "onnx-cpu lock installs", self._errors(repinned))
+
+        def unknown_runtime(value):
+            value["judges"]["pitch.pyin@1"]["acquisition"]["runtime"] = "conda"
+        self.assertIn("judge pitch.pyin@1: acquisition names a registered runtime family", self._errors(unknown_runtime))
+
+        def shared_directory(value):
+            value["judges"]["pitch.pyin@1"]["acquisition"]["directory"] = "paraformer-zh"
+        self.assertTrue(any("its own directory" in error for error in self._errors(shared_directory)))
+
+        def unpinned_interpreter(value):
+            value["acquisition"]["interpreter"]["sha256"] = "latest"
+        self.assertIn("the acquisition interpreter pins its archive by SHA-256", self._errors(unpinned_interpreter))
+
+        def climbing(value):
+            value["acquisition"]["artifacts"]["sensevoice-llamacpp-runtime-v0.1.9"]["directory"] = "../elsewhere"
+        self.assertTrue(any("safe relative directory" in error for error in self._errors(climbing)))
+
+    def test_a_lock_holds_exact_hashed_pins_only(self) -> None:
+        digest = "--hash=sha256:" + "b" * 64
+        self.assertEqual(parse_lock(f"# header\nNumPy==2.4.6 \\\n    {digest}\n"),
+                         {"numpy": {"version": "2.4.6", "hashes": ["b" * 64]}})
+        for text, reason in ((f"numpy>=2.4 {digest}\n", "exact pin"), ("numpy==2.4.6\n", "no hash"),
+                             ("numpy==2.4.6 --hash=md5:abc\n", "other than SHA-256"),
+                             (f"numpy==2.4.6 {digest}\nnumpy==2.4.6 {digest}\n", "twice"),
+                             ("# only a comment\n", "pins nothing"), ("numpy==2.4.6 \\\n", "continued")):
+            with self.subTest(text=text), self.assertRaisesRegex(JudgeRegistryError, reason):
+                parse_lock(text)
+
+    def test_panel_judges_that_could_not_be_pinned_are_blocked_with_a_reason(self) -> None:
+        blocked = {entry["judge"]: entry for entry in self.registry["acquisitionBlocked"]}
+        self.assertEqual(set(blocked), {"quality.dnsmos-p835@1"})
+        self.assertNotIn("quality.dnsmos-p835@1", self.registry["judges"])
+
+        def reasonless(value):
+            value["acquisitionBlocked"][0]["reason"] = ""
+        self.assertTrue(any("records its status, date, reason" in error for error in self._errors(reasonless)))
+
+        def substituted(value):
+            value["acquisitionBlocked"][0]["judge"] = "pitch.pyin@1"
+        self.assertIn("acquisitionBlocked pitch.pyin@1 is also a registered judge", self._errors(substituted))
+
+    def test_a_weightless_judge_runs_only_through_its_gate(self) -> None:
+        self.assertIs(require_runnable("pitch.pyin@1", packages=["librosa", "numpy"], registry=self.registry),
+                      self.registry["judges"]["pitch.pyin@1"])
+        with self.assertRaisesRegex(JudgeRegistryError, "package pykakasi is excluded"):
+            require_runnable("pitch.pyin@1", packages=["pykakasi"], registry=self.registry)
+        with self.assertRaisesRegex(JudgeRegistryError, "require_loadable"):
+            require_runnable("asr.whisper-large-v3@1", registry=self.registry)
+        with self.assertRaisesRegex(JudgeRegistryError, "not registered"):
+            require_runnable("pitch.unknown@1", registry=self.registry)
+
+
 def _hub_snapshot(root: Path, files: dict[str, bytes], *, large: set[str], revision: str) -> Path:
     """A Hugging Face cache layout: blobs named by content address, snapshot symlinks."""
     blobs = root / "blobs"
@@ -588,11 +719,18 @@ class RecoveryEvidenceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def _workers(self) -> list[str]:
+        """Every orchestrated GPU and CPU worker judge the promotion needs evidence of."""
+        return sorted(judge_id for judge_id, judge in self.registry["judges"].items()
+                      if judge["status"] not in ("retired", "quarantined")
+                      and (judge.get("execution") or {}).get("orchestrated")
+                      and judge["execution"]["lane"] in ("gpu", "cpu"))
+
     def _report(self, session: str, **overrides) -> dict:
         from delivery_resource_supervisor import recovery_report
 
         envelopes = []
-        for judge in (WHISPER, self.SENSEVOICE):
+        for judge in self._workers():
             envelopes.append({
                 "kind": "delivery-analyzer-resource-envelope", "sessionID": session,
                 "hostProfileID": overrides.pop("host", "mac-mini-m6-16gb") if judge == WHISPER else "mac-mini-m6-16gb",
@@ -653,7 +791,8 @@ class RecoveryEvidenceTests(unittest.TestCase):
             "run beside other work": [good, self._write(
                 "reports/overlap.json", self._report("session-6", overlapPossibleEnvelopes=1))],
             "lacks serial envelopes of compact.sensevoice-small-q8@1": [good, self._write(
-                "reports/one-judge.json", self._report("session-7", serialByJudge={WHISPER: 1}))],
+                "reports/one-judge.json", self._report("session-7", serialByJudge={
+                    judge: 1 for judge in self._workers() if judge != self.SENSEVOICE}))],
             "must be distinct": [good, good],
         }
         for expected, evidence in cases.items():

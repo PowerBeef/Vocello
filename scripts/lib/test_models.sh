@@ -26,7 +26,16 @@ MAC_TEST_REQUIRED_MODEL_IDS=(pro_custom_speed pro_design_speed pro_clone_speed)
 MAC_TEST_CLONE_VOICE_NAME="A_warm_elderly_woman"
 MAC_TEST_CLONE_VOICE_BRIEF="An elderly woman in her late seventies with a warm, textured alto voice, gentle breathiness, precise diction, and a kindly storytelling cadence. Distinctly feminine, mature, intimate, and unhurried."
 MAC_TEST_CLONE_REF_TRANSCRIPT="Hello, dear. I have spent a lifetime collecting stories from quiet railway towns, and I still delight in sharing them with anyone who cares to listen."
+# Whole-file digest of the fixture enrolled on the iPhone, which the clone-conditioning
+# lane checks (scripts/ios_device.sh). The Mac fixture is judged by its audio instead.
+# shellcheck disable=SC2034  # consumed by scripts/ios_device.sh after sourcing
 MAC_TEST_CLONE_REF_SHA256="03187893a3d82d38264d433f24828982c67ed42cddb71eefccb776b37ab9fe35"
+# The Mac reference is generated with a fixed seed, so its audio is identical on every
+# run; the WAV's LIST/INFO provenance comment carries its creation time, so only the
+# fmt and data chunks are digested. Pinned on mac-mini-m6-16gb (2026-09-25); an
+# engine change that moves Voice Design output re-pins it deliberately.
+MAC_TEST_CLONE_REF_SEED=19790615
+MAC_TEST_CLONE_REF_AUDIO_SHA256="cc31ef373ee4de86b89d3a480a8b47eae0a81d3f76114bffb23bcd3f97cf7684"
 # shellcheck disable=SC2034  # consumed by scripts/ios_device.sh after sourcing
 MAC_TEST_CLONE_REF_TRANSCRIPT_SHA256="98a8e46ed2cd48354f6056dc889f9209641824e610a687eeb9ab91d310477234"
 
@@ -260,8 +269,22 @@ mac_test_clone_fixture_current() {
   audio_file="$voices_dir/$MAC_TEST_CLONE_VOICE_NAME.wav"
   [[ -f "$audio_file" && -f "$transcript_file" ]] || return 1
   [[ "$(cat "$transcript_file")" == "$MAC_TEST_CLONE_REF_TRANSCRIPT" ]] || return 1
-  actual_sha256="$(shasum -a 256 "$audio_file" 2>/dev/null | awk '{print $1}')" || return 1
-  [[ "$actual_sha256" == "$MAC_TEST_CLONE_REF_SHA256" ]]
+  actual_sha256="$(python3 - "$audio_file" <<'PY' 2>/dev/null
+import hashlib, struct, sys
+data = open(sys.argv[1], "rb").read()
+digest, seen, i = hashlib.sha256(), set(), 12
+while data[:4] == b"RIFF" and i + 8 <= len(data):
+    chunk_id, size = data[i:i + 4], struct.unpack("<I", data[i + 4:i + 8])[0]
+    if chunk_id in (b"fmt ", b"data"):
+        digest.update(chunk_id + data[i + 8:i + 8 + size])
+        seen.add(chunk_id)
+    i += 8 + size + (size & 1)
+if seen != {b"fmt ", b"data"}:
+    sys.exit(1)
+print(digest.hexdigest())
+PY
+)" || return 1
+  [[ "$actual_sha256" == "$MAC_TEST_CLONE_REF_AUDIO_SHA256" ]]
 }
 
 # Bootstrap a distinctive Voice Design reference and enroll it as the bench
@@ -300,6 +323,7 @@ ensure_mac_test_clone_fixture() {
   ref_wav="$ref_dir/ref.wav"
   _test_models_note "generating distinctive Voice Design clone reference (debug context)…"
   if ! QWENVOICE_DEBUG=1 "$TEST_MODELS_VOCELLO" generate --mode design --variant speed \
+    --seed "$MAC_TEST_CLONE_REF_SEED" \
     --voice-brief "$MAC_TEST_CLONE_VOICE_BRIEF" --text "$MAC_TEST_CLONE_REF_TRANSCRIPT" \
     --out "$ref_wav" --no-stream >/dev/null 2>&1; then
     rm -rf "$ref_dir"

@@ -42,6 +42,14 @@ Engines:
   a second, per-row check. Its timeout is the job's per-row budget
   (`rowTimeoutSeconds`).
 
+- The AQ-06 judge panel (`lib/qc_pipeline/panel_engines.py`): `whisper-mlx`
+  with a job that names its judge (Whisper large-v3 from its verified
+  snapshot), `parakeet-mlx`, `funasr-paraformer`, `sensevoice-llamacpp`,
+  `qwen3-asr-mlx`, `qwen3-aligner-mlx`, `speechbrain-lid`, `wespeaker-onnx`,
+  `pyin-librosa` and `audiobox-aesthetics`. Each runs in its judge's pinned
+  runtime and runs the registry's load gate, and verifies every pinned file,
+  before anything loads (`scripts/acquire_audio_qc_judges.py` fetches them).
+
 Rows are analyzed in job order, so the runner can name the row in flight when
 a worker ends abnormally. A row's `wallSeconds` is timing, which the runner
 keeps beside the result, never in what it caches.
@@ -122,9 +130,15 @@ def _emitter(stream: Any) -> Emit:
 # --------------------------------------------------------------------------- #
 
 def whisper_mlx(job: dict[str, Any], emit: Emit) -> None:
+    config = job["engineConfig"]
+    if "judge" in config:
+        # A panel judge (Whisper large-v3): verified from its pinned snapshot first.
+        from lib.qc_pipeline.panel_engines import whisper_panel
+
+        whisper_panel(job, emit)
+        return
     from independent_asr_worker import Recognizer, read_pcm16
 
-    config = job["engineConfig"]
     rows = job["rows"]
     weights = config.get("weights")
     if not isinstance(weights, str) or not weights:
@@ -226,9 +240,25 @@ def native_command(job: dict[str, Any], emit: Emit) -> None:
                   "result": {"stdout": text, "wallSeconds": wall}})
 
 
+PANEL_ENGINES = (
+    "parakeet-mlx", "funasr-paraformer", "sensevoice-llamacpp", "qwen3-asr-mlx", "qwen3-aligner-mlx",
+    "speechbrain-lid", "wespeaker-onnx", "pyin-librosa", "audiobox-aesthetics",
+)
+
+
+def _panel_engine(name: str) -> Callable[[dict[str, Any], Emit], None]:
+    def engine(job: dict[str, Any], emit: Emit) -> None:
+        # Imported here: a panel engine loads only inside its judge's pinned runtime.
+        from lib.qc_pipeline.panel_engines import run_engine
+
+        run_engine(name, job, emit)
+    return engine
+
+
 ENGINES: dict[str, Callable[[dict[str, Any], Emit], None]] = {
     "whisper-mlx": whisper_mlx,
     "native-command": native_command,
+    **{name: _panel_engine(name) for name in PANEL_ENGINES},
 }
 
 

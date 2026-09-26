@@ -238,7 +238,17 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     private func performIdleUnloadIfStillIdle(modelID: String, token: UUID) async {
-        guard idleUnloadToken == token, canIdleUnload(modelID: modelID) else { return }
+        guard idleUnloadToken == token else { return }
+        // A model published `.loaded` unloads to `.idle`; weights a failure
+        // left resident unload under the failure, which stays published (PA-32).
+        let retainsFailure: Bool
+        if canIdleUnload(modelID: modelID) {
+            retainsFailure = false
+        } else if canIdleUnloadAfterFailure() {
+            retainsFailure = true
+        } else {
+            return
+        }
         // Idle unload shares the memory-relief admission gate. The check above
         // proved no model operation is in flight, and closing the gate keeps
         // one from starting (and publishing a model) while this one releases.
@@ -248,7 +258,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         idleUnloadTask = nil
         closeAdmissionForCriticalMemoryRelief()
         await runtime.unloadModel()
-        if canIdleUnload(modelID: modelID) {
+        if retainsFailure {
+            // The failed load state, its message and a failed clone
+            // preparation stay until the user's next action. The unload
+            // dropped the runtime's primed references, so a primed state left
+            // from before the failure would now be false.
+            if clonePreparationState.phase == .primed {
+                clonePreparationState = .idle
+            }
+        } else if canIdleUnload(modelID: modelID) {
             loadState = .idle
             clonePreparationState = .idle
             visibleErrorMessage = nil
@@ -265,6 +283,51 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             return false
         }
         return true
+    }
+
+    /// PA-32 (maintainer decision 2026-09-25): a non-cancelled failure that
+    /// leaves weights resident (a clone prime whose reference cannot be
+    /// conditioned, a failed load or prewarm, a generation failure that is not
+    /// a captured MLX failure) publishes `.failed`, which `canIdleUnload`
+    /// refuses, so only critical relief, a later model operation or `stop()`
+    /// released those weights. They now unload after the normal idle window
+    /// on every tier, and the failure stays published until the user's next
+    /// action replaces it (a generation, load, warm or prime) or dismisses it
+    /// (`clearVisibleError`). A captured MLX failure has already unloaded
+    /// the model, so the runtime reports nothing resident and nothing is armed.
+    private func scheduleIdleUnloadAfterFailure() async {
+        guard isInitialized, let modelID = await runtime.loadedModelID() else { return }
+        // Re-checked after the runtime hop: `stop()` may have reset the engine,
+        // relief may hold admission (its reopening re-arms this), or a newer
+        // operation may already own the idle unload.
+        guard isInitialized,
+              idleUnloadToken == nil,
+              !criticalMemoryReliefAdmission.isClosed,
+              publishedStateAllowsIdleUnloadAfterFailure,
+              let mode = modelRegistry.model(id: modelID)?.mode
+        else {
+            return
+        }
+        scheduleIdleUnloadIfNeeded(modelID: modelID, mode: mode, isBatch: false)
+    }
+
+    /// The published states a failure-retaining idle unload leaves in place:
+    /// the failure itself, or the idle state a dismissal left over weights
+    /// that are still resident. A prime in progress owns the model.
+    private var publishedStateAllowsIdleUnloadAfterFailure: Bool {
+        guard clonePreparationState.phase != .preparing else { return false }
+        switch loadState {
+        case .failed, .idle:
+            return true
+        case .starting, .loaded, .running:
+            return false
+        }
+    }
+
+    private func canIdleUnloadAfterFailure() -> Bool {
+        isInitialized
+            && activeModelOperation == nil
+            && publishedStateAllowsIdleUnloadAfterFailure
     }
 
     private func beginUserModelOperation(_ kind: ModelOperationKind) async throws -> UUID {
@@ -379,15 +442,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// superseded) would otherwise leave it loaded for good: `generate` schedules
     /// idle unload before the store's post-generation hard trim runs. Once the
     /// last relief holder reopens admission, a model that is still loaded and
-    /// idle gets its idle unload back.
+    /// idle gets its idle unload back. So do weights a failure left resident
+    /// behind `.failed`, or behind the `.idle` its dismissal published (PA-32);
+    /// the runtime says whether any are.
     private func rescheduleIdleUnloadAfterRelief() {
-        guard !criticalMemoryReliefAdmission.isClosed,
-              idleUnloadToken == nil,
-              case .loaded(let modelID) = loadState,
-              canIdleUnload(modelID: modelID) else {
+        guard !criticalMemoryReliefAdmission.isClosed, idleUnloadToken == nil else { return }
+        switch loadState {
+        case .loaded(let modelID):
+            guard canIdleUnload(modelID: modelID) else { return }
+            scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
+        case .failed, .idle:
+            guard canIdleUnloadAfterFailure() else { return }
+            Task { [weak self] in
+                await self?.scheduleIdleUnloadAfterFailure()
+            }
+        case .starting, .running:
             return
         }
-        scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
     }
 
     public private(set) var visibleErrorMessage: String?
@@ -902,6 +973,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // Mac) surfaces the real error. "Quality" always means the 8-bit
             // model — never a quietly-substituted Speed model.
             handle(error)
+            await scheduleIdleUnloadAfterFailure()
             throw error
         }
     }
@@ -933,6 +1005,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             await settleCancelledModelOperation()
         } catch {
             handle(error)
+            await scheduleIdleUnloadAfterFailure()
         }
     }
 
@@ -957,6 +1030,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             await settleCancelledModelOperation()
         } catch {
             handle(error)
+            await scheduleIdleUnloadAfterFailure()
         }
     }
 
@@ -1000,12 +1074,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // settles through the runtime like a cancelled load: weights it or
             // an earlier load left resident publish `.loaded` and get back the
             // idle unload this warm cancelled, so they never sit without one
-            // (AUD-10). A state this warm did not publish (`stop()` reset it
-            // meanwhile) is left alone.
+            // (AUD-10). A failure published meanwhile keeps its resident
+            // weights' idle unload (PA-32); any other state this warm did not
+            // publish (`stop()` reset it meanwhile) is left alone.
             switch loadState {
             case .starting, .loaded:
                 await settleCancelledModelOperation()
-            case .idle, .running, .failed:
+            case .failed:
+                await scheduleIdleUnloadAfterFailure()
+            case .idle, .running:
                 break
             }
             return nil
@@ -1076,6 +1153,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 message: presentedDescription(of: surfacedError)
             )
             handle(surfacedError)
+            await scheduleIdleUnloadAfterFailure()
             throw surfacedError
         }
     }
@@ -1310,6 +1388,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 )
                 let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                 await recordEventDeliveryLossIfNeeded(delivery, request: request)
+                rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
@@ -1387,6 +1466,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         )
                         let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                         await recordEventDeliveryLossIfNeeded(delivery, request: request)
+                        rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
                         throw CancellationError()
                     }
                     await unloadAfterCapturedRuntimeFailureIfNeeded(error)
@@ -1415,6 +1495,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     latestEvent = failureEvent
                     let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                     await recordEventDeliveryLossIfNeeded(delivery, request: request)
+                    await scheduleIdleUnloadAfterFailure()
                     throw surfacedError
                 }
             }
@@ -1444,6 +1525,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             latestEvent = failureEvent
             let delivery = eventRouter.snapshot(for: deliveryGenerationID)
             await recordEventDeliveryLossIfNeeded(delivery, request: request)
+            await scheduleIdleUnloadAfterFailure()
             throw surfacedError
         }
     }
@@ -1562,6 +1644,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             loadState = .idle
             clonePreparationState = .idle
         }
+    }
+
+    /// A cancelled take is not a failure: the model it leaves resident keeps
+    /// the idle unload the take cancelled, as a cancelled warm or prime does
+    /// (AUD-10), instead of staying loaded until the next model operation.
+    private func rearmIdleUnloadAfterCancelledTake(_ request: GenerationRequest, unloaded: Bool) {
+        guard !unloaded else { return }
+        scheduleIdleUnloadIfNeeded(
+            modelID: request.modelID,
+            mode: request.mode,
+            isBatch: request.batchTotal != nil
+        )
     }
 
     /// After MLX raised an error mid-generation the loaded model may hold

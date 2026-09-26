@@ -760,7 +760,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-cancelled-warm-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = ResidentLoadCoordinator(cancelsWarmRequests: true)
+        let coordinator = ResidentLoadCoordinator(warmRequests: .cancel)
         let engine = Self.makeFixtureEngine(
             root: root,
             registry: try Self.contractRegistry(),
@@ -853,23 +853,40 @@ private actor SupersededLoadCoordinator: MLXModelCoordinating {
 
 /// A model coordinator whose load succeeds with an unloaded runtime actor, so
 /// the engine's resident-model lifecycle (idle unload, trims) is observable
-/// without MLX weights. The model is never used to generate. With
-/// `cancelsWarmRequests`, a warm prefetch or clone prime (the runtime asks for
-/// capabilities first) ends cancelled before it touches MLX, as one whose
-/// intent changed does, while an earlier load stays resident.
-private actor ResidentLoadCoordinator: MLXModelCoordinating {
-    private(set) var events: [String] = []
-    private let cancelsWarmRequests: Bool
+/// without MLX weights. The model is never used to generate. A warm prefetch,
+/// prewarm or clone prime asks the runtime for capabilities first, before it
+/// touches MLX: with `.cancel` it ends cancelled there, as one whose intent
+/// changed does, and with `.fail` it fails there, as a prewarm or a clone
+/// prime whose reference cannot be conditioned does (PA-32), while an earlier
+/// load stays resident. Shared with `TTSEngineStoreTests`.
+actor ResidentLoadCoordinator: MLXModelCoordinating {
+    enum WarmRequests {
+        case proceed
+        case cancel
+        case fail
+    }
 
-    init(cancelsWarmRequests: Bool = false) {
-        self.cancelsWarmRequests = cancelsWarmRequests
+    /// The failure a `.fail` coordinator's warm and prime requests end with.
+    struct WarmRequestFailure: Error {}
+
+    /// "load", "unload" and one "capabilities" per warm, prime or take.
+    private(set) var events: [String] = []
+    private let warmRequests: WarmRequests
+
+    init(warmRequests: WarmRequests = .proceed) {
+        self.warmRequests = warmRequests
     }
 
     func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
-        if cancelsWarmRequests {
+        events.append("capabilities")
+        switch warmRequests {
+        case .proceed:
+            return Self.capabilities
+        case .cancel:
             throw CancellationError()
+        case .fail:
+            throw WarmRequestFailure()
         }
-        return Self.capabilities
     }
 
     func loadModel(

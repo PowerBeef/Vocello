@@ -1,6 +1,6 @@
 import Combine
 import Foundation
-import QwenVoiceCore
+@testable import QwenVoiceCore
 import XCTest
 import os
 
@@ -292,7 +292,10 @@ final class TTSEngineStoreTests: XCTestCase {
         StoreFixtureEngine(modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL))
     }
 
-    private func makeStore(engine: StoreFixtureEngine, dial: MemoryHeadroomDial) -> TTSEngineStore {
+    private func makeStore<Engine: TTSEngine & AnyObject>(
+        engine: Engine,
+        dial: MemoryHeadroomDial
+    ) -> TTSEngineStore {
         let backend = AnyTTSEngineBackend(
             engine: engine,
             supportsSavedVoiceMutation: true,
@@ -978,5 +981,294 @@ final class TTSEngineStoreTests: XCTestCase {
         for _ in 0..<3 {
             coordinator.scheduleWarmupIfNeeded(context: nil, snapshot: store.snapshot, ttsEngineStore: store)
         }
+    }
+
+    // MARK: - PA-32: weights a failure leaves resident still unload after idle
+
+    /// The real `MLXTTSEngine` behind the store, over a load coordinator whose
+    /// loads keep an unloaded runtime actor resident and whose warm, prewarm
+    /// and prime requests fail or end cancelled before MLX (TSan lane).
+    private struct ResidentWeights {
+        let engine: MLXTTSEngine
+        let store: TTSEngineStore
+        let loads: ResidentLoadCoordinator
+        let reported: SnapshotRecorder
+    }
+
+    /// Long enough that the load's own idle unload cannot fire before the
+    /// operation under test cancels it; the tier windows themselves are held
+    /// by `testEveryMemoryTierIdleUnloadsAResidentModel`.
+    private static let residentIdleWindow = 1.0
+
+    private func withResidentWeights(
+        _ resident: String,
+        warmRequests: ResidentLoadCoordinator.WarmRequests,
+        _ body: @MainActor (ResidentWeights) async throws -> Void
+    ) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-pa32-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let loads = ResidentLoadCoordinator(warmRequests: warmRequests)
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: loads,
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("Every PA-32 take fails before it streams.")
+            },
+            idleUnloadDelayOverride: Self.residentIdleWindow,
+            // Stay off MLX: this bundle runs under the ThreadSanitizer lane.
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let reported = SnapshotRecorder()
+        let subscription = store.snapshotUpdates.sink { reported.snapshots.append($0) }
+        defer { subscription.cancel() }
+
+        try await store.initialize(appSupportDirectory: root)
+        try await store.loadModel(id: resident)
+        XCTAssertEqual(store.loadState, .loaded(modelID: resident))
+        try await body(ResidentWeights(engine: engine, store: store, loads: loads, reported: reported))
+    }
+
+    private func unloadCount(_ loads: ResidentLoadCoordinator) async -> Int {
+        await loads.events.filter { $0 == "unload" }.count
+    }
+
+    /// Waits out the idle window until the weights unload, then for the
+    /// engine to reopen admission and the store to report where it settled.
+    private func waitForIdleUnload(
+        _ weights: ResidentWeights,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        var unloads = await unloadCount(weights.loads)
+        while unloads == 0, ContinuousClock.now < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+            unloads = await unloadCount(weights.loads)
+        }
+        XCTAssertEqual(unloads, 1, "The resident weights unload once after the idle window", file: file, line: line)
+        await waitUntil("the unload to reopen admission", file: file, line: line) { weights.engine.isReady }
+        await waitUntil("the store to report the settled engine", file: file, line: line) {
+            weights.store.isReady
+                && weights.store.loadState == weights.engine.loadState
+                && weights.store.visibleErrorMessage == weights.engine.visibleErrorMessage
+        }
+        XCTAssertEqual(
+            weights.reported.snapshots.last,
+            weights.store.frontendState,
+            "The snapshot bridge reported the settled state",
+            file: file,
+            line: line
+        )
+    }
+
+    /// The failure is published with the weights still resident, and it is
+    /// still published after the idle unload released them. Returns its copy.
+    @discardableResult
+    private func assertFailureOutlivesIdleUnload(
+        _ weights: ResidentWeights,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws -> String {
+        await waitUntil("the store to report the failure", file: file, line: line) {
+            if case .failed = weights.store.loadState { return true }
+            return false
+        }
+        let failedState = weights.store.loadState
+        let message = try XCTUnwrap(weights.store.visibleErrorMessage, file: file, line: line)
+        XCTAssertTrue(
+            weights.reported.snapshots.contains { $0.loadState == failedState },
+            "The snapshot bridge reported the failure",
+            file: file,
+            line: line
+        )
+        let unloadsAtFailure = await unloadCount(weights.loads)
+        XCTAssertEqual(unloadsAtFailure, 0, "The weights are still resident when the failure lands", file: file, line: line)
+
+        try await waitForIdleUnload(weights, file: file, line: line)
+        XCTAssertEqual(weights.store.loadState, failedState, "The failure outlives the unload", file: file, line: line)
+        XCTAssertEqual(weights.store.visibleErrorMessage, message, file: file, line: line)
+        return message
+    }
+
+    /// A clone prime whose reference cannot be conditioned publishes a failed
+    /// preparation and keeps the clone model resident; the weights still go
+    /// after the idle window, and the failure stays until leaving Clone
+    /// (the screen cancels preparation on a mode change) or a dismissal.
+    func testAFailedClonePrimeUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        try await withResidentWeights("pro_clone", warmRequests: .fail) { weights in
+            do {
+                try await weights.store.ensureCloneReferencePrimed(
+                    modelID: "pro_clone",
+                    reference: CloneReference(audioPath: "/nonexistent/pa32-reference.wav", transcript: "Hello.")
+                )
+                XCTFail("The prime must fail")
+            } catch is CancellationError {
+                XCTFail("A failed prime is not a cancellation")
+            } catch {}
+
+            try await assertFailureOutlivesIdleUnload(weights)
+            XCTAssertEqual(weights.store.clonePreparationState.phase, .failed)
+
+            await weights.store.cancelClonePreparationIfNeeded()
+            XCTAssertEqual(weights.store.clonePreparationState, .idle, "Leaving Clone clears the failed preparation")
+            weights.store.clearVisibleError()
+            XCTAssertEqual(weights.store.loadState, .idle)
+            XCTAssertNil(weights.store.visibleErrorMessage)
+        }
+    }
+
+    /// A failed prewarm keeps the warmed model resident behind `.failed`; the
+    /// weights still unload, and the Mac warmup coordinator still refuses to
+    /// warm from the kept failure.
+    func testAFailedPrewarmUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+            await weights.store.prewarmModelIfNeeded(for: request())
+            try await assertFailureOutlivesIdleUnload(weights)
+
+            let warmup = warmupCoordinator(.mid16GBMac)
+            let subscription = weights.store.snapshotChanges.sink { warmup.observe(snapshot: $0) }
+            defer { subscription.cancel() }
+            warmup.scheduleWarmupIfNeeded(
+                context: customWarmContext(.mid16GBMac),
+                snapshot: weights.store.snapshot,
+                ttsEngineStore: weights.store
+            )
+            try await Task.sleep(for: .milliseconds(50))
+            let events = await weights.loads.events
+            XCTAssertEqual(events.filter { $0 == "capabilities" }.count, 1, "No warm starts from .failed")
+            XCTAssertEqual(events.filter { $0 == "load" }.count, 1)
+            if case .failed = weights.store.loadState {} else {
+                XCTFail("The kept failure blocks the warm: \(weights.store.loadState)")
+            }
+        }
+    }
+
+    /// A take that fails short of a captured MLX failure keeps its model
+    /// resident; the weights still unload after the idle window and the
+    /// failed take stays visible.
+    func testAFailedTakeUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
+        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+            do {
+                _ = try await weights.store.generate(Self.takeRefusedByThePromptContract())
+                XCTFail("The take must fail")
+            } catch is CancellationError {
+                XCTFail("A failed take is not a cancellation")
+            } catch {}
+            XCTAssertFalse(weights.store.hasActiveGeneration)
+            try await assertFailureOutlivesIdleUnload(weights)
+        }
+    }
+
+    /// The user's next action ends a kept failure: a dismissal clears it, the
+    /// next take replaces it with its own outcome, and a model load for the
+    /// next mode publishes that model.
+    func testTheNextUserActionEndsAFailureTheIdleUnloadKept() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+            await weights.store.prewarmModelIfNeeded(for: request())
+            try await assertFailureOutlivesIdleUnload(weights)
+
+            weights.store.clearVisibleError()
+            XCTAssertEqual(weights.store.loadState, .idle)
+            XCTAssertNil(weights.store.visibleErrorMessage)
+            XCTAssertEqual(weights.reported.snapshots.last?.loadState, .idle, "The store reports the dismissal")
+            XCTAssertNil(weights.reported.snapshots.last?.visibleErrorMessage)
+        }
+        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+            await weights.store.prewarmModelIfNeeded(for: request())
+            let kept = try await assertFailureOutlivesIdleUnload(weights)
+
+            do {
+                _ = try await weights.store.generate(Self.takeRefusedByThePromptContract())
+                XCTFail("The fixture take fails")
+            } catch {}
+            await waitUntil("the store to report the take's outcome") {
+                weights.store.visibleErrorMessage == weights.engine.visibleErrorMessage
+            }
+            XCTAssertNotNil(weights.store.visibleErrorMessage)
+            XCTAssertNotEqual(weights.store.visibleErrorMessage, kept, "The next take replaced the kept failure")
+
+            try await weights.store.loadModel(id: "pro_design")
+            await waitUntil("the store to report the next mode's model") {
+                weights.store.loadState == .loaded(modelID: "pro_design")
+            }
+            XCTAssertNil(weights.store.visibleErrorMessage)
+            XCTAssertEqual(weights.reported.snapshots.last?.loadState, .loaded(modelID: "pro_design"))
+        }
+    }
+
+    /// A cancelled prime or prewarm is not a failure: it publishes no error,
+    /// its resident model stays `.loaded`, and the idle unload publishes
+    /// `.idle` as for any loaded model.
+    func testACancelledPrimeOrPrewarmIsNotAFailure() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        try await withResidentWeights("pro_clone", warmRequests: .cancel) { weights in
+            do {
+                try await weights.store.ensureCloneReferencePrimed(
+                    modelID: "pro_clone",
+                    reference: CloneReference(audioPath: "/nonexistent/pa32-reference.wav", transcript: "Hello.")
+                )
+                XCTFail("The prime must end cancelled")
+            } catch is CancellationError {}
+            try await assertCancellationIsNotAFailure(weights, resident: "pro_clone")
+        }
+        try await withResidentWeights("pro_custom", warmRequests: .cancel) { weights in
+            await weights.store.prewarmModelIfNeeded(for: request())
+            try await assertCancellationIsNotAFailure(weights, resident: "pro_custom")
+        }
+    }
+
+    private func assertCancellationIsNotAFailure(
+        _ weights: ResidentWeights,
+        resident: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        await waitUntil("the store to report the resident model", file: file, line: line) {
+            weights.store.loadState == .loaded(modelID: resident)
+        }
+        XCTAssertNil(weights.store.visibleErrorMessage, file: file, line: line)
+        XCTAssertEqual(weights.store.clonePreparationState, .idle, file: file, line: line)
+
+        try await waitForIdleUnload(weights, file: file, line: line)
+        XCTAssertEqual(weights.store.loadState, .idle, file: file, line: line)
+        XCTAssertNil(weights.store.visibleErrorMessage, file: file, line: line)
+        XCTAssertFalse(
+            weights.reported.snapshots.contains { snapshot in
+                if case .failed = snapshot.loadState { return true }
+                return snapshot.visibleErrorMessage != nil
+            },
+            "The store never reported a failure",
+            file: file,
+            line: line
+        )
+    }
+
+    /// A Built-in Voice take whose delivery asks for impersonation: the
+    /// runtime refuses it before any MLX work, an ordinary (not captured MLX)
+    /// generation failure.
+    private static func takeRefusedByThePromptContract() -> GenerationRequest {
+        GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom",
+            text: "Engine store fixture.",
+            outputPath: "/nonexistent/pa32-\(UUID().uuidString).wav",
+            shouldStream: false,
+            payload: .custom(speakerID: "aiden", deliveryStyle: "Impersonate a celebrity announcer.")
+        )
     }
 }

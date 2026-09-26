@@ -1,0 +1,174 @@
+#compdef vocello
+
+# Keep this list in step with Sources/VocelloCLI/VocelloMain.swift and the
+# command help in Sources/VocelloCLI/*Command.swift.
+_vocello() {
+  local command action previous option value
+  local -a commands actions options common runtime generate batch bench
+
+  commands=(
+    'generate:Synthesize one clip' 'gen:Synthesize one clip'
+    'custom:Synthesize with a built-in speaker'
+    'design:Synthesize from a voice description'
+    'clone:Synthesize from a reference voice'
+    'batch:Synthesize multiple clips'
+    'voices:Manage saved clone voices' 'voice:Manage saved clone voices'
+    'speakers:List built-in speakers' 'speaker:List built-in speakers'
+    'modes:List generation modes' 'deliveries:List delivery presets'
+    'delivery:List delivery presets' 'models:Manage models'
+    'model:Manage models' 'bench:Run benchmarks'
+    'benchmark:Run benchmarks' 'help:Show help' 'version:Show version'
+    '--help:Show help' '-h:Show help'
+    '--version:Show version' '-v:Show version'
+  )
+
+  if (( CURRENT == 2 )); then
+    _describe -t commands 'vocello command' commands
+    return
+  fi
+
+  command=${words[2]}
+  previous=${words[CURRENT-1]}
+
+  # Complete the value of a split --option value pair before offering flags.
+  case $previous in
+    --mode) _values 'mode' custom design clone; return ;;
+    --modes) _values -s , 'modes' custom design clone; return ;;
+    --variant) _values 'variant' speed quality; return ;;
+    --variants) _values -s , 'variants' speed quality; return ;;
+    --lengths) _values -s , 'lengths' short medium long; return ;;
+    --variation) _values 'variation' expressive balanced consistent; return ;;
+    --telemetry) _values 'telemetry' off lightweight verbose; return ;;
+    --force-class) _values 'memory class' 8gb 16gb high iphone; return ;;
+    --memory-qualification) _values 'qualification' retained-memory-v1; return ;;
+    --file|--text-file|--reference|--audio|--manifest|--prosody-profile|--codec-replay|--codec-trace|--script-file)
+      _files; return ;;
+    --out) _files; return ;;
+    --take-sha256) return ;;
+    --data-dir|--out-dir|--output-dir) _files -/; return ;;
+  esac
+
+  runtime=(
+    '--data-dir:Use a runtime data directory'
+    '--manifest:Use a model contract file'
+    '--quiet:Suppress progress notes'
+    '--verbose:Show detailed progress notes'
+  )
+  common=( '--help:Show command help' )
+  generate=(
+    '--mode:Select generation mode' '--variant:Select model quality'
+    '--text:Use inline text' '--text-file:Read text from a file'
+    '--speaker:Select a built-in speaker' '--voice-brief:Describe a voice'
+    '--voice:Select a saved voice' '--reference:Use a reference WAV'
+    '--transcript:Supply a reference transcript'
+    '--confirm-consent:Confirm permission to clone the voice'
+    '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
+    '--language:Select a language hint' '--seed:Use a deterministic seed'
+    '--variation:Select sampling variation' '--out:Write a WAV file'
+    '--stream:Use streaming synthesis' '--no-stream:Disable streaming synthesis'
+    '--play:Play the result' '--json:Write JSON output'
+    $runtime $common
+  )
+  batch=(
+    '--file:Read input lines from a file' '--mode:Select generation mode'
+    '--variant:Select model quality' '--speaker:Select a built-in speaker'
+    '--voice-brief:Describe a voice' '--voice:Select a saved voice'
+    '--reference:Use a reference WAV' '--transcript:Supply a reference transcript'
+    '--confirm-consent:Confirm permission to clone the voice'
+    '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
+    '--out-dir:Write WAV files to a directory' '--seed:Use a deterministic seed'
+    '--variation:Select sampling variation' '--play:Play the results'
+    '--json:Write JSON output' $runtime $common
+  )
+  bench=(
+    '--modes:Select benchmark modes' '--variants:Select model qualities'
+    '--lengths:Select text lengths' '--warm:Set warm repetitions'
+    '--no-cold:Skip cold takes in a delivery sweep'
+    '--voice:Select a saved clone voice' '--speaker:Select a built-in speaker'
+    '--voice-brief:Describe a voice'
+    '--confirm-consent:Confirm permission to clone the voice'
+    '--delivery:Add delivery cells' '--prosody-profile:Use a prosody profile'
+    '--continue-delivery-failures:Retain diagnostic failures'
+    '--label:Label the run' '--run-id:Set the run identifier'
+    '--force-class:Force a memory tier' '--telemetry:Select telemetry level'
+    '--memory-qualification:Select a memory qualification protocol'
+    '--seed:Use a deterministic seed' '--no-stream:Disable streaming'
+    '--ttfc:Measure first chunk latency' '--keep:Append to diagnostics'
+    '--force:Allow clearing the app data directory'
+    '--no-summary:Skip summary and registry publication'
+    '--codec-replay:Replay collected codec data'
+    '--take-sha256:Specify a take digest' '--codec-trace:Specify a codec trace'
+    '--output-dir:Write diagnostic output to a directory'
+    '--script-file:Supply the original script file'
+    $runtime $common
+  )
+
+  case $command in
+    generate|gen) options=( $generate ) ;;
+    custom|design|clone)
+      if (( ${words[(I)--file]} || ${words[(I)--file=*]} )); then
+        options=( $batch )
+      else
+        options=( $generate '--file:Read input lines from a file' )
+      fi
+      ;;
+    batch) options=( $batch ) ;;
+    bench|benchmark) options=( $bench ) ;;
+    voices|voice)
+      actions=( 'list:List saved voices' 'ls:List saved voices'
+                'enroll:Save a clone voice' 'add:Save a clone voice'
+                'delete:Delete a saved voice' 'rm:Delete a saved voice'
+                'help:Show voices help' )
+      action=${words[3]}
+      case $action in
+        enroll|add)
+          options=( '--name:Name the voice' '--audio:Use a reference WAV'
+                    '--transcript:Supply a reference transcript'
+                    '--confirm-consent:Confirm permission to clone the voice'
+                    $runtime $common ) ;;
+        delete|rm) options=( '--id:Select a saved voice' $runtime $common ) ;;
+        *) options=( '--json:Write JSON output' $runtime $common ) ;;
+      esac
+      ;;
+    speakers|speaker)
+      actions=( 'list:List speakers' 'ls:List speakers' 'help:Show speakers help' )
+      options=( '--json:Write JSON output' $runtime ) ;;
+    modes)
+      actions=( 'list:List modes' 'ls:List modes' )
+      options=( '--json:Write JSON output' '--quiet:Suppress progress notes'
+                '--verbose:Show detailed progress notes' $common ) ;;
+    deliveries|delivery)
+      actions=( 'list:List deliveries' 'ls:List deliveries' )
+      options=( '--json:Write JSON output' '--shipped-only:Show shipped presets'
+                '--quiet:Suppress progress notes' '--verbose:Show detailed progress notes'
+                $common ) ;;
+    models|model)
+      actions=( 'list:List models' 'ls:List models' 'status:Show install status'
+                'install:Install a model' 'help:Show models help' )
+      action=${words[3]}
+      options=( $runtime )
+      [[ $action == install ]] || options+=( '--json:Write JSON output' )
+      ;;
+    *) return ;;
+  esac
+
+  if (( CURRENT == 3 )) && (( ${#actions} )); then
+    if [[ ${words[CURRENT]} != -* ]]; then
+      _describe -t actions 'action' actions
+      return
+    fi
+  fi
+  if [[ ${words[CURRENT]} == --* || -z ${words[CURRENT]} ]]; then
+    _describe -t options 'option' options
+    return
+  fi
+  if [[ $command == model || $command == models ]] && [[ $action == install || $action == status ]]; then
+    # Model identifiers depend on the user's contract, so do not hard-code them.
+    return
+  fi
+  if [[ ${words[CURRENT]} == -* ]]; then
+    _describe -t options 'option' options
+  fi
+}
+
+_vocello "$@"

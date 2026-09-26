@@ -17,11 +17,11 @@
     "ios": 9
   },
   "unobservedGapBound": {
-    "description": "Memory contract v2 timer health for every memory-qualified take: no gap between two consecutive samples of the process's one memory series may exceed max(targetIntervalMultiple x the sampler cadence, floorMS), where a floor-tier take uses floorTiers.floorMS instead. The cadence is 250 ms on the 8 GB Mac, the iPhone and the 16 GB canonical M6 (the floor tiers sampled every 500 ms until 2026-09-25, when periodic ticks stopped enumerating threads) and 100 ms above, so the floor keeps one scheduler stall on a fast-cadence host from failing a take. Each take records the bound it met as samplerUnobservedGapLimitMS. Provisional: the first consented memory lane on the canonical M6 calibrates targetIntervalMultiple and floorMS, and a maintainer records that run here.",
+    "description": "Memory contract v2 timer health for every memory-qualified take: no gap between two consecutive samples of the process's one memory series may exceed max(targetIntervalMultiple x the sampler cadence, floorMS), where a floor-tier take uses floorTiers.floorMS instead. The cadence is 250 ms on the 8 GB Mac, the iPhone and the 16 GB canonical M6 (the floor tiers sampled every 500 ms until 2026-09-25, when periodic ticks stopped enumerating threads) and 100 ms above, so the floor keeps one scheduler stall on a fast-cadence host from failing a take. Each take records the bound it met as samplerUnobservedGapLimitMS. Calibrated 2026-09-25 on mac-mini-m6-16gb by mac-memory-qualification-20260926-011258-82f5f55c: the longest gap over 11 takes was 274 ms at the 250 ms cadence (1.09x the cadence), inside max(2 x cadence, 500 ms) with the 1.25 margin, so both values stay; the floor tiers stay provisional below.",
     "targetIntervalMultiple": 2.0,
-    "floorMS": 500,
-    "status": "provisional",
-    "calibrationRunID": null,
+    "floorMS": 500.0,
+    "status": "calibrated",
+    "calibrationRunID": "mac-memory-qualification-20260926-011258-82f5f55c",
     "floorTiers": {
       "description": "The floor tiers (the 8 GB Mac and the iPhone, by the device class each engine row stamps, forced or not) moved from a 500 ms to a 250 ms cadence on 2026-09-25, which would cut their bound from 1,000 ms to 500 ms while the only calibration data comes from the M6. They keep a 1,000 ms floor until a consented, unforced iPhone or 8 GB Mac memory-qualification record calibrates it (scripts/derive_memory_calibration.py --write on that record); an M6 calibration never moves it.",
       "deviceClasses": [
@@ -44,12 +44,12 @@
     "calibration": {
       "requirement": "One consented memory-qualification run per platform on its canonical host sets each mode's bound from that run's within-mode MLX growth noise; a maintainer records it here with the run ID.",
       "macos": {
-        "status": "uncalibrated",
-        "calibrationRunID": null,
+        "status": "calibrated",
+        "calibrationRunID": "mac-memory-qualification-20260926-011258-82f5f55c",
         "growthLimitMBByMode": {
-          "custom": null,
-          "design": null,
-          "clone": null
+          "custom": 16.0,
+          "design": 16.0,
+          "clone": 16.0
         }
       },
       "ios": {

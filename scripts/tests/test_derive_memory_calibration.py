@@ -15,7 +15,24 @@ import benchmark_memory  # noqa: E402
 import derive_memory_calibration as calibration  # noqa: E402
 import publish_benchmark_history as publisher  # noqa: E402
 
-POLICY = json.loads((ROOT / "config" / "memory-qualification-policy.json").read_text(encoding="utf-8"))
+LIVE_POLICY = json.loads((ROOT / "config" / "memory-qualification-policy.json").read_text(encoding="utf-8"))
+
+
+def _uncalibrated(policy: dict) -> dict:
+    """The live policy with every calibration reset, so the tool is always
+    tested from an uncalibrated starting point whatever the file records."""
+    fresh = json.loads(json.dumps(policy))
+    gap = fresh["unobservedGapBound"]
+    gap.update({"targetIntervalMultiple": 2.0, "floorMS": 500, "status": "provisional", "calibrationRunID": None})
+    gap["floorTiers"].update({"floorMS": 1000, "status": "provisional", "calibrationRunID": None})
+    for platform in ("macos", "ios"):
+        entry = fresh["retainedMemoryV2"]["calibration"][platform]
+        entry.update({"status": "uncalibrated", "calibrationRunID": None,
+                      "growthLimitMBByMode": {mode: None for mode in entry["growthLimitMBByMode"]}})
+    return fresh
+
+
+POLICY = _uncalibrated(LIVE_POLICY)
 
 
 NATIVE_TIER = {"macos": "mid_16gb_mac", "ios": "iphone_pro"}

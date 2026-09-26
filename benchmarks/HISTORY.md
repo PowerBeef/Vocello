@@ -1119,6 +1119,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-29 | [`mac-memory-qualification-20260729-024907-aec37fe2`](runs/memory-qualification/mac-memory-qualification-20260729-024907-aec37fe2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | — | `3331eecfdcdb` | `e04c74e62725` | baseline | retained-check |
 
+## memory-qualification / macos / mac-mini-m6-16gb / config `ec7c210e293f`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-26 | [`mac-memory-qualification-20260926-011258-82f5f55c`](runs/memory-qualification/mac-memory-qualification-20260926-011258-82f5f55c.json) | focused | focused | passed | qualified | 11 | 0.27 | `c7bb6edc7e1b` | `ec7c210e293f` | baseline | m6-retained |
+
 ## prosody-calibration / macos / mac-mini-m2-8gb / config `144146bbd7fa`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

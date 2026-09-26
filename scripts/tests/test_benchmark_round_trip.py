@@ -536,9 +536,17 @@ class PublisherRoundTripTests(unittest.TestCase):
         # retained-memory-v2 reports beside v1 from the post-trim MLX snapshot:
         # each mode's three retained takes grow by 2 MB (take-N adds N MB).
         retained_v2 = record["evidence"]["retainedMemoryV2"]
-        self.assertEqual(retained_v2["calibration"], "uncalibrated")
+        # The block follows the live policy: calibrated on the M6 since
+        # 2026-09-25, uncalibrated before (the fixture grows 2 MB, well inside).
+        live = json.loads((ROOT / "config" / "memory-qualification-policy.json").read_text(encoding="utf-8"))
+        macos = live["retainedMemoryV2"]["calibration"]["macos"]
         self.assertEqual(retained_v2["growthByModeMB"], {"custom": 2.0, "design": 2.0, "clone": 2.0})
-        self.assertNotIn("growthLimitMBByMode", retained_v2)
+        if macos["status"] == "calibrated":
+            self.assertEqual(retained_v2["calibration"], "calibrated")
+            self.assertEqual(retained_v2["growthLimitMBByMode"], macos["growthLimitMBByMode"])
+        else:
+            self.assertEqual(retained_v2["calibration"], "uncalibrated")
+            self.assertNotIn("growthLimitMBByMode", retained_v2)
         self.assertEqual(record["takes"][1]["metrics"]["mlxEndActiveMB"], 1802.0)
         self.assertEqual(record["takes"][1]["metrics"]["mlxEndCacheMB"], 0.0)
         # The registry recomputes the block from the takes and holds a

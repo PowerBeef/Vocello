@@ -1,0 +1,870 @@
+#!/usr/bin/env python3
+"""Acquire the audio QC judge panel (AQ-06): pinned snapshots, hash-locked runtimes, receipts.
+
+The maintainer runs this: a model or package download is a maintainer-run
+action, and nothing else in the repository downloads a judge. Everything it
+fetches is pinned in `config/audio-qc-judges.json`:
+
+- **Snapshots.** A judge's pinned files at its pinned Hugging Face revision land
+  in `<model root>/<judge directory>/<revision>/`. Each file streams into
+  `<judge directory>/.partial/`, resumes where it stopped (an HTTP range
+  request) and moves into the snapshot only once its size and digest (the LFS
+  SHA-256, or the git blob ID of a small file) match the pin. A mismatch
+  deletes the partial file and fails; a checksum is never inferred, and a file
+  already in the snapshot that does not match its pin is refused, not replaced.
+- **Interpreter.** The python-build-standalone archive is verified by SHA-256
+  (downloaded only if absent) and extracted into its own directory.
+- **Runtimes.** Each runtime family's venv is built from its committed hash lock
+  with `pip install --isolated --require-hashes --no-deps --only-binary :all:`
+  (the few sdist-only packages a lock names are built without isolation from
+  their hash-pinned sdists, after the lock's own setuptools). Its installed
+  distributions must then equal the lock exactly, and an offline import probe
+  must pass.
+- **Native runtime.** The SenseVoice llama.cpp archive and binary are verified
+  by SHA-256; an existing verified copy is reused.
+- **Receipts.** Each judge gets `<judge directory>/receipt.json`, written last:
+  every verified file's SHA-256, the lock and interpreter digests and the
+  registry entry's digest, with names relative to the model root only.
+
+Quarantined and retired judges, and the panel judges listed in
+`acquisitionBlocked`, are never fetched; `plan` names each with its reason.
+After a fetch everything is offline: `verify` re-checks every receipt without
+the network, and each worker verifies its snapshot before it loads.
+
+Commands:
+  plan    the selected judges, bytes and destinations (reads the registry and
+          the model root; no network)
+  fetch   download, build and verify the selected judges (--judge ID ...,
+          --stage N or --all)
+  verify  re-verify offline (default: every judge with a receipt)
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+import datetime as dt
+import hashlib
+import http.client
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+from typing import Any, Callable, Iterable, Sequence
+import urllib.error
+import urllib.parse
+import urllib.request
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from audio_qc_judges import (  # noqa: E402
+    BLOCKED_STATUSES,
+    JudgeRegistryError,
+    canonical_package,
+    host_profile,
+    require_loadable,
+    require_runnable,
+    runtime_lock,
+    snapshot_file_digest,
+    validate_registry,
+    verify_judge_snapshot,
+)
+
+REPO = SCRIPT_DIR.parent
+REGISTRY_PATH = REPO / "config/audio-qc-judges.json"
+WORKER = SCRIPT_DIR / "audio_qc_worker.py"
+RECEIPT_SCHEMA = "vocello.audioqc.judge-receipt/1"
+RUNTIME_RECEIPT_SCHEMA = "vocello.audioqc.runtime-receipt/1"
+INTERPRETER_RECEIPT_SCHEMA = "vocello.audioqc.interpreter-receipt/1"
+RECEIPT_NAME = "receipt.json"
+RUNTIME_RECEIPT_NAME = "vocello-runtime-receipt.json"
+# Written first into every directory this tool builds, so it only ever
+# replaces a directory it created itself.
+OWNED_MARKER = ".vocello-audio-qc-owned"
+PARTIAL_DIRECTORY = ".partial"
+HUB = "https://huggingface.co"
+PYPI_INDEX = "https://pypi.org/simple"
+USER_AGENT = "vocello-audio-qc-acquisition/1"
+# Loads never reach a hub; a runtime that tries fails instead.
+OFFLINE_ENVIRONMENT = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1",
+                       "PYTHONNOUSERSITE": "1"}
+# pip's own distribution; the venv module installs it, the lock does not pin it.
+VENV_BASELINE = frozenset({"pip"})
+BOOTSTRAP_BUILD_PACKAGES = ("setuptools",)
+CHUNK_BYTES = 1 << 20
+DOWNLOAD_ATTEMPTS = 6
+DOWNLOAD_TIMEOUT_SECONDS = 120.0
+FREE_SPACE_MARGIN_BYTES = 2 * 1024 ** 3
+TRANSIENT_HTTP = frozenset({408, 425, 429, 500, 502, 503, 504})
+LIST_DISTRIBUTIONS = (
+    "import json\nfrom importlib import metadata\n"
+    "print(json.dumps(sorted({(d.metadata['Name'], d.version) for d in metadata.distributions()})))"
+)
+IMPORT_PROBE = "import importlib, sys\nfor name in sys.argv[1:]:\n    importlib.import_module(name)\n"
+
+
+class AcquisitionError(RuntimeError):
+    """A pin, a download, a build or a verification failed; nothing unverified is kept."""
+
+
+Opener = Callable[[urllib.request.Request, float], Any]
+Runner = Callable[..., subprocess.CompletedProcess]
+
+
+def _open(request: urllib.request.Request, timeout: float) -> Any:
+    return urllib.request.urlopen(request, timeout=timeout)
+
+
+def _run(argv: Sequence[str], *, env: dict[str, str] | None = None, capture: bool = False,
+         cwd: Path | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(list(argv), env=env, cwd=cwd, check=False, text=True,
+                          capture_output=capture)
+
+
+def _log(message: str) -> None:
+    print(f"audio-qc-acquire: {message}", file=sys.stderr, flush=True)
+
+
+def default_model_root() -> Path:
+    cache = os.environ.get("QVOICE_DELIVERY_ANALYSIS_CACHE")
+    return (Path(cache) if cache else REPO / "build/cache/delivery-analysis") / "external-models"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(CHUNK_BYTES), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def entry_digest(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _atomic_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _remove_owned(path: Path) -> None:
+    """Remove a directory this tool built (it holds the owned marker); refuse anything else."""
+    if not path.exists():
+        return
+    if not (path / OWNED_MARKER).is_file():
+        raise AcquisitionError(f"{path.name} exists but was not built by this tool; move it aside and fetch again")
+    shutil.rmtree(path)
+
+
+# --------------------------------------------------------------------------- #
+# Registry and selection
+# --------------------------------------------------------------------------- #
+
+def load_valid_registry(path: Path = REGISTRY_PATH, *, root: Path = REPO) -> dict[str, Any]:
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise AcquisitionError(f"cannot read the judge registry: {error}") from None
+    errors = validate_registry(registry, root=root)
+    if errors:
+        raise AcquisitionError("the judge registry is invalid: " + "; ".join(errors[:3]))
+    return registry
+
+
+@dataclass(frozen=True)
+class Target:
+    judge_id: str
+    judge: dict[str, Any]
+    directory: str
+    stage: int
+    runtime: str
+
+    @property
+    def blocked_reason(self) -> str | None:
+        status = self.judge.get("status")
+        if status not in BLOCKED_STATUSES:
+            return None
+        detail = (self.judge.get("quarantine") or self.judge.get("retirement") or {}).get("reason")
+        return f"{status}: {detail}" if detail else str(status)
+
+    @property
+    def files(self) -> dict[str, dict[str, Any]]:
+        return dict((self.judge.get("pins") or {}).get("files") or {})
+
+    @property
+    def repository(self) -> str | None:
+        return (self.judge.get("pins") or {}).get("repository")
+
+    @property
+    def revision(self) -> str | None:
+        return (self.judge.get("pins") or {}).get("revision")
+
+    @property
+    def bytes(self) -> int:
+        return sum(int(pin.get("size", 0)) for pin in self.files.values())
+
+    def snapshot(self, root: Path) -> Path | None:
+        return root / self.directory / self.revision if self.revision else None
+
+
+def targets(registry: dict[str, Any]) -> list[Target]:
+    found = []
+    for judge_id, judge in (registry.get("judges") or {}).items():
+        spec = judge.get("acquisition")
+        if isinstance(spec, dict):
+            found.append(Target(judge_id, judge, spec["directory"], int(spec["stage"]), spec["runtime"]))
+    return sorted(found, key=lambda target: (target.stage, target.judge_id))
+
+
+def select(registry: dict[str, Any], *, judges: Sequence[str] = (), stage: int | None = None,
+           everything: bool = False) -> list[Target]:
+    available = {target.judge_id: target for target in targets(registry)}
+    blocked = {entry["judge"]: entry for entry in registry.get("acquisitionBlocked") or []}
+    if judges:
+        chosen = []
+        for judge_id in judges:
+            if judge_id in blocked:
+                raise AcquisitionError(f"{judge_id} is blocked: {blocked[judge_id]['reason']}")
+            if judge_id not in available:
+                raise AcquisitionError(f"{judge_id} is not a panel judge with an acquisition entry")
+            if available[judge_id].blocked_reason:
+                raise AcquisitionError(f"{judge_id} is {available[judge_id].blocked_reason}")
+            chosen.append(available[judge_id])
+        return chosen
+    if stage is not None:
+        return [target for target in available.values() if target.stage == stage]
+    return list(available.values()) if everything else []
+
+
+# --------------------------------------------------------------------------- #
+# Downloads
+# --------------------------------------------------------------------------- #
+
+def hub_url(repository: str, revision: str, path: str) -> str:
+    return f"{HUB}/{repository}/resolve/{revision}/{urllib.parse.quote(path)}"
+
+
+def _status(response: Any) -> int:
+    return int(getattr(response, "status", None) or response.getcode())
+
+
+def download(url: str, part: Path, *, size: int, opener: Opener = _open,
+             attempts: int = DOWNLOAD_ATTEMPTS, sleep: Callable[[float], None] = time.sleep) -> None:
+    """Fill `part` with `size` bytes from `url`, resuming across attempts (HTTP ranges)."""
+    part.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(1, attempts + 1):
+        have = part.stat().st_size if part.exists() else 0
+        if have > size:
+            part.unlink()
+            have = 0
+        if have == size:
+            return
+        headers = {"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+        if have:
+            headers["Range"] = f"bytes={have}-"
+        try:
+            with opener(urllib.request.Request(url, headers=headers), DOWNLOAD_TIMEOUT_SECONDS) as response:
+                status = _status(response)
+                if status == 206:
+                    content_range = str(response.headers.get("Content-Range", ""))
+                    if not content_range.startswith(f"bytes {have}-"):
+                        raise AcquisitionError(f"the server resumed {part.name} at the wrong offset")
+                    mode = "ab"
+                elif status == 200:
+                    mode = "wb"  # the server ignored the range: start over
+                else:
+                    raise AcquisitionError(f"unexpected HTTP status {status} for {part.name}")
+                with part.open(mode) as handle:
+                    for block in iter(lambda: response.read(CHUNK_BYTES), b""):
+                        handle.write(block)
+                        if handle.tell() > size:
+                            break
+                    handle.flush()
+                    os.fsync(handle.fileno())
+        except urllib.error.HTTPError as error:
+            if error.code not in TRANSIENT_HTTP:
+                raise AcquisitionError(f"HTTP {error.code} for {part.name}; nothing is retried") from None
+            if attempt == attempts:
+                raise AcquisitionError(f"HTTP {error.code} for {part.name} after {attempts} attempts") from None
+        except (urllib.error.URLError, OSError, http.client.HTTPException, TimeoutError) as error:
+            if attempt == attempts:
+                raise AcquisitionError(f"{part.name} could not be downloaded: {type(error).__name__}") from None
+        else:
+            if part.stat().st_size == size:
+                return
+            if part.stat().st_size > size:
+                part.unlink()
+        sleep(min(60.0, 5.0 * attempt))
+    raise AcquisitionError(f"{part.name} is incomplete after {attempts} attempts")
+
+
+def fetch_pinned_file(url: str, final: Path, part: Path, pin: dict[str, Any], *, opener: Opener = _open,
+                      sleep: Callable[[float], None] = time.sleep) -> str:
+    """One pinned file into its final place, verified; returns its SHA-256."""
+    if final.exists():
+        digest = snapshot_file_digest(final, pin)
+        if digest is None:
+            raise AcquisitionError(f"{final.name} is present but differs from its pin; remove it and fetch again")
+        return digest
+    size = pin.get("size")
+    if type(size) is not int:
+        raise AcquisitionError(f"{final.name} has no pinned size; a download is never unbounded")
+    download(url, part, size=size, opener=opener, sleep=sleep)
+    digest = snapshot_file_digest(part, pin)
+    if digest is None:
+        part.unlink(missing_ok=True)
+        raise AcquisitionError(f"{final.name} does not match its registry pin; the download was discarded")
+    final.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(part, final)
+    return digest
+
+
+def fetch_archive(url: str, archive: Path, sha256: str, size: int, *, opener: Opener = _open,
+                  sleep: Callable[[float], None] = time.sleep) -> None:
+    """A pinned archive: an existing copy must match; an absent one is downloaded and verified."""
+    if archive.exists():
+        if _sha256(archive) != sha256:
+            raise AcquisitionError(f"{archive.name} is present but differs from its pinned SHA-256")
+        return
+    part = archive.parent / PARTIAL_DIRECTORY / f"{archive.name}.part"
+    download(url, part, size=size, opener=opener, sleep=sleep)
+    if _sha256(part) != sha256:
+        part.unlink(missing_ok=True)
+        raise AcquisitionError(f"{archive.name} does not match its pinned SHA-256; the download was discarded")
+    os.replace(part, archive)
+    _prune_partial(archive.parent)
+
+
+def _prune_partial(directory: Path) -> None:
+    partial = directory / PARTIAL_DIRECTORY
+    for path in sorted(partial.rglob("*"), reverse=True) if partial.is_dir() else []:
+        if path.is_dir() and not any(path.iterdir()):
+            path.rmdir()
+    if partial.is_dir() and not any(partial.iterdir()):
+        partial.rmdir()
+
+
+def fetch_snapshot(root: Path, target: Target, *, opener: Opener = _open,
+                   sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    snapshot = target.snapshot(root)
+    if snapshot is None or not target.files:
+        return {}
+    remaining = sum(int(pin["size"]) for name, pin in target.files.items() if not (snapshot / name).exists())
+    root.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(root).free
+    if remaining + FREE_SPACE_MARGIN_BYTES > free:
+        raise AcquisitionError(
+            f"{target.judge_id} needs {remaining / 1e9:.2f} GB plus a 2 GiB margin; {free / 1e9:.2f} GB is free"
+        )
+    partial = root / target.directory / PARTIAL_DIRECTORY / str(target.revision)
+    digests = {}
+    for name, pin in sorted(target.files.items()):
+        _log(f"{target.judge_id}: {name} ({int(pin['size']) / 1e6:.1f} MB)")
+        digests[name] = fetch_pinned_file(
+            hub_url(str(target.repository), str(target.revision), name), snapshot / name,
+            partial / f"{name}.part", pin, opener=opener, sleep=sleep,
+        )
+    _prune_partial(root / target.directory)
+    return digests
+
+
+# --------------------------------------------------------------------------- #
+# Interpreter, venvs and the native runtime
+# --------------------------------------------------------------------------- #
+
+def interpreter_python(root: Path, spec: dict[str, Any]) -> Path:
+    return root / spec["directory"] / spec["executable"]
+
+
+def ensure_interpreter(root: Path, spec: dict[str, Any], *, opener: Opener = _open,
+                       sleep: Callable[[float], None] = time.sleep) -> Path:
+    """The pinned standalone interpreter, extracted from its verified archive into its own directory."""
+    archive = root / spec["archiveDirectory"] / spec["archive"]
+    fetch_archive(spec["url"], archive, spec["sha256"], spec["size"], opener=opener, sleep=sleep)
+    target = root / spec["directory"]
+    receipt = _read_json(target / RECEIPT_NAME)
+    python = interpreter_python(root, spec)
+    if receipt and receipt.get("schema") == INTERPRETER_RECEIPT_SCHEMA \
+            and receipt.get("archiveSHA256") == spec["sha256"] and python.is_file():
+        return python
+    _remove_owned(target)
+    staging = root / f".{spec['directory']}.staging"
+    _remove_owned(staging)
+    staging.mkdir(parents=True)
+    (staging / OWNED_MARKER).write_text("audio QC interpreter\n", encoding="utf-8")
+    with tarfile.open(archive, "r:gz") as bundle:
+        bundle.extractall(staging, filter="data")
+    _atomic_json(staging / RECEIPT_NAME, {"schema": INTERPRETER_RECEIPT_SCHEMA, "id": spec["id"],
+                                          "archiveSHA256": spec["sha256"]})
+    os.replace(staging, target)
+    if not python.is_file():
+        raise AcquisitionError("the extracted interpreter has no executable at its pinned path")
+    return python
+
+
+def build_environment() -> dict[str, str]:
+    """A clean environment for pip and probes: no user site, no user pip configuration."""
+    keep = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR")
+    return {**{name: os.environ[name] for name in keep if name in os.environ}, **OFFLINE_ENVIRONMENT}
+
+
+def installed_distributions(python: Path, *, runner: Runner = _run) -> dict[str, str]:
+    result = runner([str(python), "-c", LIST_DISTRIBUTIONS], env=build_environment(), capture=True)
+    if result.returncode != 0:
+        raise AcquisitionError(f"cannot list the distributions of {python.parent.parent.name}")
+    try:
+        pairs = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise AcquisitionError("the distribution listing is not JSON") from None
+    return {canonical_package(str(name)): str(version) for name, version in pairs}
+
+
+def lock_differences(installed: dict[str, str], lock: dict[str, dict[str, Any]]) -> list[str]:
+    """What stands between an installed venv and its lock (empty when they are equal)."""
+    problems = []
+    for name, entry in sorted(lock.items()):
+        if installed.get(name) != entry["version"]:
+            problems.append(f"{name} is {installed.get(name, 'missing')}, the lock pins {entry['version']}")
+    extra = sorted(set(installed) - set(lock) - VENV_BASELINE)
+    if extra:
+        problems.append("unlocked distributions are installed: " + ", ".join(extra))
+    return problems
+
+
+def import_probe(python: Path, modules: Iterable[str], *, runner: Runner = _run) -> None:
+    with tempfile.TemporaryDirectory(prefix="vocello-audio-qc-probe-") as scratch:
+        result = runner([str(python), "-c", IMPORT_PROBE, *modules], env=build_environment(), capture=True,
+                        cwd=Path(scratch))
+    if result.returncode != 0:
+        tail = (result.stderr or "").strip().splitlines()[-1:] or ["no error text"]
+        raise AcquisitionError(f"the import probe failed in {python.parent.parent.name}: {tail[0][:200]}")
+
+
+def ensure_runtime(root: Path, registry: dict[str, Any], family: str, interpreter: Path, *,
+                   runner: Runner = _run, repository: Path = REPO) -> Path:
+    """A runtime family's venv, built from its hash lock and proven equal to it."""
+    acquisition = registry["acquisition"]
+    spec = acquisition["runtimes"][family]
+    lock = runtime_lock(registry, family, root=repository)
+    lock_path = repository / spec["lock"]
+    venv = root / spec["venv"]
+    python = venv / "bin/python3"
+    interpreter_sha = acquisition["interpreter"]["sha256"]
+    receipt = _read_json(venv / RUNTIME_RECEIPT_NAME)
+    if receipt and receipt.get("schema") == RUNTIME_RECEIPT_SCHEMA and receipt.get("lockSHA256") == spec["lockSHA256"] \
+            and receipt.get("interpreterSHA256") == interpreter_sha and python.is_file() \
+            and not lock_differences(installed_distributions(python, runner=runner), lock):
+        return python
+    _remove_owned(venv)
+    _log(f"building the {family} runtime ({len(lock)} locked packages)")
+    result = runner([str(interpreter), "-m", "venv", str(venv)], env=build_environment())
+    if result.returncode != 0:
+        raise AcquisitionError(f"the {family} venv could not be created")
+    (venv / OWNED_MARKER).write_text(f"audio QC runtime {family}\n", encoding="utf-8")
+    pip = [str(python), "-m", "pip", "install", "--isolated", "--no-input", "--disable-pip-version-check",
+           "--no-cache-dir", "--index-url", PYPI_INDEX, "--require-hashes", "--no-deps"]
+    # pip reaches PyPI (the one networked step); `--isolated` ignores user pip configuration.
+    environment = build_environment()
+    builds = [canonical_package(name) for name in spec.get("sourceBuilds") or []]
+    if builds:
+        bootstrap = [name for name in BOOTSTRAP_BUILD_PACKAGES if name in lock]
+        if len(bootstrap) != len(BOOTSTRAP_BUILD_PACKAGES):
+            raise AcquisitionError(f"the {family} lock builds sdists but pins no setuptools")
+        subset = venv / "bootstrap-requirements.txt"
+        subset.write_text("".join(
+            f"{name}=={lock[name]['version']} " + " ".join(f"--hash=sha256:{digest}" for digest in lock[name]["hashes"])
+            + "\n" for name in bootstrap), encoding="utf-8")
+        steps = [
+            [*pip, "--only-binary", ":all:", "-r", str(subset)],
+            [*pip, "--only-binary", ":all:", "--no-binary", ",".join(builds), "--no-build-isolation",
+             "-r", str(lock_path)],
+        ]
+    else:
+        steps = [[*pip, "--only-binary", ":all:", "-r", str(lock_path)]]
+    for step in steps:
+        if runner(step, env=environment).returncode != 0:
+            raise AcquisitionError(f"pip could not install the {family} lock; the venv stays unverified")
+    problems = lock_differences(installed_distributions(python, runner=runner), lock)
+    if problems:
+        raise AcquisitionError(f"the {family} venv differs from its lock: " + "; ".join(problems[:3]))
+    import_probe(python, spec["importProbe"], runner=runner)
+    _atomic_json(venv / RUNTIME_RECEIPT_NAME, {
+        "schema": RUNTIME_RECEIPT_SCHEMA, "family": family, "lockSHA256": spec["lockSHA256"],
+        "interpreterSHA256": interpreter_sha, "packages": len(lock),
+    })
+    return python
+
+
+def ensure_artifact(root: Path, registry: dict[str, Any], artifact_id: str, *, opener: Opener = _open,
+                    sleep: Callable[[float], None] = time.sleep) -> dict[str, Path]:
+    """A pinned native runtime archive and the members it runs, each verified by SHA-256."""
+    spec = registry["acquisition"]["artifacts"][artifact_id]
+    directory = root / spec["directory"]
+    archive = directory / spec["archive"]
+    fetch_archive(spec["url"], archive, spec["sha256"], spec["size"], opener=opener, sleep=sleep)
+    members = {}
+    for member, digest in spec["members"].items():
+        path = directory / "extracted" / member
+        if path.exists():
+            if _sha256(path) != digest:
+                raise AcquisitionError(f"{member} is present but differs from its pinned SHA-256")
+            members[member] = path
+            continue
+        with tarfile.open(archive, "r:gz") as bundle:
+            names = {name.removeprefix("./"): name for name in bundle.getnames()}
+            info = bundle.getmember(names[member]) if member in names else None
+            if info is None or not info.isfile():
+                raise AcquisitionError(f"the pinned archive holds no file {member}")
+            source = bundle.extractfile(info)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            part = path.with_name(f".{path.name}.part")
+            with part.open("wb") as handle:
+                shutil.copyfileobj(source, handle, CHUNK_BYTES)
+                handle.flush()
+                os.fsync(handle.fileno())
+        if _sha256(part) != digest:
+            part.unlink(missing_ok=True)
+            raise AcquisitionError(f"{member} extracted from the archive does not match its pinned SHA-256")
+        part.chmod(0o755)
+        os.replace(part, path)
+        members[member] = path
+    return members
+
+
+# --------------------------------------------------------------------------- #
+# Fetch, receipts and verification
+# --------------------------------------------------------------------------- #
+
+def _lock_packages(registry: dict[str, Any], family: str, repository: Path) -> list[str]:
+    spec = registry["acquisition"]["runtimes"][family]
+    return list(runtime_lock(registry, family, root=repository)) if spec.get("kind") == "venv" else []
+
+
+def _gate(registry: dict[str, Any], target: Target, repository: Path) -> None:
+    """The registry's own load gate, before anything is downloaded for a judge."""
+    packages = _lock_packages(registry, target.runtime, repository)
+    if target.judge.get("kind") == "neural":
+        require_loadable(target.judge_id, str(target.repository), str(target.revision), packages=packages,
+                         registry=registry)
+    else:
+        require_runnable(target.judge_id, packages=packages, registry=registry)
+
+
+def _source_digest() -> str:
+    return _sha256(Path(__file__).resolve())
+
+
+def fetch(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, opener: Opener = _open,
+          runner: Runner = _run, repository: Path = REPO, sleep: Callable[[float], None] = time.sleep,
+          ) -> dict[str, Any]:
+    report: dict[str, Any] = {"fetched": [], "skipped": []}
+    runnable = []
+    for target in selected:
+        if target.blocked_reason:
+            report["skipped"].append({"judge": target.judge_id, "reason": target.blocked_reason})
+            continue
+        _gate(registry, target, repository)
+        runnable.append(target)
+    acquisition = registry["acquisition"]
+    interpreter: Path | None = None
+    runtimes: dict[str, dict[str, Any]] = {}
+    for target in runnable:
+        digests = fetch_snapshot(root, target, opener=opener, sleep=sleep)
+        family = target.runtime
+        spec = acquisition["runtimes"][family]
+        if family not in runtimes:
+            if interpreter is None:
+                interpreter = ensure_interpreter(root, acquisition["interpreter"], opener=opener, sleep=sleep)
+            if spec["kind"] == "venv":
+                ensure_runtime(root, registry, family, interpreter, runner=runner, repository=repository)
+                runtimes[family] = {"family": family, "kind": "venv", "lockSHA256": spec["lockSHA256"],
+                                    "venv": spec["venv"], "interpreterSHA256": acquisition["interpreter"]["sha256"],
+                                    "packages": spec["packages"]}
+            else:
+                artifact = acquisition["artifacts"][spec["artifact"]]
+                ensure_artifact(root, registry, spec["artifact"], opener=opener, sleep=sleep)
+                runtimes[family] = {"family": family, "kind": "native", "artifact": spec["artifact"],
+                                    "archiveSHA256": artifact["sha256"],
+                                    "binary": f"{artifact['directory']}/extracted/{spec['binary']}",
+                                    "binarySHA256": artifact["members"][spec["binary"]],
+                                    "interpreterSHA256": acquisition["interpreter"]["sha256"]}
+        if target.files:
+            verified = verify_judge_snapshot(
+                target.judge_id, target.snapshot(root), repository=str(target.repository),
+                revision=str(target.revision), packages=_lock_packages(registry, family, repository),
+                registry=registry,
+            )
+            if verified != digests:
+                raise AcquisitionError(f"{target.judge_id}: the snapshot changed while it was being verified")
+        receipt = {
+            "schema": RECEIPT_SCHEMA,
+            "judge": target.judge_id,
+            "registryEntrySHA256": entry_digest(target.judge),
+            "repository": target.repository,
+            "revision": target.revision,
+            "snapshot": f"{target.directory}/{target.revision}" if target.files else None,
+            "files": {name: {"sha256": digest, "size": target.files[name]["size"]}
+                      for name, digest in sorted(digests.items())},
+            "runtime": runtimes[family],
+            "acquisitionSourceSHA256": _source_digest(),
+            "hostProfile": host_profile(),
+            "fetchedOn": dt.date.today().isoformat(),
+        }
+        _atomic_json(root / target.directory / RECEIPT_NAME, receipt)
+        report["fetched"].append({"judge": target.judge_id, "bytes": target.bytes, "runtime": family})
+        _log(f"{target.judge_id}: fetched and verified")
+    return report
+
+
+def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, runner: Runner = _run,
+           repository: Path = REPO, imports: bool = True, require: bool = True) -> list[dict[str, Any]]:
+    """Re-verify each selected judge offline from its receipt."""
+    acquisition = registry["acquisition"]
+    results = []
+    probed: dict[str, list[str]] = {}
+    for target in selected:
+        if target.blocked_reason:
+            results.append({"judge": target.judge_id, "status": "BLOCKED", "problems": [target.blocked_reason]})
+            continue
+        receipt = _read_json(root / target.directory / RECEIPT_NAME)
+        if receipt is None:
+            if require:
+                results.append({"judge": target.judge_id, "status": "FAIL", "problems": ["not fetched"]})
+            continue
+        problems: list[str] = []
+        if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("judge") != target.judge_id:
+            problems.append("the receipt is not this judge's")
+        elif receipt.get("registryEntrySHA256") != entry_digest(target.judge):
+            problems.append("the registry entry changed since acquisition; fetch it again")
+        family = target.runtime
+        spec = acquisition["runtimes"][family]
+        try:
+            packages = _lock_packages(registry, family, repository)
+            if target.files:
+                digests = verify_judge_snapshot(
+                    target.judge_id, target.snapshot(root), repository=str(target.repository),
+                    revision=str(target.revision), packages=packages, registry=registry,
+                )
+                recorded = {name: value.get("sha256") for name, value in (receipt.get("files") or {}).items()}
+                if digests != recorded:
+                    problems.append("the snapshot's digests differ from its receipt")
+            else:
+                require_runnable(target.judge_id, packages=packages, registry=registry)
+        except JudgeRegistryError as error:
+            problems.append(str(error))
+        runtime = receipt.get("runtime") if isinstance(receipt.get("runtime"), dict) else {}
+        if spec["kind"] == "venv":
+            if runtime.get("lockSHA256") != spec["lockSHA256"]:
+                problems.append(f"the {family} lock changed since acquisition; fetch it again")
+            if family not in probed:
+                probed[family] = _verify_runtime(root, registry, family, runner=runner, repository=repository,
+                                                 imports=imports)
+            problems.extend(probed[family])
+        else:
+            artifact = acquisition["artifacts"][spec["artifact"]]
+            binary = root / artifact["directory"] / "extracted" / spec["binary"]
+            if not binary.is_file() or _sha256(binary) != artifact["members"][spec["binary"]]:
+                problems.append(f"{spec['binary']} is missing or differs from its pinned SHA-256")
+        interpreter_spec = acquisition["interpreter"]
+        extracted = _read_json(root / interpreter_spec["directory"] / RECEIPT_NAME) or {}
+        if not interpreter_python(root, interpreter_spec).is_file() \
+                or extracted.get("archiveSHA256") != interpreter_spec["sha256"]:
+            problems.append("the pinned interpreter is not extracted from its pinned archive")
+        results.append({"judge": target.judge_id, "status": "FAIL" if problems else "PASS", "problems": problems})
+    return results
+
+
+def _verify_runtime(root: Path, registry: dict[str, Any], family: str, *, runner: Runner, repository: Path,
+                    imports: bool) -> list[str]:
+    spec = registry["acquisition"]["runtimes"][family]
+    python = root / spec["venv"] / "bin/python3"
+    receipt = _read_json(root / spec["venv"] / RUNTIME_RECEIPT_NAME)
+    if not python.is_file() or not receipt or receipt.get("lockSHA256") != spec["lockSHA256"]:
+        return [f"the {family} runtime is not built from its current lock"]
+    try:
+        problems = lock_differences(installed_distributions(python, runner=runner),
+                                    runtime_lock(registry, family, root=repository))
+        if not problems and imports:
+            import_probe(python, spec["importProbe"], runner=runner)
+    except (AcquisitionError, JudgeRegistryError) as error:
+        return [str(error)]
+    return [f"the {family} venv differs from its lock: {problem}" for problem in problems]
+
+
+# --------------------------------------------------------------------------- #
+# Plan and worker launch
+# --------------------------------------------------------------------------- #
+
+def plan(root: Path, registry: dict[str, Any], selected: Sequence[Target]) -> dict[str, Any]:
+    acquisition = registry["acquisition"]
+    rows = []
+    families: set[str] = set()
+    for target in selected:
+        receipt = _read_json(root / target.directory / RECEIPT_NAME)
+        snapshot = target.snapshot(root)
+        present = sum(1 for name in target.files if snapshot is not None and (snapshot / name).exists())
+        if target.blocked_reason:
+            state = "blocked"
+        elif receipt and receipt.get("registryEntrySHA256") == entry_digest(target.judge):
+            state = "fetched"
+        elif present:
+            state = "partial"
+        else:
+            state = "absent"
+        if not target.blocked_reason:
+            families.add(target.runtime)
+        spec = acquisition["runtimes"][target.runtime]
+        rows.append({
+            "judge": target.judge_id, "status": target.judge.get("status"), "stage": target.stage,
+            "repository": target.repository, "revision": target.revision, "files": len(target.files),
+            "bytes": target.bytes, "destination": f"{target.directory}/{target.revision}" if target.files else None,
+            "runtime": target.runtime, "venv": spec.get("venv"), "state": state,
+            "blocked": target.blocked_reason,
+        })
+    runtime_bytes = sum(int(acquisition["runtimes"][family].get("downloadBytes") or 0) for family in families)
+    runnable = [row for row in rows if not row["blocked"]]
+    return {
+        "modelRoot": str(root),
+        "judges": rows,
+        "acquisitionBlocked": [{"judge": entry["judge"], "reason": entry["reason"]}
+                               for entry in registry.get("acquisitionBlocked") or []],
+        "modelBytes": sum(row["bytes"] for row in runnable),
+        "modelBytesByStage": {str(stage): sum(row["bytes"] for row in runnable if row["stage"] == stage)
+                              for stage in sorted({row["stage"] for row in runnable})},
+        "runtimeDownloadBytes": runtime_bytes,
+        "interpreterBytes": acquisition["interpreter"]["size"],
+        "runtimeFamilies": sorted(families),
+    }
+
+
+def worker_launch(root: Path, registry: dict[str, Any], judge_id: str) -> dict[str, Any]:
+    """How an orchestrator launches a fetched judge's worker: its interpreter, engine and configuration.
+
+    Read from the registry and the judge's receipt; nothing is fetched. The
+    worker verifies the snapshot itself before it loads.
+    """
+    target = next((item for item in targets(registry) if item.judge_id == judge_id), None)
+    if target is None or target.blocked_reason:
+        raise AcquisitionError(f"{judge_id} is not a runnable panel judge")
+    receipt = _read_json(root / target.directory / RECEIPT_NAME)
+    if receipt is None or receipt.get("registryEntrySHA256") != entry_digest(target.judge):
+        raise AcquisitionError(f"{judge_id} is not fetched for the current registry entry")
+    acquisition = registry["acquisition"]
+    spec = acquisition["runtimes"][target.runtime]
+    execution = target.judge["execution"]
+    config: dict[str, Any] = {"judge": judge_id}
+    if target.files:
+        config.update(repository=target.repository, revision=target.revision, snapshot=str(target.snapshot(root)))
+    for key in ("decodeOptions", "configuration", "preprocessing"):
+        if key in target.judge:
+            config[key] = target.judge[key]
+    if spec["kind"] == "venv":
+        python = root / spec["venv"] / "bin/python3"
+    else:
+        python = interpreter_python(root, acquisition["interpreter"])
+        artifact = acquisition["artifacts"][spec["artifact"]]
+        config.update(binary=str(root / artifact["directory"] / "extracted" / spec["binary"]),
+                      binarySHA256=artifact["members"][spec["binary"]])
+    return {"judge": judge_id, "engine": execution["engine"], "lane": execution["lane"],
+            "threads": execution["threads"], "command": [str(python), str(WORKER)], "engineConfig": config}
+
+
+# --------------------------------------------------------------------------- #
+# CLI
+# --------------------------------------------------------------------------- #
+
+def _print_plan(value: dict[str, Any]) -> None:
+    print(f"Model root: {value['modelRoot']}")
+    for row in value["judges"]:
+        where = row["destination"] or "(no weights)"
+        note = f"  [{row['blocked']}]" if row["blocked"] else ""
+        print(f"  stage {row['stage']}  {row['judge']:36s} {row['bytes'] / 1e9:7.3f} GB  {row['state']:8s} "
+              f"{where}  runtime={row['runtime']}{note}")
+    for entry in value["acquisitionBlocked"]:
+        print(f"  blocked  {entry['judge']}: {entry['reason']}")
+    stages = ", ".join(f"stage {stage} {amount / 1e9:.2f} GB" for stage, amount in value["modelBytesByStage"].items())
+    print(f"Models: {value['modelBytes'] / 1e9:.2f} GB ({stages}); runtime wheels about "
+          f"{value['runtimeDownloadBytes'] / 1e9:.2f} GB for {len(value['runtimeFamilies'])} families; "
+          f"interpreter {value['interpreterBytes'] / 1e6:.0f} MB")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    for name in ("plan", "fetch", "verify"):
+        command = commands.add_parser(name)
+        command.add_argument("--judge", action="append", default=[], metavar="ID")
+        command.add_argument("--stage", type=int)
+        command.add_argument("--all", action="store_true")
+        command.add_argument("--model-root", type=Path, default=None)
+        if name != "fetch":
+            command.add_argument("--json", action="store_true")
+        if name == "verify":
+            command.add_argument("--no-import-probe", action="store_true")
+    args = parser.parse_args(argv)
+    root = (args.model_root or default_model_root()).resolve()
+    try:
+        registry = load_valid_registry()
+        explicit = bool(args.judge or args.stage is not None or args.all)
+        if args.command == "plan":
+            value = plan(root, registry, select(registry, judges=args.judge, stage=args.stage,
+                                                everything=args.all or not explicit))
+            if args.json:
+                print(json.dumps(value, indent=2, sort_keys=True))
+            else:
+                _print_plan(value)
+            return 0
+        if args.command == "fetch":
+            if not explicit:
+                raise AcquisitionError("fetch needs --judge ID, --stage N or --all")
+            report = fetch(root, registry, select(registry, judges=args.judge, stage=args.stage, everything=args.all))
+            results = verify(root, registry, [target for target in targets(registry)
+                                              if target.judge_id in {item["judge"] for item in report["fetched"]}])
+            report["verified"] = results
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0 if all(item["status"] == "PASS" for item in results) else 1
+        results = verify(root, registry, select(registry, judges=args.judge, stage=args.stage,
+                                                everything=args.all or not explicit),
+                         imports=not args.no_import_probe, require=explicit)
+        if args.json:
+            print(json.dumps(results, indent=2, sort_keys=True))
+        else:
+            for item in results:
+                detail = f": {'; '.join(item['problems'])}" if item["problems"] else ""
+                print(f"{item['status']:7s} {item['judge']}{detail}")
+            if not results:
+                print("nothing fetched yet")
+        return 0 if all(item["status"] in ("PASS", "BLOCKED") for item in results) else 1
+    except (AcquisitionError, JudgeRegistryError, OSError, tarfile.TarError) as error:
+        print(f"audio-qc-acquire: FAIL\n{error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

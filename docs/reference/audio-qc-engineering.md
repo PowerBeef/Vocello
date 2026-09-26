@@ -28,6 +28,9 @@ sourceOfTruth:
   - scripts/lib/qc_pipeline/admission.py
   - scripts/lib/qc_pipeline/workers.py
   - scripts/lib/qc_pipeline/layered_cache.py
+  - scripts/lib/qc_pipeline/panel_engines.py
+  - scripts/acquire_audio_qc_judges.py
+  - config/audio-qc-runtimes/
   - scripts/delivery_resource_supervisor.py
   - config/audio-qc-judges.json
   - config/audio-qc-qualification-policy.json
@@ -1203,6 +1206,91 @@ cascade takes no evaluator model and requests no `tiny-local-heads` layer, Disti
 candidate order, the adapter and the preparation tool, and both sit on the exclusion list. Their
 licenses stay recorded as permissive. `delivery_evaluator.py` keeps the heads' fitting commands as
 research tooling outside every QC path.
+
+### Judge panel acquisition (AQ-06, prepared 2026-09-26)
+
+The audit's panel (section 4) is registered in `config/audio-qc-judges.json` as `candidate` judges.
+Each is pinned to every file it fetches at its Hugging Face revision: the LFS SHA-256 or the git blob
+ID, with the size. The pins were read from the Hub's tree metadata on 2026-09-26, and nothing was
+downloaded. Each judge also records its license tier, its voting role, its output identity, and a
+ceiling and thread count marked `provisional`. These are audit section 3.4 estimates; the two clean
+M6 runs replace each with its measured peak × 1.2.
+
+| Judge | Repository @ revision | GB | Tier | Votes | Status |
+|---|---|---|---|---|---|
+| `asr.whisper-large-v3@1` | `mlx-community/whisper-large-v3-mlx@49e6aa28` | 3.08 | B | yes | candidate |
+| `asr.parakeet-tdt-0.6b-v3@1` | `mlx-community/parakeet-tdt-0.6b-v3@ed2b7e8c` | 2.51 | B | yes | candidate |
+| `asr.paraformer-zh@1` | `funasr/paraformer-zh@d7811ee3` | 0.89 | A | yes | candidate |
+| `asr.sensevoice-small-f16@1` | `FunAudioLLM/SenseVoiceSmall-GGUF@90c1c619` (f16 file only) | 0.47 | A | yes | candidate |
+| `asr.qwen3-asr-1.7b@1` | `mlx-community/Qwen3-ASR-1.7B-bf16@e1f6c266` | 4.08 | A | no (same lab) | candidate |
+| `align.qwen3-forcedaligner-0.6b@1` | `mlx-community/Qwen3-ForcedAligner-0.6B-bf16@53c8c0e4` | 1.84 | A | no (same lab) | candidate |
+| `lid.voxlingua107-ecapa@1` | `speechbrain/lang-id-voxlingua107-ecapa@0253049a` | 0.09 | B | yes | candidate |
+| `speaker.campplus-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-campplus-LM@c5e01c6f` (ONNX only) | 0.03 | B | yes | candidate |
+| `speaker.resnet293-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-resnet293-LM@6e6bffe5` (ONNX only) | 0.11 | B | no | quarantined |
+| `pitch.pyin@1` | librosa 0.11.0, no weights | 0 | A | no | candidate |
+| `quality.audiobox-aesthetics@1` | `facebook/audiobox-aesthetics@9b1dd8e5` (safetensors only) | 0.42 | A | no (advisory) | candidate |
+
+Two picks are not fetched, and neither was substituted:
+
+- **ResNet293 is quarantined.** Its card declares CC BY 4.0, where the audit recorded Apache-2.0.
+  The tier would stay B. Lifting the quarantine is a maintainer decision; the entry's `quarantine.lift`
+  names the edit.
+- **DNSMOS is listed in `acquisitionBlocked`.** Its only official source is the microsoft/DNS-Challenge
+  GitHub repository, so no Hugging Face revision or digest exists to pin, and its training-data terms
+  are still unconfirmed.
+
+**Runtimes.** Each judge runs in the venv of its runtime family, built from a committed hash lock
+(`config/audio-qc-runtimes/<family>.txt`). The eight locks were resolved for CPython 3.14.4 on macOS
+arm64 from PyPI metadata alone. The registry records each lock's digest, and the validator refuses a
+drifted lock, a judge pin that differs from its lock, and any locked package on the exclusion list.
+
+- torch is held at 2.11.0 to match torchaudio 2.11.0, its newest release, whose wheels declare no
+  torch pin.
+- The FunASR lock builds four pure-Python sdists (jieba, oss2, crcmod, antlr4) from hash-pinned
+  sources, after the lock's own setuptools.
+- soxr, which librosa requires, is LGPL-2.1-or-later. It is recorded as a notice.
+- SenseVoice f16 reuses the pinned llama.cpp runtime v0.1.9. Its command line has no language, ITN
+  or thread option, so the audit's ja/ko lock and `use_itn=False` cannot be set. The judge's
+  `decodeOptions` say so, and a take whose emitted language differs from the expected one abstains.
+
+**Maintainer commands.** Run these from the main checkout. `fetch` is the only step that downloads.
+
+```sh
+python3 scripts/acquire_audio_qc_judges.py plan          # judges, bytes, destinations; no network
+python3 scripts/acquire_audio_qc_judges.py fetch --all   # or: fetch --stage 1, later fetch --stage 2
+python3 scripts/acquire_audio_qc_judges.py verify        # offline re-check of every receipt
+```
+
+**Disk.** The models take 13.40 GB: stage 1 is 7.07 GB (the six current languages' voters, LID,
+CAM++ and pYIN) and stage 2 is 6.34 GB (the adjudicator, the aligner and Audiobox). The runtimes add
+about 1.19 GB of wheels, about 3-4 GB once installed across eight venvs (est.), plus an 18 MB
+interpreter. Everything lands under `build/cache/delivery-analysis/external-models/`, the
+`delivery-analysis-cache` entry of the build-output policy. `fetch` refuses to start a judge
+without its remaining bytes plus 2 GiB free.
+
+**What `fetch` guarantees.**
+
+- **Files.** Each file downloads into `.partial/` and resumes by HTTP range. It moves into
+  `<judge directory>/<revision>/` only once its size and digest match the pin. A mismatch is
+  discarded, and a checksum is never inferred.
+- **Interpreter and native runtime.** The python-build-standalone 3.14.4 archive and the SenseVoice
+  runtime are verified by SHA-256, and existing copies are reused.
+- **Venvs.** Each venv installs with `pip --isolated --require-hashes --no-deps --only-binary :all:`.
+  It must then equal its lock exactly and pass an offline import probe.
+- **Receipts.** A per-judge `receipt.json`, written last, records every digest, with names relative
+  to the model root.
+- **Workers.** The worker engines (`lib/qc_pipeline/panel_engines.py`, reached through
+  `audio_qc_worker.py`) set the hubs offline. Before anything loads, each runs the registry's load
+  gate, which refuses an excluded installed package, and verifies every pinned file. The
+  weightless pYIN judge runs `require_runnable` instead of the file check.
+
+**Still to do (consent-bound, P8).** Each judge needs two clean M6 resource runs, a measured
+determinism class and a canary record, and the whisper-small against large-v3 dual run must publish
+its flip analysis. The offline tests replace every model with a fake. Each backend's own library
+calls, such as `parakeet_mlx.from_pretrained`, FunASR's `AutoModel`, mlx-audio's `load_model` and
+SpeechBrain's `from_hparams`, run for the first time in that session. The orchestrator does not yet
+build Stage 2 jobs for the panel judges; `acquire_audio_qc_judges.worker_launch` supplies their
+interpreter, engine and configuration from a current receipt.
 
 ### Speech/defect calibration: independent references, no required listening
 

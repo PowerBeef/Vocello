@@ -200,9 +200,9 @@
       "id": "delivery-analysis-cache",
       "path": "build/cache/delivery-analysis",
       "class": "cache",
-      "owner": "Operator-local delivery evaluator",
+      "owner": "Operator-local delivery evaluator and the audio QC judge panel",
       "cleanup": "aggressive",
-      "retention": "Content-addressed canonical PCM and source-bound analysis layers; never promotion evidence by itself",
+      "retention": "Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (scripts/acquire_audio_qc_judges.py, re-fetchable); never promotion evidence by itself",
       "env": "QVOICE_DELIVERY_ANALYSIS_CACHE"
     },
     {

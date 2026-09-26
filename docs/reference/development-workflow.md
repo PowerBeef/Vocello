@@ -141,8 +141,8 @@ Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
 `scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to
 the Python lane, whose supply-chain tests check their pins. A lane skipped inside a green run
 advances that lane's base, so a rarely-run lane never drags the others back. Caches are keyed
-`<platform>-xcode<version>-<dependency graph>-<ISO week>` and saved only on an exact miss, so the
-first run of each week (or of a new dependency graph) pays one save and the store holds at most a
+`<platform>-xcode<version>-<dependency graph>-<ISO week>` and saved only on an exact miss by a job
+whose steps all passed (a failed build never becomes the week's snapshot), so the first run of each week (or of a new dependency graph) pays one save and the store holds at most a
 couple of generations per platform; the shared package checkout has its own cache keyed on the two
 `Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes
 so Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00

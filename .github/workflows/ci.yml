@@ -282,8 +282,10 @@ jobs:
 
       - name: Save build caches
         # Only an exact miss saves (first run of the week or of a new graph, or a
-        # cold dispatch); a warm run leaves the store untouched.
-        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        # cold dispatch), and only after every step passed (CI-11): a failed or
+        # partial build never becomes the week's snapshot. A warm run leaves the
+        # store untouched.
+        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -292,7 +294,7 @@ jobs:
           key: ${{ steps.key.outputs.value }}
 
       - name: Save the shared package checkout
-        if: ${{ !cancelled() && steps.spm.outputs.cache-hit != 'true' }}
+        if: ${{ success() && steps.spm.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages
@@ -376,7 +378,7 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save the sanitizer build cache
-        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/macos-tsan
@@ -474,14 +476,14 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save build caches
-        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/ios-device
           key: ${{ steps.key.outputs.value }}
 
       - name: Save the shared package checkout
-        if: ${{ !cancelled() && steps.spm.outputs.cache-hit != 'true' }}
+        if: ${{ success() && steps.spm.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages

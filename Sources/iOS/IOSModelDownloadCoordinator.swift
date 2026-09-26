@@ -427,13 +427,21 @@ final class IOSModelDownloadCoordinator {
             }
             // IOS-20: space is checked again when the transfer actually starts (after
             // a queue wait, or when a relaunch restores the request), for the bytes
-            // still to fetch rather than the whole artifact.
+            // still to fetch rather than the whole artifact. `receivedBytes` counts
+            // against the whole artifact, reused shared components included.
             let bytesToFetch = files.reduce(Int64(0)) { $0 + $1.size }
-            try IOSModelDeliverySupport.ensureSufficientDiskSpace(
-                requiredBytes: max(0, bytesToFetch - request.receivedBytes),
-                at: AppPaths.appSupportDir,
-                fileManager: fileManager
-            )
+            do {
+                try IOSModelDeliverySupport.ensureSufficientDiskSpace(
+                    requiredBytes: min(bytesToFetch, max(0, totalBytes - request.receivedBytes)),
+                    at: AppPaths.appSupportDir,
+                    fileManager: fileManager
+                )
+            } catch {
+                // A relaunch can leave this request's tasks live in the background
+                // session; a request that fails here must not keep downloading.
+                await downloader.cancelAllSessionTasks()
+                throw error
+            }
             let generation = beginOperation()
             updateRequest(model.id, in: &ledger) { $0.status = .downloading }
             try ledgerStore.save(ledger)

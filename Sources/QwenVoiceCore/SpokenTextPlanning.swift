@@ -102,7 +102,9 @@ public struct SpokenTextCodeSwitchRange: Codable, Equatable, Hashable, Sendable 
 }
 
 public struct SpokenTextNormalizationPolicy: Codable, Equatable, Hashable, Sendable {
-    public static let currentAlgorithmVersion = 1
+    // v2 (2026-09-26, CORE-10): one line break per grapheme, so a CRLF pair is a
+    // line break rather than a paragraph. Text without CR normalizes as in v1.
+    public static let currentAlgorithmVersion = 2
 
     public let algorithmVersion: Int
     public let languageIdentifier: String?

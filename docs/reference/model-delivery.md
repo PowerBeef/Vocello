@@ -102,8 +102,9 @@ suffixes `huggingface.co` and `hf.co`. A rejected redirect is never adopted as b
 Background sessions follow redirects without asking the delegate, so the same allowlist is also
 applied to each transfer's final response URL at completion and to the URL in any resume data
 before it is used. No transfer may receive more than its catalog size (or its range length), so a
-misbehaving server cannot fill the disk before verification. One process at a time stages a model:
-a lock file beside the staging tree refuses a concurrent install from the app or the CLI.
+misbehaving server cannot fill the disk before verification. On the Mac, one process at a time
+stages a model: a lock file beside the staging tree refuses a concurrent install from the app or the
+CLI (the iPhone's background downloader takes no file lock in its App Group container).
 
 The catalog is `complete`: the bundled iPhone evidence supplies the three Speed variants and
 `config/model-artifact-receipts.json` supplies the three Quality variants. All six packages pin a

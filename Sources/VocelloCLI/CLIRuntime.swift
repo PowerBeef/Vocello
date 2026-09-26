@@ -143,7 +143,10 @@ struct CLIRuntime {
         let bundled = bundles.lazy
             .compactMap { $0.url(forResource: resourceName, withExtension: "json") }
             .first
+        // Resolved, so a sealed payload run through a symlink still finds its
+        // own folder (and its manifest) rather than the link's.
         let executableDirectory = (Bundle.main.executableURL ?? Bundle.main.bundleURL)
+            .resolvingSymlinksInPath()
             .deletingLastPathComponent()
         let fileManager = FileManager.default
         return resolveTrustAnchor(

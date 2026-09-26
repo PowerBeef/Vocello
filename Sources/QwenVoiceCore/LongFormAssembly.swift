@@ -13,7 +13,9 @@ public enum LongFormAssemblyError: Error, Equatable, Sendable {
 }
 
 public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
-    public static let currentAlgorithmVersion = 1
+    // v2 (2026-09-26, CORE-12): a segment's boost is capped at the per-take
+    // limiter ceiling over its peak. Segments that could not clip join as in v1.
+    public static let currentAlgorithmVersion = 2
 
     public let algorithmVersion: Int
     public let sampleRate: Int

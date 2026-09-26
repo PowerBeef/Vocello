@@ -138,11 +138,6 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
         return identity
     }
 
-    /// Background adoption is a production trust boundary. A task without an
-    /// immutable artifact identity, exact size, safe path, and SHA-256 may
-    /// finish in its current process, but it can never be adopted after a
-    /// relaunch. A chunk identity must carry a coherent in-bounds byte range;
-    /// a half-specified range is invalid.
     /// The most bytes a task with this identity may receive (SEC-16): the range
     /// length for a chunk, the catalog size for a whole file.
     public var transferByteCeiling: Int64 {
@@ -164,6 +159,11 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
         return totalBytesWritten > ceiling || totalBytesExpectedToWrite > ceiling
     }
 
+    /// Background adoption is a production trust boundary. A task without an
+    /// immutable artifact identity, exact size, safe path, and SHA-256 may
+    /// finish in its current process, but it can never be adopted after a
+    /// relaunch. A chunk identity must carry a coherent in-bounds byte range;
+    /// a half-specified range is invalid.
     public var isValidProductionIdentity: Bool {
         schemaVersion == Self.currentSchemaVersion
             && isSafeIdentityComponent(logicalRequestID)

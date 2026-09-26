@@ -109,9 +109,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// range under the same range-qualified identity; the partial and the
         /// completed-range sidecar are kept.
         public var maxRangeRetries = 3
-        /// How long a run waits for another owner of its model's staging tree (a
-        /// cancelled run of this process still unwinding, or another process) before
-        /// refusing (CORE-13).
+        /// How long a foreground run waits for another owner of its model's staging
+        /// tree (a cancelled run of this process still unwinding, or another process)
+        /// before refusing (CORE-13). Background sessions take no staging lock.
         public var stagingLockPatience: Duration = .seconds(5)
         public init() {}
     }
@@ -1584,18 +1584,33 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
         await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
+        let stagingRoot = explicitStagingRoot ?? Self.stagingRoot(forTargetDirectory: targetDir)
+        // CORE-13: the Mac app and the CLI share the models folder, so a foreground
+        // run owns its model's staging tree until its teardown ends. The iOS
+        // background downloader takes no file lock: it would be held in the App
+        // Group container across suspension (0xDEAD10CC), and its coordinator
+        // already runs one model at a time in the only process that stages there.
+        var stagingLock: StagingLock?
         do {
+            if !isBackgroundSession {
+                stagingLock = try await StagingLock.acquire(
+                    stagingRoot: stagingRoot,
+                    fileManager: fileManager,
+                    patience: engineConfiguration.stagingLockPatience
+                )
+            }
             let transferAccounting = try await runDownload(
                 files: files,
                 repo: repo,
                 revision: revision,
                 targetDir: targetDir,
                 requestIdentity: requestIdentity,
-                explicitStagingRoot: explicitStagingRoot,
+                stagingRoot: stagingRoot,
                 installedFiles: installedFiles,
                 sharedComponentPlan: sharedComponentPlan
             )
             await finishRun(succeeded: true)
+            stagingLock?.release()
             return transferAccounting
         } catch {
             // Every failure, including one before any transfer started (an invalid
@@ -1603,6 +1618,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // stops the heartbeat and releases the URLSessions, which would otherwise
             // keep this downloader alive for the life of the process (CORE-14).
             await finishRun(succeeded: false)
+            stagingLock?.release()
             throw error
         }
     }
@@ -1632,7 +1648,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         revision: String,
         targetDir: URL,
         requestIdentity: ModelDownloadRequestIdentity? = nil,
-        explicitStagingRoot: URL? = nil,
+        stagingRoot: URL,
         installedFiles: [RepoFile]? = nil,
         sharedComponentPlan: SharedComponentMigrationPlan? = nil
     ) async throws -> RepositoryTransferAccounting {
@@ -1651,13 +1667,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 throw DownloadError.apiError("Shared component installation plan does not match the artifact")
             }
         }
-        let stagingRoot = explicitStagingRoot ?? Self.stagingRoot(forTargetDirectory: targetDir)
-        let stagingLock = try await StagingLock.acquire(
-            stagingRoot: stagingRoot,
-            fileManager: fileManager,
-            patience: engineConfiguration.stagingLockPatience
-        )
-        defer { stagingLock.release() }
         let filesRoot = stagingRoot.appendingPathComponent("files", isDirectory: true)
         let partialRoot = stagingRoot.appendingPathComponent("partials", isDirectory: true)
         let resumeRoot = stagingRoot.appendingPathComponent("resume-data", isDirectory: true)
@@ -2991,6 +3000,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                !artifactURLPolicy.allowsTransferURL(resumeURL) {
                 // SEC-08: resume data names the URL it continues from; one outside
                 // the allowlist is discarded and the file restarts from its catalog URL.
+                // A task whose request is not populated yet is let through: the URL
+                // its bytes finally come from is still checked at completion.
                 resumedTask.cancel()
                 try? fileManager.removeItem(at: resumeDataURL)
             } else {

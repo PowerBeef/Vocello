@@ -12,7 +12,6 @@ enum VocelloMain {
 
     private static func execute() async -> Int32 {
         let route = CLICommandRoute(Array(CommandLine.arguments.dropFirst()))
-        if route == .missingCommand { printUsage(); exit(2) }
 
         do {
             switch route {

@@ -289,6 +289,7 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
     private static func allowlistedStage(_ value: String?) -> String? {
         guard let value else { return nil }
         return [
+            "request validation": "request_validation",
             "prepared cache validation": "prepared_cache_validation",
             "prepared cache rebuild": "prepared_cache_rebuild",
             "tokenizer preparation": "tokenizer_preparation",

@@ -61,6 +61,32 @@ bundles and catalogs. The release workflow stages a complete `Vocello CLI` folde
 quoted executable path. No checkout, Python, privileged install, Homebrew formula, or shell-profile
 edit is needed for that payload. Model weights remain separate, explicitly installed data.
 
+### Zsh completion
+
+The checked-in completion file suggests CLI commands, actions, flags, and selected option values.
+To use it from a checkout, copy it to a directory in zsh's `fpath`:
+
+```sh
+mkdir -p ~/.zsh/completions
+cp scripts/completions/_vocello ~/.zsh/completions/
+```
+
+Add this line to `~/.zshrc` before any existing `compinit` call:
+
+```zsh
+fpath=(~/.zsh/completions $fpath)
+```
+
+If your configuration does not already initialize completion, add this line after it.
+Then open a new shell:
+
+```zsh
+autoload -Uz compinit && compinit
+```
+
+With `vocello` on your `PATH`, `vocello <TAB>` lists commands and
+`vocello bench --<TAB>` lists benchmark flags.
+
 `scripts/cli_package.py` inventories the executable, source-bound catalogs, MLX shader and dependency
 resources, and existing governed license/NOTICE material. It rejects missing/stale resources,
 extra executable code, symlinks, digest drift, or mismatched source/version/build identity. Packaging

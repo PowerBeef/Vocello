@@ -478,6 +478,10 @@ targets:
       - path: Sources/VocelloCLI/CLIVoiceCloningConsent.swift
       - path: Sources/VocelloCLI/Support.swift
       - path: Sources/VocelloCLI/CLIRuntime.swift
+      # TEST-13: the `generate` option helpers (and the mode table its picker
+      # prints), tested beside the argument parser and dispatch in Support.swift.
+      - path: Sources/VocelloCLI/GenerateCommand.swift
+      - path: Sources/VocelloCLI/ModesCommand.swift
       - path: Sources/iOSSupport/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift

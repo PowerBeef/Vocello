@@ -60,6 +60,61 @@ struct Args {
     }
 }
 
+/// Which command `vocello <command> …` runs, and with which arguments. Pure, so the
+/// dispatch table is unit-tested apart from the commands it starts.
+enum CLICommandRoute: Equatable {
+    case generate([String])
+    case batch([String])
+    case modes([String])
+    case deliveries([String])
+    case voices([String])
+    case speakers([String])
+    case models([String])
+    case bench([String])
+    case help
+    case version
+    case unknown(String)
+    case missingCommand
+
+    init(_ argv: [String]) {
+        guard let command = argv.first else {
+            self = .missingCommand
+            return
+        }
+        let rest = Array(argv.dropFirst())
+        switch command {
+        case "generate", "gen":
+            self = .generate(rest)
+        case "custom", "design", "clone":
+            // Mode subcommand shortcut: inject --mode and forward. `--file` routes
+            // to bulk batch; otherwise single-clip generate.
+            let forwarded = ["--mode", command] + rest
+            let toBatch = rest.contains { $0 == "--file" || $0.hasPrefix("--file=") }
+            self = toBatch ? .batch(forwarded) : .generate(forwarded)
+        case "batch":
+            self = .batch(rest)
+        case "modes":
+            self = .modes(rest)
+        case "deliveries", "delivery":
+            self = .deliveries(rest)
+        case "voices", "voice":
+            self = .voices(rest)
+        case "speakers", "speaker":
+            self = .speakers(rest)
+        case "models", "model":
+            self = .models(rest)
+        case "bench", "benchmark":
+            self = .bench(rest)
+        case "help", "-h", "--help":
+            self = .help
+        case "version", "--version", "-v":
+            self = .version
+        default:
+            self = .unknown(command)
+        }
+    }
+}
+
 enum CLIPaths {
     /// Resolve the runtime data directory the engine roots at (models/, cache/,
     /// outputs/, diagnostics/). Mirrors the app's AppPaths selection without

@@ -11,41 +11,36 @@ enum VocelloMain {
     }
 
     private static func execute() async -> Int32 {
-        var argv = Array(CommandLine.arguments.dropFirst())
-        guard let sub = argv.first else { printUsage(); exit(2) }
-        argv.removeFirst()
+        let route = CLICommandRoute(Array(CommandLine.arguments.dropFirst()))
+        if route == .missingCommand { printUsage(); exit(2) }
 
         do {
-            switch sub {
-            case "generate", "gen":
+            switch route {
+            case .generate(let argv):
                 try await GenerateCommand.run(argv)
-            case "custom", "design", "clone":
-                // Mode subcommand shortcut: inject --mode and forward. `--file`
-                // routes to bulk batch; otherwise single-clip generate.
-                let toBatch = argv.contains { $0 == "--file" || $0.hasPrefix("--file=") }
-                let forwarded = ["--mode", sub] + argv
-                if toBatch { try await BatchCommand.run(forwarded) }
-                else { try await GenerateCommand.run(forwarded) }
-            case "batch":
+            case .batch(let argv):
                 try await BatchCommand.run(argv)
-            case "modes":
+            case .modes(let argv):
                 try await ModesCommand.run(argv)
-            case "deliveries", "delivery":
+            case .deliveries(let argv):
                 try await DeliveriesCommand.run(argv)
-            case "voices", "voice":
+            case .voices(let argv):
                 try await VoicesCommand.run(argv)
-            case "speakers", "speaker":
+            case .speakers(let argv):
                 try await SpeakersCommand.run(argv)
-            case "models", "model":
+            case .models(let argv):
                 try await ModelsCommand.run(argv)
-            case "bench", "benchmark":
+            case .bench(let argv):
                 try await BenchCommand.run(argv)
-            case "help", "-h", "--help":
+            case .help:
                 printUsage()
-            case "version", "--version", "-v":
+            case .version:
                 print("vocello \(vocelloCLIVersion)")
-            default:
-                FileHandle.standardError.write(Data("unknown command: \(sub)\n\n".utf8))
+            case .unknown(let command):
+                FileHandle.standardError.write(Data("unknown command: \(command)\n\n".utf8))
+                printUsage()
+                exit(2)
+            case .missingCommand:
                 printUsage()
                 exit(2)
             }

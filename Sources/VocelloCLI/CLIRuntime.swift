@@ -121,67 +121,81 @@ struct CLIRuntime {
     // MARK: - Manifest / version
 
     static func locateManifestURL() throws -> URL {
-        // 1) Bundled resource (shipped CLI). 2) repo-relative when run from the
-        // repo root (dev + benchmarks). 3) next to the executable.
-        let bundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
-        for bundle in bundles {
-            if let url = bundle.url(forResource: "qwenvoice_contract", withExtension: "json") {
-                return url
-            }
+        guard let url = locateTrustAnchor(named: "qwenvoice_contract") else {
+            throw CLIError("Could not locate qwenvoice_contract.json. Pass --manifest <path>.")
         }
-        let fm = FileManager.default
-        let exeDir = Bundle.main.bundleURL.deletingLastPathComponent().path
-        // Direct candidates: next to the executable, or cwd == repo root.
-        let candidates = [
-            exeDir + "/qwenvoice_contract.json",
-            fm.currentDirectoryPath + "/Sources/Resources/qwenvoice_contract.json",
-        ]
-        for path in candidates where fm.fileExists(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-        // 3) Walk up from cwd so the CLI also resolves the contract when run from
-        // any subdirectory of the repo (dev convenience).
-        if let found = findUpwards(relativePath: "Sources/Resources/qwenvoice_contract.json",
-                                   from: fm.currentDirectoryPath) {
-            return found
-        }
-        throw CLIError("Could not locate qwenvoice_contract.json. Pass --manifest <path>.")
+        return url
     }
 
     static func locateProductionCatalogURL() throws -> URL {
-        let resourceName = "qwenvoice_production_model_catalog"
+        guard let url = locateTrustAnchor(named: "qwenvoice_production_model_catalog") else {
+            throw CLIError("Could not locate authenticated production model catalog.")
+        }
+        return url
+    }
+
+    /// The sealed CLI payload's inventory, staged next to the executable by
+    /// `scripts/cli_package.py`; its presence marks a distributed build.
+    nonisolated static let sealedPayloadManifestName = "package-manifest.json"
+
+    private static func locateTrustAnchor(named resourceName: String) -> URL? {
         let bundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
-        for bundle in bundles {
-            if let url = bundle.url(forResource: resourceName, withExtension: "json") {
-                return url
-            }
-        }
-        let fm = FileManager.default
-        let exeDir = Bundle.main.bundleURL.deletingLastPathComponent().path
-        let relativePath = "Sources/Resources/\(resourceName).json"
-        let candidates = [
-            exeDir + "/\(resourceName).json",
-            fm.currentDirectoryPath + "/\(relativePath)",
-        ]
-        for path in candidates where fm.fileExists(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-        if let found = findUpwards(relativePath: relativePath, from: fm.currentDirectoryPath) {
-            return found
-        }
-        throw CLIError("Could not locate authenticated production model catalog.")
+        let bundled = bundles.lazy
+            .compactMap { $0.url(forResource: resourceName, withExtension: "json") }
+            .first
+        let executableDirectory = (Bundle.main.executableURL ?? Bundle.main.bundleURL)
+            .deletingLastPathComponent()
+        let fileManager = FileManager.default
+        return resolveTrustAnchor(
+            fileName: "\(resourceName).json",
+            bundledURL: bundled,
+            executableDirectory: executableDirectory,
+            currentDirectory: fileManager.currentDirectoryPath,
+            fileExists: { fileManager.fileExists(atPath: $0) }
+        )
+    }
+
+    /// Where a trust anchor (the contract, the production catalog) comes from, in
+    /// order (SEC-09):
+    /// 1. the resource bundled with the CLI;
+    /// 2. the file next to the executable;
+    /// 3. only outside a sealed payload (no `package-manifest.json` next to the
+    ///    executable), the repository copy under the working directory or one of its
+    ///    parents, so development runs from any repository folder keep working.
+    /// A distributed CLI therefore never reads an anchor from the folder it runs in,
+    /// which could otherwise redirect installs into the store the app shares.
+    nonisolated static func resolveTrustAnchor(
+        fileName: String,
+        bundledURL: URL?,
+        executableDirectory: URL,
+        currentDirectory: String,
+        fileExists: (String) -> Bool
+    ) -> URL? {
+        if let bundledURL { return bundledURL }
+        let besideExecutable = executableDirectory.appendingPathComponent(fileName)
+        if fileExists(besideExecutable.path) { return besideExecutable }
+        let sealedManifest = executableDirectory.appendingPathComponent(sealedPayloadManifestName)
+        guard !fileExists(sealedManifest.path) else { return nil }
+        return findUpwards(
+            relativePath: "Sources/Resources/\(fileName)",
+            from: currentDirectory,
+            fileExists: fileExists
+        )
     }
 
     /// Walk up parent directories from `start`, returning the first existing
     /// `<dir>/<relativePath>` (stops at the filesystem root). Lets the CLI find
     /// repo-relative dev assets (the contract, the summarizer script) regardless
     /// of which subdirectory it's launched from.
-    nonisolated static func findUpwards(relativePath: String, from start: String) -> URL? {
-        let fm = FileManager.default
+    nonisolated static func findUpwards(
+        relativePath: String,
+        from start: String,
+        fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) -> URL? {
         var dir = URL(fileURLWithPath: start, isDirectory: true).standardizedFileURL
         while true {
             let candidate = dir.appendingPathComponent(relativePath)
-            if fm.fileExists(atPath: candidate.path) { return candidate }
+            if fileExists(candidate.path) { return candidate }
             let parent = dir.deletingLastPathComponent()
             if parent.path == dir.path { return nil }  // reached filesystem root
             dir = parent

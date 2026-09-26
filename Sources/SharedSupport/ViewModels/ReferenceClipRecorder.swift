@@ -11,6 +11,11 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     static let minDuration: Double = 10.0
     static let maxDuration: Double = 20.0
 
+    /// Posted just before capture starts (macOS), so the app's player pauses
+    /// instead of playing into the new reference (MAC-14). On iOS the one
+    /// session owner and `IOSPlaybackExclusivity` do this.
+    nonisolated static let willStartRecordingNotification = Notification.Name("ReferenceClipRecorderWillStartRecording")
+
     @Published private(set) var isRecording: Bool = false
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var amplitude: Double = 0
@@ -125,6 +130,9 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         guard !isRecording else { return }
 
         if let virtualURL = Self.virtualMicrophoneURL {
+            #if os(macOS)
+            NotificationCenter.default.post(name: Self.willStartRecordingNotification, object: self)
+            #endif
             startVirtualCapture(from: virtualURL)
             return
         }
@@ -175,6 +183,8 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
             // outranks playback until this claim is released, and every player pauses.
             recordingClaim = try activation.get()
             IOSPlaybackExclusivity.didStartPlayback(self)
+            #else
+            NotificationCenter.default.post(name: Self.willStartRecordingNotification, object: self)
             #endif
 
             let url = makeOutputURL()
@@ -442,8 +452,7 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     }
 
     private func makeOutputURL() -> URL {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("voice-clone-references", isDirectory: true)
+        let tmp = ReferenceClipRecordingStash.captureDirectory
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let stamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")

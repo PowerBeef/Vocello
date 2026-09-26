@@ -47,7 +47,7 @@ export const WORKFLOWS = [
     accent: "you own.",
     body: "Pick a voice you already designed in Saved Voices, record a short reference clip with the microphone, or import an audio file. Transcript-backed saved voices can reuse prepared Qwen3 clone prompts for cleaner repeat generations. Only clone voices you have permission to use.",
     points: [
-      ["Saved, recorded, or imported", "Pick any voice from Saved Voices, record a clip in the app, or import a reference file on either platform. The Mac open panel accepts WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM; the iPhone Files picker accepts WAV, MP3, AIFF, or M4A. Saved Voices are optimized for repeat use."],
+      ["Saved, recorded, or imported", "Pick any voice from Saved Voices, record a clip in the app, or import a reference file on either platform. The Mac open panel accepts WAV, MP3, AIFF, M4A, or FLAC, plus OGG where macOS can decode it; the iPhone Files picker accepts WAV, MP3, AIFF, or M4A. Saved Voices are optimized for repeat use."],
       ["Transcript-backed quality", "Paste the words spoken in the clip, or let Vocello transcribe them locally, for the strongest reusable clone prompt. Audio-only references remain available as a lower-guidance fallback."],
       ["Source-led delivery", "Voice Cloning follows the reference clip. Delivery presets are not exposed for this path today."],
     ],

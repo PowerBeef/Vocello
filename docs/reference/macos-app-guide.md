@@ -45,6 +45,8 @@ actual reachable sizes rather than treating those constants as proof of fit.
 | History destination | `sidebar_history` | Cmd+4 |
 | Voices destination | `sidebar_voices` | Cmd+5 |
 | Settings destination | `sidebar_settings` | Cmd+6 |
+| History search field | `history_searchField` | Cmd+F (opens History) |
+| Stop: cancels a running take, otherwise stops playback | Playback menu | Cmd+. |
 
 Three generation modes (Custom / Design / Clone) — same engine contract as iOS, but macOS
 has **both Speed (4-bit) and Quality (8-bit)** variants.
@@ -320,7 +322,7 @@ The shell harness owns deterministic proof and evidence:
   then re-observe the real destination identifier such as `screen_customVoice`.
 - **Menus + popovers** — sort pickers, model "Manage" menus, language/delivery pickers use
   macOS menus (NSMenu), not iOS-style sheets. Re-observe after opening before selecting.
-- **Keyboard shortcuts** — Cmd+1..6 for sidebar (Cmd+6 is labeled "Models" in the Navigate menu but opens the unified Settings/Models surface); Cmd+, for the Settings window.
+- **Keyboard shortcuts** — Cmd+1..6 for sidebar (Cmd+6 is the Navigate menu's Settings item); Cmd+F opens History with its search field focused; Cmd+. cancels a running take (single take, line batch or long-form project) and otherwise stops playback; Cmd+, for the Settings window.
 - **File pickers** — reference import uses NSOpenPanel. Import is product functionality but is not
   part of the minimal smoke or benchmark lane.
 - **Screenshots** — attach named screenshots at important states and on failures; do not use

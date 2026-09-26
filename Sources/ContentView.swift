@@ -160,7 +160,10 @@ struct ContentView: View {
         .onChange(of: voiceCloningDraft.selectedSavedVoiceID) { _, newValue in
             appModel.persistVoiceCloningSavedVoiceID(newValue)
         }
-        .onChange(of: modelManager.statuses) { _, _ in handleStatusesChange() }
+        // Availability, not download progress (MAC-22): `statuses` changes ten
+        // times a second during a download, which re-rendered the whole shell
+        // and rescheduled the warmup on every tick.
+        .onChange(of: modelManager.modelInfoByID) { _, _ in handleStatusesChange() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in handleActiveVariantChange() }
         // `onReceive`, not `onChange`: `onChange(of:)` would need the
         // snapshot read in body, which would track the store (W1-D/W2-A).
@@ -171,6 +174,28 @@ struct ContentView: View {
         .onReceive(appCommandRouter.sidebarSelection) { item in
             selectDestination(item)
         }
+        // MAC-23: Stop (⌘.) cancels the running take; Search History (⌘F)
+        // opens History with its search field focused.
+        .onReceive(appCommandRouter.generationCancelRequests) { audioPlayer in
+            MacStudioGenerationActions.cancelActiveGeneration(
+                appModel: appModel,
+                ttsEngine: ttsEngineStore,
+                audioPlayer: audioPlayer
+            )
+        }
+        .onReceive(appCommandRouter.historySearchRequests) { _ in
+            selectDestination(.history)
+            appModel.historySearchFocusRequested = true
+        }
+        .onChange(of: isAnyGenerationActive, initial: true) { _, isActive in
+            appCommandRouter.isGenerationActive = isActive
+        }
+    }
+
+    /// A Studio take, line batch or long-form project is running: each
+    /// installs its task in a mode coordinator.
+    private var isAnyGenerationActive: Bool {
+        GenerationMode.allCases.contains { appModel.coordinator(for: $0).isGenerating }
     }
 
     @ViewBuilder

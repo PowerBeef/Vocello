@@ -156,6 +156,14 @@ final class ModelManagerViewModel {
     /// long content-digest pass never overwrites a newer mutation (PA-11).
     private var mutationGenerations: [String: Int] = [:]
     private var recommendedSetupTask: Task<Void, Never>?
+    /// Identity of the current recommended setup; a cancelled setup's task
+    /// never clears the state of the one that replaced it (MAC-19).
+    @ObservationIgnored private var recommendedSetupID: UUID?
+    /// The previous setup's download cancellations: a restarted setup waits
+    /// for them, so they cannot cancel the downloads it starts (MAC-19).
+    @ObservationIgnored private var recommendedSetupCancellation: Task<Void, Never>?
+    /// The in-process engine a model deletion coordinates with (MAC-20).
+    @ObservationIgnored private weak var engine: (any MacModelEngineCoordinating)?
     private var lastFailureMessages: [String: String] = [:]
     /// Maximum number of models downloaded at the same time. Each model runs its own
     /// downloader/URLSession (4 concurrent files), so this bounds the total bandwidth
@@ -531,8 +539,14 @@ final class ModelManagerViewModel {
             currentModelID: candidates.first?.id
         )
 
+        let setupID = UUID()
+        recommendedSetupID = setupID
+        let pendingCancellation = recommendedSetupCancellation
         recommendedSetupTask = Task { @MainActor [weak self] in
-            guard let self else { return }
+            // MAC-19: a setup cancelled a moment ago is still cancelling its
+            // downloads; starting before it finishes would have them cancelled.
+            await pendingCancellation?.value
+            guard let self, !Task.isCancelled else { return }
 
             // Launch every candidate up front; `startPendingDownloads` caps how many
             // run concurrently. `download(_:)` returns immediately, so this no longer
@@ -562,22 +576,30 @@ final class ModelManagerViewModel {
                 try? await Task.sleep(for: .milliseconds(400))
             }
 
+            // A cancelled setup's loop also ends here; only the current
+            // setup clears the shared state.
+            guard recommendedSetupID == setupID else { return }
             recommendedSetupTask = nil
             recommendedSetupProgress = nil
+            recommendedSetupID = nil
         }
     }
 
     func cancelRecommendedSetup() {
         recommendedSetupTask?.cancel()
         // Several candidates can be in flight at once; cancel (discard) them all.
+        // The next setup waits for this before it starts any download (MAC-19).
         let candidates = recommendedSetupCandidates()
-        Task { [weak self] in
+        let previousCancellation = recommendedSetupCancellation
+        recommendedSetupCancellation = Task { [weak self] in
+            await previousCancellation?.value
             for model in candidates {
                 await self?.cancelDownload(model)
             }
         }
         recommendedSetupTask = nil
         recommendedSetupProgress = nil
+        recommendedSetupID = nil
     }
 
     private func downloadDetail(for progress: DownloadProgress) -> String? {
@@ -846,7 +868,36 @@ final class ModelManagerViewModel {
         await handleMutationCompletion(for: model.id)
     }
 
-    func delete(_ model: TTSModel) async {
+    /// Connects the in-process engine, so deleting a model neither pulls files
+    /// from under a running generation nor leaves the weights loaded (MAC-20).
+    func attachEngine(_ engine: any MacModelEngineCoordinating) {
+        self.engine = engine
+    }
+
+    enum DeletionOutcome: Equatable {
+        case deleted
+        /// A generation is running; nothing was changed.
+        case blockedByActiveGeneration
+        case failed
+    }
+
+    @discardableResult
+    func delete(_ model: TTSModel) async -> DeletionOutcome {
+        if let engine {
+            // MAC-20: never delete under a running generation, and release the
+            // package's weights before its files go.
+            guard !engine.hasActiveGeneration else { return .blockedByActiveGeneration }
+            if engine.loadedModelID == model.id {
+                do {
+                    try await engine.unloadModel()
+                } catch {
+                    if DebugMode.isEnabled {
+                        print("[ModelManagerViewModel] unload before delete failed: \(DiagnosticPrivacy.summary(of: error))")
+                    }
+                }
+                guard !engine.hasActiveGeneration else { return .blockedByActiveGeneration }
+            }
+        }
         await stopAndClear(for: model.id)
 
         let modelDir = model.installDirectory(in: modelsDirectory)
@@ -861,7 +912,7 @@ final class ModelManagerViewModel {
         } catch {
             lastFailureMessages[model.id] = error.localizedDescription
             await handleMutationCompletion(for: model.id)
-            return
+            return .failed
         }
         lastFailureMessages.removeValue(forKey: model.id)
         removeInstallMetadata(for: model)
@@ -888,6 +939,7 @@ final class ModelManagerViewModel {
         Task {
             await handleMutationCompletion(for: model.id)
         }
+        return .deleted
     }
 
     private func reconcileActiveVariantAfterDeletion(of model: TTSModel) {
@@ -1317,4 +1369,16 @@ private extension ModelManagerViewModel.DownloadProgress.Phase {
             self = .cancelling
         }
     }
+}
+
+/// What a model deletion needs from the in-process engine (MAC-20).
+@MainActor
+protocol MacModelEngineCoordinating: AnyObject {
+    var hasActiveGeneration: Bool { get }
+    var loadedModelID: String? { get }
+    func unloadModel() async throws
+}
+
+extension TTSEngineStore: MacModelEngineCoordinating {
+    var loadedModelID: String? { loadState.currentModelID }
 }

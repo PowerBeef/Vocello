@@ -40273,68 +40273,68 @@
         }
       }
     },
-    "vocello.mac.menu.models": {
-      "comment": "macOS interface: Navigate menu command that opens Settings. Presentation only.",
+    "vocello.mac.menu.searchHistory": {
+      "comment": "macOS interface: Navigate menu command (Command-F) that opens History and focuses its search field. Presentation only.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Models"
+            "value": "Search History"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modèles"
+            "value": "Rechercher dans l’historique"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modelos"
+            "value": "Buscar en el historial"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modelle"
+            "value": "Verlauf durchsuchen"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modelli"
+            "value": "Cerca nella cronologia"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modelos"
+            "value": "Buscar no histórico"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "模型"
+            "value": "搜索历史记录"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "モデル"
+            "value": "履歴を検索"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "모델"
+            "value": "기록 검색"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Модели"
+            "value": "Поиск в истории"
           }
         }
       }
@@ -41721,6 +41721,138 @@
           "stringUnit": {
             "state": "translated",
             "value": "Удалить модель?"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.deleteModelBusyTitle": {
+      "comment": "macOS interface: alert title when a model cannot be deleted because a generation is running. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation in Progress"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Génération en cours"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generación en curso"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generierung läuft"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generazione in corso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geração em andamento"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成中です"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 진행 중"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Идёт генерация"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.deleteModelBusyMessage": {
+      "comment": "macOS interface: alert message when a model cannot be deleted because a generation is running. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current generation to finish, or cancel it, before deleting a model."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendez la fin de la génération en cours, ou annulez-la, avant de supprimer un modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espera a que termine la generación en curso, o cancélala, antes de eliminar un modelo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warte, bis die aktuelle Generierung abgeschlossen ist, oder brich sie ab, bevor du ein Modell löschst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendi la fine della generazione in corso, o annullala, prima di eliminare un modello."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aguarde o fim da geração em andamento, ou cancele-a, antes de excluir um modelo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请等待当前生成完成或将其取消，然后再删除模型。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルを削除する前に、現在の生成が完了するのを待つか、生成をキャンセルしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델을 삭제하기 전에 현재 생성이 끝날 때까지 기다리거나 생성을 취소하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прежде чем удалять модель, дождитесь окончания текущей генерации или отмените её."
           }
         }
       }
@@ -49520,61 +49652,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC, or OGG"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG ou WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC ou OGG"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG o WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC u OGG"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG oder WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC oder OGG"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG o WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC o OGG"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG ou WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC ou OGG"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV、MP3、AIFF、M4A、FLAC、OGG 或 WebM"
+            "value": "WAV、MP3、AIFF、M4A、FLAC 或 OGG"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV、MP3、AIFF、M4A、FLAC、OGG、WebM"
+            "value": "WAV、MP3、AIFF、M4A、FLAC、OGG"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG 또는 WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC 또는 OGG"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "WAV, MP3, AIFF, M4A, FLAC, OGG или WebM"
+            "value": "WAV, MP3, AIFF, M4A, FLAC или OGG"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.supportedFormatsWithoutOgg": {
+      "comment": "macOS interface: list of accepted reference audio formats on a Mac that cannot read Ogg files. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A, or FLAC"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A ou FLAC"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A o FLAC"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A oder FLAC"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A o FLAC"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A ou FLAC"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV、MP3、AIFF、M4A 或 FLAC"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV、MP3、AIFF、M4A、FLAC"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A 또는 FLAC"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV, MP3, AIFF, M4A или FLAC"
           }
         }
       }

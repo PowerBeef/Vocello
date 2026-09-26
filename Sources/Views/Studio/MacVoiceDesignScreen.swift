@@ -183,14 +183,19 @@ struct MacVoiceDesignScreen: View {
             deliverySelection = MacDeliverySelection.synced(from: draft.emotion)
         }
         .task(id: draft.text) {
+            // Debounced: the detector loads a language recognizer per call, so it
+            // never runs per keystroke, and it reads off the main actor (MAC-22).
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            let detected = PromptLanguageDetector.detect(draft.text)
+            let detected = await MacPromptLanguageDetection.detect(draft.text)
+            guard !Task.isCancelled else { return }
             if detected != detectedPromptLanguage {
                 detectedPromptLanguage = detected
             }
         }
-        .onChange(of: modelManager.statuses) { _, _ in reconcileGenerationVariantSelection() }
+        // Availability, not download progress: `statuses` changes ten times a
+        // second during a download and re-rendered the screen each time (MAC-22).
+        .onChange(of: modelManager.modelInfoByID) { _, _ in reconcileGenerationVariantSelection() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in reconcileGenerationVariantSelection() }
         .sheet(item: $presentedSheet) { presentedSheet in
             switch presentedSheet {

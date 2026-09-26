@@ -2,9 +2,10 @@ import Foundation
 
 /// Utility functions for audio file management (macOS).
 ///
-/// Mirrored by `Sources/iOSSupport/Services/AudioService.swift`. The only
-/// divergence is the preferences store: macOS reads the debug-aware
-/// `AppDefaults.store` (which isolates dev runs); iOS reads `UserDefaults.standard`.
+/// Mirrored by `Sources/iOSSupport/Services/AudioService.swift`, which reads
+/// `UserDefaults.standard` and has no user-chosen output folder (IOS-16); macOS
+/// reads the debug-aware `AppDefaults.store` (which isolates dev runs). Both
+/// name takes through `GenerationOutputFileName`.
 enum AudioService {
     private static var defaults: UserDefaults {
         AppDefaults.store
@@ -49,13 +50,16 @@ enum AudioService {
         return nil
     }
 
+    /// The folder new takes are written to: the custom output folder while it
+    /// is usable, the default outputs folder otherwise. "Open Output Folder"
+    /// and History's recovery Reveal open this one (MAC-15).
+    static var effectiveOutputsRoot: URL {
+        configuredOutputDirectoryIssue() == nil ? configuredOutputsRoot : AppPaths.outputsDir
+    }
+
     /// Generate an output file path with timestamp and text snippet.
     static func makeOutputPath(subfolder: String, text: String) -> String {
-        var root = configuredOutputsRoot
-        if configuredOutputDirectoryIssue() != nil {
-            root = AppPaths.outputsDir
-        }
-        var outputsDir = root.appendingPathComponent(subfolder, isDirectory: true)
+        var outputsDir = effectiveOutputsRoot.appendingPathComponent(subfolder, isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: outputsDir, withIntermediateDirectories: true)
         } catch {
@@ -64,22 +68,8 @@ enum AudioService {
             outputsDir = AppPaths.outputsDir.appendingPathComponent(subfolder, isDirectory: true)
             try? FileManager.default.createDirectory(at: outputsDir, withIntermediateDirectories: true)
         }
-
-        let timestamp = Self.timestampFormatter.string(from: Date())
-        let cleanText = text
-            .replacingOccurrences(of: "[^\\w\\s-]", with: "", options: .regularExpression)
-            .prefix(20)
-            .trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: " ", with: "_")
-        let filename = "\(timestamp)_\(cleanText.isEmpty ? "audio" : cleanText).wav"
-        return outputsDir.appendingPathComponent(filename).path
+        return outputsDir.appendingPathComponent(GenerationOutputFileName.make(text: text)).path
     }
-
-    private static let timestampFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyyMMdd_HH-mm-ss-SSS"
-        return f
-    }()
 }
 
 /// Global convenience function used by generate views.

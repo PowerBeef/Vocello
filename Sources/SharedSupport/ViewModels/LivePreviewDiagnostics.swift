@@ -43,7 +43,8 @@ enum LivePreviewDiagnostics {
     }
 
     /// Record a specific decode-failure return path from `loadPCMBuffer`
-    /// with the underlying error (if any) and which branch fired.
+    /// with which branch fired and the underlying error's privacy summary,
+    /// never its text (AUD-08).
     static func logDecodeFailure(
         _ branch: String,
         viewModel: AnyObject,
@@ -53,7 +54,7 @@ enum LivePreviewDiagnostics {
         guard isEnabled else { return }
         let detail: String
         if let error {
-            detail = "branch=\(branch) error=\(error.localizedDescription)"
+            detail = "branch=\(branch) error=\(DiagnosticPrivacy.summary(of: error))"
         } else {
             detail = "branch=\(branch)"
         }

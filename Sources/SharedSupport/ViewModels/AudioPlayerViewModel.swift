@@ -216,6 +216,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     private var completedLiveSessionOrder: [String] = []
     private let livePreviewConfiguration: LivePreviewConfiguration
     private var chunkObserver: NSObjectProtocol?
+    #if os(macOS)
+    private var recordingObserver: NSObjectProtocol?
+    #endif
     private var timer: Timer?
     #if os(iOS)
     private var interruptionObserver: NSObjectProtocol?
@@ -279,6 +282,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         livePreviewConfiguration = .current()
         super.init()
         bindGenerationEventSource()
+        #if os(macOS)
+        livePlayback.onConfigurationChange = { [weak self] in
+            self?.handleLiveOutputConfigurationChange()
+        }
+        registerRecordingObserver()
+        #endif
         #if os(iOS)
         registerAudioSessionObservers()
         IOSPlaybackExclusivity.register(self) { [weak self] in
@@ -301,10 +310,79 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             if let chunkObserver {
                 NotificationCenter.default.removeObserver(chunkObserver)
             }
+            #if os(macOS)
+            if let recordingObserver {
+                NotificationCenter.default.removeObserver(recordingObserver)
+            }
+            #endif
             teardownLivePlayback(clearSession: true)
             stopFilePlayback(clearPlayer: true)
         }
     }
+
+    #if os(macOS)
+    /// MAC-14: a reference recording is about to start, so whatever this player
+    /// is playing would be captured into the clip. Pause it; like another
+    /// player starting on iOS, a live preview (paused, or still buffering) does
+    /// not start on its next chunk, and Play resumes it.
+    private func registerRecordingObserver() {
+        recordingObserver = NotificationCenter.default.addObserver(
+            forName: ReferenceClipRecorder.willStartRecordingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pauseForRecording() }
+        }
+    }
+
+    private func pauseForRecording() {
+        if playbackMode == .live {
+            liveAutoplayEnabled = false
+        }
+        if isPlaying {
+            pause()
+        }
+    }
+
+    /// MAC-18: an output-device change stops the live-preview engine and can
+    /// drop what it had queued, so the preview cannot resume in place without
+    /// skipping or repeating audio. The heard position is kept, the rest of
+    /// the preview is not scheduled, and the take continues from the published
+    /// file at that position: at once when it exists, otherwise when the take
+    /// completes (the handoff `completeStreamingPreview` already makes).
+    /// Only an audible preview is handed over: a paused or buffering one
+    /// restarts its engine on the next Play or chunk. File playback
+    /// (`AVAudioPlayer`) follows the new device by itself.
+    private func handleLiveOutputConfigurationChange() {
+        guard playbackMode == .live, isPlaying, let liveSessionID,
+              livePreviewDisabledSessionID != liveSessionID else { return }
+        AppPerformanceSignposts.emit("Live Preview Output Changed")
+        let heardTime = currentTime
+        livePreviewDisabledSessionID = liveSessionID
+        stopLivePlayback(resetCurrentTime: false)
+        livePlayback.resetBookkeeping()
+        livePlayback.discardGraph()
+        livePreviewDuration = heardTime
+        currentTime = heardTime
+        setLivePreviewQueueDepth(0)
+        guard liveFinalFilePath != nil else {
+            setLivePreviewPhase(.buffering)
+            return
+        }
+        recordCompletedLiveSessionID(liveSessionID)
+        let handoff = Self.finalPlaybackHandoff(
+            heardLivePreview: livePlaybackStarted,
+            currentTime: heardTime,
+            previewDuration: heardTime,
+            duration: duration,
+            autoPlayEnabled: liveAutoplayEnabled
+        )
+        switchToFinalFilePlayback(
+            preserveCurrentTime: handoff.preserveCurrentTime,
+            autoPlay: handoff.shouldAutoPlay
+        )
+    }
+    #endif
 
     #if os(iOS)
     /// Pause for audio-session interruptions (calls/Siri) and route changes
@@ -1376,7 +1454,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         setLivePreviewPhase(.idle)
         playbackPresentationContext = presentationContext
         generatePreviewVisibilityState = presentationContext == .generatePreview ? .ready : .hidden
-        extractWaveform(from: url, replace: true)
+        extractWaveform(from: url, loadedPath: filePath)
 
         if autoPlay {
             attemptFilePlay(playbackTelemetrySessionID: playbackTelemetrySessionID)
@@ -1607,39 +1685,17 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
     // MARK: - Waveform
 
-    private func extractWaveform(from url: URL, replace: Bool) {
+    /// Reads the loaded file's waveform off the main actor. MAC-17: the bars
+    /// land only while that file is still the loaded one, so a slow read of a
+    /// take the user already left never replaces the current take's waveform.
+    private func extractWaveform(from url: URL, loadedPath: String) {
         Task.detached {
-            let extracted = WaveformService.extractSamples(from: url, targetCount: replace ? 120 : 32)
+            let extracted = WaveformService.extractSamples(from: url, targetCount: 120)
             await MainActor.run { [weak self] in
-                guard let self else { return }
-                if replace || self.waveformSamples.isEmpty {
-                    self.waveformSamples = extracted
-                } else {
-                    self.waveformSamples = Self.mergeWaveformSamples(
-                        existing: self.waveformSamples,
-                        incoming: extracted,
-                        targetCount: 120
-                    )
-                }
+                guard let self, self.currentFilePath == loadedPath else { return }
+                self.waveformSamples = extracted
             }
         }
-    }
-
-    private static func mergeWaveformSamples(existing: [Float], incoming: [Float], targetCount: Int) -> [Float] {
-        let combined = existing + incoming
-        guard combined.count > targetCount else { return combined }
-
-        var reduced: [Float] = []
-        reduced.reserveCapacity(targetCount)
-        let step = Double(combined.count) / Double(targetCount)
-        for index in 0..<targetCount {
-            let lowerBound = Int(Double(index) * step)
-            let upperBound = min(Int(Double(index + 1) * step), combined.count)
-            let slice = combined[lowerBound..<max(lowerBound + 1, upperBound)]
-            let average = slice.reduce(0, +) / Float(slice.count)
-            reduced.append(average)
-        }
-        return reduced
     }
 
     // MARK: - Formatting

@@ -534,6 +534,13 @@ targets:
       - path: Sources/iOS/Studio/IOSLongFormProject.swift
       - path: Sources/SharedSupport/Services/LivePreviewEstimate.swift
       - path: Sources/SharedSupport/Services/AudioQualityGate.swift
+      # PA-26 (MAC-09, MAC-16/IOS-16, MAC-17, MAC-25): take file names and the
+      # iPhone output-root guard, block-read waveform bars, recorded-clip
+      # cleanup and the Mac reference-import formats.
+      - path: Sources/SharedSupport/Services/GenerationOutputFileName.swift
+      - path: Sources/SharedSupport/Services/WaveformService.swift
+      - path: Sources/SharedSupport/ViewModels/ReferenceClipRecordingStash.swift
+      - path: Sources/Models/VoiceCloningReferenceAudioSupport.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB

@@ -32,6 +32,8 @@ struct MacSettingsScreen: View {
     @State private var flashResetTask: Task<Void, Never>?
     @State private var modelToDelete: TTSModel?
     @State private var showDeleteConfirmation = false
+    /// A confirmed deletion was refused because a generation is running (MAC-20).
+    @State private var showDeleteBlocked = false
     /// Non-nil when the configured output folder is missing or unwritable
     /// (`AudioService` falls back to the default outputs folder).
     @State private var outputDirectoryIssue: String?
@@ -104,7 +106,11 @@ struct MacSettingsScreen: View {
             Button(MacInterfaceText.cancel, role: .cancel) { modelToDelete = nil }
             Button(MacInterfaceText.delete, role: .destructive) {
                 if let model = modelToDelete {
-                    Task { await viewModel.delete(model) }
+                    Task {
+                        if await viewModel.delete(model) == .blockedByActiveGeneration {
+                            showDeleteBlocked = true
+                        }
+                    }
                 }
                 modelToDelete = nil
             }
@@ -112,6 +118,11 @@ struct MacSettingsScreen: View {
             if let model = modelToDelete {
                 Text(deleteMessage(for: model))
             }
+        }
+        .alert(MacInterfaceText.settingsDeleteModelBusyTitle, isPresented: $showDeleteBlocked) {
+            Button(MacInterfaceText.ok, role: .cancel) {}
+        } message: {
+            Text(MacInterfaceText.settingsDeleteModelBusyMessage)
         }
     }
 

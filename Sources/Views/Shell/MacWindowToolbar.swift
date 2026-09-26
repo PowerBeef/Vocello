@@ -104,6 +104,7 @@ private struct MacHistoryToolbarControls: View {
 
             MacToolbarSearchField(
                 text: $appModel.historySearchText,
+                focusRequested: $appModel.historySearchFocusRequested,
                 placeholder: MacInterfaceText.sidebarSearchHistory,
                 accessibilityIdentifier: "history_searchField"
             )
@@ -135,6 +136,9 @@ private struct MacVoicesToolbarControls: View {
 
 private struct MacToolbarSearchField: NSViewRepresentable {
     @Binding var text: String
+    /// Search History (⌘F) asked for focus; the field takes it once it is in
+    /// its window and clears the request (MAC-23).
+    @Binding var focusRequested: Bool
     let placeholder: String
     let accessibilityIdentifier: String
 
@@ -159,6 +163,16 @@ private struct MacToolbarSearchField: NSViewRepresentable {
             nsView.stringValue = text
         }
         configure(nsView)
+        if focusRequested {
+            // After this update: a field the navigation just created joins its
+            // window only once the toolbar has been laid out.
+            let request = $focusRequested
+            Task { @MainActor in
+                guard request.wrappedValue else { return }
+                request.wrappedValue = false
+                nsView.window?.makeFirstResponder(nsView)
+            }
+        }
     }
 
     private func configure(_ field: NSSearchField) {

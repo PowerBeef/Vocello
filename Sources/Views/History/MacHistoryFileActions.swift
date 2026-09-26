@@ -61,7 +61,15 @@ enum MacHistoryFileActions {
         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
     }
 
-    static func openOutputsFolder() {
-        NSWorkspace.shared.open(AppPaths.outputsDir)
+    /// The recovery banner's Reveal: selects the recoverable takes' audio when
+    /// any is on disk, otherwise opens the folder new takes are written to,
+    /// the custom output folder while it is usable (MAC-15).
+    static func revealRecoveryAudio(_ urls: [URL]) {
+        let existing = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
+        if existing.isEmpty {
+            NSWorkspace.shared.open(AudioService.effectiveOutputsRoot)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting(existing)
+        }
     }
 }

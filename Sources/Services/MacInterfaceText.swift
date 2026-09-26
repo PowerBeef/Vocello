@@ -431,8 +431,13 @@ enum MacInterfaceText {
                comment: "macOS interface: hint under the transcript field when speech recognition was denied. Presentation only.")
     }
     static var cloningSupportedFormats: String {
-        localization.string(localized: "vocello.mac.cloning.supportedFormats", defaultValue: "WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM",
+        localization.string(localized: "vocello.mac.cloning.supportedFormats", defaultValue: "WAV, MP3, AIFF, M4A, FLAC, or OGG",
                comment: "macOS interface: list of accepted reference audio formats. Presentation only.")
+    }
+    /// MAC-09: the list on a Mac whose AudioToolbox cannot read Ogg.
+    static var cloningSupportedFormatsWithoutOgg: String {
+        localization.string(localized: "vocello.mac.cloning.supportedFormatsWithoutOgg", defaultValue: "WAV, MP3, AIFF, M4A, or FLAC",
+               comment: "macOS interface: list of accepted reference audio formats on a Mac that cannot read Ogg files. Presentation only.")
     }
     static var cloningTranscriptAccessibility: String {
         localization.string(localized: "vocello.mac.cloning.transcriptAccessibility", defaultValue: "Transcript",
@@ -908,10 +913,6 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.menu.history", defaultValue: "History",
                comment: "macOS interface: Navigate menu command that opens History. Presentation only.")
     }
-    static var menuModels: String {
-        localization.string(localized: "vocello.mac.menu.models", defaultValue: "Models",
-               comment: "macOS interface: Navigate menu command that opens Settings. Presentation only.")
-    }
     static var menuNavigate: String {
         localization.string(localized: "vocello.mac.menu.navigate", defaultValue: "Navigate",
                comment: "macOS interface: application menu title. Presentation only.")
@@ -927,6 +928,10 @@ enum MacInterfaceText {
     static var menuPlayback: String {
         localization.string(localized: "vocello.mac.menu.playback", defaultValue: "Playback",
                comment: "macOS interface: application menu title. Presentation only.")
+    }
+    static var menuSearchHistory: String {
+        localization.string(localized: "vocello.mac.menu.searchHistory", defaultValue: "Search History",
+               comment: "macOS interface: Navigate menu command (Command-F) that opens History and focuses its search field. Presentation only.")
     }
     static var menuSavedVoices: String {
         localization.string(localized: "vocello.mac.menu.savedVoices", defaultValue: "Saved Voices",
@@ -1405,6 +1410,15 @@ enum MacInterfaceText {
     static var settingsDeleteModelTitle: String {
         localization.string(localized: "vocello.mac.settings.deleteModelTitle", defaultValue: "Delete Model?",
                comment: "macOS interface: model deletion confirmation title. Presentation only.")
+    }
+    static var settingsDeleteModelBusyTitle: String {
+        localization.string(localized: "vocello.mac.settings.deleteModelBusyTitle", defaultValue: "Generation in Progress",
+               comment: "macOS interface: alert title when a model cannot be deleted because a generation is running. Presentation only.")
+    }
+    static var settingsDeleteModelBusyMessage: String {
+        localization.string(localized: "vocello.mac.settings.deleteModelBusyMessage",
+               defaultValue: "Wait for the current generation to finish, or cancel it, before deleting a model.",
+               comment: "macOS interface: alert message when a model cannot be deleted because a generation is running. Presentation only.")
     }
     static var settingsDownloadRecommended: String {
         localization.string(localized: "vocello.mac.settings.downloadRecommended", defaultValue: "Download recommended",

@@ -178,6 +178,12 @@ struct MacSavedVoiceSheet: View {
     @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var isSaving = false
+    /// The candidate is being committed: Cancel waits for the brief commit
+    /// rather than claim to stop a voice that is already landing (MAC-12).
+    @State private var isCommitting = false
+    @State private var saveCancellation = SavedVoiceSaveCancellation()
+    /// Clips recorded in this sheet, removed when it closes (MAC-25).
+    @State private var recordedClips = ReferenceClipStashTracker()
     @State private var errorMessage: String?
     @State private var existingNormalizedNames: Set<String> = []
     /// When non-nil, the staged voice has quality warnings and the user is
@@ -414,9 +420,13 @@ struct MacSavedVoiceSheet: View {
 
             HStack {
                 Button(MacInterfaceText.cancel) {
+                    // MAC-12: a save still staging its candidate discards it
+                    // instead of committing a voice the user cancelled.
+                    if isSaving { saveCancellation.isCancelled = true }
                     dismiss()
                 }
                 .buttonStyle(.bordered)
+                .disabled(isCommitting)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("voicesEnroll_cancelButton")
 
@@ -473,9 +483,11 @@ struct MacSavedVoiceSheet: View {
         .onDisappear {
             transcriptionTask?.cancel()
             transcriptionReview.invalidate()
+            recordedClips.close()
         }
         .sheet(isPresented: $isRecordSheetPresented) {
             MacRecordVoiceSheet { url in
+                recordedClips.record(url.path)
                 audioPath = url.path
             }
         }
@@ -698,9 +710,10 @@ struct MacSavedVoiceSheet: View {
 
     // MARK: - Actions
 
+    /// The formats Voice Cloning imports (MAC-09): no catch-all audio type.
     private func browseForAudio() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio, .wav, .mp3, .aiff]
+        panel.allowedContentTypes = VoiceCloningReferenceAudioSupport.openPanelContentTypes
         if panel.runModal() == .OK, let url = panel.url {
             audioPath = url.path
         }
@@ -711,8 +724,19 @@ struct MacSavedVoiceSheet: View {
 
         isSaving = true
         errorMessage = nil
+        // Reference types the running save keeps even after the sheet closes:
+        // Cancel's flag, and the recorded clips it may still be reading.
+        let cancellation = saveCancellation
+        cancellation.isCancelled = false
+        let clips = recordedClips
+        clips.beginUse()
 
         Task {
+            defer {
+                isSaving = false
+                isCommitting = false
+                clips.endUse()
+            }
             do {
                 let candidate = try await ttsEngineStore.preparePreparedVoiceCandidate(
                     name: trimmedName,
@@ -727,30 +751,25 @@ struct MacSavedVoiceSheet: View {
                         evidence: transcriptionEvidence
                     )
                 )
-                await MainActor.run {
-                    pendingVoiceForReview = candidate.qualityWarnings.isEmpty ? nil : candidate
+                // MAC-12: Cancel arrived while the candidate was being staged.
+                // It is private and expires on its own, but it is discarded now.
+                if cancellation.isCancelled {
+                    try? await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)
+                    return
                 }
-                if candidate.qualityWarnings.isEmpty {
-                    do {
-                        let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
-                        await MainActor.run {
-                            onComplete(savedVoice)
-                            dismiss()
-                        }
-                    } catch {
-                        await MainActor.run {
-                            pendingVoiceForReview = candidate
-                            errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
+                pendingVoiceForReview = candidate.qualityWarnings.isEmpty ? nil : candidate
+                guard candidate.qualityWarnings.isEmpty else { return }
+                isCommitting = true
+                do {
+                    let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
+                    onComplete(savedVoice)
+                    dismiss()
+                } catch {
+                    pendingVoiceForReview = candidate
                     errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                 }
-            }
-            await MainActor.run {
-                isSaving = false
+            } catch {
+                errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
             }
         }
     }
@@ -793,6 +812,13 @@ struct MacSavedVoiceSheet: View {
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
         errorMessage ?? MacInterfaceText.qualityWarningSummary(tokens: candidate.qualityWarnings)
     }
+}
+
+/// Cancel's request to a save that is still staging its candidate (MAC-12);
+/// a reference type so the running save sees it after the sheet has closed.
+@MainActor
+private final class SavedVoiceSaveCancellation {
+    var isCancelled = false
 }
 
 /// Field chrome of the iOS sheets (`iosSelectionFieldChrome`): a muted glass

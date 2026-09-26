@@ -33,6 +33,9 @@ final class MacAppModel {
     var pendingHighlightedMode: GenerationMode?
 
     var historySearchText = ""
+    /// Search History (⌘F) asked for the toolbar search field; the field
+    /// takes focus and clears it (MAC-23).
+    var historySearchFocusRequested = false
     var historySortOrder: HistorySortOrder = .newest
     var historyClearRequest: HistoryClearRequest?
     var voicesEnrollRequestID: UUID?

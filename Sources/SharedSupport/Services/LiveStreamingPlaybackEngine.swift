@@ -42,6 +42,21 @@ final class LiveStreamingPlaybackEngine {
     private(set) var queuedAudioSeconds: TimeInterval = 0
     private var bufferDurations: [TimeInterval] = []
 
+    /// Called on the main actor when the output hardware changes under the
+    /// current graph (`AVAudioEngineConfigurationChange`, MAC-18): the engine
+    /// has stopped itself and may have dropped what the node had queued. The
+    /// owner decides how playback continues.
+    var onConfigurationChange: (@MainActor () -> Void)?
+    private var configurationObserver: NSObjectProtocol?
+
+    deinit {
+        MainActor.assumeIsolated {
+            if let configurationObserver {
+                NotificationCenter.default.removeObserver(configurationObserver)
+            }
+        }
+    }
+
     var isConfigured: Bool {
         engine != nil && playerNode != nil
     }
@@ -94,6 +109,31 @@ final class LiveStreamingPlaybackEngine {
         self.engine = engine
         self.playerNode = playerNode
         self.format = format
+        observeConfigurationChanges(of: engine)
+    }
+
+    private func observeConfigurationChanges(of engine: AVAudioEngine) {
+        stopObservingConfigurationChanges()
+        let engineID = ObjectIdentifier(engine)
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // Only the live graph's change counts; a retired graph's late
+                // notification changes nothing.
+                guard let self, let current = self.engine, ObjectIdentifier(current) == engineID else { return }
+                self.onConfigurationChange?()
+            }
+        }
+    }
+
+    private func stopObservingConfigurationChanges() {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
+        configurationObserver = nil
     }
 
     /// Schedules a decoded chunk and updates the FIFO bookkeeping. The
@@ -192,6 +232,7 @@ final class LiveStreamingPlaybackEngine {
     /// of the attached nodes, avoiding stale-graph assertions on the next
     /// attach.
     func discardGraph() {
+        stopObservingConfigurationChanges()
         playerNode?.stop()
         let retiredGraph = engine.map(RetiredLivePlaybackGraph.init)
         playerNode = nil

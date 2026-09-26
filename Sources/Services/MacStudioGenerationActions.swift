@@ -52,6 +52,39 @@ enum MacStudioGenerationActions {
         )
     }
 
+    /// Stop (⌘.) while a take runs (MAC-23): the line batch and the long-form
+    /// project cancel through their own runners, as their sheet's Cancel does,
+    /// and a single take through its mode's coordinator, as the Studio's Cancel
+    /// does. Returns whether anything was running.
+    @discardableResult
+    static func cancelActiveGeneration(
+        appModel: MacAppModel,
+        ttsEngine: TTSEngineStore,
+        audioPlayer: AudioPlayerViewModel
+    ) -> Bool {
+        if appModel.lineBatch.isProcessing, let mode = appModel.lineBatch.lastMode {
+            appModel.lineBatch.cancel(
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer,
+                studioCoordinator: appModel.coordinator(for: mode)
+            )
+            return true
+        }
+        if appModel.longForm.isProcessing, let mode = appModel.longForm.lastMode {
+            return appModel.longForm.cancel(
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer,
+                studioCoordinator: appModel.coordinator(for: mode)
+            )
+        }
+        var cancelled = false
+        for mode in GenerationMode.allCases where appModel.coordinator(for: mode).isGenerating {
+            cancelGeneration(coordinator: appModel.coordinator(for: mode), ttsEngine: ttsEngine, audioPlayer: audioPlayer)
+            cancelled = true
+        }
+        return cancelled
+    }
+
     private static func primeCloneReferenceIfNeeded(
         _ priming: MacStudioClonePriming,
         ttsEngine: TTSEngineStore
@@ -61,7 +94,7 @@ enum MacStudioGenerationActions {
             try await ttsEngine.ensureCloneReferencePrimed(modelID: priming.modelID, reference: priming.reference)
         } catch {
             if DebugMode.isEnabled {
-                print("[Performance][MacVoiceCloningScreen] clone priming degraded: \(error.localizedDescription)")
+                print("[Performance][MacStudioGenerationActions] clone priming degraded: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
     }

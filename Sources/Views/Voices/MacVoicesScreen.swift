@@ -306,6 +306,11 @@ private extension MacVoicesScreen {
             do {
                 try await ttsEngineStore.deletePreparedVoice(id: voice.id)
                 await MainActor.run {
+                    // MAC-13: a deleted voice's reference leaves the player too,
+                    // so it can no longer be played or revealed (⇧⌘R).
+                    if audioPlayer.currentFilePath == voice.wavPath {
+                        audioPlayer.dismiss()
+                    }
                     savedVoicesViewModel.removeVoiceFromVisibleState(id: voice.id)
                     onVoiceDeleted(voice.id)
                 }

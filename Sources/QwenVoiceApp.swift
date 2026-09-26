@@ -12,7 +12,7 @@ struct QwenVoiceApp: App {
     @State private var engineBootstrapDiagnostics: AppLaunchDiagnosticsSnapshot?
     @State private var didInitializeSelectedTTSEngine = false
     @StateObject private var audioPlayer = AudioPlayerViewModel()
-    @State private var modelManager = ModelManagerViewModel()
+    @State private var modelManager: ModelManagerViewModel
     @StateObject private var savedVoicesViewModel = SavedVoicesViewModel()
     @StateObject private var appCommandRouter = AppCommandRouter.shared
     @StateObject private var generationLibraryEvents = GenerationLibraryEvents.shared
@@ -20,19 +20,26 @@ struct QwenVoiceApp: App {
 
     init() {
         MacInterfaceLanguage.bootstrap(IOSAppLanguage(defaults: AppDefaults.store))
+        let modelManager = ModelManagerViewModel()
+        _modelManager = State(initialValue: modelManager)
         do {
-            _ttsEngineStore = State(initialValue: try MacEngineBootstrap.makeEngineStore())
+            let store = try MacEngineBootstrap.makeEngineStore()
+            // MAC-20: a model deletion checks the engine before it removes files.
+            modelManager.attachEngine(store)
+            _ttsEngineStore = State(initialValue: store)
         } catch {
-            _engineBootstrapDiagnostics = State(
-                initialValue: AppLaunchDiagnosticsSnapshot(
-                    issue: .engineBootstrapFailed,
-                    manifestPath: TTSContract.manifestURL?.path,
-                    bundlePath: Bundle.main.bundlePath,
-                    resourcesPath: Bundle.main.resourceURL?.path,
-                    underlyingError: error.localizedDescription
-                )
-            )
+            _engineBootstrapDiagnostics = State(initialValue: Self.engineBootstrapDiagnostics(for: error))
         }
+    }
+
+    private static func engineBootstrapDiagnostics(for error: any Error) -> AppLaunchDiagnosticsSnapshot {
+        AppLaunchDiagnosticsSnapshot(
+            issue: .engineBootstrapFailed,
+            manifestPath: TTSContract.manifestURL?.path,
+            bundlePath: Bundle.main.bundlePath,
+            resourcesPath: Bundle.main.resourceURL?.path,
+            underlyingError: error.localizedDescription
+        )
     }
 
     var body: some Scene {
@@ -62,11 +69,18 @@ struct QwenVoiceApp: App {
                 .keyboardShortcut(.space, modifiers: [])
                 .disabled(!audioPlayer.hasAudio)
 
+                // MAC-23: ⌘. is the Mac's cancel key. While a take runs it
+                // cancels the take (and its live preview); otherwise it stops
+                // playback, as before.
                 Button(MacInterfaceText.menuStop) {
-                    audioPlayer.dismiss()
+                    if appCommandRouter.isGenerationActive {
+                        appCommandRouter.cancelGeneration(stoppingPreviewOf: audioPlayer)
+                    } else {
+                        audioPlayer.dismiss()
+                    }
                 }
                 .keyboardShortcut(".", modifiers: .command)
-                .disabled(!audioPlayer.hasAudio)
+                .disabled(!audioPlayer.hasAudio && !appCommandRouter.isGenerationActive)
             }
 
             CommandMenu(MacInterfaceText.menuNavigate) {
@@ -95,17 +109,27 @@ struct QwenVoiceApp: App {
                 }
                 .keyboardShortcut("5", modifiers: .command)
 
-                Button(MacInterfaceText.menuModels) {
+                // Named for what it opens (MAC-23): the Settings destination.
+                Button(MacInterfaceText.settingsTitle) {
                     appCommandRouter.navigate(to: .settings)
                 }
                 .keyboardShortcut("6", modifiers: .command)
+
+                Divider()
+
+                Button(MacInterfaceText.menuSearchHistory) {
+                    appCommandRouter.searchHistory()
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
 
             // File menu additions
             CommandGroup(after: .saveItem) {
                 Divider()
                 Button(MacInterfaceText.menuOpenOutputFolder) {
-                    NSWorkspace.shared.open(Self.outputsDir)
+                    // MAC-15: the folder new takes are written to, the custom
+                    // one when it is usable.
+                    NSWorkspace.shared.open(AudioService.effectiveOutputsRoot)
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
 
@@ -213,7 +237,20 @@ struct QwenVoiceApp: App {
         }
     }
 
+    /// Retry re-runs the preflight and, when the engine could not be built,
+    /// the engine bootstrap itself (MAC-04): before, a failed bootstrap stayed
+    /// on screen however often Retry was pressed.
     private func retryLaunchPreflight() {
         appStartupCoordinator.refreshLaunchDiagnostics()
+        guard ttsEngineStore == nil else { return }
+        do {
+            let store = try MacEngineBootstrap.makeEngineStore()
+            modelManager.attachEngine(store)
+            ttsEngineStore = store
+            engineBootstrapDiagnostics = nil
+            startSelectedTTSEngineIfNeeded()
+        } catch {
+            engineBootstrapDiagnostics = Self.engineBootstrapDiagnostics(for: error)
+        }
     }
 }

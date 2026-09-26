@@ -24,6 +24,11 @@ struct MacScriptTextEditor: NSViewRepresentable {
     /// Height reported when the layout asks for the ideal size; callers bound
     /// the editor with `frame(minHeight:maxHeight:)` around it.
     var idealHeight: CGFloat = 120
+    /// Bumped by a Clear control: the editor empties itself as an ordinary,
+    /// undoable edit, so Edit > Undo (⌘Z) brings the script back (MAC-24).
+    var clearRequest: Int = 0
+    /// Names the undo action for a Clear ("Undo Clear" in the Edit menu).
+    var clearActionName: String? = nil
 
     static func typingAttributes(font: NSFont, color: NSColor, tracking: CGFloat) -> [NSAttributedString.Key: Any] {
         var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
@@ -32,7 +37,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(self, initialText: text)
+        Coordinator(self, initialText: text, clearRequest: clearRequest)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -111,6 +116,15 @@ struct MacScriptTextEditor: NSViewRepresentable {
             textView.needsDisplay = true
         }
         applyAccessibilityDescription(to: textView)
+        if context.coordinator.appliedClearRequest != clearRequest {
+            context.coordinator.appliedClearRequest = clearRequest
+            // After this update: the edit reports back through the delegate,
+            // which writes the binding, and a view update must not.
+            let actionName = clearActionName
+            Task { @MainActor in
+                textView.clearAsUndoableEdit(actionName: actionName)
+            }
+        }
         if context.coordinator.textState.recordExternalEdit(text) {
             let selectedRanges = textView.selectedRanges
             textView.string = context.coordinator.textState.text
@@ -133,10 +147,12 @@ struct MacScriptTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MacScriptTextEditor
         var textState: ScriptTextState
+        var appliedClearRequest: Int
 
-        init(_ parent: MacScriptTextEditor, initialText: String) {
+        init(_ parent: MacScriptTextEditor, initialText: String, clearRequest: Int) {
             self.parent = parent
             textState = ScriptTextState(initialText)
+            appliedClearRequest = clearRequest
         }
 
         func textDidChange(_ notification: Notification) {
@@ -164,6 +180,20 @@ final class PlaceholderTextView: NSTextView {
         } else {
             storage.addAttribute(.kern, value: tracking, range: range)
         }
+    }
+
+    /// Empties the text through the text system, which records the undo
+    /// (`allowsUndo`), then keeps the caret in the editor so ⌘Z reaches it.
+    /// `didChangeText()` reports the edit to the delegate like typing does.
+    func clearAsUndoableEdit(actionName: String?) {
+        let range = NSRange(location: 0, length: (string as NSString).length)
+        guard range.length > 0, shouldChangeText(in: range, replacementString: "") else { return }
+        replaceCharacters(in: range, with: "")
+        didChangeText()
+        if let actionName {
+            undoManager?.setActionName(actionName)
+        }
+        window?.makeFirstResponder(self)
     }
 
     override var acceptsFirstResponder: Bool { true }

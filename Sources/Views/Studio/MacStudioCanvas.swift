@@ -119,6 +119,8 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let onSaveAsVoice: (() -> Void)?
 
     @State private var isScriptFocused = false
+    /// Clear empties the script through the editor as an undoable edit (MAC-24).
+    @State private var clearScriptRequest = 0
 
     init(
         mode: GenerationMode,
@@ -251,7 +253,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 placeholder: placeholder,
                 font: .systemFont(ofSize: MacType.style(.script).size, weight: .medium),
                 isFocused: $isScriptFocused,
-                tracking: MacType.style(.script).tracking
+                tracking: MacType.style(.script).tracking,
+                clearRequest: clearScriptRequest,
+                clearActionName: MacInterfaceText.studioClearScript
             )
             .frame(maxWidth: .infinity)
             .frame(minHeight: MacStudioMetrics.composerMinHeight, maxHeight: .infinity)
@@ -274,7 +278,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
                 if !script.isEmpty {
                     Button(MacInterfaceText.studioClearScript) {
-                        script = ""
+                        clearScriptRequest += 1
                     }
                     .buttonStyle(.plain)
                     .macType(.buttonLabel)
@@ -572,5 +576,15 @@ struct MacStudioBatchButton: View {
                 endPoint: .bottom
             )
         )
+    }
+}
+
+/// The Studio screens' script-language detection (MAC-22). The recognizer
+/// reads the whole script, about a tenth of a second for a long one, so after
+/// the typing pause it runs off the main actor.
+enum MacPromptLanguageDetection {
+    @concurrent
+    static func detect(_ text: String) async -> Qwen3SupportedLanguage {
+        PromptLanguageDetector.detect(text)
     }
 }

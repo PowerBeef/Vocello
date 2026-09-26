@@ -726,7 +726,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `MacLineBatchRunner` (line batch over the shared single-take executor),
   `MacStudioLongFormPlatformHooks` (desktop adapter of the shared long-form
   runner), `GenerationTelemetryMerger` (app + engine rows),
-  `MacGenerationWarmupCoordinator`, `AudioService`, `WaveformService`.
+  `MacGenerationWarmupCoordinator`, `AudioService`.
 - `Sources/ViewModels/` — `ModelManagerViewModel` (model install/variant).
 - `Sources/QwenVoiceCore/` — `HuggingFaceDownloader` (`URLSession` + CryptoKit SHA-256).
 - `Sources/Models/` — `TTSModel`, `Generation` (GRDB record), `Voice`,
@@ -768,7 +768,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `Services/LiveStreamingPlaybackEngine` in the 2026-08 UI review's wave 2 —
   FIFO buffer bookkeeping and graph control live there, session policy stays in
   the view model),
-  `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture),
+  `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture), `WaveformService` (block-read
+  waveform bars) and `GenerationOutputFileName` (take file names in the POSIX locale),
   `ReferenceTranscriptionReviewState` (operation-generation review and explicit audio-only policy),
   `VoiceClipTranscriber` (on-device transcription plus privacy-safe enrollment metadata), `GenerationPersistence`
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,

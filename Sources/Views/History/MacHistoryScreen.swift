@@ -289,7 +289,7 @@ struct MacHistoryScreen: View {
                             || recoverySnapshot.unreadableAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
                         onRetry: { retryRecovery() },
-                        onReveal: { MacHistoryFileActions.openOutputsFolder() },
+                        onReveal: { MacHistoryFileActions.revealRecoveryAudio(recoveryAudioURLs) },
                         onExport: exportPendingAudio
                     )
                 }

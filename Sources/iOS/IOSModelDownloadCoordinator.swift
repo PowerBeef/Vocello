@@ -176,7 +176,7 @@ final class IOSModelDownloadCoordinator {
             fileManager: fileManager
         )
 
-        var ledger = try ledgerStore.load()
+        var ledger = try loadLedgerRecoveringUnusableDocument()
         let replacement = makeLedgerRequest(model: model, entry: entry, totalBytes: totalBytes)
         let queuedRequest: IOSModelDownloadLedger.Request
         if let index = ledger.requests.firstIndex(where: { $0.modelID == model.id }) {
@@ -327,7 +327,7 @@ final class IOSModelDownloadCoordinator {
         do {
             try prepareDirectories()
             try await migrateV1IfNeeded()
-            var ledger = try ledgerStore.load()
+            var ledger = try loadLedgerRecoveringUnusableDocument()
             var restored: [ModelDescriptor] = []
 
             for index in ledger.requests.indices {
@@ -380,7 +380,7 @@ final class IOSModelDownloadCoordinator {
     func resumeBackgroundEventsIfNeeded() async {
         let hasActiveWork: Bool
         do {
-            hasActiveWork = try ledgerStore.load().requests.contains(where: {
+            hasActiveWork = try loadLedgerRecoveringUnusableDocument().requests.contains(where: {
                 ![.installed, .failed, .deleted].contains($0.status)
             })
         } catch {
@@ -420,12 +420,21 @@ final class IOSModelDownloadCoordinator {
                 : entry.files.reduce(Int64(0)) { $0 + $1.sizeBytes }
             let targetDir = model.installDirectory(in: AppPaths.modelsDir)
             let stagingRoot = stagingRoot(modelID: model.id)
-            let generation = beginOperation()
 
             var ledger = try ledgerStore.load()
             guard let request = ledgerRequest(model.id, in: ledger) else {
                 throw IOSModelDownloadLedgerError.invalidDocument
             }
+            // IOS-20: space is checked again when the transfer actually starts (after
+            // a queue wait, or when a relaunch restores the request), for the bytes
+            // still to fetch rather than the whole artifact.
+            let bytesToFetch = files.reduce(Int64(0)) { $0 + $1.size }
+            try IOSModelDeliverySupport.ensureSufficientDiskSpace(
+                requiredBytes: max(0, bytesToFetch - request.receivedBytes),
+                at: AppPaths.appSupportDir,
+                fileManager: fileManager
+            )
+            let generation = beginOperation()
             updateRequest(model.id, in: &ledger) { $0.status = .downloading }
             try ledgerStore.save(ledger)
 
@@ -880,6 +889,16 @@ final class IOSModelDownloadCoordinator {
         }
     }
 
+    /// IOS-20: an unreadable or newer-schema ledger is set aside (and recorded as a
+    /// typed diagnostic) instead of blocking every later install.
+    private func loadLedgerRecoveringUnusableDocument() throws -> IOSModelDownloadLedger {
+        let recovery = try ledgerStore.loadRecoveringUnusableDocument()
+        if let reason = recovery.setAsideReason {
+            diagnosticsStore.recordFailure(classification: "ledger-set-aside", error: reason)
+        }
+        return recovery.ledger
+    }
+
     private func stagingRoot(modelID: String) -> URL {
         AppPaths.modelDownloadStagingDir.appendingPathComponent(modelID, isDirectory: true)
     }
@@ -1300,7 +1319,7 @@ final class IOSModelDownloadCoordinator {
             throw IOSModelDownloadLedgerError.unsupportedSchema(legacy.schemaVersion)
         }
 
-        var ledger = try ledgerStore.load()
+        var ledger = try loadLedgerRecoveringUnusableDocument()
         for record in legacy.downloads {
             let legacyConfig = URLSessionConfiguration.background(
                 withIdentifier: record.backgroundSessionIdentifier

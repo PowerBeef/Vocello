@@ -23,14 +23,16 @@ public enum AudioPreparationError: LocalizedError, Equatable {
     case failedToCreateOutput(String)
     case conversionFailed(String)
 
+    /// Path-free: the file's location never enters the description, which reaches
+    /// the CLI and any host without interface copy for the typed reason (AUD-08).
     public var errorDescription: String? {
         switch self {
-        case .missingInputFile(let path):
-            return "Audio file not found: \(path)"
+        case .missingInputFile:
+            return "Audio file not found."
         case .unsupportedInput(let message):
             return message
-        case .inputFileTooLarge(let path, let maxBytes, let actualBytes):
-            return "Audio file is too large to prepare safely: \(path) is \(actualBytes) bytes; the limit is \(maxBytes) bytes."
+        case .inputFileTooLarge(_, let maxBytes, let actualBytes):
+            return "Audio file is too large to prepare safely: it is \(actualBytes) bytes; the limit is \(maxBytes) bytes."
         case .inputDurationTooLong(let maxSeconds, let actualSeconds):
             return "Audio file is too long to prepare safely: \(String(format: "%.1f", actualSeconds)) seconds; the limit is \(String(format: "%.1f", maxSeconds)) seconds."
         case .decodeTimedOut(let seconds):
@@ -39,14 +41,15 @@ public enum AudioPreparationError: LocalizedError, Equatable {
             return "Audio preparation was cancelled."
         case .missingOutputDirectory:
             return "Audio preparation needs an output directory when the source is not already canonical."
-        case .failedToCreateOutputDirectory(let path):
-            return "Couldn't create audio output directory at \(path)."
-        case .failedToReadAudio(let path):
-            return "Couldn't read audio file at \(path)."
-        case .failedToCreateOutput(let path):
-            return "Couldn't create normalized audio output at \(path)."
+        case .failedToCreateOutputDirectory:
+            return "Couldn't create the audio output directory."
+        case .failedToReadAudio:
+            return "Couldn't read the audio file."
+        case .failedToCreateOutput:
+            return "Couldn't create the normalized audio output."
         case .conversionFailed(let message):
-            return message
+            // May carry a system error's text, which quotes file names.
+            return DiagnosticPrivacy.redactedText(message)
         }
     }
 }

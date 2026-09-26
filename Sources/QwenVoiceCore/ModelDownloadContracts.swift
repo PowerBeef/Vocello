@@ -32,6 +32,15 @@ public struct ModelArtifactURLPolicy: Equatable, Sendable {
         return allowsArtifactHost(destinationHost)
     }
 
+    /// Whether a transfer may use bytes from `url`: an allowlisted initial host or an
+    /// allowlisted redirect host, over HTTPS. Background URLSessions follow redirects
+    /// without asking `willPerformHTTPRedirection`, so the downloader also checks the
+    /// final response URL at completion and a resumed task's URL (SEC-08).
+    public func allowsTransferURL(_ url: URL?) -> Bool {
+        guard let url, let host = secureHost(for: url) else { return false }
+        return allowsArtifactHost(host)
+    }
+
     private func allowsArtifactHost(_ host: String) -> Bool {
         if allowedInitialHosts.contains(host) { return true }
         return allowedRedirectHostSuffixes.contains { suffix in
@@ -134,6 +143,27 @@ public struct ModelDownloadTaskIdentity: Codable, Equatable, Hashable, Sendable 
     /// finish in its current process, but it can never be adopted after a
     /// relaunch. A chunk identity must carry a coherent in-bounds byte range;
     /// a half-specified range is invalid.
+    /// The most bytes a task with this identity may receive (SEC-16): the range
+    /// length for a chunk, the catalog size for a whole file.
+    public var transferByteCeiling: Int64 {
+        if let rangeStart, let rangeEnd {
+            return rangeEnd - rangeStart + 1
+        }
+        return expectedSize
+    }
+
+    /// Whether a transfer has outgrown `ceiling`: more bytes written, or a larger
+    /// announced length (`NSURLSessionTransferSizeUnknown` is negative). A
+    /// misbehaving server could otherwise fill the disk before verification.
+    public static func exceedsTransferCeiling(
+        _ ceiling: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) -> Bool {
+        guard ceiling > 0 else { return false }
+        return totalBytesWritten > ceiling || totalBytesExpectedToWrite > ceiling
+    }
+
     public var isValidProductionIdentity: Bool {
         schemaVersion == Self.currentSchemaVersion
             && isSafeIdentityComponent(logicalRequestID)

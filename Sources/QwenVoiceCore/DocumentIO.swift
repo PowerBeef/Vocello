@@ -9,14 +9,15 @@ public enum DocumentIOError: LocalizedError, Equatable {
     /// before it is copied, instead of being copied only to fail later.
     case referenceTooLarge(maxBytes: Int64, actualBytes: Int64)
 
+    /// Path-free: the file's location never enters the description (AUD-08).
     public var errorDescription: String? {
         switch self {
-        case .missingSource(let path):
-            return "Document file not found: \(path)"
-        case .failedToCreateDirectory(let path):
-            return "Couldn't create document directory at \(path)."
-        case .failedToCopy(let path):
-            return "Couldn't copy the document to \(path)."
+        case .missingSource:
+            return "Document file not found."
+        case .failedToCreateDirectory:
+            return "Couldn't create the document directory."
+        case .failedToCopy:
+            return "Couldn't copy the document."
         case .referenceTooLarge(let maxBytes, let actualBytes):
             return "The reference audio is \(actualBytes) bytes; the limit is \(maxBytes) bytes."
         }

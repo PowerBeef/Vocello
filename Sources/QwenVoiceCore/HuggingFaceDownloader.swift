@@ -109,6 +109,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// range under the same range-qualified identity; the partial and the
         /// completed-range sidecar are kept.
         public var maxRangeRetries = 3
+        /// How long a run waits for another owner of its model's staging tree (a
+        /// cancelled run of this process still unwinding, or another process) before
+        /// refusing (CORE-13).
+        public var stagingLockPatience: Duration = .seconds(5)
         public init() {}
     }
 
@@ -179,29 +183,39 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         case invalidLocalDestination(String)
         case apiError(String)
 
+        /// Names a file by its last path component only: the catalog file name, never
+        /// the local folder it was staged in, and an underlying error's text only
+        /// after redaction. These descriptions reach the CLI, the Mac model list and
+        /// the iPhone installer (AUD-08); diagnostics record the typed summary.
         public var errorDescription: String? {
             switch self {
             case .cancelled:
                 return "Download cancelled"
             case .httpError(let code, let path, _):
-                return "HTTP \(code) downloading \(path)"
+                return "HTTP \(code) downloading \(Self.fileName(path))"
             case .fileDownloadFailed(let path, let underlying):
-                return "Failed to download \(path): \(underlying.localizedDescription)"
+                let detail = DiagnosticPrivacy.redactedText(underlying.localizedDescription)
+                return "Failed to download \(Self.fileName(path)): \(detail)"
             case .integrityCheckFailed(let path, let reason):
-                return "Downloaded file failed integrity checks for \(path): \(reason)"
+                return "Downloaded file failed integrity checks for \(Self.fileName(path)): \(reason)"
             case .rangeUnsupported(let path):
-                return "Server did not honor the byte-range request for \(path); retrying as a single stream"
+                return "Server did not honor the byte-range request for \(Self.fileName(path)); retrying as a single stream"
             case .shortRange(let path, let expectedBytes, let receivedBytes):
-                return "Byte range for \(path) returned \(receivedBytes) bytes instead of \(expectedBytes)"
+                return "Byte range for \(Self.fileName(path)) returned \(receivedBytes) bytes instead of \(expectedBytes)"
             case .chunkAssemblyFailed(let path, let reason):
-                return "Failed to assemble byte-range chunk for \(path): \(reason)"
+                return "Failed to assemble byte-range chunk for \(Self.fileName(path)): \(DiagnosticPrivacy.redactedText(reason))"
             case .invalidRemotePath(let path):
-                return "Rejected unsafe remote path: \(path)"
+                return "Rejected unsafe remote path: \(Self.fileName(path))"
             case .invalidLocalDestination(let path):
-                return "Rejected unsafe local destination: \(path)"
+                return "Rejected unsafe local destination: \(Self.fileName(path))"
             case .apiError(let message):
                 return message
             }
+        }
+
+        static func fileName(_ path: String) -> String {
+            let name = (path as NSString).lastPathComponent
+            return name.isEmpty ? "the file" : name
         }
     }
 
@@ -278,6 +292,83 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         init(_ handler: @escaping @Sendable (RangeRetryEvent) -> Void) {
             self.handler = handler
+        }
+    }
+
+    /// One process at a time stages a model (CORE-13). The app and the CLI share the
+    /// models folder, and two concurrent installs of one model would interleave
+    /// partials, completed-range sidecars and staged files. The lock file sits beside
+    /// the staging tree, which a successful run removes, and is never unlinked, so
+    /// every contender locks the same inode. The kernel releases it if its process
+    /// dies, and a thread never blocks on it: `acquire` polls.
+    final class StagingLock {
+        /// Another open description holds the lock: another process, or a run of this
+        /// process that has not finished unwinding.
+        struct Busy: Error {}
+
+        private var descriptor: Int32
+
+        /// Takes the lock, waiting up to `patience` for its current owner (a cancelled
+        /// run of the same model unwinding) to let go, then refusing the run.
+        static func acquire(
+            stagingRoot: URL,
+            fileManager: FileManager,
+            patience: Duration
+        ) async throws -> StagingLock {
+            let deadline = ContinuousClock.now + patience
+            while true {
+                do {
+                    return try StagingLock(stagingRoot: stagingRoot, fileManager: fileManager)
+                } catch is Busy {
+                    guard ContinuousClock.now < deadline else {
+                        throw DownloadError.apiError(
+                            "Another Vocello process is already downloading this model. Wait for it to finish, then try again."
+                        )
+                    }
+                    do {
+                        try await Task.sleep(for: .milliseconds(100))
+                    } catch {
+                        throw DownloadError.cancelled
+                    }
+                }
+            }
+        }
+
+        /// Takes the lock without waiting; throws `Busy` when another owner holds it.
+        init(stagingRoot: URL, fileManager: FileManager) throws {
+            let lockURL = Self.lockURL(forStagingRoot: stagingRoot)
+            try fileManager.createDirectory(
+                at: lockURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let descriptor = lockURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+                guard let path else { return -1 }
+                return Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, mode_t(0o600))
+            }
+            guard descriptor >= 0 else {
+                throw DownloadError.invalidLocalDestination(lockURL.lastPathComponent)
+            }
+            guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+                let failure = errno
+                Darwin.close(descriptor)
+                if failure == EWOULDBLOCK { throw Busy() }
+                throw DownloadError.invalidLocalDestination(lockURL.lastPathComponent)
+            }
+            self.descriptor = descriptor
+        }
+
+        func release() {
+            guard descriptor >= 0 else { return }
+            flock(descriptor, LOCK_UN)
+            Darwin.close(descriptor)
+            descriptor = -1
+        }
+
+        deinit { release() }
+
+        static func lockURL(forStagingRoot stagingRoot: URL) -> URL {
+            stagingRoot.deletingLastPathComponent()
+                .appendingPathComponent(".\(stagingRoot.lastPathComponent).lock", isDirectory: false)
         }
     }
 
@@ -1198,6 +1289,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// control-plane bytes. Entries are removed in `didCompleteWithError`, after the
     /// metrics callback has consumed them.
     private let chunkTaskPathsBox = Mutex<[Int: String]>([:])
+    /// Task-key -> the most bytes that task may receive (SEC-16), resolved once from its
+    /// production identity: the catalog size for a whole file, the range length for a
+    /// chunk. `nil` marks a task without a production identity, which has no bound.
+    private let transferCeilingsBox = Mutex<[Int: Int64?]>([:])
+    /// Tasks cancelled for receiving more than their ceiling; their terminal callbacks
+    /// fail with a typed error instead of a user cancellation.
+    private let oversizedTasksBox = Mutex<Set<Int>>([])
+    /// A foreground downloader runs once (CORE-14); set by its first `downloadFiles`.
+    private let foregroundRunClaimed = Mutex(false)
     private let state: DownloadStateRegistry
     /// The one time source for the delegate ingress gate and the registry's windows.
     private let progressClock: ProgressClock
@@ -1468,21 +1568,64 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         installedFiles: [RepoFile]? = nil,
         sharedComponentPlan: SharedComponentMigrationPlan? = nil
     ) async throws -> RepositoryTransferAccounting {
+        // CORE-14: a foreground downloader invalidates its URLSession when its run
+        // ends, so it is single-use; a second run fails typed instead of creating
+        // tasks on an invalidated session. The iOS background downloader keeps its
+        // one session for the app's lifetime and runs any number of requests.
+        if !isBackgroundSession {
+            let alreadyRan = foregroundRunClaimed.withLock { claimed in
+                defer { claimed = true }
+                return claimed
+            }
+            if alreadyRan {
+                throw DownloadError.apiError(
+                    "This downloader already ran. Create a new downloader for another download."
+                )
+            }
+        }
         await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
-        return try await runDownload(
-            files: files,
-            repo: repo,
-            revision: revision,
-            targetDir: targetDir,
-            requestIdentity: requestIdentity,
-            explicitStagingRoot: explicitStagingRoot,
-            installedFiles: installedFiles,
-            sharedComponentPlan: sharedComponentPlan
-        )
+        do {
+            let transferAccounting = try await runDownload(
+                files: files,
+                repo: repo,
+                revision: revision,
+                targetDir: targetDir,
+                requestIdentity: requestIdentity,
+                explicitStagingRoot: explicitStagingRoot,
+                installedFiles: installedFiles,
+                sharedComponentPlan: sharedComponentPlan
+            )
+            await finishRun(succeeded: true)
+            return transferAccounting
+        } catch {
+            // Every failure, including one before any transfer started (an invalid
+            // plan, a staging directory that cannot be created, a busy staging lock),
+            // stops the heartbeat and releases the URLSessions, which would otherwise
+            // keep this downloader alive for the life of the process (CORE-14).
+            await finishRun(succeeded: false)
+            throw error
+        }
+    }
+
+    /// Ends one repository run. A failure (or cancellation) tears down any remaining
+    /// in-flight URLSession tasks so the caller does not wait for them.
+    private func finishRun(succeeded: Bool) async {
+        if !succeeded {
+            await state.requestCancellation()
+        }
+        await state.finishRepositoryDownload()
+        await completeBackgroundEventsAfterPostprocessing()
+        guard !isBackgroundSession else { return }
+        if succeeded {
+            session.finishTasksAndInvalidate()
+        } else {
+            session.invalidateAndCancel()
+        }
+        invalidateChunkSessions(cancelling: !succeeded)
     }
 
     /// Staging → parallel download → SHA-256 verify → atomic install flow behind
-    /// `downloadFiles` (catalog path).
+    /// `downloadFiles` (catalog path). `downloadFiles` owns the run's teardown.
     private func runDownload(
         files: [RepoFile],
         repo: String,
@@ -1509,6 +1652,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
         let stagingRoot = explicitStagingRoot ?? Self.stagingRoot(forTargetDirectory: targetDir)
+        let stagingLock = try await StagingLock.acquire(
+            stagingRoot: stagingRoot,
+            fileManager: fileManager,
+            patience: engineConfiguration.stagingLockPatience
+        )
+        defer { stagingLock.release() }
         let filesRoot = stagingRoot.appendingPathComponent("files", isDirectory: true)
         let partialRoot = stagingRoot.appendingPathComponent("partials", isDirectory: true)
         let resumeRoot = stagingRoot.appendingPathComponent("resume-data", isDirectory: true)
@@ -1598,89 +1747,69 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 ))
             }
         }
-        do {
-            try await downloadAllFiles(
-                files,
-                repo: repo,
-                revision: revision,
-                artifactVersion: requestIdentity?.artifactVersion ?? revision,
-                filesRoot: filesRoot,
-                partialRoot: partialRoot,
-                resumeRoot: resumeRoot
-            )
-            try await throwIfCancellationRequested()
-            await state.setPhase(.verifying)
-            try await throwIfCancellationRequested()
-            try await verifyDownloadedFilesUsingReceipts(
-                files,
-                artifactVersion: requestIdentity?.artifactVersion ?? revision,
-                in: filesRoot
-            )
-            try await throwIfCancellationRequested()
-            try persistInstalledIntegrityManifest(
-                repo: repo,
-                revision: revision,
-                targetDir: targetDir,
-                files: installedFiles,
-                filesRoot: filesRoot,
-                sharedComponentManifest: sharedComponentPlan?.manifest
-            )
-            try await throwIfCancellationRequested()
-            await state.setPhase(.installing)
-            try await throwIfCancellationRequested()
-            if let sharedComponentPlan {
-                let store = SharedModelComponentStore(modelsRoot: targetDir.deletingLastPathComponent())
-                _ = try store.installStagedModel(
-                    sharedComponentPlan,
-                    stagedModelURL: filesRoot
-                ) { stagedModel in
-                    try Self.validateStagedRepository(
-                        at: stagedModel,
-                        repo: repo,
-                        revision: revision,
-                        targetFolder: targetDir.lastPathComponent,
-                        files: installedFiles,
-                        sharedComponentManifest: sharedComponentPlan.manifest
-                    )
-                }
-            } else {
-                try installStagedRepository(filesRoot: filesRoot, targetDir: targetDir)
+        try await downloadAllFiles(
+            files,
+            repo: repo,
+            revision: revision,
+            artifactVersion: requestIdentity?.artifactVersion ?? revision,
+            filesRoot: filesRoot,
+            partialRoot: partialRoot,
+            resumeRoot: resumeRoot
+        )
+        try await throwIfCancellationRequested()
+        await state.setPhase(.verifying)
+        try await throwIfCancellationRequested()
+        try await verifyDownloadedFilesUsingReceipts(
+            files,
+            artifactVersion: requestIdentity?.artifactVersion ?? revision,
+            in: filesRoot
+        )
+        try await throwIfCancellationRequested()
+        try persistInstalledIntegrityManifest(
+            repo: repo,
+            revision: revision,
+            targetDir: targetDir,
+            files: installedFiles,
+            filesRoot: filesRoot,
+            sharedComponentManifest: sharedComponentPlan?.manifest
+        )
+        try await throwIfCancellationRequested()
+        await state.setPhase(.installing)
+        try await throwIfCancellationRequested()
+        if let sharedComponentPlan {
+            let store = SharedModelComponentStore(modelsRoot: targetDir.deletingLastPathComponent())
+            _ = try store.installStagedModel(
+                sharedComponentPlan,
+                stagedModelURL: filesRoot
+            ) { stagedModel in
+                try Self.validateStagedRepository(
+                    at: stagedModel,
+                    repo: repo,
+                    revision: revision,
+                    targetFolder: targetDir.lastPathComponent,
+                    files: installedFiles,
+                    sharedComponentManifest: sharedComponentPlan.manifest
+                )
             }
-            // Installation is synchronous, so check once more before publishing
-            // success. The iOS coordinator rolls back a target created by this
-            // narrow race before it durably records deletion.
-            try await throwIfCancellationRequested()
-            Self.markExcludedFromBackup(targetDir)
-            // Every file was just verified against its catalog SHA-256; hand those
-            // same-process receipts to the status store so its first content pass
-            // does not hash the fresh install again (PA-11).
-            for (relativePath, receipt) in await state.verifiedReceipts() {
-                guard let installedURL = try? Self.validatedDestinationURL(for: relativePath, in: targetDir) else {
-                    continue
-                }
-                LocalModelAssetStore.recordVerifiedDigest(for: installedURL, receipt: receipt)
-            }
-            try? fileManager.removeItem(at: stagingRoot)
-            let transferAccounting = await state.repositoryTransferAccounting()
-            await state.finishRepositoryDownload()
-            await completeBackgroundEventsAfterPostprocessing()
-            if !isBackgroundSession {
-                session.finishTasksAndInvalidate()
-                invalidateChunkSessions(cancelling: false)
-            }
-            return transferAccounting
-        } catch {
-            // A failure (or cancellation) mid-download: tear down any remaining
-            // in-flight URLSession tasks so the caller doesn't wait for them.
-            await state.requestCancellation()
-            await state.finishRepositoryDownload()
-            await completeBackgroundEventsAfterPostprocessing()
-            if !isBackgroundSession {
-                session.invalidateAndCancel()
-                invalidateChunkSessions(cancelling: true)
-            }
-            throw error
+        } else {
+            try installStagedRepository(filesRoot: filesRoot, targetDir: targetDir)
         }
+        // Installation is synchronous, so check once more before publishing
+        // success. The iOS coordinator rolls back a target created by this
+        // narrow race before it durably records deletion.
+        try await throwIfCancellationRequested()
+        Self.markExcludedFromBackup(targetDir)
+        // Every file was just verified against its catalog SHA-256; hand those
+        // same-process receipts to the status store so its first content pass
+        // does not hash the fresh install again (PA-11).
+        for (relativePath, receipt) in await state.verifiedReceipts() {
+            guard let installedURL = try? Self.validatedDestinationURL(for: relativePath, in: targetDir) else {
+                continue
+            }
+            LocalModelAssetStore.recordVerifiedDigest(for: installedURL, receipt: receipt)
+        }
+        try? fileManager.removeItem(at: stagingRoot)
+        return await state.repositoryTransferAccounting()
     }
 
     /// Cancel all in-flight downloads. Await before deleting staging so delegate callbacks
@@ -2856,30 +2985,40 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         if fileManager.fileExists(atPath: resumeDataURL.path),
            let resumeData = try? Data(contentsOf: resumeDataURL) {
-            do {
-                return try await withCheckedThrowingContinuation { continuation in
-                    let task = session.downloadTask(withResumeData: resumeData)
-                    Task {
-                        task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
-                        let shouldResume = await state.register(
-                            taskKey: self.taskKey(for: task, in: self.session),
-                            task: task,
-                            destination: url,
-                            continuation: continuation,
-                            resumeDataURL: resumeDataURL,
-                            fileIndex: fileIndex,
-                            existingBytes: existingBytes
-                        )
-                        if shouldResume { task.resume() }
-                    }
-                }
-            } catch {
+            let resumedTask = session.downloadTask(withResumeData: resumeData)
+            if let artifactURLPolicy,
+               let resumeURL = resumedTask.currentRequest?.url ?? resumedTask.originalRequest?.url,
+               !artifactURLPolicy.allowsTransferURL(resumeURL) {
+                // SEC-08: resume data names the URL it continues from; one outside
+                // the allowlist is discarded and the file restarts from its catalog URL.
+                resumedTask.cancel()
                 try? fileManager.removeItem(at: resumeDataURL)
-                if Task.isCancelled {
-                    throw DownloadError.cancelled
-                }
-                if await state.cancellationRequested() {
-                    throw DownloadError.cancelled
+            } else {
+                do {
+                    return try await withCheckedThrowingContinuation { continuation in
+                        let task = resumedTask
+                        Task {
+                            task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
+                            let shouldResume = await state.register(
+                                taskKey: self.taskKey(for: task, in: self.session),
+                                task: task,
+                                destination: url,
+                                continuation: continuation,
+                                resumeDataURL: resumeDataURL,
+                                fileIndex: fileIndex,
+                                existingBytes: existingBytes
+                            )
+                            if shouldResume { task.resume() }
+                        }
+                    }
+                } catch {
+                    try? fileManager.removeItem(at: resumeDataURL)
+                    if Task.isCancelled {
+                        throw DownloadError.cancelled
+                    }
+                    if await state.cancellationRequested() {
+                        throw DownloadError.cancelled
+                    }
                 }
             }
         }
@@ -3262,6 +3401,18 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         totalBytesExpectedToWrite: Int64
     ) {
         let taskID = taskKey(for: downloadTask, in: session)
+        if let ceiling = transferCeiling(for: downloadTask, taskID: taskID),
+           ModelDownloadTaskIdentity.exceedsTransferCeiling(
+               ceiling,
+               totalBytesWritten: totalBytesWritten,
+               totalBytesExpectedToWrite: totalBytesExpectedToWrite
+           ) {
+            // SEC-16: stop a transfer that outgrows its catalog size before it can
+            // fill the disk; its terminal callback fails typed, never as a cancel.
+            let firstBreach = oversizedTasksBox.withLock { $0.insert(taskID).inserted }
+            if firstBreach { downloadTask.cancel() }
+            return
+        }
         let shouldForward = delegateProgressGate.withLock { gate in
             gate.shouldForward(
                 taskID: taskID,
@@ -3294,6 +3445,31 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let statusCode = response?.statusCode
         let retryAfterSeconds = Self.retryAfterSeconds(from: response)
         let contentRange = response?.value(forHTTPHeaderField: "Content-Range")
+        if oversizedTasksBox.withLock({ $0.contains(taskID) }) {
+            let rangeIgnored = Self.isIgnoredRange(downloadTask)
+            terminalEventSequencer.stage(taskID: taskID) { [state] in
+                let path = await state.destinationPath(taskID: taskID)
+                await state.resumeFailure(
+                    taskID: taskID,
+                    error: HuggingFaceDownloader.oversizedTransferError(path: path, rangeIgnored: rangeIgnored)
+                )
+            }
+            return
+        }
+        // SEC-08: a background session follows redirects without asking
+        // `willPerformHTTPRedirection`, so the host allowlist is enforced on the
+        // URL the bytes finally came from.
+        if let artifactURLPolicy,
+           !artifactURLPolicy.allowsTransferURL(response?.url ?? downloadTask.currentRequest?.url) {
+            terminalEventSequencer.stage(taskID: taskID) { [state] in
+                let path = await state.destinationPath(taskID: taskID)
+                await state.resumeFailure(
+                    taskID: taskID,
+                    error: DownloadError.apiError("Rejected an untrusted artifact redirect for \(path)")
+                )
+            }
+            return
+        }
         if let statusCode, ![200, 206].contains(statusCode) {
             terminalEventSequencer.stage(taskID: taskID) { [state] in
                 let path = await state.destinationPath(taskID: taskID)
@@ -3380,14 +3556,23 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             gate.finish(taskID: taskID)
         }
         _ = chunkTaskPathsBox.withLock { $0.removeValue(forKey: taskID) }
+        _ = transferCeilingsBox.withLock { $0.removeValue(forKey: taskID) }
+        let wasOversized = oversizedTasksBox.withLock { $0.remove(taskID) != nil }
+        let rangeIgnored = wasOversized && Self.isIgnoredRange(task)
         terminalEventSequencer.complete(taskID: taskID) { [state] in
             await state.setWaitingForConnectivity(false)
             guard let error else {
+                // An oversized task that still finished already staged its failure.
                 await state.completeStagedSuccess(taskID: taskID)
                 return
             }
             let path = await state.destinationPath(taskID: taskID)
-            if (error as NSError).code == NSURLErrorCancelled {
+            if wasOversized {
+                await state.resumeFailure(
+                    taskID: taskID,
+                    error: HuggingFaceDownloader.oversizedTransferError(path: path, rangeIgnored: rangeIgnored)
+                )
+            } else if (error as NSError).code == NSURLErrorCancelled {
                 await state.resumeFailure(taskID: taskID, error: DownloadError.cancelled)
             } else {
                 await state.resumeFailure(
@@ -3396,6 +3581,31 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
             }
         }
+    }
+
+    /// The task's byte ceiling from its production identity, decoded once per task.
+    private func transferCeiling(for task: URLSessionTask, taskID: Int) -> Int64? {
+        transferCeilingsBox.withLock { ceilings in
+            if let known = ceilings[taskID] { return known }
+            let ceiling = ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription)?
+                .transferByteCeiling
+            ceilings[taskID] = ceiling
+            return ceiling
+        }
+    }
+
+    /// A chunk task answered with the whole file (HTTP 200): the server ignored the
+    /// range, which the file-level retry handles by streaming the file once.
+    private static func isIgnoredRange(_ task: URLSessionTask) -> Bool {
+        ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription)?.rangeStart != nil
+            && (task.response as? HTTPURLResponse)?.statusCode == 200
+    }
+
+    private static func oversizedTransferError(path: String, rangeIgnored: Bool) -> DownloadError {
+        if rangeIgnored {
+            return .rangeUnsupported(path: path)
+        }
+        return .integrityCheckFailed(path: path, reason: "the transfer exceeded the size in the catalog")
     }
 
     private static func retryAfterSeconds(from response: HTTPURLResponse?) -> Double? {

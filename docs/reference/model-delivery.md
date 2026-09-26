@@ -99,6 +99,11 @@ Initial artifact requests remain restricted to the catalog's exact host. URLSess
 also policy-checked: only HTTPS destinations without credentials or IP/local hosts are accepted,
 and the destination must remain on the configured host or the explicit Hugging Face distribution
 suffixes `huggingface.co` and `hf.co`. A rejected redirect is never adopted as background work.
+Background sessions follow redirects without asking the delegate, so the same allowlist is also
+applied to each transfer's final response URL at completion and to the URL in any resume data
+before it is used. No transfer may receive more than its catalog size (or its range length), so a
+misbehaving server cannot fill the disk before verification. One process at a time stages a model:
+a lock file beside the staging tree refuses a concurrent install from the app or the CLI.
 
 The catalog is `complete`: the bundled iPhone evidence supplies the three Speed variants and
 `config/model-artifact-receipts.json` supplies the three Quality variants. All six packages pin a
@@ -175,7 +180,11 @@ relative paths. It records the logical request, model and artifact version, expe
 files, retries, monotonic received bytes, and terminal state. A one-time migration cancels the old
 per-model sessions, waits for their cancellation callbacks, moves recoverable staging into the v2
 layout, and removes the old document only when those sessions are empty. Installed models are not
-touched.
+touched. A ledger this build cannot use (undecodable, invalid, or from a newer schema) is moved
+aside to `*.unusable.json` at the next install, launch restore or background event, with a typed
+diagnostic, so it cannot block every later install; a read failure is never treated that way. Free
+space is checked when an install is requested and again, for the bytes still to fetch, when its
+transfer actually starts.
 
 ## iPhone restoration and ownership
 

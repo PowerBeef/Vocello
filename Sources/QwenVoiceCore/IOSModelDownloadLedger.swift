@@ -221,6 +221,38 @@ public struct IOSModelDownloadLedgerStore {
         return try JSONDecoder().decode(IOSModelDownloadLedger.self, from: data).validated()
     }
 
+    /// The outcome of `loadRecoveringUnusableDocument()`: the ledger to use, and the
+    /// error that made the stored document unusable when it was moved aside.
+    public struct Recovery {
+        public let ledger: IOSModelDownloadLedger
+        public let setAsideReason: (any Error)?
+    }
+
+    /// Loads the ledger; a stored document this build cannot use (undecodable, invalid,
+    /// or written by a newer schema) is moved aside to `unusableDocumentURL` and an
+    /// empty ledger is returned, so one bad document cannot block every later install
+    /// (IOS-20). Only in-flight bookkeeping is lost: installed models are found on disk,
+    /// and interrupted downloads restart from their staged partials. A read failure
+    /// (the file is protected or the volume failed) is rethrown untouched: that
+    /// document may be fine.
+    public func loadRecoveringUnusableDocument() throws -> Recovery {
+        do {
+            return Recovery(ledger: try load(), setAsideReason: nil)
+        } catch let error where error is DecodingError || error is IOSModelDownloadLedgerError {
+            let aside = unusableDocumentURL
+            if fileManager.fileExists(atPath: aside.path) {
+                try fileManager.removeItem(at: aside)
+            }
+            try fileManager.moveItem(at: fileURL, to: aside)
+            return Recovery(ledger: IOSModelDownloadLedger(), setAsideReason: error)
+        }
+    }
+
+    /// Where an unusable document is kept for diagnosis; only the latest is kept.
+    public var unusableDocumentURL: URL {
+        fileURL.deletingPathExtension().appendingPathExtension("unusable.json")
+    }
+
     public func save(_ ledger: IOSModelDownloadLedger) throws {
         let validated = try ledger.validated()
         try fileManager.createDirectory(

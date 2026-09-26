@@ -571,6 +571,56 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(try store.load().requests.first?.receivedBytes, 20)
     }
 
+    /// IOS-20: an undecodable, invalid or newer-schema ledger is set aside once and
+    /// installs continue on an empty ledger; a usable or missing one is untouched.
+    func testUnusableLedgerIsSetAsideInsteadOfBlockingInstalls() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let store = IOSModelDownloadLedgerStore(fileURL: root.appendingPathComponent("ledger.json"))
+
+        let missing = try store.loadRecoveringUnusableDocument()
+        XCTAssertNil(missing.setAsideReason)
+        XCTAssertTrue(missing.ledger.requests.isEmpty)
+
+        let valid = ledgerRequest(
+            logicalRequestID: "logical",
+            status: .downloading,
+            receivedBytes: 12,
+            verifiedFiles: []
+        )
+        try store.save(IOSModelDownloadLedger(requests: [valid]))
+        let usable = try store.loadRecoveringUnusableDocument()
+        XCTAssertNil(usable.setAsideReason)
+        XCTAssertEqual(usable.ledger.requests, [valid])
+
+        let newerSchema = Data(#"{"schemaVersion": 99, "requests": []}"#.utf8)
+        for (document, expectLedgerError) in [
+            (Data("not json".utf8), false),
+            (newerSchema, true),
+        ] {
+            try document.write(to: store.fileURL)
+            XCTAssertThrowsError(try store.load(), "the strict load still fails closed")
+            let recovery = try store.loadRecoveringUnusableDocument()
+            XCTAssertTrue(recovery.ledger.requests.isEmpty)
+            XCTAssertEqual(recovery.setAsideReason is IOSModelDownloadLedgerError, expectLedgerError)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
+            XCTAssertEqual(try Data(contentsOf: store.unusableDocumentURL), document, "kept for diagnosis")
+            // Installs resume: the next save and load work on a fresh document.
+            try store.save(IOSModelDownloadLedger(requests: [valid]))
+            XCTAssertEqual(try store.load().requests, [valid])
+        }
+
+        var invalid = valid
+        invalid.receivedBytes = 99
+        let encoder = JSONEncoder()
+        try encoder.encode(IOSModelDownloadLedger(requests: [invalid])).write(to: store.fileURL)
+        let recovered = try store.loadRecoveringUnusableDocument()
+        XCTAssertEqual(recovered.setAsideReason as? IOSModelDownloadLedgerError, .invalidDocument)
+        XCTAssertTrue(recovered.ledger.requests.isEmpty)
+    }
+
     func testArtifactUpdateMustReplaceSupersededLedgerRequestWholesale() throws {
         // Regression: a fully received request for a superseded (larger)
         // artifact cannot be resumed into a smaller replacement. Patching only
@@ -1020,8 +1070,12 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             "bytes=\(ranges[index].start)-\(ranges[index].end)"
         }
 
+        var stagingRoot: URL { root.appendingPathComponent("staging", isDirectory: true) }
+
         @discardableResult
-        func run() async throws -> HuggingFaceDownloader.RepositoryTransferAccounting {
+        func run(
+            requestIdentity: ModelDownloadRequestIdentity? = nil
+        ) async throws -> HuggingFaceDownloader.RepositoryTransferAccounting {
             let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
             let file = HuggingFaceDownloader.RepoFile(
                 path: ModelDownloadLifecycleTests.stubRelativePath,
@@ -1034,7 +1088,8 @@ final class ModelDownloadLifecycleTests: XCTestCase {
                 repo: "stub/model",
                 revision: String(repeating: "a", count: 40),
                 to: targetDir,
-                stagingRoot: root.appendingPathComponent("staging", isDirectory: true)
+                requestIdentity: requestIdentity,
+                stagingRoot: stagingRoot
             )
         }
 
@@ -1070,6 +1125,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         configuration.chunkWorkerCount = 1
         configuration.maxRangeRetries = maxRangeRetries
         configuration.maxDownloadRetries = maxDownloadRetries
+        configuration.stagingLockPatience = .milliseconds(300)
         let ranges = HuggingFaceDownloader.chunkRanges(
             total: Int64(payload.count),
             chunkSize: configuration.chunkTargetSize,
@@ -1157,6 +1213,214 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertFalse(delivery.requests.contains(""))
         XCTAssertEqual(delivery.retries.values.map(\.reason), [.network])
         XCTAssertFalse(delivery.progress.values.contains { $0.phase == .retrying })
+    }
+
+    /// SEC-16: a range whose body outgrows the range is stopped as an integrity
+    /// failure, never assembled, and the file recovers through one clean single
+    /// stream bounded by the catalog size.
+    func testOversizedRangeBodyIsRejectedAndTheFileRecoversCleanly() async throws {
+        let delivery = try makeStubbedDelivery(faults: [2: [.oversizedBody(4_096)]])
+        defer { tearDownStubbedDelivery(delivery) }
+
+        try await delivery.run(requestIdentity: ModelDownloadRequestIdentity(
+            logicalRequestID: "request-oversized",
+            modelID: "stub-model",
+            artifactVersion: "v1"
+        ))
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        XCTAssertTrue(delivery.requests.contains(delivery.header(2)))
+        XCTAssertEqual(delivery.requests.last, "", "the retry streams the whole file once")
+        XCTAssertTrue(delivery.retries.values.isEmpty, "an oversized range is not a transient range failure")
+        let retrying = delivery.progress.values.filter { $0.phase == .retrying }
+        XCTAssertFalse(retrying.isEmpty)
+        XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .integrity })
+    }
+
+    /// CORE-13 and CORE-14: a run refused before any transfer (here by a busy
+    /// staging lock) still releases the downloader, and a foreground downloader
+    /// runs once.
+    func testRefusedRunReleasesTheDownloaderWhichIsSingleUse() async throws {
+        let delivery = try makeStubbedDelivery()
+        defer { tearDownStubbedDelivery(delivery) }
+        let holder = try HuggingFaceDownloader.StagingLock(
+            stagingRoot: delivery.stagingRoot,
+            fileManager: .default
+        )
+        do {
+            try await delivery.run()
+            XCTFail("a staging tree another process owns must refuse the run")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .apiError(let message) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("already downloading"), message)
+        }
+        XCTAssertTrue(delivery.requests.isEmpty, "nothing was fetched")
+        holder.release()
+
+        do {
+            try await delivery.run()
+            XCTFail("a finished foreground downloader must not run again")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .apiError(let message) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("already ran"), message)
+        }
+        XCTAssertTrue(delivery.requests.isEmpty)
+
+        // A fresh downloader that fails its plan validation is not kept alive by its
+        // URLSession, which retains its delegate until it is invalidated.
+        weak var released: HuggingFaceDownloader?
+        do {
+            let downloader = HuggingFaceDownloader(
+                progressHandler: nil,
+                sessionConfiguration: .ephemeral
+            )
+            released = downloader
+            let file = HuggingFaceDownloader.RepoFile(path: "weights/a.bin", size: 1, sha256: nil)
+            do {
+                try await downloader.downloadFiles(
+                    [file, file],
+                    repo: "stub/model",
+                    revision: String(repeating: "a", count: 40),
+                    to: delivery.root.appendingPathComponent("models/other", isDirectory: true)
+                )
+                XCTFail("a duplicate file plan must be refused")
+            } catch {}
+        }
+        for _ in 0..<500 where released != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNil(released, "an early failure invalidates the session")
+    }
+
+    func testStagingLockAdmitsOneOwnerAtATime() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let staging = root.appendingPathComponent("staging/pro_custom", isDirectory: true)
+        let first = try HuggingFaceDownloader.StagingLock(stagingRoot: staging, fileManager: .default)
+        XCTAssertThrowsError(
+            try HuggingFaceDownloader.StagingLock(stagingRoot: staging, fileManager: .default)
+        ) { error in
+            XCTAssertTrue(error is HuggingFaceDownloader.StagingLock.Busy, "\(error)")
+        }
+        do {
+            _ = try await HuggingFaceDownloader.StagingLock.acquire(
+                stagingRoot: staging,
+                fileManager: .default,
+                patience: .milliseconds(150)
+            )
+            XCTFail("a held lock must refuse once its patience runs out")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .apiError = error else { return XCTFail("\(error)") }
+        }
+
+        // A run that is still unwinding lets go within the patience window.
+        let releaser = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            first.release()
+        }
+        let second = try await HuggingFaceDownloader.StagingLock.acquire(
+            stagingRoot: staging,
+            fileManager: .default,
+            patience: .seconds(5)
+        )
+        await releaser.value
+        second.release()
+        let lockURL = HuggingFaceDownloader.StagingLock.lockURL(forStagingRoot: staging)
+        XCTAssertEqual(lockURL.deletingLastPathComponent().lastPathComponent, "staging")
+        XCTAssertTrue(lockURL.lastPathComponent.hasPrefix("."), "hidden beside the staging tree")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: lockURL.path), "the lock inode is never unlinked")
+    }
+
+    func testTransferCeilingBoundsWholeFilesAndRanges() {
+        let sha = String(repeating: "a", count: 64)
+        let whole = ModelDownloadTaskIdentity(
+            logicalRequestID: "request",
+            modelID: "model",
+            artifactVersion: "v1",
+            relativePath: "weights/model.safetensors",
+            expectedSize: 8_192,
+            expectedSHA256: sha
+        )
+        let chunk = ModelDownloadTaskIdentity(
+            logicalRequestID: "request",
+            modelID: "model",
+            artifactVersion: "v1",
+            relativePath: "weights/model.safetensors",
+            expectedSize: 8_192,
+            expectedSHA256: sha,
+            rangeStart: 1_024,
+            rangeEnd: 2_047
+        )
+        XCTAssertEqual(whole.transferByteCeiling, 8_192)
+        XCTAssertEqual(chunk.transferByteCeiling, 1_024)
+        typealias Identity = ModelDownloadTaskIdentity
+        XCTAssertFalse(Identity.exceedsTransferCeiling(1_024, totalBytesWritten: 1_024, totalBytesExpectedToWrite: 1_024))
+        XCTAssertFalse(Identity.exceedsTransferCeiling(1_024, totalBytesWritten: 10, totalBytesExpectedToWrite: -1))
+        XCTAssertTrue(Identity.exceedsTransferCeiling(1_024, totalBytesWritten: 1_025, totalBytesExpectedToWrite: -1))
+        XCTAssertTrue(Identity.exceedsTransferCeiling(1_024, totalBytesWritten: 0, totalBytesExpectedToWrite: 8_192))
+        XCTAssertFalse(Identity.exceedsTransferCeiling(0, totalBytesWritten: 99, totalBytesExpectedToWrite: 99))
+    }
+
+    /// SEC-08: the background-session checks accept only allowlisted HTTPS hosts.
+    func testArtifactPolicyAllowsOnlyAllowlistedTransferURLs() {
+        let policy = ModelArtifactURLPolicy(
+            allowedInitialHosts: ["huggingface.co"],
+            allowedRedirectHostSuffixes: ["hf.co"]
+        )
+        XCTAssertTrue(policy.allowsTransferURL(URL(string: "https://huggingface.co/org/repo/resolve/abc/model.safetensors")))
+        XCTAssertTrue(policy.allowsTransferURL(URL(string: "https://cas-bridge.xethub.hf.co/xet/abc")))
+        XCTAssertFalse(policy.allowsTransferURL(URL(string: "https://evil.example/model.safetensors")))
+        XCTAssertFalse(policy.allowsTransferURL(URL(string: "https://nothf.co.evil.example/model")))
+        XCTAssertFalse(policy.allowsTransferURL(URL(string: "http://cdn.hf.co/model")))
+        XCTAssertFalse(policy.allowsTransferURL(nil))
+    }
+
+    /// AUD-08: error descriptions reach the CLI, the Mac model list and the iPhone
+    /// installer, so they name a file, never where it lives.
+    func testErrorDescriptionsNeverCarryTheLocalPath() throws {
+        let home = PrivateDiagnosticFixture.homeFragment
+        let privatePath = "/" + "Users/" + home
+            + "/Library/Application Support/QwenVoice/models/.qwenvoice-downloads/pro_custom/files/weights/model.safetensors"
+        let downloads: [HuggingFaceDownloader.DownloadError] = [
+            .httpError(statusCode: 404, path: privatePath),
+            .fileDownloadFailed(
+                path: privatePath,
+                underlying: CocoaError(.fileWriteOutOfSpace, userInfo: [NSFilePathErrorKey: privatePath])
+            ),
+            .integrityCheckFailed(path: privatePath, reason: "expected 42 bytes, found 0"),
+            .rangeUnsupported(path: privatePath),
+            .shortRange(path: privatePath, expectedBytes: 2, receivedBytes: 1),
+            .chunkAssemblyFailed(path: privatePath, reason: "expected 2 bytes, wrote 1"),
+            .invalidRemotePath(privatePath),
+            .invalidLocalDestination(privatePath),
+        ]
+        for error in downloads {
+            let text = try XCTUnwrap(error.errorDescription)
+            XCTAssertFalse(text.contains(home), text)
+            XCTAssertFalse(text.contains("Application Support"), text)
+        }
+        XCTAssertTrue(
+            try XCTUnwrap(downloads[2].errorDescription).contains("model.safetensors"),
+            "the catalog file name stays"
+        )
+
+        let audio: [any LocalizedError] = [
+            AudioPreparationError.missingInputFile(privatePath),
+            AudioPreparationError.inputFileTooLarge(path: privatePath, maxBytes: 1, actualBytes: 2),
+            AudioPreparationError.failedToCreateOutputDirectory(privatePath),
+            AudioPreparationError.failedToReadAudio(privatePath),
+            AudioPreparationError.failedToCreateOutput(privatePath),
+            AudioPreparationError.conversionFailed("The file “\(home) voice.m4a” couldn’t be opened at \(privatePath)"),
+            DocumentIOError.missingSource(privatePath),
+            DocumentIOError.failedToCreateDirectory(privatePath),
+            DocumentIOError.failedToCopy(privatePath),
+        ]
+        for error in audio {
+            let text = try XCTUnwrap(error.errorDescription)
+            XCTAssertFalse(text.contains(home), text)
+            XCTAssertFalse(text.contains("Application Support"), text)
+        }
     }
 
     func testIgnoredRangeStillFallsBackToOneCleanSingleStream() async throws {
@@ -1303,6 +1567,8 @@ private final class RangeStubURLProtocol: URLProtocol {
         case truncatedContentRange(Int)
         case transportError(Int)
         case status(Int, retryAfter: String?)
+        /// 206 with the full Content-Range but this many bytes more than the range.
+        case oversizedBody(Int)
     }
 
     private struct Scenario: Sendable {
@@ -1374,7 +1640,7 @@ private final class RangeStubURLProtocol: URLProtocol {
             if let retryAfter { headers["Retry-After"] = retryAfter }
             respond(statusCode: statusCode, headers: headers, body: Data("unavailable".utf8))
             return
-        case .shortBody, .truncatedContentRange, nil:
+        case .shortBody, .truncatedContentRange, .oversizedBody, nil:
             break
         }
         let total = Int64(plan.payload.count)
@@ -1389,6 +1655,9 @@ private final class RangeStubURLProtocol: URLProtocol {
         var body = plan.payload.subdata(in: Int(bounds.start)..<Int(end + 1))
         if case .shortBody(let count) = plan.fault {
             body = body.prefix(count)
+        }
+        if case .oversizedBody(let extra) = plan.fault {
+            body.append(Data(repeating: 0x5A, count: extra))
         }
         respond(
             statusCode: 206,

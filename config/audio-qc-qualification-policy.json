@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "policy": "audio-qc-qualification",
+  "status": "adopted",
+  "adoption": {
+    "date": "2026-09-25",
+    "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+    "decisions": {
+      "5": "(a) warn at the existing 60/60/60 floor; fail at one-sided Clopper-Pearson FAR <= 1% pooled and <= 5% per language on N2 for any product-affecting fail, with (b) acceptable for evidence-lane gating only",
+      "7": "A1-A10 adopted into this file; Swift gains the abstained outcome"
+    },
+    "note": "The maintainer accepted every recommendation of the audit on 2026-09-25. This file carries the threshold-change authority's five rules verbatim and adds A1-A10. docs/reference/audio-qc-engineering.md keeps the prose; scripts/audio_qc_qualification.py validate-policy checks this file."
+  },
+  "authorityRules": {
+    "source": "the retired audio-cadence-qc-contract.json, carried over verbatim on 2026-09-12",
+    "requiresUntouchedConfirmation": true,
+    "requiresIndependentReferenceEvidence": true,
+    "requiresIndependentHumanLabels": false,
+    "automaticMetricsMayScreenOnly": true,
+    "sourceChangeRequiresExplicitReview": true,
+    "currentBoundaryRemainsUntilQualified": true,
+    "text": [
+      "an untouched confirmation cohort is required (requiresUntouchedConfirmation)",
+      "independent reference evidence is required, independent human labels are not (requiresIndependentReferenceEvidence, requiresIndependentHumanLabels: false)",
+      "automatic metrics may screen candidates only, never qualify a change (automaticMetricsMayScreenOnly)",
+      "a source change requires an explicit review (sourceChangeRequiresExplicitReview)",
+      "the current boundary remains authoritative until a change is qualified (currentBoundaryRemainsUntilQualified)"
+    ]
+  },
+  "additions": [
+    {"id": "A1", "title": "Scope-bound status", "rule": "A detector gates only inside the scope of a qualified record (languages, modes, length class, F0 band, phonation). Outside it, the verdict is abstain (out-of-scope)."},
+    {"id": "A2", "title": "In-domain FAR", "rule": "FAR must be confirmed on N2 and bounded on N3. N1 alone never qualifies fail."},
+    {"id": "A3", "title": "Cross-mechanism TPR", "rule": "The TPR bound must hold on at least two construction mechanisms, one of them not used for fitting."},
+    {"id": "A4", "title": "Shams", "rule": "Every processed-positive family has a matched sham. A sham FAR that departs from the N2 FAR beyond interval overlap refuses the detector."},
+    {"id": "A5", "title": "Pre-registration", "rule": "The rule, grid, alpha, strata and split are committed by digest before the confirmation cohort is scored. Confirmation runs once, with no top-ups."},
+    {"id": "A6", "title": "No same-lineage labels", "rule": "T5 labels never come from a judge that shares family, vendor lineage or label lineage with a consumed judge. This generalizes detectorSelfLabelsAllowed: false (config/prosody-holdout-policy.json)."},
+    {"id": "A7", "title": "Automatic de-qualification", "rule": "Any change to a consumed judge's output identity, the metric definition or the rule reverts the detector to shadow. The registry enforces this by digest."},
+    {"id": "A8", "title": "Status-specific operating points", "rule": "Fail is stricter than warn (operatingPoints)."},
+    {"id": "A9", "title": "Heard defects", "rule": "A defect the maintainer hears enters Stage 0 or 1 as a shadow detector with a test, and the heard takes become P4 positives. It fails takes once it qualifies under A1-A8."},
+    {"id": "A10", "title": "Legacy bounds", "rule": "Existing Fast QC fail bounds stay, labeled legacy-unqualified, with their measured FAR and TPR reported from M1 onward. A bound is replaced only by a qualified successor, never removed on evidence of weakness alone."}
+  ],
+  "labelTiers": [
+    {"id": "T1", "source": "PCM construction: a registered injector, verified by recipe replay (source digest, injector version, parameters, seed -> output digest)", "mayQualify": ["TPR for that signal event", "sham FAR"], "mayNotQualify": ["perceptual severity", "realism"]},
+    {"id": "T2", "source": "Codec construction: a code-trace mutation decoded by the production decoder, verified by trace, recipe and decoder digests", "mayQualify": ["TPR in the product's acoustic domain"], "mayNotQualify": ["LM-origin pathologies"]},
+    {"id": "T3", "source": "Controlled generation: a registered knob with a certain effect (token cap, EOS suppression, L2 text with L1 pinned)", "mayQualify": ["natural positives for truncation, run-on and wrong language"], "mayNotQualify": ["any probabilistic knob (temperature, top-p)"]},
+    {"id": "T4", "source": "Published labels: corpus transcripts and metadata", "mayQualify": ["negatives for content, language and identity", "SV trials"], "mayNotQualify": ["that a recording is defect-free"]},
+    {"id": "T5", "source": "Cross-modal: a qualified detector of another modality and another family labels natural takes", "mayQualify": ["confirmation cohorts"], "mayNotQualify": ["sole evidence for a new fail bound", "any same-lineage label"]},
+    {"id": "T6", "source": "Human annotation (optional): the existing speech-defects-1 protocol", "mayQualify": ["as today"], "mayNotQualify": []}
+  ],
+  "populations": [
+    {"id": "N1", "content": "Human originals with verified text"},
+    {"id": "N2", "content": "N1 resynthesized through the Qwen3-TTS tokenizer at full codebooks; FAR in domain"},
+    {"id": "N3", "content": "Natural Vocello takes over the script pool; with no labels, FAR <= f / (1 - pi_max)"},
+    {"id": "S", "content": "Shams: the same processing at zero magnitude"},
+    {"id": "P1", "content": "PCM injections"},
+    {"id": "P2", "content": "Codec injections"},
+    {"id": "P3", "content": "Knob takes"},
+    {"id": "P4", "content": "Harvested natural failures with T5 labels"}
+  ],
+  "statistics": {
+    "method": "clopper-pearson-one-sided",
+    "confidence": 0.95,
+    "legacyMethod": "wilson-two-sided",
+    "legacyScope": "records published before this policy; new claims use Clopper-Pearson",
+    "unitOfIndependence": "source-family",
+    "familyRule": "crops, injections and resyntheses of one utterance are one family; one script x voice x seed is one Vocello family, deduplicated by PCM digest",
+    "clusterBootstrap": {"resamples": 2000, "seed": 20260925},
+    "multiplicity": {"method": "bonferroni", "simultaneousLanguages": 10, "zeroErrorUnitsPerLanguageAtFivePercent": 104},
+    "sampleSizeTable": [
+      {"target": 0.20, "clopperPearson": {"0": 14, "1": 22, "2": 30, "5": 50}, "wilsonTwoSidedZeroErrors": 16},
+      {"target": 0.10, "clopperPearson": {"0": 29, "1": 46, "2": 61, "5": 103}, "wilsonTwoSidedZeroErrors": 35},
+      {"target": 0.05, "clopperPearson": {"0": 59, "1": 93, "2": 124, "5": 208}, "wilsonTwoSidedZeroErrors": 73},
+      {"target": 0.02, "clopperPearson": {"0": 149, "1": 236, "2": 313, "5": 523}, "wilsonTwoSidedZeroErrors": 189},
+      {"target": 0.01, "clopperPearson": {"0": 299, "1": 473, "2": 628, "5": 1049}, "wilsonTwoSidedZeroErrors": 381}
+    ]
+  },
+  "operatingPoints": {
+    "warn": {
+      "farPooledMax": 0.10,
+      "farPerLanguageMax": 0.20,
+      "tprSevereMin": 0.70,
+      "cleanAbstentionMax": 0.10,
+      "minimumUnits": {"calibration": 60, "good": 60, "bad": 60, "speakers": 3, "scripts": 3, "languages": 3}
+    },
+    "fail": {
+      "appliesTo": ["product", "evidence-lane"],
+      "farPopulation": "N2",
+      "farPooledMax": 0.01,
+      "farPerLanguageMax": 0.05,
+      "n3FlagRateMax": 0.05,
+      "tprSevereMin": 0.90,
+      "tprModerateMin": 0.70,
+      "mechanismsMin": 2,
+      "cleanAbstentionMax": 0.05,
+      "minimumUnits": {"n2Negatives": 1240, "n2NegativesPerLanguage": 124, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
+    },
+    "evidenceLaneFail": {
+      "appliesTo": ["evidence-lane"],
+      "productAffecting": false,
+      "farPopulation": "N2",
+      "farPooledMax": 0.02,
+      "farPerLanguageMax": 0.10,
+      "n3FlagRateMax": 0.05,
+      "tprSevereMin": 0.90,
+      "tprModerateMin": 0.70,
+      "mechanismsMin": 2,
+      "cleanAbstentionMax": 0.05,
+      "minimumUnits": {"n2Negatives": 290, "n2NegativesPerLanguage": 29, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
+    },
+    "shadow": {"blocks": false, "countsAsPass": false},
+    "physicalEventsT1Only": ["non-finite samples", "digital silence", "clipping above full scale", "dc offset"]
+  },
+  "thresholdDerivation": {
+    "split": "calibration and confirmation cohorts disjoint by family, speaker and script",
+    "fitOn": "clean-negatives-only",
+    "singleThresholdRule": "split-conformal",
+    "multiParameterRule": "learn-then-test-fixed-sequence",
+    "tprOptimized": false,
+    "requiresPreRegistrationDigest": true,
+    "stratificationRequiresDeclaredReason": true,
+    "missedStratum": "scope-exclusion",
+    "confirmOnce": true,
+    "rederivationWritesNewRecord": true
+  },
+  "verdicts": {
+    "detectorStatuses": ["pass", "warn", "fail", "abstain", "uncalibrated", "unavailable"],
+    "takeStatuses": ["pass", "warn", "fail", "inconclusive", "uncalibrated", "unavailable"],
+    "precedence": ["fail", "unavailable", "abstain", "warn", "uncalibrated", "pass"],
+    "composition": "worst-of-gating/1",
+    "swiftOutcomes": {"pass": "pass", "warn": "warning", "fail": "fail", "abstain": "abstained", "uncalibrated": "uncalibrated", "unavailable": "unavailable"}
+  },
+  "laneGatingSets": {
+    "publication": {"stages": [0], "classes": []},
+    "language-bench": {"stages": [], "classes": ["B", "C", "D"]},
+    "clone-lane": {"stages": [], "classes": ["E"]},
+    "delivery-bench": {"stages": [], "classes": ["H"]},
+    "release-promotion": {"stages": [0], "classes": ["B", "C", "D", "E", "H"]}
+  },
+  "statusTransitions": {
+    "judgeStatuses": ["candidate", "shadow", "warn", "gating", "retired", "quarantined"],
+    "toShadow": "two clean canonical-host resource runs, a measured determinism class and a canary record matching the output identity",
+    "toWarn": "a qualified calibration record at the warn operating point for the declared scope (A1-A8)",
+    "toGating": "a fail-level record on two mechanisms (A3), shams (A4), a phi audit of consensus partners and an N3 bound (A2)",
+    "backToShadow": "an output-identity, metric or rule change (A7), a canary mismatch or confirmed judge drift",
+    "toQuarantined": "a license or terms change, or digest drift at acquisition; execution stops until a decision",
+    "consensusRequiresPhiAudit": true
+  }
+}

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-09-25
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -19,6 +19,9 @@ sourceOfTruth:
   - scripts/lib/language_metrics.py
   - scripts/lib/audio_qc.py
   - scripts/derive_audio_qc_bounds.py
+  - scripts/audio_qc_qualification.py
+  - scripts/lib/qc_qualification/composer.py
+  - config/audio-qc-qualification-policy.json
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -841,6 +844,18 @@ qualified change edits the Swift source, this list and the mirror together:
   envelope coefficient 1/240, low-energy envelope 0.02; the per-sample click bound warns above a
   0.0005 and fails above a 0.005 fraction of the take.
 
+The whole Fast QC v8 has one more mirror, `FASTQC_V8` with `fast_qc_v8()` in
+`scripts/lib/audio_qc.py`, which the qualification engine runs over constructed fixtures. It mirrors
+the values above plus the rest of `PCM16StreamLimiter` and `makeAudioQCReport`, and
+`scripts/tests/test_audio_qc.py` pins them: ceiling 0.965 with a 0.002 per-sample gain release;
+step bursts of steps above 0.25 in 480 samples, warning `onset_step_burst` from 3 steps starting
+in the first 50 ms; silence below 0.001, interior runs recorded from 2,400 samples (at most 256);
+`near_silent` below -60 dBFS and `low_level` below -45 dBFS; clipping failing above a 0.001
+fraction and warning on any sample beyond full scale; `hot` above a 0.02 fraction; DC warning
+above 0.05 and failing above 0.20; the pause budget from the text's punctuation runs, a cadence
+pause of 350 ms (600 ms from 45 s), an egregious gap of 1,200 ms without a declared pause and
+2,000 ms with one or from 45 s, and a suspicious single pause of 900, 1,200 or 1,500 ms.
+
 ### Threshold-change authority
 
 The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v8; v7 added only the
@@ -858,6 +873,85 @@ this policy, carried over verbatim on 2026-09-12 from the retired cadence contra
 - a source change requires an explicit review (`sourceChangeRequiresExplicitReview`);
 - the current boundary remains authoritative until a change is qualified
   (`currentBoundaryRemainsUntilQualified`).
+
+**Qualification policy (decision 7, adopted 2026-09-25).** The maintainer accepted every
+recommendation of the audio QC audit (`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`,
+section 5.6). `config/audio-qc-qualification-policy.json` carries the five rules verbatim and adds
+A1-A10: scope-bound status, in-domain FAR on N2, detection on two construction mechanisms, matched
+shams, pre-registration by digest with one confirmation, no same-lineage labels, automatic
+de-qualification, status-specific operating points, heard defects entering as shadow detectors, and
+the existing Fast QC fail bounds kept as `legacy-unqualified` until a qualified successor replaces
+them. Its operating points are decision 5: warn at the 60/60/60 floor (FAR at most 0.10 pooled);
+fail at a one-sided Clopper-Pearson FAR of at most 1% pooled and 5% per language on N2 (1,240 N2 and
+600 N3 negatives, 60 positives per subtype, severity and mechanism) for any product-affecting fail,
+with 2% pooled and 10% per language accepted for evidence-lane gating only. New claims use one-sided
+Clopper-Pearson; the Wilson figures above stay for legacy records.
+`scripts/audio_qc_qualification.py validate-policy` runs in the contract gate: it recomputes the
+sample-size table, refuses a floor that cannot meet its own bound with zero errors, requires fail to
+be stricter than warn, and holds the verdict vocabulary and lane gating sets to the composer's.
+
+### Qualification engine and the first measurement of Fast QC v8 (AQ-03, 2026-09-25)
+
+The engine lives in `scripts/lib/qc_qualification/`: exact one-sided Clopper-Pearson bounds and
+rates at a declared operating point (`stats`); a cluster bootstrap that draws whole source families
+(`resampling`); the correlated-failure audit between two judges, with phi and conditional and joint
+failure rates (`correlation`); threshold derivation from clean negatives only, under a plan whose
+digest is committed first, by the split-conformal quantile or fixed-sequence Learn-then-Test, with
+one confirmation per plan (`thresholds`); procedural speech-like sources and the abstention fixtures
+(`fixtures`); the T1 injector catalog (`injectors`); the Stage 3 composer (`composer`); and the policy
+validator (`policy`). No WAV is committed: fixtures are generated from seeds, and randomness comes from
+`PCG64.random_raw()` words, the part of NumPy's random API that stays stable across releases.
+
+The T1 catalog has 17 families: clicks, dropouts, clipping, DC, level, additive noise and hum,
+leading or terminal silence, truncation, run-on, repetition, word deletion and insertion by
+splicing, octave jumps, pitch breaks, tempo change, pitch-and-formant shift and an identity swap that
+splices a second voice rendering the same script. Each is a pure function of source, parameters and
+seed with a golden PCM16 digest per variant (`scripts/tests/test_qc_qualification_injectors.py`),
+a zero-magnitude sham that draws the same positions as its positives, a mild, moderate and severe
+sweep, and an exact labeled interval. Pitch and tempo use a windowed-sinc resampler and plain
+overlap-add, so they are signal-level constructions, not natural prosody.
+
+The composer is pure and never cached. It emits `pass`, `warn`, `fail`, `inconclusive` (a gating
+abstention), `uncalibrated` or `unavailable`, in that corrected precedence: fail, unavailable,
+abstain, warn, uncalibrated, pass. A verdict with no calibration record composes as `uncalibrated`,
+one outside its record's scope as an abstention (A1), and a legacy bound keeps its verdict (A10). No
+lane calls it yet; the lanes still compose their own verdicts until the pipeline work (AQ-05, AQ-07).
+Swift gained the matching `GenerationQualityOutcome.abstained`: it ranks 3 with `fail` and
+`unavailable`, above the unchanged pass 0, uncalibrated 1 and warning 2, and the registry reports it
+distinctly unless a gate failed or was unavailable. No producer emits it yet.
+
+**M1, "measure the present".** `python3 scripts/audio_qc_qualification.py meta-evaluation` runs the
+v8 mirror over clean procedural sources (60 modal, 30 each quiet, breathy, long-pause and high-F0),
+every injector variant of the 60 modal sources and the 12 abstention fixtures, and replays the
+committed benchmark records read-only. It writes `meta-evaluation.json` and `meta-evaluation.md` to
+`build/artifacts/diagnostics/audio-qc-meta-evaluation/` in about 30 s. The output is untracked and
+deterministic for a given tree, so it is not a registered `scripts/dev.sh regen` artifact; publishing
+it as a tracked `qc-calibration` record needs that record kind first. It is report-only:
+procedural sources are T1 construction, neither N1 nor N2, so under A2 they never qualify a fail
+bound. The first run (2026-09-25, seed 7) measured:
+
+- clean modal speech: 0 of 60 alarms (FAR at most 0.049); every alarm on clean speech (17 of 180)
+  was a `dropout` warning on a declared punctuation pause of 0.9-1.5 s;
+- clicks: 0 of 60 detected at 0.2 FS once per second or 0.5 FS five times per second, 60 of 60 at
+  full scale 50 times per second, the per-sample fraction bound growing with take length as audit
+  #85 found;
+- dropouts: 0 of 60 at 150 ms inside a word, 22 of 60 (a cadence warning) at 600 ms, 60 of 60 failed
+  at 2 s; terminal silence: 9 of 60 at 1 s, 60 of 60 from 2.5 s; 2.5 s of leading silence never reads
+  as silence (16 of 60 warned only through the speaking rate);
+- run-on: 0 of 60 at 0.5 s, 1 of 60 at 1.5 s and 49 of 60 at 4 s of repeated tail speech, the
+  speaking-rate warning firing only once a take nearly doubles; a 0.7x tempo never reaches it;
+- no v8 detector for additive noise, truncation, word deletion, octave jumps, pitch breaks, pitch and
+  formant shift or an identity swap: 0 of 60 alarms at severe for each, except noise at 0 dB SNR,
+  which trips `clicks` incidentally;
+- shams: the clipping sham (peak normalization to full scale, nothing clipped) raised `clicks` on
+  52 of 60 clean sources, so the v8 click bound also fires on loud clean speech, and the
+  natural-pause control raised a cadence warning on 9 of 60; A4 would refuse the detector for both
+  families;
+- abstention fixtures: v8 passes 6 of 12 (a chord, a clip under 1 s, a 64 s take, whisper phonation,
+  a 650 Hz F0 and a repeated-word script), as an amplitude-only gate that cannot abstain;
+- committed evidence: 3,817 takes with audio QC in 349 records, published PASS or WARN only, so a
+  fail rate there bounds nothing; QC v3 warned on 53 of 3,282 families, and the 63 QC v8 takes (23
+  families) carry no warning.
 
 ### Speech/defect calibration: independent references, no required listening
 

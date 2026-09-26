@@ -18,7 +18,7 @@ export const Footer = () => (
 
         <div className="footer-cols">
           <div className="footer-col">
-            <h5>Product</h5>
+            <h2>Product</h2>
             <ul>
               <li><a href="#workflows">Workflows</a></li>
               <li><a href="#listen">Listen</a></li>
@@ -31,7 +31,7 @@ export const Footer = () => (
             </ul>
           </div>
           <div className="footer-col">
-            <h5>Open source</h5>
+            <h2>Open source</h2>
             <ul>
               <li><a href={REPO} target="_blank" rel="noreferrer">GitHub</a></li>
               <li><a href={`${REPO}/releases`} target="_blank" rel="noreferrer">Releases</a></li>

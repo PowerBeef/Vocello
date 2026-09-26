@@ -1,4 +1,5 @@
 import React from "react";
+import { Screenshot } from "../components/Screenshot.jsx";
 import { Icon } from "../components/Icon.jsx";
 import { TESTFLIGHT } from "../data/credits.js";
 
@@ -25,9 +26,10 @@ export const IphoneBeta = () => (
         <p className="hero-meta">Public TestFlight beta · iPhone 15 Pro or newer · iOS 26</p>
       </div>
       <figure className="iphone-stage">
-        <img
+        <Screenshot
           className="iphone-shot"
           src="assets/screens/ios-studio.png"
+          width={780} height={1696}
           alt="Vocello Studio running on an iPhone, with a script ready to generate with a built-in voice"
         />
       </figure>

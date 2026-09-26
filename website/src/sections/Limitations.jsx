@@ -1,9 +1,10 @@
 import React from "react";
+import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "../data/release.js";
 
 const LIMITATIONS = [
   {
     k: "macOS 26+",
-    v: "Vocello 2.4.0 targets macOS 26. QwenVoice 1.2.3 remains the macOS 15 fallback.",
+    v: `Vocello ${STABLE_MAC_RELEASE.version} targets macOS 26. QwenVoice ${FALLBACK_MAC_RELEASE.version} remains the macOS 15 fallback.`,
   },
   {
     k: "Apple Silicon only",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import { contrastRatio, validateRepository, validateText, validateTokenContrast } from "../scripts/site-contract.mjs";
+import { contrastRatio, validateReleaseMirror, validateRepository, validateText, validateTokenContrast } from "../scripts/site-contract.mjs";
 
 const fixture = (source) => validateText({
   indexHTML: '<html lang="en"><head><meta name="description"><meta name="viewport"><meta name="robots"><meta property="og:title"><meta property="og:url"><meta property="og:image:alt"><meta name="twitter:card"><link rel="canonical"><title>Vocello 2.2</title></head></html>',
@@ -62,4 +62,31 @@ test("low-contrast text tokens fail", () => {
   const errors = validateTokenContrast(css);
   assert.ok(errors.some((value) => value.startsWith("dark --fg-tertiary on --bg-canvas")), errors.join("; "));
   assert.ok(!errors.some((value) => value.includes("--fg-secondary")), errors.join("; "));
+});
+
+test("the release mirror must match the public facts", () => {
+  const facts = { stableMacRelease: { version: "2.4.0", tag: "v2.4.0" }, fallbackMacRelease: { version: "1.2.3", tag: "v1.2.3" } };
+  const mirror = (stable) => ({
+    name: "website/src/data/release.js",
+    text: `export const STABLE_MAC_RELEASE = { version: "${stable}", tag: "v${stable}" };\nexport const FALLBACK_MAC_RELEASE = { version: "1.2.3", tag: "v1.2.3" };\n`,
+  });
+  assert.deepEqual(validateReleaseMirror({ sources: [mirror("2.4.0")], publicFacts: facts }), []);
+  assert.ok(validateReleaseMirror({ sources: [mirror("2.3.0")], publicFacts: facts })
+    .some((value) => value.includes("STABLE_MAC_RELEASE does not match")));
+  assert.ok(validateReleaseMirror({ sources: [], publicFacts: facts }).some((value) => value.includes("is missing")));
+});
+
+test("download links name the stable tag, not the latest release", () => {
+  assert.ok(fixture('<a href="https://github.com/PowerBeef/Vocello/releases/latest">Download</a>')
+    .some((value) => value.includes("/releases/latest")));
+});
+
+test("a screenshot without its AVIF sibling fails", () => {
+  const errors = fixture('<div id="home"><img src="assets/screens/none.png" alt="" /></div>');
+  assert.ok(errors.some((value) => value.includes("missing AVIF sibling: assets/screens/none.avif")));
+});
+
+test("data-module asset references are checked", () => {
+  assert.ok(fixture('export const X = { shot: "assets/screens/none.png" };')
+    .some((value) => value.includes("missing public asset: assets/screens/none.png")));
 });

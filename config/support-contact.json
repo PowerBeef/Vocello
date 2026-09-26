@@ -5,6 +5,6 @@
   "supportEmail": "patricedery02@gmail.com",
   "responseOwner": "Vocello maintainer",
   "privacyURL": "https://vocello.vercel.app/privacy/",
-  "publicDiscussionURL": "https://github.com/PowerBeef/Vocello/discussions",
+  "publicIssueURL": "https://github.com/PowerBeef/Vocello/issues/new/choose",
   "securityReportURL": "https://github.com/PowerBeef/Vocello/security/advisories/new"
 }

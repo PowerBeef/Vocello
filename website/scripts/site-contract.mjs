@@ -58,10 +58,39 @@ export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) =>
   for (const match of combined.matchAll(/href=["'`]#([^"'`]+)["'`]/g)) {
     if (!ids.has(match[1])) errors.push(`internal link #${match[1]} has no static target`);
   }
-  for (const match of combined.matchAll(/(?:src|shot):?\s*=\s*["'`]\/?(assets\/[^"'`]+)["'`]/g)) {
+  for (const match of combined.matchAll(/\b(?:src|shot)\s*(?::|=)\s*["'`]\/?(assets\/[^"'`]+)["'`]/g)) {
     if (!fs.existsSync(path.join(publicRoot, match[1]))) errors.push(`missing public asset: ${match[1]}`);
+    // WEB-02: a screenshot is served as AVIF with its PNG as the fallback.
+    const avif = match[1].replace(/\.png$/, ".avif");
+    if (/^assets\/screens\/.+\.png$/.test(match[1]) && !fs.existsSync(path.join(publicRoot, avif))) {
+      errors.push(`missing AVIF sibling: ${avif}`);
+    }
   }
+  errors.push(...validateReleaseMirror({ sources, publicFacts }));
   return [...new Set(errors)].sort();
+};
+
+// WEB-07: src/data/release.js is the one mirror of the stable and fallback Mac
+// releases in config/public-product-facts.json, and download links name the
+// stable tag rather than /releases/latest. Copy that scopes a claim to a named
+// build (PA-18) keeps its literal version.
+const RELEASE_MIRROR = path.join("src", "data", "release.js");
+
+export const validateReleaseMirror = ({ sources, publicFacts }) => {
+  const errors = [];
+  for (const { name, text } of sources) {
+    if (text.includes("/releases/latest")) errors.push(`${name} links /releases/latest instead of the stable tag`);
+  }
+  const mirror = sources.find(({ name }) => name.endsWith(RELEASE_MIRROR));
+  if (!mirror) return [...errors, `${RELEASE_MIRROR} is missing`];
+  for (const [constant, key] of [["STABLE_MAC_RELEASE", "stableMacRelease"], ["FALLBACK_MAC_RELEASE", "fallbackMacRelease"]]) {
+    const match = new RegExp(`${constant}\\s*=\\s*\\{\\s*version:\\s*"([^"]+)",\\s*tag:\\s*"([^"]+)"\\s*\\}`).exec(mirror.text);
+    const facts = publicFacts?.[key];
+    if (!match || match[1] !== facts?.version || match[2] !== facts?.tag) {
+      errors.push(`${RELEASE_MIRROR} ${constant} does not match ${key} in the public facts`);
+    }
+  }
+  return errors;
 };
 
 // WEB-03 (PA-20): every text token keeps WCAG AA contrast (4.5:1) on every

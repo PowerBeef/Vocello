@@ -104,10 +104,14 @@ do not hard-code duplicate hex values.
 
 Asset ownership:
 
-- `public/assets/screens/`: product screenshots, including `ios-studio.png`.
+- `public/assets/screens/`: product screenshots, including `ios-studio.png`. Each PNG ships with an
+  AVIF sibling (`sips -s format avif -s formatOptions 80 x.png --out x.avif`) and renders through
+  `src/components/Screenshot.jsx` with its pixel size; only the hero loads eagerly.
 - `public/assets/voice-samples/`: WAV samples referenced by `src/data/samples.js`. When audio
   changes, regenerate waveform arrays with `website/scripts/render-waveforms.mjs`.
-- `public/assets/app-icon-1024.png`, `vocello-header-mark.png`, and `social_preview.png`: brand art.
+- `public/assets/favicon-32.png`, `apple-touch-icon.png` (180 px), `vocello-header-mark.png`, and
+  `social_preview.png`: brand art. `src/data/release.js` mirrors the stable and fallback releases in
+  `../config/public-product-facts.json`; download links name the stable tag.
 
 Add assets under a category directory in `public/assets/` and reference them through the data layer, not directly
 from unrelated JSX.

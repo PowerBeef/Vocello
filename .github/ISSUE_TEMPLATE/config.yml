@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/PowerBeef/Vocello/security/advisories/new
     about: Report vulnerabilities privately. Do not put security details in a public issue.
   - name: Usage and troubleshooting
-    url: https://github.com/PowerBeef/Vocello/discussions
-    about: Ask setup and usage questions without filing a product defect.
+    url: https://vocello.vercel.app/support/
+    about: Setup help and privacy-safe troubleshooting, without filing a product defect.

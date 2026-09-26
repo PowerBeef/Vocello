@@ -1,4 +1,5 @@
 import React from "react";
+import { Screenshot } from "../components/Screenshot.jsx";
 
 const ROWS = [
   {
@@ -48,8 +49,9 @@ export const HowItRuns = () => (
 
         <figure className="runs-shot">
           <div className="window">
-            <img
+            <Screenshot
               src="assets/screens/model-downloads.png"
+              width={2080} height={1380}
               alt="Vocello Model Downloads screen showing Speed and Quality models ready"
             />
           </div>

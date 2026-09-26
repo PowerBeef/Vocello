@@ -56,7 +56,7 @@ def validate(root: Path) -> list[str]:
         owner = _required_text(config.get("responseOwner"), "responseOwner")
         support_url = _https_url(config.get("supportURL"), "supportURL")
         privacy_url = _https_url(config.get("privacyURL"), "privacyURL")
-        discussion_url = _https_url(config.get("publicDiscussionURL"), "publicDiscussionURL")
+        issue_url = _https_url(config.get("publicIssueURL"), "publicIssueURL")
         security_url = _https_url(config.get("securityReportURL"), "securityReportURL")
     except ValueError as error:
         return [str(error)]
@@ -82,7 +82,7 @@ def validate(root: Path) -> list[str]:
         (f"mailto:{email}", "support mailto"),
         (owner, "response owner"),
         (privacy_url, "privacy URL"),
-        (discussion_url, "discussion URL"),
+        (issue_url, "public issue URL"),
         (security_url, "security-report URL"),
     ):
         if needle not in support:

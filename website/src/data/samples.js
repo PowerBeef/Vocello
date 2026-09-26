@@ -4,6 +4,7 @@
 export const SAMPLES = [
   {
     id: "narrator",
+    name: "British narrator",
     mode: "Voice Design",
     color: "var(--lavender-300)",
     voice: "A warm, deep narrator with a subtle British accent.",
@@ -15,17 +16,19 @@ export const SAMPLES = [
   },
   {
     id: "host",
+    name: "Aiden",
     mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Aiden, English native",
     quote: "Hey, welcome back to Field Notes. Today we're walking through the demo build, end to end.",
     duration: "0:06",
-    delivery: "Excited / Normal",
+    delivery: "Excited",
     src: "assets/voice-samples/custom-voice-aiden-excited.wav",
     wave: [0.64, 0.57, 0.11, 0.08, 1, 0.61, 0.69, 0.24, 0.12, 0.78, 0.42, 0.33, 0.08, 0.06, 0.06, 0.18, 0.59, 0.57, 0.46, 0.3, 0.24, 0.45, 0.18, 0.4, 0.48, 0.65, 0.71, 0.79, 0.23, 0.06, 0.06, 0.21, 0.52, 0.34, 0.06, 0.42, 0.19, 0.42, 0.23, 0.07],
   },
   {
     id: "japanese",
+    name: "Ono Anna",
     mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Ono Anna, Japanese native",
@@ -37,6 +40,7 @@ export const SAMPLES = [
   },
   {
     id: "narration",
+    name: "Ryan",
     mode: "Built-in Voice",
     color: "var(--gold-300)",
     voice: "Ryan, English native",

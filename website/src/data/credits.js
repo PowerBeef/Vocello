@@ -1,3 +1,5 @@
+import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "./release.js";
+
 export const CREDITS = [
   { name: "Qwen3-TTS", href: "https://github.com/QwenLM/Qwen3-TTS" },
   { name: "MLX", href: "https://github.com/ml-explore/mlx" },
@@ -7,6 +9,7 @@ export const CREDITS = [
 ];
 
 export const REPO = "https://github.com/PowerBeef/Vocello";
-export const RELEASE_LATEST = "https://github.com/PowerBeef/Vocello/releases/latest";
-export const RELEASE_V1 = "https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3";
+// WEB-07: download buttons name the stable tag the page describes, never the latest release.
+export const RELEASE_STABLE = `${REPO}/releases/tag/${STABLE_MAC_RELEASE.tag}`;
+export const RELEASE_FALLBACK = `${REPO}/releases/tag/${FALLBACK_MAC_RELEASE.tag}`;
 export const TESTFLIGHT = "https://testflight.apple.com/join/Cvp6yCv7";

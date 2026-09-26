@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
 import { Waveform } from "../components/Waveform.jsx";
 import { SAMPLES, DELIVERIES } from "../data/samples.js";
+import { Screenshot } from "../components/Screenshot.jsx";
 
 export const Listen = () => {
   const [playing, setPlaying] = useState(null);
@@ -64,7 +65,8 @@ export const Listen = () => {
                 <div className="listen-row-controls">
                   <button
                     className="play-btn"
-                    aria-label={`${isPlaying ? "Pause" : "Play"} ${s.mode} sample`}
+                    aria-label={`Play ${s.mode} sample: ${s.name}`}
+                    aria-pressed={isPlaying}
                     onClick={() => togglePlay(s)}
                   >
                     <Icon name={isPlaying ? "pause" : "play"} size={14} />
@@ -100,8 +102,9 @@ export const Listen = () => {
 
         <figure className="try-shot">
           <div className="window">
-            <img
+            <Screenshot
               src="assets/screens/delivery-presets.png"
+              width={2080} height={1380}
               alt="The Vocello delivery menu open, listing the eight presets, the four distinct deliveries first and the directional hints after them, plus Custom"
             />
           </div>

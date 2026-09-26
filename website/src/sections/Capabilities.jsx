@@ -1,4 +1,5 @@
 import React from "react";
+import { Screenshot } from "../components/Screenshot.jsx";
 
 const ROWS = [
   {
@@ -41,8 +42,9 @@ export const Capabilities = () => (
 
       <figure className="caps-shot">
         <div className="window">
-          <img
+          <Screenshot
             src="assets/screens/history.png"
+            width={2080} height={1380}
             alt="Vocello Generation History listing past takes across Built-in Voice, Voice Design, and Voice Cloning"
           />
         </div>

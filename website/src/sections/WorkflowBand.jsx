@@ -1,4 +1,5 @@
 import React from "react";
+import { Screenshot } from "../components/Screenshot.jsx";
 
 const renderHeadline = (segments, accent) =>
   segments.map((seg, i) =>
@@ -20,14 +21,14 @@ export const WorkflowBand = ({ workflow, index }) => {
       <div className="container workflow-band-inner">
         <figure className="workflow-band-shot">
           <div className="window">
-            <img src={workflow.shot} alt={`Vocello ${workflow.title} screen`} />
+            <Screenshot src={workflow.shot} width={2080} height={1380} alt={`Vocello ${workflow.title} screen`} />
           </div>
         </figure>
         <div className="workflow-band-copy">
           <p className="workflow-band-index">{String(index + 1).padStart(2, "0")} · {workflow.eyebrow}</p>
-          <h3 id={`workflow-${workflow.id}-title`} className="workflow-band-title">
+          <h2 id={`workflow-${workflow.id}-title`} className="workflow-band-title">
             {renderHeadline(workflow.headline, workflow.accent)}
-          </h3>
+          </h2>
           <p className="workflow-band-body">{workflow.body}</p>
           <ol className="workflow-band-points">
             {workflow.points.map(([h, sub], i) => (

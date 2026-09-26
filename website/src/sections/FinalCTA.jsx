@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon } from "../components/Icon.jsx";
-import { CREDITS, REPO, RELEASE_LATEST, RELEASE_V1, TESTFLIGHT } from "../data/credits.js";
+import { CREDITS, REPO, RELEASE_FALLBACK, RELEASE_STABLE, TESTFLIGHT } from "../data/credits.js";
+import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "../data/release.js";
 
 export const FinalCTA = () => (
   <section id="download" className="final-cta-section">
@@ -8,11 +9,11 @@ export const FinalCTA = () => (
       <div className="cta-block">
         <h2 className="cta-title">Local by design. Yours to keep.</h2>
         <p className="cta-body">
-          Vocello 2.4.0 for macOS 26 and Apple Silicon. Free, open-source,
+          Vocello {STABLE_MAC_RELEASE.version} for macOS 26 and Apple Silicon. Free, open-source,
           ready to install in under a minute.
         </p>
         <div className="hero-ctas hero-ctas--center">
-          <a className="btn btn-primary" href={RELEASE_LATEST} target="_blank" rel="noreferrer">
+          <a className="btn btn-primary" href={RELEASE_STABLE} target="_blank" rel="noreferrer">
             <Icon name="apple" size={16} />
             Download Vocello
           </a>
@@ -32,8 +33,8 @@ export const FinalCTA = () => (
           </a>
           <span className="cta-meta-sep" aria-hidden="true">·</span>
           Stable build for macOS 15:{" "}
-          <a href={RELEASE_V1} target="_blank" rel="noreferrer" className="cta-meta-link">
-            QwenVoice 1.2.3
+          <a href={RELEASE_FALLBACK} target="_blank" rel="noreferrer" className="cta-meta-link">
+            QwenVoice {FALLBACK_MAC_RELEASE.version}
           </a>
         </p>
         <div className="cta-credits">

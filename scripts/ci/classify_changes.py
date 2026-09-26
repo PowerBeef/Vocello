@@ -192,8 +192,10 @@ def _is_swift(path: str) -> bool:
         return True
     if path.startswith("Packages/"):
         return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
-    # A Swift test pins the shipping iPhone memory bands to this contract (V-4).
-    if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json"):
+    # Swift tests pin the shipping iPhone memory bands (V-4) and the Fast QC
+    # Stage 0 constants (audio QC audit 5.5) to these records.
+    if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json",
+                "config/audio-qc-stage0-calibration.json"):
         return True
     # Parity fixtures a Swift test scores beside its Python mirror (AQ-02).
     if path in SWIFT_PARITY_FIXTURES:

@@ -120,10 +120,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   `scripts/lib/language_metrics.py` and `scripts/lib/audio_qc.py`; thresholds stay in Swift. The
   metrics also accept a third family id, `sensevoice`, which no lane produces today: SenseVoice
   appears only as a compact-model adapter id in the delivery research cascade, never as a language
-  witness. A defect the maintainer hears is a QC blind spot: add a deterministic, reference-free
-  measurement to the Swift QC, with a test, as a shadow detector whose positives are the heard takes;
-  it fails them once it qualifies (A9, `config/audio-qc-qualification-policy.json`); listening sets
-  are never the ongoing control.
+  witness. A defect the maintainer hears is a QC blind spot: it enters Stage 0 or 1 as a
+  deterministic, reference-free shadow detector with a test, and the heard takes become its P4
+  positives; it fails takes once it qualifies under A1-A8 (A9,
+  `config/audio-qc-qualification-policy.json`); listening sets are never the ongoing control.
   Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only

@@ -1226,7 +1226,10 @@ enum BenchCommand {
     /// analysis step just wrote, and every verdict is checked against the
     /// take's stored fast verdict (a composed verdict can never be better
     /// than the fast one it finalized with). Fail-closed: a missing row,
-    /// missing sidecar verdict, or fail outcome fails the bench run.
+    /// missing sidecar verdict, or fail outcome fails the bench run. An
+    /// abstention is not a pass (audit 2026-09-25, section 3.3): the summary
+    /// counts it, and any abstained take ends the run as inconclusive after
+    /// the verdicts are written, unless a take failed. No gate abstains yet.
     private struct ComposeEngineRow: Decodable {
         struct AnyObjectElement: Decodable {}
         let generationID: String?
@@ -1291,6 +1294,7 @@ enum BenchCommand {
         let policy = GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false)
         var verdicts: [ComposedTakeVerdict] = []
         var failures: [String] = []
+        var abstentions: [String] = []
         for entry in entries {
             guard let row = rowsByID[entry.generationID] else {
                 throw CLIError("composed quality: no engine row for generation \(entry.generationID)")
@@ -1352,6 +1356,8 @@ enum BenchCommand {
             }
             if verdict.outcome == .fail {
                 failures.append("\(entry.deliveryWav): \(verdict.issues.joined(separator: ","))")
+            } else if verdict.outcome == .abstained {
+                abstentions.append("\(entry.deliveryWav): \(verdict.issues.joined(separator: ","))")
             }
             verdicts.append(ComposedTakeVerdict(
                 generationID: entry.generationID,
@@ -1379,10 +1385,18 @@ enum BenchCommand {
         let uncalibrated = verdicts.filter { $0.outcome == "uncalibrated" }.count
         note(
             "composed canonical quality: \(verdicts.count) delivery take(s), \(warned) warning(s), "
-                + "\(uncalibrated) uncalibrated → bench-quality-composed.json"
+                + "\(uncalibrated) uncalibrated, \(abstentions.count) abstained → bench-quality-composed.json"
         )
         if !failures.isEmpty {
             throw CLIError("composed canonical quality FAILED: \(failures.joined(separator: "; "))")
+        }
+        // Composer precedence: fail > unavailable > abstain > warning. An
+        // abstention blocks a claimed pass without naming a defect.
+        if !abstentions.isEmpty {
+            throw CLIError(
+                "composed canonical quality INCONCLUSIVE: \(abstentions.count) take(s) abstained, "
+                    + "which is not a pass: \(abstentions.joined(separator: "; "))"
+            )
         }
     }
 

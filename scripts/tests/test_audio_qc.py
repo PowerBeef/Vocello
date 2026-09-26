@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -129,31 +130,16 @@ class FastQCV8MirrorTests(unittest.TestCase):
         time = np.arange(int(seconds * self.RATE)) / self.RATE
         return amplitude * np.cos(2 * np.pi * frequency * time)
 
-    def test_replay_constants_are_the_swift_values(self) -> None:
-        # Swift owns these (PCM16StreamLimiter, makeAudioQCReport, AudioSpeakingRateQC);
-        # docs/reference/audio-qc-engineering.md lists them. A qualified change edits all three.
-        constants = audio_qc.FASTQC_V8
-        self.assertEqual(
-            (constants["ceiling"], constants["maxSingleSampleStep"], constants["releaseStepPerSample"],
-             constants["stepBurstStepThreshold"], constants["stepBurstWindowSamples"],
-             constants["clickEventGapSamples"], constants["lowEnergyClickEnvelope"], constants["silenceFloor"],
-             constants["interiorRunRecordFloorSamples"], constants["interiorRunRecordCap"]),
-            (0.965, 0.42, 0.002, 0.25, 480, 240, 0.02, 0.001, 2_400, 256))
-        self.assertEqual(constants["clickEnvelopeCoefficient"], 1.0 / 240.0)
-        self.assertEqual(
-            (constants["silentFailDBFS"], constants["lowLevelWarnDBFS"], constants["clipFailFraction"],
-             constants["clickFailFraction"], constants["clickWarnFraction"], constants["hotWarnFraction"],
-             constants["dcOffsetWarn"], constants["dcOffsetFail"], constants["onsetStepBurstMinSteps"],
-             constants["onsetStepBurstWindowMS"], constants["longContentSeconds"]),
-            (-60.0, -45.0, 0.001, 0.005, 0.0005, 0.02, 0.05, 0.20, 3, 50.0, 45.0))
-        self.assertEqual(constants["cadencePauseMS"], {"short": 350, "long": 600})
-        self.assertEqual(constants["egregiousMS"], {"noDeclaredPause": 1_200, "declaredPauseOrLong": 2_000})
-        self.assertEqual(constants["suspiciousSingleMS"],
-                         {"noDeclaredPause": 900, "declaredPause": 1_200, "long": 1_500})
-        self.assertEqual({name: (band["slowSecondsPerUnit"], band["minimumJudgedUnits"])
-                          for name, band in constants["speakingRateBands"].items()},
-                         {"alphabetic": (0.145, 20), "chinese": (0.45, 8), "japanese": (0.40, 8),
-                          "korean": (0.40, 8)})
+    def test_replay_constants_are_the_calibration_record(self) -> None:
+        # Swift owns these (PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds,
+        # AudioSpeakingRateQC). AudioQCStage0CalibrationTests pins the Swift values to the same
+        # record, so neither side reads the other's source (audit 2026-09-25, section 5.5).
+        record = json.loads((Path(__file__).resolve().parents[2] / "config" / "audio-qc-stage0-calibration.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual(record["algorithmVersion"], audio_qc.FASTQC_V8_ALGORITHM_VERSION)
+        self.assertEqual(record["calibration"], "legacy-unqualified")
+        self.assertEqual(audio_qc.FASTQC_V8, record["constants"])
+        self.assertEqual(audio_qc.FASTQC_V8["clickEnvelopeCoefficient"], 1.0 / 240.0)
 
     def test_text_measures(self) -> None:
         self.assertEqual(audio_qc.expected_pause_count("Hello there, world. Bye!"), 2)

@@ -286,3 +286,120 @@ final class AudioQCSpeakingRateTests: XCTestCase {
         XCTAssertEqual(decoded.secondsPerTextUnit, measured.secondsPerTextUnit)
     }
 }
+
+/// Audit 2026-09-25, section 5.5: the Stage 0 constants stay in Swift, and a
+/// Swift test asserts they equal the calibration record of their algorithm
+/// version, `config/audio-qc-stage0-calibration.json`. The Python mirror is
+/// pinned to the same record (`scripts/tests/test_audio_qc.py`), so neither
+/// side reads the other's source.
+final class AudioQCStage0CalibrationTests: XCTestCase {
+    private typealias Thresholds = StreamingExecutionContext.AudioQCThresholds
+
+    private func record() throws -> [String: Any] {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(
+            contentsOf: repository.appendingPathComponent("config/audio-qc-stage0-calibration.json")
+        )
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func constants() throws -> [String: Any] {
+        try XCTUnwrap(try record()["constants"] as? [String: Any])
+    }
+
+    private func number(_ key: String, in parent: [String: Any]) throws -> NSNumber {
+        try XCTUnwrap(parent[key] as? NSNumber, key)
+    }
+
+    private func table(_ key: String, in parent: [String: Any]) throws -> [String: Any] {
+        try XCTUnwrap(parent[key] as? [String: Any], key)
+    }
+
+    func testTheRecordCoversTheCurrentAlgorithmVersion() throws {
+        let document = try record()
+        XCTAssertEqual(document["algorithmVersion"] as? Int, AudioQCReport.currentAlgorithmVersion)
+        XCTAssertEqual(document["calibration"] as? String, "legacy-unqualified")
+    }
+
+    func testLimiterConstantsEqualTheRecord() throws {
+        let values = try constants()
+        // Float32 constants against their decimal record: equal within Float32 precision.
+        let floats: [(Float, String)] = [
+            (PCM16StreamLimiter.ceiling, "ceiling"),
+            (PCM16StreamLimiter.maxSingleSampleStep, "maxSingleSampleStep"),
+            (PCM16StreamLimiter.releaseStepPerSample, "releaseStepPerSample"),
+            (PCM16StreamLimiter.stepBurstStepThreshold, "stepBurstStepThreshold"),
+            (PCM16StreamLimiter.clickEnvelopeCoefficient, "clickEnvelopeCoefficient"),
+            (PCM16StreamLimiter.lowEnergyClickEnvelope, "lowEnergyClickEnvelope"),
+            (PCM16StreamLimiter.silenceFloor, "silenceFloor"),
+        ]
+        for (value, key) in floats {
+            let expected = try number(key, in: values).doubleValue
+            XCTAssertEqual(Double(value), expected, accuracy: abs(expected) * 1e-6, key)
+        }
+        let integers: [(Int, String)] = [
+            (PCM16StreamLimiter.stepBurstWindowSamples, "stepBurstWindowSamples"),
+            (PCM16StreamLimiter.clickEventGapSamples, "clickEventGapSamples"),
+            (PCM16StreamLimiter.interiorRunRecordFloorSamples, "interiorRunRecordFloorSamples"),
+            (PCM16StreamLimiter.interiorRunRecordCap, "interiorRunRecordCap"),
+        ]
+        for (value, key) in integers {
+            XCTAssertEqual(value, try number(key, in: values).intValue, key)
+        }
+    }
+
+    func testReportThresholdsEqualTheRecord() throws {
+        let values = try constants()
+        let doubles: [(Double, String)] = [
+            (Thresholds.silentFailDBFS, "silentFailDBFS"),
+            (Thresholds.lowLevelWarnDBFS, "lowLevelWarnDBFS"),
+            (Thresholds.clipFailFraction, "clipFailFraction"),
+            (Thresholds.clickFailFraction, "clickFailFraction"),
+            (Thresholds.clickWarnFraction, "clickWarnFraction"),
+            (Thresholds.hotWarnFraction, "hotWarnFraction"),
+            (Thresholds.dcOffsetWarn, "dcOffsetWarn"),
+            (Thresholds.dcOffsetFail, "dcOffsetFail"),
+            (Thresholds.onsetStepBurstWindowMS, "onsetStepBurstWindowMS"),
+            (Thresholds.longContentSeconds, "longContentSeconds"),
+        ]
+        for (value, key) in doubles {
+            XCTAssertEqual(value, try number(key, in: values).doubleValue, accuracy: 1e-12, key)
+        }
+        XCTAssertEqual(
+            Thresholds.onsetStepBurstMinSteps, try number("onsetStepBurstMinSteps", in: values).intValue
+        )
+        let cadence = try table("cadencePauseMS", in: values)
+        XCTAssertEqual(Thresholds.cadencePauseMS, try number("short", in: cadence).intValue)
+        XCTAssertEqual(Thresholds.longContentCadencePauseMS, try number("long", in: cadence).intValue)
+        let egregious = try table("egregiousMS", in: values)
+        XCTAssertEqual(Thresholds.egregiousNoDeclaredPauseMS, try number("noDeclaredPause", in: egregious).intValue)
+        XCTAssertEqual(
+            Thresholds.egregiousDeclaredPauseOrLongMS, try number("declaredPauseOrLong", in: egregious).intValue
+        )
+        let suspicious = try table("suspiciousSingleMS", in: values)
+        XCTAssertEqual(Thresholds.suspiciousNoDeclaredPauseMS, try number("noDeclaredPause", in: suspicious).intValue)
+        XCTAssertEqual(Thresholds.suspiciousDeclaredPauseMS, try number("declaredPause", in: suspicious).intValue)
+        XCTAssertEqual(Thresholds.suspiciousLongContentMS, try number("long", in: suspicious).intValue)
+    }
+
+    func testSpeakingRateBandsEqualTheRecord() throws {
+        let bands = try table("speakingRateBands", in: try constants())
+        let classes: [AudioSpeakingRateQC.ScriptClass] = [.alphabetic, .chinese, .japanese, .korean]
+        XCTAssertEqual(Set(bands.keys), Set(classes.map(\.rawValue)))
+        for scriptClass in classes {
+            let band = try table(scriptClass.rawValue, in: bands)
+            XCTAssertEqual(
+                AudioSpeakingRateQC.slowSecondsPerUnit(for: scriptClass),
+                try number("slowSecondsPerUnit", in: band).doubleValue,
+                accuracy: 1e-12,
+                scriptClass.rawValue
+            )
+            XCTAssertEqual(
+                AudioSpeakingRateQC.minimumJudgedUnits(for: scriptClass),
+                try number("minimumJudgedUnits", in: band).intValue,
+                scriptClass.rawValue
+            )
+        }
+    }
+}

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "record": "audio-qc-stage0-calibration",
+  "algorithmVersion": 8,
+  "calibration": "legacy-unqualified",
+  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md, sections 5.5 and 5.6 (A10)",
+  "note": "The Stage 0 constants of Fast QC v8: PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds and AudioSpeakingRateQC. Swift owns them; AudioQCStage0CalibrationTests asserts the Swift values equal this record, and scripts/tests/test_audio_qc.py asserts the Python mirror's FASTQC_V8 does. They are legacy-unqualified bounds (A10), not qualified operating points: a qualified change writes a new record for a new algorithm version and edits Swift, the mirror and the record together.",
+  "constants": {
+    "ceiling": 0.965,
+    "maxSingleSampleStep": 0.42,
+    "releaseStepPerSample": 0.002,
+    "stepBurstStepThreshold": 0.25,
+    "stepBurstWindowSamples": 480,
+    "clickEventGapSamples": 240,
+    "clickEnvelopeCoefficient": 0.004166666666666667,
+    "lowEnergyClickEnvelope": 0.02,
+    "silenceFloor": 0.001,
+    "interiorRunRecordFloorSamples": 2400,
+    "interiorRunRecordCap": 256,
+    "silentFailDBFS": -60.0,
+    "lowLevelWarnDBFS": -45.0,
+    "clipFailFraction": 0.001,
+    "clickFailFraction": 0.005,
+    "clickWarnFraction": 0.0005,
+    "hotWarnFraction": 0.02,
+    "dcOffsetWarn": 0.05,
+    "dcOffsetFail": 0.2,
+    "onsetStepBurstMinSteps": 3,
+    "onsetStepBurstWindowMS": 50.0,
+    "longContentSeconds": 45.0,
+    "cadencePauseMS": {
+      "short": 350,
+      "long": 600
+    },
+    "egregiousMS": {
+      "noDeclaredPause": 1200,
+      "declaredPauseOrLong": 2000
+    },
+    "suspiciousSingleMS": {
+      "noDeclaredPause": 900,
+      "declaredPause": 1200,
+      "long": 1500
+    },
+    "speakingRateBands": {
+      "alphabetic": {
+        "slowSecondsPerUnit": 0.145,
+        "minimumJudgedUnits": 20
+      },
+      "chinese": {
+        "slowSecondsPerUnit": 0.45,
+        "minimumJudgedUnits": 8
+      },
+      "japanese": {
+        "slowSecondsPerUnit": 0.4,
+        "minimumJudgedUnits": 8
+      },
+      "korean": {
+        "slowSecondsPerUnit": 0.4,
+        "minimumJudgedUnits": 8
+      }
+    }
+  }
+}

@@ -2841,8 +2841,37 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
+    /// The report thresholds of Fast QC v8 (Stage 0). Swift owns them;
+    /// `AudioQCStage0CalibrationTests` asserts they equal the v8 calibration
+    /// record, `config/audio-qc-stage0-calibration.json` (audit 2026-09-25,
+    /// section 5.5), which the Python mirror is pinned to as well. They are
+    /// `legacy-unqualified` bounds (A10): changing one is a qualified change
+    /// under the threshold-change authority, with a new algorithm version and
+    /// record.
+    enum AudioQCThresholds {
+        static let silentFailDBFS = -60.0
+        static let lowLevelWarnDBFS = -45.0
+        static let clipFailFraction = 0.001
+        static let clickFailFraction = 0.005
+        static let clickWarnFraction = 0.0005
+        static let hotWarnFraction = 0.02
+        static let dcOffsetWarn = 0.05
+        static let dcOffsetFail = 0.20
+        static let onsetStepBurstMinSteps = 3
+        static let onsetStepBurstWindowMS = 50.0
+        static let longContentSeconds = 45.0
+        static let cadencePauseMS = 350
+        static let longContentCadencePauseMS = 600
+        static let egregiousNoDeclaredPauseMS = 1_200
+        static let egregiousDeclaredPauseOrLongMS = 2_000
+        static let suspiciousNoDeclaredPauseMS = 900
+        static let suspiciousDeclaredPauseMS = 1_200
+        static let suspiciousLongContentMS = 1_500
+    }
+
     /// Build the reference-free `AudioQCReport` from the limiter's per-sample
-    /// metrics. Thresholds are conservative + tunable here — they exist to catch
+    /// metrics. The thresholds (`AudioQCThresholds`) are conservative and move
+    /// only under the threshold-change authority — they exist to catch
     /// GROSS defects (regression tripwire), not to claim subjective naturalness.
     /// Autonomous promotion combines this evidence with the applicable fixed-seed
     /// ASR, prosody, and delivery gates. Fractions are relative to processed samples.
@@ -2893,18 +2922,23 @@ struct StreamingExecutionContext: Sendable {
             ? Double(metrics.clickEventCount) / durationSeconds
             : nil
 
-        // Conservative thresholds (documented; tune as the corpus dictates).
-        let silentFailDBFS = -60.0, lowLevelWarnDBFS = -45.0
-        let clipFailFrac = 0.001, clickFailFrac = 0.005
-        let clickWarnFrac = 0.0005, hotWarnFrac = 0.02
-        let dcOffsetWarn = 0.05, dcOffsetFail = 0.20
+        // Conservative thresholds (documented; `AudioQCThresholds` holds the values).
+        let silentFailDBFS = AudioQCThresholds.silentFailDBFS
+        let lowLevelWarnDBFS = AudioQCThresholds.lowLevelWarnDBFS
+        let clipFailFrac = AudioQCThresholds.clipFailFraction
+        let clickFailFrac = AudioQCThresholds.clickFailFraction
+        let clickWarnFrac = AudioQCThresholds.clickWarnFraction
+        let hotWarnFrac = AudioQCThresholds.hotWarnFraction
+        let dcOffsetWarn = AudioQCThresholds.dcOffsetWarn
+        let dcOffsetFail = AudioQCThresholds.dcOffsetFail
         // v7: a take that opens with a dense burst of quarter-scale steps. The
         // September 13 A/B (28 seeds per codec, clone short) found such bursts
         // inside the first 50 ms in 4 of 28 fp16-codec takes and 0 of 28 fp32
         // takes; the ordinary plosive-onset cluster 150 to 250 ms in is common to
         // both codecs and to release 2.4.0, so the window stays tight. Warn-only
         // until a corpus sets the failing boundary.
-        let onsetStepBurstMinSteps = 3, onsetStepBurstWindowMS = 50.0
+        let onsetStepBurstMinSteps = AudioQCThresholds.onsetStepBurstMinSteps
+        let onsetStepBurstWindowMS = AudioQCThresholds.onsetStepBurstWindowMS
         // Dropout (punctuation-aware). This fast, amplitude-only tripwire cannot
         // decide that an ordinary cadence pause is missing speech. The 2026-08-22
         // cross-speaker delivery screen proved the old rule could: it rejected 38
@@ -2920,8 +2954,10 @@ struct StreamingExecutionContext: Sendable {
         // thresholds below were calibrated on the ≤341-char canonical corpus
         // (natural max ~810 ms) and misclassified narration pacing as
         // dropouts when extrapolated to minute-scale takes.
-        let longContent = durationSeconds >= 45
-        let cadencePauseMS = longContent ? 600 : 350
+        let longContent = durationSeconds >= AudioQCThresholds.longContentSeconds
+        let cadencePauseMS = longContent
+            ? AudioQCThresholds.longContentCadencePauseMS
+            : AudioQCThresholds.cadencePauseMS
         // A delivery instruction can legitimately stretch the one pause the
         // script actually contains. The cross-speaker 2026-08-22 matrix found
         // Vivian's corrected Sad rendering produced one 1.506 s pause at the
@@ -2931,8 +2967,14 @@ struct StreamingExecutionContext: Sendable {
         // 1.2–2.0 s as a warning. Excess pauses still fail below, and any gap
         // at or above 2 s remains an unconditional failure.
         let hasDeclaredPause = expectedPauseCount > 0
-        let egregiousMS = longContent || hasDeclaredPause ? 2_000 : 1_200
-        let suspiciousSingleMS = longContent ? 1_500 : (hasDeclaredPause ? 1_200 : 900)
+        let egregiousMS = longContent || hasDeclaredPause
+            ? AudioQCThresholds.egregiousDeclaredPauseOrLongMS
+            : AudioQCThresholds.egregiousNoDeclaredPauseMS
+        let suspiciousSingleMS = longContent
+            ? AudioQCThresholds.suspiciousLongContentMS
+            : (hasDeclaredPause
+                ? AudioQCThresholds.suspiciousDeclaredPauseMS
+                : AudioQCThresholds.suspiciousNoDeclaredPauseMS)
         let cadencePauseCount = interiorSilencesMS.filter { $0 >= cadencePauseMS }.count
         let excessCadencePauses = max(0, cadencePauseCount - max(0, expectedPauseCount))
         let suspiciousPauseCount = interiorSilencesMS.filter { $0 >= suspiciousSingleMS }.count

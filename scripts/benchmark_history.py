@@ -2847,7 +2847,7 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         raise HistoryError("trace summary target process is not a safe identifier")
     require_digest(summary["tocDigest"], "evidence.trace.summary.tocDigest", allow_na=False)
     cpu_rows = sum(rows.get(name, 0) for name in ("cpu-profile", "time-profile"))
-    signpost_rows = sum(value for name, value in rows.items() if "signpost" in name)
+    signpost_rows = sum(value for name, value in rows.items() if "signpost" in name.lower())
     if cpu_rows != summary.get("cpuSampleCount", 0) or signpost_rows != summary["signpostEventCount"]:
         raise HistoryError("trace summary row counts do not match CPU/signpost totals")
     if sum(rows.values()) != summary["capturedDataRowCount"]:
@@ -2884,7 +2884,11 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
             )
         except ValueError as error:
             raise HistoryError(str(error)) from error
-        if summary["signpostIntervalCount"] != rows.get("os-signpost-interval", 0):
+        interval_rows = sum(
+            value for name, value in rows.items()
+            if name.lower() in {"os-signpost-interval", "ossignpostintervals"}
+        )
+        if summary["signpostIntervalCount"] != interval_rows:
             raise HistoryError("trace summary interval count does not match its exported rows")
 
 

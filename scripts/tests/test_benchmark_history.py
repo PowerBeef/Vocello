@@ -2115,6 +2115,20 @@ class BenchmarkHistoryTests(unittest.TestCase):
         })
         return summary
 
+    def test_a_witness_summary_keyed_by_xcode_27s_interval_table_validates(self) -> None:
+        # Xcode 27's xctrace names the paired-interval table OSSignpostIntervals;
+        # its rows count as interval and signpost rows like os-signpost-interval's.
+        run_id = "profile-witness-xcode27"
+        summary = self.witness_trace_summary()
+        rows = summary["capturedRowsBySchema"]
+        rows["OSSignpostIntervals"] = rows.pop("os-signpost-interval")
+        manifest = self.profile_producer_manifest(
+            run_id, quality=True, policy="summaryOnly", profile_kind="witness",
+            template="os_signpost", summary=summary,
+        )
+        record = json.loads(history.record_manifest(self.write_manifest(manifest, run_id)).read_text())
+        self.assertIn("OSSignpostIntervals", record["evidence"]["trace"]["summary"]["capturedRowsBySchema"])
+
     def test_a_witness_profile_publishes_without_cpu_fields_and_only_as_a_witness(self) -> None:
         run_id = "profile-witness"
         manifest = self.profile_producer_manifest(

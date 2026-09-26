@@ -4404,9 +4404,11 @@ def trace_evidence(
             (value for key, value in element.attrib.items() if key.rsplit("}", 1)[-1].lower() in {"schema", "name", "id"}),
             tag,
         )
-        token = str(name).strip().lower()
+        # Keep the table's own spelling: the export XPath is case-sensitive
+        # (Xcode 27 names its interval table OSSignpostIntervals).
+        token = str(name).strip()
         schemas.add(token)
-        if "signpost" in token:
+        if "signpost" in token.lower():
             signpost_schemas.add(token)
     profile_kind = getattr(args, "profile_kind", "cpu")
     track_details: dict[str, set[str]] = {}

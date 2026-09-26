@@ -32,8 +32,12 @@ final class QwenVoiceApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // MAC-25: reference recordings a crash or force quit left behind; no
         // draft can point at them in a new process. Another running copy's
-        // folder is left alone.
-        ReferenceClipRecordingStash.removeLeftoverRecordings(anotherCopyIsRunning: Self.anotherCopyIsRunning)
+        // folder is left alone. The scan runs off the main thread so it never
+        // delays launch; quit keeps its sweep synchronous below.
+        let anotherCopyIsRunning = Self.anotherCopyIsRunning
+        Task.detached(priority: .utility) {
+            ReferenceClipRecordingStash.removeLeftoverRecordings(anotherCopyIsRunning: anotherCopyIsRunning)
+        }
         // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their
         // registered knobs): seed History before any navigation can reach it,
         // then start the frame probe so its display link binds the first key

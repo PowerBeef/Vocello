@@ -1455,8 +1455,9 @@ enum PreparedModelOverlay {
             return
         }
         for entry in entries where isRebuildName(entry.lastPathComponent) {
-            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
+            // An unreadable date keeps the entry, as the other sweeps do.
+            guard let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate else { continue }
             if now.timeIntervalSince(modified) > age {
                 try? fileManager.removeItem(at: entry)
             }

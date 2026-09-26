@@ -549,11 +549,16 @@ struct VocelloPresentationText: Sendable {
         )
     }
 
-    /// Saved Voice failures keep the engine's typed busy state distinct from
-    /// other failures, whose existing descriptions are not reverse-translated.
+    /// Saved Voice failures keep the engine's typed busy state distinct; a
+    /// typed reference-audio or storage failure (a conversion's
+    /// `AudioPreparationError` among them) reads as its path-free interface
+    /// copy; other failures keep their own description.
     func savedVoiceErrorMessage(_ error: Error) -> String {
         if (error as? TTSEngineError) == .savedVoiceStoreBusy {
             return savedVoicesStoreBusy
+        }
+        if let reason = GenerationFailurePresentationReason(error) {
+            return generationFailureMessage(reason)
         }
         return error.localizedDescription
     }

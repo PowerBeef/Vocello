@@ -939,8 +939,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             let name = entry.lastPathComponent
             let isConversionTemporary = name.hasPrefix(".") && name.contains(".converting-") && name.hasSuffix(".wav")
             guard isConversionTemporary || isSavedVoiceConversionName(name) else { continue }
-            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
+            // An unreadable date keeps the file, as the other sweeps do.
+            guard let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate else { continue }
             if now.timeIntervalSince(modified) > age {
                 try? fileManager.removeItem(at: entry)
             }
@@ -1933,6 +1934,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         // candidate holds its copy; a typed preparation error surfaces as is.
         var sourceURL = requestedURL
         var conversionURL: URL?
+        // Registered before the conversion runs, so a cancellation thrown after
+        // its publish rename still removes the converted copy.
+        defer {
+            if let conversionURL {
+                try? FileManager.default.removeItem(at: conversionURL)
+            }
+        }
         if let appSupportDirectoryURL,
            let target = Self.savedVoiceConversionURL(
                for: requestedURL,
@@ -1942,11 +1950,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             sourceURL = try await audioPreparationService.normalizeAudio(
                 AudioPreparationRequest(inputURL: requestedURL, outputURL: target)
             ).normalizedURL
-        }
-        defer {
-            if let conversionURL {
-                try? FileManager.default.removeItem(at: conversionURL)
-            }
         }
         let warnings = await SavedVoiceAudioReads.qualityWarnings(forAudioAt: sourceURL.path)
         do {

@@ -24,6 +24,26 @@ final class ReferenceImportStorageTests: XCTestCase {
 
     // MARK: - LocalDocumentIO
 
+    /// A conversion failure reaches the enrollment UI as its typed, path-free
+    /// copy, never as English text carrying the user's source path.
+    func testASavedVoiceConversionFailureShowsNoPath() {
+        let path = "/Users/example/Private Folder/reference.flac"
+        let presentation = VocelloPresentationText()
+        for error in [
+            AudioPreparationError.failedToReadAudio(path),
+            AudioPreparationError.missingInputFile(path),
+            AudioPreparationError.inputFileTooLarge(path: path, maxBytes: 1, actualBytes: 2),
+        ] {
+            let message = presentation.savedVoiceErrorMessage(error)
+            XCTAssertFalse(message.contains("Private Folder"), message)
+            XCTAssertEqual(message, presentation.generationFailureMessage(error))
+        }
+        XCTAssertEqual(
+            presentation.savedVoiceErrorMessage(TTSEngineError.savedVoiceStoreBusy),
+            presentation.savedVoicesStoreBusy
+        )
+    }
+
     func testTheDefaultCapIsWhatAudioPreparationAccepts() {
         XCTAssertEqual(
             LocalDocumentIO(importedReferenceDirectory: root).maximumReferenceBytes,

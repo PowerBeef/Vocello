@@ -336,14 +336,14 @@ struct IOSRecordVoiceSheet: View {
                     completeEnrollment(voice)
                 } catch {
                     pendingVoiceForReview = candidate
-                    enrollError = error.localizedDescription
+                    enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 }
             } else {
                 // Soft/hard warnings remain private candidates until Keep.
                 pendingVoiceForReview = candidate
             }
         } catch {
-            enrollError = error.localizedDescription
+            enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
         }
     }
 
@@ -357,7 +357,7 @@ struct IOSRecordVoiceSheet: View {
                 isReviewDecisionInFlight = false
                 completeEnrollment(voice)
             } catch {
-                enrollError = error.localizedDescription
+                enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
         }
@@ -383,7 +383,7 @@ struct IOSRecordVoiceSheet: View {
                     onDismiss()
                 }
             } catch {
-                enrollError = error.localizedDescription
+                enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
         }

@@ -30,6 +30,7 @@ from lib.language_metrics import (
     LANGUAGE_CHECK_KINDS,
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
+    NORMALIZATION_DATA_FILES,
     score_recognition,
 )
 from lib.qc_qualification.composer import compose
@@ -42,10 +43,13 @@ COMPACT_ADAPTER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 STAGE0_CALIBRATION = REPO / "config/audio-qc-stage0-calibration.json"
 ASR_METRIC_DEFINITION = ACCURACY_METRIC_VERSION
 # Every source that shapes a recognizer's L2 value, hashed together into its
-# L2 key: the scoring (`score_recognition`), its reduction to measurements
-# (`asr_metrics`, this module) and the recognition it reads, including the
-# detected language (`independent_asr._recognition`).
-ASR_METRIC_SOURCES = (LANGUAGE_METRICS_SOURCE, VERDICTS_SOURCE, INDEPENDENT_ASR_SOURCE)
+# L2 key: the scoring (`score_recognition`) and the data it reads (the Chinese
+# fold table), its reduction to measurements (`asr_metrics`, this module) and
+# the recognition it reads, including the detected language
+# (`independent_asr._recognition`).
+ASR_METRIC_SOURCES = (
+    LANGUAGE_METRICS_SOURCE, *NORMALIZATION_DATA_FILES, VERDICTS_SOURCE, INDEPENDENT_ASR_SOURCE,
+)
 # SenseVoice's tag metrics: its output parser and the reduction below.
 SENSEVOICE_METRIC_SOURCES = (COMPACT_ADAPTER_SOURCE, VERDICTS_SOURCE)
 SENSEVOICE_METRIC_KEYS = ("languageTag", "emotionTag", "eventTag", "textNormalizationTag")

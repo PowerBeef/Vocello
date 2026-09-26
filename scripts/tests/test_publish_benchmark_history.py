@@ -1881,7 +1881,7 @@ class PublisherTests(unittest.TestCase):
                 "designInstructionDigest": None,
                 "expectedLanguage": "french",
                 "selectedLocaleIdentifier": "fr-CA",
-                "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
+                "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
                 "accuracyMetric": "wordErrorRate",
                 "accuracyThreshold": 0.15,
                 "outputVerifierSchemaVersion": 3,
@@ -1906,7 +1906,7 @@ class PublisherTests(unittest.TestCase):
             "outputAlgorithm": "language-output-verifier-v3",
             "recognitionSchemaVersion": 2,
             "recognitionAlgorithm": "apple-speech-file-consensus-v2",
-            "accuracyMetricVersion": "normalization-v2-edit-rate-v3",
+            "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
             "requiredPassCount": 3,
             "families": ["apple-speech"],
         })

@@ -616,6 +616,28 @@ class CheckLanguageOutputTests(unittest.TestCase):
         )
         self.assertTrue(any("wrong primary accuracy metric" in failure for failure in failures), failures)
 
+    def test_normalization_v3_verification_folds_a_traditional_transcript(self) -> None:
+        """AQ-02 P2b: a v4 verification is rescored under normalization v3, so a
+        correct Mandarin take heard in Traditional characters pays only its one
+        real homophone (是 for 时); the same evidence declared under v3 is
+        rescored without the fold and no longer matches."""
+        v4 = "normalization-v3-edit-rate-v4"
+        script = "今天天气很好，红色的火车离开安静的车站，准时开往远处的城市。"
+        heard = "今天天氣很好,紅色的火車離開安靜的車站,準是開往遠處的城市"
+        chinese = verification("chinese", script=script, transcript_override=heard, accuracy_metric_version=v4)
+        word, _character = recomputed_accuracy(script, heard, "chinese", version=v4)
+        chinese.update({
+            "segmentationAwareWordErrorRate": word["segmentationAwareErrorRate"],
+            "wordBoundaryOnlyEdits": word["wordBoundaryOnlyEdits"],
+        })
+        self.assertEqual((chinese["accuracyMetric"], chinese["characterSubstitutions"]), ("characterErrorRate", 1))
+        self.assertAlmostEqual(chinese["accuracyValue"], 1 / 27)
+        self.assertEqual(validate_structured_verification(chinese, "chinese", script, "zh"), [])
+        failures = validate_structured_verification(
+            dict(chinese, accuracyMetricVersion="normalization-v2-edit-rate-v3"), "chinese", script, "zh",
+        )
+        self.assertTrue(any("CER does not match" in failure for failure in failures), failures)
+
 
 if __name__ == "__main__":
     unittest.main()

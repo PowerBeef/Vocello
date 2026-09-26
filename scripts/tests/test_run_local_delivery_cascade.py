@@ -76,8 +76,8 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         self.assertEqual(report['status'], 'pass')
         # WER v2 moves pass/fail under the same evidence policy, so the review
         # names the scoring version it applied.
-        self.assertEqual(report['accuracyMetricVersion'], 'normalization-v2-edit-rate-v3')
-        self.assertTrue(all(r['accuracyMetricVersion'] == 'normalization-v2-edit-rate-v3'
+        self.assertEqual(report['accuracyMetricVersion'], 'normalization-v3-edit-rate-v4')
+        self.assertTrue(all(r['accuracyMetricVersion'] == 'normalization-v3-edit-rate-v4'
                             for r in report['recognitions']))
         self.assertFalse(report['humanListeningRequired'])
         self.assertEqual(report['perceptualQuality'], 'not-established')
@@ -196,7 +196,7 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         self.assertEqual(len(first["composerSHA256"]), 64)
         # The shared metrics that score every recognition bind the report too.
         self.assertIn("lib/language_metrics.py", first["reviewDependencies"])
-        self.assertEqual(first["accuracyMetricVersion"], "normalization-v2-edit-rate-v3")
+        self.assertEqual(first["accuracyMetricVersion"], "normalization-v3-edit-rate-v4")
         self.assertEqual(
             first["reportDigest"],
             digest({key: value for key, value in first.items() if key != "reportDigest"}),

@@ -276,8 +276,10 @@ def validate_structured_verification(
 
     # The declared accuracy metric version picks the text normalization and the
     # gated score (v1: plain rates; v2: the segmentation-aware word rate; v3:
-    # both under normalization v2, Korean by characters). An unknown version
-    # fails below and is recomputed under the current one for the other checks.
+    # both under normalization v2, Korean by characters; v4: under
+    # normalization v3, Chinese folded from Traditional to Simplified). An
+    # unknown version fails below and is recomputed under the current one for
+    # the other checks.
     version = verification.get("accuracyMetricVersion")
     scoring_version = version if version in ACCURACY_METRIC_VERSIONS else ACCURACY_METRIC_VERSION
     recomputed_word: dict[str, int | float] | None = None

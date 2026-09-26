@@ -4,12 +4,13 @@ One tokenizer, one edit distance, one locale table, one threshold set and one
 family-consensus rule, applied per verdict channel. `check_language_output.py`, `publish_benchmark_history.py`,
 `run_local_delivery_cascade.py` and `independent_asr.py` import from here; the
 Swift `GenerationOutputVerifier` keeps its own implementation as the independent
-cross-check. Text normalization v2 (AQ-02) is pinned to the Swift verifier by
-the shared fixtures in `scripts/tests/fixtures/language_normalization_v2.json`,
-which `scripts/tests/test_language_metrics.py` and the Swift
-`WordErrorRateTests` both score; the legacy v1 tokenizer keeps its own
-fixtures (diacritic and width folding, alphanumeric token boundaries). Both
-share the stable diagonal → deletion → insertion ties.
+cross-check. The current text normalization (v3, AQ-02) is pinned to the Swift
+verifier by the shared fixtures in
+`scripts/tests/fixtures/language_normalization.json`, which
+`scripts/tests/test_language_metrics.py` and the Swift `WordErrorRateTests`
+both score; the legacy v1 tokenizer keeps its own fixtures (diacritic and
+width folding, alphanumeric token boundaries). Both share the stable diagonal
+→ deletion → insertion ties.
 
 Thresholds are facts about the product gate, not tunables: 15 % normalized edit
 rate and a 0.5 language-match score. Change them in one place, with the
@@ -19,8 +20,11 @@ threshold-change authority described in `docs/reference/audio-qc-engineering.md`
 from __future__ import annotations
 
 from collections.abc import Callable
+import functools
 import hashlib
+import json
 import math
+from pathlib import Path
 import re
 from typing import Any
 import unicodedata
@@ -40,23 +44,36 @@ MIN_LANGUAGE_MATCH_SCORE = 0.5
 #   v2 (`normalized_tokens`): NFKC (NFC for Korean) and case folding, the extra
 #   Latin folds, recognizer-tag stripping, English, French and Italian words
 #   joined across an inner apostrophe, and Korean gated by its syllable rate.
+# - v4 (AQ-02 phase P2b, 2026-09-26) keeps v3's rates and scores under text
+#   normalization v3: v2 plus the Traditional-to-Simplified fold of Chinese on
+#   both sides (`fold_traditional_chinese`), so a recognizer that writes a
+#   correct Mandarin take in Traditional characters no longer pays CER for
+#   the orthography. Records keep the version they declare and rescore under it.
 LEGACY_ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
 SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION = "segmentation-aware-edit-rate-v2"
-ACCURACY_METRIC_VERSION = "normalization-v2-edit-rate-v3"
+NORMALIZATION_V2_ACCURACY_METRIC_VERSION = "normalization-v2-edit-rate-v3"
+ACCURACY_METRIC_VERSION = "normalization-v3-edit-rate-v4"
 ACCURACY_METRIC_VERSIONS = (
-    LEGACY_ACCURACY_METRIC_VERSION, SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION, ACCURACY_METRIC_VERSION,
+    LEGACY_ACCURACY_METRIC_VERSION, SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION,
+    NORMALIZATION_V2_ACCURACY_METRIC_VERSION, ACCURACY_METRIC_VERSION,
 )
 # Versions whose word gate reads the segmentation-aware rate (a tuple, so a
 # malformed declared version tests false instead of raising).
-SEGMENTATION_AWARE_METRIC_VERSIONS = (SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION, ACCURACY_METRIC_VERSION)
+SEGMENTATION_AWARE_METRIC_VERSIONS = (
+    SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION, NORMALIZATION_V2_ACCURACY_METRIC_VERSION, ACCURACY_METRIC_VERSION,
+)
 TEXT_NORMALIZATION_V1 = "text-normalization-v1"
 TEXT_NORMALIZATION_V2 = "text-normalization-v2"
+TEXT_NORMALIZATION_V3 = "text-normalization-v3"
 # The text normalization each accuracy metric version scores under.
 ACCURACY_METRIC_NORMALIZATIONS = {
     LEGACY_ACCURACY_METRIC_VERSION: TEXT_NORMALIZATION_V1,
     SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION: TEXT_NORMALIZATION_V1,
-    ACCURACY_METRIC_VERSION: TEXT_NORMALIZATION_V2,
+    NORMALIZATION_V2_ACCURACY_METRIC_VERSION: TEXT_NORMALIZATION_V2,
+    ACCURACY_METRIC_VERSION: TEXT_NORMALIZATION_V3,
 }
+# The normalization current records score under.
+TEXT_NORMALIZATION = ACCURACY_METRIC_NORMALIZATIONS[ACCURACY_METRIC_VERSION]
 # The longest run of tokens on either side of one merge or split that v2
 # credits (a four-word compound and its spaced spelling). Swift mirrors it as
 # `VoiceClipTranscriber.wordBoundarySpanLimit`.
@@ -158,9 +175,9 @@ def primary_accuracy_score(
 ) -> float:
     """The gated score under one accuracy metric version.
 
-    v1 gates the plain word or character rate; v2 and v3 gate the
-    segmentation-aware word rate (characters are unchanged), and v3 gates
-    Korean by its character rate. An unknown version fails closed."""
+    v1 gates the plain word or character rate; v2 to v4 gate the
+    segmentation-aware word rate (characters are unchanged), and v3 and v4
+    gate Korean by its character rate. An unknown version fails closed."""
     _require_version(version)
     if primary_accuracy_metric(expected_language, version=version) == "characterErrorRate":
         return float(character["errorRate"])
@@ -170,12 +187,13 @@ def primary_accuracy_score(
 
 
 # --------------------------------------------------------------------------- #
-# Text normalization v2 (AQ-02 P2a; audit AQ-F21, AQ-F24, AQ-F25)
+# Text normalization v2 (AQ-02 P2a; audit AQ-F21, AQ-F24, AQ-F25) and v3 (P2b)
 # --------------------------------------------------------------------------- #
-# Swift mirror: `VoiceClipTranscriber.normalizedWordTokens(_:language:)`. Every
-# step is defined per code point from Unicode properties both runtimes expose
-# (normalization forms, the full lowercase mapping, general categories), so the
-# two agree by construction; the shared fixtures prove it.
+# Swift mirror: `VoiceClipTranscriber.normalizedWordTokens(_:language:)`, which
+# implements the current version (v3). Every step is defined per code point from
+# Unicode properties both runtimes expose (normalization forms, the full
+# lowercase mapping, general categories) or from committed data (the fold
+# table), so the two agree by construction; the shared fixtures prove it.
 #
 # 1. Unicode form: NFKC, or NFC for Korean (NFKC would recompose compatibility
 #    jamo into syllables the recognizer never wrote).
@@ -183,6 +201,8 @@ def primary_accuracy_score(
 # 3. Case folding: the context-free full lowercase mapping of each code point,
 #    then CASE_FOLD_EXTRAS. After NFKC this equals Unicode full case folding for
 #    the modern Latin, Cyrillic, kana, CJK and Hangul text of the ten languages.
+#    Then the version's extension steps (NORMALIZATION_EXTENSION_STEPS): v3
+#    folds Chinese Traditional characters to Simplified (AQ-F22); v2 has none.
 # 4. Folded languages (Latin and Cyrillic, and any language outside the table):
 #    NFKD, drop nonspacing marks (the v1 fold: é→e, ё→е, й→и, ñ→n), then
 #    ADDITIONAL_DIACRITICS for the letters NFKD cannot decompose. Chinese and
@@ -227,14 +247,18 @@ CASE_FOLD_EXTRAS = {"ß": "ss", "ς": "σ"}
 ADDITIONAL_DIACRITICS = {"ß": "ss", "æ": "ae", "œ": "oe", "ø": "o", "ł": "l"}
 RECOGNIZER_TAG = re.compile(r"<\|[^|<>]*\|>")
 
-# P2b (AQ-02, decision 4: package pins and downloads). The package-backed steps
-# each language gains, by slot. Normalization v2 registers none of them: a
-# filled slot moves what the metrics measure, so P2b registers its steps under a
-# new normalization (and accuracy metric) version in NORMALIZATION_EXTENSION_STEPS
-# and never changes v2. Fixtures that need a slot carry `"phase": "P2b"`.
+# P2b (AQ-02). The steps each language gains beyond v2, by slot. A filled slot
+# moves what the metrics measure, so each lands under a new normalization (and
+# accuracy metric) version in NORMALIZATION_EXTENSION_STEPS and never changes an
+# earlier one. Fixtures that need a slot carry `"phase": "P2b"`; a slot the
+# current version fills pins its score, an open one pins `expectedAfterP2b`.
 NORMALIZATION_EXTENSION_SLOTS: dict[str, dict[str, str]] = {
-    # OpenCC t2s (Apache-2.0) on both sides; never zhconv (GPL).
-    "script-variant": {"chinese": "opencc-t2s"},
+    # Filled by v3: the committed single-character table derived from ICU's
+    # Hant-Hans transform (Unicode License v3), on both sides. The audit named
+    # OpenCC t2s; a committed table needs no package pin, and the in-app
+    # verifier reads the same bytes instead of the OS's ICU data. Never zhconv
+    # (GPL).
+    "script-variant": {"chinese": "hant-hans-v1"},
     # Arabic digits to spoken numerals on both sides of the primary metric.
     "digit-verbalization": {"chinese": "cn2an", "japanese": "num2words-ja"},
     # A verbalized-digit WER diagnostic beside the primary metric.
@@ -248,15 +272,111 @@ NORMALIZATION_EXTENSION_SLOTS: dict[str, dict[str, str]] = {
     # bracket and filler steps).
     "spelling-variant": {"english": "whisper-english-spelling-map"},
 }
+
+# The Traditional-to-Simplified fold (slot `script-variant`, AQ-F22). Whisper
+# often writes a correct Mandarin take in Traditional characters, which the
+# Simplified corpus charged as substitutions (a 2026-09-26 take scored CER 0.44
+# and folds to one real homophone). The table is committed data with a manifest
+# (provenance, SHA-256, license); `fold_table_issues` is its integrity check,
+# and the Swift verifier embeds the same bytes
+# (`scripts/generate_hant_hans_fold_swift.py`). Only Chinese folds: Japanese
+# writes its own kanji forms (葉 "leaf" and 叶 "to grant" are different words
+# that the table would merge) and Korean hanja are left as written.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+HANT_HANS_TABLE = REPOSITORY_ROOT / "config" / "language-normalization" / "hant-hans-v1.txt"
+HANT_HANS_MANIFEST = HANT_HANS_TABLE.with_suffix(".json")
+# Data files whose bytes shape a score; the audio QC pipeline keys its cached
+# recognizer metrics on them beside this module's source.
+NORMALIZATION_DATA_FILES = (HANT_HANS_TABLE,)
+SCRIPT_VARIANT_LANGUAGES = frozenset({"chinese"})
+_FOLD_TABLE_LINE = re.compile(r"([1-9A-F][0-9A-F]{3,5}) ([1-9A-F][0-9A-F]{3,5})")
+
+
+def fold_table_issues(data: bytes, manifest: Any) -> list[str]:
+    """Why a fold table may not be scored with (empty when it may).
+
+    The bytes must match the manifest's SHA-256 and entry count; each line maps
+    one scalar in the manifest's source ranges to one other scalar, sources are
+    sorted and unique, and no target is itself a source (the fold is
+    idempotent, so both sides of a comparison meet in one spelling)."""
+    if not isinstance(manifest, dict):
+        return ["manifest-invalid"]
+    issues: set[str] = set()
+    if hashlib.sha256(data).hexdigest() != manifest.get("sha256"):
+        issues.add("sha256-mismatch")
+    try:
+        text = data.decode("ascii")
+    except UnicodeDecodeError:
+        return sorted(issues | {"not-ascii"})
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    else:
+        issues.add("unterminated-line")
+    try:
+        ranges = [(int(low, 16), int(high, 16)) for low, high in manifest.get("sourceRanges", ())]
+    except (TypeError, ValueError):
+        return sorted(issues | {"manifest-invalid"})
+    pairs: list[tuple[int, int]] = []
+    for line in lines:
+        match = _FOLD_TABLE_LINE.fullmatch(line)
+        if match is None:
+            issues.add("malformed-line")
+            continue
+        source, target = int(match.group(1), 16), int(match.group(2), 16)
+        if not any(low <= source <= high for low, high in ranges):
+            issues.add("source-out-of-range")
+        if target > 0x10FFFF or 0xD800 <= target <= 0xDFFF:
+            issues.add("target-not-a-scalar")
+        if source == target:
+            issues.add("identity-mapping")
+        pairs.append((source, target))
+    sources = [source for source, _target in pairs]
+    if any(left >= right for left, right in zip(sources, sources[1:])):
+        issues.add("unsorted-or-duplicate-source")
+    if set(sources) & {target for _source, target in pairs}:
+        issues.add("not-idempotent")
+    if len(pairs) != manifest.get("entryCount"):
+        issues.add("entry-count-mismatch")
+    return sorted(issues)
+
+
+@functools.cache
+def hant_hans_fold_table() -> dict[int, int]:
+    """The committed fold table as `str.translate` input; refuses a table that fails its check."""
+    data = HANT_HANS_TABLE.read_bytes()
+    manifest = json.loads(HANT_HANS_MANIFEST.read_text(encoding="utf-8"))
+    if issues := fold_table_issues(data, manifest):
+        raise ValueError(f"{HANT_HANS_TABLE.name} fails its integrity check: {', '.join(issues)}")
+    return {
+        int(source, 16): int(target, 16)
+        for source, target in (line.split(" ") for line in data.decode("ascii").splitlines())
+    }
+
+
+def fold_traditional_chinese(text: str, language: str) -> str:
+    """Normalization v3, slot `script-variant`: each Traditional character of
+    Chinese text becomes its Simplified form; other languages pass unchanged.
+
+    Folding both sides can only merge characters, so an edit count can only
+    stay or drop: the fold forgives orthography, and it can forgive a
+    substitution between two characters that fold together (幹 and 乾 both
+    become 干), never charge one."""
+    if language not in SCRIPT_VARIANT_LANGUAGES:
+        return text
+    return text.translate(hant_hans_fold_table())
+
+
 # The steps each normalization version applies after case folding and before
-# the script fold, as `step(text, language) -> text`. v2 has none.
-NORMALIZATION_EXTENSION_STEPS: dict[str, tuple[Callable[[str, str], str], ...]] = {
+# the script fold, as (slot, `step(text, language) -> text`). v2 has none.
+NORMALIZATION_EXTENSION_STEPS: dict[str, tuple[tuple[str, Callable[[str, str], str]], ...]] = {
     TEXT_NORMALIZATION_V2: (),
+    TEXT_NORMALIZATION_V3: (("script-variant", fold_traditional_chinese),),
 }
 
 
 def normalization_profile(language: str) -> str:
-    """A language's normalization v2 profile; unknown languages fold like Latin."""
+    """A language's normalization v2 and v3 profile; unknown languages fold like Latin."""
     return NORMALIZATION_PROFILES.get(language, FOLDED_PROFILE)
 
 
@@ -271,12 +391,21 @@ def _is_word_character(character: str) -> bool:
     return character not in APOSTROPHES and unicodedata.category(character)[0] in "LMN"
 
 
-def normalized_text(text: str, language: str, *, preserve_diacritics: bool = False) -> str:
-    """Steps 1-4 of normalization v2; `preserve_diacritics` skips step 4 (a diagnostic)."""
+def _extension_steps(normalization: str) -> tuple[tuple[str, Callable[[str, str], str]], ...]:
+    if normalization not in NORMALIZATION_EXTENSION_STEPS:
+        raise ValueError(f"unknown token normalization {normalization!r}")
+    return NORMALIZATION_EXTENSION_STEPS[normalization]
+
+
+def normalized_text(
+    text: str, language: str, *, preserve_diacritics: bool = False, normalization: str = TEXT_NORMALIZATION,
+) -> str:
+    """Steps 1-4 of normalization v2 or v3; `preserve_diacritics` skips step 4 (a diagnostic)."""
+    steps = _extension_steps(normalization)
     profile = normalization_profile(language)
     folded = unicodedata.normalize("NFC" if profile == HANGUL_PROFILE else "NFKC", text)
     folded = _case_fold(RECOGNIZER_TAG.sub(" ", folded))
-    for step in NORMALIZATION_EXTENSION_STEPS[TEXT_NORMALIZATION_V2]:
+    for _slot, step in steps:
         folded = step(folded, language)
     if profile == FOLDED_PROFILE and not preserve_diacritics:
         folded = "".join(
@@ -287,9 +416,13 @@ def normalized_text(text: str, language: str, *, preserve_diacritics: bool = Fal
     return folded
 
 
-def normalized_tokens(text: str, language: str, *, preserve_diacritics: bool = False) -> list[str]:
-    """Normalization v2 word tokens (steps 1-5)."""
-    folded = normalized_text(text, language, preserve_diacritics=preserve_diacritics)
+def normalized_tokens(
+    text: str, language: str, *, preserve_diacritics: bool = False, normalization: str = TEXT_NORMALIZATION,
+) -> list[str]:
+    """Normalization v2 or v3 word tokens (steps 1-5); the current version by default."""
+    folded = normalized_text(
+        text, language, preserve_diacritics=preserve_diacritics, normalization=normalization,
+    )
     joins_apostrophes = language in APOSTROPHE_LANGUAGES
     tokens: list[str] = []
     current: list[str] = []
@@ -317,13 +450,14 @@ def character_units(tokens: list[str]) -> list[str]:
 def scoring_units(text: str, language: str, *, version: str = ACCURACY_METRIC_VERSION) -> tuple[list[str], list[str]]:
     """The word tokens and character units one metric version scores."""
     _require_version(version)
-    if ACCURACY_METRIC_NORMALIZATIONS[version] == TEXT_NORMALIZATION_V1:
+    normalization = ACCURACY_METRIC_NORMALIZATIONS[version]
+    if normalization == TEXT_NORMALIZATION_V1:
         preserve = language in LEGACY_CHARACTER_ERROR_LANGUAGES
         return (
             normalized_word_tokens(text),
             list("".join(normalized_word_tokens(text, preserve_diacritics=preserve))),
         )
-    tokens = normalized_tokens(text, language)
+    tokens = normalized_tokens(text, language, normalization=normalization)
     return tokens, character_units(tokens)
 
 
@@ -347,17 +481,17 @@ FILLER_WORDS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _normalized_fillers(language: str) -> tuple[str, ...]:
+def _normalized_fillers(language: str, normalization: str) -> tuple[str, ...]:
     forms = {
-        "".join(character_units(normalized_tokens(word, language)))
+        "".join(character_units(normalized_tokens(word, language, normalization=normalization)))
         for word in FILLER_WORDS.get(language, ())
     }
     return tuple(sorted((form for form in forms if form), key=lambda form: (-len(form), form)))
 
 
-def filler_count(tokens: list[str], language: str) -> int:
+def filler_count(tokens: list[str], language: str, *, normalization: str = TEXT_NORMALIZATION) -> int:
     """How many fillers normalized tokens hold (0 for a language without a lexicon)."""
-    fillers = _normalized_fillers(language)
+    fillers = _normalized_fillers(language, normalization)
     if not fillers:
         return 0
     if language in ("chinese", "japanese"):
@@ -375,10 +509,15 @@ def filler_count(tokens: list[str], language: str) -> int:
     return sum(1 for token in tokens if token in fillers)
 
 
-def filler_counts(reference: str, hypothesis: str, language: str) -> dict[str, int]:
+def filler_counts(
+    reference: str, hypothesis: str, language: str, *, normalization: str = TEXT_NORMALIZATION,
+) -> dict[str, int]:
     """Fillers in each text, and the hypothesis fillers the script does not hold."""
-    reference_count = filler_count(normalized_tokens(reference, language), language)
-    hypothesis_count = filler_count(normalized_tokens(hypothesis, language), language)
+    reference_count, hypothesis_count = (
+        filler_count(normalized_tokens(text, language, normalization=normalization), language,
+                     normalization=normalization)
+        for text in (reference, hypothesis)
+    )
     return {
         "referenceFillerCount": reference_count,
         "hypothesisFillerCount": hypothesis_count,
@@ -392,19 +531,23 @@ def filler_counts(reference: str, hypothesis: str, language: str) -> dict[str, i
 DIACRITIC_DIAGNOSTIC_LANGUAGES = frozenset({"french", "german", "spanish", "italian", "portuguese"})
 
 
-def normalization_diagnostics(reference: str, hypothesis: str, language: str) -> dict[str, float]:
-    """Normalization v2 diagnostics that never gate: Korean jamo CER and
+def normalization_diagnostics(
+    reference: str, hypothesis: str, language: str, *, normalization: str = TEXT_NORMALIZATION,
+) -> dict[str, float]:
+    """Normalization v2 and v3 diagnostics that never gate: Korean jamo CER and
     diacritic-preserving WER (both scored beside the primary metric)."""
     diagnostics: dict[str, float] = {}
     if language == "korean":
         reference_jamo = list(unicodedata.normalize("NFD", "".join(character_units(
-            normalized_tokens(reference, language)))))
+            normalized_tokens(reference, language, normalization=normalization)))))
         hypothesis_jamo = list(unicodedata.normalize("NFD", "".join(character_units(
-            normalized_tokens(hypothesis, language)))))
+            normalized_tokens(hypothesis, language, normalization=normalization)))))
         diagnostics["jamoCharacterErrorRate"] = float(edit_metrics(reference_jamo, hypothesis_jamo)["errorRate"])
     if language in DIACRITIC_DIAGNOSTIC_LANGUAGES:
-        reference_words = normalized_tokens(reference, language, preserve_diacritics=True)
-        hypothesis_words = normalized_tokens(hypothesis, language, preserve_diacritics=True)
+        reference_words = normalized_tokens(
+            reference, language, preserve_diacritics=True, normalization=normalization)
+        hypothesis_words = normalized_tokens(
+            hypothesis, language, preserve_diacritics=True, normalization=normalization)
         diagnostics["diacriticPreservingWordErrorRate"] = float(
             segmentation_aware_metrics(reference_words, hypothesis_words)["segmentationAwareErrorRate"]
         )
@@ -640,8 +783,9 @@ def recomputed_accuracy(
     """Word and character metrics of one transcript against its script.
 
     Scored under the text normalization of `version` (v1 and v2: the v1
-    tokenizer; v3: normalization v2). The word metrics also carry the WER v2
-    decomposition (`segmentationAwareErrorRate`, `wordBoundaryOnlyEdits`)."""
+    tokenizer; v3: normalization v2; v4: normalization v3). The word metrics
+    also carry the WER v2 decomposition (`segmentationAwareErrorRate`,
+    `wordBoundaryOnlyEdits`)."""
     reference_words, reference_characters = scoring_units(reference, expected_language, version=version)
     hypothesis_words, hypothesis_characters = scoring_units(hypothesis, expected_language, version=version)
     word = edit_metrics(reference_words, hypothesis_words)
@@ -725,8 +869,8 @@ def score_recognition(
 ) -> dict[str, Any]:
     """Recompute the verdict of one qualified recognition from its transcript.
 
-    Under normalization v2 (v3) the verdict also counts fillers (never gated)
-    and carries the normalization diagnostics (never gated)."""
+    Under normalization v2 or v3 (v3 and v4) the verdict also counts fillers
+    (never gated) and carries the normalization diagnostics (never gated)."""
     transcript = str(recognition.get("transcript", ""))
     word, character = recomputed_accuracy(script, transcript, language, version=accuracy_metric_version)
     metric = primary_accuracy_metric(language, version=accuracy_metric_version)
@@ -736,10 +880,10 @@ def score_recognition(
     deletion_run = (character if metric == "characterErrorRate" else word)["longestDeletionRun"]
     normalization = ACCURACY_METRIC_NORMALIZATIONS[accuracy_metric_version]
     extra: dict[str, Any] = {}
-    if normalization == TEXT_NORMALIZATION_V2:
+    if normalization != TEXT_NORMALIZATION_V1:
         extra = {
-            **filler_counts(script, transcript, language),
-            "diagnostics": normalization_diagnostics(script, transcript, language),
+            **filler_counts(script, transcript, language, normalization=normalization),
+            "diagnostics": normalization_diagnostics(script, transcript, language, normalization=normalization),
         }
     return {
         "textNormalization": normalization,

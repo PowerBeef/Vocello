@@ -136,11 +136,15 @@ LANGUAGE_VERIFICATION = (
     # The run plan, which refuses scripts that fail the corpus lint (AQ-02).
     "scripts/language_bench_evidence.py",
     "scripts/lib/language_metrics.py",
+    # The Chinese Traditional-to-Simplified fold table both families are
+    # scored with (text normalization v3, AQ-02 P2b).
+    "config/language-normalization/hant-hans-v1.txt",
 )
 # The iPhone app's own verifier: its normalization and scores are the Apple
 # Speech family's measurement (AQ-02 mirrors language_metrics.py in it).
 IN_APP_LANGUAGE_VERIFICATION = (
     "Sources/SharedSupport/Services/GenerationOutputVerifier.swift",
+    "Sources/SharedSupport/Services/HantHansFoldTable.swift",
     "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
 )
 PROFILE_SUMMARY = (
@@ -282,14 +286,21 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # case folding, the extra Latin folds, recognizer-tag stripping, elisions
     # joined, Korean gated by its syllable rate), and the plan refuses scripts
     # that fail the corpus lint.
-    ("language", "macos"): 4,
+    # 5 (2026-09-26, AQ-02 P2b): every family is scored under text
+    # normalization v3 (accuracy metric normalization-v3-edit-rate-v4), which
+    # folds a Chinese script and transcript from Traditional to Simplified
+    # characters with the committed hant-hans-v1 table before scoring.
+    ("language", "macos"): 5,
     # 3 (2026-09-25, audit #87, #42/#43 and the sampler change): the iPhone lang-bench
     # probes each take's sentinel first at its predicted end, then every 3 s,
     # instead of every 10 s from the launch, so fewer device copies overlap the
     # measured generation.
     # 4 (2026-09-25, AQ-02 P2a): the in-app verifier and the Mac rescoring move
     # to text normalization v2, as on the Mac.
-    ("language", "ios"): 4,
+    # 5 (2026-09-26, AQ-02 P2b): the in-app verifier (languageASR gate 7) and the
+    # Mac rescoring move to text normalization v3, the Chinese
+    # Traditional-to-Simplified fold, as on the Mac.
+    ("language", "ios"): 5,
     # 2 (2026-09-25, audit #51/#52/#97 and the sampler change): the iPhone
     # memory profile records through the Allocations template (no automatic VM
     # snapshots, which suspended the target), every iPhone profile stops

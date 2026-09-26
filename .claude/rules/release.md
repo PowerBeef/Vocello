@@ -45,7 +45,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   workflow (`test-without-building`, `scripts/ui_test.sh`, an `xcodebuild`/`xcb_run` `test` action), not
   compilation.
 - Generated files (`docs/ROADMAP.md`, the production model catalog, the owned-package inventory and
-  facade baseline, `docs/charts/*.svg`, `Sources/Resources/third_party_attributions.json`) are
+  facade baseline, `docs/charts/*.svg`, `Sources/Resources/third_party_attributions.json`, the Swift
+  copy of the Chinese fold table `Sources/SharedSupport/Services/HantHansFoldTable.swift`) are
   regenerated with `scripts/dev.sh regen` (`scripts/refresh_derived_artifacts.py`, which validates
   every artifact it registers) in the same change as their inputs; the attributions follow
   `NOTICES.md`, license inputs, `Package.resolved` and the attribution policy

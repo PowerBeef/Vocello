@@ -21,6 +21,9 @@ RESOLVED = Path("QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Pa
 OWNED_RESOLVED = Path("Packages/VocelloQwen3Core/Package.resolved")
 CATALOG = Path("Sources/Resources/qwenvoice_production_model_catalog.json")
 OUTPUT = Path("Sources/Resources/third_party_attributions.json")
+# The licenses the policy defines: packages and models use Apache-2.0 or MIT;
+# Unicode-3.0 covers data derived from Unicode CLDR and ICU (dataComponents).
+LICENSE_IDS = frozenset({"Apache-2.0", "MIT", "Unicode-3.0"})
 
 
 class ContractError(ValueError):
@@ -88,8 +91,8 @@ def build(root: Path) -> dict:
         raise ContractError("attribution policy schemaVersion must be 1")
 
     license_paths = policy.get("licenses")
-    if not isinstance(license_paths, dict) or set(license_paths) != {"Apache-2.0", "MIT"}:
-        raise ContractError("attribution policy must define Apache-2.0 and MIT license sources")
+    if not isinstance(license_paths, dict) or set(license_paths) != LICENSE_IDS:
+        raise ContractError("attribution policy must define Apache-2.0, MIT and Unicode-3.0 license sources")
     licenses: dict[str, dict] = {}
     for identifier, relative in sorted(license_paths.items()):
         if not isinstance(relative, str):
@@ -185,6 +188,42 @@ def build(root: Path) -> dict:
             "origins": origins,
             "scope": "owned",
             "licenseTextOverride": license_bytes.decode("utf-8"),
+        })
+
+    # Third-party data the app compiles in, each described by a committed
+    # manifest whose digest must match the shipped bytes (AQ-02: the Chinese
+    # Traditional-to-Simplified fold table derived from ICU, Unicode-3.0).
+    data_policy = unique_map(policy.get("dataComponents"), "identity", "data components")
+    for identity in sorted(data_policy):
+        rule = data_policy[identity]
+        license_id = rule.get("licenseID")
+        if license_id not in licenses:
+            raise ContractError(f"data component {identity} has unsupported licenseID")
+        manifest_path = rule.get("dataManifestPath")
+        if not isinstance(manifest_path, str):
+            raise ContractError(f"data component {identity} dataManifestPath is invalid")
+        data_manifest = read_json(root, manifest_path)
+        data_path = data_manifest.get("table")
+        if not isinstance(data_path, str):
+            raise ContractError(f"data component {identity} manifest names no data file")
+        data_digest = digest(read_bytes(root, data_path))
+        if data_digest != data_manifest.get("sha256"):
+            raise ContractError(f"data component {identity} data digest drifts from its manifest")
+        data_license = data_manifest.get("license")
+        if not isinstance(data_license, dict) or data_license.get("spdx") != license_id:
+            raise ContractError(f"data component {identity} license drifts from its manifest")
+        components.append({
+            "id": identity,
+            "displayName": rule.get("displayName"),
+            "version": data_manifest.get("id"),
+            "revision": None,
+            "sourceURL": https_url(rule.get("sourceURL"), f"data component {identity} sourceURL"),
+            "licenseID": license_id,
+            "upstreamLicenseSHA256": licenses[license_id]["sha256"],
+            "copyrightNotice": data_license.get("copyrightNotice"),
+            "notice": rule.get("notice"),
+            "dataSHA256": data_digest,
+            "scope": "application-data",
         })
 
     catalog_bytes = read_bytes(root, CATALOG)

@@ -105,16 +105,40 @@ syllable rate, never NFKD jamo (audit AQ-F21). The character rate is space- and 
 every version. The language tables cover the product's ten languages, so Italian, Portuguese,
 Russian and Korean cells no longer fail closed; the corpus still scripts six. Korean jamo CER and a
 diacritic-preserving WER (French, German, Spanish, Italian, Portuguese) are Python diagnostics that
-never gate. Swift and Python score every case of
-`scripts/tests/fixtures/language_normalization_v2.json` identically (`WordErrorRateTests` and
-`test_language_metrics.py`). The package-backed steps (OpenCC t2s and cn2an for Chinese, num2words
+never gate. The steps beyond P2a (a Chinese script-variant fold, cn2an for Chinese, num2words
 digit diagnostics, a fugashi kana-reading CER for Japanese, Whisper's English spelling map) are
 phase P2b: named slots in `NORMALIZATION_EXTENSION_SLOTS`, fixtures marked `P2b`, and a new
-normalization and metric version when they land. The corpus lint refuses digits, brackets, symbols
+normalization and metric version when each lands. The corpus lint refuses digits, brackets, symbols
 and spoken punctuation, and abbreviations in a gated script (`script_lint_issues`): the plan builder
-applies it and the Python suite lints the tracked corpus. The in-app `languageASR` gate is
-composition 6 and the language kinds' measurement version is 4. v1 and v2 records keep validating
-and rescoring under their own normalization; filler counts are refused on them.
+applies it and the Python suite lints the tracked corpus. The in-app `languageASR` gate was
+composition 6 and the language kinds' measurement version 4 under v3. v1 and v2 records keep
+validating and rescoring under their own normalization; filler counts are refused on them.
+
+Since 2026-09-26 (AQ-02 phase P2b, first step; audit AQ-F22) the contract is
+`normalization-v3-edit-rate-v4`: the same rates under text normalization v3, which is v2 plus a
+Traditional-to-Simplified fold of Chinese on both sides, after case folding. whisper-small wrote a
+correct Mandarin take of the corpus script in Traditional characters on the first real-audio
+orchestrator run (CER 12/27, a false fail); folded, only its one real homophone remains (1/27). The
+fold is the committed single-character table `config/language-normalization/hant-hans-v1.txt`
+(3,079 entries, with its SHA-256, provenance and license in `hant-hans-v1.json`), derived once from
+ICU's `Hant-Hans` transform on macOS 27.0 (26A428) by `scripts/generate_hant_hans_table.swift` and
+closed so no target is itself a source. Neither runtime calls ICU, whose data moves with the OS:
+`language_metrics.fold_traditional_chinese` reads the table and refuses one that fails its
+integrity check (`fold_table_issues`), and the in-app verifier embeds its exact bytes in the
+generated `HantHansFoldTable.swift` (`scripts/generate_hant_hans_fold_swift.py`; `scripts/dev.sh
+regen` refreshes it and the contract gate checks it). The table replaces the audit's OpenCC `t2s`:
+no package pin, and the same bytes in both runtimes. It is Unicode-3.0 data and is attributed in
+the app's open-source licenses. Only Chinese folds: Japanese writes its own kanji (葉 "leaf" and 叶
+"to grant" are different words the table would merge) and Korean hanja stay as written. Folding
+both sides only merges characters, so an edit count can only stay or drop. Swift and Python score
+every case of `scripts/tests/fixtures/language_normalization.json` identically
+(`WordErrorRateTests` and `test_language_metrics.py`), including a generated sweep of every table
+entry; the Chinese cases the fold changes also pin their normalization v2 count, which records
+declaring `normalization-v2-edit-rate-v3` keep rescoring under. The in-app `languageASR` gate is
+composition 7 and the language kinds' measurement version is 5. Replayed over the same 45
+committed scored family-takes, no verdict can change: 3 are Chinese (one Apple take with no edit
+and two passing Apple takes at CER 0.111, which the fold can only lower), and every other take
+scores as under v2.
 
 Replayed offline over the 45 committed scored family-takes (5 of the 8 language records; no record
 is rewritten), 34 are determined by their published evidence and none changes verdict: 25 with no
@@ -352,8 +376,9 @@ decode), decodes each take with the language locked to the expected language,
 detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
 processed duration the publisher checks against the WAV), the per-take recognition time without model
 load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language
-lineage's measurement version is 3 since WER v2, the per-channel vote, the Auto seed, the corpus
-fixtures and the macOS prompt digest, none of which a published record carries yet) and whisper's worst no-speech probability and
+lineage's measurement version was 3 for WER v2, the per-channel vote, the Auto seed, the corpus
+fixtures and the macOS prompt digest, 4 for text normalization v2 and is 5 for the Chinese
+Traditional-to-Simplified fold) and whisper's worst no-speech probability and
 mean log probability, published as `independentMaximumNoSpeechProbability` and
 `independentMeanAverageLogProbability`. The publisher re-scores every transcript against the corpus with the same
 15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that

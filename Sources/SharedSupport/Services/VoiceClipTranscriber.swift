@@ -656,7 +656,7 @@ enum VoiceClipTranscriber {
         return Qwen3SupportedLanguage.normalized(code) == expected
     }
 
-    /// Word edit metrics under text normalization v2 for `expectedLanguage` (Auto folds like a
+    /// Word edit metrics under text normalization v3 for `expectedLanguage` (Auto folds like a
     /// Latin language).
     static func wordErrorMetrics(
         reference: String,
@@ -669,8 +669,9 @@ enum VoiceClipTranscriber {
         )
     }
 
-    /// Space-free character edit metrics under text normalization v2: Unicode scalars of the
-    /// normalized words, so Korean counts Hangul syllables and Japanese keeps its dakuten.
+    /// Space-free character edit metrics under text normalization v3: Unicode scalars of the
+    /// normalized words, so Korean counts Hangul syllables, Japanese keeps its dakuten and
+    /// Chinese compares Simplified characters.
     static func characterErrorMetrics(
         reference: String,
         hypothesis: String,
@@ -802,23 +803,26 @@ enum VoiceClipTranscriber {
         )
     }
 
-    // MARK: Text normalization v2
+    // MARK: Text normalization v3
 
-    /// Text normalization v2 (AQ-02 P2a; audit AQ-F21, AQ-F24, AQ-F25), the normalization
-    /// accuracy metric `normalization-v2-edit-rate-v3` scores under. It mirrors
+    /// Text normalization v3 (AQ-02 P2a and P2b; audit AQ-F21, AQ-F22, AQ-F24, AQ-F25), the
+    /// normalization accuracy metric `normalization-v3-edit-rate-v4` scores under. It mirrors
     /// `normalized_tokens` in `scripts/lib/language_metrics.py` step for step, from Unicode
-    /// properties both runtimes expose; `scripts/tests/fixtures/language_normalization_v2.json`
-    /// pins the two to identical tokens and edit counts.
+    /// properties both runtimes expose and the committed fold table;
+    /// `scripts/tests/fixtures/language_normalization.json` pins the two to identical tokens
+    /// and edit counts.
     ///
     /// 1. NFKC, or NFC for Korean (NFKC would compose compatibility jamo into syllables).
     /// 2. Recognizer tags (`<|…|>`) become spaces.
-    /// 3. Case folding: each scalar's full lowercase mapping, then `caseFoldExtras`.
+    /// 3. Case folding: each scalar's full lowercase mapping, then `caseFoldExtras`. Then, for
+    ///    Chinese only, each Traditional character folds to Simplified (`HantHansFoldTable`,
+    ///    new in v3): Japanese kanji and Korean hanja stay as written.
     /// 4. Latin and Cyrillic (and Auto): NFKD, nonspacing marks dropped, then
     ///    `additionalDiacritics`. Chinese and Japanese keep their marks, Korean its syllables.
     /// 5. Words are runs of letters, marks and numbers; anything else is a boundary, so bracket
     ///    contents and fillers stay words. English, French and Italian join a word across an
     ///    apostrophe between two word scalars (l'homme, don't) without scoring the apostrophe.
-    static let textNormalizationVersion = "text-normalization-v2"
+    static let textNormalizationVersion = "text-normalization-v3"
 
     private enum NormalizationProfile {
         case folded
@@ -832,6 +836,23 @@ enum VoiceClipTranscriber {
         "\u{DF}": "ss", "\u{E6}": "ae", "\u{153}": "oe", "\u{F8}": "o", "\u{142}": "l"
     ]
     private static let recognizerTagPattern = #"<\|[^|<>]*\|>"#
+
+    /// The Traditional-to-Simplified fold, parsed once from the generated copy of the committed
+    /// table. `WordErrorRateTests` holds it to the table file entry for entry.
+    static let traditionalToSimplified: [Unicode.Scalar: Unicode.Scalar] = {
+        var fold: [Unicode.Scalar: Unicode.Scalar] = [:]
+        fold.reserveCapacity(HantHansFoldTable.entryCount)
+        for line in HantHansFoldTable.table.split(separator: "\n") {
+            let fields = line.split(separator: " ")
+            guard fields.count == 2,
+                  let sourceValue = UInt32(fields[0], radix: 16),
+                  let targetValue = UInt32(fields[1], radix: 16),
+                  let source = Unicode.Scalar(sourceValue),
+                  let target = Unicode.Scalar(targetValue) else { continue }
+            fold[source] = target
+        }
+        return fold
+    }()
 
     private static func normalizationProfile(for language: Qwen3SupportedLanguage) -> NormalizationProfile {
         switch language {
@@ -848,7 +869,7 @@ enum VoiceClipTranscriber {
         language == .english || language == .french || language == .italian
     }
 
-    /// Normalization v2 word tokens of `text` for `language`.
+    /// Normalization v3 word tokens of `text` for `language`.
     static func normalizedWordTokens(_ text: String, language: Qwen3SupportedLanguage) -> [String] {
         let scalars = normalizedScalars(text, language: language)
         let joinsApostrophes = joinsWordsAcrossApostrophes(language)
@@ -903,6 +924,7 @@ enum VoiceClipTranscriber {
                 }
             }
         }
+        folded = foldedScriptVariants(folded, language: language)
         guard profile == .folded else { return Array(folded) }
         var stripped: [Unicode.Scalar] = []
         for scalar in String(folded).decomposedStringWithCompatibilityMapping.unicodeScalars
@@ -914,6 +936,21 @@ enum VoiceClipTranscriber {
             }
         }
         return stripped
+    }
+
+    /// Step 3's extension (normalization v3, slot `script-variant`): Chinese folds each
+    /// Traditional character to its Simplified form, on the script and the transcript alike.
+    /// Only Chinese: the table would merge Japanese kanji that are different words (葉 and 叶).
+    private static func foldedScriptVariants(
+        _ scalars: String.UnicodeScalarView,
+        language: Qwen3SupportedLanguage
+    ) -> String.UnicodeScalarView {
+        guard language == .chinese else { return scalars }
+        var folded = String.UnicodeScalarView()
+        for scalar in scalars {
+            folded.append(traditionalToSimplified[scalar] ?? scalar)
+        }
+        return folded
     }
 
     /// General categories L, M and N; an apostrophe is never a word scalar (U+02BC is a letter).

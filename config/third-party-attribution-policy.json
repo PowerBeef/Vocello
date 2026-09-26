@@ -3,7 +3,8 @@
   "description": "Source policy for the generated offline attribution manifest. Resolved package and production model identities must match exactly.",
   "licenses": {
     "Apache-2.0": "config/licenses/Apache-2.0.txt",
-    "MIT": "config/licenses/MIT-terms.txt"
+    "MIT": "config/licenses/MIT-terms.txt",
+    "Unicode-3.0": "config/licenses/Unicode-3.0.txt"
   },
   "packages": [
     {"identity":"eventsource","displayName":"EventSource","sourceURL":"https://github.com/mattt/EventSource","licenseID":"MIT","upstreamLicenseSHA256":"2f9b695627d569a3ce452b2c03fdd34310df78c8ea94edfafd9ce38381e5b502","copyrightNotice":"Copyright 2025 Mattt (https://mat.tt)"},
@@ -27,6 +28,9 @@
   "ownedComponents": [
     {"identity":"vocello","displayName":"Vocello","version":"3.0.0","sourceURL":"https://github.com/PowerBeef/Vocello","licenseID":"MIT","licensePath":"LICENSE","copyrightNotice":"Copyright (c) 2026 PowerBeef"},
     {"identity":"vocello-qwen3-core","displayName":"Vocello Qwen3 Core","version":"owned runtime","sourceURL":"https://github.com/PowerBeef/Vocello/tree/main/Packages/VocelloQwen3Core","licenseID":"MIT","licensePath":"Packages/VocelloQwen3Core/LICENSE","noticePath":"Packages/VocelloQwen3Core/NOTICES.md","originsPath":"Packages/VocelloQwen3Core/ORIGINS.md"}
+  ],
+  "dataComponents": [
+    {"identity":"icu-hant-hans-fold","displayName":"ICU Hant-Hans transform data","sourceURL":"https://github.com/unicode-org/icu","licenseID":"Unicode-3.0","dataManifestPath":"config/language-normalization/hant-hans-v1.json","notice":"Vocello's Chinese transcript check folds Traditional characters to Simplified with a single-character table derived from ICU's Hant-Hans transform (Unicode CLDR transform data)."}
   ],
   "modelCards": [
     {"repo":"PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit","licenseID":"Apache-2.0","baseRepo":"mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit","baseRevision":"e7dd0585652209fa0d7783659aad4e8a324de11c","redistributionDecision":"pending-qualified-review"},

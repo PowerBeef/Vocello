@@ -161,6 +161,11 @@ class QualityPromotionTests(unittest.TestCase):
         transcriber = PROMOTION.classify_paths(contract, ["Sources/SharedSupport/Services/VoiceClipTranscriber.swift"])
         self.assertIn("audio-quality-and-evaluation", transcriber["classes"])
         self.assertIn("multilingual-output", transcriber["promotionCapabilities"])
+        # The Chinese fold table it scores with, as data and as its generated Swift copy.
+        for path in ("Sources/SharedSupport/Services/HantHansFoldTable.swift",
+                     "config/language-normalization/hant-hans-v1.txt"):
+            fold = PROMOTION.classify_paths(contract, [path])
+            self.assertIn("audio-quality-and-evaluation", fold["classes"], path)
 
     def test_routing_must_reference_defined_evidence_and_capabilities(self) -> None:
         contract = PROMOTION.load_contract(self.root)

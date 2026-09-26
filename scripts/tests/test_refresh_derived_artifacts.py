@@ -58,6 +58,7 @@ STALE_BUILDERS = {
     "vendor-current-inventory": ("make_current_inventory", {"stale": True}),
     "vendor-facade-api-baseline": ("make_facade_api_baseline", {"stale": True}),
     "model-catalog": ("build_catalog", {"stale": True}),
+    "hant-hans-fold-swift": ("render", "stale\n"),
     "readme-charts": ("render_all", {"stale-chart.svg": "stale"}),
     "third-party-attributions": ("build", {"stale": True}),
     "roadmap-render": ("render", "stale\n"),

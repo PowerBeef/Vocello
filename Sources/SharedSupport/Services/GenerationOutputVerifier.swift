@@ -24,8 +24,10 @@ enum GenerationOutputVerifier {
         /// `character_error_rate`. Through v4 the gate reported the v1 word rate
         /// whatever its outcome read. v6 (text normalization v2, AQ-02) scores every
         /// rate under normalization v2 and gates Korean by its syllable character
-        /// rate. The verifier's `accuracyMetricVersion` records which rate and
-        /// normalization the outcome used.
+        /// rate. v7 (text normalization v3, AQ-02 P2b) folds a Chinese transcript
+        /// and script from Traditional to Simplified characters before scoring. The
+        /// verifier's `accuracyMetricVersion` records which rate and normalization
+        /// the outcome used.
         func languageASRGateResult(evidenceDigest: String? = nil) -> GenerationQualityGateResult {
             let consensusPasses = recognition.consensusStatus == .consistent
                 ? recognition.repetitions.count
@@ -63,7 +65,7 @@ enum GenerationOutputVerifier {
             return GenerationQualityGateResult(
                 gate: .languageASR,
                 outcome: outcome,
-                algorithmVersion: 6,
+                algorithmVersion: 7,
                 evidenceDigest: evidenceDigest,
                 measurements: measurements
             )
@@ -71,13 +73,14 @@ enum GenerationOutputVerifier {
 
         static let currentSchemaVersion = 3
         static let currentAlgorithmVersion = "language-output-verifier-v3"
-        /// Accuracy metric v3 (AQ-02 P2a, 2026-09-25): WER v2 (audit #43), the segmentation-aware
+        /// Accuracy metric v4 (AQ-02 P2b, 2026-09-26): WER v2 (audit #43), the segmentation-aware
         /// word rate that does not charge a recognizer's word-boundary merges or splits, scored
-        /// under text normalization v2 (`VoiceClipTranscriber.textNormalizationVersion`), with
-        /// Korean gated by its syllable character rate. `wordErrorRate` keeps the plain word
-        /// rate under the same normalization. Mirrors `ACCURACY_METRIC_VERSION` in
-        /// `scripts/lib/language_metrics.py`, which still rescores the v1 and v2 records.
-        static let currentAccuracyMetricVersion = "normalization-v2-edit-rate-v3"
+        /// under text normalization v3 (`VoiceClipTranscriber.textNormalizationVersion`), with
+        /// Korean gated by its syllable character rate and Chinese folded from Traditional to
+        /// Simplified characters. `wordErrorRate` keeps the plain word rate under the same
+        /// normalization. Mirrors `ACCURACY_METRIC_VERSION` in `scripts/lib/language_metrics.py`,
+        /// which still rescores the v1, v2 and v3 records.
+        static let currentAccuracyMetricVersion = "normalization-v3-edit-rate-v4"
 
         var schemaVersion: Int
         var algorithmVersion: String

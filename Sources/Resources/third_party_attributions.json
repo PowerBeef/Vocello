@@ -25,6 +25,19 @@
       "version": "7.10.0"
     },
     {
+      "copyrightNotice": "Copyright © 2016-2025 Unicode, Inc.",
+      "dataSHA256": "276f10c889517a4abf2cad02f70e8cb02a70ff9eacc7391e2101aa849a11f068",
+      "displayName": "ICU Hant-Hans transform data",
+      "id": "icu-hant-hans-fold",
+      "licenseID": "Unicode-3.0",
+      "notice": "Vocello's Chinese transcript check folds Traditional characters to Simplified with a single-character table derived from ICU's Hant-Hans transform (Unicode CLDR transform data).",
+      "revision": null,
+      "scope": "application-data",
+      "sourceURL": "https://github.com/unicode-org/icu",
+      "upstreamLicenseSHA256": "11eafde72ded1ec1e9eb5bf449db9617d1bdb0d9d9fdc2096847d44432abb304",
+      "version": "hant-hans-v1"
+    },
+    {
       "copyrightNotice": "Copyright (c) 2023 ml-explore",
       "displayName": "MLX Swift",
       "id": "mlx-swift",
@@ -263,7 +276,7 @@
   "generatedFrom": {
     "applicationPackageResolutionSHA256": "a3bde2fe2753992858a7b91bfc17ab24c534ff442bacde92937fb3149fd4dd0c",
     "ownedRuntimePackageResolutionSHA256": "295e8a6d2f512181f28cd8827657a00326daaa7a14a1856768da3ea82c78421f",
-    "policySHA256": "d21651cbfe9c435b9940612d93e5e57a234dd546b93901417823c0bec4895f70",
+    "policySHA256": "764e38c2d63f7ba0798d85f15773c66b97e59c56553dce2981b737778b15afe9",
     "productionModelCatalogSHA256": "f8e97b8ab1bb042348da771ac42c76c1bec2f571b66aa9c057749fafe8c21eb8"
   },
   "licenses": [
@@ -276,6 +289,11 @@
       "id": "MIT",
       "sha256": "5afc22050b6dfd55677fab336d50f1ac0b9173a53a4cb6bb99b9ef2525b3306c",
       "text": "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
+    },
+    {
+      "id": "Unicode-3.0",
+      "sha256": "11eafde72ded1ec1e9eb5bf449db9617d1bdb0d9d9fdc2096847d44432abb304",
+      "text": "UNICODE LICENSE V3\n\nCOPYRIGHT AND PERMISSION NOTICE\n\nCopyright © 2016-2025 Unicode, Inc.\n\nNOTICE TO USER: Carefully read the following legal agreement. BY\nDOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR\nSOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE\nTERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT\nDOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.\n\nPermission is hereby granted, free of charge, to any person obtaining a\ncopy of data files and any associated documentation (the \"Data Files\") or\nsoftware and any associated documentation (the \"Software\") to deal in the\nData Files or Software without restriction, including without limitation\nthe rights to use, copy, modify, merge, publish, distribute, and/or sell\ncopies of the Data Files or Software, and to permit persons to whom the\nData Files or Software are furnished to do so, provided that either (a)\nthis copyright and permission notice appear with all copies of the Data\nFiles or Software, or (b) this copyright and permission notice appear in\nassociated Documentation.\n\nTHE DATA FILES AND SOFTWARE ARE PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY\nKIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF\nTHIRD PARTY RIGHTS.\n\nIN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE\nBE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,\nOR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,\nWHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA\nFILES OR SOFTWARE.\n\nExcept as contained in this notice, the name of a copyright holder shall\nnot be used in advertising or otherwise to promote the sale, use or other\ndealings in these Data Files or Software without prior written\nauthorization of the copyright holder.\n"
     }
   ],
   "modelArtifacts": [
@@ -366,7 +384,7 @@
   ],
   "schemaVersion": 1,
   "summary": {
-    "componentCount": 19,
+    "componentCount": 20,
     "modelArtifactCount": 6,
     "pendingContentRightsCount": 4
   }

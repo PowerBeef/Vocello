@@ -97,8 +97,11 @@ NATIVE_LANES = ("swift", "ios", "python")
 # Under Packages/ the iOS compile reads the package sources and manifests; the
 # governance JSON is a contract-gate input (macOS job) and the markdown is prose.
 PACKAGE_MANIFESTS = ("Package.swift", "Package.resolved")
-SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization_v2.json",
-                         "scripts/tests/fixtures/audio_qc_stage0_observations.json")
+# The Chinese fold table is one too: WordErrorRateTests holds the generated
+# Swift copy to it entry for entry.
+SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization.json",
+                         "scripts/tests/fixtures/audio_qc_stage0_observations.json",
+                         "config/language-normalization/hant-hans-v1.txt")
 BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capability-matrix.json",
                  "config/toolchain.json")
 # Validated on Linux by the contracts job; the macOS gate does not need them.

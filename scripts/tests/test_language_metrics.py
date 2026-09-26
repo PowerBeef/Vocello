@@ -7,8 +7,10 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unicodedata
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -92,13 +94,15 @@ class TokenizerAndEditDistanceTests(unittest.TestCase):
     def test_thresholds_are_the_product_gate(self) -> None:
         self.assertEqual(metrics.MAX_ACCURACY_ERROR_RATE, 0.15)
         self.assertEqual(metrics.MIN_LANGUAGE_MATCH_SCORE, 0.5)
-        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "normalization-v2-edit-rate-v3")
+        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "normalization-v3-edit-rate-v4")
+        self.assertEqual(metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION, "normalization-v2-edit-rate-v3")
         self.assertEqual(metrics.SEGMENTATION_AWARE_ACCURACY_METRIC_VERSION, "segmentation-aware-edit-rate-v2")
         self.assertEqual(metrics.LEGACY_ACCURACY_METRIC_VERSION, "normalized-edit-rate-v1")
         self.assertEqual(
             [metrics.ACCURACY_METRIC_NORMALIZATIONS[version] for version in metrics.ACCURACY_METRIC_VERSIONS],
-            ["text-normalization-v1", "text-normalization-v1", "text-normalization-v2"],
+            ["text-normalization-v1", "text-normalization-v1", "text-normalization-v2", "text-normalization-v3"],
         )
+        self.assertEqual(metrics.TEXT_NORMALIZATION, "text-normalization-v3")
 
 
 class SegmentationAwareWERTests(unittest.TestCase):
@@ -134,7 +138,9 @@ class SegmentationAwareWERTests(unittest.TestCase):
         # CER zero: every word error is a two-word merge. v1 charges four edits
         # (0.4 here); v2 charges none, and the v1 rate stays published.
         entry = recognition(script=self.CASES[0][0], transcript=self.CASES[0][1], language="german")
-        for version in ("segmentation-aware-edit-rate-v2", "normalization-v2-edit-rate-v3"):
+        for version in (
+            "segmentation-aware-edit-rate-v2", "normalization-v2-edit-rate-v3", "normalization-v3-edit-rate-v4",
+        ):
             with self.subTest(version=version):
                 aware = metrics.score_recognition(
                     entry, script=self.CASES[0][0], language="german", accuracy_metric_version=version)
@@ -172,7 +178,7 @@ class SegmentationAwareWERTests(unittest.TestCase):
                 self.assertEqual(aware["segmentationAwareEditDistance"], 0)
 
 
-FIXTURES = Path(__file__).resolve().parent / "fixtures" / "language_normalization_v2.json"
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "language_normalization.json"
 ROOT = Path(__file__).resolve().parents[2]
 # The tracked corpora whose scripts a language verdict gates.
 # `language_bench_evidence.build_plan` refuses a lint issue at plan time; this
@@ -185,7 +191,8 @@ GATED_SCRIPT_CORPORA = (ROOT / "config" / "language-bench-corpus.json",)
 # blocks is scored by both runtimes through the generated `sweep-` fixture
 # cases: Basic Latin to Latin Extended-B, Latin Extended Additional, Cyrillic,
 # kana, a CJK and a Hangul sample, the half- and full-width forms and the
-# Hangul compatibility jamo. Regenerate with
+# Hangul compatibility jamo. The fold sweep (`FOLD_SWEEP_PREFIX`) adds every
+# entry of the Chinese Traditional-to-Simplified table. Regenerate both with
 # `python3 scripts/tests/test_language_metrics.py --write-sweep-cases`.
 SWEEP_BLOCKS = ((0x20, 0x250), (0x1E00, 0x1F00), (0x400, 0x500), (0x3040, 0x3100),
                 (0x4E00, 0x4F00), (0xAC00, 0xAD00), (0xFF00, 0xFFF0), (0x3130, 0x3190))
@@ -193,24 +200,27 @@ SWEEP_BLOCKS = ((0x20, 0x250), (0x1E00, 0x1F00), (0x400, 0x500), (0x3040, 0x3100
 SWEEP_LANGUAGES = ("english", "japanese", "korean")
 SWEEP_CASE_SIZE = 64
 SWEEP_PREFIX = "sweep-"
+FOLD_SWEEP_PREFIX = f"{SWEEP_PREFIX}chinese-fold-"
 # Code points left out of the sweep, each with the reason the two runtimes
 # disagree on it. None is known: Python's Unicode 13.0 and 16.0 generate
 # identical cases.
 SWEEP_EXCLUSIONS: dict[int, str] = {}
 
 
-def pinned_scores(reference: str, hypothesis: str, language: str) -> dict:
+def pinned_scores(
+    reference: str, hypothesis: str, language: str, version: str = metrics.ACCURACY_METRIC_VERSION,
+) -> dict:
     """A fixture case's `expected` block, as the parity tests read it."""
-    reference_tokens = metrics.normalized_tokens(reference, language)
-    hypothesis_tokens = metrics.normalized_tokens(hypothesis, language)
-    word, character = metrics.recomputed_accuracy(reference, hypothesis, language)
-    primary = metrics.primary_accuracy_metric(language)
+    reference_tokens, reference_characters = metrics.scoring_units(reference, language, version=version)
+    hypothesis_tokens, hypothesis_characters = metrics.scoring_units(hypothesis, language, version=version)
+    word, character = metrics.recomputed_accuracy(reference, hypothesis, language, version=version)
+    primary = metrics.primary_accuracy_metric(language, version=version)
     counts = ("substitutions", "insertions", "deletions", "longestDeletionRun")
     return {
         "referenceTokens": reference_tokens,
         "hypothesisTokens": hypothesis_tokens,
-        "referenceCharacters": "".join(metrics.character_units(reference_tokens)),
-        "hypothesisCharacters": "".join(metrics.character_units(hypothesis_tokens)),
+        "referenceCharacters": "".join(reference_characters),
+        "hypothesisCharacters": "".join(hypothesis_characters),
         "word": {key: word[key] for key in counts},
         "segmentationAwareEditDistance": word["segmentationAwareEditDistance"],
         "wordBoundaryOnlyEdits": word["wordBoundaryOnlyEdits"],
@@ -223,8 +233,24 @@ def pinned_scores(reference: str, hypothesis: str, language: str) -> dict:
     }
 
 
-def sweep_cases() -> list[dict]:
-    """The `sweep-` cases: each block's code points, space-separated,
+def python_diagnostics(reference: str, hypothesis: str, language: str) -> dict:
+    """A fixture case's `pythonDiagnostics` block under the current normalization."""
+    diagnostics: dict = {
+        "excessFillerCount": metrics.filler_counts(reference, hypothesis, language)["excessFillerCount"],
+    }
+    diagnostics.update(metrics.normalization_diagnostics(reference, hypothesis, language))
+    return diagnostics
+
+
+def legacy_primary_errors(reference: str, hypothesis: str, language: str) -> int:
+    """The gated edit count under normalization v2 (records declaring normalization-v2-edit-rate-v3)."""
+    return pinned_scores(
+        reference, hypothesis, language, version=metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION,
+    )["primaryErrors"]
+
+
+def unicode_sweep_cases() -> list[dict]:
+    """The code point sweep: each block's code points, space-separated,
     SWEEP_CASE_SIZE to a case, in every SWEEP_LANGUAGES profile, against their
     NFD spelling (canonically equivalent, so every edit count is zero)."""
     cases = []
@@ -235,10 +261,6 @@ def sweep_cases() -> list[dict]:
                 chunk = code_points[offset:offset + SWEEP_CASE_SIZE]
                 reference = " ".join(map(chr, chunk))
                 hypothesis = unicodedata.normalize("NFD", reference)
-                diagnostics = {
-                    "excessFillerCount": metrics.filler_counts(reference, hypothesis, language)["excessFillerCount"],
-                }
-                diagnostics.update(metrics.normalization_diagnostics(reference, hypothesis, language))
                 cases.append({
                     "id": f"{SWEEP_PREFIX}{language}-{chunk[0]:04x}-{chunk[-1]:04x}",
                     "language": language,
@@ -247,9 +269,49 @@ def sweep_cases() -> list[dict]:
                     "note": f"Generated sweep of U+{chunk[0]:04X}..U+{chunk[-1]:04X} against its NFD spelling.",
                     "phase": "P2a",
                     "expected": pinned_scores(reference, hypothesis, language),
-                    "pythonDiagnostics": diagnostics,
+                    "pythonDiagnostics": python_diagnostics(reference, hypothesis, language),
                 })
     return cases
+
+
+def fold_table_entries() -> list[tuple[int, int]]:
+    return sorted(metrics.hant_hans_fold_table().items())
+
+
+def fold_sweep_cases() -> list[dict]:
+    """The fold sweep (normalization v3): every entry of the committed
+    Traditional-to-Simplified table, SWEEP_CASE_SIZE to a case, its sources as
+    the transcript against its targets as the script. Every edit count is zero
+    under v3 and every character a substitution under v2, so the Swift copy of
+    the table, Foundation's NFKC and the stdlib's categories answer to Python's
+    entry by entry."""
+    entries = fold_table_entries()
+    cases = []
+    for offset in range(0, len(entries), SWEEP_CASE_SIZE):
+        chunk = entries[offset:offset + SWEEP_CASE_SIZE]
+        reference = "".join(chr(target) for _source, target in chunk)
+        hypothesis = "".join(chr(source) for source, _target in chunk)
+        cases.append({
+            "id": f"{FOLD_SWEEP_PREFIX}{chunk[0][0]:04x}-{chunk[-1][0]:04x}",
+            "language": "chinese",
+            "reference": reference,
+            "hypothesis": hypothesis,
+            "note": (
+                f"Generated sweep of the fold table's entries U+{chunk[0][0]:04X}..U+{chunk[-1][0]:04X}: "
+                "the Traditional sources against their Simplified targets."
+            ),
+            "phase": "P2b",
+            "slot": "script-variant",
+            "expected": pinned_scores(reference, hypothesis, "chinese"),
+            "pythonDiagnostics": python_diagnostics(reference, hypothesis, "chinese"),
+            "expectedV2": {"primaryErrors": legacy_primary_errors(reference, hypothesis, "chinese")},
+        })
+    return cases
+
+
+def sweep_cases() -> list[dict]:
+    """Every generated `sweep-` case: the code point sweep, then the fold sweep."""
+    return unicode_sweep_cases() + fold_sweep_cases()
 
 
 def write_sweep_cases() -> None:
@@ -271,9 +333,10 @@ def write_sweep_cases() -> None:
     FIXTURES.write_text("".join(escaped), encoding="utf-8")
 
 
-class NormalizationV2ParityTests(unittest.TestCase):
-    """AQ-02 P2a: text normalization v2 on the fixtures the Swift verifier's
-    `WordErrorRateTests.testNormalizationV2ParityFixtures` scores too."""
+class NormalizationParityTests(unittest.TestCase):
+    """AQ-02 P2a and P2b: the current text normalization (v3) on the fixtures
+    the Swift verifier's `WordErrorRateTests.testNormalizationParityFixtures`
+    scores too."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -281,7 +344,7 @@ class NormalizationV2ParityTests(unittest.TestCase):
         cls.cases = cls.document["cases"]
 
     def test_the_fixtures_name_the_current_versions_and_cover_every_language(self) -> None:
-        self.assertEqual(self.document["normalizationVersion"], metrics.TEXT_NORMALIZATION_V2)
+        self.assertEqual(self.document["normalizationVersion"], metrics.TEXT_NORMALIZATION)
         self.assertEqual(self.document["accuracyMetricVersion"], metrics.ACCURACY_METRIC_VERSION)
         identifiers = [case["id"] for case in self.cases]
         self.assertEqual(len(identifiers), len(set(identifiers)))
@@ -322,22 +385,43 @@ class NormalizationV2ParityTests(unittest.TestCase):
                 for key, value in computed.items():
                     self.assertAlmostEqual(value, diagnostics[key], msg=key)
 
-    def test_p2b_cases_name_a_slot_normalization_v2_leaves_empty(self) -> None:
+    def test_normalization_v2_rescoring_leaves_the_fold_out(self) -> None:
+        # Records that declare normalization-v2-edit-rate-v3 keep rescoring under
+        # v2. The fold is v3's only step, so every case scores the same under v2
+        # except the Chinese cases it folds, which pin their v2 count.
+        for case in self.cases:
+            with self.subTest(case=case["id"]):
+                legacy = pinned_scores(
+                    case["reference"], case["hypothesis"], case["language"],
+                    version=metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION,
+                )
+                if "expectedV2" in case:
+                    self.assertEqual(case["language"], "chinese")
+                    self.assertEqual(legacy["primaryErrors"], case["expectedV2"]["primaryErrors"])
+                    self.assertGreater(legacy["primaryErrors"], case["expected"]["primaryErrors"])
+                else:
+                    self.assertEqual(legacy, case["expected"])
+
+    def test_p2b_cases_name_their_slot(self) -> None:
         self.assertEqual(metrics.NORMALIZATION_EXTENSION_STEPS[metrics.TEXT_NORMALIZATION_V2], ())
-        pending = [case for case in self.cases if case["phase"] == "P2b"]
-        self.assertTrue(pending)
+        filled = {slot for slot, _step in metrics.NORMALIZATION_EXTENSION_STEPS[metrics.TEXT_NORMALIZATION]}
+        self.assertEqual(filled, {"script-variant"})
+        self.assertTrue([case for case in self.cases if case.get("slot") not in (None, *filled)])
         for case in self.cases:
             with self.subTest(case=case["id"]):
                 if case["phase"] == "P2b":
                     self.assertIn(case["language"], metrics.NORMALIZATION_EXTENSION_SLOTS[case["slot"]])
-                    self.assertIn("expectedAfterP2b", case)
+                    # A filled slot pins its score under the current version; an
+                    # open one also pins what its step will change.
+                    self.assertEqual("expectedAfterP2b" in case, case["slot"] not in filled)
                 else:
                     self.assertEqual(case["phase"], "P2a")
                     self.assertNotIn("slot", case)
                     self.assertNotIn("expectedAfterP2b", case)
+                    self.assertNotIn("expectedV2", case)
 
     def test_the_generated_sweep_scores_every_swept_code_point(self) -> None:
-        # Swift scores the same cases in WordErrorRateTests.testNormalizationV2ParityFixtures.
+        # Swift scores the same cases in WordErrorRateTests.testNormalizationParityFixtures.
         generated = [case for case in self.cases if case["id"].startswith(SWEEP_PREFIX)]
         self.assertEqual(generated, sweep_cases(), "regenerate with --write-sweep-cases")
         swept = {point for start, end in SWEEP_BLOCKS for point in range(start, end)}
@@ -351,6 +435,17 @@ class NormalizationV2ParityTests(unittest.TestCase):
                     for character in case["reference"]
                 }
                 self.assertEqual(scored, swept - set(SWEEP_EXCLUSIONS))
+
+    def test_the_fold_sweep_scores_every_table_entry(self) -> None:
+        folded = [case for case in self.cases if case["id"].startswith(FOLD_SWEEP_PREFIX)]
+        entries = fold_table_entries()
+        self.assertEqual("".join(case["hypothesis"] for case in folded), "".join(chr(s) for s, _t in entries))
+        self.assertEqual("".join(case["reference"] for case in folded), "".join(chr(t) for _s, t in entries))
+        for case in folded:
+            with self.subTest(case=case["id"]):
+                self.assertEqual(case["expected"]["primaryErrors"], 0)
+                # Sources and targets are disjoint, so v2 charges every character.
+                self.assertEqual(case["expectedV2"]["primaryErrors"], len(case["reference"]))
 
     def test_case_folding_equals_unicode_folding_for_the_ten_languages(self) -> None:
         for start, end in SWEEP_BLOCKS:
@@ -378,13 +473,18 @@ class NormalizationV2ParityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metrics.recomputed_accuracy("a", "a", "english", version="edit-rate-v9")
 
-    def test_v3_verdicts_count_fillers_and_carry_diagnostics_that_never_gate(self) -> None:
+    def test_v3_and_v4_verdicts_count_fillers_and_carry_diagnostics_that_never_gate(self) -> None:
         script = "The train left the station"
         entry = recognition(script=script, transcript="The um train uh left the station")
         verdict = metrics.score_recognition(entry, script=script, language="english")
-        self.assertEqual(verdict["textNormalization"], "text-normalization-v2")
+        self.assertEqual(verdict["textNormalization"], "text-normalization-v3")
         self.assertEqual((verdict["hypothesisFillerCount"], verdict["excessFillerCount"]), (2, 2))
         self.assertAlmostEqual(verdict["errorRate"], 0.4)
+        v3 = metrics.score_recognition(
+            entry, script=script, language="english",
+            accuracy_metric_version=metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION)
+        self.assertEqual(v3["textNormalization"], "text-normalization-v2")
+        self.assertEqual((v3["excessFillerCount"], v3["errorRate"]), (2, verdict["errorRate"]))
         korean = metrics.score_recognition(
             recognition(script="가다", transcript="거다", language="korean"), script="가다", language="korean")
         self.assertEqual((korean["metric"], korean["errorRate"]), ("CER", 0.5))
@@ -395,6 +495,124 @@ class NormalizationV2ParityTests(unittest.TestCase):
         self.assertEqual(legacy["textNormalization"], "text-normalization-v1")
         self.assertNotIn("excessFillerCount", legacy)
         self.assertNotIn("diagnostics", legacy)
+
+
+class HantHansFoldTests(unittest.TestCase):
+    """AQ-02 P2b: the committed Traditional-to-Simplified table and the Chinese-only fold."""
+
+    # whisper-small's transcript of the corpus's Chinese script on the first
+    # real-audio orchestrator run (2026-09-26, design-zh-pinned): a correct take
+    # written in Traditional characters, with one real homophone (准是 for 准时).
+    SCRIPT = "今天天气很好，红色的火车离开安静的车站，准时开往远处的城市。"
+    TRADITIONAL = "今天天氣很好,紅色的火車離開安靜的車站,準是開往遠處的城市"
+
+    def setUp(self) -> None:
+        self.data = metrics.HANT_HANS_TABLE.read_bytes()
+        self.manifest = json.loads(metrics.HANT_HANS_MANIFEST.read_text(encoding="utf-8"))
+
+    def test_the_committed_table_matches_its_manifest(self) -> None:
+        self.assertEqual(hashlib.sha256(self.data).hexdigest(), self.manifest["sha256"])
+        self.assertEqual(metrics.fold_table_issues(self.data, self.manifest), [])
+        self.assertEqual(self.manifest["table"], metrics.HANT_HANS_TABLE.relative_to(ROOT).as_posix())
+        self.assertEqual(self.manifest["id"], metrics.NORMALIZATION_EXTENSION_SLOTS["script-variant"]["chinese"])
+        self.assertEqual(self.manifest["license"]["spdx"], "Unicode-3.0")
+        self.assertTrue((ROOT / self.manifest["license"]["text"]).is_file())
+        self.assertTrue((ROOT / self.manifest["provenance"]["generator"]).is_file())
+        # Every entry maps exactly one scalar, a letter, to exactly one other
+        # letter, and no target is itself a source.
+        lines = self.data.decode("ascii").splitlines()
+        self.assertEqual(len(lines), self.manifest["entryCount"])
+        pairs = []
+        for line in lines:
+            fields = line.split(" ")
+            self.assertEqual(len(fields), 2, line)
+            source, target = (int(field, 16) for field in fields)
+            for value in (source, target):
+                self.assertFalse(0xD800 <= value <= 0xDFFF or value > 0x10FFFF, line)
+                self.assertEqual(unicodedata.category(chr(value)), "Lo", line)
+            self.assertNotEqual(source, target, line)
+            pairs.append((source, target))
+        self.assertEqual(dict(pairs), metrics.hant_hans_fold_table())
+        self.assertFalse({source for source, _t in pairs} & {target for _s, target in pairs})
+
+    def test_the_integrity_check_refuses_a_changed_table(self) -> None:
+        def issues(data: bytes, **manifest_overrides) -> list[str]:
+            manifest = dict(self.manifest, sha256=hashlib.sha256(data).hexdigest())
+            manifest.update(manifest_overrides)
+            return metrics.fold_table_issues(data, manifest)
+
+        first = self.data.split(b"\n", 1)[0] + b"\n"
+        cases = {
+            "malformed-line": self.data.replace(b"6C23 6C14\n", b"6C23 6C14 6C15\n"),
+            "not-idempotent": self.data.replace(b"8449 53F6\n", b"8449 6C23\n"),
+            "identity-mapping": self.data.replace(b"6C23 6C14\n", b"6C23 6C23\n"),
+            "target-not-a-scalar": self.data.replace(b"6C23 6C14\n", b"6C23 D800\n"),
+            "source-out-of-range": b"1E00 1E01\n" + self.data,
+            "unsorted-or-duplicate-source": first + self.data,
+            "unterminated-line": self.data.rstrip(b"\n"),
+            "not-ascii": self.data + "氣 气\n".encode(),
+        }
+        for issue, data in cases.items():
+            with self.subTest(issue=issue):
+                self.assertNotEqual(data, self.data)
+                self.assertIn(issue, issues(data))
+        self.assertIn("malformed-line", issues(self.data.lower()))
+        self.assertEqual(issues(self.data, entryCount=self.manifest["entryCount"] + 1), ["entry-count-mismatch"])
+        self.assertEqual(metrics.fold_table_issues(self.data, dict(self.manifest, sha256="0" * 64)),
+                         ["sha256-mismatch"])
+        self.assertEqual(metrics.fold_table_issues(self.data, None), ["manifest-invalid"])
+        # The scorer refuses a table that fails the check rather than folding with it.
+        with tempfile.TemporaryDirectory() as directory:
+            table = Path(directory) / "hant-hans-v1.txt"
+            table.write_bytes(cases["not-idempotent"])
+            with mock.patch.object(metrics, "HANT_HANS_TABLE", table), self.assertRaises(ValueError):
+                metrics.hant_hans_fold_table.__wrapped__()
+
+    def test_only_chinese_folds(self) -> None:
+        self.assertEqual(metrics.normalized_tokens("樹葉落了", "chinese"), ["树叶落了"])
+        # Japanese kanji are Japanese spellings: 葉 (leaf) and 叶 (to grant) are
+        # different words the table would merge. Korean hanja stay too.
+        self.assertEqual(metrics.normalized_tokens("遠くの列車と木の葉", "japanese"), ["遠くの列車と木の葉"])
+        self.assertEqual(metrics.normalized_tokens("漢字", "korean"), ["漢字"])
+        self.assertEqual(metrics.normalized_tokens("漢字", "english"), ["漢字"])
+        self.assertEqual(metrics.normalized_tokens("漢字", "auto"), ["漢字"])
+        # Normalization v2 never folds; v1 has no extension steps to apply.
+        self.assertEqual(
+            metrics.normalized_tokens("樹葉落了", "chinese", normalization=metrics.TEXT_NORMALIZATION_V2),
+            ["樹葉落了"],
+        )
+        with self.assertRaises(ValueError):
+            metrics.normalized_tokens("樹葉", "chinese", normalization=metrics.TEXT_NORMALIZATION_V1)
+
+    def test_a_correct_take_written_in_traditional_characters_passes(self) -> None:
+        entry = recognition(script=self.SCRIPT, transcript=self.TRADITIONAL, language="chinese")
+        current = metrics.score_recognition(entry, script=self.SCRIPT, language="chinese")
+        self.assertEqual((current["metric"], current["textNormalization"]), ("CER", "text-normalization-v3"))
+        self.assertEqual(
+            (current["character"]["substitutions"], current["character"]["referenceCount"]), (1, 27))
+        self.assertAlmostEqual(current["errorRate"], 1 / 27)
+        self.assertTrue(current["passed"])
+        legacy = metrics.score_recognition(
+            entry, script=self.SCRIPT, language="chinese",
+            accuracy_metric_version=metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION)
+        self.assertAlmostEqual(legacy["errorRate"], 12 / 27)
+        self.assertFalse(legacy["passed"])
+
+    def test_the_fold_never_charges_an_edit(self) -> None:
+        import random
+        generator = random.Random(20260926)
+        entries = fold_table_entries()
+        alphabet = [chr(point) for pair in entries[:: len(entries) // 60] for point in pair] + list("的是了在")
+        legacy = metrics.NORMALIZATION_V2_ACCURACY_METRIC_VERSION
+        for _ in range(300):
+            reference = "".join(generator.choice(alphabet) for _ in range(generator.randint(0, 10)))
+            hypothesis = "".join(generator.choice(alphabet) for _ in range(generator.randint(0, 10)))
+            _word, folded = metrics.recomputed_accuracy(reference, hypothesis, "chinese")
+            _word, unfolded = metrics.recomputed_accuracy(reference, hypothesis, "chinese", version=legacy)
+            distance = folded["substitutions"] + folded["insertions"] + folded["deletions"]
+            self.assertLessEqual(
+                distance, unfolded["substitutions"] + unfolded["insertions"] + unfolded["deletions"])
+            self.assertEqual(folded["referenceCount"], unfolded["referenceCount"])
 
 
 class CorpusLintTests(unittest.TestCase):

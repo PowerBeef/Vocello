@@ -38,6 +38,8 @@ python3 "$SCRIPT_DIR/build_output_policy.py" validate
 # Generated project surfaces and product identity.
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
+# The in-app copy of the Chinese fold table the language verdicts score with (AQ-02).
+python3 "$SCRIPT_DIR/generate_hant_hans_fold_swift.py" --check
 python3 "$SCRIPT_DIR/cli_version_contract.py" validate
 python3 "$SCRIPT_DIR/localization_contract.py" validate
 python3 "$SCRIPT_DIR/saved_voice_lifecycle_contract.py" validate

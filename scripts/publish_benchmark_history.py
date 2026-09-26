@@ -66,6 +66,7 @@ from language_bench_evidence import (  # noqa: E402
     stable_default_seed,
 )
 from lib.language_metrics import (  # noqa: E402
+    ACCURACY_METRIC_NORMALIZATIONS,
     ACCURACY_METRIC_VERSION,
     CHANNEL_CONSENSUS_ALGORITHM,
     DELETION_RUN_WARNING_LENGTH,
@@ -100,10 +101,11 @@ LANGUAGE_OUTPUT_ALGORITHM = "language-output-verifier-v3"
 ASR_EVIDENCE_SCHEMA = 2
 ASR_EVIDENCE_ALGORITHM = "apple-speech-file-consensus-v2"
 ASR_REQUIRED_PASS_COUNT = 3
-# Accuracy metric v3 (AQ-02 P2a, 2026-09-25): new records gate WER v2 (the
+# Accuracy metric v4 (AQ-02 P2b, 2026-09-26): new records gate WER v2 (the
 # segmentation-aware word rate, audit #43) and Korean's syllable rate under text
-# normalization v2, and keep publishing the plain word rate beside it;
-# lib.language_metrics owns the version.
+# normalization v3 (v2 plus the Chinese Traditional-to-Simplified fold), and
+# keep publishing the plain word rate beside it; lib.language_metrics owns the
+# version.
 LANGUAGE_ACCURACY_METRIC_VERSION = ACCURACY_METRIC_VERSION
 LANGUAGE_SAMPLING_VARIATION = "expressive"
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
@@ -2801,10 +2803,11 @@ def sanitized_asr_evidence(
         "primaryAccuracyScore": primary_score,
         "segmentationAwareWordErrorRate": float(word_metrics["segmentationAwareErrorRate"]),
         "wordBoundaryOnlyEdits": int(word_metrics["wordBoundaryOnlyEdits"]),
-        # Fillers the script does not hold (normalization v2, AQ-02): counted,
-        # never erased and never gated.
+        # Fillers the script does not hold (normalization v2 and later, AQ-02):
+        # counted, never erased and never gated.
         "excessFillerCount": int(filler_counts(
             reference_script, transcripts[0], str(expected_language),
+            normalization=ACCURACY_METRIC_NORMALIZATIONS[LANGUAGE_ACCURACY_METRIC_VERSION],
         )["excessFillerCount"]),
         **count_fields,
         **boolean_fields,

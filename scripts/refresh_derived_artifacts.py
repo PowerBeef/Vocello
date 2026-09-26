@@ -51,6 +51,13 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         stale_markers=("qwenvoice_production_model_catalog.json is stale",),
     ),
     DerivedArtifact(
+        artifact_id="hant-hans-fold-swift",
+        description="Sources/SharedSupport/Services/HantHansFoldTable.swift",
+        check=("python3", "scripts/generate_hant_hans_fold_swift.py", "--check"),
+        rebuild=("python3", "scripts/generate_hant_hans_fold_swift.py"),
+        stale_markers=("HantHansFoldTable.swift is stale",),
+    ),
+    DerivedArtifact(
         artifact_id="readme-charts",
         description="docs/charts/*.svg (README performance charts)",
         check=("python3", "scripts/generate_readme_charts.py", "--check"),

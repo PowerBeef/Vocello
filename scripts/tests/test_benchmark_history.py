@@ -1111,6 +1111,13 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(history.HistoryError):
                 self.publish(record, f"normalization-v2-invalid-{index}")
 
+        # A v4 record (text normalization v3, the Chinese fold, AQ-02 P2b) keeps
+        # the same rules and counts fillers too.
+        v4 = copy.deepcopy(valid)
+        v4["run"]["id"] = "normalization-v3-valid"
+        v4["evidence"]["languageVerification"]["accuracyMetricVersion"] = "normalization-v3-edit-rate-v4"
+        self.publish(v4, "normalization-v3-valid")
+
         # Without filler counts the same take is a valid WER v2 record.
         v2 = copy.deepcopy(valid)
         v2["run"]["id"] = "normalization-v2-as-wer-v2"

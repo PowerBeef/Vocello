@@ -16,6 +16,9 @@ FILES = (
     "config/third-party-attribution-policy.json",
     "config/licenses/Apache-2.0.txt",
     "config/licenses/MIT-terms.txt",
+    "config/licenses/Unicode-3.0.txt",
+    "config/language-normalization/hant-hans-v1.json",
+    "config/language-normalization/hant-hans-v1.txt",
     "config/notices/swift-asn1.txt",
     "config/notices/swift-crypto.txt",
     "config/notices/swift-nio.txt",
@@ -73,6 +76,9 @@ class AttributionManifestTests(unittest.TestCase):
             "resolution": lambda root: self.mutate_revision(root),
             "license": lambda root: (root / "config/licenses/Apache-2.0.txt").write_text("changed", encoding="utf-8"),
             "model card": lambda root: self.mutate_model_card(root),
+            # Compiled-in Unicode-3.0 data must be the bytes its manifest attributes.
+            "data": lambda root: (root / "config/language-normalization/hant-hans-v1.txt").write_text(
+                "6C23 6C14\n", encoding="utf-8"),
         }
         for label, mutate in mutations.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:

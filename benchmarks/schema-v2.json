@@ -251,11 +251,12 @@
               ]
             },
             "accuracyMetricVersion": {
-              "description": "normalized-edit-rate-v1 gates the plain word or character rate; segmentation-aware-edit-rate-v2 (records since 2026-09-25, audit #43) gates the word rate that does not charge word-boundary merges and splits; normalization-v2-edit-rate-v3 (AQ-02) gates the same rates under text normalization v2 and Korean by its syllable character rate.",
+              "description": "normalized-edit-rate-v1 gates the plain word or character rate; segmentation-aware-edit-rate-v2 (records since 2026-09-25, audit #43) gates the word rate that does not charge word-boundary merges and splits; normalization-v2-edit-rate-v3 (AQ-02) gates the same rates under text normalization v2 and Korean by its syllable character rate; normalization-v3-edit-rate-v4 (AQ-02 P2b, records since 2026-09-26) scores them under text normalization v3, which also folds Chinese from Traditional to Simplified characters.",
               "enum": [
                 "normalized-edit-rate-v1",
                 "segmentation-aware-edit-rate-v2",
-                "normalization-v2-edit-rate-v3"
+                "normalization-v2-edit-rate-v3",
+                "normalization-v3-edit-rate-v4"
               ]
             },
             "requiredPassCount": {

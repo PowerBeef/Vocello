@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import QwenVoiceCore
 import XCTest
@@ -111,7 +112,7 @@ final class WordErrorRateTests: XCTestCase {
             expectedScript: script,
             expectedLanguage: .german
         )
-        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v2-edit-rate-v3")
+        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v3-edit-rate-v4")
         XCTAssertEqual(try XCTUnwrap(result.wordErrorRate), 0.4, accuracy: 1e-12)
         XCTAssertEqual(try XCTUnwrap(result.segmentationAwareWordErrorRate), 0, accuracy: 1e-12)
         XCTAssertEqual(result.wordBoundaryOnlyEdits, 4)
@@ -119,19 +120,21 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(result.accuracyPass, true)
     }
 
-    /// Normalization v2 parity (AQ-02 P2a): every case of the fixtures shared with
+    /// Normalization parity (AQ-02 P2a and P2b): every case of the fixtures shared with
     /// `scripts/tests/test_language_metrics.py` scores to the same tokens, character units and
-    /// edit counts here. P2b cases pin today's scores as well; their `expectedAfterP2b` belongs
-    /// to the package steps P2b adds. The generated `sweep-` cases hold every code point of the
-    /// Python sweep's blocks in each normalization profile, so the stdlib's case mapping and
-    /// categories and Foundation's normalization forms answer to Python's `unicodedata`.
-    func testNormalizationV2ParityFixtures() throws {
+    /// edit counts here under the current normalization (v3). Cases of an open P2b slot pin
+    /// today's scores as well; their `expectedAfterP2b` belongs to steps not yet added. The
+    /// generated `sweep-` cases hold every code point of the Python sweep's blocks in each
+    /// normalization profile, so the stdlib's case mapping and categories and Foundation's
+    /// normalization forms answer to Python's `unicodedata`, and every entry of the Chinese
+    /// Traditional-to-Simplified fold table.
+    func testNormalizationParityFixtures() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let data = try Data(contentsOf: repositoryRoot.appendingPathComponent(
-            "scripts/tests/fixtures/language_normalization_v2.json"
+            "scripts/tests/fixtures/language_normalization.json"
         ))
         let fixtures = try JSONDecoder().decode(NormalizationFixtures.self, from: data)
         XCTAssertEqual(fixtures.normalizationVersion, VoiceClipTranscriber.textNormalizationVersion)
@@ -189,6 +192,72 @@ final class WordErrorRateTests: XCTestCase {
             let primaryErrors = metric == .characterErrorRate ? character.editDistance : aware.editDistance
             XCTAssertEqual(primaryErrors, expected.primaryErrors, fixture.id)
         }
+    }
+
+    /// Text normalization v3 (AQ-02 P2b): the generated table is the committed table byte for
+    /// byte, and the fold the verifier applies holds every entry of it. Python reads the same file
+    /// (`scripts/lib/language_metrics.py`), so neither runtime depends on the OS's ICU data.
+    func testHantHansFoldTableIsTheCommittedTable() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let data = try Data(contentsOf: repositoryRoot.appendingPathComponent(
+            "config/language-normalization/hant-hans-v1.txt"
+        ))
+        XCTAssertEqual(Data(HantHansFoldTable.table.utf8), data)
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, HantHansFoldTable.tableSHA256)
+        XCTAssertEqual(HantHansFoldTable.version, "hant-hans-v1")
+
+        var committed: [Unicode.Scalar: Unicode.Scalar] = [:]
+        for line in try XCTUnwrap(String(data: data, encoding: .ascii)).split(separator: "\n") {
+            let fields = line.split(separator: " ").compactMap { field in
+                UInt32(field, radix: 16).flatMap { Unicode.Scalar($0) }
+            }
+            XCTAssertEqual(fields.count, 2, String(line))
+            if fields.count == 2 {
+                committed[fields[0]] = fields[1]
+            }
+        }
+        XCTAssertEqual(committed.count, HantHansFoldTable.entryCount)
+        XCTAssertEqual(VoiceClipTranscriber.traditionalToSimplified, committed)
+        // Idempotent: no target is itself a source, so both sides meet in one spelling.
+        XCTAssertTrue(Set(committed.values).isDisjoint(with: committed.keys))
+    }
+
+    /// AQ-02 P2b: whisper-small wrote a correct Mandarin take of the corpus script in Traditional
+    /// characters (CER 12/27 under normalization v2). The fold leaves the one real homophone.
+    /// Japanese kanji never fold: 葉 (leaf) and 叶 (to grant) stay different words.
+    func testChineseFoldsTraditionalCharactersBeforeScoring() throws {
+        let script = "今天天气很好，红色的火车离开安静的车站，准时开往远处的城市。"
+        let transcript = "今天天氣很好,紅色的火車離開安靜的車站,準是開往遠處的城市"
+        let passes = (1 ... 3).map { pass(index: $0, transcript: transcript, localeIdentifier: "zh-CN") }
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: evidence(
+                authorization: .authorized,
+                consensus: .consistent,
+                repetitions: passes,
+                transcript: transcript,
+                expectedLanguage: .chinese
+            ),
+            expectedScript: script,
+            expectedLanguage: .chinese
+        )
+        XCTAssertNil(result.skipReason)
+        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v3-edit-rate-v4")
+        XCTAssertEqual(result.accuracyMetric, .characterErrorRate)
+        XCTAssertEqual(result.referenceCharacterCount, 27)
+        XCTAssertEqual(result.characterSubstitutions, 1)
+        XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 1.0 / 27.0, accuracy: 1e-12)
+        XCTAssertEqual(result.accuracyPass, true)
+
+        XCTAssertEqual(
+            VoiceClipTranscriber.normalizedWordTokens("遠くの列車と木の葉", language: .japanese),
+            ["遠くの列車と木の葉"]
+        )
+        XCTAssertEqual(VoiceClipTranscriber.normalizedWordTokens("樹葉落了", language: .chinese), ["树叶落了"])
+        XCTAssertEqual(VoiceClipTranscriber.normalizedWordTokens("漢字", language: .korean), ["漢字"])
     }
 
     /// AQ-F21: Korean gates its space-free syllable rate, so eojeol spacing costs nothing and
@@ -510,7 +579,7 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(result.deletions, 0)
         XCTAssertEqual(result.detectedLanguage, Qwen3SupportedLanguage.auto.rawValue)
         XCTAssertEqual(result.accuracyPass, true)
-        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v2-edit-rate-v3")
+        XCTAssertEqual(result.accuracyMetricVersion, "normalization-v3-edit-rate-v4")
         XCTAssertEqual(result.accuracyMetric, .wordErrorRate)
         XCTAssertEqual(result.accuracyThreshold, 0.30, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0.25, accuracy: 0.001)
@@ -908,8 +977,8 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(metrics.longestDeletionRun, expected.longestDeletionRun, message, file: file, line: line)
     }
 
-    /// `scripts/tests/fixtures/language_normalization_v2.json`; Python-only diagnostics and the
-    /// P2b expectations are ignored here.
+    /// `scripts/tests/fixtures/language_normalization.json`; Python-only diagnostics, the P2b
+    /// expectations and the normalization v2 counts (`expectedV2`) are ignored here.
     private struct NormalizationFixtures: Decodable {
         struct EditCounts: Decodable {
             var substitutions: Int
@@ -966,7 +1035,7 @@ final class WordErrorRateTests: XCTestCase {
         let gate = passing.languageASRGateResult(evidenceDigest: digest)
         XCTAssertEqual(gate.gate, .languageASR)
         XCTAssertEqual(gate.outcome, .pass)
-        XCTAssertEqual(gate.algorithmVersion, 6)
+        XCTAssertEqual(gate.algorithmVersion, 7)
         XCTAssertEqual(gate.evidenceDigest, digest)
         XCTAssertEqual(
             gate.measurements.first { $0.key == .consensusPassCount }?.value,

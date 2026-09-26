@@ -56,6 +56,7 @@ from delivery_resource_supervisor import (  # noqa: E402
     run_supervised,
 )
 import independent_asr  # noqa: E402
+from lib import language_metrics  # noqa: E402
 from lib.language_metrics import score_recognition, text_sha256  # noqa: E402
 from lib.qc_pipeline.admission import AdmissionPolicy, AdmissionTimeout, HostAdmission, HostBusy  # noqa: E402
 from lib.qc_pipeline.evidence import (  # noqa: E402
@@ -264,7 +265,7 @@ class LanguageLaneTests(OrchestratorFixture):
 
         # 4. A metric-definition change recomputes L2 from L1 without a model.
         redefined = self._orchestrator(supervisor=refusing_supervisor, offline=True,
-                                       judge=self._judge(metric_definition="normalization-v2-edit-rate-v3-test"))
+                                       judge=self._judge(metric_definition="normalization-v3-edit-rate-v4-test"))
         changed = redefined.run(manifest)
         self.assertEqual(changed["header"]["cache"]["L1"]["misses"], 0)
         self.assertEqual(changed["header"]["cache"]["L2"]["hits"], 0)
@@ -532,6 +533,8 @@ class CacheIdentityTests(SmallRunFixture):
 
         shaping = {Path(inspect.getsourcefile(function)).resolve() for function in (
             verdicts.asr_metrics, score_recognition, independent_asr._recognition)}
+        # The committed data the scoring reads (the Chinese fold table, AQ-02 P2b).
+        shaping |= {path.resolve() for path in language_metrics.NORMALIZATION_DATA_FILES}
         self.assertEqual({path.resolve() for path in verdicts.ASR_METRIC_SOURCES}, shaping)
         copies = []
         for source in verdicts.ASR_METRIC_SOURCES:

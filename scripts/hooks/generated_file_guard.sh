@@ -34,6 +34,8 @@ while IFS= read -r file_path; do
     block "edit config/model-artifact-receipts.json, then python3 scripts/model_catalog_contract.py rebuild" ;;
   Sources/Resources/third_party_attributions.json)
     block "edit config/third-party-attribution-policy.json or its inputs, then python3 scripts/attribution_manifest.py rebuild" ;;
+  Sources/SharedSupport/Services/HantHansFoldTable.swift)
+    block "python3 scripts/generate_hant_hans_fold_swift.py (from config/language-normalization/hant-hans-v1.txt)" ;;
   docs/charts/*.svg)
     block "python3 scripts/generate_readme_charts.py" ;;
   benchmarks/HISTORY.md)

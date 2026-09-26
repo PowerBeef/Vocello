@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "hant-hans-v1",
+  "description": "Traditional-to-Simplified Chinese fold of text normalization v3 (AQ-02 P2b): each Traditional character of a Chinese reference or transcript is replaced by its Simplified form before scoring, in scripts/lib/language_metrics.py and in the in-app verifier (Sources/SharedSupport/Services/HantHansFoldTable.swift, generated from the table by scripts/generate_hant_hans_fold_swift.py). Both runtimes read this committed snapshot instead of ICU, whose data changes with the OS. Only Chinese folds: Japanese kanji and Korean hanja are left as written.",
+  "table": "config/language-normalization/hant-hans-v1.txt",
+  "sha256": "276f10c889517a4abf2cad02f70e8cb02a70ff9eacc7391e2101aa849a11f068",
+  "entryCount": 3079,
+  "format": "One mapping per line, ending in a line feed: the source and target code points in uppercase hexadecimal without leading zeros, separated by one space, sorted by source. Every source lies in sourceRanges, every target is one other Unicode scalar, and no target is itself a source, so the fold is idempotent.",
+  "sourceRanges": [
+    ["3400", "4DBF"],
+    ["4E00", "9FFF"],
+    ["F900", "FAFF"],
+    ["20000", "2A6DF"]
+  ],
+  "provenance": {
+    "transform": "ICU Hant-Hans (Foundation StringTransform(\"Hant-Hans\")), the reverse direction of CLDR's Simplified-Traditional (Hans-Hant) transform",
+    "platform": "macOS 27.0 (26A428), ICU data icudt78l",
+    "derivedOn": "2026-09-26",
+    "generator": "scripts/generate_hant_hans_table.swift",
+    "selection": "Each code point of sourceRanges transformed alone; kept when the result is exactly one scalar that differs from the input. No compatibility ideograph yields an entry; both runtimes apply NFKC first, which maps them to unified ideographs.",
+    "rawEntryCount": 3080,
+    "rawSHA256": "92b531f1fcc00af1a96de166522ade78a3d44db670ff01e206558302ad33d25d",
+    "closure": "Chains are followed to their end and a cycle folds to its lowest code point, so no target is a source. ICU maps U+82CE and U+82E7 to each other and U+85B4 to U+82E7; closed, U+82CE is left as written (entry dropped) and U+85B4 and U+82E7 fold to U+82CE, which Unihan also lists as U+82E7's simplified variant.",
+    "closureChanges": [
+      {"source": "82CE", "icu": "82E7", "folded": null},
+      {"source": "85B4", "icu": "82E7", "folded": "82CE"}
+    ]
+  },
+  "license": {
+    "spdx": "Unicode-3.0",
+    "text": "config/licenses/Unicode-3.0.txt",
+    "textSource": "The Unicode License V3 section of the ICU 78.3 LICENSE file",
+    "copyrightNotice": "Copyright © 2016-2025 Unicode, Inc."
+  }
+}

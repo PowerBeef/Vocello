@@ -61,6 +61,7 @@ GENERATED = ("docs/ROADMAP.md", "QwenVoice.xcodeproj/project.pbxproj",
              "benchmarks/runs/engine-generation/frozen.json",
              "Sources/Resources/qwenvoice_production_model_catalog.json",
              "Sources/Resources/third_party_attributions.json",
+             "Sources/SharedSupport/Services/HantHansFoldTable.swift",
              "docs/charts/architecture-dark.svg", "benchmarks/HISTORY.md",
              "Packages/VocelloQwen3Core/CURRENT_INVENTORY.json",
              "Packages/VocelloQwen3Core/FACADE_API_BASELINE.json")

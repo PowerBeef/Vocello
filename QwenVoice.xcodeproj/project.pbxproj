@@ -103,6 +103,7 @@
 		1B078BCA387E60CFA8C95C82 /* VoiceClipTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F068FE73DB34691E0E3372C /* VoiceClipTranscriber.swift */; };
 		1B135CECFE9134BB9914EFE3 /* VoiceBankCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1332C167E816CFF11257E5DF /* VoiceBankCatalog.swift */; };
 		1C601DB930D64AF476028A59 /* VocelloQwen3Core in Frameworks */ = {isa = PBXBuildFile; productRef = 8139A1718AAB15681C47BF78 /* VocelloQwen3Core */; };
+		1C98014633F09CEA06C85269 /* HantHansFoldTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */; };
 		1CBEFD2A5A49468100DA458F /* IOSModelDownloadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF88AA09F26970BD78F68AF6 /* IOSModelDownloadCoordinator.swift */; };
 		1D9CF18E56494AE4DDD0A72F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BB1E93A79756A33FF71DBB /* RootView.swift */; };
 		1DC62431C3DDA0031793740B /* AppLaunchDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14202A5EA4A0355319DF2F34 /* AppLaunchDiagnostics.swift */; };
@@ -671,6 +672,7 @@
 		DE0B7FF8B0A57CDF2BEA982D /* VocelloLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662E97138F8905F59604826E /* VocelloLocalization.swift */; };
 		DE5182B6285E60582036B554 /* StudioGenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C3D5708FC88C667497CBF52 /* StudioGenerationCoordinator.swift */; };
 		DE960F3E5C43F5F60368E475 /* StudioGenerationItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E629E97563CC6579A0C1AD7 /* StudioGenerationItems.swift */; };
+		DEF5F54B55097EF23840ED48 /* HantHansFoldTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */; };
 		DF3DAF9007342D3E300F75BF /* LongFormHistoryAcceptanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9427C2443A738E51E8F88D /* LongFormHistoryAcceptanceTests.swift */; };
 		DFF41A112585ADC31484F16C /* IOSMemorySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8AF8C5F67A18A2A6790A33 /* IOSMemorySnapshot.swift */; };
 		E021F6AAA4108A660E2816F1 /* ProductionModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA340290E0CAD1882CF1A837 /* ProductionModelCatalog.swift */; };
@@ -753,6 +755,7 @@
 		F9081261E601D48A8782985C /* VocelloSubtleGlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8241843C9164F5B82DC88BF /* VocelloSubtleGlassChrome.swift */; };
 		F9B7BE5834B657714DF2DBA4 /* VocelloPrimaryCTAButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E32B4D98926E3BFAD0690C4 /* VocelloPrimaryCTAButton.swift */; };
 		FA61C7F4EBDCB6DBDA82377E /* RequestLocalSamplingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C628D0D4B50BA8A4D9A4E /* RequestLocalSamplingPolicyTests.swift */; };
+		FA6BE7CD3A8DC3E7BD4B5985 /* HantHansFoldTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */; };
 		FAB031D2988164F1B0477F4C /* AppGenerationTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D1BFA11B3D97C8053C1336A /* AppGenerationTimeline.swift */; };
 		FB094496E4667327357A38CF /* QwenVoiceCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C1CD42CBFA3E0E68EDA48DEA /* QwenVoiceCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		FB580B67F03AAA61FA205BCE /* LanguageSelectionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83543082A7A136CF321231B /* LanguageSelectionPresentationTests.swift */; };
@@ -1184,6 +1187,7 @@
 		90F9873786E11A6DBE0BCF00 /* IOSUnloadQuiescence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSUnloadQuiescence.swift; sourceTree = "<group>"; };
 		9149B3BEE30949867C4573CF /* MacStudioSetupChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStudioSetupChip.swift; sourceTree = "<group>"; };
 		917EC933816CEDA7A4F80E85 /* MacFileSaveCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFileSaveCopy.swift; sourceTree = "<group>"; };
+		921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HantHansFoldTable.swift; sourceTree = "<group>"; };
 		927598F48A6C57FCB82ED71C /* VocelloPresentationText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloPresentationText.swift; sourceTree = "<group>"; };
 		92897B88826720DA43A40B19 /* MemoryTelemetryV8Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTelemetryV8Tests.swift; sourceTree = "<group>"; };
 		92BB1E93A79756A33FF71DBB /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -2107,6 +2111,7 @@
 				9B31FA4FAD84410F74EB19EB /* GenerationOutputVerifier.swift */,
 				220CFD2739290441DB6C2732 /* GenerationPersistence.swift */,
 				EBE77E3E45F2B4B04CDB73DF /* GenerationTextLimitPolicy.swift */,
+				921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */,
 				5C07D4BA0B6BA90166DDD177 /* IOSLongFormProductionServices.swift */,
 				DE98ABA2A416060FE667DD45 /* LanguageSelectionPresentation.swift */,
 				4C119A41F59D74162A8D4BF4 /* LivePreviewEstimate.swift */,
@@ -2897,6 +2902,7 @@
 				19CC3C0AB92BCC9A3DCCB6C6 /* GenerationOutputVerifier.swift in Sources */,
 				B03552F3823AFAD7425C8F3D /* GenerationPersistence.swift in Sources */,
 				B9E910DF560104F3E54B6317 /* GenerationTextLimitPolicy.swift in Sources */,
+				1C98014633F09CEA06C85269 /* HantHansFoldTable.swift in Sources */,
 				FE5FA62325678411A11D14DF /* HistoryPersistenceError.swift in Sources */,
 				051D4607CAD1F08CFF493DA5 /* HistoryScreen.swift in Sources */,
 				CAC104EFF8BBD01F0674A3FD /* IOSAccessibility.swift in Sources */,
@@ -3093,6 +3099,7 @@
 				AA9D8D7AAFB3BA4E985F9953 /* GenerationTerminalDiagnosticEvidenceTests.swift in Sources */,
 				6AD76B9F2A709895ACB2BA9C /* GenerationTextLimitPolicy.swift in Sources */,
 				6F5F73F9223E6A6A4EF9B315 /* GenerationTextLimitPolicyTests.swift in Sources */,
+				FA6BE7CD3A8DC3E7BD4B5985 /* HantHansFoldTable.swift in Sources */,
 				1A652DB3E3278260A378D4A8 /* HistoryDeletionEngineTests.swift in Sources */,
 				CE53C4508BAC6A10662AE579 /* HistoryPersistenceError.swift in Sources */,
 				64C97400A3DA665D1196F260 /* HistoryPersistenceErrorTests.swift in Sources */,
@@ -3287,6 +3294,7 @@
 				B98933702A7AE0E0F7F73A8F /* GenerationTelemetryMerger.swift in Sources */,
 				142D9D53DD031434DC679186 /* GenerationTextLimitPolicy.swift in Sources */,
 				FF540F76D257DCBF303A314D /* GenerationVariationPreference.swift in Sources */,
+				DEF5F54B55097EF23840ED48 /* HantHansFoldTable.swift in Sources */,
 				D0A4C4DBADE1D461F01D65EE /* HistoryPersistenceError.swift in Sources */,
 				94E0EBABE2B6B960AE5CE028 /* HistoryPresentation.swift in Sources */,
 				EFFA8063FBB5389AFE8B41C3 /* IOSAppLanguage.swift in Sources */,

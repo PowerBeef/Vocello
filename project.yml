@@ -426,6 +426,8 @@ targets:
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
       - path: Sources/SharedSupport/Services/GenerationOutputVerifier.swift
       - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift
+      # Generated: the Chinese Traditional-to-Simplified fold the verifier scores with (AQ-02).
+      - path: Sources/SharedSupport/Services/HantHansFoldTable.swift
       - path: Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift
       - path: Sources/SharedSupport/Database/HistoryPersistenceError.swift
       - path: Sources/SharedSupport/Database/GenerationMigrations.swift

@@ -55,7 +55,7 @@ from lib.language_metrics import (  # noqa: E402
     LANGUAGE_CHECK_KINDS,
     NEGATIVE_CONTROL_KIND,
     SEGMENTATION_AWARE_METRIC_VERSIONS,
-    TEXT_NORMALIZATION_V2,
+    TEXT_NORMALIZATION_V1,
     channel_consensus,
     run_channel_verdicts,
 )
@@ -301,8 +301,8 @@ LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
 }
 DELETION_RUN_METRIC_KEYS = ("longestDeletionRun", "independentLongestDeletionRun")
 # Fillers each family's transcript holds beyond the script's (records scored
-# under text normalization v2, accuracy metric v3, AQ-02): counted, never
-# erased and never gated.
+# under text normalization v2 or later, accuracy metric v3 or later, AQ-02):
+# counted, never erased and never gated.
 FILLER_COUNT_METRIC_KEYS = ("excessFillerCount", "independentExcessFillerCount")
 # WER v2 (records since 2026-09-25, audit #43): each family's segmentation-aware
 # word rate and the word-boundary edits it credited; v2 records gate on it.
@@ -552,7 +552,7 @@ METRIC_KEYS = {
     *DELETION_RUN_METRIC_KEYS,
     # WER v2 per family (records since 2026-09-25, audit #43).
     *(key for keys in SEGMENTATION_AWARE_METRIC_KEYS.values() for key in keys),
-    # Excess fillers per family (text normalization v2, AQ-02).
+    # Excess fillers per family (text normalization v2 or later, AQ-02).
     *FILLER_COUNT_METRIC_KEYS,
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
@@ -3085,18 +3085,19 @@ def validate_record(
     seen_generations: set[str] = set()
     negative_control_count = 0
     declared_verification = record["evidence"].get("languageVerification")
-    # The gated word score under the record's accuracy metric version (v2 and
-    # v3: segmentation-aware, audit #43); v1 records keep the plain rate. Each
+    # The gated word score under the record's accuracy metric version (v2 to
+    # v4: segmentation-aware, audit #43); v1 records keep the plain rate. Each
     # version is validated under its own rules, so legacy records keep theirs.
     declared_metric_version = (
         declared_verification.get("accuracyMetricVersion")
         if isinstance(declared_verification, dict) else None
     )
     segmentation_aware = declared_metric_version in SEGMENTATION_AWARE_METRIC_VERSIONS
-    # Filler counts exist only under text normalization v2 (accuracy metric v3).
+    # Filler counts exist only under text normalization v2 and later (accuracy
+    # metric v3 and later).
     counts_fillers = (
         declared_metric_version in ACCURACY_METRIC_VERSIONS
-        and ACCURACY_METRIC_NORMALIZATIONS[declared_metric_version] == TEXT_NORMALIZATION_V2
+        and ACCURACY_METRIC_NORMALIZATIONS[declared_metric_version] != TEXT_NORMALIZATION_V1
     )
     # Records since 2026-09-25 declare the negative control an accuracy control
     # (audit #42): it must fail on accuracy; its language check is reported only.
@@ -3247,7 +3248,7 @@ def validate_record(
             ):
                 raise HistoryError(f"take metric {key} must be a nonnegative count")
         if not counts_fillers and any(key in take["metrics"] for key in FILLER_COUNT_METRIC_KEYS):
-            raise HistoryError("filler counts require text normalization v2 (accuracy metric v3)")
+            raise HistoryError("filler counts require text normalization v2 or later (accuracy metric v3 or later)")
         if "accuracyMetric" in take and "whisper" in language_families(record):
             metrics = take["metrics"]
             if missing := sorted(INDEPENDENT_ACCURACY_METRIC_KEYS - set(metrics)):
@@ -3403,7 +3404,8 @@ def validate_record(
         "accuracyMetricVersion"
     ) in ACCURACY_METRIC_VERSIONS:
         # Every record keeps the version it declares: v1, WER v2 (records since
-        # 2026-09-25, audit #43) or v3 (text normalization v2, AQ-02).
+        # 2026-09-25, audit #43), v3 (text normalization v2, AQ-02) or v4 (text
+        # normalization v3, the Chinese Traditional-to-Simplified fold, AQ-02 P2b).
         expected_language_verification["accuracyMetricVersion"] = language_verification["accuracyMetricVersion"]
     if accuracy_evidence_required and (
         run["kind"] != "language" or language_verification is None

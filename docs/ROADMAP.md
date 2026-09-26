@@ -272,8 +272,8 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-28` | superseded | Calibrate the layered local delivery evaluator | — |
 | `DP-29` | in-flight | Qualify the native-language delivery corpus and cross-language sentinels | — |
-| `DP-31` | planned | Confirm Speed and Quality candidates with a frozen automated holdout | — |
-| `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | `DP-31` |
+| `DP-31` | planned | Confirm Speed and Quality candidates with a frozen automated holdout | `AQ-07`, `AQ-08` |
+| `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | `DP-31`, `AQ-07`, `AQ-08` |
 
 ### Open items in detail
 
@@ -285,10 +285,10 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
   gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
 
 - **`DP-31`** (planned) — Confirm Speed and Quality candidates with a frozen automated holdout.
-  gate: Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, UTMOS, memory, cancellation, seed and receipt guardrails. Listening is optional; automatic metric qualification is not listener-proven semantic improvement.
+  gate: Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, memory, cancellation, seed and receipt guardrails; the quality guardrail is the qualified advisory composite of AQ-08 (UTMOS retired by AQ-01). Listening is optional; automatic metric qualification is not listener-proven semantic improvement.
 
 - **`DP-32`** (planned) — Promote only qualifying delivery changes and revalidate all modes.
-  gate: A global or per-preset prompt/compiler change requires DP-31 automated measured-claim qualification: positive paired metric improvement lower bound, corrected above-chance comparison, distributed speaker/script improvement, no corrected preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, relative UTMOS delta >= -0.10 and valid runtime identities. Human listening is optional. Revalidate CustomVoice, VoiceDesign identity/delivery and clone reference banks separately. Preserve prompts if no candidate qualifies. No hidden best-of-N, cloud/app-bundled evaluator or automatic publication.
+  gate: A global or per-preset prompt/compiler change requires DP-31 automated measured-claim qualification: positive paired metric improvement lower bound, corrected above-chance comparison, distributed speaker/script improvement, no corrected preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, no significant regression on the qualified quality composite of AQ-08 (UTMOS retired by AQ-01) and valid runtime identities. Human listening is optional. Revalidate CustomVoice, VoiceDesign identity/delivery and clone reference banks separately. Preserve prompts if no candidate qualifies. No hidden best-of-N, cloud/app-bundled evaluator or automatic publication.
 
 ## 2026-08 engineering review remediation
 

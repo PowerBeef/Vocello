@@ -568,7 +568,7 @@
       "plan": "delivery-prompting-2026-08",
       "title": "Confirm Speed and Quality candidates with a frozen automated holdout",
       "status": "planned",
-      "gate": "Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, UTMOS, memory, cancellation, seed and receipt guardrails. Listening is optional; automatic metric qualification is not listener-proven semantic improvement.",
+      "gate": "Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, memory, cancellation, seed and receipt guardrails; the quality guardrail is the qualified advisory composite of AQ-08 (UTMOS retired by AQ-01). Listening is optional; automatic metric qualification is not listener-proven semantic improvement.",
       "sourceOfTruth": [
         "scripts/delivery_promotion_decision.py",
         "scripts/delivery_statistics.py"
@@ -577,23 +577,29 @@
         "file:scripts/tests/test_delivery_promotion_decision.py",
         "file:scripts/tests/test_delivery_statistics.py"
       ],
-      "updated": "2026-09-21",
-      "notes": "September 21 exploratory French pilot completed 192 paired treatments plus 24 shared Neutral controls with zero terminal failures/retries. French instructions improved advisory NISQA, while English passed more delivery acoustic checks; ASR improvement was not consistent. Neither semantic superiority nor confirmation is established. Results/limits: docs/reference/french-delivery-pilot-2026-09-21.md. Production prompts unchanged. The automated schema-2 decision remains the promotion route; the optional listening lane was removed September 12."
+      "updated": "2026-09-25",
+      "notes": "September 21 exploratory French pilot completed 192 paired treatments plus 24 shared Neutral controls with zero terminal failures/retries. French instructions improved advisory NISQA, while English passed more delivery acoustic checks; ASR improvement was not consistent. Neither semantic superiority nor confirmation is established. Results/limits: docs/reference/french-delivery-pilot-2026-09-21.md. Production prompts unchanged. The automated schema-2 decision remains the promotion route; the optional listening lane was removed September 12.",
+      "blockedBy": [
+        "AQ-07",
+        "AQ-08"
+      ]
     },
     {
       "id": "DP-32",
       "plan": "delivery-prompting-2026-08",
       "title": "Promote only qualifying delivery changes and revalidate all modes",
       "status": "planned",
-      "gate": "A global or per-preset prompt/compiler change requires DP-31 automated measured-claim qualification: positive paired metric improvement lower bound, corrected above-chance comparison, distributed speaker/script improvement, no corrected preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, relative UTMOS delta >= -0.10 and valid runtime identities. Human listening is optional. Revalidate CustomVoice, VoiceDesign identity/delivery and clone reference banks separately. Preserve prompts if no candidate qualifies. No hidden best-of-N, cloud/app-bundled evaluator or automatic publication.",
+      "gate": "A global or per-preset prompt/compiler change requires DP-31 automated measured-claim qualification: positive paired metric improvement lower bound, corrected above-chance comparison, distributed speaker/script improvement, no corrected preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, no significant regression on the qualified quality composite of AQ-08 (UTMOS retired by AQ-01) and valid runtime identities. Human listening is optional. Revalidate CustomVoice, VoiceDesign identity/delivery and clone reference banks separately. Preserve prompts if no candidate qualifies. No hidden best-of-N, cloud/app-bundled evaluator or automatic publication.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/EmotionPreset.swift",
         "scripts/delivery_promotion_decision.py",
         "scripts/build_emotion_reference_bank.py"
       ],
-      "updated": "2026-09-11",
+      "updated": "2026-09-25",
       "blockedBy": [
-        "DP-31"
+        "DP-31",
+        "AQ-07",
+        "AQ-08"
       ],
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by DP-31. Promotion requires DP-31's automated measured-claim qualification, which has not run. No source work is pending on this item until the blocker moves; status reflects that, not a regression."
     },

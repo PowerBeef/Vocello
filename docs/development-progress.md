@@ -17,6 +17,25 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 26, afternoon — wave 11 integrated locally; paused for a terminal restart
+
+Local `main` is ahead of `origin/main` by the wave 11 batch, not yet pushed. It holds AQ-05 (staged
+audio QC orchestrator, budgeted admission, persistent workers, L0-L2 cache, evidence bundle,
+DistilHuBERT retired) with all nine adversarial-review fixes (one host-wide analysis lock,
+process-group ceilings, crash isolation, cache identity), AQ-04 (additive Stage 0 DSP fields with a
+Python mirror in parity, and engine introspection) with its review fix, and PA-26 batch B3 (macOS)
+with its two review rounds (model deletion unloads first unless another model is loaded; per-process
+recording folders). PA-32, B4 and B5 are pushed with CI green (5765c9ac); the roadmap commit for
+them is in the local batch. The routed check and the full core and runtime lanes passed before the
+last two macOS fixes, which have targeted tests and a clean build. Resume: `scripts/dev.sh check
+--since origin/main`, push, watch CI; then (consented Mac lanes, quiet host) the seeded gate bench
+compare that measures AQ-04's per-step cost (the paused run stopped in its test step, before any
+bench take) and the first real-audio orchestrator run on the quick lang-bench manifest, compared
+with its recorded verdicts; then roadmap notes for AQ-04, AQ-05 and PA-26 (its note is near the
+1,200-character limit) and a new item for an engine-side model-deletion lease (a model-only warm
+that starts after the unload is invisible to the store). Maintainer at the Mac: screen saver off,
+Terminal Developer Tools permission, PA-10's `.p12` export.
+
 ### September 25, night — wave 9, the audio QC audit and the headless AV-17 session
 
 Wave 9 (all three BT tracks plus their review fixes) is on `main` with CI green; BT-02 closed.

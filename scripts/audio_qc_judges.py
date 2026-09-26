@@ -11,8 +11,13 @@ module validates it and is the load-time gate for registered judges:
   never ships.
 - A judge from the generator's lab never votes (decision 3a).
 - Every neural judge that can still run is pinned by file digest, or by every
-  file of a Hugging Face snapshot at its revision (the LFS SHA-256 or the git
-  blob ID), verified before each load.
+  file of a snapshot at its revision, verified before each load. A Hugging Face
+  snapshot pins each file's size and its LFS SHA-256, or, for a small non-LFS
+  file only, its git blob ID (optionally with its content SHA-256); a GitHub
+  snapshot pins each file's size, content SHA-256 and git blob ID. File keys are
+  relative paths that never climb, repositories read `owner/name`, and a panel
+  judge pins every weight file by SHA-256, never by a git blob ID alone. A
+  panel snapshot holds plain files only: a symbolic link refuses the load.
 - The exclusion list (audit section 4.9) is refused by model and package: no
   registered judge, execution candidate or runtime dependency may match it, and
   every model loader calls `require_loadable` with its registry judge and the
@@ -134,6 +139,18 @@ JUDGE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+$")
 ROADMAP_ITEM = re.compile(r"^[A-Z]+-[0-9]+$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GIT_REVISION = re.compile(r"^[0-9a-f]{40}$")
+# A Hugging Face or GitHub repository id: `owner/name`, never a URL, host, `@` or extra slash. An
+# owner holds no dot (neither host allows one), so `huggingface.co/name` is refused as well.
+REPOSITORY_ID = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?/[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?$")
+# Where a content-addressed snapshot comes from (a pin without `source` is a Hugging Face one).
+SNAPSHOT_SOURCES = ("huggingface", "github")
+DEFAULT_SNAPSHOT_SOURCE = "huggingface"
+SNAPSHOT_PIN_KEYS = frozenset({"lfsSHA256", "gitBlobID", "sha256", "size"})
+# The Hub keeps every file above 10 MB in LFS, so a git blob (SHA-1) pin above it is never genuine.
+GIT_BLOB_MAX_BYTES = 10_000_000
+# Weight and pickle formats: a panel judge pins these by SHA-256, never by a SHA-1 blob ID alone.
+WEIGHT_SUFFIXES = (".bin", ".ckpt", ".gguf", ".h5", ".msgpack", ".npy", ".npz", ".onnx", ".pickle", ".pkl",
+                   ".pt", ".pth", ".safetensors", ".tflite")
 
 
 class JudgeRegistryError(ValueError):
@@ -201,16 +218,55 @@ def _exclusion_errors(label: str, models: Iterable[str], packages: Iterable[str]
     return errors
 
 
+def safe_file_key(value: Any) -> bool:
+    """A snapshot file key: a relative POSIX path with no empty, `.` or `..` part.
+
+    Leading-dot names (`.gitattributes`) stay allowed; an absolute path, a
+    backslash or a NUL never is.
+    """
+    if not isinstance(value, str) or not value or value.startswith("/") or "\\" in value or "\0" in value:
+        return False
+    return all(part not in ("", ".", "..") for part in value.split("/"))
+
+
+def repository_id(value: Any) -> bool:
+    """`owner/name`, as a Hugging Face or GitHub repository id reads: no scheme, host, `@` or extra slash."""
+    return isinstance(value, str) and bool(REPOSITORY_ID.match(value)) and ".." not in value
+
+
+def snapshot_pin_problem(value: Any, *, source: str = DEFAULT_SNAPSHOT_SOURCE) -> str | None:
+    """Why one snapshot file pin is not acceptable for its source, or None.
+
+    Every pin records its size. A Hugging Face file pins its LFS SHA-256, or,
+    when it is a small non-LFS file, its git blob ID, which a content SHA-256
+    may reinforce. A GitHub file pins its content SHA-256 and its git blob ID.
+    """
+    if not isinstance(value, dict) or not set(value) <= SNAPSHOT_PIN_KEYS:
+        return "is not a snapshot file pin"
+    size = value.get("size")
+    if type(size) is not int or size < 0:
+        return "records no size"
+    for key, pattern in (("lfsSHA256", SHA256), ("sha256", SHA256), ("gitBlobID", GIT_REVISION)):
+        if key in value and not pattern.match(str(value[key])):
+            return f"has a malformed {key}"
+    if source == "github":
+        if "lfsSHA256" in value or "sha256" not in value or "gitBlobID" not in value:
+            return "pins a GitHub file by its size, content SHA-256 and git blob ID"
+        return None
+    if source != DEFAULT_SNAPSHOT_SOURCE:
+        return f"comes from an unknown source {source!r}"
+    if ("lfsSHA256" in value) == ("gitBlobID" in value):
+        return "names either an LFS SHA-256 or a git blob ID"
+    if "lfsSHA256" in value and "sha256" in value:
+        return "carries a content SHA-256 only beside a git blob ID"
+    if "gitBlobID" in value and "sha256" not in value and size > GIT_BLOB_MAX_BYTES:
+        return f"is larger than {GIT_BLOB_MAX_BYTES} bytes, so a git blob ID cannot pin it (it needs its LFS SHA-256)"
+    return None
+
+
 def _snapshot_pin(value: Any) -> bool:
-    """One snapshot file pin: the LFS SHA-256 or the git blob ID, and optionally its size."""
-    if not isinstance(value, dict) or not set(value) <= {"lfsSHA256", "gitBlobID", "size"}:
-        return False
-    size = value.get("size", 0)
-    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
-        return False
-    if "lfsSHA256" in value:
-        return "gitBlobID" not in value and bool(SHA256.match(str(value["lfsSHA256"])))
-    return bool(GIT_REVISION.match(str(value.get("gitBlobID", ""))))
+    """A verifiable snapshot file pin of either source."""
+    return any(snapshot_pin_problem(value, source=source) is None for source in SNAPSHOT_SOURCES)
 
 
 def _list_entry_errors(kind: str, entries: Any, required: tuple[str, ...]) -> list[str]:
@@ -624,9 +680,16 @@ def acquisition_errors(registry: dict[str, Any], *, root: Path = REPO) -> list[s
         if family not in runtimes:
             errors.append(f"{label}: acquisition names a registered runtime family")
             continue
+        pins = judge.get("pins") if isinstance(judge.get("pins"), dict) else {}
+        files = pins.get("files") if isinstance(pins.get("files"), dict) else {}
+        if judge.get("kind") == "neural" and pins.get("digestStatus") != SNAPSHOT_STATUS:
+            errors.append(f"{label}: a panel judge with weights is pinned by snapshot ({SNAPSHOT_STATUS})")
+        for name, pin in sorted(files.items()):
+            if (isinstance(name, str) and name.lower().endswith(WEIGHT_SUFFIXES) and isinstance(pin, dict)
+                    and "lfsSHA256" not in pin and "sha256" not in pin):
+                errors.append(f"{label}: weight file {name} is pinned by SHA-256, never by a git blob ID alone")
         if judge.get("status") in BLOCKED_STATUSES or family not in locks:
             continue
-        pins = judge.get("pins") if isinstance(judge.get("pins"), dict) else {}
         for package, version in (pins.get("runtime") or {}).items():
             locked = locks[family].get(canonical_package(package))
             if locked is None or locked["version"] != version:
@@ -771,14 +834,25 @@ def _pin_errors(label: str, judge: dict[str, Any], kind: Any, blocked: bool) -> 
     if not isinstance(pins.get("verification"), str) or not pins["verification"].strip():
         errors.append(f"{label}: pins must say how the judge is verified before it loads")
     if kind == "neural":
-        if not isinstance(pins.get("repository"), str) or not GIT_REVISION.match(str(pins.get("revision", ""))):
-            errors.append(f"{label}: a neural judge is pinned by repository and immutable revision")
+        if not repository_id(pins.get("repository")) or not GIT_REVISION.match(str(pins.get("revision", ""))):
+            errors.append(f"{label}: a neural judge is pinned by an owner/name repository and an immutable revision")
+        source = pins.get("source", DEFAULT_SNAPSHOT_SOURCE)
+        if source not in SNAPSHOT_SOURCES or (source != DEFAULT_SNAPSHOT_SOURCE and status != SNAPSHOT_STATUS):
+            errors.append(f"{label}: a pin's source is {' or '.join(SNAPSHOT_SOURCES)}, and only a snapshot names one")
+            source = DEFAULT_SNAPSHOT_SOURCE
         files = pins.get("files")
+        if isinstance(files, dict) and any(not safe_file_key(name) for name in files):
+            errors.append(f"{label}: file keys are relative paths with no empty, '.' or '..' part")
         if status == SNAPSHOT_STATUS:
-            if not isinstance(files, dict) or any(not _snapshot_pin(value) for value in files.values()):
-                errors.append(f"{label}: snapshot file pins name an LFS SHA-256 or a git blob ID")
+            if not isinstance(files, dict):
+                errors.append(f"{label}: snapshot file pins are missing")
             elif not files and not blocked:
                 errors.append(f"{label}: a runnable snapshot judge pins every file of its snapshot")
+            else:
+                for name, value in sorted(files.items()):
+                    problem = snapshot_pin_problem(value, source=source)
+                    if problem is not None:
+                        errors.append(f"{label}: snapshot file pin {name} {problem}")
         elif not isinstance(files, dict) or any(not SHA256.match(str(value)) for value in files.values()):
             errors.append(f"{label}: file pins must be SHA-256 digests")
         elif status == "pinned" and not files:
@@ -1043,38 +1117,56 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _pinned_sha256(path: Path, pin: dict[str, Any]) -> str | None:
+    """The file's SHA-256 when its size and every digest its pin records match, else None."""
+    if path.stat().st_size != pin["size"]:
+        return None
+    sha256 = _sha256(path)
+    if any(key in pin and sha256 != pin[key] for key in ("lfsSHA256", "sha256")):
+        return None
+    if "gitBlobID" in pin and _git_blob_sha1(path) != pin["gitBlobID"]:
+        return None
+    return sha256
+
+
 def snapshot_file_digest(path: Path, pin: dict[str, Any]) -> str | None:
     """The file's SHA-256 when its bytes match a snapshot pin, else None.
 
-    The size (when recorded) is compared first; then the LFS SHA-256 of a large
-    file or the git blob ID of any other. The pin is the only authority: nothing
+    The size is compared first; then every digest the pin records: the LFS or
+    content SHA-256 and the git blob ID. The pin is the only authority: nothing
     about the file is trusted until its bytes match.
     """
     if not _snapshot_pin(pin) or not path.is_file():
         return None
-    if "size" in pin and path.stat().st_size != pin["size"]:
-        return None
-    sha256 = _sha256(path)
-    verified = (sha256 == pin["lfsSHA256"]) if "lfsSHA256" in pin else (_git_blob_sha1(path) == pin["gitBlobID"])
-    return sha256 if verified else None
+    return _pinned_sha256(path, pin)
 
 
-def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revision: str) -> dict[str, str]:
-    """Verify a local Hugging Face snapshot against its registry pins; return file SHA-256s.
+def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revision: str,
+                        allow_symlinks: bool = True) -> dict[str, str]:
+    """Verify a local snapshot against its registry pins; return file SHA-256s.
 
     The directory must be the pinned revision's snapshot and hold exactly the
     pinned files: an unpinned or missing file refuses. Each file's bytes (the
-    blob a cache symlink resolves to, or a plain copy) must match its pin, the
-    LFS SHA-256 of a large file or the git blob ID of any other, and its size
-    when recorded. The pins come from the Hub's tree metadata at the revision,
-    so a fabricated snapshot cannot pass by naming its own blobs.
+    blob a cache symlink resolves to, or a plain copy) must match its pin: its
+    size and every digest it records. The pins come from the source's own
+    metadata at the revision, so a fabricated snapshot cannot pass by naming its
+    own blobs. `allow_symlinks=False` (every panel judge) refuses a symbolic link
+    anywhere inside the snapshot, the directory itself included.
     """
+    if not allow_symlinks and snapshot.is_symlink():
+        raise JudgeRegistryError("the snapshot directory is a symbolic link; a panel snapshot holds plain files only")
     if not snapshot.is_dir():
         raise JudgeRegistryError("the pinned snapshot is not in the local cache")
     if snapshot.name != revision:
         raise JudgeRegistryError("the snapshot directory is not the pinned revision")
     if not pinned_files:
         raise JudgeRegistryError("the judge pins no snapshot files; it cannot be verified")
+    if not allow_symlinks:
+        links = sorted(path.relative_to(snapshot).as_posix() for path in snapshot.rglob("*") if path.is_symlink())
+        if links:
+            raise JudgeRegistryError(
+                f"the snapshot holds a symbolic link ({links[0]}); a panel snapshot holds plain files only"
+            )
     present = {
         path.relative_to(snapshot).as_posix(): path
         for path in sorted(snapshot.rglob("*")) if not path.is_dir()
@@ -1093,13 +1185,8 @@ def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revisio
         blob = path.resolve()
         if not blob.is_file():
             raise JudgeRegistryError(f"snapshot file {relative} has no blob")
-        if "size" in pin and blob.stat().st_size != pin["size"]:
-            raise JudgeRegistryError(f"snapshot file {relative} differs from its registry pin")
-        sha256 = _sha256(blob)
-        verified = (sha256 == pin["lfsSHA256"]) if "lfsSHA256" in pin else (
-            _git_blob_sha1(blob) == pin["gitBlobID"]
-        )
-        if not verified:
+        sha256 = _pinned_sha256(blob, pin)
+        if sha256 is None:
             raise JudgeRegistryError(f"snapshot file {relative} differs from its registry pin")
         digests[relative] = sha256
     return digests
@@ -1108,12 +1195,18 @@ def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revisio
 def verify_judge_snapshot(judge_id: str, snapshot: Path, *, repository: str, revision: str,
                           packages: Iterable[str] = (),
                           registry: dict[str, Any] | None = None) -> dict[str, str]:
-    """The load-time gate for a snapshot-loaded judge: loadable, then every file verified."""
+    """The load-time gate for a snapshot-loaded judge: loadable, then every file verified.
+
+    A panel judge (one with an `acquisition` entry) is fetched as plain files,
+    so a symbolic link anywhere inside its snapshot refuses the load; a legacy
+    judge read from the Hugging Face cache resolves its snapshot links.
+    """
     judge = require_loadable(judge_id, repository, revision, packages=packages, registry=registry)
     pins = judge.get("pins") or {}
     if pins.get("digestStatus") != SNAPSHOT_STATUS:
         raise JudgeRegistryError(f"audio QC judge {judge_id} is not pinned by snapshot")
-    return verify_hub_snapshot(snapshot, pins.get("files") or {}, revision=revision)
+    return verify_hub_snapshot(snapshot, pins.get("files") or {}, revision=revision,
+                               allow_symlinks="acquisition" not in judge)
 
 
 def main() -> int:

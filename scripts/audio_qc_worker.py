@@ -45,9 +45,11 @@ Engines:
 - The AQ-06 judge panel (`lib/qc_pipeline/panel_engines.py`): `whisper-mlx`
   with a job that names its judge (Whisper large-v3 from its verified
   snapshot), `parakeet-mlx`, `funasr-paraformer`, `sensevoice-llamacpp`,
-  `qwen3-asr-mlx`, `qwen3-aligner-mlx`, `speechbrain-lid`, `wespeaker-onnx`,
-  `pyin-librosa` and `audiobox-aesthetics`. Each runs in its judge's pinned
-  runtime and runs the registry's load gate, and verifies every pinned file,
+  `qwen3-asr-mlx`, `qwen3-aligner-mlx`, `speechbrain-lid`, `wespeaker-onnx`
+  (CAM++ and ResNet293), `pyin-librosa`, `audiobox-aesthetics` and
+  `dnsmos-onnx` (DNSMOS P.835). Each runs in its judge's pinned runtime, with
+  the hubs offline and every model cache pointed into an empty per-run
+  directory, and runs the registry's load gate, and verifies every pinned file,
   before anything loads (`scripts/acquire_audio_qc_judges.py` fetches them).
 
 Rows are analyzed in job order, so the runner can name the row in flight when
@@ -242,7 +244,7 @@ def native_command(job: dict[str, Any], emit: Emit) -> None:
 
 PANEL_ENGINES = (
     "parakeet-mlx", "funasr-paraformer", "sensevoice-llamacpp", "qwen3-asr-mlx", "qwen3-aligner-mlx",
-    "speechbrain-lid", "wespeaker-onnx", "pyin-librosa", "audiobox-aesthetics",
+    "speechbrain-lid", "wespeaker-onnx", "pyin-librosa", "audiobox-aesthetics", "dnsmos-onnx",
 )
 
 

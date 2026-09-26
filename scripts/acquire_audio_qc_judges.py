@@ -5,21 +5,34 @@ The maintainer runs this: a model or package download is a maintainer-run
 action, and nothing else in the repository downloads a judge. Everything it
 fetches is pinned in `config/audio-qc-judges.json`:
 
-- **Snapshots.** A judge's pinned files at its pinned Hugging Face revision land
-  in `<model root>/<judge directory>/<revision>/`. Each file streams into
-  `<judge directory>/.partial/`, resumes where it stopped (an HTTP range
-  request) and moves into the snapshot only once its size and digest (the LFS
-  SHA-256, or the git blob ID of a small file) match the pin. A mismatch
-  deletes the partial file and fails; a checksum is never inferred, and a file
-  already in the snapshot that does not match its pin is refused, not replaced.
+- **Snapshots.** A judge's pinned files at its pinned revision land in
+  `<model root>/<judge directory>/<revision>/`: from Hugging Face
+  (`huggingface.co/<repo>/resolve/<revision>/<path>`) or, for a GitHub-sourced
+  snapshot, from `raw.githubusercontent.com/<repo>/<commit>/<path>`. Each file
+  streams into `<judge directory>/.partial/`, resumes where it stopped (an HTTP
+  range request) and moves into the snapshot only once its size and every
+  digest its pin records (the LFS or content SHA-256, the git blob ID of a small
+  file) match. A mismatch deletes the partial file and fails; a checksum is
+  never inferred, a file already in the snapshot that does not match its pin is
+  refused, not replaced, and a path that resolves outside the model root is
+  refused before anything is written.
+- **Transport.** Every download is https, and a redirect is followed only to
+  https on huggingface.co, `*.hf.co`, `*.huggingface.co`, github.com and its
+  release and raw content hosts; anything else refuses the download.
+- **Disk.** Before anything is fetched, the whole selection must fit: its
+  remaining model bytes, each runtime still to build at the documented install
+  estimate (its wheel bytes x 3.5) and the interpreter, plus a 2 GiB margin.
 - **Interpreter.** The python-build-standalone archive is verified by SHA-256
-  (downloaded only if absent) and extracted into its own directory.
+  (downloaded only if absent) and extracted into its own directory; an
+  extracted interpreter is reused only while every file matches the archive.
 - **Runtimes.** Each runtime family's venv is built from its committed hash lock
   with `pip install --isolated --require-hashes --no-deps --only-binary :all:`
-  (the few sdist-only packages a lock names are built without isolation from
-  their hash-pinned sdists, after the lock's own setuptools). Its installed
-  distributions must then equal the lock exactly, and an offline import probe
-  must pass.
+  and `PIP_CONFIG_FILE=/dev/null`, so no pip configuration file is read (the
+  few sdist-only packages a lock names are built without isolation from their
+  hash-pinned sdists, after the lock's own setuptools). Its installed
+  distributions must then equal the lock exactly, every installed file must
+  match the SHA-256 its distribution's RECORD lists, and an offline import
+  probe must pass. A venv is reused only while all of that still holds.
 - **Native runtime.** The SenseVoice llama.cpp archive and binary are verified
   by SHA-256; an existing verified copy is reused.
 - **Receipts.** Each judge gets `<judge directory>/receipt.json`, written last:
@@ -29,7 +42,9 @@ fetches is pinned in `config/audio-qc-judges.json`:
 Quarantined and retired judges, and the panel judges listed in
 `acquisitionBlocked`, are never fetched; `plan` names each with its reason.
 After a fetch everything is offline: `verify` re-checks every receipt without
-the network, and each worker verifies its snapshot before it loads.
+the network (snapshots, the interpreter archive and its extracted files, and
+every venv file against its RECORD), and each worker verifies its snapshot
+before it loads.
 
 Commands:
   plan    the selected judges, bytes and destinations (reads the registry and
@@ -42,13 +57,15 @@ Commands:
 from __future__ import annotations
 
 import argparse
+import base64
+import csv
 from dataclasses import dataclass
 import datetime as dt
 import hashlib
 import http.client
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -66,12 +83,14 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from audio_qc_judges import (  # noqa: E402
     BLOCKED_STATUSES,
+    DEFAULT_SNAPSHOT_SOURCE,
     JudgeRegistryError,
     canonical_package,
     host_profile,
     require_loadable,
     require_runnable,
     runtime_lock,
+    safe_file_key,
     snapshot_file_digest,
     validate_registry,
     verify_judge_snapshot,
@@ -90,8 +109,17 @@ RUNTIME_RECEIPT_NAME = "vocello-runtime-receipt.json"
 OWNED_MARKER = ".vocello-audio-qc-owned"
 PARTIAL_DIRECTORY = ".partial"
 HUB = "https://huggingface.co"
+GITHUB_RAW = "https://raw.githubusercontent.com"
 PYPI_INDEX = "https://pypi.org/simple"
 USER_AGENT = "vocello-audio-qc-acquisition/1"
+# The hosts a download or any redirect of it may reach, over https only: the Hub
+# and its CDNs, the GitHub release hosts of the interpreter and the SenseVoice
+# runtime, and raw.githubusercontent.com for a GitHub-sourced snapshot.
+DOWNLOAD_HOSTS = frozenset({
+    "huggingface.co", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
+    "raw.githubusercontent.com",
+})
+DOWNLOAD_HOST_SUFFIXES = (".hf.co", ".huggingface.co")
 # Loads never reach a hub; a runtime that tries fails instead.
 OFFLINE_ENVIRONMENT = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1",
                        "PYTHONNOUSERSITE": "1"}
@@ -102,6 +130,9 @@ CHUNK_BYTES = 1 << 20
 DOWNLOAD_ATTEMPTS = 6
 DOWNLOAD_TIMEOUT_SECONDS = 120.0
 FREE_SPACE_MARGIN_BYTES = 2 * 1024 ** 3
+# The documented install estimate (docs/reference/audio-qc-engineering.md): about 1.19 GB of wheels
+# install to about 3-4 GB, so a runtime is budgeted at its wheel bytes x 3.5, the interpreter likewise.
+INSTALLED_BYTES_PER_DOWNLOADED_BYTE = 3.5
 TRANSIENT_HTTP = frozenset({408, 425, 429, 500, 502, 503, 504})
 LIST_DISTRIBUTIONS = (
     "import json\nfrom importlib import metadata\n"
@@ -118,8 +149,43 @@ Opener = Callable[[urllib.request.Request, float], Any]
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
+def allowed_download_url(url: str) -> bool:
+    """An https URL on one of the download hosts, with no credentials and the default port."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    host = (parts.hostname or "").lower()
+    if parts.scheme != "https" or parts.username or parts.password or port not in (None, 443):
+        return False
+    return host in DOWNLOAD_HOSTS or host.endswith(DOWNLOAD_HOST_SUFFIXES)
+
+
+def _described(url: str) -> str:
+    """A URL's scheme and host only (a CDN redirect carries a signed query)."""
+    parts = urllib.parse.urlsplit(url)
+    return f"{parts.scheme or '?'}://{parts.hostname or '?'}"
+
+
+class PinnedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to https on the download hosts; https to http or any other host refuses."""
+
+    def redirect_request(self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any,
+                         newurl: str) -> urllib.request.Request | None:
+        if not allowed_download_url(newurl):
+            raise AcquisitionError(f"a download was redirected to {_described(newurl)}, which is not an allowed "
+                                   "https download host; nothing is fetched from it")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(PinnedRedirectHandler)
+
+
 def _open(request: urllib.request.Request, timeout: float) -> Any:
-    return urllib.request.urlopen(request, timeout=timeout)
+    if not allowed_download_url(request.full_url):
+        raise AcquisitionError(f"{_described(request.full_url)} is not an allowed https download host")
+    return _OPENER.open(request, timeout=timeout)
 
 
 def _run(argv: Sequence[str], *, env: dict[str, str] | None = None, capture: bool = False,
@@ -226,6 +292,16 @@ class Target:
         return (self.judge.get("pins") or {}).get("revision")
 
     @property
+    def source(self) -> str:
+        return str((self.judge.get("pins") or {}).get("source", DEFAULT_SNAPSHOT_SOURCE))
+
+    def file_url(self, name: str) -> str:
+        """Where one pinned file downloads from: its Hub revision or its GitHub commit."""
+        if self.source == "github":
+            return github_raw_url(str(self.repository), str(self.revision), name)
+        return hub_url(str(self.repository), str(self.revision), name)
+
+    @property
     def bytes(self) -> int:
         return sum(int(pin.get("size", 0)) for pin in self.files.values())
 
@@ -268,6 +344,10 @@ def select(registry: dict[str, Any], *, judges: Sequence[str] = (), stage: int |
 
 def hub_url(repository: str, revision: str, path: str) -> str:
     return f"{HUB}/{repository}/resolve/{revision}/{urllib.parse.quote(path)}"
+
+
+def github_raw_url(repository: str, commit: str, path: str) -> str:
+    return f"{GITHUB_RAW}/{repository}/{commit}/{urllib.parse.quote(path)}"
 
 
 def _status(response: Any) -> int:
@@ -370,26 +450,49 @@ def _prune_partial(directory: Path) -> None:
         partial.rmdir()
 
 
+def _inside(root: Path, path: Path) -> bool:
+    """Whether `path`, every link in it resolved, stays inside `root`."""
+    try:
+        return path.resolve().is_relative_to(root.resolve())
+    except (OSError, RuntimeError):
+        return False
+
+
+def snapshot_paths(root: Path, target: Target) -> dict[str, tuple[Path, Path]]:
+    """Each pinned file's final and partial path, refused unless both resolve inside the model root."""
+    snapshot = target.snapshot(root)
+    if snapshot is None:
+        return {}
+    partial = root / target.directory / PARTIAL_DIRECTORY / str(target.revision)
+    paths = {}
+    for name in sorted(target.files):
+        if not safe_file_key(name):
+            raise AcquisitionError(f"{target.judge_id}: {name!r} is not a safe relative file key")
+        final, part = snapshot / name, partial / f"{name}.part"
+        if not (_inside(root, final) and _inside(root, part)):
+            raise AcquisitionError(f"{target.judge_id}: {name} resolves outside the model root; nothing is written")
+        paths[name] = (final, part)
+    return paths
+
+
 def fetch_snapshot(root: Path, target: Target, *, opener: Opener = _open,
                    sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     snapshot = target.snapshot(root)
     if snapshot is None or not target.files:
         return {}
-    remaining = sum(int(pin["size"]) for name, pin in target.files.items() if not (snapshot / name).exists())
     root.mkdir(parents=True, exist_ok=True)
+    paths = snapshot_paths(root, target)
+    remaining = sum(int(target.files[name]["size"]) for name, (final, _part) in paths.items() if not final.exists())
     free = shutil.disk_usage(root).free
     if remaining + FREE_SPACE_MARGIN_BYTES > free:
         raise AcquisitionError(
             f"{target.judge_id} needs {remaining / 1e9:.2f} GB plus a 2 GiB margin; {free / 1e9:.2f} GB is free"
         )
-    partial = root / target.directory / PARTIAL_DIRECTORY / str(target.revision)
     digests = {}
-    for name, pin in sorted(target.files.items()):
+    for name, (final, part) in paths.items():
+        pin = target.files[name]
         _log(f"{target.judge_id}: {name} ({int(pin['size']) / 1e6:.1f} MB)")
-        digests[name] = fetch_pinned_file(
-            hub_url(str(target.repository), str(target.revision), name), snapshot / name,
-            partial / f"{name}.part", pin, opener=opener, sleep=sleep,
-        )
+        digests[name] = fetch_pinned_file(target.file_url(name), final, part, pin, opener=opener, sleep=sleep)
     _prune_partial(root / target.directory)
     return digests
 
@@ -402,17 +505,69 @@ def interpreter_python(root: Path, spec: dict[str, Any]) -> Path:
     return root / spec["directory"] / spec["executable"]
 
 
+def _stream_sha256(stream: Any) -> str:
+    digest = hashlib.sha256()
+    for block in iter(lambda: stream.read(CHUNK_BYTES), b""):
+        digest.update(block)
+    return digest.hexdigest()
+
+
+def _compiled(name: str) -> bool:
+    """Bytecode Python may rewrite in place; never compared, only counted."""
+    return "__pycache__" in PurePosixPath(name).parts
+
+
+def interpreter_check(root: Path, spec: dict[str, Any]) -> tuple[list[str], dict[str, int]]:
+    """The interpreter archive re-hashed against its pin, and every extracted file against the archive.
+
+    Returns the problems (empty when the interpreter may run) and the counts:
+    files compared, and bytecode files skipped (Python may rewrite them).
+    """
+    counts = {"interpreterFiles": 0, "interpreterBytecodeSkipped": 0}
+    archive = root / spec["archiveDirectory"] / spec["archive"]
+    if not archive.is_file() or _sha256(archive) != spec["sha256"]:
+        return ["the interpreter archive is missing or differs from its pinned SHA-256"], counts
+    directory = root / spec["directory"]
+    receipt = _read_json(directory / RECEIPT_NAME) or {}
+    if receipt.get("schema") != INTERPRETER_RECEIPT_SCHEMA or receipt.get("archiveSHA256") != spec["sha256"] \
+            or not interpreter_python(root, spec).is_file():
+        return ["the pinned interpreter is not extracted from its pinned archive"], counts
+    changed: list[str] = []
+    with tarfile.open(archive, "r:gz") as bundle:
+        for member in bundle:
+            if not member.isfile():
+                continue
+            name = member.name.removeprefix("./").lstrip("/")
+            if _compiled(name):
+                counts["interpreterBytecodeSkipped"] += 1
+                continue
+            counts["interpreterFiles"] += 1
+            path = directory / name
+            source = bundle.extractfile(member)
+            expected = _stream_sha256(source) if source is not None else ""
+            if path.is_symlink() or not path.is_file() or _sha256(path) != expected:
+                changed.append(name)
+    if changed:
+        return [f"{len(changed)} extracted interpreter files differ from the pinned archive "
+                f"(first: {changed[0]})"], counts
+    return [], counts
+
+
 def ensure_interpreter(root: Path, spec: dict[str, Any], *, opener: Opener = _open,
                        sleep: Callable[[float], None] = time.sleep) -> Path:
-    """The pinned standalone interpreter, extracted from its verified archive into its own directory."""
+    """The pinned standalone interpreter, extracted from its verified archive into its own directory.
+
+    An existing extraction is reused only while every file still matches the archive.
+    """
     archive = root / spec["archiveDirectory"] / spec["archive"]
     fetch_archive(spec["url"], archive, spec["sha256"], spec["size"], opener=opener, sleep=sleep)
     target = root / spec["directory"]
-    receipt = _read_json(target / RECEIPT_NAME)
     python = interpreter_python(root, spec)
-    if receipt and receipt.get("schema") == INTERPRETER_RECEIPT_SCHEMA \
-            and receipt.get("archiveSHA256") == spec["sha256"] and python.is_file():
+    problems, _counts = interpreter_check(root, spec)
+    if not problems:
         return python
+    if (target / RECEIPT_NAME).exists():
+        _log(f"re-extracting the interpreter: {problems[0]}")
     _remove_owned(target)
     staging = root / f".{spec['directory']}.staging"
     _remove_owned(staging)
@@ -429,9 +584,79 @@ def ensure_interpreter(root: Path, spec: dict[str, Any], *, opener: Opener = _op
 
 
 def build_environment() -> dict[str, str]:
-    """A clean environment for pip and probes: no user site, no user pip configuration."""
+    """A clean environment for venv, pip and probes: no user site and no pip configuration file at all.
+
+    `PIP_CONFIG_FILE=/dev/null` makes pip skip every configuration file (global,
+    user and site), which `--isolated` alone does not.
+    """
     keep = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR")
-    return {**{name: os.environ[name] for name in keep if name in os.environ}, **OFFLINE_ENVIRONMENT}
+    return {**{name: os.environ[name] for name in keep if name in os.environ}, **OFFLINE_ENVIRONMENT,
+            "PIP_CONFIG_FILE": os.devnull}
+
+
+def _record_digest(path: Path) -> str:
+    """A file's SHA-256 as a wheel RECORD writes it: urlsafe base64 without padding."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(CHUNK_BYTES), b""):
+            digest.update(block)
+    return base64.urlsafe_b64encode(digest.digest()).rstrip(b"=").decode("ascii")
+
+
+def venv_record_check(venv: Path) -> tuple[list[str], dict[str, int]]:
+    """Every installed file of a venv against the SHA-256 its distribution's RECORD lists.
+
+    RECORD entries without a hash (RECORD itself, and anything written after
+    the install) are skipped and counted. A missing, changed or linked file, a
+    distribution without a RECORD and an entry that points outside the venv are
+    problems. Returns the problems and the counts.
+    """
+    counts = {"distributions": 0, "runtimeFiles": 0, "unhashedRecordEntries": 0}
+    sites = sorted(venv.glob("lib/python*/site-packages"))
+    if len(sites) != 1:
+        return ["the venv has no single site-packages directory"], counts
+    site = sites[0]
+    base = os.path.normpath(venv)
+    changed: list[str] = []
+    missing: list[str] = []
+    problems: list[str] = []
+    for dist in sorted(site.glob("*.dist-info")):
+        counts["distributions"] += 1
+        record = dist / "RECORD"
+        if record.is_symlink() or not record.is_file():
+            problems.append(f"{dist.name} has no RECORD")
+            continue
+        try:
+            rows = list(csv.reader(record.read_text(encoding="utf-8").splitlines()))
+        except (OSError, UnicodeDecodeError, csv.Error):
+            problems.append(f"{dist.name} has an unreadable RECORD")
+            continue
+        for row in rows:
+            if not row or not row[0]:
+                continue
+            relative, recorded = row[0], (row[1] if len(row) > 1 else "")
+            if not recorded:
+                counts["unhashedRecordEntries"] += 1
+                continue
+            location = os.path.normpath(os.path.join(site, relative))
+            if not location.startswith(base + os.sep):
+                problems.append(f"{dist.name} records a path outside the venv")
+                continue
+            algorithm, _, expected = recorded.partition("=")
+            path = Path(location)
+            if algorithm != "sha256":
+                problems.append(f"{dist.name} records {relative} with {algorithm or 'no'} hash, not sha256")
+            elif path.is_symlink() or not path.is_file():
+                missing.append(relative)
+            elif _record_digest(path) != expected:
+                changed.append(relative)
+            else:
+                counts["runtimeFiles"] += 1
+    if changed:
+        problems.append(f"{len(changed)} installed files differ from their RECORD (first: {changed[0]})")
+    if missing:
+        problems.append(f"{len(missing)} recorded files are missing (first: {missing[0]})")
+    return problems, counts
 
 
 def installed_distributions(python: Path, *, runner: Runner = _run) -> dict[str, str]:
@@ -468,7 +693,12 @@ def import_probe(python: Path, modules: Iterable[str], *, runner: Runner = _run)
 
 def ensure_runtime(root: Path, registry: dict[str, Any], family: str, interpreter: Path, *,
                    runner: Runner = _run, repository: Path = REPO) -> Path:
-    """A runtime family's venv, built from its hash lock and proven equal to it."""
+    """A runtime family's venv, built from its hash lock and proven equal to it.
+
+    An existing venv is reused only while its receipt names the current lock and
+    interpreter, its distributions equal the lock and every installed file
+    matches its RECORD; otherwise it is rebuilt.
+    """
     acquisition = registry["acquisition"]
     spec = acquisition["runtimes"][family]
     lock = runtime_lock(registry, family, root=repository)
@@ -480,7 +710,10 @@ def ensure_runtime(root: Path, registry: dict[str, Any], family: str, interprete
     if receipt and receipt.get("schema") == RUNTIME_RECEIPT_SCHEMA and receipt.get("lockSHA256") == spec["lockSHA256"] \
             and receipt.get("interpreterSHA256") == interpreter_sha and python.is_file() \
             and not lock_differences(installed_distributions(python, runner=runner), lock):
-        return python
+        problems, _counts = venv_record_check(venv)
+        if not problems:
+            return python
+        _log(f"rebuilding the {family} runtime: {problems[0]}")
     _remove_owned(venv)
     _log(f"building the {family} runtime ({len(lock)} locked packages)")
     result = runner([str(interpreter), "-m", "venv", str(venv)], env=build_environment())
@@ -489,7 +722,8 @@ def ensure_runtime(root: Path, registry: dict[str, Any], family: str, interprete
     (venv / OWNED_MARKER).write_text(f"audio QC runtime {family}\n", encoding="utf-8")
     pip = [str(python), "-m", "pip", "install", "--isolated", "--no-input", "--disable-pip-version-check",
            "--no-cache-dir", "--index-url", PYPI_INDEX, "--require-hashes", "--no-deps"]
-    # pip reaches PyPI (the one networked step); `--isolated` ignores user pip configuration.
+    # pip reaches PyPI (the one networked step); `--isolated` ignores user configuration and
+    # PIP_* variables, and PIP_CONFIG_FILE=/dev/null (build_environment) every configuration file.
     environment = build_environment()
     builds = [canonical_package(name) for name in spec.get("sourceBuilds") or []]
     if builds:
@@ -513,6 +747,9 @@ def ensure_runtime(root: Path, registry: dict[str, Any], family: str, interprete
     problems = lock_differences(installed_distributions(python, runner=runner), lock)
     if problems:
         raise AcquisitionError(f"the {family} venv differs from its lock: " + "; ".join(problems[:3]))
+    problems, _counts = venv_record_check(venv)
+    if problems:
+        raise AcquisitionError(f"the {family} venv differs from its RECORDs: " + "; ".join(problems[:3]))
     import_probe(python, spec["importProbe"], runner=runner)
     _atomic_json(venv / RUNTIME_RECEIPT_NAME, {
         "schema": RUNTIME_RECEIPT_SCHEMA, "family": family, "lockSHA256": spec["lockSHA256"],
@@ -580,6 +817,66 @@ def _source_digest() -> str:
     return _sha256(Path(__file__).resolve())
 
 
+def _installed_estimate(download_bytes: int) -> int:
+    return int(download_bytes * INSTALLED_BYTES_PER_DOWNLOADED_BYTE)
+
+
+def disk_requirement(root: Path, registry: dict[str, Any], selected: Sequence[Target]) -> dict[str, int]:
+    """What a fetch of the selection still needs on disk, before it starts (no network).
+
+    The remaining model bytes; each runtime family whose receipt does not name
+    its current lock and interpreter, at the documented install estimate (its
+    wheel bytes x 3.5); the interpreter archive and its extraction when absent;
+    a native runtime archive when absent; and the 2 GiB margin.
+    """
+    acquisition = registry["acquisition"]
+    runnable = [target for target in selected if not target.blocked_reason]
+    models = 0
+    for target in runnable:
+        snapshot = target.snapshot(root)
+        models += sum(int(pin.get("size", 0)) for name, pin in target.files.items()
+                      if snapshot is None or not (snapshot / name).exists())
+    interpreter_spec = acquisition["interpreter"]
+    interpreter = 0
+    runtimes = 0
+    families = sorted({target.runtime for target in runnable})
+    if families:
+        if not (root / interpreter_spec["archiveDirectory"] / interpreter_spec["archive"]).exists():
+            interpreter += int(interpreter_spec["size"])
+        receipt = _read_json(root / interpreter_spec["directory"] / RECEIPT_NAME) or {}
+        if receipt.get("archiveSHA256") != interpreter_spec["sha256"]:
+            interpreter += _installed_estimate(int(interpreter_spec["size"]))
+    for family in families:
+        spec = acquisition["runtimes"][family]
+        if spec.get("kind") == "venv":
+            receipt = _read_json(root / spec["venv"] / RUNTIME_RECEIPT_NAME) or {}
+            if receipt.get("lockSHA256") != spec["lockSHA256"] \
+                    or receipt.get("interpreterSHA256") != interpreter_spec["sha256"]:
+                runtimes += _installed_estimate(int(spec.get("downloadBytes") or 0))
+        else:
+            artifact = acquisition["artifacts"][spec["artifact"]]
+            if not (root / artifact["directory"] / artifact["archive"]).exists():
+                runtimes += 2 * int(artifact["size"])
+    total = models + interpreter + runtimes + FREE_SPACE_MARGIN_BYTES
+    return {"modelBytes": models, "interpreterBytes": interpreter, "runtimeInstallBytes": runtimes,
+            "marginBytes": FREE_SPACE_MARGIN_BYTES, "totalBytes": total}
+
+
+def require_free_space(root: Path, registry: dict[str, Any], selected: Sequence[Target]) -> dict[str, int]:
+    """Refuse a fetch whose whole selection, runtimes included, does not fit on the model root's volume."""
+    needed = disk_requirement(root, registry, selected)
+    root.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(root).free
+    if needed["totalBytes"] > free:
+        raise AcquisitionError(
+            f"the selection needs {needed['totalBytes'] / 1e9:.2f} GB ({needed['modelBytes'] / 1e9:.2f} GB of "
+            f"models, about {needed['runtimeInstallBytes'] / 1e9:.2f} GB of runtimes, "
+            f"{needed['interpreterBytes'] / 1e9:.2f} GB of interpreter and a 2 GiB margin); "
+            f"{free / 1e9:.2f} GB is free, so nothing was fetched"
+        )
+    return needed
+
+
 def fetch(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, opener: Opener = _open,
           runner: Runner = _run, repository: Path = REPO, sleep: Callable[[float], None] = time.sleep,
           ) -> dict[str, Any]:
@@ -591,6 +888,8 @@ def fetch(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, o
             continue
         _gate(registry, target, repository)
         runnable.append(target)
+    if runnable:
+        report["disk"] = require_free_space(root, registry, runnable)
     acquisition = registry["acquisition"]
     interpreter: Path | None = None
     runtimes: dict[str, dict[str, Any]] = {}
@@ -644,10 +943,16 @@ def fetch(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, o
 
 def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, runner: Runner = _run,
            repository: Path = REPO, imports: bool = True, require: bool = True) -> list[dict[str, Any]]:
-    """Re-verify each selected judge offline from its receipt."""
+    """Re-verify each selected judge offline from its receipt.
+
+    Each result carries its problems and the counts behind a PASS: the
+    interpreter files compared with the re-hashed archive, and the venv files
+    checked against their RECORDs (with the RECORD entries that carry no hash).
+    """
     acquisition = registry["acquisition"]
     results = []
-    probed: dict[str, list[str]] = {}
+    probed: dict[str, tuple[list[str], dict[str, int]]] = {}
+    interpreter: tuple[list[str], dict[str, int]] | None = None
     for target in selected:
         if target.blocked_reason:
             results.append({"judge": target.judge_id, "status": "BLOCKED", "problems": [target.blocked_reason]})
@@ -658,6 +963,7 @@ def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, 
                 results.append({"judge": target.judge_id, "status": "FAIL", "problems": ["not fetched"]})
             continue
         problems: list[str] = []
+        checks: dict[str, int] = {}
         if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("judge") != target.judge_id:
             problems.append("the receipt is not this judge's")
         elif receipt.get("registryEntrySHA256") != entry_digest(target.judge):
@@ -674,6 +980,7 @@ def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, 
                 recorded = {name: value.get("sha256") for name, value in (receipt.get("files") or {}).items()}
                 if digests != recorded:
                     problems.append("the snapshot's digests differ from its receipt")
+                checks["snapshotFiles"] = len(digests)
             else:
                 require_runnable(target.judge_id, packages=packages, registry=registry)
         except JudgeRegistryError as error:
@@ -685,36 +992,40 @@ def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, 
             if family not in probed:
                 probed[family] = _verify_runtime(root, registry, family, runner=runner, repository=repository,
                                                  imports=imports)
-            problems.extend(probed[family])
+            problems.extend(probed[family][0])
+            checks.update(probed[family][1])
         else:
             artifact = acquisition["artifacts"][spec["artifact"]]
             binary = root / artifact["directory"] / "extracted" / spec["binary"]
             if not binary.is_file() or _sha256(binary) != artifact["members"][spec["binary"]]:
                 problems.append(f"{spec['binary']} is missing or differs from its pinned SHA-256")
-        interpreter_spec = acquisition["interpreter"]
-        extracted = _read_json(root / interpreter_spec["directory"] / RECEIPT_NAME) or {}
-        if not interpreter_python(root, interpreter_spec).is_file() \
-                or extracted.get("archiveSHA256") != interpreter_spec["sha256"]:
-            problems.append("the pinned interpreter is not extracted from its pinned archive")
-        results.append({"judge": target.judge_id, "status": "FAIL" if problems else "PASS", "problems": problems})
+        if interpreter is None:
+            interpreter = interpreter_check(root, acquisition["interpreter"])
+        problems.extend(interpreter[0])
+        checks.update(interpreter[1])
+        results.append({"judge": target.judge_id, "status": "FAIL" if problems else "PASS", "problems": problems,
+                        "checks": checks})
     return results
 
 
 def _verify_runtime(root: Path, registry: dict[str, Any], family: str, *, runner: Runner, repository: Path,
-                    imports: bool) -> list[str]:
+                    imports: bool) -> tuple[list[str], dict[str, int]]:
     spec = registry["acquisition"]["runtimes"][family]
-    python = root / spec["venv"] / "bin/python3"
-    receipt = _read_json(root / spec["venv"] / RUNTIME_RECEIPT_NAME)
+    venv = root / spec["venv"]
+    python = venv / "bin/python3"
+    receipt = _read_json(venv / RUNTIME_RECEIPT_NAME)
     if not python.is_file() or not receipt or receipt.get("lockSHA256") != spec["lockSHA256"]:
-        return [f"the {family} runtime is not built from its current lock"]
+        return [f"the {family} runtime is not built from its current lock"], {}
     try:
-        problems = lock_differences(installed_distributions(python, runner=runner),
-                                    runtime_lock(registry, family, root=repository))
+        problems = [f"the {family} venv differs from its lock: {problem}" for problem in lock_differences(
+            installed_distributions(python, runner=runner), runtime_lock(registry, family, root=repository))]
+        records, counts = venv_record_check(venv)
+        problems.extend(f"the {family} venv: {problem}" for problem in records)
         if not problems and imports:
             import_probe(python, spec["importProbe"], runner=runner)
     except (AcquisitionError, JudgeRegistryError) as error:
-        return [str(error)]
-    return [f"the {family} venv differs from its lock: {problem}" for problem in problems]
+        return [str(error)], {}
+    return problems, counts
 
 
 # --------------------------------------------------------------------------- #
@@ -760,6 +1071,8 @@ def plan(root: Path, registry: dict[str, Any], selected: Sequence[Target]) -> di
         "runtimeDownloadBytes": runtime_bytes,
         "interpreterBytes": acquisition["interpreter"]["size"],
         "runtimeFamilies": sorted(families),
+        # What a fetch of this selection still needs free before it starts (require_free_space).
+        "diskRequired": disk_requirement(root, registry, selected),
     }
 
 
@@ -812,6 +1125,10 @@ def _print_plan(value: dict[str, Any]) -> None:
     print(f"Models: {value['modelBytes'] / 1e9:.2f} GB ({stages}); runtime wheels about "
           f"{value['runtimeDownloadBytes'] / 1e9:.2f} GB for {len(value['runtimeFamilies'])} families; "
           f"interpreter {value['interpreterBytes'] / 1e6:.0f} MB")
+    disk = value["diskRequired"]
+    print(f"A fetch of this selection needs {disk['totalBytes'] / 1e9:.2f} GB free: {disk['modelBytes'] / 1e9:.2f} GB "
+          f"of models still to fetch, about {disk['runtimeInstallBytes'] / 1e9:.2f} GB of runtimes still to build, "
+          f"{disk['interpreterBytes'] / 1e9:.2f} GB of interpreter and a 2 GiB margin")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -857,7 +1174,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             for item in results:
                 detail = f": {'; '.join(item['problems'])}" if item["problems"] else ""
-                print(f"{item['status']:7s} {item['judge']}{detail}")
+                checks = item.get("checks") or {}
+                counted = (f" ({checks.get('snapshotFiles', 0)} snapshot files, {checks.get('runtimeFiles', 0)} "
+                           f"runtime files against their RECORDs, {checks.get('unhashedRecordEntries', 0)} RECORD "
+                           f"entries without a hash, {checks.get('interpreterFiles', 0)} interpreter files)"
+                           if item["status"] == "PASS" else "")
+                print(f"{item['status']:7s} {item['judge']}{counted}{detail}")
             if not results:
                 print("nothing fetched yet")
         return 0 if all(item["status"] in ("PASS", "BLOCKED") for item in results) else 1

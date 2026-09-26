@@ -17,9 +17,16 @@ load gate for the judge the job names:
 - the registry must run the judge under this engine.
 
 A failure raises before the `ready` line, so the worker ends unready and its
-rows are retried once, then unavailable: it fails closed. Hubs are switched off
-(`HF_HUB_OFFLINE` and friends) before any library is imported, so a load that
-tried to reach the network fails instead.
+rows are retried once, then unavailable: it fails closed. A panel snapshot holds
+plain files only: a symbolic link anywhere inside it refuses the load.
+
+**No shared cache.** Before any library is imported, the hubs are switched off
+(`HF_HUB_OFFLINE`, `TRANSFORMERS_OFFLINE` and friends) and every model cache a
+library could fall back to (`HF_HOME`, `HF_HUB_CACHE`, `TORCH_HOME`,
+`MODELSCOPE_CACHE`, `XDG_CACHE_HOME`) points into an empty directory created
+for this run and removed when it exits. A load that tried the network fails,
+and a model cached anywhere else on the host can never load in place of the
+verified snapshot.
 
 **Library calls are isolated.** Each backend keeps its library calls in its
 `__init__` and `analyze`, so the offline tests replace a backend with a fake and
@@ -35,16 +42,21 @@ private, like every worker job). A row's result is the judge's raw output (L1);
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import math
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 SAMPLE_RATE_HZ = 16_000
 OFFLINE_ENVIRONMENT = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1"}
+# Every cache a panel library could load a model from; each points into this run's empty directory.
+CACHE_VARIABLES = ("HF_HOME", "HF_HUB_CACHE", "TORCH_HOME", "MODELSCOPE_CACHE", "XDG_CACHE_HOME")
+_EMPTY_CACHE_ROOT: Path | None = None
 # The exceptions a row's analysis can raise without the worker being broken.
 ROW_FAILURES = (OSError, ValueError, KeyError, IndexError, RuntimeError)
 
@@ -59,8 +71,22 @@ class PanelEngineError(ValueError):
 # Verification before load
 # --------------------------------------------------------------------------- #
 
-def go_offline() -> None:
+def go_offline() -> Path:
+    """Hubs off, and every model cache pointed into an empty per-run directory, before any library import.
+
+    The directory is created once per worker process and removed when it
+    exits; each cache variable names its own empty subdirectory.
+    """
+    global _EMPTY_CACHE_ROOT
+    if _EMPTY_CACHE_ROOT is None or not _EMPTY_CACHE_ROOT.is_dir():
+        _EMPTY_CACHE_ROOT = Path(tempfile.mkdtemp(prefix="vocello-audio-qc-empty-cache-"))
+        atexit.register(shutil.rmtree, _EMPTY_CACHE_ROOT, True)
+    for name in CACHE_VARIABLES:
+        directory = _EMPTY_CACHE_ROOT / name.lower()
+        directory.mkdir(exist_ok=True)
+        os.environ[name] = str(directory)
     os.environ.update(OFFLINE_ENVIRONMENT)
+    return _EMPTY_CACHE_ROOT
 
 
 def installed_packages() -> list[str]:
@@ -411,6 +437,161 @@ class AudioboxBackend:
         return {axis: float(scores[axis]) for axis in ("CE", "CU", "PC", "PQ")}
 
 
+# --------------------------------------------------------------------------- #
+# DNSMOS P.835: a port of Microsoft's dnsmos_local.py
+# --------------------------------------------------------------------------- #
+# Ported from microsoft/DNS-Challenge, DNSMOS/dnsmos_local.py at commit
+# 591184a9fcb2cbdec02520fed81a32bbbf9d73ff (git blob e32032e97541fde9a98fdc12745d5c1e09e5c7f1),
+# Copyright (c) Microsoft Corporation. The repository licenses its content, the
+# DNSMOS models included, under CC BY 4.0 (LICENSE) and its code under the MIT
+# License (LICENSE-CODE; its permission notice is config/licenses/MIT-terms.txt,
+# which applies to this port). Credit: C. K. A. Reddy, V. Gopal and R. Cutler,
+# "DNSMOS P.835", ICASSP 2022. Only the regular (non-personalized) path is ported:
+# the same 9.01 s windows with a 1 s hop over the clip tiled to at least one
+# window, the same float truncation of each window's end (which drops some
+# windows, e.g. those starting at 7-23 s), the same P.808 mel features and the
+# same polynomial calibration. The reference environment pinned librosa 0.8.1,
+# whose default pad mode was reflect, so the P.808 features pass it explicitly.
+DNSMOS_INPUT_LENGTH = 9.01  # seconds (INPUT_LENGTH)
+DNSMOS_P808_TRIM = 160  # samples dropped from each window's end before the P.808 features
+DNSMOS_P808_MEL = {"n_mels": 120, "frame_size": 320, "hop_length": 160}
+# np.poly1d coefficients, highest power first: the non-personalized mapping of get_polyfit_val.
+DNSMOS_POLYNOMIALS = {
+    "SIG": (-0.08397278, 1.22083953, 0.0052439),
+    "BAK": (-0.13166888, 1.60915514, -0.39604546),
+    "OVRL": (-0.06766283, 1.11546468, 0.04602535),
+}
+
+
+def dnsmos_polynomial(coefficients: Sequence[float], value: float) -> float:
+    """np.poly1d(coefficients)(value): Horner's rule in double precision, as numpy's polyval runs it."""
+    result = 0.0
+    for coefficient in coefficients:
+        result = result * float(value) + coefficient
+    return result
+
+
+def dnsmos_calibrate(sig_raw: float, bak_raw: float, ovrl_raw: float) -> dict[str, float]:
+    """The non-personalized P.835 calibration of one window's raw SIG, BAK and OVRL."""
+    return {"SIG": dnsmos_polynomial(DNSMOS_POLYNOMIALS["SIG"], sig_raw),
+            "BAK": dnsmos_polynomial(DNSMOS_POLYNOMIALS["BAK"], bak_raw),
+            "OVRL": dnsmos_polynomial(DNSMOS_POLYNOMIALS["OVRL"], ovrl_raw)}
+
+
+def dnsmos_windows(sample_count: int, fs: int = SAMPLE_RATE_HZ) -> tuple[int, int, list[tuple[int, int]]]:
+    """(tiled length, hop count, scored windows) exactly as dnsmos_local.py derives them.
+
+    The clip doubles (`np.append(audio, audio)`) until it holds one window of
+    `int(9.01 * fs)` samples; `num_hops = int(floor(len / fs) - 9.01) + 1`; each
+    hop's window is `[idx * fs, int((idx + 9.01) * fs))`, and a window shorter
+    than one full window after that float truncation is skipped, not scored.
+    """
+    if sample_count <= 0:
+        raise ValueError("an empty take has no DNSMOS window")
+    len_samples = int(DNSMOS_INPUT_LENGTH * fs)
+    length = sample_count
+    while length < len_samples:
+        length *= 2
+    num_hops = int(math.floor(length / fs) - DNSMOS_INPUT_LENGTH) + 1
+    windows = []
+    for idx in range(num_hops):
+        start, end = int(idx * fs), int((idx + DNSMOS_INPUT_LENGTH) * fs)
+        if min(end, length) - start >= len_samples:
+            windows.append((start, end))
+    return length, num_hops, windows
+
+
+class DnsmosScorer:
+    """dnsmos_local.py's ComputeScore.__call__ for one 16 kHz clip, with its sessions and features injected."""
+
+    def __init__(self, primary: Callable[[Any], Any], p808: Callable[[Any], Any],
+                 melspec: Callable[[Any], Any]) -> None:
+        self.primary, self.p808, self.melspec = primary, p808, melspec
+
+    def score(self, audio: Any) -> dict[str, Any]:
+        import numpy as np
+
+        # soundfile reads PCM16 as float64 / 32768; the canonical PCM arrives as float32 of the same values.
+        audio = np.asarray(audio, dtype=np.float64)
+        actual_audio_len = len(audio)
+        length, num_hops, windows = dnsmos_windows(actual_audio_len)
+        while len(audio) < length:
+            audio = np.append(audio, audio)
+        raw = {"SIG": [], "BAK": [], "OVRL": []}
+        calibrated = {"SIG": [], "BAK": [], "OVRL": []}
+        p808_scores = []
+        rows = []
+        for start, end in windows:
+            audio_seg = audio[start:end]
+            input_features = np.array(audio_seg).astype("float32")[np.newaxis, :]
+            p808_input_features = np.array(self.melspec(audio_seg[:-DNSMOS_P808_TRIM])).astype("float32")[np.newaxis, :, :]
+            p808_mos = self.p808(p808_input_features)[0][0][0]
+            mos_sig_raw, mos_bak_raw, mos_ovr_raw = self.primary(input_features)[0][0]
+            values = dnsmos_calibrate(mos_sig_raw, mos_bak_raw, mos_ovr_raw)
+            for axis, value in (("SIG", mos_sig_raw), ("BAK", mos_bak_raw), ("OVRL", mos_ovr_raw)):
+                raw[axis].append(value)
+                calibrated[axis].append(values[axis])
+            p808_scores.append(p808_mos)
+            rows.append({"startSeconds": start / SAMPLE_RATE_HZ, **values,
+                         "raw": {"SIG": float(mos_sig_raw), "BAK": float(mos_bak_raw), "OVRL": float(mos_ovr_raw)},
+                         "P808_MOS": float(p808_mos)})
+        if not rows:
+            raise ValueError("no full DNSMOS window survives the reference's window arithmetic")
+        return {
+            "SIG": float(np.mean(calibrated["SIG"])), "BAK": float(np.mean(calibrated["BAK"])),
+            "OVRL": float(np.mean(calibrated["OVRL"])),
+            "raw": {axis: float(np.mean(values)) for axis, values in raw.items()},
+            "P808_MOS": float(np.mean(p808_scores)), "numHops": num_hops, "windowsScored": len(rows),
+            "lenSeconds": actual_audio_len / SAMPLE_RATE_HZ, "windows": rows,
+        }
+
+
+def dnsmos_melspec(librosa: Any, audio: Any) -> Any:
+    """ComputeScore.audio_melspec: the P.808 model's log-mel input, frames first."""
+    import numpy as np
+
+    mel_spec = librosa.feature.melspectrogram(
+        y=audio, sr=SAMPLE_RATE_HZ, n_fft=DNSMOS_P808_MEL["frame_size"] + 1,
+        hop_length=DNSMOS_P808_MEL["hop_length"], n_mels=DNSMOS_P808_MEL["n_mels"], pad_mode="reflect",
+    )
+    mel_spec = (librosa.power_to_db(mel_spec, ref=np.max) + 40) / 40
+    return mel_spec.T
+
+
+class DnsmosBackend:
+    """DNSMOS P.835 (SIG, BAK, OVRL, plus P.808) on ONNX Runtime CPU from the verified GitHub snapshot."""
+
+    def __init__(self, snapshot: Path, config: dict[str, Any], threads: int) -> None:
+        import librosa
+        import onnxruntime
+
+        options = dict(config.get("configuration") or {})
+        if int(options.get("sampleRateHz", 0)) != SAMPLE_RATE_HZ or options.get("personalized") is not False:
+            raise PanelEngineError("DNSMOS runs the regular P.835 mapping on the canonical 16 kHz audio")
+        sessions = []
+        for key in ("primaryModel", "p808Model"):
+            name = options.get(key)
+            path = snapshot / str(name)
+            if not isinstance(name, str) or not path.resolve().is_relative_to(snapshot.resolve()) \
+                    or not path.is_file():
+                raise PanelEngineError(f"the DNSMOS configuration's {key} is not a file of the verified snapshot")
+            session_options = onnxruntime.SessionOptions()
+            session_options.intra_op_num_threads = threads
+            session_options.inter_op_num_threads = 1
+            session_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
+            sessions.append(onnxruntime.InferenceSession(str(path), sess_options=session_options,
+                                                         providers=["CPUExecutionProvider"]))
+        primary, p808 = sessions
+        self.scorer = DnsmosScorer(
+            lambda features: primary.run(None, {"input_1": features}),
+            lambda features: p808.run(None, {"input_1": features}),
+            lambda audio: dnsmos_melspec(librosa, audio),
+        )
+
+    def analyze(self, audio: Any, row: dict[str, Any]) -> dict[str, Any]:
+        return self.scorer.score(audio)
+
+
 BACKENDS: dict[str, Callable[..., Any]] = {
     "parakeet-mlx": ParakeetBackend,
     "funasr-paraformer": ParaformerBackend,
@@ -419,6 +600,7 @@ BACKENDS: dict[str, Callable[..., Any]] = {
     "speechbrain-lid": VoxLinguaBackend,
     "wespeaker-onnx": WespeakerBackend,
     "audiobox-aesthetics": AudioboxBackend,
+    "dnsmos-onnx": DnsmosBackend,
     "pyin-librosa": PyinBackend,
 }
 NO_WEIGHTS = frozenset({"pyin-librosa"})
@@ -431,6 +613,7 @@ NO_WEIGHTS = frozenset({"pyin-librosa"})
 def whisper_panel(job: dict[str, Any], emit: Emit) -> None:
     """Whisper large-v3: the whisper-small recognizer's decode, plus the panel's
     `noSpeechThreshold` and `initialPrompt` options, loaded from the verified snapshot."""
+    go_offline()
     from independent_asr_worker import Recognizer
 
     class PanelRecognizer(Recognizer):  # type: ignore[misc, valid-type]

@@ -1210,38 +1210,60 @@ research tooling outside every QC path.
 ### Judge panel acquisition (AQ-06, prepared 2026-09-26)
 
 The audit's panel (section 4) is registered in `config/audio-qc-judges.json` as `candidate` judges.
-Each is pinned to every file it fetches at its Hugging Face revision: the LFS SHA-256 or the git blob
-ID, with the size. The pins were read from the Hub's tree metadata on 2026-09-26, and nothing was
-downloaded. Each judge also records its license tier, its voting role, its output identity, and a
-ceiling and thread count marked `provisional`. These are audit section 3.4 estimates; the two clean
-M6 runs replace each with its measured peak × 1.2.
+Each is pinned to every file it fetches at its revision, with the size. A Hugging Face file pins its
+LFS SHA-256, or, for a small non-LFS file, its git blob ID; the pins were read from the Hub's tree
+metadata on 2026-09-26, and nothing was downloaded. DNSMOS is the one GitHub-sourced snapshot: each
+file pins its size, content SHA-256 and git blob ID at a commit. Each judge also records its license
+tier, its voting role, its output identity, and a ceiling and thread count marked `provisional`.
+These are audit estimates; the two clean M6 runs replace each with its measured peak × 1.2.
 
-| Judge | Repository @ revision | GB | Tier | Votes | Status |
-|---|---|---|---|---|---|
-| `asr.whisper-large-v3@1` | `mlx-community/whisper-large-v3-mlx@49e6aa28` | 3.08 | B | yes | candidate |
-| `asr.parakeet-tdt-0.6b-v3@1` | `mlx-community/parakeet-tdt-0.6b-v3@ed2b7e8c` | 2.51 | B | yes | candidate |
-| `asr.paraformer-zh@1` | `funasr/paraformer-zh@d7811ee3` | 0.89 | A | yes | candidate |
-| `asr.sensevoice-small-f16@1` | `FunAudioLLM/SenseVoiceSmall-GGUF@90c1c619` (f16 file only) | 0.47 | A | yes | candidate |
-| `asr.qwen3-asr-1.7b@1` | `mlx-community/Qwen3-ASR-1.7B-bf16@e1f6c266` | 4.08 | A | no (same lab) | candidate |
-| `align.qwen3-forcedaligner-0.6b@1` | `mlx-community/Qwen3-ForcedAligner-0.6B-bf16@53c8c0e4` | 1.84 | A | no (same lab) | candidate |
-| `lid.voxlingua107-ecapa@1` | `speechbrain/lang-id-voxlingua107-ecapa@0253049a` | 0.09 | B | yes | candidate |
-| `speaker.campplus-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-campplus-LM@c5e01c6f` (ONNX only) | 0.03 | B | yes | candidate |
-| `speaker.resnet293-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-resnet293-LM@6e6bffe5` (ONNX only) | 0.11 | B | no | quarantined |
-| `pitch.pyin@1` | librosa 0.11.0, no weights | 0 | A | no | candidate |
-| `quality.audiobox-aesthetics@1` | `facebook/audiobox-aesthetics@9b1dd8e5` (safetensors only) | 0.42 | A | no (advisory) | candidate |
+| Judge | Repository @ revision | GB | Stage | Tier | Votes | Status |
+|---|---|---|---|---|---|---|
+| `asr.whisper-large-v3@1` | `mlx-community/whisper-large-v3-mlx@49e6aa28` | 3.08 | 1 | B | yes | candidate |
+| `asr.parakeet-tdt-0.6b-v3@1` | `mlx-community/parakeet-tdt-0.6b-v3@ed2b7e8c` | 2.51 | 1 | B | yes | candidate |
+| `asr.paraformer-zh@1` | `funasr/paraformer-zh@d7811ee3` | 0.89 | 1 | A | yes | candidate |
+| `asr.sensevoice-small-f16@1` | `FunAudioLLM/SenseVoiceSmall-GGUF@90c1c619` (f16 file only) | 0.47 | 1 | A | yes | candidate |
+| `lid.voxlingua107-ecapa@1` | `speechbrain/lang-id-voxlingua107-ecapa@0253049a` | 0.09 | 1 | B | yes | candidate |
+| `speaker.campplus-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-campplus-LM@c5e01c6f` (ONNX only) | 0.03 | 1 | B | yes | candidate |
+| `pitch.pyin@1` | librosa 0.11.0, no weights | 0 | 1 | A | no | candidate |
+| `asr.qwen3-asr-1.7b@1` | `mlx-community/Qwen3-ASR-1.7B-bf16@e1f6c266` | 4.08 | 2 | A | no (same lab) | candidate |
+| `align.qwen3-forcedaligner-0.6b@1` | `mlx-community/Qwen3-ForcedAligner-0.6B-bf16@53c8c0e4` | 1.84 | 2 | A | no (same lab) | candidate |
+| `speaker.resnet293-voxceleb@1` | `Wespeaker/wespeaker-voxceleb-resnet293-LM@6e6bffe5` (ONNX only) | 0.11 | 2 | B | no (until the correlated-failure audit) | candidate |
+| `quality.audiobox-aesthetics@1` | `facebook/audiobox-aesthetics@9b1dd8e5` (safetensors only) | 0.42 | 2 | A | no (advisory) | candidate |
+| `quality.dnsmos-p835@1` | GitHub `microsoft/DNS-Challenge@591184a9` (`DNSMOS/DNSMOS/sig_bak_ovr.onnx`, `model_v8.onnx`) | 0.001 | 2 | B | no (advisory) | candidate |
 
-Two picks are not fetched, and neither was substituted:
+Nothing is quarantined or listed in `acquisitionBlocked`. Two maintainer decisions of 2026-09-26,
+recorded in each entry's `licenseDecision`, cleared the earlier holds:
 
-- **ResNet293 is quarantined.** Its card declares CC BY 4.0, where the audit recorded Apache-2.0.
-  The tier would stay B. Lifting the quarantine is a maintainer decision; the entry's `quarantine.lift`
-  names the edit.
-- **DNSMOS is listed in `acquisitionBlocked`.** Its only official source is the microsoft/DNS-Challenge
-  GitHub repository, so no Hugging Face revision or digest exists to pin, and its training-data terms
-  are still unconfirmed.
+- **ResNet293.** The CC BY 4.0 license its card declares at the pinned revision is accepted (the
+  audit had recorded Apache-2.0). It stays tier B, internal evaluation only. It is a stage 2
+  candidate that does not vote: it shares CAM++'s VoxCeleb training data, so it votes only after the
+  correlated-failure audit (audit section 5) passes (`votingGate`).
+- **DNSMOS P.835.** It is accepted as an advisory, non-voting screen under the CC BY 4.0 license of
+  `microsoft/DNS-Challenge`, pinned at commit `591184a9fcb2cbdec02520fed81a32bbbf9d73ff`. The audit
+  rated it A with its training-data terms still to confirm. The repository lists its corpora under
+  their original terms, VoxCeleb2 among them, so it is recorded as tier B like every VoxCeleb-trained
+  judge. Its engine (`dnsmos-onnx`) ports `DNSMOS/dnsmos_local.py` at that commit (blob `e32032e9`,
+  MIT): 16 kHz mono, the clip tiled to at least one 9.01 s window, 1 s hops with the reference's
+  float truncation (which skips some windows, for example those starting at 7-23 s), the P.808
+  log-mel features with librosa's reflect padding (the reference pinned librosa 0.8.1), and the
+  non-personalized polynomial mapping of SIG, BAK and OVRL, averaged over the scored windows.
+
+**Attribution for evaluation-only assets.** `scripts/attribution_manifest.py` and
+`config/third-party-attribution-policy.json` cover only what ships in the apps (resolved packages
+and production catalog models), so evaluation-only judges keep their credits in the registry's
+`license.notices` and here. None of them ships or is redistributed.
+
+- ResNet293-LM: CC BY 4.0, WeSpeaker (wenet-e2e/wespeaker; Wang et al., ICASSP 2023), trained on
+  VoxCeleb (CC BY 4.0; the audio's copyright stays with its owners).
+- DNSMOS P.835: CC BY 4.0, Microsoft (microsoft/DNS-Challenge; Reddy, Gopal and Cutler, ICASSP 2022).
+  The ported scoring in `panel_engines.py` credits `dnsmos_local.py`, MIT, Copyright (c) Microsoft
+  Corporation.
+- Audiobox Aesthetics: CC BY 4.0, Meta (Tjandra et al., 2025).
 
 **Runtimes.** Each judge runs in the venv of its runtime family, built from a committed hash lock
-(`config/audio-qc-runtimes/<family>.txt`). The eight locks were resolved for CPython 3.14.4 on macOS
-arm64 from PyPI metadata alone. The registry records each lock's digest, and the validator refuses a
+(`config/audio-qc-runtimes/<family>.txt`). The nine locks target CPython 3.14.4 on macOS arm64 and
+come from PyPI metadata alone. The registry records each lock's digest, and the validator refuses a
 drifted lock, a judge pin that differs from its lock, and any locked package on the exclusion list.
 
 - torch is held at 2.11.0 to match torchaudio 2.11.0, its newest release, whose wheels declare no
@@ -1249,6 +1271,8 @@ drifted lock, a judge pin that differs from its lock, and any locked package on 
 - The FunASR lock builds four pure-Python sdists (jieba, oss2, crcmod, antlr4) from hash-pinned
   sources, after the lock's own setuptools.
 - soxr, which librosa requires, is LGPL-2.1-or-later. It is recorded as a notice.
+- `onnx-librosa` (DNSMOS) is its own family: the librosa-dsp pins plus onnx-cpu's onnxruntime,
+  flatbuffers and protobuf, so the stage 1 onnx-cpu and librosa-dsp venvs keep their locks.
 - SenseVoice f16 reuses the pinned llama.cpp runtime v0.1.9. Its command line has no language, ITN
   or thread option, so the audit's ja/ko lock and `use_itn=False` cannot be set. The judge's
   `decodeOptions` say so, and a take whose emitted language differs from the expected one abstains.
@@ -1256,41 +1280,66 @@ drifted lock, a judge pin that differs from its lock, and any locked package on 
 **Maintainer commands.** Run these from the main checkout. `fetch` is the only step that downloads.
 
 ```sh
-python3 scripts/acquire_audio_qc_judges.py plan          # judges, bytes, destinations; no network
-python3 scripts/acquire_audio_qc_judges.py fetch --all   # or: fetch --stage 1, later fetch --stage 2
-python3 scripts/acquire_audio_qc_judges.py verify        # offline re-check of every receipt
+python3 scripts/acquire_audio_qc_judges.py plan              # judges, bytes, destinations, disk needed; no network
+python3 scripts/acquire_audio_qc_judges.py fetch --stage 1   # then: fetch --stage 2 (ResNet293, DNSMOS, ...)
+python3 scripts/acquire_audio_qc_judges.py verify            # offline re-check of every receipt
+python3 scripts/acquire_audio_qc_judges.py fetch --judge lid.voxlingua107-ecapa@1  # refreshes its receipt
 ```
 
-**Disk.** The models take 13.40 GB: stage 1 is 7.07 GB (the six current languages' voters, LID,
-CAM++ and pYIN) and stage 2 is 6.34 GB (the adjudicator, the aligner and Audiobox). The runtimes add
-about 1.19 GB of wheels, about 3-4 GB once installed across eight venvs (est.), plus an 18 MB
+The last line is needed once if VoxLingua was fetched before its `hyperparams.yaml` pin gained a
+content SHA-256: `verify` then reports that its registry entry changed, and `fetch` re-verifies the
+files already on disk and rewrites the receipt without downloading them again.
+
+**Disk.** The models take 13.52 GB: stage 1 is 7.07 GB (the six current languages' voters, LID,
+CAM++ and pYIN) and stage 2 is 6.45 GB (the adjudicator, the aligner, ResNet293, Audiobox and
+DNSMOS). The runtimes add about 1.31 GB of wheels across nine venvs, about 4.6 GB once installed
+(est.: wheel bytes × 3.5, the upper end of the earlier 3-4 GB for 1.19 GB), plus an 18 MB
 interpreter. Everything lands under `build/cache/delivery-analysis/external-models/`, the
-`delivery-analysis-cache` entry of the build-output policy. `fetch` refuses to start a judge
-without its remaining bytes plus 2 GiB free.
+`delivery-analysis-cache` entry of the build-output policy. Before a fetch starts, the whole
+selection must fit: its remaining model bytes, each venv still to build at that estimate and the
+interpreter, plus a 2 GiB margin (`plan` prints the figure; a clean `--all` needs about 20.4 GB).
 
-**What `fetch` guarantees.**
+**What `fetch` and `verify` guarantee.**
 
-- **Files.** Each file downloads into `.partial/` and resumes by HTTP range. It moves into
-  `<judge directory>/<revision>/` only once its size and digest match the pin. A mismatch is
-  discarded, and a checksum is never inferred.
+- **Files.** Each file downloads into `.partial/` and resumes by HTTP range, from the Hub or, for a
+  GitHub snapshot, from `raw.githubusercontent.com/<repo>/<commit>/<path>`. It moves into
+  `<judge directory>/<revision>/` only once its size and every digest its pin records match. A
+  mismatch is discarded, and a checksum is never inferred. File keys are relative paths that never
+  climb, and a path that resolves outside the model root is refused before anything is written.
+- **Transport.** Every download is https, and a redirect is followed only to https on
+  huggingface.co, `*.hf.co`, `*.huggingface.co`, github.com, its release asset hosts and
+  `raw.githubusercontent.com`. An https-to-http redirect, or one to any other host, fails the fetch.
+- **Pins.** Repositories read `owner/name`; every file pin records its size; a git blob ID (SHA-1)
+  pins only a small non-LFS file (at most 10 MB), and a panel weight file is pinned by SHA-256.
+  VoxLingua's `hyperparams.yaml`, which SpeechBrain instantiates, pins its content SHA-256 beside
+  its blob ID.
 - **Interpreter and native runtime.** The python-build-standalone 3.14.4 archive and the SenseVoice
-  runtime are verified by SHA-256, and existing copies are reused.
-- **Venvs.** Each venv installs with `pip --isolated --require-hashes --no-deps --only-binary :all:`.
-  It must then equal its lock exactly and pass an offline import probe.
+  runtime are verified by SHA-256. `verify` re-hashes the interpreter archive and compares every
+  extracted file with it (bytecode under `__pycache__` is skipped and counted); `fetch` re-extracts
+  an interpreter that no longer matches.
+- **Venvs.** Each venv installs with `pip --isolated --require-hashes --no-deps --only-binary :all:`
+  and `PIP_CONFIG_FILE=/dev/null`, so no pip configuration file is read. It must then equal its lock
+  exactly, every installed file must match the SHA-256 its distribution's RECORD lists (entries
+  without a hash, such as RECORD itself and bytecode, are counted), and an offline import probe must
+  pass. `fetch` reuses an existing venv only while all of that holds, and rebuilds it otherwise.
 - **Receipts.** A per-judge `receipt.json`, written last, records every digest, with names relative
   to the model root.
 - **Workers.** The worker engines (`lib/qc_pipeline/panel_engines.py`, reached through
-  `audio_qc_worker.py`) set the hubs offline. Before anything loads, each runs the registry's load
-  gate, which refuses an excluded installed package, and verifies every pinned file. The
-  weightless pYIN judge runs `require_runnable` instead of the file check.
+  `audio_qc_worker.py`) set the hubs offline and point `HF_HOME`, `HF_HUB_CACHE`, `TORCH_HOME`,
+  `MODELSCOPE_CACHE` and `XDG_CACHE_HOME` into an empty directory created for the run, so a model
+  cached anywhere else on the host can never load. Before anything loads, each runs the registry's
+  load gate, which refuses an excluded installed package, and verifies every pinned file; a
+  symbolic link anywhere inside a panel snapshot refuses the load. The weightless pYIN judge runs
+  `require_runnable` instead of the file check.
 
 **Still to do (consent-bound, P8).** Each judge needs two clean M6 resource runs, a measured
 determinism class and a canary record, and the whisper-small against large-v3 dual run must publish
 its flip analysis. The offline tests replace every model with a fake. Each backend's own library
-calls, such as `parakeet_mlx.from_pretrained`, FunASR's `AutoModel`, mlx-audio's `load_model` and
-SpeechBrain's `from_hparams`, run for the first time in that session. The orchestrator does not yet
-build Stage 2 jobs for the panel judges; `acquire_audio_qc_judges.worker_launch` supplies their
-interpreter, engine and configuration from a current receipt.
+calls, such as `parakeet_mlx.from_pretrained`, FunASR's `AutoModel`, mlx-audio's `load_model`,
+SpeechBrain's `from_hparams` and the DNSMOS ONNX sessions, run for the first time in that session.
+The orchestrator does not yet build Stage 2 jobs for the panel judges;
+`acquire_audio_qc_judges.worker_launch` supplies their interpreter, engine and configuration from a
+current receipt.
 
 ### Speech/defect calibration: independent references, no required listening
 

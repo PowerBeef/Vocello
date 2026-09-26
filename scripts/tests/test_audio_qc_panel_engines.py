@@ -6,12 +6,16 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import os
 from pathlib import Path
 import stat
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -27,16 +31,23 @@ WEIGHTED = {
     "speechbrain-lid": "lid.voxlingua107-ecapa@1",
     "wespeaker-onnx": "speaker.campplus-voxceleb@1",
     "audiobox-aesthetics": "quality.audiobox-aesthetics@1",
+    "dnsmos-onnx": "quality.dnsmos-p835@1",
 }
+# Judges that share an engine with a WEIGHTED one.
+ALSO_WEIGHTED = (("wespeaker-onnx", "speaker.resnet293-voxceleb@1"),)
+DNSMOS = "quality.dnsmos-p835@1"
 PYIN = "pitch.pyin@1"
 WHISPER = "asr.whisper-large-v3@1"
 SENSEVOICE = "asr.sensevoice-small-f16@1"
 
 
-def _pin(content: bytes, *, large: bool) -> dict:
+def _pin(content: bytes, *, large: bool, content_sha256: bool = False) -> dict:
     if large:
         return {"lfsSHA256": hashlib.sha256(content).hexdigest(), "size": len(content)}
-    return {"gitBlobID": hashlib.sha1(b"blob %d\0" % len(content) + content).hexdigest(), "size": len(content)}
+    pin = {"gitBlobID": hashlib.sha1(b"blob %d\0" % len(content) + content).hexdigest(), "size": len(content)}
+    if content_sha256:
+        pin["sha256"] = hashlib.sha256(content).hexdigest()
+    return pin
 
 
 class FakeBackend:
@@ -85,7 +96,8 @@ class PanelEngineTests(unittest.TestCase):
         for name, content in files.items():
             (snapshot / name).parent.mkdir(parents=True, exist_ok=True)
             (snapshot / name).write_bytes(content)
-        pins["files"] = {name: _pin(content, large="lfsSHA256" in pins["files"][name])
+        pins["files"] = {name: _pin(content, large="lfsSHA256" in pins["files"][name],
+                                    content_sha256="sha256" in pins["files"][name])
                          for name, content in files.items()}
         config = {"judge": judge_id, "repository": pins["repository"], "revision": pins["revision"],
                   "snapshot": str(snapshot)}
@@ -104,7 +116,7 @@ class PanelEngineTests(unittest.TestCase):
         return emitted
 
     def test_every_weighted_engine_verifies_its_snapshot_before_it_loads(self) -> None:
-        for engine, judge_id in WEIGHTED.items():
+        for engine, judge_id in (*WEIGHTED.items(), *ALSO_WEIGHTED):
             with self.subTest(engine=engine), mock.patch.dict(panel_engines.BACKENDS, {engine: FakeBackend}):
                 FakeBackend.built = []
                 snapshot, config = self._snapshot(judge_id)
@@ -119,7 +131,7 @@ class PanelEngineTests(unittest.TestCase):
                 self.assertIn("wallSeconds", emitted[1]["result"])
                 # One altered byte in any pinned file: nothing loads.
                 FakeBackend.built = []
-                victim = sorted(snapshot.iterdir())[0]
+                victim = sorted(path for path in snapshot.rglob("*") if path.is_file())[0]
                 victim.write_bytes(victim.read_bytes()[:-1] + b"#")
                 with self.assertRaisesRegex(JudgeRegistryError, "differs from its registry pin"):
                     self._run(self._job(engine, config, threads))
@@ -214,6 +226,176 @@ class PanelEngineTests(unittest.TestCase):
         self.assertEqual(panel_engines.alignment_units("你好 世界", "zh"), ["你", "好", "世", "界"])
         self.assertEqual(panel_engines.alignment_units("Bonjour le monde", "fr"), ["Bonjour", "le", "monde"])
         self.assertEqual(panel_engines._finite([1.0, math.nan, 2.5]), [1.0, None, 2.5])
+
+
+    def test_every_engine_runs_offline_with_empty_per_run_caches(self) -> None:
+        """A model cached anywhere on the host can never load: every cache points into an empty run directory."""
+        shared = self.root / "shared-cache"
+        (shared / "hub/models--fixture").mkdir(parents=True)
+        seen: dict[str, str | None] = {}
+        watched = (*panel_engines.CACHE_VARIABLES, "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
+
+        class CacheProbe(FakeBackend):
+            def __init__(self, snapshot, config, threads) -> None:
+                super().__init__(snapshot, config, threads)
+                seen.update({name: os.environ.get(name) for name in watched})
+
+        engine, judge_id = "wespeaker-onnx", WEIGHTED["wespeaker-onnx"]
+        _snapshot, config = self._snapshot(judge_id)
+        inherited = {name: str(shared) for name in panel_engines.CACHE_VARIABLES}
+        with mock.patch.dict(os.environ, {**inherited, "HF_HUB_OFFLINE": "0"}), \
+                mock.patch.dict(panel_engines.BACKENDS, {engine: CacheProbe}):
+            self._run(self._job(engine, config))
+        self.assertEqual((seen["HF_HUB_OFFLINE"], seen["TRANSFORMERS_OFFLINE"]), ("1", "1"))
+        caches = [Path(str(seen[name])) for name in panel_engines.CACHE_VARIABLES]
+        self.assertEqual(len(set(caches)), len(caches))
+        run_root = caches[0].parent
+        self.assertTrue(run_root.name.startswith("vocello-audio-qc-empty-cache-"))
+        for cache in caches:
+            with self.subTest(cache=cache.name):
+                self.assertEqual(cache.parent, run_root)
+                self.assertNotEqual(cache, shared)
+                self.assertEqual(list(cache.iterdir()), [])
+
+    def test_a_symbolic_link_inside_a_panel_snapshot_refuses_the_load(self) -> None:
+        engine, judge_id = "wespeaker-onnx", WEIGHTED["wespeaker-onnx"]
+        snapshot, config = self._snapshot(judge_id)
+        victim = snapshot / "config.yaml"
+        outside = self.root / "outside-config.yaml"
+        outside.write_bytes(victim.read_bytes())
+        victim.unlink()
+        victim.symlink_to(outside)
+        with mock.patch.dict(panel_engines.BACKENDS, {engine: FakeBackend}):
+            with self.assertRaisesRegex(JudgeRegistryError, r"symbolic link \(config\.yaml\)"):
+                self._run(self._job(engine, config))
+        self.assertEqual(FakeBackend.built, [])
+
+
+class DnsmosTests(unittest.TestCase):
+    """The DNSMOS P.835 port: windowing, calibration and scoring against hand-computed values (no model)."""
+
+    SIG, BAK, OVRL = (panel_engines.DNSMOS_POLYNOMIALS[axis] for axis in ("SIG", "BAK", "OVRL"))
+
+    def test_windows_follow_the_reference_arithmetic(self) -> None:
+        windows = panel_engines.dnsmos_windows
+        # One window is int(9.01 * 16000) = 144,160 samples; a 3 s take doubles twice, to 192,000.
+        self.assertEqual(windows(48_000), (192_000, 3, [(0, 144_160), (16_000, 160_160), (32_000, 176_160)]))
+        self.assertEqual(windows(144_160), (144_160, 1, [(0, 144_160)]))
+        self.assertEqual(windows(152_000), (152_000, 1, [(0, 144_160)]))
+        # A 20 s take has int(20 - 9.01) + 1 = 11 hops, but int((idx + 9.01) * 16000) truncates to one
+        # sample short for idx 7-10 (16.009999999999998 * 16000 = 256159.99999999997), so the reference
+        # skips those windows and scores the ones starting at 0-6 s.
+        length, hops, scored = windows(320_000)
+        self.assertEqual((length, hops), (320_000, 11))
+        self.assertEqual([start for start, _end in scored], [0, 16_000, 32_000, 48_000, 64_000, 80_000, 96_000])
+        self.assertTrue(all(end - start == 144_160 for start, end in scored))
+        # One sample tiles to 2**18 = 262,144 samples: int(16 - 9.01) + 1 = 7 hops.
+        self.assertEqual(windows(1)[:2], (262_144, 7))
+        with self.assertRaises(ValueError):
+            windows(0)
+
+    def test_the_calibration_is_the_non_personalized_polynomial_mapping(self) -> None:
+        calibrate = panel_engines.dnsmos_calibrate
+        # By hand: SIG(3) = -0.08397278 * 9 + 1.22083953 * 3 + 0.0052439 = 2.91200747, and so on.
+        for raw, expected in ((3.0, {"SIG": 2.91200747, "BAK": 3.24640004, "OVRL": 2.78345392}),
+                              (1.0, {"SIG": 1.14211065, "BAK": 1.0814408, "OVRL": 1.0938272}),
+                              (0.0, {"SIG": 0.0052439, "BAK": -0.39604546, "OVRL": 0.04602535}),
+                              (2.0, {"SIG": 2.11103184, "BAK": 2.2955893, "OVRL": 2.00630339})):
+            values = calibrate(raw, raw, raw)
+            for axis, value in expected.items():
+                with self.subTest(raw=raw, axis=axis):
+                    self.assertAlmostEqual(values[axis], value, places=8)
+        # The same doubles numpy's poly1d produces for the models' float32 outputs.
+        for raw in (np.float32(3.3712), np.float32(1.25), np.float32(4.8)):
+            for coefficients in (self.SIG, self.BAK, self.OVRL):
+                self.assertEqual(panel_engines.dnsmos_polynomial(coefficients, raw),
+                                 float(np.poly1d(coefficients)(raw)))
+
+    def test_the_scorer_feeds_each_model_its_reference_input_and_averages_the_windows(self) -> None:
+        primary_inputs, p808_inputs, mel_inputs = [], [], []
+
+        def primary(features):
+            primary_inputs.append(features)
+            return [np.array([[float(len(primary_inputs)), 2.0, 3.0]], dtype=np.float32)]
+
+        def p808(features):
+            p808_inputs.append(features)
+            return [np.array([[3.5]], dtype=np.float32)]
+
+        def melspec(audio):
+            mel_inputs.append(audio)
+            return np.zeros((900, 120))
+
+        audio = ((np.arange(48_000) % 200) - 100).astype(np.float32) / 32768.0
+        result = panel_engines.DnsmosScorer(primary, p808, melspec).score(audio)
+        self.assertEqual((result["numHops"], result["windowsScored"], result["lenSeconds"]), (3, 3, 3.0))
+        self.assertEqual([window["startSeconds"] for window in result["windows"]], [0.0, 1.0, 2.0])
+        # The P.835 model reads the 9.01 s window as float32; the P.808 features drop its last 160 samples.
+        self.assertEqual((primary_inputs[0].shape, primary_inputs[0].dtype), ((1, 144_160), np.float32))
+        self.assertEqual((p808_inputs[0].shape, p808_inputs[0].dtype), ((1, 900, 120), np.float32))
+        self.assertEqual((len(mel_inputs[0]), mel_inputs[0].dtype), (144_000, np.float64))
+        np.testing.assert_array_equal(primary_inputs[1][0], np.tile(audio, 4)[16_000:160_160])
+        # Raw SIG 1, 2, 3 average to 2; the calibrated SIG is the mean of each window's calibrated value.
+        self.assertAlmostEqual(result["raw"]["SIG"], 2.0)
+        self.assertAlmostEqual(result["SIG"], (1.14211065 + 2.11103184 + 2.91200747) / 3, places=8)
+        self.assertAlmostEqual(result["BAK"], 2.2955893, places=8)
+        self.assertAlmostEqual(result["OVRL"], 2.78345392, places=8)
+        self.assertAlmostEqual(result["P808_MOS"], 3.5)
+        with self.assertRaises(ValueError):
+            panel_engines.DnsmosScorer(primary, p808, melspec).score(np.zeros(0, dtype=np.float32))
+
+    def test_the_backend_wires_both_sessions_and_the_reference_mel_features(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        snapshot = Path(temporary.name) / "591184a9fcb2cbdec02520fed81a32bbbf9d73ff"
+        (snapshot / "DNSMOS/DNSMOS").mkdir(parents=True)
+        for name in ("sig_bak_ovr.onnx", "model_v8.onnx"):
+            (snapshot / "DNSMOS/DNSMOS" / name).write_bytes(b"fixture")
+        configuration = copy.deepcopy(load_registry()["judges"][DNSMOS]["configuration"])
+        sessions = []
+
+        class FakeSession:
+            def __init__(self, path, sess_options=None, providers=None) -> None:
+                self.path, self.options, self.providers, self.feeds = Path(path), sess_options, providers, []
+                sessions.append(self)
+
+            def run(self, outputs, feeds):
+                self.feeds.append(feeds)
+                if self.path.name == "model_v8.onnx":
+                    return [np.array([[3.25]], dtype=np.float32)]
+                return [np.array([[3.0, 3.0, 3.0]], dtype=np.float32)]
+
+        mel_calls = []
+
+        def melspectrogram(**kwargs):
+            mel_calls.append(kwargs)
+            return np.ones((120, 900))
+
+        modules = {
+            "onnxruntime": SimpleNamespace(SessionOptions=SimpleNamespace, InferenceSession=FakeSession,
+                                           ExecutionMode=SimpleNamespace(ORT_SEQUENTIAL="sequential")),
+            "librosa": SimpleNamespace(feature=SimpleNamespace(melspectrogram=melspectrogram),
+                                       power_to_db=lambda spectrum, ref: np.zeros_like(spectrum)),
+        }
+        config = {"judge": DNSMOS, "configuration": configuration}
+        with mock.patch.dict(sys.modules, modules):
+            result = panel_engines.DnsmosBackend(snapshot, config, 1).analyze(np.zeros(48_000, dtype=np.float32), {})
+            for override in ({"primaryModel": "../escape.onnx"}, {"p808Model": "DNSMOS/DNSMOS/absent.onnx"},
+                             {"personalized": True}, {"sampleRateHz": 48_000}):
+                with self.subTest(override=override), self.assertRaises(panel_engines.PanelEngineError):
+                    panel_engines.DnsmosBackend(snapshot, {**config, "configuration": {**configuration, **override}}, 1)
+        self.assertEqual([session.path.name for session in sessions[:2]], ["sig_bak_ovr.onnx", "model_v8.onnx"])
+        for session in sessions[:2]:
+            self.assertEqual(session.providers, ["CPUExecutionProvider"])
+            self.assertEqual((session.options.intra_op_num_threads, session.options.inter_op_num_threads), (1, 1))
+            self.assertEqual(set(session.feeds[0]), {"input_1"})
+        self.assertEqual(sessions[1].feeds[0]["input_1"].shape, (1, 900, 120))
+        kwargs = mel_calls[0]
+        self.assertEqual({key: kwargs[key] for key in ("sr", "n_fft", "hop_length", "n_mels", "pad_mode")},
+                         {"sr": 16_000, "n_fft": 321, "hop_length": 160, "n_mels": 120, "pad_mode": "reflect"})
+        self.assertEqual(len(kwargs["y"]), 144_000)
+        self.assertEqual((result["numHops"], result["P808_MOS"]), (3, 3.25))
+        self.assertAlmostEqual(result["OVRL"], 2.78345392, places=7)
 
 
 if __name__ == "__main__":

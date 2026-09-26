@@ -175,13 +175,17 @@ class JudgeRegistryTests(unittest.TestCase):
         self.assertIn(f"judge {ECAPA}: a runnable snapshot judge pins every file of its snapshot",
                       self._errors(empty_snapshot))
 
-        for pin in ({"sha256": "0" * 64}, {"lfsSHA256": "0" * 63}, {"gitBlobID": "0" * 64},
-                    {"lfsSHA256": "0" * 64, "gitBlobID": "0" * 40}, {"gitBlobID": "0" * 40, "size": -1}):
+        for pin, problem in (({"sha256": "0" * 64, "size": 1}, "names either an LFS SHA-256 or a git blob ID"),
+                             ({"lfsSHA256": "0" * 63, "size": 1}, "has a malformed lfsSHA256"),
+                             ({"gitBlobID": "0" * 64, "size": 1}, "has a malformed gitBlobID"),
+                             ({"lfsSHA256": "0" * 64, "gitBlobID": "0" * 40, "size": 1},
+                              "names either an LFS SHA-256 or a git blob ID"),
+                             ({"gitBlobID": "0" * 40, "size": -1}, "records no size"),
+                             ({"gitBlobID": "0" * 40}, "records no size")):
             def malformed(registry, pin=pin):
                 registry["judges"][ECAPA]["pins"]["files"]["hyperparams.yaml"] = pin
             with self.subTest(pin=pin):
-                self.assertIn(f"judge {ECAPA}: snapshot file pins name an LFS SHA-256 or a git blob ID",
-                              self._errors(malformed))
+                self.assertIn(f"judge {ECAPA}: snapshot file pin hyperparams.yaml {problem}", self._errors(malformed))
 
     def test_planned_retirements_are_explicitly_deferred(self) -> None:
         ecapa = self.registry["judges"][ECAPA]["plannedRetirement"]
@@ -453,15 +457,15 @@ class PanelAcquisitionTests(unittest.TestCase):
 
     def test_the_panel_is_pinned_candidates_with_provisional_resources(self) -> None:
         panel = {judge_id: judge for judge_id, judge in self.registry["judges"].items() if "acquisition" in judge}
-        self.assertEqual(len(panel), 11)
+        self.assertEqual(len(panel), 12)
         for judge_id, judge in panel.items():
             with self.subTest(judge=judge_id):
-                self.assertIn(judge["status"], ("candidate", "quarantined"))
+                self.assertEqual(judge["status"], "candidate")
                 self.assertEqual((judge["determinismClass"], judge["canary"]), ("unmeasured", None))
                 self.assertEqual(judge["resources"]["ceilingStatus"], "provisional")
                 self.assertIsNone(judge["resources"]["canonicalHostPeakBytes"])
-                execution = judge.get("execution") or judge["plannedExecution"]
-                self.assertEqual(execution["threadsStatus"], "provisional")
+                self.assertNotIn("plannedExecution", judge)
+                self.assertEqual(judge["execution"]["threadsStatus"], "provisional")
                 self.assertIn("threads", judge["identity"]["output"])
                 if judge["kind"] == "neural":
                     pins = judge["pins"]
@@ -472,14 +476,95 @@ class PanelAcquisitionTests(unittest.TestCase):
         for judge_id in ("asr.qwen3-asr-1.7b@1", "align.qwen3-forcedaligner-0.6b@1"):
             self.assertEqual((panel[judge_id]["voting"], panel[judge_id]["independence"]["generatorLabCorrelated"]),
                              (False, True))
-        # A license that differs from the audit quarantines the judge instead of adopting it.
+        # ResNet293 (decision 2026-09-26): CC BY 4.0 accepted at tier B, a stage 2 candidate that votes
+        # only after the correlated-failure audit against CAM++, with its attribution recorded.
         resnet = panel["speaker.resnet293-voxceleb@1"]
-        self.assertEqual((resnet["status"], resnet["voting"]), ("quarantined", False))
-        self.assertNotIn("execution", resnet)
-        self.assertIn("CC BY 4.0", resnet["license"]["weights"])
-        with self.assertRaisesRegex(JudgeRegistryError, "quarantined"):
-            require_loadable("speaker.resnet293-voxceleb@1", resnet["pins"]["repository"], resnet["pins"]["revision"],
-                             registry=self.registry)
+        self.assertEqual((resnet["status"], resnet["voting"], resnet["license"]["tier"], resnet["ships"]),
+                         ("candidate", False, "B", False))
+        self.assertEqual((resnet["execution"]["engine"], resnet["acquisition"]["stage"]), ("wespeaker-onnx", 2))
+        self.assertIn("correlated-failure audit", resnet["votingGate"]["requires"])
+        self.assertEqual(resnet["votingGate"]["status"], "pending")
+        attribution = " ".join(resnet["license"]["notices"])
+        for credit in ("CC BY 4.0", "WeSpeaker", "VoxCeleb"):
+            self.assertIn(credit, attribution)
+        self.assertIs(require_loadable("speaker.resnet293-voxceleb@1", resnet["pins"]["repository"],
+                                       resnet["pins"]["revision"], registry=self.registry), resnet)
+        # DNSMOS (decision 2026-09-26): an advisory, non-voting screen pinned to a GitHub commit.
+        dnsmos = panel["quality.dnsmos-p835@1"]
+        self.assertEqual((dnsmos["voting"], dnsmos["acquisition"]["stage"], dnsmos["execution"]["engine"]),
+                         (False, 2, "dnsmos-onnx"))
+        self.assertEqual((dnsmos["pins"]["source"], dnsmos["pins"]["repository"], dnsmos["pins"]["revision"]),
+                         ("github", "microsoft/DNS-Challenge", "591184a9fcb2cbdec02520fed81a32bbbf9d73ff"))
+        self.assertEqual({name: (pin["size"], pin["gitBlobID"]) for name, pin in dnsmos["pins"]["files"].items()}, {
+            "DNSMOS/DNSMOS/sig_bak_ovr.onnx": (1157965, "814b8dc6dafa729c0b821a64bef2e7156dc0c01a"),
+            "DNSMOS/DNSMOS/model_v8.onnx": (224860, "15f1da4d9142bffa65ac6e9dc2e89857fc85b845"),
+        })
+        self.assertIn("CC BY 4.0", dnsmos["license"]["weights"])
+        self.assertTrue(any("Microsoft DNSMOS" in notice for notice in dnsmos["license"]["notices"]))
+        # VoxLingua's executable hyperparameters carry a content SHA-256 beside their git blob ID.
+        hyperparams = panel["lid.voxlingua107-ecapa@1"]["pins"]["files"]["hyperparams.yaml"]
+        self.assertEqual(set(hyperparams), {"gitBlobID", "sha256", "size"})
+
+    def test_snapshot_file_keys_repositories_and_pins_are_strict(self) -> None:
+        judge_id = "speaker.campplus-voxceleb@1"
+        label = f"judge {judge_id}"
+
+        def with_files(files):
+            def mutate(value):
+                value["judges"][judge_id]["pins"]["files"] = files
+            return mutate
+
+        blob = {"gitBlobID": "a" * 40, "size": 10}
+        for key in ("/etc/passwd", "../escape.yaml", "a/../../escape", "./config.yaml", "a//b", "", "a\\b"):
+            with self.subTest(key=key):
+                self.assertIn(f"{label}: file keys are relative paths with no empty, '.' or '..' part",
+                              self._errors(with_files({key: blob})))
+        self.assertEqual(self._errors(with_files({".gitattributes": blob, "nested/.hidden": blob,
+                                                   "model.onnx": {"lfsSHA256": "b" * 64, "size": 5}})), [])
+        for repository in ("https://huggingface.co/Wespeaker/x", "Wespeaker/x@main", "Wespeaker/x/y",
+                           "huggingface.co/Wespeaker", "Wespeaker", "Wespeaker/../x", "we speaker/x"):
+            def repointed(value, repository=repository):
+                value["judges"][judge_id]["pins"]["repository"] = repository
+            with self.subTest(repository=repository):
+                self.assertIn(f"{label}: a neural judge is pinned by an owner/name repository and an immutable "
+                              "revision", self._errors(repointed))
+        cases = {
+            "records no size": {"gitBlobID": "a" * 40},
+            "names either an LFS SHA-256 or a git blob ID": {"lfsSHA256": "b" * 64, "gitBlobID": "a" * 40, "size": 1},
+            "cannot pin it (it needs its LFS SHA-256)": {"gitBlobID": "a" * 40, "size": 10_000_001},
+            "carries a content SHA-256 only beside a git blob ID": {"lfsSHA256": "b" * 64, "sha256": "c" * 64,
+                                                                    "size": 1},
+            "has a malformed sha256": {"gitBlobID": "a" * 40, "sha256": "not-a-digest", "size": 1},
+        }
+        for problem, pin in cases.items():
+            with self.subTest(problem=problem):
+                self.assertTrue(any(problem in error for error in self._errors(with_files({"README.md": pin}))),
+                                self._errors(with_files({"README.md": pin})))
+        # A large text file can keep its git blob ID only beside its content SHA-256.
+        self.assertEqual(self._errors(with_files({"README.md": {"gitBlobID": "a" * 40, "sha256": "c" * 64,
+                                                                 "size": 10_000_001}})), [])
+        # A panel judge pins every weight file by SHA-256, never by a git blob ID alone.
+        self.assertIn(f"{label}: weight file tiny.onnx is pinned by SHA-256, never by a git blob ID alone",
+                      self._errors(with_files({"tiny.onnx": blob})))
+
+    def test_a_github_snapshot_pins_size_sha256_and_git_blob(self) -> None:
+        judge_id = "quality.dnsmos-p835@1"
+        name = "DNSMOS/DNSMOS/model_v8.onnx"
+
+        def without(field):
+            def mutate(value):
+                del value["judges"][judge_id]["pins"]["files"][name][field]
+            return mutate
+        for field in ("sha256", "gitBlobID"):
+            with self.subTest(field=field):
+                self.assertIn(f"judge {judge_id}: snapshot file pin {name} pins a GitHub file by its size, "
+                              "content SHA-256 and git blob ID", self._errors(without(field)))
+        self.assertIn(f"judge {judge_id}: snapshot file pin {name} records no size", self._errors(without("size")))
+
+        def unknown_source(value):
+            value["judges"][judge_id]["pins"]["source"] = "gitlab"
+        self.assertTrue(any("a pin's source is huggingface or github" in error
+                            for error in self._errors(unknown_source)))
 
     def test_a_runtime_lock_is_digest_bound_exact_and_license_checked(self) -> None:
         registry = copy.deepcopy(self.registry)
@@ -539,17 +624,18 @@ class PanelAcquisitionTests(unittest.TestCase):
                 parse_lock(text)
 
     def test_panel_judges_that_could_not_be_pinned_are_blocked_with_a_reason(self) -> None:
-        blocked = {entry["judge"]: entry for entry in self.registry["acquisitionBlocked"]}
-        self.assertEqual(set(blocked), {"quality.dnsmos-p835@1"})
-        self.assertNotIn("quality.dnsmos-p835@1", self.registry["judges"])
+        # DNSMOS left the list once its GitHub commit was pinned (2026-09-26); nothing is blocked now.
+        self.assertEqual(self.registry["acquisitionBlocked"], [])
+        entry = {"id": "quality.fixture", "judge": "quality.fixture@1", "status": "blocked", "date": "2026-09-26",
+                 "reason": "nothing to pin", "unblock": "pin it"}
 
-        def reasonless(value):
-            value["acquisitionBlocked"][0]["reason"] = ""
-        self.assertTrue(any("records its status, date, reason" in error for error in self._errors(reasonless)))
-
-        def substituted(value):
-            value["acquisitionBlocked"][0]["judge"] = "pitch.pyin@1"
-        self.assertIn("acquisitionBlocked pitch.pyin@1 is also a registered judge", self._errors(substituted))
+        def blocked(value, **overrides):
+            value["acquisitionBlocked"] = [{**entry, **overrides}]
+        self.assertEqual(self._errors(blocked), [])
+        self.assertTrue(any("records its status, date, reason" in error
+                            for error in self._errors(lambda value: blocked(value, reason=""))))
+        self.assertIn("acquisitionBlocked pitch.pyin@1 is also a registered judge",
+                      self._errors(lambda value: blocked(value, judge="pitch.pyin@1")))
 
     def test_a_weightless_judge_runs_only_through_its_gate(self) -> None:
         self.assertIs(require_runnable("pitch.pyin@1", packages=["librosa", "numpy"], registry=self.registry),
@@ -649,6 +735,44 @@ class HubSnapshotVerificationTests(unittest.TestCase):
             verify_hub_snapshot(self.snapshot, {}, revision=self.REVISION)
         with self.assertRaisesRegex(JudgeRegistryError, "not in the local cache"):
             verify_hub_snapshot(self.root / "absent", self.pins, revision=self.REVISION)
+
+    def test_a_content_sha256_beside_a_git_blob_id_is_checked_too(self) -> None:
+        pins = copy.deepcopy(self.pins)
+        pins["hyperparams.yaml"]["sha256"] = hashlib.sha256(self.FILES["hyperparams.yaml"]).hexdigest()
+        self.assertIn("hyperparams.yaml", verify_hub_snapshot(self.snapshot, pins, revision=self.REVISION))
+        pins["hyperparams.yaml"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(JudgeRegistryError, "hyperparams.yaml differs from its registry pin"):
+            verify_hub_snapshot(self.snapshot, pins, revision=self.REVISION)
+
+    def test_a_panel_snapshot_refuses_any_symbolic_link(self) -> None:
+        with self.assertRaisesRegex(JudgeRegistryError, "symbolic link"):
+            verify_hub_snapshot(self.snapshot, self.pins, revision=self.REVISION, allow_symlinks=False)
+        plain = self.root / "plain" / self.REVISION
+        for name, content in self.FILES.items():
+            (plain / name).parent.mkdir(parents=True, exist_ok=True)
+            (plain / name).write_bytes(content)
+        self.assertEqual(set(verify_hub_snapshot(plain, self.pins, revision=self.REVISION, allow_symlinks=False)),
+                         set(self.FILES))
+        # A linked directory inside the snapshot, or a linked snapshot directory, refuses as well.
+        (plain / "nested/label_encoder.txt").unlink()
+        (plain / "nested").rmdir()
+        (plain / "nested").symlink_to(self.snapshot / "nested", target_is_directory=True)
+        with self.assertRaisesRegex(JudgeRegistryError, r"symbolic link \(nested\)"):
+            verify_hub_snapshot(plain, self.pins, revision=self.REVISION, allow_symlinks=False)
+        linked = self.root / "linked" / self.REVISION
+        linked.parent.mkdir()
+        linked.symlink_to(self.snapshot, target_is_directory=True)
+        with self.assertRaisesRegex(JudgeRegistryError, "snapshot directory is a symbolic link"):
+            verify_hub_snapshot(linked, self.pins, revision=self.REVISION, allow_symlinks=False)
+        # A panel judge (one with an acquisition entry) always loads under that rule.
+        registry = load_registry()
+        judge = registry["judges"]["speaker.campplus-voxceleb@1"]
+        judge["pins"]["files"] = self.pins
+        judge["pins"]["revision"] = self.REVISION
+        with self.assertRaisesRegex(JudgeRegistryError, "symbolic link"):
+            verify_judge_snapshot("speaker.campplus-voxceleb@1", self.snapshot,
+                                  repository=judge["pins"]["repository"], revision=judge["pins"]["revision"],
+                                  registry=registry)
 
     def test_a_fabricated_ecapa_snapshot_fails_against_the_registry_pins(self) -> None:
         registry = load_registry()

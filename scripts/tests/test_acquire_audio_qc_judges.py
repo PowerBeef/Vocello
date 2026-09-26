@@ -2,22 +2,28 @@
 """Judge panel acquisition (AQ-06): pinned, resumable, verified downloads, hash-locked runtimes, offline verify.
 
 No test reaches the network: a fake hub serves fixture bytes by URL, and a fake
-runner stands in for `python -m venv`, pip and the import probe.
+runner stands in for `python -m venv`, pip and the import probe, writing a
+site-packages tree whose RECORD files list each installed file's SHA-256.
 """
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 import urllib.error
+import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -29,6 +35,8 @@ CAMPPLUS = "speaker.campplus-voxceleb@1"
 PYIN = "pitch.pyin@1"
 SENSEVOICE = "asr.sensevoice-small-f16@1"
 RESNET = "speaker.resnet293-voxceleb@1"
+DNSMOS = "quality.dnsmos-p835@1"
+SITE_PACKAGES = "lib/python3.14/site-packages"
 
 
 def _blob_id(content: bytes) -> str:
@@ -103,11 +111,31 @@ class FakeHub:
         return FakeResponse(status, body[start:], start, len(body), self.cut.pop(url, None))
 
 
+def _record_hash(content: bytes) -> str:
+    return "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode("ascii")
+
+
+def _install_distribution(venv: Path, name: str, version: str) -> None:
+    """A wheel install as pip leaves it: the module, and a RECORD hashing each file (RECORD itself unhashed)."""
+    site = venv / SITE_PACKAGES
+    module = name.replace("-", "_")
+    files = {f"{module}/__init__.py": f"# fixture {name} {version}\n".encode(),
+             f"{module}-{version}.dist-info/METADATA": f"Name: {name}\nVersion: {version}\n".encode()}
+    rows = []
+    for relative, content in files.items():
+        (site / relative).parent.mkdir(parents=True, exist_ok=True)
+        (site / relative).write_bytes(content)
+        rows.append(f"{relative},{_record_hash(content)},{len(content)}")
+    rows.append(f"{module}-{version}.dist-info/RECORD,,")
+    (site / f"{module}-{version}.dist-info/RECORD").write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
 class FakeRunner:
-    """`python -m venv`, pip, the distribution listing and the import probe, recorded."""
+    """`python -m venv`, pip, the distribution listing and the import probe, recorded with their environments."""
 
     def __init__(self, installed: dict[str, str] | None = None) -> None:
         self.calls: list[list[str]] = []
+        self.environments: list[dict[str, str] | None] = []
         # Given: what the venv holds whatever pip installs. Otherwise pip installs each file it reads.
         self.fixed = installed is not None
         self.installed = installed
@@ -117,19 +145,23 @@ class FakeRunner:
     def __call__(self, argv, *, env=None, capture=False, cwd=None):
         argv = [str(item) for item in argv]
         self.calls.append(argv)
+        self.environments.append(env)
         if argv[1:3] == ["-m", "venv"]:
             python = Path(argv[3]) / "bin/python3"
             python.parent.mkdir(parents=True, exist_ok=True)
             python.write_text("#!fixture\n", encoding="utf-8")
+            _install_distribution(Path(argv[3]), "pip", "26.0")
             return subprocess.CompletedProcess(argv, 0, "", "")
         if argv[1:4] == ["-m", "pip", "install"]:
             if "-r" in argv and not self.fixed:
                 lock = argv[argv.index("-r") + 1]
                 self.installed = dict(self.installed or {})
+                venv = Path(argv[0]).parent.parent
                 for line in Path(lock).read_text(encoding="utf-8").splitlines():
                     if "==" in line and not line.startswith("#"):
                         name, version = line.split()[0].split("==")
                         self.installed[name] = version
+                        _install_distribution(venv, name, version)
             return subprocess.CompletedProcess(argv, 1 if self.pip_fails else 0, "", "")
         if argv[1] == "-c" and argv[2] == acquire.LIST_DISTRIBUTIONS:
             pairs = sorted({**(self.installed or {}), "pip": "26.0"}.items())
@@ -167,6 +199,22 @@ class AcquisitionTests(unittest.TestCase):
         artifact.update(sha256=hashlib.sha256(native).hexdigest(), size=len(native),
                         members={"llama-funasr-sensevoice": hashlib.sha256(self.binary).hexdigest()})
         served[artifact["url"]] = native
+        # DNSMOS, a GitHub-sourced snapshot, pinned to fixture bytes at nested paths.
+        self.dnsmos_content = {"DNSMOS/DNSMOS/sig_bak_ovr.onnx": b"primary" * 900,
+                               "DNSMOS/DNSMOS/model_v8.onnx": b"p808" * 700}
+        dnsmos = self.registry["judges"][DNSMOS]["pins"]
+        dnsmos["files"] = {name: {"sha256": hashlib.sha256(data).hexdigest(), "gitBlobID": _blob_id(data),
+                                  "size": len(data)} for name, data in self.dnsmos_content.items()}
+        for name, data in self.dnsmos_content.items():
+            served[acquire.github_raw_url(dnsmos["repository"], dnsmos["revision"], name)] = data
+        # No committed judge is quarantined or blocked any more: the fixture copy holds one of each.
+        resnet = self.registry["judges"][RESNET]
+        resnet["status"] = "quarantined"
+        resnet["quarantine"] = {"date": "2026-09-26", "reason": "fixture license question"}
+        resnet["plannedExecution"] = resnet.pop("execution")
+        self.registry["acquisitionBlocked"] = [{
+            "id": "quality.fixture-blocked", "judge": "quality.fixture-blocked@1", "status": "blocked",
+            "date": "2026-09-26", "reason": "fixture: nothing to pin", "unblock": "pin it"}]
         self.hub = FakeHub(served)
         self.lock = runtime_lock(self.registry, "onnx-cpu")
 
@@ -191,7 +239,7 @@ class AcquisitionTests(unittest.TestCase):
         self.assertEqual(rows[PYIN]["destination"], None)
         self.assertEqual(rows[RESNET]["state"], "blocked")
         self.assertIn("quarantined", rows[RESNET]["blocked"])
-        self.assertEqual([entry["judge"] for entry in value["acquisitionBlocked"]], ["quality.dnsmos-p835@1"])
+        self.assertEqual([entry["judge"] for entry in value["acquisitionBlocked"]], ["quality.fixture-blocked@1"])
         # Blocked judges never count toward what would be downloaded.
         self.assertEqual(value["modelBytes"], sum(row["bytes"] for row in rows.values() if not row["blocked"]))
         self.assertEqual(sum(value["modelBytesByStage"].values()), value["modelBytes"])
@@ -201,7 +249,7 @@ class AcquisitionTests(unittest.TestCase):
         with self.assertRaisesRegex(acquire.AcquisitionError, "quarantined"):
             acquire.select(self.registry, judges=[RESNET])
         with self.assertRaisesRegex(acquire.AcquisitionError, "blocked"):
-            acquire.select(self.registry, judges=["quality.dnsmos-p835@1"])
+            acquire.select(self.registry, judges=["quality.fixture-blocked@1"])
         with self.assertRaisesRegex(acquire.AcquisitionError, "not a panel judge"):
             acquire.select(self.registry, judges=["asr.whisper-small@1"])
         stage_two = {target.judge_id for target in acquire.select(self.registry, stage=2)}
@@ -237,9 +285,18 @@ class AcquisitionTests(unittest.TestCase):
         # Offline verification passes and never reaches the hub; a second fetch downloads nothing.
         self.hub.offline = True
         results = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)
-        self.assertEqual(results, [{"judge": CAMPPLUS, "status": "PASS", "problems": []}])
+        self.assertEqual([(item["judge"], item["status"], item["problems"]) for item in results],
+                         [(CAMPPLUS, "PASS", [])])
+        checks = results[0]["checks"]
+        # Every locked distribution plus pip: two hashed files each, RECORD itself counted as unhashed.
+        self.assertEqual(checks["runtimeFiles"], 2 * (len(self.lock) + 1))
+        self.assertEqual(checks["unhashedRecordEntries"], len(self.lock) + 1)
+        self.assertEqual((checks["snapshotFiles"], checks["interpreterFiles"]), (3, 1))
+        venvs = sum(1 for call in runner.calls if call[1:3] == ["-m", "venv"])
         again = self._fetch(CAMPPLUS, runner=runner)
         self.assertEqual([item["judge"] for item in again["fetched"]], [CAMPPLUS])
+        # A verified runtime is reused, not rebuilt.
+        self.assertEqual(sum(1 for call in runner.calls if call[1:3] == ["-m", "venv"]), venvs)
 
     def test_an_interrupted_download_resumes_from_where_it_stopped(self) -> None:
         judge = self.registry["judges"][CAMPPLUS]
@@ -378,6 +435,185 @@ class AcquisitionTests(unittest.TestCase):
         config = launch["engineConfig"]
         self.assertEqual(config["snapshot"], str(self.root / "wespeaker-voxceleb-campplus-lm" / self.revision))
         self.assertEqual((config["judge"], config["revision"]), (CAMPPLUS, self.revision))
+
+
+    # ------------------------------------------------------------------ #
+    # Supply-chain hardening (AQ-06 review)
+    # ------------------------------------------------------------------ #
+
+    def test_every_venv_and_pip_step_reads_no_pip_configuration_file(self) -> None:
+        runner = FakeRunner()
+        self._fetch(CAMPPLUS, runner=runner)
+        steps = [(call, env) for call, env in zip(runner.calls, runner.environments)
+                 if call[1:3] == ["-m", "venv"] or call[1:4] == ["-m", "pip", "install"]]
+        self.assertGreaterEqual(len(steps), 2)
+        for call, env in steps:
+            with self.subTest(step=call[1:4]):
+                self.assertEqual(env["PIP_CONFIG_FILE"], os.devnull)
+                self.assertNotIn("PIP_INDEX_URL", env)
+
+    def test_a_venv_file_that_differs_from_its_record_fails_verify_and_is_rebuilt(self) -> None:
+        runner = FakeRunner()
+        self._fetch(CAMPPLUS, runner=runner)
+        self.hub.offline = True
+        venv = self.root / self.registry["acquisition"]["runtimes"]["onnx-cpu"]["venv"]
+        module = venv / SITE_PACKAGES / "onnxruntime/__init__.py"
+        module.write_text("import os  # swapped\n", encoding="utf-8")
+        result = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)[0]
+        self.assertEqual(result["status"], "FAIL")
+        self.assertTrue(any("1 installed files differ from their RECORD (first: onnxruntime/__init__.py)" in problem
+                            for problem in result["problems"]), result["problems"])
+        # A missing recorded file and a distribution without a RECORD are refused too.
+        module.unlink()
+        record = next((venv / SITE_PACKAGES).glob("numpy-*.dist-info")) / "RECORD"
+        record.unlink()
+        problems = acquire.venv_record_check(venv)[0]
+        self.assertTrue(any("recorded files are missing" in problem for problem in problems))
+        self.assertTrue(any("has no RECORD" in problem for problem in problems))
+        # fetch reuses a runtime only when the full check passes: this one is rebuilt.
+        venvs = sum(1 for call in runner.calls if call[1:3] == ["-m", "venv"])
+        self.hub.offline = False
+        self._fetch(CAMPPLUS, runner=runner)
+        self.assertEqual(sum(1 for call in runner.calls if call[1:3] == ["-m", "venv"]), venvs + 1)
+        result = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)[0]
+        self.assertEqual(result["status"], "PASS", result["problems"])
+
+    def test_a_record_entry_outside_the_venv_is_refused(self) -> None:
+        venv = self.root / "venv"
+        _install_distribution(venv, "fixture", "1.0")
+        record = venv / SITE_PACKAGES / "fixture-1.0.dist-info/RECORD"
+        record.write_text(record.read_text(encoding="utf-8") + "../../../../outside.py,sha256=abc,3\n",
+                          encoding="utf-8")
+        problems, counts = acquire.venv_record_check(venv)
+        self.assertIn("fixture-1.0.dist-info records a path outside the venv", problems)
+        self.assertEqual((counts["runtimeFiles"], counts["unhashedRecordEntries"]), (2, 1))
+
+    def test_the_interpreter_is_rehashed_against_its_pin_and_its_archive(self) -> None:
+        runner = FakeRunner()
+        self._fetch(CAMPPLUS, runner=runner)
+        spec = self.registry["acquisition"]["interpreter"]
+        python = acquire.interpreter_python(self.root, spec)
+        python.write_bytes(b"#!swapped interpreter\n")
+        result = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)[0]
+        self.assertIn("1 extracted interpreter files differ from the pinned archive (first: python/bin/python3.14)",
+                      result["problems"])
+        # fetch re-extracts an interpreter that no longer matches its archive, from the verified archive.
+        acquire.ensure_interpreter(self.root, spec, opener=self.hub, sleep=lambda _seconds: None)
+        self.assertEqual(python.read_bytes(), b"#!fixture interpreter\n")
+        self.assertEqual(acquire.interpreter_check(self.root, spec)[0], [])
+        # The archive itself is re-hashed against its pin on every verify.
+        archive = self.root / spec["archiveDirectory"] / spec["archive"]
+        archive.write_bytes(archive.read_bytes() + b"\0")
+        result = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)[0]
+        self.assertIn("the interpreter archive is missing or differs from its pinned SHA-256", result["problems"])
+
+    def test_a_symbolic_link_inside_a_panel_snapshot_fails_verify(self) -> None:
+        runner = FakeRunner()
+        self._fetch(CAMPPLUS, runner=runner)
+        snapshot = self.root / "wespeaker-voxceleb-campplus-lm" / self.revision
+        elsewhere = self.root / "elsewhere-config.yaml"
+        elsewhere.write_bytes(self.content["config.yaml"])
+        (snapshot / "config.yaml").unlink()
+        (snapshot / "config.yaml").symlink_to(elsewhere)
+        result = acquire.verify(self.root, self.registry, [self._target(CAMPPLUS)], runner=runner)[0]
+        self.assertEqual(result["status"], "FAIL")
+        self.assertTrue(any("symbolic link (config.yaml)" in problem for problem in result["problems"]))
+
+    def test_a_snapshot_path_that_resolves_outside_the_model_root_is_refused(self) -> None:
+        outside = Path(self.temporary.name) / "outside"
+        outside.mkdir()
+        judge_directory = self.root / "wespeaker-voxceleb-campplus-lm"
+        judge_directory.mkdir(parents=True)
+        (judge_directory / self.revision).symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(acquire.AcquisitionError, "resolves outside the model root"):
+            self._fetch(CAMPPLUS)
+        self.assertEqual(list(outside.iterdir()), [])
+        self.assertFalse(any(url.startswith(acquire.HUB) for url, _range in self.hub.requests))
+
+    def test_the_whole_selection_must_fit_before_anything_is_fetched(self) -> None:
+        selection = [self._target(CAMPPLUS), self._target(PYIN)]
+        needed = acquire.disk_requirement(self.root, self.registry, selection)
+        runtimes = self.registry["acquisition"]["runtimes"]
+        expected_runtimes = sum(int(runtimes[family]["downloadBytes"] * acquire.INSTALLED_BYTES_PER_DOWNLOADED_BYTE)
+                                for family in ("onnx-cpu", "librosa-dsp"))
+        self.assertEqual(needed["modelBytes"], sum(len(data) for data in self.content.values()))
+        self.assertEqual(needed["runtimeInstallBytes"], expected_runtimes)
+        self.assertEqual(needed["totalBytes"], needed["modelBytes"] + needed["runtimeInstallBytes"]
+                         + needed["interpreterBytes"] + acquire.FREE_SPACE_MARGIN_BYTES)
+        usage = shutil_usage(free=needed["totalBytes"] - 1)
+        with mock.patch.object(acquire.shutil, "disk_usage", return_value=usage):
+            with self.assertRaisesRegex(acquire.AcquisitionError, "nothing was fetched"):
+                self._fetch(CAMPPLUS, PYIN)
+        self.assertEqual(self.hub.requests, [])
+        # A built runtime and a fetched snapshot no longer count toward what a fetch needs.
+        self._fetch(CAMPPLUS)
+        after = acquire.disk_requirement(self.root, self.registry, selection)
+        self.assertEqual(after["modelBytes"], 0)
+        self.assertEqual(after["runtimeInstallBytes"],
+                         int(runtimes["librosa-dsp"]["downloadBytes"] * acquire.INSTALLED_BYTES_PER_DOWNLOADED_BYTE))
+        self.assertEqual(after["interpreterBytes"], 0)
+
+    def test_a_github_snapshot_downloads_from_its_pinned_commit_and_verifies(self) -> None:
+        runner = FakeRunner()
+        report = self._fetch(DNSMOS, runner=runner)
+        self.assertEqual([item["judge"] for item in report["fetched"]], [DNSMOS])
+        pins = self.registry["judges"][DNSMOS]["pins"]
+        urls = {url for url, _range in self.hub.requests if "raw.githubusercontent.com" in url}
+        self.assertEqual(urls, {f"https://raw.githubusercontent.com/microsoft/DNS-Challenge/{pins['revision']}/{name}"
+                                for name in self.dnsmos_content})
+        snapshot = self.root / "dnsmos-p835" / pins["revision"]
+        for name, data in self.dnsmos_content.items():
+            self.assertEqual((snapshot / name).read_bytes(), data)
+        self.hub.offline = True
+        result = acquire.verify(self.root, self.registry, [self._target(DNSMOS)], runner=runner)[0]
+        self.assertEqual(result["status"], "PASS", result["problems"])
+        # Both digests bind a GitHub file: bytes with the right blob ID but another SHA-256 are refused.
+        name = "DNSMOS/DNSMOS/model_v8.onnx"
+        pins["files"][name]["sha256"] = "0" * 64
+        result = acquire.verify(self.root, self.registry, [self._target(DNSMOS)], runner=runner)[0]
+        self.assertTrue(any(f"snapshot file {name} differs from its registry pin" in problem
+                            for problem in result["problems"]))
+
+
+def shutil_usage(*, free: int) -> SimpleNamespace:
+    """A disk_usage result with the given free bytes."""
+    return SimpleNamespace(total=free * 2, used=free, free=free)
+
+
+class TransportTests(unittest.TestCase):
+    """Downloads and every redirect stay on https and on the pinned hosts."""
+
+    def test_only_https_on_the_download_hosts_is_allowed(self) -> None:
+        for url in ("https://huggingface.co/x/y/resolve/abc/file", "https://cdn-lfs-us-1.hf.co/repos/a/b",
+                    "https://cas-bridge.xethub.hf.co/xet", "https://us.gcp.cdn.huggingface.co/x",
+                    "https://github.com/astral-sh/python-build-standalone/releases/download/x.tar.gz",
+                    "https://objects.githubusercontent.com/github-production-release-asset/x",
+                    "https://release-assets.githubusercontent.com/github-production-release-asset/x",
+                    "https://raw.githubusercontent.com/microsoft/DNS-Challenge/abc/DNSMOS/x.onnx"):
+            with self.subTest(url=url):
+                self.assertTrue(acquire.allowed_download_url(url))
+        for url in ("http://huggingface.co/x", "https://evil.example/x", "https://huggingface.co.evil.example/x",
+                    "https://nothf.co/x", "https://user:secret@huggingface.co/x", "https://huggingface.co:8443/x",
+                    "ftp://huggingface.co/x", "https://gist.githubusercontent.com/x", "file:///etc/passwd"):
+            with self.subTest(url=url):
+                self.assertFalse(acquire.allowed_download_url(url))
+
+    def test_a_redirect_is_followed_only_to_an_allowed_https_host(self) -> None:
+        handler = acquire.PinnedRedirectHandler()
+        request = urllib.request.Request("https://huggingface.co/x/y/resolve/abc/model.onnx",
+                                         headers={"Range": "bytes=10-"})
+        followed = handler.redirect_request(request, None, 302, "Found", {}, "https://cdn-lfs.hf.co/x?signed=1")
+        self.assertEqual(followed.full_url, "https://cdn-lfs.hf.co/x?signed=1")
+        for target in ("http://cdn-lfs.hf.co/x", "https://mirror.example/x?token=secret"):
+            with self.subTest(target=target), self.assertRaisesRegex(acquire.AcquisitionError, "redirected") as caught:
+                handler.redirect_request(request, None, 302, "Found", {}, target)
+            self.assertNotIn("secret", str(caught.exception))
+
+    def test_a_download_url_off_the_allowed_hosts_is_refused_before_any_connection(self) -> None:
+        with mock.patch.object(acquire._OPENER, "open", side_effect=AssertionError("connected")):
+            with self.assertRaisesRegex(acquire.AcquisitionError, "not an allowed https download host"):
+                acquire._open(urllib.request.Request("http://huggingface.co/x"), 1.0)
+        self.assertTrue(any(isinstance(handler, acquire.PinnedRedirectHandler) for handler in acquire._OPENER.handlers))
 
 
 class CommandLineTests(unittest.TestCase):

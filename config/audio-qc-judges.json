@@ -79,7 +79,7 @@
     "outputPolicyEntry": "delivery-analysis-cache",
     "stages": {
       "1": "The content voters for the six current languages (Whisper large-v3, Parakeet v3, Paraformer-zh, SenseVoice f16), the language-ID vote, speaker family 1 and pYIN.",
-      "2": "The non-voting adjudicator and aligner and the advisory quality judge; speaker family 2 once its quarantine lifts."
+      "2": "The non-voting adjudicator and aligner, speaker family 2 (ResNet293, non-voting until the correlated-failure audit) and the advisory quality judges (Audiobox Aesthetics and DNSMOS P.835)."
     },
     "interpreter": {
       "id": "cpython-3.14.4+20260414",
@@ -101,6 +101,7 @@
       "audiobox-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/audiobox-torch.txt", "lockSHA256": "51e1ad40299a122add1688e7ac93c36bac2922e69cc8aaad63d2b388f4c5dc71", "packages": 32, "downloadBytes": 114454742, "sourceBuilds": [], "venv": "audio-qc-runtime-audiobox-torch-py314", "importProbe": ["torch", "torchaudio", "audiobox_aesthetics.infer"]},
       "onnx-cpu": {"kind": "venv", "lock": "config/audio-qc-runtimes/onnx-cpu.txt", "lockSHA256": "d9328ed263b6818cbce98894e98a2bd38b7eb00d741f2751ebda56fab4224dd3", "packages": 6, "downloadBytes": 37091817, "sourceBuilds": [], "venv": "audio-qc-runtime-onnx-cpu-py314", "importProbe": ["onnxruntime", "kaldi_native_fbank", "numpy"]},
       "librosa-dsp": {"kind": "venv", "lock": "config/audio-qc-runtimes/librosa-dsp.txt", "lockSHA256": "bb585a7a43ff7521cc2d8368bf7e2a0cc62581ba182f35dbb142fc5c8eba8f51", "packages": 31, "downloadBytes": 98754182, "sourceBuilds": [], "venv": "audio-qc-runtime-librosa-dsp-py314", "importProbe": ["librosa", "numpy"]},
+      "onnx-librosa": {"kind": "venv", "lock": "config/audio-qc-runtimes/onnx-librosa.txt", "lockSHA256": "9770c7827d2268d921d70e804759885eaa0a3c9da140ee7b9a15329ea7d81731", "packages": 34, "downloadBytes": 120782195, "sourceBuilds": [], "venv": "audio-qc-runtime-onnx-librosa-py314", "importProbe": ["onnxruntime", "librosa.feature", "numpy"], "note": "Its own family, so the stage 1 onnx-cpu and librosa-dsp venvs keep their locks: the librosa-dsp pins plus onnx-cpu's onnxruntime, flatbuffers and protobuf."},
       "sensevoice-llamacpp": {"kind": "native", "artifact": "sensevoice-llamacpp-runtime-v0.1.9", "binary": "llama-funasr-sensevoice", "note": "The worker runs on the standalone interpreter itself (standard library only); the model runs in the pinned native binary."}
     },
     "artifacts": {
@@ -967,7 +968,7 @@
           "classifier.ckpt": {"lfsSHA256": "a50d9024ff58d317031c9787d4c6c614d454a87a8ef32f9d36338cd3ff57adbc", "size": 762555},
           "config.json": {"gitBlobID": "6fad8e826fd6808012326b33e4beb8d4e083d808", "size": 51},
           "embedding_model.ckpt": {"lfsSHA256": "ab750d5c06d713477045fa798fab5d33e959dbc0dfe4de510a9a47844c79a19a", "size": 84474355},
-          "hyperparams.yaml": {"gitBlobID": "27d80047d277c45575779937a92cb829d4158528", "size": 1519},
+          "hyperparams.yaml": {"gitBlobID": "27d80047d277c45575779937a92cb829d4158528", "sha256": "88fec9791a8416a152fb10834327e18d38e5bf7a351e9b714e08cdc4af05de6f", "size": 1519},
           "label_encoder.txt": {"gitBlobID": "addb319892122ba2e7ddb4d01e0c87c4833dab38", "size": 2204},
           "normalizer.ckpt": {"lfsSHA256": "c369e01dfa2e0d84c6b116f33c7b94f1fe28c061642086538e93cde3d97c26ef", "size": 1063},
           "udhr_th.wav": {"lfsSHA256": "5bdc3a0a686eed58c6ccff264c5605a3c245e6598610dcc6e355104758acc6d7", "size": 1146684}
@@ -1062,16 +1063,20 @@
     "speaker.resnet293-voxceleb@1": {
       "role": "Speaker-identity family 2 (audit section 4.3): a second architecture on the same VoxCeleb data, replacing the excluded WavLM-large SV checkpoint.",
       "kind": "neural",
-      "status": "quarantined",
+      "status": "candidate",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": "speaker-resnet293",
       "ships": false,
-      "quarantine": {
+      "licenseDecision": {
         "date": "2026-09-26",
         "item": "AQ-06",
-        "reason": "The model card at the pinned revision declares CC BY 4.0, while the audit (section 4.3) recorded an Apache-2.0 card. The tier would stay B (permissive weights, VoxCeleb training audio), and WeSpeaker's pretrained-model notes say VoxCeleb models follow the dataset's CC BY 4.0, but a license that differs from the audit is not adopted without a decision.",
-        "lift": "A maintainer decision accepting CC BY 4.0 (attribution) for this tier-B judge: set status to candidate and voting to true, and move plannedExecution to execution. Its pins are complete, so acquisition then fetches it with stage 2."
+        "decision": "The maintainer accepts the CC BY 4.0 license the model card declares at the pinned revision (the audit, section 4.3, had recorded Apache-2.0). The tier stays B: internal evaluation only, never shipped (decision 2a). The quarantine of 2026-09-26 is lifted.",
+        "attribution": "CC BY 4.0: WeSpeaker ResNet293-LM (wenet-e2e/wespeaker), trained on VoxCeleb"
+      },
+      "votingGate": {
+        "status": "pending",
+        "requires": "The correlated-failure audit (audit section 5) against CAM++, which shares its VoxCeleb training data. Until it passes, ResNet293 runs as a non-voting candidate; it votes only after that audit, jointly with CAM++."
       },
       "panel": {"audit": "4.3"},
       "pins": {
@@ -1088,13 +1093,13 @@
         "runtime": {"onnxruntime": "1.30.0", "kaldi-native-fbank": "1.22.3", "numpy": "2.4.6"}
       },
       "license": {
-        "weights": "CC BY 4.0 (Hugging Face card at the pinned revision; the audit recorded Apache-2.0)",
+        "weights": "CC BY 4.0 (Hugging Face card at the pinned revision; accepted by the maintainer decision of 2026-09-26, where the audit recorded Apache-2.0)",
         "code": "Apache-2.0 (WeSpeaker export); the feature and embedding code is owned",
         "trainingData": "VoxCeleb 2 development set (5,994 speakers): YouTube-derived celebrity speech; copyright stays with the owners; no explicit non-commercial term",
         "tier": "B",
         "trainingDataRisk": "scraped-web-audio",
         "commercialUseCompatible": true,
-        "notices": ["CC BY 4.0 attribution: WeSpeaker, ResNet293-LM (Wang et al., ICASSP 2023)"],
+        "notices": ["CC BY 4.0 attribution: WeSpeaker ResNet293-LM (wenet-e2e/wespeaker; Wang et al., ICASSP 2023), trained on VoxCeleb (Nagrani et al.; CC BY 4.0, copyright of the audio stays with the original owners). Internal evaluation only; never shipped or redistributed."],
         "sources": ["https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet293-LM", "https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md"]
       },
       "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
@@ -1111,7 +1116,7 @@
         "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "preprocessing", "hostProfile", "threads"],
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
-      "plannedExecution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
       "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit estimate about 0.3 GB (section 3.4), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "expectedDeterminismClass": "D0",
@@ -1211,6 +1216,67 @@
       "expectedDeterminismClass": "D0",
       "canary": null,
       "acquisition": {"directory": "audiobox-aesthetics", "stage": 2, "runtime": "audiobox-torch"}
+    },
+    "quality.dnsmos-p835@1": {
+      "role": "Secondary advisory quality screen (audit section 4.6): DNSMOS P.835 SIG, BAK and OVRL (and the P.808 MOS its reference script reports), a screen, not a naturalness judge; never reaches warn.",
+      "kind": "neural",
+      "status": "candidate",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "licenseDecision": {
+        "date": "2026-09-26",
+        "item": "AQ-06",
+        "decision": "The maintainer accepts DNSMOS P.835 as an advisory, non-voting screen under the CC BY 4.0 license of microsoft/DNS-Challenge, fetched from that repository at the pinned commit. It leaves acquisitionBlocked.",
+        "attribution": "CC BY 4.0: Microsoft DNSMOS P.835 (microsoft/DNS-Challenge; Reddy, Gopal and Cutler, ICASSP 2022); the owned engine ports dnsmos_local.py (MIT, Copyright (c) Microsoft Corporation)"
+      },
+      "panel": {"audit": "4.6"},
+      "pins": {
+        "source": "github",
+        "repository": "microsoft/DNS-Challenge",
+        "revision": "591184a9fcb2cbdec02520fed81a32bbbf9d73ff",
+        "files": {
+          "DNSMOS/DNSMOS/model_v8.onnx": {"sha256": "9246480c58567bc6affd4200938e77eef49468c8bc7ed3776d109c07456f6e91", "gitBlobID": "15f1da4d9142bffa65ac6e9dc2e89857fc85b845", "size": 224860},
+          "DNSMOS/DNSMOS/sig_bak_ovr.onnx": {"sha256": "269fbebdb513aa23cddfbb593542ecc540284a91849ac50516870e1ac78f6edd", "gitBlobID": "814b8dc6dafa729c0b821a64bef2e7156dc0c01a", "size": 1157965}
+        },
+        "filesSource": "The GitHub contents API at the pinned commit (read 2026-09-26): each file's path, size and git blob ID. Both files are small and not in LFS; each was fetched once into a temporary directory to record its content SHA-256, its bytes matching the blob ID, and deleted. Only the regular P.835 model and the P.808 model are pinned; sig.onnx, bak_ovr.onnx and the personalized pDNSMOS model are not used.",
+        "sourceScript": {"path": "DNSMOS/dnsmos_local.py", "gitBlobID": "e32032e97541fde9a98fdc12745d5c1e09e5c7f1", "size": 6491, "portedTo": "scripts/lib/qc_pipeline/panel_engines.py (DnsmosScorer)"},
+        "digestStatus": "content-addressed-snapshot",
+        "verification": "scripts/acquire_audio_qc_judges.py fetches exactly these files from raw.githubusercontent.com at the pinned commit into the owned model root, refusing any size, SHA-256 or git blob mismatch; before every load the worker verifies the snapshot directory holds exactly these files, each matching its pin (verify_judge_snapshot), and refuses an excluded runtime package. Nothing is downloaded at load time.",
+        "runtime": {"onnxruntime": "1.30.0", "librosa": "0.11.0", "numpy": "2.4.6", "numba": "0.67.0", "scipy": "1.18.1"}
+      },
+      "license": {
+        "weights": "CC BY 4.0 (microsoft/DNS-Challenge LICENSE at the pinned commit, which covers the repository's content, the DNSMOS ONNX models included)",
+        "code": "MIT (microsoft/DNS-Challenge LICENSE-CODE) for dnsmos_local.py, whose scoring the owned engine ports with credit",
+        "trainingData": "Crowdsourced ITU-T P.835 ratings (Microsoft) of noisy and noise-suppressed DNS Challenge clips; the repository lists the challenge corpora under their original terms: LibriVox (public domain), PTDB-TUG (ODbL), Edinburgh 56 speakers and VCTK (ODC-By), VocalSet (CC BY 4.0), CREMA-D (DbCL), VoxCeleb2 (CC BY 4.0, copyright with the video owners), AudioSet (CC BY 4.0), Freesound (CC0 only), DEMAND (CC BY-SA 3.0) and OpenSLR 26/28 (Apache-2.0); no explicit non-commercial term",
+        "tier": "B",
+        "tierBasis": "The audit (section 4.6) rated DNSMOS A with its training-data terms still to confirm. Confirmed at acquisition: the weights are CC BY 4.0, but the corpora its ratings were collected on include VoxCeleb2, YouTube-derived audio whose copyright stays with the owners, which this registry places in tier B for every judge. Internal evaluation only (decision 2a).",
+        "trainingDataRisk": "scraped-web-audio",
+        "commercialUseCompatible": true,
+        "notices": ["CC BY 4.0 attribution: Microsoft DNSMOS P.835 (microsoft/DNS-Challenge; C. K. A. Reddy, V. Gopal and R. Cutler, ICASSP 2022). Internal evaluation only; never shipped or redistributed.", "MIT: the DNSMOS scoring in scripts/lib/qc_pipeline/panel_engines.py is ported from microsoft/DNS-Challenge DNSMOS/dnsmos_local.py, Copyright (c) Microsoft Corporation."],
+        "sources": ["https://github.com/microsoft/DNS-Challenge/tree/591184a9fcb2cbdec02520fed81a32bbbf9d73ff/DNSMOS", "https://arxiv.org/abs/2110.01763"]
+      },
+      "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
+      "independence": {
+        "vendor": "Microsoft Research (DNS Challenge)",
+        "architecture": "DNSMOS P.835 convolutional regressor on the raw 16 kHz waveform (9.01 s windows), plus the P.808 model on 120-bin log-mel features",
+        "trainingData": "DNS Challenge P.835 crowdsourced ratings",
+        "labelLineage": "human ITU-T P.835 ratings of noise-suppression output",
+        "generatorLabCorrelated": false,
+        "correlationNotes": "Trained on noise-suppression conditions, not TTS; a relative screen whose SIG and BAK read noise and suppression artifacts, not naturalness (audit section 4.6)."
+      },
+      "configuration": {"sampleRateHz": 16000, "personalized": false, "primaryModel": "DNSMOS/DNSMOS/sig_bak_ovr.onnx", "p808Model": "DNSMOS/DNSMOS/model_v8.onnx", "inputLengthSeconds": 9.01, "hopSeconds": 1.0, "p808": {"trimSamples": 160, "nMels": 120, "nFft": 321, "hopLength": 160, "padMode": "reflect", "toDb": "power_to_db(ref=max), then (x + 40) / 40"}, "calibration": {"SIG": [-0.08397278, 1.22083953, 0.0052439], "BAK": [-0.13166888, 1.60915514, -0.39604546], "OVRL": [-0.06766283, 1.11546468, 0.04602535]}, "aggregate": "mean over scored windows"},
+      "identity": {
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeDependenciesDigest", "runtimeVersions", "workerSourceSHA256", "engine", "configuration", "hostProfile", "threads"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
+      },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "dnsmos-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 1, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": 805306368, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 4.6 estimate (about 0.25 GB), raised to 768 MiB for the interpreter, ONNX Runtime, librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "expectedDeterminismClass": "D0",
+      "canary": null,
+      "acquisition": {"directory": "dnsmos-p835", "stage": 2, "runtime": "onnx-librosa"}
     }
   },
   "excluded": [
@@ -1242,7 +1308,5 @@
   "useRestrictions": [
     {"id": "qwen2-audio-per-take-judge", "reason": "Qwen2-Audio shares the generator's lab (decision 3a) and samples its answers (determinism class D2), so a per-take verdict is neither independent nor repeatable (audit section 4.9).", "models": ["*Qwen2-Audio*"], "forbiddenUse": "A per-take judge, a vote or a verdict.", "permittedUse": "Research only: pairwise A/B per cell in both orders, scored by answer log-probabilities (audit section 4.7); a matching judge records this restriction as its useRestriction, never votes and is never warn or gating."}
   ],
-  "acquisitionBlocked": [
-    {"id": "quality.dnsmos-p835", "judge": "quality.dnsmos-p835@1", "role": "Secondary advisory quality screen (audit section 4.6): DNSMOS P.835 OVRL, SIG and BAK.", "status": "blocked", "date": "2026-09-26", "reason": "Its only official source is the microsoft/DNS-Challenge GitHub repository (DNSMOS ONNX files); no Microsoft-owned Hugging Face repository holds it and community mirrors are not the audited source, so no revision or file digest could be pinned from Hugging Face metadata. The audit also leaves its training-data terms to confirm at acquisition.", "unblock": "Pin the DNS-Challenge commit and each ONNX file's digest from the repository's own metadata, confirm the DNSMOS training-data terms, then register it as a candidate with an ONNX Runtime engine."}
-  ]
+  "acquisitionBlocked": []
 }

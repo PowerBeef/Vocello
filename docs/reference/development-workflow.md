@@ -97,7 +97,9 @@ pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. 
 in about 65 to 90 seconds on the development Mac (Mac mini M6). `scripts/tests/conftest.py` marks
 modules by name: `research` (audio, delivery, prosody and device-analysis tooling) runs when those
 paths change and nightly. No module needs the macOS host: the benchmark publisher's host probes
-(`swift -e`, `devicectl`) are mocked in its tests, so every module runs on Linux. Every run prints its slowest
+(`swift -e`, `devicectl`) are mocked in its tests, so every module runs on Linux. Linux jobs run on
+`ubuntu-24.04` (its Python 3.12), never `ubuntu-latest`, so an image migration cannot move the
+interpreter under the gate; move the label deliberately. Every run prints its slowest
 tests; a test that outgrows its lane moves, it does not slow every push. `pytest.ini` already passes
 `-q`; adding another `-q` drops the summary line, so judge a run by pytest's exit code.
 

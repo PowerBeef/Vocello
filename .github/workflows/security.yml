@@ -21,7 +21,7 @@ concurrency:
 jobs:
   npm-advisory-audit:
     name: npm advisory audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -50,7 +50,7 @@ jobs:
         include:
           - language: javascript-typescript
             build-mode: none
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - language: swift
             build-mode: manual
             runner: macos-26
@@ -106,7 +106,7 @@ jobs:
     name: Security required
     needs: [npm-advisory-audit, codeql]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Aggregate security results

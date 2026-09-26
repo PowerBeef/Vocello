@@ -45,7 +45,7 @@ concurrency:
 jobs:
   changes:
     name: Change routing
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -115,7 +115,7 @@ jobs:
 
   contracts:
     name: Repository contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -151,7 +151,7 @@ jobs:
     name: Python tests (linux)
     needs: changes
     if: needs.changes.outputs.python == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -493,7 +493,7 @@ jobs:
     name: Website deterministic checks
     needs: changes
     if: needs.changes.outputs.website == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -524,7 +524,7 @@ jobs:
   dependency-submission:
     name: Submit Swift dependency graph
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
@@ -560,7 +560,7 @@ jobs:
     name: CI required
     needs: [changes, contracts, python, macos-tests, macos-tsan, ios-compile, website, dependency-submission]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       # On a pull request the macOS jobs and the dependency submission are

@@ -540,6 +540,34 @@ export_attachments() {
 # match an existing row, so a prompt can still appear despite a decided row.
 # That path is only reachable when the virtual-microphone fixture is broken;
 # the smoke suite asserts the fixture explicitly.
+# Whether the benchmark lane arms played-audio capture (PC-01). The runner needs
+# its own System Audio Recording grant; on macOS 27 the first process tap raises
+# that prompt and blocks the runner until it is answered, so an unattended run
+# would stall and fail its capture take. QVOICE_MAC_BENCH_PLAYBACK_CAPTURE picks:
+# auto (default) arms capture unless the TCC database shows no grant, on always
+# arms it, off never does. Unarmed, takes pace and play out exactly the same and
+# the record simply carries no capture evidence.
+mac_bench_playback_capture_enabled() {
+  local mode="${QVOICE_MAC_BENCH_PLAYBACK_CAPTURE:-auto}" rows
+  case "$mode" in
+    on) return 0 ;;
+    off)
+      note "playback capture off (QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=off): the record carries no capture evidence"
+      return 1 ;;
+    auto) ;;
+    *) die "QVOICE_MAC_BENCH_PLAYBACK_CAPTURE must be auto, on or off (got '$mode')" ;;
+  esac
+  if rows="$(sqlite3 -readonly "$HOME/Library/Application Support/com.apple.TCC/TCC.db"       "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests.xctrunner';"       2>/dev/null)"; then
+    if [[ "$rows" != *2* ]]; then
+      note "playback capture off: the UI test runner has no System Audio Recording grant (docs/reference/macos-permissions.md); the record carries no capture evidence"
+      return 1
+    fi
+    return 0
+  fi
+  warn "cannot read the TCC database to confirm the runner's System Audio Recording grant; capture stays armed, and without the grant macOS 27 prompts at the first captured take and blocks the runner until it is answered (QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=off skips capture)"
+  return 0
+}
+
 # Played-audio capture (PC-01). Xcode signs the generated XCTRunner app with
 # the App Sandbox on, which blocks both the process tap and every write under
 # build/artifacts (the coordinator's files silently never appear). The lane
@@ -547,8 +575,9 @@ export_attachments() {
 # using the stable Apple Development identity when the keychain has one so the
 # System Audio Recording grant's designated requirement survives rebuilds; an
 # ad-hoc signature binds that grant to one code hash and every rebuild of the
-# test bundle voids it. Creating a process tap never prompts on macOS 26, so
-# the grant is added by hand once (docs/reference/macos-permissions.md).
+# test bundle voids it. Creating a process tap never prompts on macOS 26 (the
+# grant is added by hand once); macOS 27 prompts at the first tap, and one
+# Autoriser on the re-signed runner lasts (docs/reference/macos-permissions.md).
 prepare_runner_for_playback_capture() {
   local runner="$MAC_DERIVED/Build/Products/Release/VocelloMacUITests-Runner.app"
   local plist="$runner/Contents/Info.plist"
@@ -642,7 +671,7 @@ mac_ui_preflight() {
         2>/dev/null)"; then
       note "ui-preflight: TCC database unreadable (no Full Disk Access) — cannot verify kTCCServiceAudioCapture"
     elif [[ -z "$rows" ]]; then
-      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — a process tap never prompts; add the runner once by hand or playback capture evidence stays unavailable (docs/reference/macos-permissions.md)"
+      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — the benchmark lane runs without capture; grant it once (macOS 27 prompts at the first captured take; docs/reference/macos-permissions.md)"
     fi
   fi
   return 0
@@ -1248,7 +1277,7 @@ validate_macos_benchmark() {
         --variant speed \
         --seed-policy "$seed_policy" \
         --allocation "$matrix_allocation" --matrix-version "$matrix_version" \
-        --playback-capture-dir "$out/playback-capture" \
+        ${bench_playback_capture_dir:+--playback-capture-dir "$bench_playback_capture_dir"} \
         --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" \
         >"$out/benchmark-gate.txt" 2>&1 || status=$?
     (( status == 75 && SECONDS < deadline )) || break
@@ -1502,8 +1531,11 @@ elif [[ "$platform" == "macos" ]]; then
     export TEST_RUNNER_QVOICE_MAC_BENCH_ALLOCATION="$matrix_allocation"
     # Played-audio capture (PC-01): the runner taps the app's own output per take
     # and writes take-NN-<cell>.wav/.json here; absent captures never fail the lane.
-    mkdir -p "$out/playback-capture"
-    export TEST_RUNNER_QVOICE_MAC_BENCH_CAPTURE_DIR="$out/playback-capture"
+    if mac_bench_playback_capture_enabled; then
+      bench_playback_capture_dir="$out/playback-capture"
+      mkdir -p "$bench_playback_capture_dir"
+      export TEST_RUNNER_QVOICE_MAC_BENCH_CAPTURE_DIR="$bench_playback_capture_dir"
+    fi
     # The 8 GB floor emulated on this Mac (audit #11 option b): the runner hands
     # the registered knobs to the app. Emulated rows stamp a forced tier and the
     # emulated RAM, so the record publishes only as exploratory evidence; a

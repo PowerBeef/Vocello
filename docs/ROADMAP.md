@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audio-qc-audit-2026-09` | active | backend-mlx | 2/9 (22%) |
+| `audio-qc-audit-2026-09` | active | backend-mlx | 4/9 (44%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
@@ -24,7 +24,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 22/33 (67%) |
+| `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -95,8 +95,6 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `AQ-02` | in-flight | Normalization v2 and ten-language coverage | — |
-| `AQ-04` | planned | Stage 0 observational DSP and engine introspection | — |
-| `AQ-05` | planned | Staged pipeline, workers and admission | `AQ-01` |
 | `AQ-06` | planned | Judge panel acquisition and M6 qualification | `AQ-01`, `AQ-05` |
 | `AQ-07` | planned | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
 | `AQ-08` | planned | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
@@ -106,12 +104,6 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 
 - **`AQ-02`** (in-flight) — Normalization v2 and ten-language coverage.
   gate: Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.
-
-- **`AQ-04`** (planned) — Stage 0 observational DSP and engine introspection.
-  gate: Every new field has procedural tests with exact expected values; fields are additive to QC v8 with no verdict change; the Python mirror matches Swift on fixtures.
-
-- **`AQ-05`** (planned) — Staged pipeline, workers and admission.
-  gate: One worker per model per run; the admission semaphore enforces registry ceilings; an L0-L2 cache replay reproduces current cascade and language verdicts exactly; the evidence schema and private bundle validate; DistilHuBERT and the uncalibrated heads leave the QC paths.
 
 - **`AQ-06`** (planned) — Judge panel acquisition and M6 qualification.
   gate: Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.
@@ -515,6 +507,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-26` | in-flight | Low-severity backlog from the external audit | — |
 | `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
 | `PA-31` | in-flight | The engine store reports frontend state changes with the streaming engine | — |
+| `PA-33` | planned | Engine-side lease for model deletion | — |
 
 ### Open items in detail
 
@@ -550,6 +543,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-31`** (in-flight) — The engine store reports frontend state changes with the streaming engine.
   gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
+
+- **`PA-33`** (planned) — Engine-side lease for model deletion.
+  gate: Deleting a model's files takes an engine-side lease that refuses or waits out every load, warm (including a model-only warm that publishes no state) and generation of that model until the files are gone, with tests over the engine's operation gate.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

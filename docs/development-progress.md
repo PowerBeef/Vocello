@@ -17,6 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 26, evening — wave 11 shipped; lanes run; UI lanes wait for one permission
+
+Wave 11 is on `main` with CI green: AQ-05 (staged QC orchestrator) and AQ-04 (Stage 0 signals and
+engine introspection) are closed, PA-32 closed earlier, and PA-26 batches B3-B5 landed. The
+release environment holds its 11 secrets (PA-10). Lanes on the M6: the gate bench passes after
+AQ-04 (RTF +0.46%, identical tokens); the first Time Profiler CPU profile publishes (CPU Profiler
+needs root for kpc on macOS 27, instrument-profile v4); the memory profile stalls after its
+tokenizer loads under Allocations (BT-06); the orchestrator's first real run reproduces
+witness_verdict on 19 takes and exposed a Traditional-script false fail (AQ-02 P2b folding in
+flight). The stall calibration found two harness bugs (a take finishing between polls; the
+Studio identifier hiding the card's), both fixed; take 4 then waited on macOS 27's System Audio
+Recording prompt for the test runner. The benchmark lane now skips capture when it cannot see
+the grant (`QVOICE_MAC_BENCH_PLAYBACK_CAPTURE`). Next: integrate AQ-02 P2b and PA-26 B1 and B2
+(agents), then the stall calibration without capture, and with the maintainer at the Mac, one
+Autoriser for the runner, then the canonical M6 UI benchmark (AV-17 step 2) and ui-perf x3.
+
 ### September 26, afternoon — wave 11 integrated locally; paused for a terminal restart
 
 Local `main` is ahead of `origin/main` by the wave 11 batch, not yet pushed. It holds AQ-05 (staged

@@ -60,15 +60,21 @@ the recurring permission pain.
   app's own audio output from `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests.xctrunner`, usage
   string in `project.yml`). Xcode signs that runner sandboxed, which would block the tap and the
   capture files, so the lane re-signs it without entitlements after the build, with the same
-  Apple Development identity `build.sh` uses (ad hoc only when none is installed). Creating a
-  process tap never prompts on macOS 26: an ungranted runner simply receives silence. Add the
-  runner once by hand under System Settings → Privacy & Security → Screen & System Audio Recording
-  → *System Audio Recording Only* (plus button, Cmd+Shift+G,
-  `build/cache/xcode/macos-optimized/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
-  the login password) **after** a benchmark lane has re-signed it. An identity-signed grant survives
-  rebuilds; an ad-hoc one binds to a single code hash and needs redoing after every rebuild.
-  Ungranted, the lane still passes with `playbackCaptureStatus: unavailable` or `silent` on every
-  take. Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
+  Apple Development identity `build.sh` uses (ad hoc only when none is installed). On macOS 26
+  creating a process tap never prompts (an ungranted runner receives silence), so add the runner
+  once by hand under System Settings → Privacy & Security → Screen & System Audio Recording →
+  *System Audio Recording Only* (plus button, Cmd+Shift+G,
+  `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
+  the login password) **after** a benchmark lane has re-signed it. On macOS 27 the first captured
+  take raises « VocelloMacUITests-Runner souhaite enregistrer le contenu audio système »: click
+  **Autoriser** once while the lane runs, so the grant attaches to the re-signed runner (a grant
+  added in System Settings before that binds to whatever build is on disk). An identity-signed
+  grant survives rebuilds; an ad-hoc one binds to a single code hash and needs redoing after
+  every rebuild. The prompt blocks the runner until it is answered, so an unattended benchmark
+  lane arms capture only when it can: `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (default) skips
+  capture when the TCC database shows no grant, `off` always skips it, `on` always arms it.
+  Unarmed, the takes pace and play out the same and the record carries no capture evidence.
+  Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
   Every macOS lane also verifies the runner's signature before launching it and re-signs it in
   place when a build interrupted between Xcode's Info.plist rewrite and its CodeSign step left
   it invalid (launchd otherwise refuses to spawn it: "Runningboard has returned error 5" with

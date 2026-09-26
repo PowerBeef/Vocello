@@ -1146,8 +1146,8 @@
         "config/delivery-evaluator-v2-contract.json"
       ],
       "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
-      "notes": "M6 canonical since 2026-09-22 (maintainer decision); history starts a new series, and until (2) lands the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as Mac mini M2 8 GB. Step (1) done 2026-09-25: three seeded gate runs from 848e140a seeded the M6 baseline (RTF 0.265, engine first chunk 145 ms, 52 tokens/s, footprint 2,501 MB, MLX peak 2,376 MB, between-run ranges at most 0.7%). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c passed all 11 takes and calibrated the unobserved-gap bound (2x / 500 ms kept) and retained-memory v2 (16 MB per mode). Gate compares pass; the 2-3% timing drift is between sessions. Automation Mode no longer needs authentication; the UI lanes (stall calibration, step 2, step 3) need an unlocked session. Step (5) is unblocked. Step (6): emulate the 8 GB floor with the registered knob, claims limited to policy and footprint (#11 b). Step (5) is re-scoped by the accepted audio QC audit: NISQA retires, DistilHuBERT leaves QC and SenseVoice moves to f16, so AQ-06 qualifies the new panel instead of requalifying the old candidates.",
-      "updated": "2026-09-25"
+      "notes": "M6 canonical since 2026-09-22 (maintainer decision); history starts a new series, and until (2) lands the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820. Step (1) done 2026-09-25: three seeded gate runs seeded the M6 baseline (RTF 0.265, first chunk 145 ms, 52 tokens/s). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c calibrated the gap bound and retained-memory v2. Gate compares pass (2026-09-26 after wave 11: mac-gate-bench-20260926-180734-fe43583b). Step (5) is re-scoped by the audio QC audit: AQ-06 qualifies the new judge panel. Step (6) emulation passed (exploratory). Steps (2) and (3) wait for the maintainer at the Mac: the UI test runner needs macOS 27's System Audio Recording grant (one Autoriser on the lane's prompt; see BT-03), then the stall calibration, the first canonical M6 UI benchmark with charts, README and website in the same commit, and three ui-perf sessions.",
+      "updated": "2026-09-26"
     },
     {
       "id": "AUD-01",
@@ -1410,7 +1410,7 @@
       "sourceOfTruth": [
         "docs/audits/2026-09-22-project-audit.md"
       ],
-      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed. From AUD-08: console-only error prints (not persisted) in IOSAudioSessionOwner, QVoiceiOSApp, IOSGenerationModeViews, IOSVoicePreviewPlayer, MacVoiceCloningScreen, MacStudioGenerationActions, LivePreviewDiagnostics and the package's stderr paths. 2026-09-26: B5 fixed WEB-02 (AVIF screenshots, lazy loading, 32/180 px icons, four unused assets removed; first load 0.46 MB from 5.6), WEB-06, WEB-07, WEB-08, the Discussions links (REPO-05), SEC-11 scanner tokens, SEC-17 checkout credentials, CI-11, CI-14 (ubuntu-24.04), CI-15, CI-18, DOC-05, DOC-09; B4 fixed IOS-18, IOS-19, IOS-21, IOS-25b, IOS-25c (Studio shows no take-time copy failure) and the iOS AUD-08 prints. Open: B1-B3, B6, CI-16, CI-21, DOC-10 (3.0 README), Cancel during an iOS save.",
+      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows no other item covers (ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02 to WEB-08, UX-01, REPO-01 to REPO-05), worked in batches by area; the verification addendum lists rows that are wrong or already fixed. 2026-09-26: B5 (website AVIF and 0.46 MB first load, headings, stable-tag links, robots and sitemap, issue links; scanner tokens, checkout credentials, CI-11, CI-14, CI-15, CI-18; DOC-05, DOC-09), B4 (IOS-18, 19, 21, 25b, 25c and the iOS AUD-08 prints) and B3 (MAC-04, 09b, 12 to 20, 22 partly, 23, 24, 25b, the Mac AUD-08 prints, IOS-16; review fixes: model deletion unloads first unless another model is loaded, per-process recording folders) landed. Open: B1 and B2 (in flight), B6, CI-16, CI-21, DOC-10 (3.0 README), MAC-05 with PA-08.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-26"
     },
@@ -1474,8 +1474,8 @@
         "config/ui-perf-thresholds.json",
         "scripts/ui_test.sh"
       ],
-      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Maintainer decisions 2026-09-25: a provisional 250 ms stall limit that reports only until an M6 run calibrates it (#6); ui-perf ceilings from run-to-run spread (#34); pooled medians (#72); the 8 GB floor emulated (#11 b); open decisions delegated to the audit's recommendations. Landed (waves 7-8): stall contract, censored heartbeats, Speed per take, spread ceilings, floor knob, per-take load, pacing, seeds stamped. Wave 9: seed policy cell-hash-v1 on both platforms (#29); cell aggregate 2, declared matrices and the ui_bench_allocation tool (#30); one capture per cell, pasted scripts (#31); a harness-control scenario and phases (#32 #82); pure-UI sidebar navigation plus a warms scenario (#33); window heartbeats, sample p95, clipped maxGap (#80 #81); the M2 ui-perf ceilings marked stale (#77/#78); iOS load and sampler interval (#28 #33); lean iOS pulls (#21). #74 part 4 documented, no product change. Open: the stall calibration run, three counted ui-perf sessions, two seeded runs for seed determinism, a measured matrix reallocation, iPhone runs.",
-      "updated": "2026-09-25"
+      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Decisions 2026-09-25: a provisional 250 ms stall limit that reports only until an M6 run calibrates it; spread-derived ui-perf ceilings; pooled medians; the 8 GB floor emulated. Landed (waves 7-9): stall contract, censored heartbeats, Speed per take, spread ceilings, floor knob, per-take load, pacing, seed policy cell-hash-v1, cell aggregate 2 and ui_bench_allocation, one capture per cell, harness-control and warms scenarios, window heartbeats, the M2 ceilings marked stale, iOS load and sampler interval. 2026-09-26 stall-calibration attempts on the M6: a warm short take finished between two polls (the start check now accepts a new completed card) and the Studio screen identifier hid the card's per-take identifier (screens are containers now); takes 1-3 then pass, and take 4, the first playback capture, waits on macOS 27's System Audio Recording prompt for VocelloMacUITests-Runner (the lane re-signs it with the Apple Development identity, so one Autoriser on the prompt lasts). Open: that grant (maintainer at the Mac), the calibration run, three ui-perf sessions, seed determinism runs, matrix reallocation, iPhone runs.",
+      "updated": "2026-09-26"
     },
     {
       "id": "BT-04",
@@ -1520,8 +1520,8 @@
         "Sources/QwenVoiceCore/NativeTelemetry.swift",
         "scripts/ios_device.sh"
       ],
-      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Landed (wave 8): the token read's own timer, Duration totals, observed pipelined wait, per-take signpost statistics, device waits on markers. Wave 9: all per-step intervals on the allocation-free os_signpost path; v9 mlxInstantProvenance, outputAdapterIdentityVersion 4; sink hand-off totals (#61); ttfcObserverLagMS from a per-chunk hand-off stamp, withMirroredSignpost removed (#48); TOC duration (#96); profile --kind witness (#99/#50); cpuPlausibility (#97); early stop and SIGINT (#51/#52); tail decode (#60); trace.instrumented (#69); predicted-end first probes (#87); crash classification (#45). M6 2026-09-25: gate compares pass after waves 8 and 9 with timing 1.6-3.4% off the seeded runs; telemetry-overhead puts instrumentation at +0.3% (lightweight) and +0.6% (verbose) RTF, and telemetry off itself reads 2.4% above the baseline, so the offset is between-session drift, not instrumentation. Open: #98 GPU trace kind; cross-session gate noise (#106) before any re-seed; M6 kept-trace CPU and witness profiles; iPhone memory profile, VM guard and device waits.",
-      "updated": "2026-09-25"
+      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Landed (waves 8-9): the token read's own timer and signpost, all per-step intervals on the allocation-free os_signpost path, v9 mlxInstantProvenance and outputAdapterIdentityVersion 4, sink hand-off totals (#61), ttfcObserverLagMS from a per-chunk stamp (#48), TOC duration (#96), profile --kind witness (#99/#50), cpuPlausibility (#97), early stop and SIGINT (#51/#52), tail decode (#60), trace.instrumented (#69), predicted-end probes (#87), crash classification (#45). M6: the witness profile passes the 36x(tokens+1) interval check; gate drift is between sessions (instrumentation +0.3-0.6%). 2026-09-26: CPU Profiler needs root for kpc on macOS 27, so Mac CPU and memory profiles sample with Time Profiler (instrument-profile v4); the first v4 CPU profile publishes 4,332 samples and 12,036 intervals (mac-cpu-profile-20260926-181200-bfb871c8). The memory profile timed out: the bench sat blocked after its tokenizer loaded under Allocations + VM Tracker (mac-memory-profile-20260926-181312-6c30ec6a, 567 CPU samples in 180 s). Open: that stall; #98 GPU trace kind; #106 gate noise; iPhone memory profile, VM guard and device waits.",
+      "updated": "2026-09-26"
     },
     {
       "id": "AQ-02",
@@ -1536,37 +1536,6 @@
       "notes": "Wave 10 landed P2a (2026-09-26): normalization v2 in Python and Swift with byte-exact parity over a shared fixture plus a generated Unicode sweep (102 cases): Korean syllable CER, NFKC and casefold, Latin folds, recognizer-tag stripping, bracket and filler safety, space-free CER, ten-language tables; a corpus lint refusing digits, symbols and per-language abbreviations; accuracy metric normalization-v2-edit-rate-v3, language measurement version 4, the in-app languageASR gate at algorithm 6; the promotion contract routes VoiceClipTranscriber. Replay: no published verdict changes. Open: P2b (OpenCC, cn2an, num2words, fugashi pins and downloads), the CC0 ten-language script pool, and a consented lang-bench under v3.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-26"
-    },
-    {
-      "id": "AQ-04",
-      "title": "Stage 0 observational DSP and engine introspection",
-      "status": "planned",
-      "gate": "Every new field has procedural tests with exact expected values; fields are additive to QC v8 with no verdict change; the Python mirror matches Swift on fixtures.",
-      "sourceOfTruth": [
-        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
-        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
-        "scripts/lib/audio_qc.py"
-      ],
-      "notes": "Audit AQ-F08-F12, F49 (P4): BS.1770 loudness and true peak, noise floor and SNR, bandwidth, spectral-flux events, codec-frame modulation, seam discontinuity, self-similarity repetition, and the engine's own signals (codec-token cycles, EOS trajectory, entropy). Additive observational fields keep QC v8, valid under either option of decision 8 (the M6 gate baseline binds v8). Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25"
-    },
-    {
-      "id": "AQ-05",
-      "title": "Staged pipeline, workers and admission",
-      "status": "planned",
-      "gate": "One worker per model per run; the admission semaphore enforces registry ceilings; an L0-L2 cache replay reproduces current cascade and language verdicts exactly; the evidence schema and private bundle validate; DistilHuBERT and the uncalibrated heads leave the QC paths.",
-      "sourceOfTruth": [
-        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
-        "scripts/delivery_resource_supervisor.py",
-        "config/delivery-evaluator-v2-contract.json"
-      ],
-      "notes": "Audit AQ-F41, F42, F44, F46, F48 (P5). Replaces one process launch per clip and the host-wide single-analyzer lock sized for 8 GB. The admission semaphore and the child-attributed recovery rule are decision 9; the rest can start once AQ-01's registry exists. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25",
-      "blockedBy": [
-        "AQ-01"
-      ]
     },
     {
       "id": "AQ-06",
@@ -1644,6 +1613,19 @@
         "AQ-01",
         "AQ-03"
       ]
+    },
+    {
+      "id": "PA-33",
+      "plan": "project-audit-2026-09",
+      "title": "Engine-side lease for model deletion",
+      "status": "planned",
+      "gate": "Deleting a model's files takes an engine-side lease that refuses or waits out every load, warm (including a model-only warm that publishes no state) and generation of that model until the files are gone, with tests over the engine's operation gate.",
+      "sourceOfTruth": [
+        "Sources/Services/MacModelDeletionSequence.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "notes": "Found by the PA-26 B3 review on 2026-09-26. MacModelDeletionSequence unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation.",
+      "updated": "2026-09-26"
     }
   ]
 }

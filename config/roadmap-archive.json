@@ -4115,6 +4115,40 @@
       ],
       "notes": "Closed 2026-09-26 (wave 11; maintainer decision 2026-09-25). A non-cancelled failure that leaves a model resident (failed load, ensure-load, prewarm, prefetch, clone prime, either generation path) arms the normal per-tier idle unload; from .failed (or the .idle a dismiss leaves) it releases the weights under the admission gate and keeps the failed state, message, latest event and a failed clone preparation until the user's next action (dismiss, a take, a load or leaving Clone); a stale .primed resets. Relief reopening admission re-arms it, and a cancelled take now re-arms idle unload too. Captured MLX failures and cancellations never arm it; the Mac warmup coordinator still does not warm from .failed, so after a failure a mode change warms only once the user dismisses or generates. Tests over the real engine behind the store (TTSEngineStoreTests) cover each failure kind, the next action, cancellation and the snapshot bridge.",
       "updated": "2026-09-26"
+    },
+    {
+      "id": "AQ-04",
+      "title": "Stage 0 observational DSP and engine introspection",
+      "status": "done",
+      "gate": "Every new field has procedural tests with exact expected values; fields are additive to QC v8 with no verdict change; the Python mirror matches Swift on fixtures.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "scripts/lib/audio_qc.py",
+        "Sources/QwenVoiceCore/AudioQCSignalObserver.swift",
+        "scripts/lib/audio_qc_observations.py",
+        "config/audio-qc-stage0-observations.json"
+      ],
+      "notes": "Closed 2026-09-26 (wave 11; decision 8a keeps QC v8). Stage 0 adds observational fields only, in AudioQCReport.signal (its own algorithmVersion 1): BS.1770-4 integrated, short-term maximum and LRA, 4x true peak, p10 noise floor, WADA-SNR, effective bandwidth, clustered flux events per second, the 12.5 Hz modulation index, a seam z-score at chunk seams and the repetition stripe (600 ms, cos 0.95). The Python mirror (scripts/lib/audio_qc_observations.py) matches Swift natively on shared fixtures pinned by config/audio-qc-stage0-observations.json; verdicts are unchanged. Engine introspection (codec-token cycles, EOS trajectory, entropy, seams) runs on a compiled scalar graph inside the step's own evaluation; a review fix makes a failed compiled call reach the typed MLX failure and keeps one trace per generation. The seeded M6 gate bench measured the cost: RTF +0.46%, first chunk +1.4%, tokens/s -0.14%, footprint flat and generated tokens identical (mac-gate-bench-20260926-180734-fe43583b), so the fields stay on in every take and no measurement version moves.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-26"
+    },
+    {
+      "id": "AQ-05",
+      "title": "Staged pipeline, workers and admission",
+      "status": "done",
+      "gate": "One worker per model per run; the admission semaphore enforces registry ceilings; an L0-L2 cache replay reproduces current cascade and language verdicts exactly; the evidence schema and private bundle validate; DistilHuBERT and the uncalibrated heads leave the QC paths.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "scripts/delivery_resource_supervisor.py",
+        "config/delivery-evaluator-v2-contract.json",
+        "scripts/audio_qc_orchestrator.py",
+        "scripts/audio_qc_worker.py",
+        "scripts/lib/qc_pipeline/admission.py"
+      ],
+      "notes": "Closed 2026-09-26 (wave 11; decision 9a). One orchestrator (scripts/audio_qc_orchestrator.py) runs Stages 1-3 after the generator exits with one persistent worker per judge per run (scripts/audio_qc_worker.py), admitted by a budgeted semaphore (10 GiB provisional, one MLX GPU worker beside at most two CPU workers, registry ceilings enforced live on the worker's process group) under one host-wide analysis lock; an L0-L2 cache keyed by output identities with verdicts never cached; take-evidence/1 records and an untracked private bundle; DistilHuBERT and the fitted heads retired from every QC path. An adversarial review found nine defects (host-wide lock, orphaned worker, crash isolation, process-group ceilings, timeout scaling, trivially satisfiable binding evidence, cache keys, concurrent adoption); all were fixed with tests. First real run 2026-09-26: 19 lang-bench takes through the whisper-small worker reproduce witness_verdict exactly (status, expectation, error rates, channels, reasons). The child-attributed recovery rule stays report-only (candidateBinding false) until committed M6 recovery reports bind it.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-26"
     }
   ]
 }

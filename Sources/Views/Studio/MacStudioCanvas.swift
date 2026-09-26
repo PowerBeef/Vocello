@@ -255,7 +255,11 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 isFocused: $isScriptFocused,
                 tracking: MacType.style(.script).tracking,
                 clearRequest: clearScriptRequest,
-                clearActionName: MacInterfaceText.studioClearScript
+                clearUndoTitles: MacUndoActionTitles(
+                    actionName: MacInterfaceText.studioClearScript,
+                    undoMenuTitle: MacInterfaceText.studioUndoClearScript,
+                    redoMenuTitle: MacInterfaceText.studioRedoClearScript
+                )
             )
             .frame(maxWidth: .infinity)
             .frame(minHeight: MacStudioMetrics.composerMinHeight, maxHeight: .infinity)

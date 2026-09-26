@@ -3,19 +3,20 @@ import XCTest
 /// MAC-16 / IOS-16: take file names and the iPhone's output-folder override.
 final class GenerationOutputFileNameTests: XCTestCase {
     private let utc = TimeZone(identifier: "UTC")!
-    /// 2026-09-26 14:03:07.512 UTC.
-    private let date = Date(timeIntervalSince1970: 1_790_431_387.512)
+    /// 2026-09-26 14:03:07.250 UTC. A quarter second is exact in binary, so the
+    /// millisecond field cannot round down to the previous value.
+    private let date = Date(timeIntervalSince1970: 1_790_431_387.25)
 
     func testTheTimestampIsGregorianWithASCIIDigits() {
         let stamp = GenerationOutputFileName.timestamp(for: date, timeZone: utc)
-        XCTAssertEqual(stamp, "20260926_14-03-07-512")
+        XCTAssertEqual(stamp, "20260926_14-03-07-250")
         XCTAssertTrue(stamp.allSatisfy { $0.isASCII })
     }
 
     func testTheNameJoinsTheTimestampAndTheSnippet() {
         XCTAssertEqual(
             GenerationOutputFileName.make(text: "Hello, world!", date: date, timeZone: utc),
-            "20260926_14-03-07-512_Hello_world.wav"
+            "20260926_14-03-07-250_Hello_world.wav"
         )
     }
 

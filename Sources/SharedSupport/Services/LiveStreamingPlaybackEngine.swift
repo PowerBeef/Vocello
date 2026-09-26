@@ -49,12 +49,10 @@ final class LiveStreamingPlaybackEngine {
     var onConfigurationChange: (@MainActor () -> Void)?
     private var configurationObserver: NSObjectProtocol?
 
-    deinit {
-        MainActor.assumeIsolated {
-            if let configurationObserver {
-                NotificationCenter.default.removeObserver(configurationObserver)
-            }
-        }
+    /// Runs on the main actor even when the last reference goes elsewhere (an
+    /// `isolated deinit` hops there instead of trapping like `assumeIsolated`).
+    isolated deinit {
+        stopObservingConfigurationChanges()
     }
 
     var isConfigured: Bool {

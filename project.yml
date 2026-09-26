@@ -541,6 +541,9 @@ targets:
       - path: Sources/SharedSupport/Services/WaveformService.swift
       - path: Sources/SharedSupport/ViewModels/ReferenceClipRecordingStash.swift
       - path: Sources/Models/VoiceCloningReferenceAudioSupport.swift
+      # MAC-20: a model deletion's engine side over a fake engine (and the
+      # store's conformance, compiled above).
+      - path: Sources/Services/MacModelDeletionSequence.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB

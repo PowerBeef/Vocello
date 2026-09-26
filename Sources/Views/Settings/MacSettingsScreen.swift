@@ -107,7 +107,8 @@ struct MacSettingsScreen: View {
             Button(MacInterfaceText.delete, role: .destructive) {
                 if let model = modelToDelete {
                     Task {
-                        if await viewModel.delete(model) == .blockedByActiveGeneration {
+                        // A busy engine, or an unload it refused, kept the files.
+                        if await viewModel.delete(model).showsEngineBusyAlert {
                             showDeleteBlocked = true
                         }
                     }

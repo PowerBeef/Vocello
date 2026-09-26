@@ -27,8 +27,9 @@ struct MacScriptTextEditor: NSViewRepresentable {
     /// Bumped by a Clear control: the editor empties itself as an ordinary,
     /// undoable edit, so Edit > Undo (⌘Z) brings the script back (MAC-24).
     var clearRequest: Int = 0
-    /// Names the undo action for a Clear ("Undo Clear" in the Edit menu).
-    var clearActionName: String? = nil
+    /// Names a Clear in the Edit menu ("Undo Clear", "Redo Clear"): the whole
+    /// titles come from the catalog in the interface language.
+    var clearUndoTitles: MacUndoActionTitles? = nil
 
     static func typingAttributes(font: NSFont, color: NSColor, tracking: CGFloat) -> [NSAttributedString.Key: Any] {
         var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
@@ -116,11 +117,12 @@ struct MacScriptTextEditor: NSViewRepresentable {
             textView.needsDisplay = true
         }
         applyAccessibilityDescription(to: textView)
+        context.coordinator.applyUndoTitles()
         if context.coordinator.appliedClearRequest != clearRequest {
             context.coordinator.appliedClearRequest = clearRequest
             // After this update: the edit reports back through the delegate,
             // which writes the binding, and a view update must not.
-            let actionName = clearActionName
+            let actionName = clearUndoTitles?.actionName
             Task { @MainActor in
                 textView.clearAsUndoableEdit(actionName: actionName)
             }
@@ -144,21 +146,71 @@ struct MacScriptTextEditor: NSViewRepresentable {
         }
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MacScriptTextEditor
         var textState: ScriptTextState
         var appliedClearRequest: Int
+        /// The editor's own undo stack, used when it names a Clear (MAC-24).
+        let scriptUndoManager: MacScriptUndoManager
 
         init(_ parent: MacScriptTextEditor, initialText: String, clearRequest: Int) {
             self.parent = parent
             textState = ScriptTextState(initialText)
             appliedClearRequest = clearRequest
+            scriptUndoManager = MacScriptUndoManager()
+            super.init()
+            applyUndoTitles()
+        }
+
+        func applyUndoTitles() {
+            let titles = parent.clearUndoTitles.map { [$0] } ?? []
+            if scriptUndoManager.namedActions != titles {
+                scriptUndoManager.namedActions = titles
+            }
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textState.recordNativeEdit(textView.string)
         }
+
+        /// An editor that names a Clear keeps its own undo stack, so the Edit
+        /// menu titles that action in the interface language. Any other editor
+        /// answers what the text view would without a delegate: the responder
+        /// chain's undo manager (the window's).
+        func undoManager(for view: NSTextView) -> UndoManager? {
+            parent.clearUndoTitles == nil ? view.nextResponder?.undoManager : scriptUndoManager
+        }
+    }
+}
+
+/// An undoable action's Edit-menu names in the interface language (MAC-24).
+struct MacUndoActionTitles: Equatable {
+    /// The name the edit registers (`UndoManager.setActionName`).
+    let actionName: String
+    /// The whole Undo menu title, such as "Undo Clear".
+    let undoMenuTitle: String
+    /// The whole Redo menu title, such as "Redo Clear".
+    let redoMenuTitle: String
+}
+
+/// The script editor's undo manager (MAC-24). AppKit builds "Undo <action>"
+/// in the system language, so an action named from the interface-language
+/// catalog would read half translated; the actions this manager names take
+/// their whole titles from the catalog, and every other action (typing, paste)
+/// keeps AppKit's.
+final class MacScriptUndoManager: UndoManager {
+    var namedActions: [MacUndoActionTitles] = []
+
+    override func undoMenuTitle(forUndoActionName actionName: String) -> String {
+        namedActions.first { $0.actionName == actionName }?.undoMenuTitle
+            ?? super.undoMenuTitle(forUndoActionName: actionName)
+    }
+
+    override func redoMenuTitle(forUndoActionName actionName: String) -> String {
+        namedActions.first { $0.actionName == actionName }?.redoMenuTitle
+            ?? super.redoMenuTitle(forUndoActionName: actionName)
     }
 }
 

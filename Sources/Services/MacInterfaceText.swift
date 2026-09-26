@@ -1657,6 +1657,14 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.studio.clearScript", defaultValue: "Clear",
                comment: "macOS interface: composer action that empties the script. Presentation only.")
     }
+    static var studioUndoClearScript: String {
+        localization.string(localized: "vocello.mac.studio.undoClearScript", defaultValue: "Undo Clear",
+               comment: "macOS interface: Edit menu item that restores the script the composer's Clear emptied. Presentation only.")
+    }
+    static var studioRedoClearScript: String {
+        localization.string(localized: "vocello.mac.studio.redoClearScript", defaultValue: "Redo Clear",
+               comment: "macOS interface: Edit menu item that empties the script again after Undo Clear. Presentation only.")
+    }
     static var studioCloningVoice: String {
         localization.string(localized: "vocello.mac.studio.cloningVoice", defaultValue: "Cloning voice…",
                comment: "macOS interface: generating-bar subline in Voice Cloning. Presentation only.")

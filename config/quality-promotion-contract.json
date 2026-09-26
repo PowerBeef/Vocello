@@ -383,6 +383,7 @@
           "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
           "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift",
           "Sources/ViewModels/ModelManagerViewModel.swift",
+          "Sources/Services/MacModelDeletionSequence.swift",
           "Sources/VocelloCLI/CLIRuntime.swift",
           "Sources/VocelloCLI/ModelsCommand.swift",
           "Sources/QwenVoiceCore/SharedModelComponentStore.swift",

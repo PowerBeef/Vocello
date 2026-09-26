@@ -19,14 +19,15 @@ final class VoiceCloningReferenceAudioSupportTests: XCTestCase {
         )
     }
 
-    func testTheSystemQueryAnswersForThisHost() {
+    /// Whatever this runner's AudioToolbox reads, the offered list keeps its
+    /// invariants; the host's own capability is not asserted.
+    func testTheOfferedListFollowsThisHostsProbe() {
         let readable = VoiceCloningReferenceAudioSupport.systemReadableAudioExtensions()
-        XCTAssertTrue(readable.contains("wav"))
-        XCTAssertFalse(readable.contains("webm"))
-        XCTAssertEqual(
-            VoiceCloningReferenceAudioSupport.allowedFileExtensions.contains("ogg"),
-            readable.contains("ogg")
-        )
+        let offered = VoiceCloningReferenceAudioSupport.allowedFileExtensions
+        XCTAssertFalse(offered.contains("webm"), "WebM is never offered, whatever the probe reports")
+        XCTAssertTrue(offered.isSuperset(of: VoiceCloningReferenceAudioSupport.baseFileExtensions))
+        XCTAssertEqual(offered.contains("ogg"), readable.contains("ogg"), "Ogg is offered exactly when the probe reads it")
+        XCTAssertEqual(offered, VoiceCloningReferenceAudioSupport.allowedFileExtensions(systemReadableExtensions: readable))
     }
 
     func testThePanelListsTheAllowedTypesAndNotEveryAudioType() {

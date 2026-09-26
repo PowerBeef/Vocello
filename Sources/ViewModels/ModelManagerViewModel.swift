@@ -874,45 +874,59 @@ final class ModelManagerViewModel {
         self.engine = engine
     }
 
-    enum DeletionOutcome: Equatable {
-        case deleted
-        /// A generation is running; nothing was changed.
-        case blockedByActiveGeneration
-        case failed
-    }
+    typealias DeletionOutcome = MacModelDeletionSequence.Outcome
 
+    /// MAC-20: never removes files the engine is using. A take, a line batch or
+    /// long-form project between two takes, or a load, warm or prime blocks the
+    /// deletion; the package's weights are released first when they are
+    /// loaded, and a refused unload keeps the files (`MacModelDeletionSequence`).
     @discardableResult
     func delete(_ model: TTSModel) async -> DeletionOutcome {
-        if let engine {
-            // MAC-20: never delete under a running generation, and release the
-            // package's weights before its files go.
-            guard !engine.hasActiveGeneration else { return .blockedByActiveGeneration }
-            if engine.loadedModelID == model.id {
-                do {
-                    try await engine.unloadModel()
-                } catch {
-                    if DebugMode.isEnabled {
-                        print("[ModelManagerViewModel] unload before delete failed: \(DiagnosticPrivacy.summary(of: error))")
-                    }
-                }
-                guard !engine.hasActiveGeneration else { return .blockedByActiveGeneration }
-            }
-        }
-        await stopAndClear(for: model.id)
-
         let modelDir = model.installDirectory(in: modelsDirectory)
-        // Staging first: its reuse pins would otherwise keep the blobs the delete
-        // releases. The downloader is already stopped.
-        HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
-        do {
-            try SharedModelComponentStore(modelsRoot: modelsDirectory).deleteModel(
-                modelFolder: modelDir.lastPathComponent,
-                reclamation: .background
-            )
-        } catch {
-            lastFailureMessages[model.id] = error.localizedDescription
+        var stoppedDownloads = false
+        var removalError: (any Error)?
+        let outcome = await MacModelDeletionSequence.run(
+            modelID: model.id,
+            engine: engine,
+            stopDownloads: {
+                await stopAndClear(for: model.id)
+                stoppedDownloads = true
+                // Staging first: its reuse pins would otherwise keep the blobs
+                // the delete releases. The downloader is already stopped.
+                HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
+            },
+            removeFiles: {
+                do {
+                    try SharedModelComponentStore(modelsRoot: modelsDirectory).deleteModel(
+                        modelFolder: modelDir.lastPathComponent,
+                        reclamation: .background
+                    )
+                    return true
+                } catch {
+                    removalError = error
+                    return false
+                }
+            },
+            unloadFailed: { error in
+                if DebugMode.isEnabled {
+                    print("[ModelManagerViewModel] unload before delete failed: \(DiagnosticPrivacy.summary(of: error))")
+                }
+            }
+        )
+        switch outcome {
+        case .deleted:
+            break
+        case .failed(.fileRemoval):
+            lastFailureMessages[model.id] = removalError?.localizedDescription
             await handleMutationCompletion(for: model.id)
-            return .failed
+            return outcome
+        case .blockedByActiveGeneration, .failed(.engineRelease):
+            // The files are intact; a download this deletion stopped reports
+            // the package's state again.
+            if stoppedDownloads {
+                await handleMutationCompletion(for: model.id)
+            }
+            return outcome
         }
         lastFailureMessages.removeValue(forKey: model.id)
         removeInstallMetadata(for: model)
@@ -1369,16 +1383,4 @@ private extension ModelManagerViewModel.DownloadProgress.Phase {
             self = .cancelling
         }
     }
-}
-
-/// What a model deletion needs from the in-process engine (MAC-20).
-@MainActor
-protocol MacModelEngineCoordinating: AnyObject {
-    var hasActiveGeneration: Bool { get }
-    var loadedModelID: String? { get }
-    func unloadModel() async throws
-}
-
-extension TTSEngineStore: MacModelEngineCoordinating {
-    var loadedModelID: String? { loadState.currentModelID }
 }

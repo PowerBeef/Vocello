@@ -846,18 +846,20 @@ final class ModelManagerViewModel {
 
     /// Stop the in-flight download for `modelID` and clear its tracking, without changing
     /// the model's status. Shared by cancel + delete. Awaits the downloader's cancellation
-    /// so callers can safely delete staging afterwards.
+    /// and the run itself, so the old run has released its staging lock and stopped writing
+    /// before callers delete staging or start the next download (CORE-13).
     private func stopAndClear(for modelID: String) async {
         _ = beginEpoch(for: modelID)
         pendingModelDownloads.removeAll { $0.id == modelID }
         let downloader = downloaders.removeValue(forKey: modelID)
-        downloadTasks[modelID]?.cancel()
-        downloadTasks.removeValue(forKey: modelID)
+        let task = downloadTasks.removeValue(forKey: modelID)
+        task?.cancel()
         inflightModelDownloads.remove(modelID)
         lastProgressPublishTimes.removeValue(forKey: modelID)
         if let downloader {
             await downloader.cancel()
         }
+        await task?.value
     }
 
     /// Cancel an in-flight download and discard its staged partial so the next download

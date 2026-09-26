@@ -51,7 +51,11 @@ enum VocelloMain {
             }
             return 130
         } catch {
-            FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+            // A typed error prints its own path-free description (SEC-11); the
+            // raw value would print every associated value, staged paths and an
+            // underlying error's userInfo included.
+            let message = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            FileHandle.standardError.write(Data("error: \(message)\n".utf8))
             return 1
         }
         return 0

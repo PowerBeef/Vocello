@@ -379,6 +379,104 @@ final class GenerationQualityCompositionTests: XCTestCase {
         )
     }
 
+    // MARK: Abstention (audio QC audit 2026-09-25, section 3.3, decision 7)
+
+    private func canonicalVerdict(
+        prosody: GenerationQualityOutcome,
+        delivery: GenerationQualityOutcome,
+        hitTokenCap: Bool = false
+    ) throws -> QualityGateRegistryVerdict {
+        let digest = String(repeating: "c", count: 64)
+        let report = GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false),
+            finishReason: .eos,
+            hitTokenCap: hitTokenCap,
+            audioQC: Self.cleanAudioQC(durationSeconds: 5.0),
+            wavDigest: digest,
+            usedStreaming: true,
+            chunkCount: 7,
+            audioChannel: nil,
+            deepEvidence: [
+                .prosody: .init(outcome: prosody, algorithmVersion: 4, evidenceDigest: digest),
+                .delivery: .init(outcome: delivery, algorithmVersion: 3, evidenceDigest: digest),
+            ]
+        )
+        return try QualityGateRegistry.evaluate(report)
+    }
+
+    func testAbstainedRanksWithTheBlockingOutcomesAboveTheUncalibratedOrder() {
+        let blocking = [GenerationQualityOutcome.fail, .unavailable].map(GenerationQualityComposition.rank(of:))
+        XCTAssertEqual(blocking, [3, 3])
+        XCTAssertEqual(GenerationQualityComposition.rank(of: .abstained), 3)
+        let order: [GenerationQualityOutcome] = [.pass, .uncalibrated, .warning]
+        XCTAssertEqual(order.map(GenerationQualityComposition.rank(of:)), [0, 1, 2])
+    }
+
+    func testAnAbstentionBlocksAPassAndIsReportedDistinctly() throws {
+        let abstained = try canonicalVerdict(prosody: .abstained, delivery: .pass)
+        XCTAssertEqual(abstained.outcome, GenerationQualityOutcome.abstained)
+        XCTAssertEqual(abstained.issues, ["quality_gate_abstained.prosody"])
+        // It outranks a warning (here the token cap) and an uncalibrated gate.
+        XCTAssertEqual(
+            try canonicalVerdict(prosody: .abstained, delivery: .warning).outcome,
+            GenerationQualityOutcome.abstained
+        )
+        XCTAssertEqual(
+            try canonicalVerdict(prosody: .uncalibrated, delivery: .abstained).outcome,
+            GenerationQualityOutcome.abstained
+        )
+        let capped = try canonicalVerdict(prosody: .abstained, delivery: .pass, hitTokenCap: true)
+        XCTAssertEqual(capped.outcome, GenerationQualityOutcome.abstained)
+        XCTAssertEqual(capped.issues, ["quality_gate_abstained.prosody", "quality_gate_warning.token_cap"])
+        // A failed or unavailable gate still decides, in either gate order.
+        XCTAssertEqual(
+            try canonicalVerdict(prosody: .abstained, delivery: .fail).outcome,
+            GenerationQualityOutcome.fail
+        )
+        let unavailable = try canonicalVerdict(prosody: .unavailable, delivery: .abstained)
+        XCTAssertEqual(unavailable.outcome, GenerationQualityOutcome.fail)
+        XCTAssertEqual(
+            unavailable.issues,
+            ["quality_gate_abstained.delivery", "quality_gate_unavailable.prosody"]
+        )
+    }
+
+    func testAbstainedCodingKeepsEveryLegacyValue() throws {
+        let legacy = #"["pass","warning","fail","unavailable","uncalibrated"]"#
+        XCTAssertEqual(
+            try JSONDecoder().decode([GenerationQualityOutcome].self, from: Data(legacy.utf8)),
+            [.pass, .warning, .fail, .unavailable, .uncalibrated]
+        )
+        let encoded = try JSONEncoder().encode(GenerationQualityOutcome.abstained)
+        XCTAssertEqual(String(decoding: encoded, as: UTF8.self), #""abstained""#)
+        XCTAssertEqual(
+            try JSONDecoder().decode(GenerationQualityOutcome.self, from: encoded),
+            GenerationQualityOutcome.abstained
+        )
+        let stored = #"{"outcome":"uncalibrated","requiredGates":["terminal"],"issues":[]}"#
+        let verdict = try JSONDecoder().decode(QualityGateRegistryVerdict.self, from: Data(stored.utf8))
+        XCTAssertEqual(verdict.outcome, GenerationQualityOutcome.uncalibrated)
+        // The bench's fast-consistency guard and the telemetry notes read raw values.
+        XCTAssertEqual(GenerationQualityOutcome(rawValue: "abstained"), GenerationQualityOutcome.abstained)
+        let digest = String(repeating: "d", count: 64)
+        let report = GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: false),
+            finishReason: .eos,
+            hitTokenCap: false,
+            audioQC: Self.cleanAudioQC(durationSeconds: 3.0),
+            wavDigest: digest,
+            usedStreaming: true,
+            chunkCount: 4,
+            audioChannel: nil,
+            deepEvidence: [.prosody: .init(outcome: .abstained, algorithmVersion: 4, evidenceDigest: digest)]
+        )
+        let notes = GenerationQualityReportProducer.telemetryNotes(for: report)
+        XCTAssertEqual(notes["quality_registry_outcome"], "abstained")
+        XCTAssertEqual(notes["quality_registry_issues"], "quality_gate_abstained.prosody")
+    }
+
     // MARK: Cell-level delivery adherence (gate v3, audit #39)
 
     private func cellGate(_ status: String, flags: [String] = []) -> GenerationQualityComposition.DeliveryCellGate {

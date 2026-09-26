@@ -193,13 +193,16 @@ public enum GenerationQualityComposition {
     }
 
     /// Ranks outcomes for the fast-consistency guard: a composed verdict can
-    /// never be better than the fast verdict its take finalized with.
+    /// never be better than the fast verdict its take finalized with. An
+    /// abstention blocks a claimed pass, so it ranks with `unavailable` and
+    /// `fail` (audio QC audit 2026-09-25, section 3.3); the registry still
+    /// reports it distinctly.
     public static func rank(of outcome: GenerationQualityOutcome) -> Int {
         switch outcome {
         case .pass: return 0
         case .uncalibrated: return 1
         case .warning: return 2
-        case .unavailable, .fail: return 3
+        case .abstained, .unavailable, .fail: return 3
         }
     }
 }

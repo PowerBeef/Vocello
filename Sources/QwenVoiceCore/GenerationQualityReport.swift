@@ -16,6 +16,15 @@ public enum GenerationQualityOutcome: String, Codable, Hashable, Sendable {
     /// calibration evidence. It never blocks and never reads as `pass`: the
     /// registry verdict of an otherwise passing report is `uncalibrated`.
     case uncalibrated
+    /// The gate ran and declined to judge (audio QC audit 2026-09-25, section
+    /// 3.3, decision 7): the take is outside its qualified scope, its recognizer
+    /// families or repeated passes disagree, its confidence is low, or its text
+    /// class is unqualified. It blocks a claimed pass like `fail` and
+    /// `unavailable` but names neither a defect nor an infrastructure failure,
+    /// so the registry reports it distinctly: `abstained` (the Python
+    /// composer's `inconclusive`) unless a required gate failed or was
+    /// unavailable, and above any warning.
+    case abstained
 }
 
 public enum GenerationQualityGateID: String, CaseIterable, Codable, Hashable, Sendable {
@@ -244,6 +253,8 @@ public enum QualityGateRegistry {
             }
         }
 
+        // Precedence: fail (an unavailable gate fails closed) > abstained >
+        // warning > uncalibrated > pass (audit 2026-09-25, section 3.3).
         var outcome: GenerationQualityOutcome = .pass
         var issues: [String] = []
         for gate in required {
@@ -257,6 +268,9 @@ public enum QualityGateRegistry {
             case .warning:
                 if outcome == .pass || outcome == .uncalibrated { outcome = .warning }
                 issues.append("quality_gate_warning.\(gate.rawValue)")
+            case .abstained:
+                if outcome != .fail { outcome = .abstained }
+                issues.append("quality_gate_abstained.\(gate.rawValue)")
             case .fail:
                 outcome = .fail
                 issues.append("quality_gate_failed.\(gate.rawValue)")

@@ -1048,6 +1048,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-02 | [`mac-lang-bench-20260902-024501-bd2df074`](runs/language/mac-lang-bench-20260902-024501-bd2df074.json) | partial | exploratory | passedWithWarnings | qualified-with-warnings | 19 | — | `f7600f678425` dirty | `excluded` | baseline | av08-mac-full-20260901 |
 
+## language / macos / mac-mini-m6-16gb / config `eb462c990534`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-26 | [`mac-lang-bench-20260926-015446-923dc005`](runs/language/mac-lang-bench-20260926-015446-923dc005.json) | focused | focused | passed | qualified | 7 | 0.27 | `4270b1109e61` | `eb462c990534` | baseline | mac-lang-bench-20260926-015446-923dc005 |
+
 ## memory-qualification / ios / iphone-17-pro / config `7482ce732e47`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

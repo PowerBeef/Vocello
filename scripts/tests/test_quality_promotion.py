@@ -157,6 +157,10 @@ class QualityPromotionTests(unittest.TestCase):
         self.assertNotIn("engine-runtime", excluded["classes"])
         memory = PROMOTION.classify_paths(contract, ["Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"])
         self.assertIn("macos-retained-memory", memory["promotionRequiredEvidence"])
+        # The in-app text normalization and edit metrics the language verdict scores with.
+        transcriber = PROMOTION.classify_paths(contract, ["Sources/SharedSupport/Services/VoiceClipTranscriber.swift"])
+        self.assertIn("audio-quality-and-evaluation", transcriber["classes"])
+        self.assertIn("multilingual-output", transcriber["promotionCapabilities"])
 
     def test_routing_must_reference_defined_evidence_and_capabilities(self) -> None:
         contract = PROMOTION.load_contract(self.root)

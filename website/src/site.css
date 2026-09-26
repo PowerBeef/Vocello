@@ -326,6 +326,12 @@ a { color: inherit; text-decoration: none; }
   display: block;
 }
 
+/* A Screenshot's <picture> adds no box, so its img lays out as the direct child
+   of flex stages such as .iphone-stage, as the bare img did. */
+picture {
+  display: contents;
+}
+
 /* ============== SECTION SHELL ============== */
 
 .section {

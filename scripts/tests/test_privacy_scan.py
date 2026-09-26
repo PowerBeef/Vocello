@@ -61,6 +61,10 @@ class PrivacyScanTests(unittest.TestCase):
         key = self.write("enc.txt", "-----BEGIN " + "ENCRYPTED PRIVATE KEY-----\nabc\n-----END " + "ENCRYPTED PRIVATE KEY-----\n")
         self.assertEqual([f.split(":")[0] for f in MODULE.scan(self.root, [key])], ["enc.txt"])
 
+    def test_armored_pgp_private_key_block_is_rejected(self) -> None:
+        key = self.write("pgp.asc", "-----BEGIN " + "PGP PRIVATE KEY BLOCK-----\nabc\n-----END " + "PGP PRIVATE KEY BLOCK-----\n")
+        self.assertEqual([f.split(":")[0] for f in MODULE.scan(self.root, [key])], ["pgp.asc"])
+
     def test_missing_and_binary_paths_are_skipped(self) -> None:
         (self.root / "blob.bin").write_bytes(b"\0\1\2/Users/" + b"someone/")
         self.assertEqual(MODULE.scan(self.root, ["missing.md", "blob.bin"]), [])

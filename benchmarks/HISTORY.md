@@ -1005,6 +1005,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-12 | [`mac-profile-20260712-210447-f2761314`](runs/instrument-profile/mac-profile-20260712-210447-f2761314.json) | instrumented | exploratory | passed | memory-contract-incomplete | 2 | — | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
 
+## instrument-profile / macos / mac-mini-m6-16gb / config `1874bbcf8cf8`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-26 | [`mac-witness-profile-20260926-015308-67e3045b`](runs/instrument-profile/mac-witness-profile-20260926-015308-67e3045b.json) | instrumented | instrumented | passedWithWarnings | qualified | 4 | 0.27 | `f40381eb9080` | `excluded` | baseline | instrument-witness-profile |
+
 ## language / ios / iphone-17-pro / config `12e46802c192`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

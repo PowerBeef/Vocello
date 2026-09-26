@@ -17,6 +17,24 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 25, night — wave 9, the audio QC audit and the headless AV-17 session
+
+Wave 9 (all three BT tracks plus their review fixes) is on `main` with CI green; BT-02 closed.
+The maintainer asked for an autonomous, self-validating audio QC harness: the audit
+([audio QC audit](audits/2026-09-25-audio-qc-speech-analysis-audit.md), plan
+`audio-qc-audit-2026-09`, AQ-01 to AQ-09) was adversarially verified, and the maintainer accepted
+all nine recommendations; DP-28 and AV-07 are superseded, PA-32 is decided. Headless M6 lanes
+(maintainer consent: everything but the iPhone): gate compares pass (the 2-3% timing drift is
+between sessions; instrumentation costs 0.3-0.6%); the first M6 memory qualification calibrated
+the gap bound and retained-memory v2 (AV-17 step 4); the witness profile passes BT-06's interval
+gate after two fixes for Xcode 27's `OSSignpostIntervals` table; the quick language bench passes,
+and the full one reproduced Custom zh over-continuation (ICA-15); the 8 GB floor emulation passed
+(step 6, exploratory). Fixed on the way: the Mac clone fixture was unseeded and hash-pinned on
+the whole WAV. Waiting on the maintainer at the Mac: an unlocked session for the UI lanes (stall
+calibration, AV-17 steps 2-3) and Terminal's Developer Tools permission for the CPU and memory
+profiles; PA-10's `.p12` export and the two secrets commands. Next code: AQ-01, AQ-02 and AQ-03
+(decision-free parts first), PA-32, and the PA-26 batches.
+
 ### September 25, late — wave 8 landed; next is the M6 UI calibration run
 
 Wave 8 is on `main` with CI green (a00eb8d4, 2871108b): BT-03's floor-emulation knob, report-only

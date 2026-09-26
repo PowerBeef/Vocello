@@ -527,7 +527,6 @@
         "scripts/prepare_delivery_compact_model_config.py",
         "scripts/qualify_delivery_compact_models.py",
         "scripts/run_local_delivery_cascade.py",
-        "scripts/emotion_advisory.py",
         "scripts/analyze_prosody.py"
       ],
       "evidence": [
@@ -541,7 +540,6 @@
         "file:scripts/tests/test_prepare_delivery_compact_model_config.py",
         "file:scripts/tests/test_qualify_delivery_compact_models.py",
         "file:scripts/tests/test_run_local_delivery_cascade.py",
-        "file:scripts/tests/test_emotion_advisory.py",
         "commit:ae446132"
       ],
       "updated": "2026-09-25",

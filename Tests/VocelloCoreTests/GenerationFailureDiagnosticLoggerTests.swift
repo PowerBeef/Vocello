@@ -268,8 +268,9 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             stage: .clonePreparation,
             message: "The native runtime could not prepare the clone reference"
         )
-        // The English diagnostic text carries the path; the interface reason does not.
-        XCTAssertTrue(unreadable.localizedDescription.contains(privatePath))
+        // Neither the English diagnostic text (SEC-11) nor the interface reason
+        // carries the path.
+        XCTAssertFalse(unreadable.localizedDescription.contains("/private/fixture"))
         XCTAssertEqual(Reason(unreadable), .referenceAudioUnreadable)
         XCTAssertFalse(Reason(unreadable)?.rawValue.contains(privatePath) ?? true)
 

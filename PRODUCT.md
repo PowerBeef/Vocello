@@ -16,7 +16,7 @@ The job: bring text, leave with audio that sounds right, in seconds, without lea
 
 Vocello is a local-first text-to-speech application that runs Qwen3-TTS / MLX models entirely on-device. Three generation modes share one chrome:
 
-- **Built-in Voice** (internal mode id `custom`) — generate with a chosen preset speaker, delivery style, and intensity. “Speed”
+- **Built-in Voice** (internal mode id `custom`) — generate with a chosen preset speaker and one of eight delivery presets or a delivery described in free text. “Speed”
   names the 4-bit model variant, not a delivery control.
 - **Voice Design** — describe a voice in natural language; the model produces it.
 - **Voice Cloning** — provide a 10–20 s reference clip (record it in-app or import a file; the transcript can auto-fill via on-device transcription); the model speaks the user's text in that voice.
@@ -57,6 +57,6 @@ Apple-native craftsmanship with a warm golden brand color (Vocello gold). Local-
 - **VoiceOver labels and hints on every interactive control.** Existing `accessibilityIdentifier` values (e.g. `voicesRow_*`, `voicesEnroll_*`) are load-bearing for the test harness and must remain stable as UI evolves.
 - **Dynamic Type / Larger Text respected.** Layouts hold at the largest accessibility text size; truncation is allowed, but never to the point of hiding the primary action.
 - **Reduce Motion honored.** All animation is gated through `appAnimation` / `AppLaunchConfiguration.performAnimated`, which defer to the system setting.
-- **Reduce Transparency honored.** Liquid Glass surfaces fall back to `legacyBody` solid fills when the user has reduced transparency, so the chrome never becomes unreadable.
+- **Reduce Transparency honored.** Liquid Glass surfaces fall back to solid fills when the user has reduced transparency (`GatedGlass` on the Mac, `IOSGatedGlassModifier` on iPhone), so the chrome never becomes unreadable.
 - **No color-only signal.** Mode color always pairs with an icon, label, or position cue. Quality warnings pair an orange triangle with a written headline.
 - **Sound-aware UI.** Because the product is audio-first, never gate critical state behind audio cues alone — every audible event has a visible counterpart (caption, badge, progress, etc.).

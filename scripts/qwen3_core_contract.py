@@ -515,6 +515,17 @@ def git_blob(repo_root: Path, commit: str, relative: Path) -> bytes | None:
     return result.stdout if result.returncode == 0 else None
 
 
+def git_commit_available(repo_root: Path, commit: str) -> bool:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=repo_root,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
+
+
 def git_tree_relative_paths(repo_root: Path, commit: str, root: Path) -> set[str]:
     result = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", commit, root.as_posix()],
@@ -990,6 +1001,14 @@ def validate(repo_root: Path) -> list[str]:
     ):
         errors.append("RELOCATION_INVENTORY requires unique safe relative paths")
     relocation_counts = {"identical": 0, "modified": 0, "added": 0}
+    # CI-18: a shallow clone lacks the comparison base; say so once instead of
+    # reporting every relocated file's source digest as irreproducible.
+    base_available = git_commit_available(repo_root, relocation_base)
+    if not base_available:
+        errors.append(
+            f"RELOCATION_INVENTORY comparison base {relocation_base[:12]} is not in this clone "
+            "(a shallow clone; run `git fetch --unshallow`)"
+        )
     for entry in relocation_entries:
         status = entry.get("status")
         source_digest = entry.get("sourceSHA256")
@@ -1008,7 +1027,7 @@ def validate(repo_root: Path) -> list[str]:
             errors.append(f"RELOCATION_INVENTORY {entry.get('path')}: invalid classification")
             continue
         relocation_counts[status] += 1
-        if source_digest is not None:
+        if source_digest is not None and base_available:
             source_blob = git_blob(
                 repo_root,
                 relocation_base,

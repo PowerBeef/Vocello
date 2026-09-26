@@ -46,6 +46,21 @@ class PrivacyScanTests(unittest.TestCase):
         self.assertTrue(any("credential-shaped token" in f for f in findings), findings)
         self.assertTrue(any("credential file" in f for f in findings), findings)
 
+    def test_hugging_face_npm_and_fine_grained_github_tokens_are_rejected(self) -> None:
+        # SEC-11: prefixes assembled at runtime so this file never holds a token shape.
+        samples = {
+            "hf.txt": "hf" + "_" + "a1B2" * 9,
+            "npm.txt": "npm" + "_" + "Z9y8" * 9,
+            "pat.txt": "github" + "_pat_" + "A1b2_" * 12,
+        }
+        paths = [self.write(name, f"token = {value}\n") for name, value in samples.items()]
+        findings = MODULE.scan(self.root, paths)
+        self.assertEqual(sorted(f.split(":")[0] for f in findings), sorted(samples), findings)
+
+    def test_encrypted_private_key_block_is_rejected(self) -> None:
+        key = self.write("enc.txt", "-----BEGIN " + "ENCRYPTED PRIVATE KEY-----\nabc\n-----END " + "ENCRYPTED PRIVATE KEY-----\n")
+        self.assertEqual([f.split(":")[0] for f in MODULE.scan(self.root, [key])], ["enc.txt"])
+
     def test_missing_and_binary_paths_are_skipped(self) -> None:
         (self.root / "blob.bin").write_bytes(b"\0\1\2/Users/" + b"someone/")
         self.assertEqual(MODULE.scan(self.root, ["missing.md", "blob.bin"]), [])

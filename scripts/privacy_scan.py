@@ -9,7 +9,8 @@ Usage:
 The rules are exact and few: a developer home directory (`/Users/<name>/`,
 `/home/<name>/`, `C:\\Users\\<name>\\`) other than the documented `example`
 placeholder, and the fixed shapes of real credentials (complete private-key PEM blocks,
-AWS access keys, GitHub tokens, Slack tokens, App Store Connect key files). Prose
+AWS access keys, GitHub classic and fine-grained tokens, Hugging Face and npm tokens, Slack
+tokens, App Store Connect key files). Prose
 about these things is fine; the tokens themselves are not.
 
 The scan reads repository text only. It cannot tell whether arbitrary text holds a
@@ -26,11 +27,14 @@ import sys
 from pathlib import Path
 
 HOME = re.compile(r"(?:/Users/|/home/|C:\\\\Users\\\\)(?!example[/\\\\])[A-Za-z0-9._-]+[/\\\\]")
-PEM_BEGIN = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----")
-PEM_END = re.compile(r"-----END (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----")
+PEM_BEGIN = re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----")
+PEM_END = re.compile(r"-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----")
 SECRETS = (
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{50,}\b"),
+    re.compile(r"\bhf_[A-Za-z0-9]{34,}\b"),
+    re.compile(r"\bnpm_[A-Za-z0-9]{36,}\b"),
     re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
     re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b"),
 )

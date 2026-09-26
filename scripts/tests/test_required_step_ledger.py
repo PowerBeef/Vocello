@@ -174,6 +174,9 @@ class RequiredStepLedgerTests(unittest.TestCase):
                         )
 
     def test_every_declared_required_step_is_failure_injected(self) -> None:
+        # CI-15: this matrix is quadratic in each lane's steps, so it drives the
+        # ledger functions in-process; the subprocess tests above and below cover
+        # the command-line plumbing once.
         workflows = json.loads(CONTRACT.read_text(encoding="utf-8"))["workflows"]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -181,24 +184,16 @@ class RequiredStepLedgerTests(unittest.TestCase):
                 for failed_step in workflow["requiredSteps"]:
                     with self.subTest(workflow=workflow_id, step=failed_step):
                         ledger = root / f"{workflow_id}-{failed_step}.json"
-                        init = ["init", "--ledger", str(ledger), "--workflow", workflow_id, "--run-id", "fixture"]
+                        identity = None
                         if workflow.get("sourceIdentityRequired"):
                             identity = root / f"{workflow_id}-source.json"
                             self.write_source_identity(identity)
-                            init.extend(["--source-identity", str(identity)])
-                        self.run_tool(*init, check=True)
+                        ledger_module.initialize(ledger, CONTRACT, workflow_id, "fixture", identity)
                         for step in workflow["requiredSteps"]:
-                            self.run_tool(
-                                "record", "--ledger", str(ledger), "--step", step,
-                                "--exit-code", "19" if step == failed_step else "0", check=True,
-                            )
+                            ledger_module.record(ledger, step, 19 if step == failed_step else 0)
                         for step in workflow.get("optionalSteps", []):
-                            self.run_tool(
-                                "record", "--ledger", str(ledger), "--step", step,
-                                "--exit-code", "0", check=True,
-                            )
-                        completed = self.run_tool("finalize", "--ledger", str(ledger))
-                        self.assertNotEqual(completed.returncode, 0)
+                            ledger_module.record(ledger, step, 0)
+                        self.assertFalse(ledger_module.finalize(ledger))
                         payload = json.loads(ledger.read_text(encoding="utf-8"))
                         self.assertEqual(payload["status"], "failed")
                         self.assertIn(failed_step, payload["failedRequiredSteps"])

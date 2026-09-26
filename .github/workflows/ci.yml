@@ -63,6 +63,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # Each lane is diffed against the last run on this branch in which its job
       # passed, so a run cancelled by a superseding push cannot leave a lane
@@ -122,6 +123,7 @@ jobs:
         with:
           # roadmap.py resolves evidence commits against history.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install ripgrep and the pinned numpy
         run: |
@@ -156,6 +158,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install pinned numpy, pytest and ripgrep
         run: |
@@ -192,6 +195,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Native toolchain
         uses: ./.github/actions/native-toolchain
@@ -308,6 +312,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Native toolchain
         uses: ./.github/actions/native-toolchain
@@ -388,6 +393,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Native toolchain
         uses: ./.github/actions/native-toolchain
@@ -490,6 +496,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Select Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -521,6 +529,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Generate deterministic Swift dependency snapshot
         run: |

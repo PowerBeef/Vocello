@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-26
 summary: Standing policy: Vocello is the public name; QwenVoice/QVoice remain compatibility identities wherever change would break imports, signatures, persisted data, or evidence — with the compatibility map and migration bar.
 sourceOfTruth:
   - project.yml
@@ -31,7 +31,7 @@ history, diagnostics, and release identity.
 | Surface | Current contract | Policy |
 | --- | --- | --- |
 | Public app/site/release name | Vocello | Use for user-facing copy and new public artifacts |
-| Repository | QwenVoice | Stable project and automation identity |
+| Repository | `PowerBeef/Vocello` (renamed from QwenVoice; GitHub redirects the old name) | Stable project and automation identity |
 | Swift application/core modules | `QwenVoice*` | Preserve until a facade-backed source migration proves compatibility |
 | Owned model package | `Packages/VocelloQwen3Core` | First-party path and public facade; legacy `MLXAudio*` products are transitional implementation compatibility |
 | macOS/iOS bundle IDs | `config/apple-platform-capability-matrix.json` | Never rename without signed update and data/keychain migration review |
@@ -40,7 +40,7 @@ history, diagnostics, and release identity.
 | iOS managed support directory | `Q-Voice` fallback or App Group `Vocello` root | Preserve for fallback and migration compatibility |
 | Environment variables | `QWENVOICE_*` and `QVOICE_*` | Existing names remain stable; every production use is registered and gated/classified |
 | Telemetry and benchmark schemas | Versioned QwenVoice/Vocello records | Additive evolution with backward decoding; historical records are immutable |
-| XPC service and wire names | QwenVoice compatibility identifiers | App-owned typed contract; change only with coordinated client/service compatibility |
+| XPC service and wire names | Retired 2026-09-15 with the in-process Mac engine (CONV-03) | Historical records keep their names; no wire protocol remains |
 
 ## New naming
 

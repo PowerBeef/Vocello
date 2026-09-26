@@ -512,7 +512,7 @@
       "id": "DP-28",
       "plan": "delivery-prompting-2026-08",
       "title": "Calibrate the layered local delivery evaluator",
-      "status": "in-flight",
+      "status": "superseded",
       "gate": "Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial 8 GB-floor resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.",
       "sourceOfTruth": [
         "config/delivery-evaluator-v2-contract.json",
@@ -544,8 +544,9 @@
         "file:scripts/tests/test_emotion_advisory.py",
         "commit:ae446132"
       ],
-      "updated": "2026-09-22",
-      "notes": "Human listening is no longer required (September 6 decision): byte-bound native QC, independent-family full-file ASR, explicit uncertainty and frozen independent-reference calibration/holdouts replace it; the listening-lane scripts were deleted on September 12 (git history retains them; delivery_promotion_decision.py still reads schema-1 listener results). config/delivery-evaluator-v2-contract.json names polyphase-kaiser5-v2 as deterministicResampling, matching scripts/audio_resampling.py. The evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, qualification and promotion-decision infrastructure is deterministic and source-bound, but the automatic layers still abstain without calibrated tiny heads. Closure requires an untouched confirmation cohort beating ridge-v1 without a preset, VAD, speaker or script-group regression. No production threshold, prompt, model, seed or release acceptance has changed. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-25",
+      "notes": "Human listening is no longer required (September 6 decision): byte-bound native QC, independent-family full-file ASR, explicit uncertainty and frozen independent-reference calibration/holdouts replace it; the listening-lane scripts were deleted on September 12 (git history retains them; delivery_promotion_decision.py still reads schema-1 listener results). config/delivery-evaluator-v2-contract.json names polyphase-kaiser5-v2 as deterministicResampling, matching scripts/audio_resampling.py. The evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, qualification and promotion-decision infrastructure is deterministic and source-bound, but the automatic layers still abstain without calibrated tiny heads. Closure requires an untouched confirmation cohort beating ridge-v1 without a preset, VAD, speaker or script-group regression. No production threshold, prompt, model, seed or release acceptance has changed. (Earlier history: git log -p -- config/roadmap.json.) Superseded 2026-09-25 by AQ-08 (audio QC audit, maintainer approved).",
+      "supersededBy": "AQ-08"
     },
     {
       "id": "DP-29",
@@ -625,7 +626,7 @@
       "id": "AV-07",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — independently validate prosody thresholds",
-      "status": "in-flight",
+      "status": "superseded",
       "gate": "Freeze source-bound independent reference labels before fitting and pass the existing 95% confusion/noise targets on an untouched speaker/script/translation/source-group holdout with length/language/severity coverage. Human listening is optional. Byte-verified controlled defects qualify signal detection only, never general usability or semantic emotion. Pinned external labels qualify only their documented rubric/cohort. Require provenance/corpus digests, frozen feature/profile, holdout uncertainty, repeatability, no self-labels/leakage, retained failures and actual consumer integration. Also recalibrate the click detector: the September 7 reference-base pilot flagged 3 of 45 professional recordings as native QC failures on `clicks` alone (716 to 1,327 adjacent-sample jumps above 0.42 full scale), which are signal observations, not confirmed audible clicks; split the limiter's click statistic from the QC verdict, measure the false-positive rate on the pinned reference base, and change the threshold only under the threshold-change authority in docs/reference/audio-qc-engineering.md.",
       "evidence": [
         "commit:ae446132",
@@ -647,8 +648,9 @@
         "scripts/tests/test_delivery_acoustic_reference.py",
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ],
-      "updated": "2026-09-12",
-      "notes": "September 7 reference-base adoption is implemented (45-clip numerical manifest pinned by the evaluator contract; cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity); all 64 historical takes processed, all 64 quality verdicts inconclusive, no independent labels or thresholds inferred. The September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot feed holdout validation until its exact catalog digests are re-derived and pinned in config/prosody-holdout-policy.json approvedExternalCatalogSHA256 (currently empty). The click-detector recalibration from the audio-QC audit belongs here (docs/reference/audio-qc-engineering.md, reference-base pilot table); the retired cadence contract's threshold authority now lives in that document. Cache replay: 512 hits, 0.42 s, 45 MB sampled RSS, zero swap delta. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-25",
+      "notes": "September 7 reference-base adoption is implemented (45-clip numerical manifest pinned by the evaluator contract; cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity); all 64 historical takes processed, all 64 quality verdicts inconclusive, no independent labels or thresholds inferred. The September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot feed holdout validation until its exact catalog digests are re-derived and pinned in config/prosody-holdout-policy.json approvedExternalCatalogSHA256 (currently empty). The click-detector recalibration from the audio-QC audit belongs here (docs/reference/audio-qc-engineering.md, reference-base pilot table); the retired cadence contract's threshold authority now lives in that document. Cache replay: 512 hits, 0.42 s, 45 MB sampled RSS, zero swap delta. (Earlier history: git log -p -- config/roadmap.json.) Superseded 2026-09-25 by AQ-07 (audio QC audit, maintainer approved).",
+      "supersededBy": "AQ-07"
     },
     {
       "id": "AV-08",
@@ -1138,7 +1140,7 @@
         "config/delivery-evaluator-v2-contract.json"
       ],
       "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
-      "notes": "Canonical macOS benchmark host switched from mac-mini-m2-8gb to mac-mini-m6-16gb on 2026-09-22 (maintainer decision); published history starts a new series. Until (2) lands, the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as measured on Mac mini M2 8 GB. The benchmark and telemetry audit (2026-09-25) required BT-01 to BT-04 before any M6 record, and BT-05's supervisor batch before step 5. Step (1) done 2026-09-25: three seeded gate runs from commit 848e140a (mac-gate-bench-20260925-171242-f0765b07, -172105-c3bfdf05, -172329-a73cdc6a) seeded the committed M6 baseline: RTF 0.265, engine first chunk 145 ms, 52 tokens/s, footprint 2,501 MB, MLX peak 2,376 MB, between-run ranges at most 0.7% (footprint 1.9%). Automation Mode no longer needs authentication and wave 8 landed BT-03's report-only stall limit and floor knob and BT-05's supervisor batch (2026-09-25): the calibration run and step (5) are unblocked. Maintainer decision 2026-09-25 for step (6): emulate the 8 GB floor on the M6 with a registered simulated-memory knob, claims limited to policy and footprint (#11 option b).",
+      "notes": "M6 canonical since 2026-09-22 (maintainer decision); history starts a new series, and until (2) lands the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as Mac mini M2 8 GB. Step (1) done 2026-09-25: three seeded gate runs from 848e140a seeded the M6 baseline (RTF 0.265, engine first chunk 145 ms, 52 tokens/s, footprint 2,501 MB, MLX peak 2,376 MB, between-run ranges at most 0.7%). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c passed all 11 takes and calibrated the unobserved-gap bound (2x / 500 ms kept) and retained-memory v2 (16 MB per mode). Gate compares after waves 8 and 9 pass; telemetry-overhead shows the 2-3% timing drift is between sessions, not instrumentation. Automation Mode no longer needs authentication; the UI lanes (stall calibration, step 2, step 3) need an unlocked session. Step (5) is unblocked. Step (6): emulate the 8 GB floor with the registered knob, claims limited to policy and footprint (#11 b).",
       "updated": "2026-09-25"
     },
     {
@@ -1448,7 +1450,7 @@
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "Sources/Services/MacGenerationWarmupCoordinator.swift"
       ],
-      "notes": "Found by the AUD-10 review on 2026-09-25. These paths publish .failed and never schedule idle unload; performIdleUnloadIfStillIdle clears loadState, clonePreparationState and visibleErrorMessage, so letting it run from .failed would make a surfaced failure disappear after the idle window (30 s on iPhone), while publishing .loaded would need the failure kept elsewhere. Only the store's critical-band full unload, a later model operation or stop() release the weights today, and the Mac warmup coordinator will not warm from .failed. Needs a product decision on how the failure stays visible.",
+      "notes": "Found by the AUD-10 review on 2026-09-25. These paths publish .failed and never schedule idle unload; performIdleUnloadIfStillIdle clears loadState, clonePreparationState and visibleErrorMessage, so letting it run from .failed would make a surfaced failure disappear after the idle window (30 s on iPhone), while publishing .loaded would need the failure kept elsewhere. Only the store's critical-band full unload, a later model operation or stop() release the weights today, and the Mac warmup coordinator will not warm from .failed. Needs a product decision on how the failure stays visible. Maintainer decision 2026-09-25: unload after the normal idle window, and keep the failure visible until the user's next action.",
       "updated": "2026-09-25"
     },
     {
@@ -1539,7 +1541,7 @@
         "config/delivery-evaluator-v2-candidates.json",
         "scripts/prepare_delivery_compact_model_config.py"
       ],
-      "notes": "Audit AQ-F01-F06, F40, F43, F45, F47 (phases P0, P1). Urgent: the evaluator registry labels NISQA commercial-compatible while its weights are CC BY-NC-SA 4.0; UTMOSv2 and the advisory SER are trained on non-commercial data. Correcting the registry stops NISQA in the delivery cascade, so it is decision 1. Provenance records that change no gate can start now. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F01-F06, F40, F43, F45, F47 (phases P0, P1). Urgent: the evaluator registry labels NISQA commercial-compatible while its weights are CC BY-NC-SA 4.0; UTMOSv2 and the advisory SER are trained on non-commercial data. Correcting the registry stops NISQA in the delivery cascade, so it is decision 1. Provenance records that change no gate can start now. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25"
     },
@@ -1553,7 +1555,7 @@
         "scripts/lib/language_metrics.py",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift"
       ],
-      "notes": "Audit AQ-F21-F28, F32 (P2a, P2b). The largest avoidable error today: Korean is scored after NFKD splits Hangul into jamo, traditional Chinese is never folded, digits are never reconciled with spelled numbers, and bracketed text Qwen3-TTS speaks is deleted. P2a needs no new package; OpenCC, cn2an, num2words and fugashi pins wait for decision 4. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F21-F28, F32 (P2a, P2b). The largest avoidable error today: Korean is scored after NFKD splits Hangul into jamo, traditional Chinese is never folded, digits are never reconciled with spelled numbers, and bracketed text Qwen3-TTS speaks is deleted. P2a needs no new package; OpenCC, cn2an, num2words and fugashi pins wait for decision 4. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25"
     },
@@ -1567,7 +1569,7 @@
         "docs/reference/audio-qc-engineering.md",
         "Sources/QwenVoiceCore/GenerationQualityComposition.swift"
       ],
-      "notes": "Audit AQ-F07, F33, F34, F36-F39 (P3). Labels come from construction (injected defects with sham controls, codec-trace mutation, forced failures); thresholds come from clean clips only with exact one-sided bounds (299 clean clips with no alarm support FAR <= 1%). A1-A10 and .abstained bind only after decision 7; the engine can run report-only now. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F07, F33, F34, F36-F39 (P3). Labels come from construction (injected defects with sham controls, codec-trace mutation, forced failures); thresholds come from clean clips only with exact one-sided bounds (299 clean clips with no alarm support FAR <= 1%). A1-A10 and .abstained bind only after decision 7; the engine can run report-only now. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25"
     },
@@ -1581,7 +1583,7 @@
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "scripts/lib/audio_qc.py"
       ],
-      "notes": "Audit AQ-F08-F12, F49 (P4): BS.1770 loudness and true peak, noise floor and SNR, bandwidth, spectral-flux events, codec-frame modulation, seam discontinuity, self-similarity repetition, and the engine's own signals (codec-token cycles, EOS trajectory, entropy). Additive observational fields keep QC v8, valid under either option of decision 8 (the M6 gate baseline binds v8). Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F08-F12, F49 (P4): BS.1770 loudness and true peak, noise floor and SNR, bandwidth, spectral-flux events, codec-frame modulation, seam discontinuity, self-similarity repetition, and the engine's own signals (codec-token cycles, EOS trajectory, entropy). Additive observational fields keep QC v8, valid under either option of decision 8 (the M6 gate baseline binds v8). Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25"
     },
@@ -1595,7 +1597,7 @@
         "scripts/delivery_resource_supervisor.py",
         "config/delivery-evaluator-v2-contract.json"
       ],
-      "notes": "Audit AQ-F41, F42, F44, F46, F48 (P5). Replaces one process launch per clip and the host-wide single-analyzer lock sized for 8 GB. The admission semaphore and the child-attributed recovery rule are decision 9; the rest can start once AQ-01's registry exists. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F41, F42, F44, F46, F48 (P5). Replaces one process launch per clip and the host-wide single-analyzer lock sized for 8 GB. The admission semaphore and the child-attributed recovery rule are decision 9; the rest can start once AQ-01's registry exists. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25",
       "blockedBy": [
@@ -1611,7 +1613,7 @@
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
         "config/delivery-evaluator-v2-candidates.json"
       ],
-      "notes": "Audit AQ-F13, F14, F20, F29 (P7, P8). Panel (section 4): Whisper large-v3 plus Parakeet v3 as voting families (Paraformer for zh, SenseVoice f16 for ja and ko), Qwen3-ASR non-voting, VoxLingua107 ECAPA LID, Qwen3-ForcedAligner, CAM++ and ResNet293 speaker families, pYIN, Audiobox and DNSMOS advisory. About 13.5 GB of models (est.). Needs decisions 2-4 and a consent-bound session. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F13, F14, F20, F29 (P7, P8). Panel (section 4): Whisper large-v3 plus Parakeet v3 as voting families (Paraformer for zh, SenseVoice f16 for ja and ko), Qwen3-ASR non-voting, VoxLingua107 ECAPA LID, Qwen3-ForcedAligner, CAM++ and ResNet293 speaker families, pYIN, Audiobox and DNSMOS advisory. About 13.5 GB of models (est.). Needs decisions 2-4 and a consent-bound session. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25",
       "blockedBy": [
@@ -1628,13 +1630,16 @@
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
         "docs/reference/audio-qc-engineering.md"
       ],
-      "notes": "Audit AQ-F07, F10, F13, F15, F17, F29-F31 (P9, P10). Takes over BT-05's bounds cohort (speaking-rate and click fail bounds), prosody calibration and clone-band calibration, and AV-07 (recommended supersession, pending maintainer review). Gating bar is decision 5: warn at 60/60/60, fail at FAR <= 1% pooled and <= 5% per language. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F07, F10, F13, F15, F17, F29-F31 (P9, P10). Takes over BT-05's bounds cohort (speaking-rate and click fail bounds), prosody calibration and clone-band calibration, and AV-07 (recommended supersession, pending maintainer review). Gating bar is decision 5: warn at 60/60/60, fail at FAR <= 1% pooled and <= 5% per language. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25",
       "blockedBy": [
         "AQ-02",
         "AQ-03",
         "AQ-06"
+      ],
+      "legacyIds": [
+        "AV-07"
       ]
     },
     {
@@ -1647,12 +1652,15 @@
         "scripts/analyze_prosody.py",
         "config/prosody-holdout-policy.json"
       ],
-      "notes": "Audit AQ-F16, F18, F19 (sections 4.4-4.7). The HNR proxy reads 0.5-13 dB on pure sines where Praat gives >= 37 dB; neural MOS barely beats clip length on commercial-quality TTS, so it stays advisory. Recommended to supersede DP-28 (pending maintainer review). Semantic valence is not autonomously measurable. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F16, F18, F19 (sections 4.4-4.7). The HNR proxy reads 0.5-13 dB on pure sines where Praat gives >= 37 dB; neural MOS barely beats clip length on commercial-quality TTS, so it stays advisory. Recommended to supersede DP-28 (pending maintainer review). Semantic valence is not autonomously measurable. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25",
       "blockedBy": [
         "AQ-03",
         "AQ-06"
+      ],
+      "legacyIds": [
+        "DP-28"
       ]
     },
     {
@@ -1665,7 +1673,7 @@
         "docs/reference/audio-qc-engineering.md",
         ".claude/rules/release.md"
       ],
-      "notes": "Audit AQ-F50, F51 (P6). Today accuracy is stated in prose inside a 1,057-line decision log. Each judge page states what it measures, how, its threshold and provenance, its measured accuracy and its limits; the accuracy blocks are generated so they cannot go stale. The release.md rewrite is decision 7. Maintainer decisions pending (audit section 9): license posture, tier-B weights, same-lab judges, downloads, gating bar, Apple Speech, rule changes, QC version timing, admission and recovery.",
+      "notes": "Audit AQ-F50, F51 (P6). Today accuracy is stated in prose inside a 1,057-line decision log. Each judge page states what it measures, how, its threshold and provenance, its measured accuracy and its limits; the accuracy blocks are generated so they cannot go stale. The release.md rewrite is decision 7. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-25",
       "blockedBy": [

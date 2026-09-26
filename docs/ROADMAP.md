@@ -15,9 +15,9 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `audio-qc-audit-2026-09` | active | backend-mlx | 0/9 (0%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 30/34 (88%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
@@ -198,7 +198,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `AV-07` | in-flight | P2 — independently validate prosody thresholds | — |
+| `AV-07` | superseded | P2 — independently validate prosody thresholds | — |
 | `AV-08` | parked | P2 — qualify multilingual output beyond a single cohort | — |
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
@@ -206,9 +206,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | `BT-01`, `BT-02`, `BT-03`, `BT-04` |
 
 ### Open items in detail
-
-- **`AV-07`** (in-flight) — P2 — independently validate prosody thresholds.
-  gate: Freeze source-bound independent reference labels before fitting and pass the existing 95% confusion/noise targets on an untouched speaker/script/translation/source-group holdout with length/language/severity coverage. Human listening is optional. Byte-verified controlled defects qualify signal detection only, never general usability or semantic emotion. Pinned external labels qualify only their documented rubric/cohort. Require provenance/corpus digests, frozen feature/profile, holdout uncertainty, repeatability, no self-labels/leakage, retained failures and actual consumer integration. Also recalibrate the click detector: the September 7 reference-base pilot flagged 3 of 45 professional recordings as native QC failures on `clicks` alone (716 to 1,327 adjacent-sample jumps above 0.42 full scale), which are signal observations, not confirmed audible clicks; split the limiter's click statistic from the QC verdict, measure the false-positive rate on the pinned reference base, and change the threshold only under the threshold-change authority in docs/reference/audio-qc-engineering.md.
 
 - **`AV-08`** (parked) — P2 — qualify multilingual output beyond a single cohort.
   gate: Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell. Second recognizer family: qualify the whisper-small MLX producer (scripts/independent_asr.py) with two clean 8 GB host runs (peak RSS and footprint under its 2.5 GiB ceiling, post-exit memory recovery, no swap growth) and publish the first two-family iOS language records; until then macOS language records are explicitly single-family (`languageVerification.families: ["whisper"]`) and never consensus.
@@ -273,7 +270,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
-| `DP-28` | in-flight | Calibrate the layered local delivery evaluator | — |
+| `DP-28` | superseded | Calibrate the layered local delivery evaluator | — |
 | `DP-29` | in-flight | Qualify the native-language delivery corpus and cross-language sentinels | — |
 | `DP-31` | planned | Confirm Speed and Quality candidates with a frozen automated holdout | — |
 | `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | `DP-31` |
@@ -283,9 +280,6 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
   gate: Re-verify the R8 watch list against primary sources; if a lever runs on-device at the 8 GB floor, open a measured DP item with a pre-registered holdout comparison, else re-park with the reason.
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
-
-- **`DP-28`** (in-flight) — Calibrate the layered local delivery evaluator.
-  gate: Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial 8 GB-floor resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.
 
 - **`DP-29`** (in-flight) — Qualify the native-language delivery corpus and cross-language sentinels.
   gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.

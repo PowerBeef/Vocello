@@ -13,6 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
+| `audio-qc-audit-2026-09` | active | backend-mlx | 0/9 (0%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
@@ -82,6 +83,55 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-13`** (parked) — implement the one-time iOS Design and Clone export unlock before freeze.
   gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
   unparkWhen: Rerun scripts/ui_test.sh ios purchase --scenario exports on the paired iPhone, then the remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization.
+
+## Autonomous, self-validating audio QC
+
+`audio-qc-audit-2026-09` · **active** · backend-mlx · adopted 2026-09-25
+
+Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.
+
+Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`](audits/2026-09-25-audio-qc-speech-analysis-audit.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `AQ-01` | planned | License-clean judge registry | — |
+| `AQ-02` | planned | Normalization v2 and ten-language coverage | — |
+| `AQ-03` | planned | Qualification engine and injector catalog | — |
+| `AQ-04` | planned | Stage 0 observational DSP and engine introspection | — |
+| `AQ-05` | planned | Staged pipeline, workers and admission | `AQ-01` |
+| `AQ-06` | planned | Judge panel acquisition and M6 qualification | `AQ-01`, `AQ-05` |
+| `AQ-07` | planned | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
+| `AQ-08` | planned | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
+| `AQ-09` | planned | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |
+
+### Open items in detail
+
+- **`AQ-01`** (planned) — License-clean judge registry.
+  gate: No non-retired judge is tier C or unknown; NISQA, UTMOSv2 and the SER are retired or quarantined per decision 1; every judge loads offline after digest verification; the adoption wording names the canonical host; output and envelope identities are split, with an offline replay showing no cache invalidation on a supervisor-only change.
+
+- **`AQ-02`** (planned) — Normalization v2 and ten-language coverage.
+  gate: Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.
+
+- **`AQ-03`** (planned) — Qualification engine and injector catalog.
+  gate: CI goldens for injectors, statistics and the verdict composer; the policy file with A1-A10 validates; the first generated meta-evaluation report quantifies Fast QC v8 flags on procedural and committed evidence; the Swift abstained outcome is tested.
+
+- **`AQ-04`** (planned) — Stage 0 observational DSP and engine introspection.
+  gate: Every new field has procedural tests with exact expected values; fields are additive to QC v8 with no verdict change; the Python mirror matches Swift on fixtures.
+
+- **`AQ-05`** (planned) — Staged pipeline, workers and admission.
+  gate: One worker per model per run; the admission semaphore enforces registry ceilings; an L0-L2 cache replay reproduces current cascade and language verdicts exactly; the evidence schema and private bundle validate; DistilHuBERT and the uncalibrated heads leave the QC paths.
+
+- **`AQ-06`** (planned) — Judge panel acquisition and M6 qualification.
+  gate: Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.
+
+- **`AQ-07`** (planned) — Detector qualification and lane gating sets.
+  gate: Calibration records meeting A8 for detector classes A-D (then E, I, J) in declared scopes; correlated-failure audits recorded; the language bench gates on B, C and D and publishes two-family records; the clone lane gates on E.
+
+- **`AQ-08`** (planned) — Prosody, delivery and advisory quality rebuild.
+  gate: pYIN and HNR pass the oracle ladders; prosody flags are replaced by class F detectors; class H warns at cell level only; the Audiobox and DNSMOS composite passes its ladder test; the DP-31/DP-32 guardrails cite only qualified judges.
+
+- **`AQ-09`** (planned) — Audio QC documentation and generated accuracy report.
+  gate: The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; audio-qc-engineering.md is historical; release.md is updated per decision 7.
 
 ## Specialist-audit remediation
 

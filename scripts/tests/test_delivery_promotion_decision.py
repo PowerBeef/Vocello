@@ -126,11 +126,16 @@ class DeliveryPromotionDecisionTests(unittest.TestCase):
             self.assertEqual(report["verdict"], "qualifies")
             self.assertNotIn("relativeUTMOSDelta", report["automaticGuardrails"])
             self.assertEqual(report["retiredGuardrails"]["relativeUTMOSDelta"], {
-                "value": -0.5, "retiredJudge": "quality.utmosv2@1", "gating": False,
+                "value": -0.5, "valid": True, "retiredJudge": "quality.utmosv2@1", "gating": False,
             })
-            payload["automaticGuardrails"]["relativeUTMOSDelta"] = float("nan")
-            with self.assertRaisesRegex(DecisionError, "relativeUTMOSDelta"):
-                decide(payload)
+            # A malformed legacy value is reported invalid; it never aborts a decision.
+            for malformed in (float("nan"), float("inf"), True, "-0.5"):
+                payload["automaticGuardrails"]["relativeUTMOSDelta"] = malformed
+                report = decide(payload)
+                self.assertEqual(report["verdict"], "qualifies")
+                self.assertEqual(report["retiredGuardrails"]["relativeUTMOSDelta"], {
+                    "value": None, "valid": False, "retiredJudge": "quality.utmosv2@1", "gating": False,
+                })
 
     def test_single_speaker_gain_rejects_as_concentrated(self) -> None:
         fixture = passing_fixture()

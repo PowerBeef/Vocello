@@ -461,7 +461,16 @@ def validate_challenger_layer(payload: dict[str, Any]) -> dict[str, Any]:
     peak_rss = provenance.get("peakRSSBytes")
     if isinstance(peak_rss, bool) or not isinstance(peak_rss, int) or peak_rss <= 0:
         raise EvaluatorError("challenger peakRSSBytes must be a positive integer")
-    for field in ("canonicalHostQualified", "offlineAfterAcquisition", "sequentialMemoryReleased"):
+    # A legacy payload attested the retired 8 GB host (`eightGigabyteHostCompatible`)
+    # instead of the canonical host: it stays readable, the key is ignored, and
+    # the composition reports it as not canonical-host qualified.
+    legacy_host_attestation = (
+        "eightGigabyteHostCompatible" in provenance and "canonicalHostQualified" not in provenance
+    )
+    required = ("offlineAfterAcquisition", "sequentialMemoryReleased") + (
+        () if legacy_host_attestation else ("canonicalHostQualified",)
+    )
+    for field in required:
         if provenance.get(field) is not True:
             raise EvaluatorError(f"challenger provenance requires {field}=true")
     _layer_rows(payload, CHALLENGER_LAYER)
@@ -515,11 +524,15 @@ def compose_layers(layers: dict[str, dict[str, Any]], dimensional: dict[str, Any
         ),
         "challengerProvenance": (
             {
-                field: layers[CHALLENGER_LAYER]["modelProvenance"][field]
-                for field in (
-                    "modelID", "sourceRevision", "weightsSHA256", "license",
-                    "trainingDataDeclaration", "labelMapDigest", "peakRSSBytes",
-                )
+                **{
+                    field: layers[CHALLENGER_LAYER]["modelProvenance"][field]
+                    for field in (
+                        "modelID", "sourceRevision", "weightsSHA256", "license",
+                        "trainingDataDeclaration", "labelMapDigest", "peakRSSBytes",
+                    )
+                },
+                "canonicalHostQualified":
+                    layers[CHALLENGER_LAYER]["modelProvenance"].get("canonicalHostQualified") is True,
             }
             if CHALLENGER_LAYER in layers else None
         ),

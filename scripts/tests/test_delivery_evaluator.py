@@ -192,6 +192,21 @@ class DeliveryEvaluatorTests(unittest.TestCase):
         self.assertEqual(
             composed["challengerProvenance"]["weightsSHA256"], "b" * 64
         )
+        self.assertIs(composed["challengerProvenance"]["canonicalHostQualified"], True)
+
+        # A legacy payload attested the retired 8 GB host: still readable, the
+        # key is ignored, and it is not canonical-host qualified.
+        legacy = copy.deepcopy(challenger)
+        del legacy["modelProvenance"]["canonicalHostQualified"]
+        for attested in (True, False):
+            legacy["modelProvenance"]["eightGigabyteHostCompatible"] = attested
+            self.assertEqual(validate_challenger_layer(legacy), legacy)
+            composed = compose_layers({"acoustic": acoustic, "challenger": legacy}, None)
+            self.assertIs(composed["challengerProvenance"]["canonicalHostQualified"], False)
+        unattested = copy.deepcopy(challenger)
+        del unattested["modelProvenance"]["canonicalHostQualified"]
+        with self.assertRaisesRegex(EvaluatorError, "canonicalHostQualified"):
+            validate_challenger_layer(unattested)
 
         incompatible = copy.deepcopy(challenger)
         incompatible["modelProvenance"]["commercialUseCompatible"] = False

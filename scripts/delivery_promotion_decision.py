@@ -203,9 +203,12 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
         if name not in metrics:
             continue
         value = metrics[name]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise DecisionError(f"{name} must be finite numeric evidence when present")
-        retired_results[name] = {"value": value, "retiredJudge": judge, "gating": False}
+        # A retired column never gates, so a malformed legacy value cannot
+        # abort the decision: it is reported as invalid instead.
+        valid = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+        retired_results[name] = {
+            "value": value if valid else None, "valid": valid, "retiredJudge": judge, "gating": False,
+        }
 
     invariants = payload.get("runtimeInvariants")
     required_invariants = ("memoryQualified", "cancellationValid", "seedIdentityValid", "instructionReceiptsValid")

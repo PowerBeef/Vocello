@@ -126,8 +126,8 @@ def qualify(
     runs = []
     for index, (audio, audio_sha) in enumerate(zip(audio_paths, audio_digests), start=1):
         payload, cache_hit = run_compact_adapter(
+            # The host-wide analysis lock: a probe excludes every generator and analyzer.
             wav_path=audio, config=config, cache=cache,
-            lock_root=output_root / "supervisor",
             return_unqualified=True,
         )
         if cache_hit:

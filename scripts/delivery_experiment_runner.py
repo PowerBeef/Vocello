@@ -49,10 +49,10 @@ from delivery_experiment import (
     compile_instruction,
 )
 from lib import jsonio  # noqa: E402
+from delivery_resource_supervisor import HOST_LOCK_NAME, host_analysis_lock_root  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_SERIAL_LOCK_ROOT = REPO / "build/cache/delivery-analysis"
 SCHEMA_VERSION = 1
 DEFAULT_TIMEOUT_SECONDS = 3_600
 FRENCH_PILOT = REPO / "config/delivery-french-pilot.json"
@@ -502,11 +502,11 @@ def run_execution_plan(
     run_dir: Path, lock_root: Path, limit: int | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS, retry_failures: bool = False,
 ) -> dict[str, Any]:
-    # lock_root is deliberately required: production callers pass the shared
-    # DEFAULT_SERIAL_LOCK_ROOT so generators and heavy analyzers serialize on one
+    # lock_root is deliberately required: production callers pass the host-wide
+    # host_analysis_lock_root() so generators and heavy analyzers serialize on one
     # lock, while tests pass a private temporary root and never touch it.
     lock_root.mkdir(parents=True, exist_ok=True)
-    lock_path = lock_root / "delivery-analysis-supervisor.lock"
+    lock_path = lock_root / HOST_LOCK_NAME
     with lock_path.open("a+b") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -1045,7 +1045,7 @@ def main() -> int:
             if args.command == "run":
                 result = run_execution_plan(
                     plan=plan, binary=args.binary.resolve(), data_dir=args.data_dir,
-                    run_dir=args.run_dir, lock_root=DEFAULT_SERIAL_LOCK_ROOT,
+                    run_dir=args.run_dir, lock_root=host_analysis_lock_root(),
                     limit=args.limit,
                     timeout_seconds=args.timeout_seconds,
                     retry_failures=args.retry_failures,

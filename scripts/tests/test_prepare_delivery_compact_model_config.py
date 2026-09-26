@@ -32,6 +32,7 @@ from delivery_compact_model_adapter import (  # noqa: E402
 from delivery_resource_supervisor import SupervisedResult  # noqa: E402
 from run_local_delivery_cascade import run_cascade  # noqa: E402
 import delivery_resource_supervisor  # noqa: E402
+import delivery_compact_model_adapter  # noqa: E402
 import independent_asr  # noqa: E402
 
 SUPERVISOR = Path(delivery_resource_supervisor.__file__)
@@ -381,6 +382,82 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(CompactAdapterError, "unavailable: crash"):
                 run_compact_adapter_batch(wav_paths=[fresh], config=config, cache=cache, lock_root=root,
                                           supervisor=silent)
+
+    def _batch_fixture(self, root: Path) -> tuple[dict, list[Path]]:
+        """A prepared SenseVoice configuration over fixture files, and three distinct clips."""
+        contract = copy.deepcopy(self.contract)
+        candidate = contract["candidates"]["sensevoice-small-q8"]
+        for name, content, target, field in (
+            ("sensevoice-q8/" + candidate["weightsFile"], b"fixture q8 weights", candidate, "weightsSHA256"),
+            ("runtime-v0.1.9/" + candidate["runtime"]["archiveFile"], b"fixture archive",
+             candidate["runtime"], "archiveSHA256"),
+            ("runtime-v0.1.9/extracted/" + candidate["runtime"]["binaryFile"], b"fixture binary",
+             candidate["runtime"], "binarySHA256"),
+        ):
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            target[field] = file_sha256(path)
+        contract_path = root / "contract.json"
+        contract_path.write_text(json.dumps(contract))
+        config = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root)
+        clips = []
+        for index, frequency in enumerate((150, 190, 230)):
+            clip = root / f"clip-{index}.wav"
+            samples = np.rint(6000 * np.sin(2 * np.pi * frequency * np.arange(24000) / 24000)).astype("<i2")
+            with wave.open(str(clip), "wb") as wav:
+                wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+                wav.writeframes(samples.tobytes())
+            clips.append(clip)
+        return config, clips
+
+    def test_the_batch_worker_scales_its_timeout_and_caches_only_qualified_launches(self) -> None:
+        from delivery_compact_model_adapter import adapter_threads, compact_layer_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, clips = self._batch_fixture(root)
+            cache = DeliveryAnalysisCache(root / "cache")
+            launches = []
+
+            def worker(command, **kwargs):
+                job = json.loads(Path(command[command.index("--job") + 1]).read_text(encoding="utf-8"))
+                launches.append((job, kwargs))
+                crashed = len(launches) == 1
+                rows = job["rows"][:1] if crashed else job["rows"]
+                lines = [{"kind": "ready", "engine": "native-command", "threads": 2}]
+                lines += [{"kind": "row", "id": row["id"], "childMaxRSSBytes": 1024,
+                           "result": {"stdout": "<|en|><|NEUTRAL|><|Speech|><|withitn|>fixture"}} for row in rows]
+                if not crashed:
+                    lines.append({"kind": "done", "rows": len(rows)})
+                report = {"qualified": not crashed, "returnCode": 3 if crashed else 0,
+                          "qualificationFailures": ["nonzero-exit"] if crashed else []}
+                return SupervisedResult(report=report, stdout="".join(json.dumps(line) + "\n" for line in lines).encode(),
+                                        stderr=b"")
+
+            results = run_compact_adapter_batch(wav_paths=clips, config=config, cache=cache, lock_root=root,
+                                                supervisor=worker, supervisor_options={"timeout_seconds": 7.0})
+            # The caller's per-clip timeout scales each launch: start-up allowance plus 7 s per clip.
+            self.assertEqual([len(job["rows"]) for job, _kwargs in launches], [3, 1, 1])
+            self.assertEqual([kwargs["timeout_seconds"] for _job, kwargs in launches], [900.0 + 21, 907.0, 907.0])
+            self.assertEqual({job["engineConfig"]["rowTimeoutSeconds"] for job, _kwargs in launches}, {7.0})
+            self.assertEqual(set(results), set(clips))
+            threads = adapter_threads("sensevoice-small-q8")
+            identities = [compact_layer_identity(cache.canonicalize(clip), config, threads) for clip in clips]
+            # The first clip came from the launch that crashed: used for this run, never cached.
+            self.assertIsNone(cache.load(identities[0]))
+            self.assertFalse(results[clips[0]][0]["resourceEnvelope"]["qualified"])
+            self.assertTrue(all(cache.load(identity) is not None for identity in identities[1:]))
+
+            # The worker host writes what the binary reads: its source keys the entry.
+            host_copy = root / "audio_qc_worker.py"
+            host_copy.write_bytes(Path(delivery_compact_model_adapter.WORKER_HOST).read_bytes())
+            with patch("delivery_compact_model_adapter.WORKER_HOST", host_copy):
+                before = compact_layer_identity(cache.canonicalize(clips[1]), config, threads)
+                host_copy.write_bytes(host_copy.read_bytes() + b"\n# a worker host edit\n")
+                after = compact_layer_identity(cache.canonicalize(clips[1]), config, threads)
+            self.assertNotEqual(before.key, after.key)
+            self.assertEqual(before.key, identities[1].key)
 
     def test_invalid_resampler_fails_before_asset_inspection(self) -> None:
         with patch("prepare_delivery_compact_model_config._verified") as verify:

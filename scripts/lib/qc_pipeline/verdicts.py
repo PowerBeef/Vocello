@@ -36,8 +36,19 @@ from lib.qc_qualification.composer import compose
 
 REPO = Path(__file__).resolve().parents[3]
 LANGUAGE_METRICS_SOURCE = REPO / "scripts/lib/language_metrics.py"
+VERDICTS_SOURCE = Path(__file__).resolve()
+INDEPENDENT_ASR_SOURCE = REPO / "scripts/independent_asr.py"
+COMPACT_ADAPTER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 STAGE0_CALIBRATION = REPO / "config/audio-qc-stage0-calibration.json"
 ASR_METRIC_DEFINITION = ACCURACY_METRIC_VERSION
+# Every source that shapes a recognizer's L2 value, hashed together into its
+# L2 key: the scoring (`score_recognition`), its reduction to measurements
+# (`asr_metrics`, this module) and the recognition it reads, including the
+# detected language (`independent_asr._recognition`).
+ASR_METRIC_SOURCES = (LANGUAGE_METRICS_SOURCE, VERDICTS_SOURCE, INDEPENDENT_ASR_SOURCE)
+# SenseVoice's tag metrics: its output parser and the reduction below.
+SENSEVOICE_METRIC_SOURCES = (COMPACT_ADAPTER_SOURCE, VERDICTS_SOURCE)
+SENSEVOICE_METRIC_KEYS = ("languageTag", "emotionTag", "eventTag", "textNormalizationTag")
 # `score_recognition` fields that are verdicts or thresholds; Stage 3 applies them.
 ASR_VERDICT_FIELDS = ("modelFamily", "accuracyThreshold", "languagePass", "accuracyPass", "passed", "deletionRunWarning")
 # Recognizer families and the registry judges they come from.
@@ -66,6 +77,13 @@ def asr_metrics(recognition: Mapping[str, Any], *, script: str, language: str) -
     metrics = {key: value for key, value in scored.items() if key not in ASR_VERDICT_FIELDS}
     metrics["detectedLanguage"] = recognition.get("detectedLanguage")
     return metrics
+
+
+def sensevoice_tag_metrics(parsed: Mapping[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """L2 of one parsed SenseVoice output: its four governed tags, and the private transcript."""
+    transcript = parsed.get("transcript")
+    return ({key: parsed[key] for key in SENSEVOICE_METRIC_KEYS},
+            transcript if isinstance(transcript, str) else None)
 
 
 def asr_verdict(metrics: Mapping[str, Any], *, family: Any, language: str) -> dict[str, Any]:

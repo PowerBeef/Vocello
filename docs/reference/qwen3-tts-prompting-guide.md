@@ -791,8 +791,9 @@ cross-language sentinels. [`delivery_experiment_runner.py`](../../scripts/delive
 binds a plan to exact production instructions, binary digest, sampling parameters, seeds, script
 identities, instruction receipts, and output hashes. It is serial, resumable, local-only, and never
 publishes evidence automatically; its `run_execution_plan` requires an explicit `lock_root` (the CLI
-passes `DEFAULT_SERIAL_LOCK_ROOT`, which is `build/cache/delivery-analysis`, the same
-`delivery-analysis-supervisor.lock` root the heavy analyzers use), so programmatic callers must supply one. For evaluator calibration, its balanced rotation can keep one
+passes the host-wide analysis lock root, `hostAnalysisLock` in `config/build-output-policy.json`,
+the same `delivery-analysis-supervisor.lock` root every heavy analyzer uses whatever its checkout or
+cache root), so programmatic callers must supply one. For evaluator calibration, its balanced rotation can keep one
 seed and one neutral script fixed per speaker across all presets while the cohort collectively
 spans multiple seeds and all three script lengths; this preserves paired neutral reuse and real
 speaker/script/seed blocking without expanding the listener packet into a full factorial.

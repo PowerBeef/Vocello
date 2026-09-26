@@ -135,6 +135,12 @@
     "env": "QVOICE_NATIVE_LOCK",
     "purpose": "Host-wide lock that serializes every Xcode/SwiftPM build and test across all checkouts and agent worktrees on the development Mac."
   },
+  "hostAnalysisLock": {
+    "schemaVersion": 1,
+    "defaultPath": "~/Library/Caches/Vocello/delivery-analysis-lock",
+    "env": "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT",
+    "purpose": "Host-wide lock root shared by every generator, standalone analyzer and audio QC orchestrator on the Mac, whatever checkout, worktree or analysis cache root each uses: delivery-analysis-supervisor.lock (exclusive for a generator or standalone analyzer, shared by an orchestrator run) and the audio QC admission ledger. The environment override exists for tests only."
+  },
   "entries": [
     {
       "id": "xcode-macos-derived-data",

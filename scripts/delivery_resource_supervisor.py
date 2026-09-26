@@ -3,7 +3,10 @@
 
 It supervises one governed child and records a compact, privacy-safe resource
 envelope. Two exclusion modes share one host lock file
-(`delivery-analysis-supervisor.lock`):
+(`delivery-analysis-supervisor.lock`) under the one host-wide analysis lock
+root (`host_analysis_lock_root`: `hostAnalysisLock` in
+`config/build-output-policy.json`, `~/Library/Caches/Vocello/...`), which no
+checkout, worktree or analysis cache root changes:
 
 - A standalone caller (no admission ticket) holds it exclusively, as the
   generator (`delivery_experiment_runner.py`) does: one heavy process host-wide.
@@ -12,6 +15,8 @@ envelope. Two exclusion modes share one host lock file
   workers coexist within the registry's memory budget, while a generator or a
   standalone analyzer still excludes them all. The ticket's ceiling bounds the
   child's ceilings, so a worker can never run above what it was admitted for.
+  The ticket learns the child's PID inside the supervision's `try`, so a
+  failed ledger write still terminates and reaps the child.
 
 The 5 GiB ceiling is provisional: it predates any canonical-host measurement,
 and per-judge ceilings (the measured peak on the canonical Mac mini M6 times
@@ -20,11 +25,15 @@ AQ-F43; `config/audio-qc-judges.json`). The 8 GB Mac is a product floor, not an
 evaluator host. This module's source is envelope identity: it is recorded with
 each run and never keys a cache entry.
 
-``owned-process-probe-v3`` (audit #7, #38, #101, #102):
+``owned-process-probe-v4`` (audit #7, #38, #101, #102; v4 AQ-05 review):
 
-- The owned child is sampled in-process (``proc_pid_rusage`` on macOS), never by
-  spawning a probe per tick, so the cadence is the 50 ms sleep and a failed
-  sample is counted and fails closed instead of reading as zero memory.
+- The owned child's whole process group is sampled in-process
+  (``proc_listpids`` and ``proc_pid_rusage`` on macOS, ``/proc`` elsewhere),
+  never by spawning a probe per tick, so the cadence is the 50 ms sleep and a
+  failed sample is counted and fails closed instead of reading as zero memory.
+  Every command the child runs (a native judge binary under the persistent
+  worker) stays in its group, so the ceilings bind the group's summed resident
+  memory and footprint live, not after a descendant exits.
 - Physical footprint, when measured, peaks at the larger of the samples and the
   kernel's lifetime high-water mark, read once more from the exited child before
   it is reaped. ``ru_maxrss`` from the reap is recorded beside the sampled RSS.
@@ -72,6 +81,7 @@ import sys
 import tempfile
 import time
 from typing import Any, Callable, Sequence
+import uuid
 
 
 SCHEMA_VERSION = 1
@@ -86,7 +96,9 @@ PRESSURE_WARNING_FREE_PERCENT = 10.0
 SHUTDOWN_WAIT_SECONDS = 2.0
 PROBE_EXIT_WAIT_SECONDS = 0.25
 REAP_POLL_SECONDS = 0.01
-PROBE_ALGORITHM_VERSION = "owned-process-probe-v3"
+PROBE_ALGORITHM_VERSION = "owned-process-probe-v4"
+# What the ceilings bind: the owned child and every process in its group.
+SAMPLED_PROCESS_SCOPE = "process-group"
 # Text probes are only a fallback for the sysctl reads; they run in the C
 # locale so a decimal comma (fr_CA prints "0,00M") never reaches the parser.
 PROBE_ENVIRONMENT_OVERRIDES = {"LC_ALL": "C", "LANG": "C"}
@@ -95,10 +107,40 @@ PROBE_ENVIRONMENT_OVERRIDES = {"LC_ALL": "C", "LANG": "C"}
 HOST_LOCK_NAME = "delivery-analysis-supervisor.lock"
 EXCLUSIVE_EXCLUSION = "host-exclusive-lock"
 ADMITTED_EXCLUSION = "budgeted-admission"
+REPO = Path(__file__).resolve().parents[1]
+BUILD_OUTPUT_POLICY = REPO / "config/build-output-policy.json"
+HARDWARE_PROFILES = REPO / "benchmarks/hardware-profiles.json"
+HOST_ANALYSIS_LOCK_CONTRACT = "hostAnalysisLock"
+# One session per supervising process: a standalone analyzer run. An admitted
+# worker's envelope names its orchestrator run's session instead.
+PROCESS_SESSION_ID = uuid.uuid4().hex
 
 
 class ResourceSupervisorError(RuntimeError):
     """A process could not run inside the serial resource contract."""
+
+
+def host_analysis_lock_root(policy_path: Path = BUILD_OUTPUT_POLICY) -> Path:
+    """The one host-wide root of the analysis lock and the admission ledger.
+
+    Every generator, standalone analyzer and orchestrator on the host resolves
+    the same directory, whatever its checkout, worktree or analysis cache root
+    (`hostAnalysisLock` in `config/build-output-policy.json`, under
+    `~/Library/Caches/Vocello/`). An absolute `QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT`
+    overrides it, for tests only, as `QVOICE_NATIVE_LOCK` does for the native lock.
+    """
+    try:
+        contract = json.loads(policy_path.read_text(encoding="utf-8"))[HOST_ANALYSIS_LOCK_CONTRACT]
+        default, variable = contract["defaultPath"], contract["env"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise ResourceSupervisorError("the build-output policy declares no host analysis lock") from None
+    if (not isinstance(default, str) or not default.startswith("~/Library/Caches/")
+            or not isinstance(variable, str) or not variable):
+        raise ResourceSupervisorError("the host analysis lock must live under ~/Library/Caches/")
+    override = os.environ.get(variable, "")
+    if override and Path(override).is_absolute():
+        return Path(override)
+    return Path(default).expanduser()
 
 
 @dataclass(frozen=True)
@@ -248,6 +290,8 @@ def _darwin_libraries() -> tuple[Any, Any] | None:
         return None
     libproc.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
     libproc.proc_pid_rusage.restype = ctypes.c_int
+    libproc.proc_listpids.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_int]
+    libproc.proc_listpids.restype = ctypes.c_int
     libc.sysctlbyname.argtypes = [
         ctypes.c_char_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t),
         ctypes.c_void_p, ctypes.c_size_t,
@@ -304,6 +348,175 @@ def process_probe_identity(sampler: Callable[[int], ProcessSample]) -> str:
     if sampler is not owned_process_sample:
         return "injected"
     return "libproc-rusage-v4" if sys.platform == "darwin" else "procfs-status"
+
+
+_PROC_PGRP_ONLY = 2
+_MAXIMUM_GROUP_LISTING = 65_536
+
+
+def _darwin_group_members(group_id: int) -> list[int]:
+    libraries = _darwin_libraries()
+    if libraries is None:
+        raise ResourceSupervisorError("process-group probe is unavailable")
+    capacity = 64
+    while capacity <= _MAXIMUM_GROUP_LISTING:
+        buffer = (ctypes.c_int * capacity)()
+        written = libraries[1].proc_listpids(_PROC_PGRP_ONLY, group_id, buffer, ctypes.sizeof(buffer))
+        if written < 0:
+            raise ResourceSupervisorError("process-group probe failed")
+        count = written // ctypes.sizeof(ctypes.c_int)
+        if count < capacity:
+            return [pid for pid in buffer[:count] if pid > 0]
+        capacity *= 4
+    raise ResourceSupervisorError("process-group probe overflowed")
+
+
+def _procfs_group_members(group_id: int) -> list[int]:
+    members = []
+    try:
+        entries = list(os.scandir("/proc"))
+    except OSError:
+        raise ResourceSupervisorError("process-group probe failed") from None
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            text = Path(entry.path, "stat").read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue  # exited while listed
+        fields = text.rsplit(")", 1)[-1].split()
+        # After the command name: state, parent PID, process group.
+        if len(fields) > 2 and fields[2] == str(group_id):
+            members.append(int(entry.name))
+    return members
+
+
+def process_group_members(group_id: int) -> list[int]:
+    """Every live process in one process group (the owned child leads its own)."""
+    if type(group_id) is not int or group_id <= 0:
+        raise ResourceSupervisorError("process-group identity is invalid")
+    if sys.platform == "darwin":
+        return _darwin_group_members(group_id)
+    return _procfs_group_members(group_id)
+
+
+def group_probe_identity(lister: Callable[[int], Sequence[int]]) -> str:
+    if lister is not process_group_members:
+        return "injected"
+    return "libproc-listpids-pgrp" if sys.platform == "darwin" else "procfs-pgrp"
+
+
+def process_start_identity(process_id: int) -> str | None:
+    """A token naming one process instance, since a PID alone may be reused.
+
+    The kernel's start time of the process (``ri_proc_start_abstime`` on macOS,
+    ``/proc/<pid>/stat`` start ticks elsewhere). Raises ``ProcessLookupError``
+    when no such process exists and ``PermissionError`` when the PID names
+    another user's process; None when the start time cannot be read.
+    """
+    if type(process_id) is not int or process_id <= 0:
+        return None
+    if sys.platform == "darwin":
+        libraries = _darwin_libraries()
+        if libraries is None:
+            return None
+        info = _RusageInfoV4()
+        if libraries[1].proc_pid_rusage(process_id, _RUSAGE_INFO_V4, ctypes.byref(info)) != 0:
+            code = ctypes.get_errno()
+            if code == errno.ESRCH:
+                raise ProcessLookupError("no such process")
+            if code == errno.EPERM:
+                raise PermissionError("another user's process")
+            return None
+        return f"mach-abs:{int(info.ri_proc_start_abstime)}"
+    try:
+        text = Path(f"/proc/{process_id}/stat").read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        raise ProcessLookupError("no such process") from None
+    except OSError:
+        return None
+    fields = text.rsplit(")", 1)[-1].split()
+    # Field 22 of stat, the 20th after the command name: start time in ticks.
+    return f"proc-ticks:{fields[19]}" if len(fields) > 19 else None
+
+
+@functools.lru_cache(maxsize=1)
+def host_model_identifier() -> str | None:
+    """The host's hardware model identifier (``hw.model``); None off macOS."""
+    libraries = _darwin_libraries()
+    if libraries is None:
+        return None
+    libc = libraries[0]
+    size = ctypes.c_size_t(0)
+    if libc.sysctlbyname(b"hw.model", None, ctypes.byref(size), None, 0) != 0 or not 0 < size.value <= 256:
+        return None
+    buffer = ctypes.create_string_buffer(size.value)
+    if libc.sysctlbyname(b"hw.model", ctypes.byref(buffer), ctypes.byref(size), None, 0) != 0:
+        return None
+    value = buffer.value.decode("ascii", errors="replace").strip()
+    return value or None
+
+
+@functools.lru_cache(maxsize=1)
+def host_hardware_profile_id(profiles_path: Path = HARDWARE_PROFILES) -> str | None:
+    """The `benchmarks/hardware-profiles.json` profile this Mac is (model and memory), else None."""
+    model, memory = host_model_identifier(), _darwin_sysctl("hw.memsize")
+    if model is None or memory is None:
+        return None
+    try:
+        profiles = json.loads(profiles_path.read_text(encoding="utf-8")).get("profiles") or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    for profile in profiles:
+        if (isinstance(profile, dict) and profile.get("platform") == "macos"
+                and profile.get("modelIdentifier") == model and profile.get("memoryBytes") == memory
+                and isinstance(profile.get("id"), str)):
+            return profile["id"]
+    return None
+
+
+@dataclass(frozen=True)
+class GroupUsage:
+    """The rest of the owned child's process group at one sample (bytes)."""
+
+    resident_bytes: int = 0
+    footprint_bytes: int = 0
+    processes: int = 0
+
+
+def _descendant_usage(
+    leader: int, lister: Callable[[int], Sequence[int]], *,
+    rss_sampler: Callable[[int], int] | None, process_sampler: Callable[[int], ProcessSample],
+    footprint_sampler: Callable[[int], Any] | None, footprint: bool,
+) -> GroupUsage:
+    """Sum every other member of the leader's group; one that exits meanwhile is skipped."""
+    resident_total = footprint_total = count = 0
+    for member in lister(leader):
+        if member == leader:
+            continue
+        try:
+            observed: Any = None
+            if rss_sampler is not None:
+                resident = rss_sampler(member)
+            else:
+                observed = process_sampler(member)
+                resident = observed.resident_bytes
+            if type(resident) is not int or resident < 0:
+                raise ResourceSupervisorError("invalid descendant resident measurement")
+            member_footprint = 0
+            if footprint:
+                source = (footprint_sampler(member) if footprint_sampler is not None
+                          else observed if observed is not None else process_sampler(member))
+                current, _lifetime = _footprint_values(source)
+                if current is _MALFORMED:
+                    raise ResourceSupervisorError("invalid descendant footprint measurement")
+                member_footprint = current or 0
+        except ProcessLookupError:
+            continue  # it exited between the listing and its sample
+        resident_total += resident
+        footprint_total += member_footprint
+        count += 1
+    return GroupUsage(resident_total, footprint_total, count)
 
 
 def _darwin_sysctl(name: str) -> int | None:
@@ -647,17 +860,18 @@ def binding_qualification_failures(
 
 
 @contextlib.contextmanager
-def host_exclusion(lock_root: Path, admission: Any | None = None):
+def host_exclusion(lock_root: Path | None = None, admission: Any | None = None):
     """The host lock for one supervised child; yields the descriptor it inherits.
 
     Without an admission ticket the lock is taken exclusively (a generator or a
     standalone analyzer). With one, the ticket already holds it shared for its
     orchestrator run and yields that descriptor, so the child keeps a generator
-    out even if its orchestrator dies.
+    out even if its orchestrator dies. The root defaults to the host-wide one.
     """
     if admission is not None:
         yield admission.host_lock_fd()
         return
+    lock_root = lock_root if lock_root is not None else host_analysis_lock_root()
     lock_root.mkdir(parents=True, exist_ok=True)
     with (lock_root / HOST_LOCK_NAME).open("a+b") as lock:
         try:
@@ -669,6 +883,16 @@ def host_exclusion(lock_root: Path, admission: Any | None = None):
         yield lock.fileno()
 
 
+RECOVERY_REPORT_KIND = "delivery-analyzer-recovery-report"
+RECOVERY_REPORT_SCHEMA_VERSION = 1
+# An admitted envelope is serial only when its admission capped the host at one
+# worker *and* counted the orchestrators' in-process Stage 1 against that cap
+# (`lib.qc_pipeline.admission.SERIAL_SCOPE`); otherwise another orchestrator's
+# Stage 1 DSP may have run beside it.
+SERIAL_ADMISSION_SCOPE = "workers-and-stage1"
+_SESSION_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+
+
 def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Binding against candidate recovery verdicts over saved envelopes (audit #102).
 
@@ -676,12 +900,15 @@ def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
     the free-percent pressure warning), the candidate's, and the attribution, so
     a proposed rule change cites how many results it would flip and why.
 
-    The promotion evidence the judge registry names (decision 9a) reads three
-    of these: ``serialEnvelopes`` (a child that ran with no other admitted
-    worker: an exclusive lock, or an admission whose worker cap was one),
+    The promotion evidence the judge registry names (decision 9a) reads the
+    report as committed: ``serialEnvelopes`` (a child that ran with nothing else
+    admitted beside it: an exclusive lock, or an admission whose worker cap of
+    one also held back every orchestrator's Stage 1), ``serialByJudge``,
     ``serialCandidateWouldQualifyBindingFailure`` (a drop the candidate blames
     on another allocator although nothing else ran, which would be a
-    misattribution) and ``unattributed``; ``byJudge`` counts admitted envelopes.
+    misattribution), ``unattributed``, ``overlapPossibleEnvelopes`` (admitted
+    envelopes that are not provably serial, refused as evidence), the distinct
+    ``sessionIDs`` and the ``hostProfileIDs`` (hardware profiles) the envelopes ran on.
     """
     rows = []
     for envelope in envelopes:
@@ -695,23 +922,34 @@ def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
         candidate = envelope.get("candidateRecoveryRule") or {}
         attribution = (envelope.get("recoveryAttribution") or {}).get("status")
         admission = envelope.get("admission") if isinstance(envelope.get("admission"), dict) else None
-        serial = admission is None or admission.get("workerCap") == 1
+        serial = admission is None or (
+            admission.get("workerCap") == 1 and admission.get("serialScope") == SERIAL_ADMISSION_SCOPE
+        )
+        session = envelope.get("sessionID")
+        host = envelope.get("hostProfileID")
         rows.append({
             "bindingRecoveryQualified": binding_recovery,
             "candidateQualified": candidate.get("qualified"),
             "attribution": attribution,
             "serial": serial,
             "judge": admission.get("judge") if admission else None,
+            "session": session if isinstance(session, str) and _SESSION_TOKEN.fullmatch(session) else None,
+            "host": host if isinstance(host, str) and _SESSION_TOKEN.fullmatch(host) else None,
         })
     judged = [row for row in rows if row["candidateQualified"] is not None]
     by_attribution: dict[str, int] = {}
     by_judge: dict[str, int] = {}
+    serial_by_judge: dict[str, int] = {}
     for row in rows:
         key = str(row["attribution"])
         by_attribution[key] = by_attribution.get(key, 0) + 1
         if isinstance(row["judge"], str):
             by_judge[row["judge"]] = by_judge.get(row["judge"], 0) + 1
+            if row["serial"]:
+                serial_by_judge[row["judge"]] = serial_by_judge.get(row["judge"], 0) + 1
     return {
+        "schemaVersion": RECOVERY_REPORT_SCHEMA_VERSION,
+        "kind": RECOVERY_REPORT_KIND,
         "candidateRule": CANDIDATE_RECOVERY_RULE,
         "envelopes": len(rows),
         "withCandidateVerdict": len(judged),
@@ -729,8 +967,14 @@ def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
             if row["serial"] and row["candidateQualified"] and not row["bindingRecoveryQualified"]
         ),
         "unattributed": by_attribution.get("unattributed", 0) + by_attribution.get("None", 0),
+        "overlapPossibleEnvelopes": sum(1 for row in rows if not row["serial"]),
         "attribution": dict(sorted(by_attribution.items())),
         "byJudge": dict(sorted(by_judge.items())),
+        "serialByJudge": dict(sorted(serial_by_judge.items())),
+        "sessionIDs": sorted({row["session"] for row in rows if row["session"]}),
+        "envelopesWithoutSession": sum(1 for row in rows if not row["session"]),
+        "hostProfileIDs": sorted({row["host"] for row in rows if row["host"]}),
+        "envelopesWithoutHost": sum(1 for row in rows if not row["host"]),
     }
 
 
@@ -749,7 +993,7 @@ def envelopes_in(value: Any) -> list[dict[str, Any]]:
 
 
 def run_supervised(
-    command: Sequence[str], *, lock_root: Path,
+    command: Sequence[str], *, lock_root: Path | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     maximum_rss_bytes: int = PROVISIONAL_MAXIMUM_RSS_BYTES,
     environment: dict[str, str] | None = None,
@@ -762,20 +1006,28 @@ def run_supervised(
     process_sampler: Callable[[int], ProcessSample] = owned_process_sample,
     admission: Any | None = None,
     recovery_rule: str = WHOLE_HOST_RECOVERY_RULE,
+    group_lister: Callable[[int], Sequence[int]] = process_group_members,
+    session_id: str | None = None,
 ) -> SupervisedResult:
     """Run one governed child and qualify its resource envelope.
 
     Resident memory comes from ``process_sampler`` (in-process) unless an
-    ``rss_sampler`` is injected. Physical footprint is measured when a
-    ``physical_footprint_sampler`` is given or ``measure_physical_footprint`` is
-    set (MLX callers, whose Metal memory RSS cannot see); the in-process probe then
-    also supplies the kernel's lifetime peak.
+    ``rss_sampler`` is injected, summed over the child's whole process group
+    (``group_lister``): a command the child runs is sampled and bounded live.
+    Physical footprint is measured when a ``physical_footprint_sampler`` is
+    given or ``measure_physical_footprint`` is set (MLX callers, whose Metal
+    memory RSS cannot see); the in-process probe then also supplies the child's
+    lifetime peak. The lock root defaults to the host-wide one.
 
     ``admission`` is an orchestrator ticket (``AdmissionTicket``): the child runs
     under the ticket's shared host lock instead of an exclusive one, its
     ceilings may not exceed the admitted ceiling, and the ticket learns the
     child's PID so a dead orchestrator's budget stays reserved while the child
-    lives. ``recovery_rule`` selects the binding post-exit recovery rule.
+    lives. Binding the PID happens inside the supervision's ``try``: a failed
+    ledger write terminates and reaps the child before the error propagates.
+    ``recovery_rule`` selects the binding post-exit recovery rule.
+    ``session_id`` names the session the envelope belongs to (an admitted
+    worker's is its orchestrator run's; a standalone run's is this process's).
     """
     if not command or any(not isinstance(item, str) or not item for item in command):
         raise ResourceSupervisorError("supervised command must be a non-empty string vector")
@@ -797,7 +1049,10 @@ def run_supervised(
             raise ResourceSupervisorError("a supervised worker's ceilings exceed its admitted ceiling")
     footprint_requested = physical_footprint_sampler is not None or bool(measure_physical_footprint)
     footprint_from_process_probe = footprint_requested and physical_footprint_sampler is None
+    lock_root = lock_root if lock_root is not None else host_analysis_lock_root()
     lock_root.mkdir(parents=True, exist_ok=True)
+    admitted_session = getattr(admission, "session_id", None) if admission is not None else None
+    session = admitted_session if isinstance(admitted_session, str) else session_id or PROCESS_SESSION_ID
     with host_exclusion(lock_root, admission) as lock_fd:
         before = snapshotter()
         started = time.monotonic()
@@ -814,6 +1069,7 @@ def run_supervised(
         probe_failures: list[dict[str, str]] = []
         terminal_probe_count = 0
         terminal_lifetime_read = False
+        maximum_group_processes = 0
         wait_usage: Any | None = None
         with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
             process = subprocess.Popen(
@@ -824,9 +1080,12 @@ def run_supervised(
                 # explicitly: the inherited descriptor lasts until child exit.
                 pass_fds=(lock_fd,),
             )
-            if admission is not None:
-                admission.bind_child(process.pid)
             try:
+                # Inside the try: if the ledger write fails (a full disk, an
+                # unreadable ledger), the finally still terminates and reaps
+                # the child, so no worker outlives its supervision.
+                if admission is not None:
+                    admission.bind_child(process.pid)
                 while True:
                     state = _exited_unreaped(process)
                     if state is None and process.poll() is not None:
@@ -856,6 +1115,7 @@ def run_supervised(
                         if type(resident) is not int or resident < 0:
                             raise ResourceSupervisorError("invalid resident measurement")
                         peak_rss = max(peak_rss, resident)
+                        leader_footprint: int | None = None
                         if footprint_requested:
                             probe_stage = "physical-footprint"
                             if physical_footprint_sampler is not None:
@@ -873,8 +1133,20 @@ def run_supervised(
                                 if resource_probe_failed:
                                     probe_failures.append({"stage": probe_stage, "reason": "missing-live-measurement"})
                             else:
-                                footprint_samples += 1
-                                sampled_peak_footprint = max(sampled_peak_footprint, footprint)
+                                leader_footprint = footprint
+                        # The rest of the child's group (a native judge binary its
+                        # worker runs): the ceilings bind the group's sum, live.
+                        probe_stage = "process-group"
+                        group = _descendant_usage(
+                            process.pid, group_lister, rss_sampler=rss_sampler, process_sampler=process_sampler,
+                            footprint_sampler=physical_footprint_sampler, footprint=footprint_requested,
+                        )
+                        maximum_group_processes = max(maximum_group_processes, group.processes + 1)
+                        peak_rss = max(peak_rss, resident + group.resident_bytes)
+                        if leader_footprint is not None:
+                            footprint_samples += 1
+                            sampled_peak_footprint = max(sampled_peak_footprint,
+                                                         leader_footprint + group.footprint_bytes)
                         resource_samples += 1
                         now = time.monotonic()
                         if last_sample_at is not None:
@@ -1020,6 +1292,9 @@ def run_supervised(
             "probeFailureCount": len(probe_failures),
             "terminalProbeCount": terminal_probe_count,
             "processProbe": "injected" if rss_sampler is not None else process_probe_identity(process_sampler),
+            "groupProbe": group_probe_identity(group_lister),
+            "sampledProcessScope": SAMPLED_PROCESS_SCOPE,
+            "maximumSampledProcessCount": maximum_group_processes,
             "sampleIntervalSeconds": SAMPLE_INTERVAL_SECONDS,
             "resourceSampleCount": resource_samples,
             "maximumSampleGapSeconds": maximum_sample_gap,
@@ -1046,6 +1321,9 @@ def run_supervised(
             "wholeHostRecoveryFailures": whole_host_failures,
             "exclusion": ADMITTED_EXCLUSION if admission is not None else EXCLUSIVE_EXCLUSION,
             "admission": admission.report() if admission is not None else None,
+            # Where and when, for the recovery report a rule change cites.
+            "sessionID": session,
+            "hostProfileID": host_hardware_profile_id(),
             "recoverySnapshotCount": recovery_snapshot_count,
             "recoveryWaitSeconds": recovery_wait_seconds,
             "stdoutSHA256": _digest(stdout),

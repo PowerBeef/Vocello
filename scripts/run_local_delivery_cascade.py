@@ -458,7 +458,7 @@ def _validate_manifest(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def run_cascade(
-    *, manifest: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path,
+    *, manifest: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path | None = None,
     compact_config: dict[str, Any] | None = None,
     compact_supervisor_options: dict[str, Any] | None = None,
     reference_audio_dir: Path | None = None,
@@ -641,7 +641,6 @@ def main() -> int:
     parser.add_argument("--plan", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
-    parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
     parser.add_argument("--review-evidence", type=Path, help="untracked, run-bound full-file ASR receipts; never listener responses")
     parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
@@ -655,7 +654,8 @@ def main() -> int:
         result = run_cascade(
             manifest=build_cascade_manifest(plan_path=args.plan, run_dir=args.run_dir,
                                            review_evidence=_read(args.review_evidence) if args.review_evidence else None),
-            cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,
+            # The host-wide analysis lock, never one beside the cache root.
+            cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler),
             compact_config=compact,
             reference_audio_dir=args.reference_audio_dir,
         )

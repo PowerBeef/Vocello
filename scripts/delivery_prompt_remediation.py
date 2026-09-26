@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from delivery_experiment import EXPECTED_PRESETS, digest  # noqa: E402
 from delivery_experiment_runner import (  # noqa: E402
-    DEFAULT_SERIAL_LOCK_ROOT,
     REPO,
     RunnerError,
     _reference_key,
@@ -34,6 +33,7 @@ from delivery_experiment_runner import (  # noqa: E402
     run_execution_plan,
     validate_execution_plan,
 )
+from delivery_resource_supervisor import host_analysis_lock_root  # noqa: E402
 from delivery_statistics import paired_bootstrap_delta  # noqa: E402
 
 
@@ -1048,7 +1048,7 @@ def main() -> int:
                 root=args.root, binary=args.binary.resolve(), data_dir=args.data_dir,
                 contract=contract, candidate_id=args.candidate,
                 stage_name=args.stage, variant=args.variant,
-                lock_root=DEFAULT_SERIAL_LOCK_ROOT,
+                lock_root=host_analysis_lock_root(),
             )
         elif args.command in {"decide", "recompose-legacy"}:
             result = decide(

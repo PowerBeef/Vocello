@@ -3,28 +3,45 @@
 `run_persistent_worker` writes the job, admits the worker (when the caller runs
 under an orchestrator's `RunAdmission`), launches `scripts/audio_qc_worker.py`
 (or any command speaking its JSONL protocol) under the resource supervisor with
-the judge's ceiling, and reads the rows it emitted:
+the judge's ceiling, and reads the rows it emitted. A worker analyzes its rows
+in job order, so the row in flight when it ends abnormally is the first row it
+had not emitted:
 
 - A clean, qualified run accepts every emitted row.
 - A worker that ended abnormally mid-job (a crash, a timeout or a ceiling
-  breach) keeps the rows it had emitted; the remainder is retried once in a
-  fresh worker, and the retry is recorded as its own launch. A row the retry
-  does not complete either is `unavailable` (`crash`, `timeout` or
-  `envelope-breach`).
+  breach) keeps the rows it had emitted. The row in flight is retried alone
+  once in a fresh worker, then the rest of the job continues in another fresh
+  worker; each is recorded as its own launch. Only a row that ends two workers
+  abnormally is `unavailable` (`crash`, `timeout` or `envelope-breach`); one
+  bad row never costs the rows after it.
+- A worker that ended before it was ready (a start-up failure, or output that
+  breaks the protocol) has no row in flight: its rows are retried once
+  together, and a second such failure makes every row it still held
+  unavailable.
 - A run whose envelope failed a host condition (pressure, swap, post-exit
-  recovery or a probe) accepts nothing: its rows are `unavailable`
-  (`envelope-breach`) and nothing is retried, since a retry would not change
-  the host.
+  recovery or a probe) accepts nothing: its rows and every row still queued are
+  `unavailable` (`envelope-breach`) and nothing is retried, since a retry would
+  not change the host.
 - A row the engine reports it could not analyze is `unavailable`
   (`analysis-failed`, or the reason the engine gave) and is not retried.
+
+Every row ends exactly once, accepted, adopted or unavailable. A launch's
+timeout scales with its rows: a fixed start-up allowance (model load and warm
+up) plus the per-row budget for each row. Timing (`wallSeconds`) is reported
+beside a row's result, never inside it, so what a caller caches is keyed by
+what the judge measured, not by how long it took. After admission and before
+each launch, an `adopt` hook may resolve rows another run already stored;
+adopted rows launch nothing.
 
 Accepted rows are what the caller may cache (L1); unavailable rows never are.
 """
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -42,7 +59,12 @@ ABNORMAL_END_FAILURES = frozenset({
 # part of the crash, not a separate host condition.
 SHORT_LIFE_MEASUREMENT_GAPS = frozenset({"peak-rss-unavailable", "physical-footprint-unavailable"})
 ROW_ERROR_REASONS = frozenset({"analysis-failed", "timeout", "envelope-breach"})
-DEFAULT_TIMEOUT_SECONDS = 900.0
+# The old one-process-per-clip path allowed 900 s per clip; a persistent worker
+# keeps that per row and adds one start-up allowance per launch.
+DEFAULT_ROW_TIMEOUT_SECONDS = 900.0
+DEFAULT_STARTUP_SECONDS = 900.0
+# Row fields that record how long a row took, never what the judge measured.
+TIMING_KEYS = frozenset({"wallSeconds"})
 
 
 class WorkerProtocolError(ValueError):
@@ -59,17 +81,34 @@ class WorkerSpec:
     ceiling_bytes: int
     engine_config: Mapping[str, Any] = field(default_factory=dict)
     measure_physical_footprint: bool = False
-    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+    row_timeout_seconds: float = DEFAULT_ROW_TIMEOUT_SECONDS
+    startup_seconds: float = DEFAULT_STARTUP_SECONDS
     environment: Mapping[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("row_timeout_seconds", "startup_seconds"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
+                    or value <= 0:
+                raise ValueError(f"a worker's {name} must be positive and finite")
+
+    def job_timeout_seconds(self, rows: int) -> float:
+        """One launch's timeout: the start-up allowance plus the per-row budget per row."""
+        return float(self.startup_seconds + max(rows, 1) * self.row_timeout_seconds)
 
 
 @dataclass
 class WorkerOutcome:
     judge_id: str
+    # Accepted rows' results, timing removed (what the caller may cache).
     results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Accepted rows' wall time as the worker reported it (provenance only).
+    timings: dict[str, float] = field(default_factory=dict)
+    # Rows another run stored after this one planned them, resolved after admission.
+    adopted: dict[str, dict[str, Any]] = field(default_factory=dict)
     unavailable: dict[str, str] = field(default_factory=dict)
     launches: list[dict[str, Any]] = field(default_factory=list)
-    # The launch (1 or 2) whose worker emitted each accepted row.
+    # The launch (1-based) whose worker emitted each accepted row.
     row_launch: dict[str, int] = field(default_factory=dict)
     ready: dict[str, Any] | None = None
 
@@ -78,6 +117,7 @@ class WorkerOutcome:
             "judge": self.judge_id,
             "launches": self.launches,
             "rowsAccepted": len(self.results),
+            "rowsAdopted": len(self.adopted),
             "rowsUnavailable": dict(sorted(self.unavailable.items())),
             "modelLoadSeconds": (self.ready or {}).get("modelLoadSeconds"),
             "warmupSeconds": (self.ready or {}).get("warmupSeconds"),
@@ -147,7 +187,7 @@ def host_condition_failed(failures: set[str]) -> bool:
 
 
 def _unavailable_reason(failures: set[str]) -> str:
-    """Why rows a retried worker still did not complete are unavailable."""
+    """Why a row whose worker ended abnormally is unavailable."""
     if "timeout" in failures:
         return "timeout"
     if failures & CEILING_FAILURES:
@@ -155,14 +195,24 @@ def _unavailable_reason(failures: set[str]) -> str:
     return "crash"
 
 
+def split_timing(result: Mapping[str, Any]) -> tuple[dict[str, Any], float | None]:
+    """A row's result without its timing, and the timing it reported."""
+    value = {key: item for key, item in result.items() if key not in TIMING_KEYS}
+    wall = result.get("wallSeconds")
+    timing = float(wall) if isinstance(wall, (int, float)) and not isinstance(wall, bool) \
+        and math.isfinite(wall) else None
+    return value, timing
+
+
 def run_persistent_worker(
-    spec: WorkerSpec, rows: Sequence[Mapping[str, Any]], *, workdir: Path, lock_root: Path,
+    spec: WorkerSpec, rows: Sequence[Mapping[str, Any]], *, workdir: Path, lock_root: Path | None = None,
     run_admission: Any | None = None, judge_admission: Any | None = None,
     supervisor: Callable[..., Any] = run_supervised,
     recovery_rule: str = WHOLE_HOST_RECOVERY_RULE,
     supervisor_options: Mapping[str, Any] | None = None,
+    adopt: Callable[[Sequence[Mapping[str, Any]]], Mapping[str, dict[str, Any]]] | None = None,
 ) -> WorkerOutcome:
-    """Run one judge's rows through one worker (plus at most one recorded retry)."""
+    """Run one judge's rows through one worker, isolating a row that crashes it."""
     if run_admission is not None and judge_admission is None:
         raise ValueError("an admitted worker needs its judge admission")
     if judge_admission is not None and judge_admission.ceiling_bytes != spec.ceiling_bytes:
@@ -171,34 +221,56 @@ def run_persistent_worker(
     if len(set(identities)) != len(identities):
         raise ValueError("worker rows need unique identities")
     outcome = WorkerOutcome(spec.judge_id)
-    pending = [dict(row) for row in rows]
     workdir.mkdir(parents=True, exist_ok=True)
-    for attempt in (0, 1):
-        if not pending:
-            break
-        job_path = workdir / f"{spec.judge_id.replace('@', '-')}-launch-{attempt + 1}.json"
-        job_path.write_text(json.dumps({
-            "schemaVersion": 1, "kind": JOB_KIND, "protocol": PROTOCOL,
-            "judge": spec.judge_id, "engine": spec.engine, "threads": spec.threads,
-            "engineConfig": dict(spec.engine_config), "rows": pending,
-        }, ensure_ascii=False), encoding="utf-8")
-        environment = {**os.environ, **dict(spec.environment or {}), **thread_environment(spec.threads)}
+    # Each queued batch: its rows and why it runs.
+    queue: deque[tuple[list[dict[str, Any]], str]] = deque([([dict(row) for row in rows], "job")])
+    crashes: dict[str, int] = {}
+    unready_failures = 0
+
+    def queued_rows() -> list[dict[str, Any]]:
+        return [row for batch, _kind in queue for row in batch]
+
+    while queue:
+        batch, kind = queue.popleft()
         ticket = run_admission.admit(judge_admission) if run_admission is not None else None
         try:
+            if adopt is not None:
+                # Re-checked after admission: another run may have stored these
+                # rows after this one planned them.
+                found = adopt(batch) or {}
+                for row in batch:
+                    identity = str(row["id"])
+                    if isinstance(found.get(identity), dict):
+                        outcome.adopted[identity] = found[identity]
+                batch = [row for row in batch if str(row["id"]) not in outcome.adopted]
+            if not batch:
+                continue
+            launch = len(outcome.launches) + 1
+            job_path = workdir / f"{spec.judge_id.replace('@', '-')}-launch-{launch}.json"
+            job_path.write_text(json.dumps({
+                "schemaVersion": 1, "kind": JOB_KIND, "protocol": PROTOCOL,
+                "judge": spec.judge_id, "engine": spec.engine, "threads": spec.threads,
+                "engineConfig": {**dict(spec.engine_config), "rowTimeoutSeconds": spec.row_timeout_seconds},
+                "rows": batch,
+            }, ensure_ascii=False), encoding="utf-8")
+            environment = {**os.environ, **dict(spec.environment or {}), **thread_environment(spec.threads)}
+            timeout = spec.job_timeout_seconds(len(batch))
             result = supervisor(
                 [*spec.command, "--job", str(job_path)], lock_root=lock_root,
-                timeout_seconds=spec.timeout_seconds,
+                timeout_seconds=timeout,
                 maximum_rss_bytes=spec.ceiling_bytes, maximum_physical_footprint_bytes=spec.ceiling_bytes,
                 measure_physical_footprint=spec.measure_physical_footprint,
                 environment=environment, admission=ticket, recovery_rule=recovery_rule,
                 **dict(supervisor_options or {}),
             )
         finally:
+            # The supervisor has terminated and reaped its child by now; a
+            # child that survived keeps its ledger entry (`AdmissionTicket.release`).
             if ticket is not None:
                 ticket.release()
         envelope = result.report
         failures = set(envelope.get("qualificationFailures") or [])
-        expected = [str(row["id"]) for row in pending]
+        expected = [str(row["id"]) for row in batch]
         protocol_error = None
         try:
             parsed = parse_worker_stream(result.stdout, expected)
@@ -216,15 +288,19 @@ def run_persistent_worker(
                 if peak is not None and peak > spec.ceiling_bytes:
                     outcome.unavailable[identity] = "envelope-breach"
                     continue
-                outcome.results[identity] = value
-                outcome.row_launch[identity] = attempt + 1
+                outcome.results[identity], timing = split_timing(value)
+                if timing is not None:
+                    outcome.timings[identity] = timing
+                outcome.row_launch[identity] = launch
                 accepted += 1
             for identity, reason in parsed.row_errors.items():
                 outcome.unavailable[identity] = reason
         outcome.launches.append({
-            "launch": attempt + 1,
-            "retry": attempt > 0,
-            "rows": len(pending),
+            "launch": launch,
+            "retry": launch > 1,
+            "kind": kind,
+            "rows": len(batch),
+            "timeoutSeconds": timeout,
             "rowsEmitted": len(parsed.rows),
             "rowsAccepted": accepted,
             "rowErrors": len(parsed.row_errors),
@@ -233,18 +309,38 @@ def run_persistent_worker(
             "descendantPeakRSSBytes": max(parsed.child_peaks.values(), default=None),
             "resourceEnvelope": envelope,
         })
-        remaining = [row for row in pending
+        remaining = [row for row in batch
                      if str(row["id"]) not in outcome.results and str(row["id"]) not in outcome.unavailable]
         if host_condition:
-            for row in remaining:
+            for row in remaining + queued_rows():
                 outcome.unavailable[str(row["id"])] = "envelope-breach"
+            queue.clear()
             break
         if not remaining:
-            break
-        if attempt == 1:
-            reason = "crash" if protocol_error else _unavailable_reason(failures)
-            for row in remaining:
-                outcome.unavailable[str(row["id"])] = reason
-            break
-        pending = remaining
+            continue
+        reason = "crash" if protocol_error else _unavailable_reason(failures)
+        if parsed.ready is None:
+            # Nothing was in flight: the worker never started its rows.
+            unready_failures += 1
+            if unready_failures > 1:
+                for row in remaining + queued_rows():
+                    outcome.unavailable[str(row["id"])] = reason
+                queue.clear()
+                break
+            queue.appendleft((remaining, "retry"))
+            continue
+        in_flight, rest = remaining[0], remaining[1:]
+        identity = str(in_flight["id"])
+        crashes[identity] = crashes.get(identity, 0) + 1
+        if rest:
+            queue.appendleft((rest, "remainder"))
+        if crashes[identity] > 1:
+            outcome.unavailable[identity] = reason
+        else:
+            # Alone first, so a second failure is this row's own.
+            queue.appendleft(([in_flight], "isolated"))
+    resolved = [set(outcome.results), set(outcome.adopted), set(outcome.unavailable)]
+    if any(first & second for index, first in enumerate(resolved) for second in resolved[index + 1:]) \
+            or set().union(*resolved) != set(identities):
+        raise RuntimeError("every worker row ends exactly once: accepted, adopted or unavailable")
     return outcome

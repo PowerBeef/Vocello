@@ -12,10 +12,14 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
+
+_LOCK_ROOT_KEY = pytest.StashKey[str]()
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 if str(SCRIPTS) not in sys.path:  # modules loaded by path import `lib.*`
@@ -33,8 +37,23 @@ def _research_prefixes() -> tuple[str, ...]:
     return module.RESEARCH_PREFIXES
 
 
+ANALYSIS_LOCK_ROOT_VARIABLE = "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT"
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "research: audio, delivery, prosody and device-analysis tooling")
+    # No test touches the host's real analysis lock or admission ledger: every
+    # test process (each xdist worker too) gets its own root, the test-only
+    # override of `hostAnalysisLock` in config/build-output-policy.json.
+    root = tempfile.mkdtemp(prefix="vocello-analysis-lock-")
+    config.stash[_LOCK_ROOT_KEY] = root
+    os.environ[ANALYSIS_LOCK_ROOT_VARIABLE] = root
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    root = config.stash.get(_LOCK_ROOT_KEY, None)
+    if root:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def _quarantined() -> set[str]:

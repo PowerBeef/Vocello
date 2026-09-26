@@ -403,7 +403,7 @@ def _recognition(row: dict[str, Any], result: dict[str, Any], *, provenance: dic
 
 
 def transcribe_manifest(
-    *, manifest: dict[str, Any], config: dict[str, Any], cache: Any, lock_root: Path,
+    *, manifest: dict[str, Any], config: dict[str, Any], cache: Any, lock_root: Path | None = None,
     supervisor: Callable[..., Any] | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     maximum_rss_bytes: int = MAXIMUM_RSS_BYTES,
@@ -730,7 +730,6 @@ def main() -> int:
                             help="untracked config from prepare_delivery_compact_model_config.py whisper-small-mlx")
     transcribe.add_argument("--output", type=Path, required=True)
     transcribe.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
-    transcribe.add_argument("--lock-root", type=Path)
     transcribe.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     transcribe.add_argument("--maximum-rss-bytes", type=int, default=MAXIMUM_RSS_BYTES)
 
@@ -785,7 +784,6 @@ def main() -> int:
         cache = DeliveryAnalysisCache(args.cache_root, resampler_version=configured_resampler(config))
         evidence = transcribe_manifest(
             manifest=_load_json(args.manifest), config=config, cache=cache,
-            lock_root=args.lock_root or args.cache_root,
             timeout_seconds=args.timeout_seconds, maximum_rss_bytes=args.maximum_rss_bytes,
         )
         atomic_json(args.output, evidence)

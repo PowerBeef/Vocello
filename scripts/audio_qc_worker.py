@@ -34,9 +34,17 @@ Engines:
   invocation (the SenseVoice Q8 llama.cpp runtime). The command template is the
   adapter configuration's, with `{audio}` bound per row to a canonical WAV. The
   binary loads its model on every invocation: only the supervision and the
-  admission are per run for this engine. Each invocation is reaped with
-  `wait4`, and its peak resident memory is reported per row
-  (`childMaxRSSBytes`), since the supervisor samples this host process only.
+  admission are per run for this engine. Each invocation stays in this
+  worker's process group, which the supervisor samples live: the judge's
+  ceiling binds the worker and the binary together while the binary runs, and
+  a breach terminates the whole group. Each invocation is also reaped with
+  `wait4` and its peak resident memory reported per row (`childMaxRSSBytes`),
+  a second, per-row check. Its timeout is the job's per-row budget
+  (`rowTimeoutSeconds`).
+
+Rows are analyzed in job order, so the runner can name the row in flight when
+a worker ends abnormally. A row's `wallSeconds` is timing, which the runner
+keeps beside the result, never in what it caches.
 """
 
 from __future__ import annotations

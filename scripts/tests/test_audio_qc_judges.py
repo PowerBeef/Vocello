@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -246,26 +247,15 @@ class JudgeRegistryTests(unittest.TestCase):
             registry["admission"]["recoveryRule"]["candidateBinding"] = True
         self.assertIn("a binding child-attributed recovery rule cites at least 2 recovery reports",
                       self._errors(flipped))
+        # Self-declared digests and counts no longer satisfy the gate: each
+        # report is a committed file (`RecoveryEvidenceTests`).
+        declared = [{"path": "reports/a.json", "sha256": "a" * 64, "date": "2026-10-01"},
+                    {"path": "reports/b.json", "sha256": "b" * 64, "date": "2026-10-01"}]
 
-        def report(digest: str, **overrides) -> dict:
-            value = {"recoveryReportSHA256": digest, "hardwareProfileID": "mac-mini-m6-16gb", "date": "2026-10-01",
-                     "serialEnvelopes": 4, "serialCandidateWouldQualifyBindingFailure": 0, "unattributed": 0,
-                     "byJudge": {WHISPER: 2, "compact.sensevoice-small-q8@1": 2}}
-            return {**value, **overrides}
-
-        def evidenced(registry, reports):
+        def self_declared(registry):
             registry["admission"]["recoveryRule"]["candidateBinding"] = True
-            registry["admission"]["recoveryRule"]["promotion"]["evidence"] = reports
-        self.assertEqual(self._errors(lambda r: evidenced(r, [report("a" * 64), report("b" * 64)])), [])
-        misattributed = self._errors(lambda r: evidenced(
-            r, [report("a" * 64), report("b" * 64, serialCandidateWouldQualifyBindingFailure=1)]))
-        self.assertTrue(any("blamed a serial post-exit drop" in e for e in misattributed))
-        self.assertTrue(any("canonical hardware profile" in e for e in self._errors(lambda r: evidenced(
-            r, [report("a" * 64), report("b" * 64, hardwareProfileID="mac-mini-m2-8gb")]))))
-        self.assertTrue(any("lacks envelopes of compact.sensevoice-small-q8@1" in e for e in self._errors(
-            lambda r: evidenced(r, [report("a" * 64), report("b" * 64, byJudge={WHISPER: 1})]))))
-        self.assertIn("recovery evidence reports must be distinct",
-                      self._errors(lambda r: evidenced(r, [report("a" * 64), report("a" * 64)])))
+            registry["admission"]["recoveryRule"]["promotion"]["evidence"] = declared
+        self.assertTrue(any("not a file inside the repository" in e for e in self._errors(self_declared)))
 
         def oversized(registry):
             registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"] = 10 * 1024**3
@@ -571,6 +561,111 @@ class HubSnapshotVerificationTests(unittest.TestCase):
             whisper = registry["judges"][WHISPER]["pins"]
             verify_judge_snapshot(WHISPER, self.snapshot, repository=whisper["repository"],
                                   revision=whisper["revision"], registry=registry)
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(root), "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture",
+                    "-c", "commit.gpgsign=false", *args], check=True, capture_output=True)
+
+
+class RecoveryEvidenceTests(unittest.TestCase):
+    """The recovery-rule switch binds only on committed recovery-report files (decision 9a)."""
+
+    SENSEVOICE = "compact.sensevoice-small-q8@1"
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        registry_test = JudgeRegistryTests("_repository_copy")
+        registry_test.registry = load_registry()
+        registry_test.root = self.root
+        registry_test._repository_copy()
+        _git(self.root, "init", "-q")
+        _git(self.root, "add", "-A")
+        _git(self.root, "commit", "-qm", "fixture repository")
+        self.registry = load_registry()
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def _report(self, session: str, **overrides) -> dict:
+        from delivery_resource_supervisor import recovery_report
+
+        envelopes = []
+        for judge in (WHISPER, self.SENSEVOICE):
+            envelopes.append({
+                "kind": "delivery-analyzer-resource-envelope", "sessionID": session,
+                "hostProfileID": overrides.pop("host", "mac-mini-m6-16gb") if judge == WHISPER else "mac-mini-m6-16gb",
+                "admission": {"judge": judge, "workerCap": 1, "serialScope": "workers-and-stage1"},
+                "wholeHostRecoveryFailures": [], "candidateRecoveryRule": {"qualified": True},
+                "recoveryAttribution": {"status": "recovered"},
+            })
+        return {**recovery_report(envelopes), **overrides}
+
+    def _write(self, relative: str, report: dict, *, commit: bool = True) -> dict:
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if commit:
+            _git(self.root, "add", relative)
+            _git(self.root, "commit", "-qm", f"add {relative}")
+        return {"path": relative, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "date": "2026-10-01"}
+
+    def _flipped(self, evidence: list[dict]) -> dict:
+        registry = copy.deepcopy(self.registry)
+        registry["admission"]["recoveryRule"]["candidateBinding"] = True
+        registry["admission"]["recoveryRule"]["promotion"]["evidence"] = evidence
+        return registry
+
+    def _errors(self, evidence: list[dict]) -> list[str]:
+        from audio_qc_judges import admission_errors
+
+        return admission_errors(self._flipped(evidence), root=self.root)
+
+    def test_two_committed_reports_from_separate_sessions_make_the_rule_binding(self) -> None:
+        from lib.qc_pipeline.admission import AdmissionPolicy
+
+        evidence = [self._write("reports/first.json", self._report("session-1")),
+                    self._write("reports/second.json", self._report("session-2"))]
+        self.assertEqual(self._errors(evidence), [])
+        policy = AdmissionPolicy.from_registry(self._flipped(evidence), root=self.root)
+        self.assertEqual((policy.recovery_rule, policy.worker_cap), ("attributed-post-exit-recovery-v2", None))
+        path = self.root / "config/audio-qc-judges.json"
+        path.write_text(json.dumps(self._flipped(evidence)), encoding="utf-8")
+        self.assertIs(load_registry(path, root=self.root)["admission"]["recoveryRule"]["candidateBinding"], True)
+
+    def test_the_gate_reads_the_committed_file_not_what_the_registry_says(self) -> None:
+        good = self._write("reports/first.json", self._report("session-1"))
+        cases = {
+            "not a file inside the repository": [good, {"path": "reports/absent.json", "sha256": "a" * 64,
+                                                        "date": "2026-10-01"}],
+            "outside": [good, {"path": "../elsewhere.json", "sha256": "a" * 64, "date": "2026-10-01"}],
+            "does not match its recorded SHA-256": [good, {**self._write("reports/second.json",
+                                                                          self._report("session-2")),
+                                                           "sha256": "b" * 64}],
+            "is not committed": [good, self._write("reports/untracked.json", self._report("session-3"),
+                                                   commit=False)],
+            "separate sessions": [good, self._write("reports/same-session.json", self._report("session-1"))],
+            "blamed a serial post-exit drop": [good, self._write(
+                "reports/misattributed.json", self._report("session-4", serialCandidateWouldQualifyBindingFailure=1))],
+            "canonical hardware profile": [good, self._write(
+                "reports/other-host.json", self._report("session-5", host="mac-mini-m2-8gb"))],
+            "run beside other work": [good, self._write(
+                "reports/overlap.json", self._report("session-6", overlapPossibleEnvelopes=1))],
+            "lacks serial envelopes of compact.sensevoice-small-q8@1": [good, self._write(
+                "reports/one-judge.json", self._report("session-7", serialByJudge={WHISPER: 1}))],
+            "must be distinct": [good, good],
+        }
+        for expected, evidence in cases.items():
+            with self.subTest(expected=expected):
+                errors = self._errors(evidence)
+                self.assertTrue(any(expected in error for error in errors) or (
+                    expected == "outside" and any("repository-relative path" in error for error in errors)), errors)
+        # A committed report edited afterwards is refused too.
+        edited = self._write("reports/edited.json", self._report("session-8"))
+        (self.root / "reports/edited.json").write_text(json.dumps(self._report("session-8")), encoding="utf-8")
+        edited["sha256"] = hashlib.sha256((self.root / "reports/edited.json").read_bytes()).hexdigest()
+        self.assertTrue(any("differs from its committed version" in error for error in self._errors([good, edited])))
 
 
 if __name__ == "__main__":

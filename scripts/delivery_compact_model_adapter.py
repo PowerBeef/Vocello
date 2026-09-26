@@ -15,7 +15,12 @@ fed only the uncalibrated heads.
 (`audio_qc_worker.py`, audit AQ-F42); `run_compact_adapter` launches one
 process for one clip and remains for the two cold qualification probes. Both
 fix the judge's declared thread count in the worker's environment and key the
-cache on it, so either path reuses the other's entries.
+cache on it and on the worker host's source digest, so either path reuses the
+other's entries. The batch path's worker timeout scales with its clips (a
+start-up allowance plus the caller's per-clip `timeout_seconds`), and it caches
+only rows from a qualified launch: a row kept from a worker that later crashed
+is returned for this run, never cached. Both paths re-check the cache before
+launching and adopt an entry another run stored first.
 
 Identity v4 (audit AQ-F47) splits what a run produced from how it was
 supervised. The output identity (model, weights, runtime binary and
@@ -49,6 +54,7 @@ from delivery_analysis_cache import (
     file_sha256,
     configured_resampler,
 )
+from lib.qc_pipeline.layered_cache import store_or_adopt
 from audio_qc_judges import JudgeRegistryError, host_profile, load_registry, require_loadable
 from audio_qc_worker import thread_environment
 from delivery_resource_supervisor import SupervisedResult, run_supervised
@@ -333,7 +339,11 @@ def adapter_threads(adapter_id: str, registry: dict[str, Any] | None = None) -> 
 
 
 def compact_layer_identity(canonical: CanonicalAudio, config: dict[str, Any], threads: int) -> LayerIdentity:
-    """The cache key of one clip's compact output: the output identity and the thread count."""
+    """The cache key of one clip's compact output: the output identity, the thread count and the worker host.
+
+    The worker host (`audio_qc_worker.py`) writes the canonical WAV the native
+    binary reads and parses what it prints, so its source is output identity.
+    """
     return LayerIdentity(
         original_wav_sha256=canonical.original_wav_sha256,
         canonical_derivative_sha256=canonical.canonical_derivative_sha256,
@@ -345,6 +355,7 @@ def compact_layer_identity(canonical: CanonicalAudio, config: dict[str, Any], th
         weights_sha256=config["weightsSHA256"],
         preprocessing_config_digest=digest({
             "preprocessingConfigDigest": config["preprocessingConfigDigest"], "threads": threads,
+            "workerHostSHA256": file_sha256(WORKER_HOST),
         }),
     )
 
@@ -398,7 +409,7 @@ def _render(config: dict[str, Any], *, audio: str) -> list[str]:
 
 def run_compact_adapter(
     *, wav_path: Path, config: dict[str, Any], cache: DeliveryAnalysisCache,
-    lock_root: Path,
+    lock_root: Path | None = None,
     supervisor: Callable[..., SupervisedResult] = run_supervised,
     supervisor_options: dict[str, Any] | None = None,
     return_unqualified: bool = False,
@@ -436,13 +447,17 @@ def run_compact_adapter(
     payload = _payload(config, output, result.report, envelope, threads)
     if result.report.get("qualified"):
         try:
-            cache.store(identity, payload)
+            stored, adopted = store_or_adopt(cache, identity, payload)
         except AnalysisCacheError as error:
             raise CompactAdapterError(str(error)) from error
+        if adopted:
+            return stored, True
     return payload, False
 
 
-# Options the persistent-worker runner sets itself from the registry.
+# Options the persistent-worker runner sets itself from the registry. A
+# caller's `timeout_seconds` is the per-clip budget (as on the one-clip path);
+# the runner scales each launch's timeout from it.
 _RUNNER_OWNED_OPTIONS = frozenset({
     "timeout_seconds", "maximum_rss_bytes", "maximum_physical_footprint_bytes",
     "measure_physical_footprint", "environment", "admission", "recovery_rule", "lock_root",
@@ -451,7 +466,7 @@ _RUNNER_OWNED_OPTIONS = frozenset({
 
 def run_compact_adapter_batch(
     *, wav_paths: Sequence[Path], config: dict[str, Any], cache: DeliveryAnalysisCache,
-    lock_root: Path,
+    lock_root: Path | None = None,
     supervisor: Callable[..., SupervisedResult] = run_supervised,
     supervisor_options: dict[str, Any] | None = None,
     run_admission: Any | None = None,
@@ -463,11 +478,14 @@ def run_compact_adapter_batch(
     Cache hits launch nothing; clips with byte-identical canonical audio share
     one row. The worker runs under the judge's registry ceiling and thread
     count, admitted when `run_admission` is given (the orchestrator) or under
-    the exclusive host lock otherwise. Accepted rows are cached before any
-    unavailable row is reported, so a rerun resumes rather than repeats.
+    the exclusive host lock otherwise, with a timeout of a start-up allowance
+    plus the per-clip `timeout_seconds` of `supervisor_options` for each clip.
+    Rows from a qualified launch are cached before any unavailable row is
+    reported, so a rerun resumes rather than repeats; a row kept from a launch
+    that ended abnormally is returned for this run and never cached.
     """
     from lib.qc_pipeline.admission import AdmissionError, judge_admission as admission_for, judge_ceiling
-    from lib.qc_pipeline.workers import WorkerSpec, run_persistent_worker
+    from lib.qc_pipeline.workers import DEFAULT_ROW_TIMEOUT_SECONDS, WorkerSpec, run_persistent_worker
 
     config = validate_adapter_config(config)
     if cache.resampler_version != configured_resampler(config):
@@ -504,23 +522,42 @@ def run_compact_adapter_batch(
         engine_config = {"weights": str(config["weightsPath"]), "decodeOptions": {}}
         rows = [{"id": key, "pcmPath": str(canonical.derivative_path), "language": None}
                 for key, (_i, canonical, _p) in pending.items()]
-    options = {key: value for key, value in dict(supervisor_options or {}).items() if key not in _RUNNER_OWNED_OPTIONS}
-    spec = WorkerSpec(
-        judge_id=judge_id, engine=engine, command=command, threads=threads,
-        lane=str((judge.get("execution") or {}).get("lane")), ceiling_bytes=ceiling,
-        engine_config=engine_config, measure_physical_footprint=adapter_id in MLX_ADAPTERS,
-        environment={"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu"},
-    )
+    requested = dict(supervisor_options or {})
+    row_timeout = requested.get("timeout_seconds", DEFAULT_ROW_TIMEOUT_SECONDS)
+    options = {key: value for key, value in requested.items() if key not in _RUNNER_OWNED_OPTIONS}
+    try:
+        spec = WorkerSpec(
+            judge_id=judge_id, engine=engine, command=command, threads=threads,
+            lane=str((judge.get("execution") or {}).get("lane")), ceiling_bytes=ceiling,
+            engine_config=engine_config, measure_physical_footprint=adapter_id in MLX_ADAPTERS,
+            row_timeout_seconds=row_timeout, environment={"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu"},
+        )
+    except ValueError as error:
+        raise CompactAdapterError(str(error)) from None
+
+    def adopt(batch: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        # Another run may have stored a clip after this one planned it.
+        found = {}
+        for row in batch:
+            retained = cache.load(pending[str(row["id"])][0])
+            if retained is not None:
+                found[str(row["id"])] = retained
+        return found
+
     envelope = envelope_identity()
     with tempfile.TemporaryDirectory(prefix="vocello-compact-batch-") as temporary:
         outcome = run_persistent_worker(
             spec, rows, workdir=Path(temporary), lock_root=lock_root,
             run_admission=run_admission,
             judge_admission=admission_for(registry, judge_id) if run_admission is not None else None,
-            supervisor=supervisor, recovery_rule=recovery_rule, supervisor_options=options,
+            supervisor=supervisor, recovery_rule=recovery_rule, supervisor_options=options, adopt=adopt,
         )
     missing: list[str] = []
     for key, (identity, _canonical, paths) in pending.items():
+        if key in outcome.adopted:
+            for path in paths:
+                results[path] = (outcome.adopted[key], True)
+            continue
         raw = outcome.results.get(key)
         if raw is None:
             missing.append(outcome.unavailable.get(key, "crash"))
@@ -529,12 +566,14 @@ def run_compact_adapter_batch(
         output = _parse_output(config, stdout)
         launch = outcome.launches[outcome.row_launch[key] - 1]
         payload = _payload(config, output, launch["resourceEnvelope"], envelope, threads)
-        try:
-            stored = cache.store(identity, payload)
-        except AnalysisCacheError as error:
-            raise CompactAdapterError(str(error)) from error
+        hit = False
+        if launch["resourceEnvelope"].get("qualified") is True:
+            try:
+                payload, hit = store_or_adopt(cache, identity, payload)
+            except AnalysisCacheError as error:
+                raise CompactAdapterError(str(error)) from error
         for path in paths:
-            results[path] = (stored, False)
+            results[path] = (payload, hit)
     if missing:
         raise CompactAdapterError(
             f"compact adapter worker left {len(missing)} clip(s) unavailable: " + ",".join(sorted(set(missing)))

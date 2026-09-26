@@ -47,21 +47,22 @@
     "lanes": {
       "gpu": {"maximumConcurrent": 1, "note": "One MLX worker at a time: MLX workers share one GPU and its unified-memory working set."},
       "cpu": {"maximumConcurrent": 2, "note": "At most two CPU neural workers beside the GPU worker."},
-      "dsp": {"maximumConcurrent": 4, "note": "Reserved for a Stage 1 DSP worker pool; Stage 1 runs in the orchestrator today."}
+      "dsp": {"maximumConcurrent": 4, "note": "Stage 1 DSP: each orchestrator's in-process L0 and Stage 1 take one dsp slot (its memory inside the orchestrator reservation), and a Stage 1 worker pool later."}
     },
-    "ceilingRule": "A worker's admission ceiling is its judge's measured canonical-host peak x 1.2 once measured (resources.canonicalHostPeakBytes), else its provisional ceiling; a judge with neither is refused. The supervisor enforces the same ceiling on the live child, so the budget is a bound.",
-    "generatorExclusion": "A generator and every standalone analyzer hold the host lock exclusively; an orchestrator run holds it shared and every worker it admits inherits that descriptor. No evaluator runs beside a resident generator, no generator starts beside an evaluator, and a run on a busy host refuses to start.",
+    "ceilingRule": "A worker's admission ceiling is its judge's measured canonical-host peak x 1.2 once measured (resources.canonicalHostPeakBytes), else its provisional ceiling; a judge with neither is refused. The supervisor enforces the same ceiling live on the worker's whole process group (the worker and every command it runs, summed each sample), so the budget is a bound.",
+    "generatorExclusion": "The host lock and the admission ledger live under the one host-wide analysis lock root (config/build-output-policy.json hostAnalysisLock), whatever the checkout or cache root. A generator and every standalone analyzer hold the host lock exclusively; an orchestrator run holds it shared and every worker it admits inherits that descriptor. No evaluator runs beside a resident generator, no generator starts beside an evaluator, and a run on a busy host refuses to start.",
     "recoveryRule": {
       "binding": "whole-host-free-percent-v1",
       "candidate": "attributed-post-exit-recovery-v2",
       "candidateBinding": false,
       "workerCapWhileWholeHostBinding": 1,
-      "reason": "While the whole-host rule binds, one worker's post-exit drop in host free memory cannot be told apart from another worker's allocation, so admission caps the host at one supervised worker. Making the child-attributed rule binding lifts the cap to the lane limits.",
+      "reason": "While the whole-host rule binds, one worker's post-exit drop in host free memory cannot be told apart from another worker's allocation, so admission caps the host at one supervised worker, and each orchestrator's in-process L0 and Stage 1 DSP take a slot of that cap. Making the child-attributed rule binding lifts the cap to the lane limits.",
       "promotion": {
         "switch": "candidateBinding",
         "requires": [
-          "At least two recovery reports (delivery_resource_supervisor.py recovery-report), each over envelopes from a separate session on the canonical hardware profile.",
-          "Every orchestrated worker judge (lanes gpu and cpu) has at least one serial envelope in each report (byJudge).",
+          "At least two recovery reports (delivery_resource_supervisor.py recovery-report), each saved as a file committed to this repository and cited here by its repository path, file SHA-256 and date; the counts are read from the committed file, never from this registry.",
+          "Each report's envelopes ran on the canonical hardware profile (hostProfileIDs is the canonical profile's id, envelopesWithoutHost is 0) and name their sessions (envelopesWithoutSession is 0); no two reports share a session.",
+          "Every orchestrated worker judge (lanes gpu and cpu) has at least one serial envelope in each report (serialByJudge), and overlapPossibleEnvelopes is 0: an admitted envelope is serial only when the one-worker cap also held back every orchestrator's in-process L0 and Stage 1.",
           "Each report has serialEnvelopes of at least 1 and serialCandidateWouldQualifyBindingFailure of 0: when nothing else ran, the candidate never blamed a post-exit drop on another allocator.",
           "Each report has unattributed 0: the kernel pressure level and physical memory read on every envelope."
         ],

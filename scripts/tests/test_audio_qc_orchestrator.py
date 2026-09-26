@@ -19,10 +19,13 @@ The replay proves three things:
 
 from __future__ import annotations
 
+import argparse
 import copy
 import hashlib
+import inspect
 import json
 import math
+import os
 from pathlib import Path
 import struct
 import sys
@@ -45,9 +48,16 @@ from audio_qc_orchestrator import (  # noqa: E402
     replay_committed_records,
 )
 from delivery_analysis_cache import DeliveryAnalysisCache, digest, file_sha256  # noqa: E402
-from delivery_resource_supervisor import HostSnapshot, run_supervised  # noqa: E402
+import delivery_resource_supervisor  # noqa: E402
+from delivery_resource_supervisor import (  # noqa: E402
+    HostSnapshot,
+    ResourceSupervisorError,
+    host_exclusion,
+    run_supervised,
+)
 import independent_asr  # noqa: E402
-from lib.language_metrics import text_sha256  # noqa: E402
+from lib.language_metrics import score_recognition, text_sha256  # noqa: E402
+from lib.qc_pipeline.admission import AdmissionPolicy, AdmissionTimeout, HostAdmission, HostBusy  # noqa: E402
 from lib.qc_pipeline.evidence import (  # noqa: E402
     validate_private_bundle,
     validate_take_evidence,
@@ -59,6 +69,7 @@ from run_local_delivery_cascade import run_cascade  # noqa: E402
 REPO = Path(__file__).resolve().parents[2]
 FIXTURE_WORKER = Path(__file__).resolve().parent / "fixtures/audio_qc_fixture_worker.py"
 WHISPER = "asr.whisper-small@1"
+SENSEVOICE = "compact.sensevoice-small-q8@1"
 MIB = 1024**2
 LANGUAGE_CODES = {"english": "en", "french": "fr", "german": "de", "korean": "ko", "chinese": "zh"}
 SCRIPTS = {
@@ -189,7 +200,7 @@ class LanguageLaneTests(OrchestratorFixture):
         self.assertEqual(envelope["exclusion"], "budgeted-admission")
         self.assertEqual(envelope["admission"]["ceilingBytes"], 2684354560)
         self.assertEqual(envelope["maximumAllowedRSSBytes"], 2684354560)
-        self.assertEqual(header["cache"]["L1"], {"hits": 0, "misses": 9 - 1})
+        self.assertEqual(header["cache"]["L1"], {"hits": 0, "misses": 9 - 1, "adopted": 0})
         for record in result["records"]:
             self.assertEqual(validate_take_evidence(record), [], record["take"]["takeID"])
 
@@ -288,10 +299,11 @@ class LanguageLaneTests(OrchestratorFixture):
         judge = self._judge(engine_config={"table": self.table, "crashAlways": crashing})
         result = self._orchestrator(judge=judge).run(manifest)
         launches = result["header"]["workers"][0]["launches"]
-        self.assertEqual([launch["retry"] for launch in launches], [False, True])
+        # The job, the crashing row alone, then the rest: one bad take costs no other.
+        self.assertEqual([launch["kind"] for launch in launches], ["job", "isolated", "remainder"])
         unavailable = [record for record in result["records"]
                        if any(item["status"] == "unavailable" for item in record["measurements"])]
-        self.assertTrue(unavailable)
+        self.assertEqual([record["take"]["takeID"] for record in unavailable], ["custom-en-pinned"])
         for record in unavailable:
             self.assertEqual(record["takeVerdict"]["status"], "unavailable")
             self.assertEqual(record["legacyVerdicts"]["languageWitness"]["status"], "unavailable")
@@ -406,6 +418,209 @@ class DeliveryLaneTests(OrchestratorFixture):
         comparison = compare_with_bundle(replay, bundle)
         self.assertTrue(comparison["identical"], comparison["differences"])
         self.assertEqual(replay["header"]["run"], result["header"]["run"])
+
+
+class SmallRunFixture(OrchestratorFixture):
+    def _small_manifest(self, count: int = 3, *, take_ids: list[str] | None = None) -> dict:
+        rows = []
+        for index in range(count):
+            audio = self._audio(f"small-{index}", 180 + 20 * index)
+            self._answer(audio, transcript=SCRIPTS["english"], detected="en")
+            rows.append(independent_asr._row(
+                row_id=f"small-{index}", generation_id=f"generation-{index}", audio=audio,
+                audio_sha256=file_sha256(audio), expected_language="english", reference_text=SCRIPTS["english"],
+                cell_id=f"small-{index}",
+            ))
+        source = {"schemaVersion": 1, "kind": "independent-asr-manifest", "runID": "small-run",
+                  "platform": "macos", "generationProcessExited": True, "rows": rows}
+        manifest = manifest_from_independent_asr(source, source_sha256=digest(source))
+        for take, take_id in zip(manifest["takes"], take_ids or []):
+            take["id"] = take_id
+        return manifest
+
+
+class ConcurrentRunTests(SmallRunFixture):
+    def test_a_run_adopts_what_another_run_stored_after_it_planned(self) -> None:
+        """Two orchestrators planned the same misses; the later one adopts, never fails its takes."""
+        manifest = self._small_manifest()
+        judge = self._judge(engine_config={"table": self.table, "measureWall": True})
+        locks = self.root / "locks"
+        policy = AdmissionPolicy.from_registry(self.registry)
+        other = self._orchestrator(judge=judge)
+        other.host = HostAdmission(locks, policy)
+        ran_other: list[dict] = []
+
+        class InterleavedHost(HostAdmission):
+            def _admit(self, lane, judge_id, ceiling_bytes, host_fd, **kwargs):
+                if lane == "gpu" and not ran_other:
+                    # Another run finishes between this run's plan and its admission.
+                    ran_other.append(other.run(manifest))
+                return super()._admit(lane, judge_id, ceiling_bytes, host_fd, **kwargs)
+
+        later = self._orchestrator(judge=judge)
+        later.host = InterleavedHost(locks, policy)
+        result = later.run(manifest)
+        self.assertEqual(len(ran_other), 1)
+        worker = result["header"]["workers"][0]
+        self.assertEqual((worker["launches"], worker["rowsAdopted"]), ([], 3))
+        self.assertEqual(result["header"]["cache"]["L1"]["adopted"], 3)
+        for record, first in zip(result["records"], ran_other[0]["records"]):
+            statuses = {item["judge"]: item["status"] for item in record["measurements"]}
+            self.assertEqual(statuses[WHISPER], "complete", record["take"]["takeID"])
+            self.assertEqual(record["verdicts"], first["verdicts"])
+        # Timing never entered the cached entry; the launch that measured it keeps it.
+        first_measurement = next(item for item in ran_other[0]["records"][0]["measurements"] if item["judge"] == WHISPER)
+        self.assertIsInstance(first_measurement["wallSeconds"], float)
+        self.assertNotIn("recognition.recognitionDurationSeconds", first_measurement["metrics"])
+
+    def test_a_different_entry_stored_first_is_adopted(self) -> None:
+        from lib.qc_pipeline.layered_cache import LayeredCache, l1_identity
+
+        cache = DeliveryAnalysisCache(self.cache_root)
+        audio = self._audio("adopted", 440)
+        canonical = cache.canonicalize(audio)
+        identity = l1_identity(canonical, self._judge().identity, {"lockedLanguage": "en"})
+        first, second = LayeredCache(cache), LayeredCache(cache)
+        stored, adopted = first.store_l1(identity, {"transcript": "first run"})
+        self.assertEqual((stored, adopted), ({"transcript": "first run"}, False))
+        # A nondeterministic judge's second run: its own value never replaces or fails the first.
+        stored, adopted = second.store_l1(identity, {"transcript": "second run"})
+        self.assertEqual((stored, adopted), ({"transcript": "first run"}, True))
+        self.assertEqual(second.report()["L1"]["adopted"], 1)
+
+    def test_a_judge_never_admitted_keeps_the_other_judges_results(self) -> None:
+        manifest = self._small_manifest(2)
+        whisper = self._judge(engine_config={"table": self.table, "sleepPerRow": 0.3})
+        second = self._judge(
+            judge_id=SENSEVOICE, family=None, language_codes={}, engine_config={"table": self.table},
+            identity=JudgeIdentity(SENSEVOICE, output_identity_digest(SENSEVOICE, {"fixture": "tags", "threads": 2}),
+                                   "fixture/sensevoice", "b" * 40, hashlib.sha256(b"sensevoice weights").hexdigest()),
+        )
+
+        class NeverFits(HostAdmission):
+            """SenseVoice's admission times out while whisper's worker still runs."""
+
+            def _admit(self, lane, judge_id, ceiling_bytes, host_fd, **kwargs):
+                if judge_id == SENSEVOICE:
+                    raise AdmissionTimeout(f"{judge_id} was not admitted in time: budget-exhausted")
+                return super()._admit(lane, judge_id, ceiling_bytes, host_fd, **kwargs)
+
+        orchestrator = Orchestrator(
+            registry=self.registry, cache=DeliveryAnalysisCache(self.cache_root), lock_root=self.root / "locks",
+            stage2=[whisper, second], supervisor=quiet_supervisor,
+            host_admission=NeverFits(self.root / "locks", AdmissionPolicy.from_registry(self.registry)),
+        )
+        result = orchestrator.run(manifest)
+        for record in result["records"]:
+            measured = {item["judge"]: item for item in record["measurements"]}
+            self.assertEqual(measured[WHISPER]["status"], "complete")
+            self.assertEqual((measured[SENSEVOICE]["status"], measured[SENSEVOICE]["reasons"]),
+                             ("unavailable", ["admission-timeout"]))
+            self.assertEqual(validate_take_evidence(record), [])
+        workers = {worker["judge"]: worker for worker in result["header"]["workers"]}
+        self.assertEqual(workers[SENSEVOICE]["launches"], [])
+        # Whisper's rows were stored as its worker finished: a replay of it alone launches nothing.
+        replay = Orchestrator(registry=self.registry, cache=DeliveryAnalysisCache(self.cache_root),
+                              lock_root=self.root / "locks", stage2=[whisper], supervisor=refusing_supervisor,
+                              offline=True).run(manifest)
+        self.assertEqual(replay["header"]["cache"]["L1"]["misses"], 0)
+
+
+class CacheIdentityTests(SmallRunFixture):
+    def test_the_l2_key_covers_every_source_that_shapes_it(self) -> None:
+        from lib.qc_pipeline import verdicts
+
+        shaping = {Path(inspect.getsourcefile(function)).resolve() for function in (
+            verdicts.asr_metrics, score_recognition, independent_asr._recognition)}
+        self.assertEqual({path.resolve() for path in verdicts.ASR_METRIC_SOURCES}, shaping)
+        copies = []
+        for source in verdicts.ASR_METRIC_SOURCES:
+            copy_path = self.root / "sources" / source.name
+            copy_path.parent.mkdir(exist_ok=True)
+            copy_path.write_bytes(source.read_bytes())
+            copies.append(copy_path)
+        judge = self._judge(metric_sources=tuple(copies))
+        manifest = self._small_manifest(2)
+        first = self._orchestrator(judge=judge).run(manifest)
+        self.assertEqual(first["header"]["cache"]["L2"]["misses"], 2)
+        again = self._orchestrator(judge=judge, supervisor=refusing_supervisor, offline=True).run(manifest)
+        self.assertEqual((again["header"]["cache"]["L2"]["hits"], again["header"]["cache"]["L2"]["misses"]), (2, 0))
+        for copy_path in copies:
+            with self.subTest(source=copy_path.name):
+                copy_path.write_bytes(copy_path.read_bytes() + b"\n# an edit that could move a metric\n")
+                edited = self._orchestrator(judge=judge, supervisor=refusing_supervisor, offline=True).run(manifest)
+                self.assertEqual(edited["header"]["cache"]["L2"]["hits"], 0)
+                self.assertEqual(edited["header"]["cache"]["L2"]["misses"], 2)
+
+    def test_a_take_id_that_is_not_a_token_keeps_its_bundle_valid(self) -> None:
+        manifest = self._small_manifest(2, take_ids=["take one, English", "take/two/nested"])
+        result = self._orchestrator().run(manifest)
+        bundle = self.root / "bundle"
+        write_private_bundle(bundle, header=result["header"], takes=zip(result["records"], result["privates"]),
+                             repository=REPO)
+        self.assertEqual(validate_private_bundle(bundle, repository=REPO), [])
+        for record, private in zip(result["records"], result["privates"]):
+            self.assertEqual(private["takeID"], record["take"]["takeID"])
+            self.assertEqual(private["takeID"], digest(private["manifestTakeID"]))
+
+    def test_each_launch_scales_its_timeout_with_the_per_row_budget(self) -> None:
+        manifest = self._small_manifest(3)
+        timeouts = []
+
+        def recording(command, **kwargs):
+            timeouts.append(kwargs["timeout_seconds"])
+            return quiet_supervisor(command, **kwargs)
+
+        judge = self._judge(row_timeout_seconds=7.0, startup_seconds=11.0)
+        self._orchestrator(judge=judge, supervisor=recording).run(manifest)
+        self.assertEqual(timeouts, [11.0 + 3 * 7.0])
+
+        class Captured(Exception):
+            pass
+
+        seen = {}
+
+        def capture(judge_id, config, registry, **kwargs):
+            seen.update(kwargs)
+            raise Captured
+
+        config = self.root / "config.json"
+        config.write_text("{}", encoding="utf-8")
+        with mock.patch.object(orchestrator_module, "stage2_judge_from_adapter_config", capture), \
+                self.assertRaises(Captured):
+            orchestrator_module.main(["run", "--manifest", str(config), "--judge-config", f"{WHISPER}={config}",
+                                      "--resampler", "linear-rational-v1", "--timeout-seconds", "7"])
+        self.assertEqual(seen, {"row_timeout_seconds": 7.0})
+
+
+class HostWideLockTests(SmallRunFixture):
+    def test_every_cache_root_contends_on_the_one_host_lock(self) -> None:
+        host_root = self.root / "host-analysis-lock"
+        with mock.patch.dict(os.environ, {"QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT": str(host_root),
+                                          "QVOICE_DELIVERY_ANALYSIS_CACHE": str(self.root / "env-cache")}):
+            manifest = self._small_manifest(1)
+            first = Orchestrator(registry=self.registry, cache=DeliveryAnalysisCache(self.root / "cache-a"),
+                                 stage2=[self._judge()], supervisor=quiet_supervisor)
+            second = orchestrator_module._orchestrator(argparse.Namespace(
+                judge_config=None, resampler=None, cache_root=self.root / "cache-b", timeout_seconds=900.0,
+            ), offline=False)
+            self.assertEqual(first.host.lock_root, host_root)
+            self.assertEqual(second.host.lock_root, host_root)
+            # One ledger: a run under one cache root spends the budget the other sees.
+            with first.host.run():
+                self.assertEqual([ticket["lane"] for ticket in second.host.status()["tickets"]], ["orchestrator"])
+            # A generator (the exclusive host lock) keeps out an orchestrator on any cache root.
+            with host_exclusion(delivery_resource_supervisor.host_analysis_lock_root()):
+                for orchestrator in (first, second):
+                    with self.assertRaises(HostBusy):
+                        orchestrator.run(manifest)
+                with self.assertRaises(ResourceSupervisorError):
+                    run_supervised([sys.executable, "-c", "print(1)"], snapshotter=lambda: HostSnapshot(50.0, 0, False))
+            # And an orchestrator run keeps out a generator or standalone analyzer.
+            with second.host.run():
+                with self.assertRaises(ResourceSupervisorError):
+                    with host_exclusion():
+                        pass
 
 
 class CommittedRecordReplayTests(unittest.TestCase):

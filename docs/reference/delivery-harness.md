@@ -445,13 +445,20 @@ The cascade derives its input from the runner's retained plan, execution state, 
 source identities and exact WAV digests after the generator has exited, then reuses neutral
 controls through `build/cache/delivery-analysis` (bounded with
 `python3 scripts/delivery_analysis_cache.py prune --keep-newest N`; a pruned entry is recomputed
-on its next use). The default root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
-cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. The
-experiment runner and every standalone analyzer hold `<lock root>/delivery-analysis-supervisor.lock`
-exclusively (the runner's `run_execution_plan` requires an explicit `lock_root`, and its CLI always
-passes the shared default root); the audio QC orchestrator holds it shared for its run and admits
-its workers against the judge registry's memory budget (decision 9a). Point every tool at the same
-root or they will not exclude one another. Cache identity binds original and canonical
+on its next use). The default cache root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
+cascade and `independent_asr.py transcribe` also take `--cache-root`. The lock is not: every
+generator, standalone analyzer and audio QC orchestrator on the host uses
+`delivery-analysis-supervisor.lock` under the one host-wide analysis lock root
+(`hostAnalysisLock` in `config/build-output-policy.json`,
+`~/Library/Caches/Vocello/delivery-analysis-lock`), whatever its checkout, worktree or cache root,
+and the orchestrators' admission ledger lives beside it. `QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT`
+overrides it for tests only. The experiment runner, the qualification probes and every standalone
+analyzer hold the lock exclusively (the runner's `run_execution_plan` requires an explicit
+`lock_root`, and its CLI passes the host-wide root); the audio QC orchestrator holds it shared for
+its run and admits its workers against the judge registry's memory budget (decision 9a). The
+compact layer's persistent worker gives each launch a start-up allowance plus the per-clip
+`timeout_seconds` for every clip it holds, retries a clip that crashed its worker alone before the
+rest, and caches only clips from a qualified launch. Cache identity binds original and canonical
 16 kHz mono PCM bytes to layer, binary, model, revision, weights, and preprocessing digests;
 corruption or drift fails closed and a cache hit launches no model. Reports contain digests and
 measurements, never local paths or audio. Always-on acoustics can reject a broken row, but with no

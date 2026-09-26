@@ -24,6 +24,8 @@ sourceOfTruth:
   - scripts/audio_qc_orchestrator.py
   - scripts/audio_qc_worker.py
   - scripts/lib/qc_pipeline/admission.py
+  - scripts/lib/qc_pipeline/workers.py
+  - scripts/lib/qc_pipeline/layered_cache.py
   - scripts/delivery_resource_supervisor.py
   - config/audio-qc-judges.json
   - config/audio-qc-qualification-policy.json
@@ -1017,30 +1019,61 @@ bound, and a rate on them describes the fixtures as much as the detector. The ru
 for the language lane, `--from-cascade-input` for the delivery lane) must declare
 `generationProcessExited`, and every take is bound to its WAV digest before anything runs.
 
-- **Admission (decision 9a).** A generator and every standalone analyzer still hold
-  `delivery-analysis-supervisor.lock` exclusively. An orchestrator run holds it shared and admits
-  each worker against `config/audio-qc-judges.json#admission`: a 10 GiB budget (16 GiB less about
-  4.5 GiB for macOS and tooling and a 1.5 GiB margin, provisional until AQ-06 measures it), one MLX
-  GPU worker at a time beside at most two CPU workers, and each judge at its ceiling (measured
-  canonical-host peak x 1.2, else its provisional ceiling). The supervisor enforces the same ceiling
-  on the live child and refuses one above its ticket. The ledger lives beside the lock; a live child
-  keeps its budget even if its orchestrator died. `admission-status` prints it.
+- **One host-wide lock root.** `delivery-analysis-supervisor.lock` and the admission ledger live
+  under `hostAnalysisLock` in `config/build-output-policy.json`
+  (`~/Library/Caches/Vocello/delivery-analysis-lock`), never beside a cache root: every generator,
+  standalone analyzer, qualification probe and orchestrator on the host contends on one lock and
+  spends one budget, whatever its checkout, worktree, `--cache-root` or
+  `QVOICE_DELIVERY_ANALYSIS_CACHE`. No tool takes a `--lock-root`; `QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT`
+  overrides the root for tests only (the Python suite gives each test process its own).
+- **Admission (decision 9a).** A generator and every standalone analyzer still hold the lock
+  exclusively. An orchestrator run holds it shared and admits each worker against
+  `config/audio-qc-judges.json#admission`: a 10 GiB budget (16 GiB less about 4.5 GiB for macOS and
+  tooling and a 1.5 GiB margin, provisional until AQ-06 measures it), one MLX GPU worker at a time
+  beside at most two CPU workers, and each judge at its ceiling (measured canonical-host peak x 1.2,
+  else its provisional ceiling). The supervisor (`owned-process-probe-v4`) samples the worker's whole
+  process group every 50 ms and enforces the same ceiling live on the group's summed resident memory
+  and footprint, so a native judge binary the worker runs is stopped while it runs, not after it
+  exits; it refuses a child above its ticket. The ticket learns the child's PID inside the
+  supervision's `try`, so a failed ledger write (a full disk, an unreadable ledger) still terminates
+  and reaps the child, and a ticket is released only once its child is gone. The ledger records each
+  owner and child by PID and process start time, so a reused PID never pins a stale entry; a live
+  child keeps its budget even if its orchestrator died. `admission-status` prints the ledger. The
+  registry's admission validator runs when the registry or the policy loads, so an invalid or
+  unevidenced admission block is refused, not applied.
 - **One persistent worker per judge per run.** `scripts/audio_qc_worker.py` loads its model once,
-  warms it and streams the job's rows as JSON lines (`whisper-mlx` wraps `independent_asr_worker.py`'s
-  recognizer; `native-command` runs the pinned SenseVoice binary per row, whose model reload per
-  invocation stays, and reports each invocation's `wait4` peak since the supervisor samples the host
-  process only). A crash keeps the rows already emitted and retries the remainder once in a fresh
-  worker, recorded as its own launch; a row still missing is `unavailable`. A failed host condition
-  (pressure, swap, recovery) accepts nothing and retries nothing. Each judge's thread count is
-  declared in the registry, fixed in the worker's environment before it starts (the worker refuses a
-  mismatch) and part of its output identity. The delivery cascade's compact layer uses the same
-  worker once per run (`run_compact_adapter_batch`).
+  warms it and streams the job's rows in job order as JSON lines (`whisper-mlx` wraps
+  `independent_asr_worker.py`'s recognizer; `native-command` runs the pinned SenseVoice binary per
+  row, whose model reload per invocation stays, and also reports each invocation's `wait4` peak as a
+  second, per-row check). A launch's timeout is a start-up allowance (900 s) plus a per-row budget for
+  each row it holds (900 s by default, the old per-clip allowance; the orchestrator's
+  `--timeout-seconds` and the compact batch path's `timeout_seconds` set it per row). A worker that
+  ends abnormally keeps the rows it emitted; the row in flight is retried alone once, then the rest
+  continue in a fresh worker, each recorded as its own launch. Only a row that ends two workers
+  abnormally is `unavailable` (`crash`, `timeout` or `envelope-breach`), so one bad row never costs
+  the rows after it; a worker that fails before it is ready is retried once with all its rows. A
+  failed host condition (pressure, swap, recovery) accepts nothing and retries nothing. Each judge's
+  thread count is declared in the registry, fixed in the worker's environment before it starts (the
+  worker refuses a mismatch) and part of its output identity. The delivery cascade's compact layer
+  uses the same worker once per run (`run_compact_adapter_batch`), keys its entries on the worker
+  host's source too, and caches only clips from a qualified launch.
 - **L0-L2 cache.** L0 is the canonical 16 kHz derivative; L1 a judge's raw output, keyed by the
   L0 digests, the judge's output identity (never the supervisor) and the request (a recognizer's
-  locked language); L2 the metrics, keyed by the L1 key, the metric definition's version and source
-  (`lib/language_metrics.py` for a recognizer: `score_recognition`'s measurements without its
-  verdicts or thresholds) and the scoring inputs (script digest, language). A Stage 1 DSP judge's
-  raw output is its metric vector, so its L2 is its L1. Verdicts are never cached.
+  locked language); its wall time rides beside it as the measurement's `wallSeconds`, never inside
+  it. L2 is the metrics, keyed by the L1 key, the metric definition's version, the digest of every
+  source that shapes the value (a declared list per judge: `lib/language_metrics.py`,
+  `lib/qc_pipeline/verdicts.py` and `independent_asr.py` for a recognizer, whose detected language
+  `_recognition` maps; the compact adapter and `verdicts.py` for SenseVoice's tags) and the scoring
+  inputs (script digest, language). A Stage 1 DSP judge's raw output is its metric vector, so its L2
+  is its L1. Verdicts are never cached. Orchestrators share the cache: rows are re-checked after
+  admission and one another run stored meanwhile is adopted rather than launched, a stored entry
+  that differs from this run's (a nondeterministic judge) is adopted rather than failing the take,
+  and each judge's rows are stored as its worker finishes, so a judge whose admission times out
+  (`admission-timeout`, unavailable) discards no other judge's results.
+- **L0 and Stage 1 hold a slot.** An orchestrator's in-process canonicalization and Stage 1 DSP
+  take a `dsp` slot of the ledger (their memory stays inside the orchestrator's reservation); while
+  the whole-host recovery rule binds, that slot counts against the one-worker cap, so no admitted
+  worker's envelope overlaps another orchestrator's DSP.
 - **Stage 3.** Today's verdicts are replayed from L2 through the unchanged code: the language lane's
   `witness_verdict` and the cascade's `review_automated_audio` and `compose_route`, each given a
   scorer that rebuilds `score_recognition`'s result from the cached metrics and today's thresholds.
@@ -1052,8 +1085,10 @@ for the language lane, `--from-cascade-input` for the delivery lane) must declar
   the composer's verdicts and the replayed ones, validated to carry no transcript, text or path. The
   private bundle (`build/artifacts/macos/audio-qc/<run>/`, untracked) holds `bundle.json` with every
   worker launch and resource envelope, the records, and per-take private files (audio path,
-  reference text, transcripts); failing takes are named in it, never committed as audio.
-  `validate-bundle` re-hashes and re-validates it and refuses one inside tracked paths.
+  reference text, transcripts); failing takes are named in it, never committed as audio. A take
+  whose manifest ID is not a safe token is named by its digest in both its record and its private
+  file (the manifest ID stays in the private file). `validate-bundle` re-hashes and re-validates it
+  and refuses one inside tracked paths.
 
 **Replay.** `replay --manifest … --bundle …` reruns Stage 3 from the cache and refuses if any model
 would have to run; `replay-records` runs the same Stage 3 functions over the committed language
@@ -1073,13 +1108,21 @@ recorded channel), and every take's expectation and each record's `outputCellsPa
 child-attributed rule (`attributed-post-exit-recovery-v2`) binding in place of the whole-host rule;
 each envelope keeps the whole-host outcome (`wholeHostRecoveryFailures`) either way. The switch is
 `admission.recoveryRule.candidateBinding` in the registry, `false` today: report-only, and while
-the whole-host rule binds, admission caps the host at one supervised worker, since one worker's
-post-exit drop cannot be told apart from another's allocation. The registry validator accepts
-`true` only with at least two distinct `recovery-report` summaries from separate sessions on the
-canonical profile, each with serial envelopes of every orchestrated GPU and CPU judge,
+the whole-host rule binds, admission caps the host at one supervised worker (L0 and Stage 1
+included), since one worker's post-exit drop cannot be told apart from another's allocation. Each
+envelope names its session (the orchestrator run, or the standalone process) and its hardware
+profile (`hostProfileID`, matched from `benchmarks/hardware-profiles.json`). `recovery-report`
+counts an admitted envelope as serial only when its admission capped the host at one worker with
+Stage 1 counted (`serialScope`), and reports `overlapPossibleEnvelopes`, `serialByJudge`, the
+`sessionIDs` and the `hostProfileIDs`. The registry validator, which also runs whenever the registry
+or the admission policy loads, accepts `true` only when `promotion.evidence` cites at least two
+`recovery-report` files committed to the repository by path, file SHA-256 and date; it reads the
+counts from each committed file, never from the registry: the canonical profile only, every
+envelope with a session and a host, no session shared between reports, serial envelopes of every
+orchestrated GPU and CPU judge, `overlapPossibleEnvelopes` 0,
 `serialCandidateWouldQualifyBindingFailure` 0 (with nothing else running, the candidate never
-blamed a drop on another allocator) and `unattributed` 0. Flipping it lifts the cap to the lane
-limits.
+blamed a drop on another allocator) and `unattributed` 0. An uncommitted or edited report, or a
+local flip without evidence, is refused. Flipping it lifts the cap to the lane limits.
 
 **Retired from QC.** DistilHuBERT (`compact.distilhubert@1`) and the fitted ridge, elastic-net and
 PLS heads (`delivery.fitted-heads@2`) are retired as measurands (audit sections 4.9 and 7.1): the

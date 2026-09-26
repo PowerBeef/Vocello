@@ -30,7 +30,10 @@ module validates it and is the load-time gate for registered judges:
   declares its lane, engine and thread count (part of its output identity) and
   has a ceiling the budget can hold. The child-attributed recovery rule stays
   report-only (`candidateBinding: false`, one worker host-wide) until the
-  registry records the M6 evidence its promotion names.
+  registry cites the M6 evidence its promotion names: committed
+  `recovery-report` files, each bound by its file SHA-256, whose own counts,
+  host and separate sessions meet the promotion. `load_registry` runs this
+  admission gate, so a local flip without that evidence never takes effect.
 
 Commands:
   validate   check the registry against the repository (the contract gate)
@@ -106,11 +109,12 @@ EXECUTION_LANES = (*WORKER_LANES, "engine", "device")
 WHOLE_HOST_RECOVERY_RULE = "whole-host-free-percent-v1"
 CANDIDATE_RECOVERY_RULE = "attributed-post-exit-recovery-v2"
 IN_PROCESS_ENGINE = "in-process"
-# What a promotion of the child-attributed recovery rule must cite per report.
-RECOVERY_EVIDENCE_FIELDS = (
-    "recoveryReportSHA256", "hardwareProfileID", "date", "serialEnvelopes",
-    "serialCandidateWouldQualifyBindingFailure", "unattributed", "byJudge",
-)
+# What a promotion of the child-attributed recovery rule cites per report: a
+# committed `delivery_resource_supervisor.py recovery-report` output, by its
+# repository path and file SHA-256. The counts are read from the file itself.
+RECOVERY_EVIDENCE_FIELDS = ("path", "sha256", "date")
+RECOVERY_REPORT_KIND = "delivery-analyzer-recovery-report"
+RECOVERY_REPORT_SCHEMA_VERSION = 1
 MINIMUM_RECOVERY_REPORTS = 2
 SNAPSHOT_STATUS = "content-addressed-snapshot"
 JUDGE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+$")
@@ -133,8 +137,15 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_registry(path: Path = DEFAULT_REGISTRY) -> dict[str, Any]:
-    return _read_json(path)
+def load_registry(path: Path = DEFAULT_REGISTRY, *, root: Path = REPO) -> dict[str, Any]:
+    """The registry, refused when its admission block fails (a switch flipped without evidence)."""
+    registry = _read_json(path)
+    errors = admission_errors(registry, root=root)
+    if errors:
+        raise JudgeRegistryError(
+            "the judge registry's admission block is invalid, so it may not load: " + "; ".join(errors[:3])
+        )
+    return registry
 
 
 def _strings(value: Any) -> list[str]:
@@ -263,13 +274,69 @@ def judge_admission_ceiling(judge: dict[str, Any]) -> int | None:
     return provisional if _positive_int(provisional) else None
 
 
+def _committed_file_errors(root: Path, relative: str) -> list[str]:
+    """A file the repository has committed and the working tree has not changed."""
+    try:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relative],
+            capture_output=True, check=False, timeout=30,
+        )
+        changed = subprocess.run(
+            ["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", relative],
+            capture_output=True, check=False, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ["cannot be proven committed"]
+    if tracked.returncode != 0:
+        return ["is not committed to the repository"]
+    if changed.returncode != 0:
+        return ["differs from its committed version"]
+    return []
+
+
+def _recovery_report_file(root: Path, entry: Any, label: str) -> tuple[dict[str, Any] | None, list[str]]:
+    """One cited report: a committed file inside the repository whose digest matches."""
+    if not isinstance(entry, dict) or any(field not in entry for field in RECOVERY_EVIDENCE_FIELDS):
+        return None, [f"{label} records {', '.join(RECOVERY_EVIDENCE_FIELDS)}"]
+    relative = entry["path"]
+    if (not isinstance(relative, str) or not relative or Path(relative).is_absolute()
+            or ".." in Path(relative).parts):
+        return None, [f"{label} names its report by a repository-relative path"]
+    target = root / relative
+    try:
+        inside = target.resolve().is_relative_to(root.resolve())
+    except OSError:
+        inside = False
+    if not inside or not target.is_file():
+        return None, [f"{label}: {relative} is not a file inside the repository"]
+    if not SHA256.match(str(entry["sha256"])) or _sha256(target) != entry["sha256"]:
+        return None, [f"{label}: {relative} does not match its recorded SHA-256"]
+    if not isinstance(entry["date"], str) or not entry["date"].strip():
+        return None, [f"{label} records the date it was measured"]
+    errors = [f"{label}: {relative} {problem}" for problem in _committed_file_errors(root, relative)]
+    try:
+        report = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, errors + [f"{label}: {relative} is not a JSON recovery report"]
+    if (not isinstance(report, dict) or report.get("kind") != RECOVERY_REPORT_KIND
+            or report.get("schemaVersion") != RECOVERY_REPORT_SCHEMA_VERSION
+            or report.get("candidateRule") != CANDIDATE_RECOVERY_RULE):
+        return None, errors + [f"{label}: {relative} is not a {RECOVERY_REPORT_KIND} of the candidate rule"]
+    return report, errors
+
+
 def _recovery_evidence_errors(evidence: Any, registry: dict[str, Any], root: Path) -> list[str]:
-    """The M6 evidence that alone may make the child-attributed rule binding."""
+    """The M6 evidence that alone may make the child-attributed rule binding.
+
+    Each cited report is a committed `recovery-report` file, bound by its file
+    SHA-256; its counts, host and sessions are read from the file, never from
+    the registry. The reports must come from separate sessions.
+    """
     if not isinstance(evidence, list) or len(evidence) < MINIMUM_RECOVERY_REPORTS:
         return [f"a binding child-attributed recovery rule cites at least {MINIMUM_RECOVERY_REPORTS} recovery reports"]
     errors: list[str] = []
     try:
-        canonical = [profile.get("id") for profile in canonical_profiles(registry, root)]
+        canonical = sorted({str(profile.get("id")) for profile in canonical_profiles(registry, root)})
     except JudgeRegistryError:
         canonical = []
     workers = sorted(
@@ -277,29 +344,41 @@ def _recovery_evidence_errors(evidence: Any, registry: dict[str, Any], root: Pat
         if judge.get("status") not in BLOCKED_STATUSES and isinstance(judge.get("execution"), dict)
         and judge["execution"].get("orchestrated") is True and judge["execution"].get("lane") in ("gpu", "cpu")
     )
-    digests = set()
-    for index, report in enumerate(evidence):
+    digests: set[str] = set()
+    sessions: list[set[str]] = []
+    for index, entry in enumerate(evidence):
         label = f"recovery evidence {index + 1}"
-        if not isinstance(report, dict) or any(field not in report for field in RECOVERY_EVIDENCE_FIELDS):
-            errors.append(f"{label} records {', '.join(RECOVERY_EVIDENCE_FIELDS)}")
+        report, problems = _recovery_report_file(root, entry, label)
+        errors.extend(problems)
+        if report is None:
             continue
-        if not SHA256.match(str(report["recoveryReportSHA256"])):
-            errors.append(f"{label} names its recovery report by SHA-256")
-        digests.add(report["recoveryReportSHA256"])
-        if report["hardwareProfileID"] not in canonical:
+        digests.add(entry["sha256"])
+        if len(canonical) != 1 or report.get("hostProfileIDs") != canonical \
+                or report.get("envelopesWithoutHost") != 0:
             errors.append(f"{label} was not measured on the canonical hardware profile")
-        if not _positive_int(report["serialEnvelopes"]):
+        if not _positive_int(report.get("serialEnvelopes")):
             errors.append(f"{label} holds no serial envelope")
-        if report["serialCandidateWouldQualifyBindingFailure"] != 0:
+        if report.get("serialCandidateWouldQualifyBindingFailure") != 0:
             errors.append(f"{label}: the candidate blamed a serial post-exit drop on another allocator")
-        if report["unattributed"] != 0:
+        if report.get("unattributed") != 0:
             errors.append(f"{label} has unattributed envelopes")
-        by_judge = report["byJudge"] if isinstance(report["byJudge"], dict) else {}
+        if report.get("overlapPossibleEnvelopes") != 0:
+            errors.append(f"{label} holds envelopes that may have run beside other work")
+        by_judge = report.get("serialByJudge") if isinstance(report.get("serialByJudge"), dict) else {}
         missing = [judge_id for judge_id in workers if not _positive_int(by_judge.get(judge_id))]
         if missing:
-            errors.append(f"{label} lacks envelopes of {', '.join(missing)}")
+            errors.append(f"{label} lacks serial envelopes of {', '.join(missing)}")
+        report_sessions = report.get("sessionIDs")
+        if (not isinstance(report_sessions, list) or not report_sessions
+                or any(not isinstance(item, str) or not item for item in report_sessions)
+                or report.get("envelopesWithoutSession") != 0):
+            errors.append(f"{label} names the session of every envelope")
+        else:
+            sessions.append(set(report_sessions))
     if len(digests) < MINIMUM_RECOVERY_REPORTS:
         errors.append("recovery evidence reports must be distinct")
+    if any(first & second for position, first in enumerate(sessions) for second in sessions[position + 1:]):
+        errors.append("recovery evidence reports must come from separate sessions")
     return errors
 
 
@@ -650,7 +729,8 @@ def _adoption_errors(registry: dict[str, Any], root: Path, candidates: dict[str,
 
 
 def validate_repository(root: Path = REPO, registry: dict[str, Any] | None = None) -> list[str]:
-    registry = registry if registry is not None else load_registry(root / "config/audio-qc-judges.json")
+    # Read, not loaded: the validator reports every error, the load gate only refuses.
+    registry = registry if registry is not None else _read_json(root / "config/audio-qc-judges.json")
     errors = validate_registry(registry, root=root)
     if errors:
         return errors
@@ -802,7 +882,7 @@ def main() -> int:
     validate.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     args = parser.parse_args()
     try:
-        registry = load_registry(args.registry)
+        registry = _read_json(args.registry)
         errors = validate_repository(REPO, registry)
     except JudgeRegistryError as error:
         errors = [str(error)]

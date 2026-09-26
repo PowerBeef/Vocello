@@ -14,11 +14,17 @@ bound). An L1 key binds the judge's output identity (AQ-01: model, weights,
 runtime, worker source, command template, decode options, the host until
 cross-host determinism is measured, and the judge's declared thread count) and
 the request (for a recognizer, its locked language), never the envelope: a
-supervisor fix reuses every entry. An L2 key binds the L1 key, the metric
-definition's version and the source of the module that computes it, and what
-the metric reads besides the raw output (the reference text digest and the
-expected language), so a normalization change recomputes L2 without launching
-a model. Verdict fields and thresholds never enter L2.
+supervisor fix reuses every entry. An L1 payload is what the judge measured,
+never how long it took (`wallSeconds` rides beside it as provenance). An L2
+key binds the L1 key, the metric definition's version, the digest of every
+source that shapes the L2 value (a declared list, `metric_sources_digest`),
+and what the metric reads besides the raw output (the reference text digest
+and the expected language), so a normalization change recomputes L2 without
+launching a model. Verdict fields and thresholds never enter L2.
+
+Several orchestrators share the cache. A run that finds an entry another run
+stored first adopts it (`store_or_adopt`): the first stored value is the
+entry, and a second run of a nondeterministic judge never fails its takes.
 """
 
 from __future__ import annotations
@@ -26,11 +32,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 from pathlib import Path
-from typing import Any, Callable, Mapping
+import threading
+from typing import Any, Callable, Mapping, Sequence
 
 from delivery_analysis_cache import (
     LEGACY_RESAMPLER_VERSION,
     NO_MODEL_DIGEST,
+    AnalysisCacheError,
     CanonicalAudio,
     DeliveryAnalysisCache,
     LayerIdentity,
@@ -108,13 +116,37 @@ def file_digest(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def metric_sources_digest(sources: Sequence[Path]) -> str:
+    """One digest over every source file that shapes an L2 value, in declared order."""
+    if not sources:
+        raise ValueError("an L2 metric declares the sources that shape it")
+    return digest({"metricSources": [{"name": path.name, "sha256": file_digest(path)} for path in sources]})
+
+
+def store_or_adopt(cache: DeliveryAnalysisCache, identity: LayerIdentity,
+                   payload: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Store an entry, or adopt the one another run stored first under the same key.
+
+    Returns the entry and whether it was adopted. Any other failure (an unsafe
+    payload, a corrupt entry) still raises.
+    """
+    try:
+        return cache.store(identity, payload), False
+    except AnalysisCacheError:
+        retained = cache.load(identity)
+        if retained is None:
+            raise
+        return retained, True
+
+
 @dataclass
 class LayerCounters:
     hits: int = 0
     misses: int = 0
+    adopted: int = 0
 
     def report(self) -> dict[str, int]:
-        return {"hits": self.hits, "misses": self.misses}
+        return {"hits": self.hits, "misses": self.misses, "adopted": self.adopted}
 
 
 @dataclass
@@ -125,6 +157,8 @@ class LayeredCache:
     counters: dict[str, LayerCounters] = field(
         default_factory=lambda: {"L0": LayerCounters(), "L1": LayerCounters(), "L2": LayerCounters()}
     )
+    # Workers of several judges re-check L1 from their own threads.
+    _adopt_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     @property
     def resampler_version(self) -> str:
@@ -148,20 +182,36 @@ class LayeredCache:
         self.counters["L1"].misses += value is None
         return value
 
-    def store_l1(self, identity: LayerIdentity, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.cache.store(identity, payload)
+    def store_l1(self, identity: LayerIdentity, payload: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+        """Store a launched row's L1, adopting what another run stored first."""
+        stored, adopted = store_or_adopt(self.cache, identity, payload)
+        with self._adopt_lock:
+            self.counters["L1"].adopted += adopted
+        return stored, adopted
+
+    def adopt_l1(self, identity: LayerIdentity) -> dict[str, Any] | None:
+        """An entry another run stored after this one planned it (re-checked after admission)."""
+        value = self.cache.load(identity)
+        with self._adopt_lock:
+            self.counters["L1"].adopted += value is not None
+        return value
+
+    def _or_compute(self, layer: str, identity: LayerIdentity,
+                    compute: Callable[[], dict[str, Any]]) -> tuple[dict[str, Any], bool]:
+        retained = self.cache.load(identity)
+        if retained is not None:
+            self.counters[layer].hits += 1
+            return retained, True
+        self.counters[layer].misses += 1
+        value, adopted = store_or_adopt(self.cache, identity, compute())
+        self.counters[layer].adopted += adopted
+        return value, False
 
     def l1_or_compute(self, identity: LayerIdentity, compute: Callable[[], dict[str, Any]]) -> tuple[dict[str, Any], bool]:
-        value, hit = self.cache.get_or_compute(identity, compute)
-        self.counters["L1"].hits += hit
-        self.counters["L1"].misses += not hit
-        return value, hit
+        return self._or_compute("L1", identity, compute)
 
     def l2_or_compute(self, identity: LayerIdentity, compute: Callable[[], dict[str, Any]]) -> tuple[dict[str, Any], bool]:
-        value, hit = self.cache.get_or_compute(identity, compute)
-        self.counters["L2"].hits += hit
-        self.counters["L2"].misses += not hit
-        return value, hit
+        return self._or_compute("L2", identity, compute)
 
     def report(self) -> dict[str, Any]:
         return {layer: counter.report() for layer, counter in self.counters.items()}

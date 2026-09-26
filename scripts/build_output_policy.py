@@ -417,12 +417,34 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
     ):
         raise PolicyError("hostNativeLock.defaultPath must stay under ~/Library/Caches/")
 
+    analysis_lock = document.get("hostAnalysisLock")
+    if not isinstance(analysis_lock, dict) or analysis_lock.get("schemaVersion") != 1:
+        raise PolicyError("hostAnalysisLock must be a schema-v1 object")
+    if analysis_lock.get("env") != "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT":
+        raise PolicyError("hostAnalysisLock.env must be QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT")
+    default_root = analysis_lock.get("defaultPath")
+    if (
+        not isinstance(default_root, str)
+        or not default_root.startswith("~/Library/Caches/")
+        or ".." in PurePosixPath(default_root).parts
+    ):
+        raise PolicyError("hostAnalysisLock.defaultPath must stay under ~/Library/Caches/")
+
     return tuple(entries), entries_by_id
 
 
 def host_native_lock_path(document: dict[str, Any]) -> Path:
     """The host-wide native lock; an absolute QVOICE_NATIVE_LOCK overrides it."""
     contract = document["hostNativeLock"]
+    override = os.environ.get(contract["env"], "")
+    if override and Path(override).is_absolute():
+        return Path(override)
+    return Path(contract["defaultPath"]).expanduser()
+
+
+def host_analysis_lock_root(document: dict[str, Any]) -> Path:
+    """The host-wide analysis lock root; an absolute override is for tests only."""
+    contract = document["hostAnalysisLock"]
     override = os.environ.get(contract["env"], "")
     if override and Path(override).is_absolute():
         return Path(override)

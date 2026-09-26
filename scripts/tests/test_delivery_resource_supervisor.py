@@ -478,7 +478,7 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
         self.assertNotIn("post-exit-memory-recovery-unqualified", failures)
         self.assertEqual(result.report["hostBefore"]["probeFailures"], ["swap-usage-unparsed"])
 
-    # -- owned-process-probe-v3: in-process sampling (audit #38, #101) -------
+    # -- in-process sampling (audit #38, #101) --------------------------------
 
     def test_default_probe_samples_the_child_in_process(self) -> None:
         def no_probe_process(*args, **kwargs):
@@ -491,7 +491,7 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
             )
         report = result.report
         self.assertTrue(report["qualified"], report["qualificationFailures"])
-        self.assertEqual(report["probeAlgorithmVersion"], "owned-process-probe-v3")
+        self.assertEqual(report["probeAlgorithmVersion"], "owned-process-probe-v4")
         self.assertIn(report["processProbe"], ("libproc-rusage-v4", "procfs-status"))
         self.assertGreater(report["peakRSSBytes"], 0)
         self.assertGreaterEqual(report["resourceSampleCount"], 2)
@@ -701,6 +701,88 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
         path.write_text(json.dumps(evidence))
         self.assertEqual(main(["recovery-report", str(path)]), 0)
 
+
+    def test_the_recovery_report_counts_only_provably_serial_envelopes(self) -> None:
+        """Admitted envelopes are serial only when the one-worker cap also held back every Stage 1."""
+        from delivery_resource_supervisor import recovery_report
+
+        base = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(59.0, 0, False, 1, 16 * GIB), child=GIB,
+        )
+        admitted = {"judge": "asr.whisper-small@1", "workerCap": 1, "serialScope": "workers-and-stage1"}
+        serial = {**base, "admission": admitted, "sessionID": "session-a", "hostProfileID": "mac-mini-m6-16gb"}
+        # Before Stage 1 counted against the cap, another orchestrator's DSP could run beside it.
+        overlapped = {**base, "admission": {**admitted, "serialScope": None}, "sessionID": "session-b",
+                      "hostProfileID": "mac-mini-m6-16gb"}
+        uncapped = {**base, "admission": {**admitted, "workerCap": None}, "sessionID": "session-b",
+                    "hostProfileID": "mac-mini-m6-16gb"}
+        standalone = {**base, "sessionID": "session-c", "hostProfileID": None}
+        summary = recovery_report([serial, overlapped, uncapped, standalone])
+        self.assertEqual((summary["kind"], summary["schemaVersion"]), ("delivery-analyzer-recovery-report", 1))
+        self.assertEqual(summary["serialEnvelopes"], 2)
+        self.assertEqual(summary["overlapPossibleEnvelopes"], 2)
+        self.assertEqual(summary["serialByJudge"], {"asr.whisper-small@1": 1})
+        self.assertEqual(summary["byJudge"], {"asr.whisper-small@1": 3})
+        self.assertEqual(summary["sessionIDs"], ["session-a", "session-b", "session-c"])
+        self.assertEqual((summary["hostProfileIDs"], summary["envelopesWithoutHost"]), (["mac-mini-m6-16gb"], 1))
+
+    def test_every_envelope_names_its_session_and_host(self) -> None:
+        from delivery_resource_supervisor import PROCESS_SESSION_ID, host_hardware_profile_id
+
+        report = run_supervised([sys.executable, "-c", "print(1)"], lock_root=self.root,
+                                snapshotter=self._snapshot, rss_sampler=lambda _pid: MIB).report
+        self.assertEqual(report["sessionID"], PROCESS_SESSION_ID)
+        self.assertEqual(report["hostProfileID"], host_hardware_profile_id())
+        named = run_supervised([sys.executable, "-c", "print(1)"], lock_root=self.root, session_id="run-7",
+                               snapshotter=self._snapshot, rss_sampler=lambda _pid: MIB).report
+        self.assertEqual(named["sessionID"], "run-7")
+
+    # -- owned-process-probe-v4: the child's whole process group ----------
+
+    def test_the_ceiling_binds_the_process_group_sum_live(self) -> None:
+        """A descendant's memory counts while it runs, so a group above the ceiling is stopped."""
+        leader_ids = []
+
+        def group(leader):
+            leader_ids.append(leader)
+            return [leader, 999_001, 999_002]
+
+        def resident(pid):
+            return {999_001: 40 * MIB, 999_002: 30 * MIB}.get(pid, 20 * MIB)
+
+        started = __import__("time").monotonic()
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            lock_root=self.root, snapshotter=self._snapshot, rss_sampler=resident, group_lister=group,
+            maximum_rss_bytes=64 * MIB,
+        )
+        report = result.report
+        self.assertLess(__import__("time").monotonic() - started, 10.0)
+        self.assertTrue(report["resourceLimitTerminated"])
+        self.assertEqual(report["peakRSSBytes"], 90 * MIB)
+        self.assertEqual(report["maximumSampledProcessCount"], 3)
+        self.assertEqual((report["sampledProcessScope"], report["groupProbe"]), ("process-group", "injected"))
+        # A member that exits between the listing and its sample is skipped, never a failure.
+        vanished = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.2)"],
+            lock_root=self.root, snapshotter=self._snapshot, group_lister=lambda leader: [leader, 999_003],
+            rss_sampler=lambda pid: (_ for _ in ()).throw(ProcessLookupError()) if pid == 999_003 else MIB,
+        ).report
+        self.assertTrue(vanished["qualified"], vanished["qualificationFailures"])
+        self.assertEqual(vanished["maximumSampledProcessCount"], 1)
+
+    def test_the_real_group_probe_lists_the_child_and_its_command(self) -> None:
+        from delivery_resource_supervisor import process_group_members
+
+        result = run_supervised(
+            [sys.executable, "-c",
+             "import subprocess, sys, time; child = subprocess.Popen([sys.executable, '-c', "
+             "'import time; time.sleep(1)']); time.sleep(.6); child.wait()"],
+            lock_root=self.root, snapshotter=self._snapshot,
+        )
+        self.assertTrue(result.report["qualified"], result.report["qualificationFailures"])
+        self.assertGreaterEqual(result.report["maximumSampledProcessCount"], 2)
+        self.assertIn(os.getpid(), process_group_members(os.getpgid(0)))
 
 if __name__ == "__main__":
     unittest.main()

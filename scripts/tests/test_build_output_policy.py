@@ -201,6 +201,27 @@ class BuildOutputPolicyTests(unittest.TestCase):
             with self.assertRaises(POLICY.PolicyError):
                 POLICY.load_policy(self.root, self.manifest)
 
+    def test_host_analysis_lock_is_host_wide_and_overridable_for_tests(self) -> None:
+        policy = POLICY.load_policy(self.root, self.manifest)
+        home = self.root / "fake-home"
+        with mock.patch.dict(os.environ, {"HOME": str(home)}, clear=False):
+            os.environ.pop("QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT", None)
+            default = POLICY.host_analysis_lock_root(policy.document)
+        # Outside every checkout and cache root: every generator, analyzer and
+        # orchestrator on the host shares one lock and one admission ledger.
+        self.assertEqual(default, home / "Library/Caches/Vocello/delivery-analysis-lock")
+        with mock.patch.dict(os.environ, {"QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT": "/tmp/fixture-lock-root"}):
+            self.assertEqual(POLICY.host_analysis_lock_root(policy.document), Path("/tmp/fixture-lock-root"))
+        for bad in ({"schemaVersion": 1, "env": "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT",
+                     "defaultPath": "build/cache/delivery-analysis"},
+                    {"schemaVersion": 1, "env": "QVOICE_DELIVERY_ANALYSIS_CACHE",
+                     "defaultPath": "~/Library/Caches/Vocello/x"}):
+            invalid = copy.deepcopy(self.document)
+            invalid["hostAnalysisLock"] = bad
+            self.write_manifest(invalid)
+            with self.assertRaises(POLICY.PolicyError):
+                POLICY.load_policy(self.root, self.manifest)
+
     def test_status_counts_allocated_bytes_without_following_symlinks(self) -> None:
         managed = self.root / "build/cache/xcode/macos"
         managed.mkdir(parents=True)

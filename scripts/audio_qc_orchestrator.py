@@ -8,16 +8,25 @@ of takes and loads no model itself:
   (16 kHz mono PCM16, `polyphase-kaiser5-v2`).
 - **Stage 1 (DSP, in-process).** For the delivery lane: canonical PCM
   integrity, the prosody analyzer and the temporal contours, each cached as L1
-  under its source digest and declared thread count.
+  under its source digest and declared thread count. L0 and Stage 1 hold a
+  dsp slot of the admission ledger, which counts against the host's one-worker
+  cap while the whole-host recovery rule binds.
 - **Stage 2 (workers).** Each requested neural judge (the whisper-small
   recognizer, optionally SenseVoice) runs in **one persistent worker per run**
   (`audio_qc_worker.py`), admitted by the budgeted semaphore of
   `config/audio-qc-judges.json#admission` (decision 9a) under the shared host
-  lock, with the judge's registry ceiling enforced by the supervisor. Rows
-  already in L1 launch nothing.
+  lock of the one host-wide analysis lock root, with the judge's registry
+  ceiling enforced live by the supervisor on the worker's process group. Each
+  launch's timeout is a start-up allowance plus a per-row budget
+  (`--timeout-seconds`, per row). Rows already in L1 launch nothing; rows
+  another run stored after this one planned them are adopted after admission,
+  and each judge's rows are stored as soon as its worker finishes. A judge
+  never admitted in time leaves its takes `unavailable` (`admission-timeout`)
+  without discarding the other judges' results.
 - **L2.** Each raw output is reduced to its metrics (for a recognizer: the
   edit operations and rates of `score_recognition`, without verdicts or
-  thresholds), keyed by the L1 key, the metric definition and its source.
+  thresholds), keyed by the L1 key, the metric definition and the digest of
+  every source that shapes it (a declared list per judge).
 - **Stage 3 (never cached).** The current verdicts are replayed from L2: the
   language lane's witness verdict (`independent_asr.witness_verdict`) and the
   delivery lane's automated review and route (`run_local_delivery_cascade`),
@@ -35,6 +44,11 @@ Commands:
                    it with a bundle's records
   validate-bundle  re-hash and re-validate a private bundle
   admission-status the host's admission ledger and policy
+
+The host lock and the admission ledger always live under the host-wide
+analysis lock root (`delivery_resource_supervisor.host_analysis_lock_root`),
+never under the cache root, so every orchestrator, generator and analyzer on
+the host contends on one lock and one budget.
 """
 
 from __future__ import annotations
@@ -64,7 +78,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import numpy as np  # noqa: E402
 
-from audio_qc_judges import load_registry  # noqa: E402
+from audio_qc_judges import JudgeRegistryError, load_registry  # noqa: E402
 from delivery_analysis_cache import (  # noqa: E402
     NO_MODEL_DIGEST,
     SUPPORTED_RESAMPLERS,
@@ -88,6 +102,7 @@ from lib.language_metrics import (  # noqa: E402
 from lib.qc_pipeline.admission import (  # noqa: E402
     AdmissionError,
     AdmissionPolicy,
+    AdmissionTimeout,
     HostAdmission,
     judge_admission,
 )
@@ -105,20 +120,29 @@ from lib.qc_pipeline.layered_cache import (  # noqa: E402
     LayeredCache,
     l1_identity,
     l2_identity,
+    metric_sources_digest,
     output_identity_digest,
 )
 from lib.qc_pipeline.verdicts import (  # noqa: E402
     ASR_METRIC_DEFINITION,
-    LANGUAGE_METRICS_SOURCE,
+    ASR_METRIC_SOURCES,
+    SENSEVOICE_METRIC_SOURCES,
     L2Scorer,
     asr_metrics,
     channel_detectors,
     compose_take,
     integrity_detector,
     replay_committed_language_record,
+    sensevoice_tag_metrics,
     stage0_detector,
 )
-from lib.qc_pipeline.workers import WorkerSpec, run_persistent_worker  # noqa: E402
+from lib.qc_pipeline.workers import (  # noqa: E402
+    DEFAULT_ROW_TIMEOUT_SECONDS,
+    DEFAULT_STARTUP_SECONDS,
+    WorkerOutcome,
+    WorkerSpec,
+    run_persistent_worker,
+)
 from prosody_quality_gate import evaluate_metrics  # noqa: E402
 import run_local_delivery_cascade as cascade  # noqa: E402
 
@@ -138,7 +162,7 @@ PROSODY_JUDGE = "prosody@3"
 TEMPORAL_JUDGE = "temporal-contour@1"
 DSP_METRIC_DEFINITION = "dsp-feature-vector-v1"
 SENSEVOICE_METRIC_DEFINITION = "sensevoice-tags-v1"
-ADAPTER_SOURCE = SCRIPT_DIR / "delivery_compact_model_adapter.py"
+ADMISSION_TIMEOUT = "admission-timeout"
 
 
 class OrchestratorError(ValueError):
@@ -276,9 +300,12 @@ class Stage2Judge:
     language_codes: Mapping[str, str] = field(default_factory=dict)
     model_identity_sha256: str = NO_MODEL_DIGEST
     measure_physical_footprint: bool = False
-    timeout_seconds: float = 900.0
+    # A launch's timeout: the start-up allowance plus this budget per row.
+    row_timeout_seconds: float = DEFAULT_ROW_TIMEOUT_SECONDS
+    startup_seconds: float = DEFAULT_STARTUP_SECONDS
     metric_definition: str = ASR_METRIC_DEFINITION
-    metric_source: Path = LANGUAGE_METRICS_SOURCE
+    # Every source that shapes this judge's L2 value, hashed together into its key.
+    metric_sources: tuple[Path, ...] = ASR_METRIC_SOURCES
     # Raw output -> (L2 metrics, private text) for a judge that is not a recognizer.
     reduce: Callable[[dict[str, Any]], tuple[dict[str, Any], str | None]] | None = None
 
@@ -306,12 +333,13 @@ class Stage2Judge:
         return WorkerSpec(
             judge_id=self.judge_id, engine=self.engine, command=self.command, threads=self.threads,
             lane=lane, ceiling_bytes=ceiling_bytes, engine_config=config,
-            measure_physical_footprint=self.measure_physical_footprint, timeout_seconds=self.timeout_seconds,
+            measure_physical_footprint=self.measure_physical_footprint,
+            row_timeout_seconds=self.row_timeout_seconds, startup_seconds=self.startup_seconds,
         )
 
 
-def stage2_judge_from_adapter_config(judge_id: str, config: dict[str, Any],
-                                     registry: Mapping[str, Any]) -> Stage2Judge:
+def stage2_judge_from_adapter_config(judge_id: str, config: dict[str, Any], registry: Mapping[str, Any], *,
+                                     row_timeout_seconds: float = DEFAULT_ROW_TIMEOUT_SECONDS) -> Stage2Judge:
     """A Stage 2 judge from a prepared, verified adapter configuration (identity v4)."""
     from delivery_compact_model_adapter import (
         ADAPTER_JUDGES, CompactAdapterError, _parse_output, validate_adapter_config,
@@ -344,7 +372,7 @@ def stage2_judge_from_adapter_config(judge_id: str, config: dict[str, Any],
             threads=admission.threads, family="whisper", language_codes=dict(languages),
             model_identity_sha256=digest({key: config[key] for key in (
                 "modelID", "sourceRevision", "weightsSHA256", "labelMapDigest")}),
-            measure_physical_footprint=True,
+            measure_physical_footprint=True, row_timeout_seconds=row_timeout_seconds,
         )
     if judge_id == SENSEVOICE_JUDGE:
         command = []
@@ -353,16 +381,14 @@ def stage2_judge_from_adapter_config(judge_id: str, config: dict[str, Any],
         output = output_identity_digest(judge_id, {**common, "engine": "native-command"})
 
         def reduce(raw: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
-            parsed = _parse_output(config, str(raw.get("stdout", "")).encode("utf-8"))
-            metrics = {key: parsed[key] for key in ("languageTag", "emotionTag", "eventTag", "textNormalizationTag")}
-            return metrics, parsed.get("transcript")
+            return sensevoice_tag_metrics(_parse_output(config, str(raw.get("stdout", "")).encode("utf-8")))
 
         return Stage2Judge(
             judge_id=judge_id, engine="native-command", command=(sys.executable, str(WORKER_HOST)),
             engine_config={"command": command},
             identity=JudgeIdentity(judge_id, output, config["modelID"], config["sourceRevision"], config["weightsSHA256"]),
-            threads=admission.threads, metric_definition=SENSEVOICE_METRIC_DEFINITION, metric_source=ADAPTER_SOURCE,
-            reduce=reduce,
+            threads=admission.threads, metric_definition=SENSEVOICE_METRIC_DEFINITION,
+            metric_sources=SENSEVOICE_METRIC_SOURCES, reduce=reduce, row_timeout_seconds=row_timeout_seconds,
         )
     raise OrchestratorError(f"{judge_id} is not a Stage 2 judge the orchestrator runs")
 
@@ -422,11 +448,17 @@ def _metrics(value: Any, prefix: str = "") -> dict[str, Any]:
     return {key: item for key, item in output.items() if is_token(key)}
 
 
+# What a recognition measured; its wall time is the measurement's `wallSeconds`
+# (provenance of the launch that produced it), never a metric.
 RECOGNITION_METRICS = (
     "languageMatchScore", "detectedLanguageProbability", "fullFileProcessed", "processedDurationSeconds",
-    "segmentCount", "maximumNoSpeechProbability", "meanAverageLogProbability", "recognitionDurationSeconds",
-    "decodeLanguage",
+    "segmentCount", "maximumNoSpeechProbability", "meanAverageLogProbability", "decodeLanguage",
 )
+
+
+def _safe_take_id(take_id: str) -> str:
+    """A take's identity in its record and its private file alike."""
+    return take_id if is_token(take_id) else digest(take_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -435,7 +467,7 @@ RECOGNITION_METRICS = (
 
 class Orchestrator:
     def __init__(
-        self, *, registry: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path,
+        self, *, registry: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path | None = None,
         stage2: Sequence[Stage2Judge] = (), host_admission: HostAdmission | None = None,
         supervisor: Callable[..., Any] = run_supervised, supervisor_options: Mapping[str, Any] | None = None,
         offline: bool = False,
@@ -443,6 +475,7 @@ class Orchestrator:
         self.registry = registry
         self.policy = AdmissionPolicy.from_registry(registry)
         self.layered = LayeredCache(cache)
+        # None is the host-wide analysis lock root; only a test names its own.
         self.lock_root = lock_root
         self.stage2 = {judge.judge_id: judge for judge in stage2}
         self.host = host_admission or HostAdmission(lock_root, self.policy)
@@ -480,10 +513,28 @@ class Orchestrator:
 
     # -- Stage 2 ----------------------------------------------------------- #
 
-    def _run_workers(self, plans: dict[str, dict[str, Any]], run_admission: Any, workdir: Path) -> dict[str, Any]:
-        outcomes: dict[str, Any] = {}
+    def _run_workers(self, plans: dict[str, dict[str, Any]], run_admission: Any, workdir: Path,
+                     accept: Callable[[str, WorkerOutcome], None]) -> dict[str, dict[str, Any]]:
+        """Run every judge's worker; `accept` stores each judge's rows as soon as it finishes.
 
-        def launch(judge_id: str) -> Any:
+        A judge whose admission times out leaves its rows `unavailable`
+        (`admission-timeout`); another judge's failure is raised only after
+        every finished judge's rows were stored, so nothing already measured is
+        discarded.
+        """
+        reports: dict[str, dict[str, Any]] = {}
+
+        def adopt_for(judge_id: str) -> Callable[[Sequence[Mapping[str, Any]]], dict[str, dict[str, Any]]]:
+            def adopt(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+                found = {}
+                for row in rows:
+                    value = self.layered.adopt_l1(plans[judge_id][str(row["id"])]["identity"])
+                    if value is not None:
+                        found[str(row["id"])] = value
+                return found
+            return adopt
+
+        def launch(judge_id: str) -> WorkerOutcome:
             judge = self.stage2[judge_id]
             admission = judge_admission(self.registry, judge_id)
             rows = [entry["row"] for entry in plans[judge_id].values()]
@@ -492,16 +543,29 @@ class Orchestrator:
                 workdir=workdir / judge_id.replace("@", "-"), lock_root=self.lock_root,
                 run_admission=run_admission, judge_admission=admission, supervisor=self.supervisor,
                 recovery_rule=self.policy.recovery_rule, supervisor_options=self.supervisor_options,
+                adopt=adopt_for(judge_id),
             )
 
         pending = [judge_id for judge_id, plan in plans.items() if plan]
         if not pending:
-            return outcomes
+            return reports
+        failure: BaseException | None = None
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(pending)) as pool:
             futures = {pool.submit(launch, judge_id): judge_id for judge_id in pending}
             for future in concurrent.futures.as_completed(futures):
-                outcomes[futures[future]] = future.result()
-        return outcomes
+                judge_id = futures[future]
+                try:
+                    outcome = future.result()
+                except AdmissionTimeout:
+                    outcome = WorkerOutcome(judge_id, unavailable={key: ADMISSION_TIMEOUT for key in plans[judge_id]})
+                except Exception as error:  # noqa: BLE001 - raised once the others are stored
+                    failure = failure or error
+                    continue
+                accept(judge_id, outcome)
+                reports[judge_id] = outcome.report()
+        if failure is not None:
+            raise failure
+        return reports
 
     # -- the run ----------------------------------------------------------- #
 
@@ -510,18 +574,23 @@ class Orchestrator:
         lane = manifest["lane"]
         takes = manifest["takes"]
         with self.host.run() as run_admission:
-            canonical: dict[str, CanonicalAudio] = {}
-            for take in takes:
-                path = Path(take["audioPath"])
-                if not path.is_file() or file_sha256(path) != take["audioSHA256"]:
-                    raise OrchestratorError(f"{take['id']}: audio is missing or its bytes changed")
-                canonical[take["id"]] = self.layered.canonical(path)
-            stage1 = {take["id"]: self._stage1(take, canonical[take["id"]]) for take in takes} \
-                if lane == "delivery-bench" else {}
+            # L0 and Stage 1 run in this process. They hold a dsp slot, which
+            # counts against the host's one-worker cap while the whole-host
+            # recovery rule binds, so no admitted worker's envelope overlaps them.
+            with run_admission.stage1():
+                canonical: dict[str, CanonicalAudio] = {}
+                for take in takes:
+                    path = Path(take["audioPath"])
+                    if not path.is_file() or file_sha256(path) != take["audioSHA256"]:
+                        raise OrchestratorError(f"{take['id']}: audio is missing or its bytes changed")
+                    canonical[take["id"]] = self.layered.canonical(path)
+                stage1 = {take["id"]: self._stage1(take, canonical[take["id"]]) for take in takes} \
+                    if lane == "delivery-bench" else {}
             # Plan Stage 2: an L1 hit launches nothing; identical audio and
             # requests share one worker row.
             l1_keys: dict[str, dict[str, Any]] = {judge_id: {} for judge_id in self.stage2}
             raw: dict[str, dict[str, Any]] = {judge_id: {} for judge_id in self.stage2}
+            timings: dict[str, dict[str, float]] = {judge_id: {} for judge_id in self.stage2}
             states: dict[str, dict[str, str]] = {judge_id: {} for judge_id in self.stage2}
             out_of_scope: dict[str, set[str]] = {judge_id: set() for judge_id in self.stage2}
             plans: dict[str, dict[str, Any]] = {judge_id: {} for judge_id in self.stage2}
@@ -548,25 +617,36 @@ class Orchestrator:
                 missing = sorted(judge_id for judge_id, plan in plans.items() if plan)
                 raise OrchestratorError(f"replay needs every L1 entry; a model would have to run for {', '.join(missing)}")
             unavailable: dict[str, dict[str, str]] = {judge_id: {} for judge_id in self.stage2}
-            with tempfile.TemporaryDirectory(prefix="vocello-audio-qc-") as temporary:
-                outcomes = self._run_workers(plans, run_admission, Path(temporary))
-            for judge_id, outcome in outcomes.items():
+
+            def accept(judge_id: str, outcome: WorkerOutcome) -> None:
+                """Store one finished judge's rows in L1 (adopting what another run stored first)."""
                 for key, entry in plans[judge_id].items():
+                    adopted = outcome.adopted.get(key)
+                    if adopted is not None:
+                        for take_id in entry["takes"]:
+                            raw[judge_id][take_id] = adopted
+                            states[judge_id][take_id] = "hit"
+                        continue
                     result = outcome.results.get(key)
                     if result is None:
                         for take_id in entry["takes"]:
                             unavailable[judge_id][take_id] = outcome.unavailable.get(key, "crash")
                         continue
                     try:
-                        stored = self.layered.store_l1(entry["identity"], result)
+                        stored, _adopted = self.layered.store_l1(entry["identity"], result)
                     except ValueError:
                         for take_id in entry["takes"]:
                             unavailable[judge_id][take_id] = "analysis-failed"
                         continue
                     for take_id in entry["takes"]:
                         raw[judge_id][take_id] = stored
+                        if key in outcome.timings:
+                            timings[judge_id][take_id] = outcome.timings[key]
+
+            with tempfile.TemporaryDirectory(prefix="vocello-audio-qc-") as temporary:
+                workers = self._run_workers(plans, run_admission, Path(temporary), accept)
             return self._compose(manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope,
-                                 {judge_id: outcome.report() for judge_id, outcome in outcomes.items()})
+                                 workers, timings)
 
     # -- L2, Stage 3 and Stage 4 -------------------------------------------- #
 
@@ -588,7 +668,8 @@ class Orchestrator:
         recognition["modelFamily"] = judge.family
         return recognition
 
-    def _compose(self, manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope, workers):
+    def _compose(self, manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope, workers,
+                 timings):
         lane = manifest["lane"]
         takes = manifest["takes"]
         scorer = L2Scorer()
@@ -598,7 +679,7 @@ class Orchestrator:
         measurements: dict[str, list[dict[str, Any]]] = {take["id"]: [] for take in takes}
         recognitions: dict[str, list[dict[str, Any]]] = {take["id"]: [] for take in takes}
         transcripts: dict[str, dict[str, str]] = {take["id"]: {} for take in takes}
-        metric_source = {judge_id: file_sha256(judge.metric_source) for judge_id, judge in self.stage2.items()}
+        metric_source = {judge_id: metric_sources_digest(judge.metric_sources) for judge_id, judge in self.stage2.items()}
         for take in takes:
             take_id = take["id"]
             for judge_id, judge in self.stage2.items():
@@ -615,10 +696,14 @@ class Orchestrator:
                     continue
                 identity, request = l1_keys[judge_id][take_id]
                 value = raw[judge_id][take_id]
-                wall = value.get("wallSeconds")
+                # Timing of this run's launch, never of the cached entry.
+                wall = timings[judge_id].get(take_id)
                 l2_state = "none"
                 if judge.family is not None:
-                    recognition = self._recognition(judge, take, canonical[take_id], value, request)
+                    recognition = self._recognition(
+                        judge, take, canonical[take_id], value if wall is None else {**value, "wallSeconds": wall},
+                        request,
+                    )
                     recognitions[take_id].append(recognition)
                     transcripts[take_id][judge_id] = recognition["transcript"]
                     metrics: dict[str, Any] = {}
@@ -685,7 +770,9 @@ class Orchestrator:
                                     legacy.get(take_id, {}), scorer)
             records.append(record)
             privates.append({
-                "schema": PRIVATE_SCHEMA, "takeID": take_id, "audioPath": take["audioPath"],
+                # The record's take identity, and the manifest's own beside it.
+                "schema": PRIVATE_SCHEMA, "takeID": _safe_take_id(take_id), "manifestTakeID": take_id,
+                "audioPath": take["audioPath"],
                 "referenceText": take.get("referenceText"), "transcripts": transcripts[take_id],
                 "externalRecognitionCount": len(take.get("externalRecognitions") or []),
             })
@@ -832,7 +919,7 @@ class Orchestrator:
         return {
             "schema": TAKE_EVIDENCE_SCHEMA,
             "take": {
-                "takeID": take_id if is_token(take_id) else digest(take_id),
+                "takeID": _safe_take_id(take_id),
                 "audioSHA256": take["audioSHA256"],
                 "canonicalPCMSHA256": canonical.canonical_derivative_sha256,
                 "canonicalSampleRateHz": 16_000,
@@ -925,10 +1012,11 @@ def _orchestrator(args: argparse.Namespace, *, offline: bool) -> Orchestrator:
         if resampler not in (None, chosen):
             raise OrchestratorError("every judge configuration must share one resampler")
         resampler = chosen
-        judges.append(stage2_judge_from_adapter_config(judge_id, config, registry))
+        judges.append(stage2_judge_from_adapter_config(judge_id, config, registry,
+                                                      row_timeout_seconds=args.timeout_seconds))
     cache = DeliveryAnalysisCache(args.cache_root, resampler_version=resampler or select_resampler(args.resampler))
-    return Orchestrator(registry=registry, cache=cache, lock_root=args.lock_root or args.cache_root,
-                        stage2=judges, offline=offline)
+    # The lock and the ledger are the host's, never the cache root's.
+    return Orchestrator(registry=registry, cache=cache, stage2=judges, offline=offline)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -945,8 +1033,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         command.add_argument("--judge-config", action="append", metavar="JUDGE=CONFIG",
                              help="a prepared adapter configuration per Stage 2 judge (asr.whisper-small@1=...)")
         command.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
-        command.add_argument("--lock-root", type=Path)
         command.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
+        command.add_argument("--timeout-seconds", type=float, default=DEFAULT_ROW_TIMEOUT_SECONDS,
+                             help="per-row timeout of each Stage 2 worker; a launch also gets a fixed "
+                                  f"start-up allowance ({DEFAULT_STARTUP_SECONDS:g} s)")
         if name == "run":
             command.add_argument("--bundle", type=Path, help="a new, untracked bundle directory")
         else:
@@ -957,8 +1047,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                                   help="Stage 3 over the committed language records' metrics, against their verdicts")
     records.add_argument("--records", type=Path, default=REPO / "benchmarks/runs/language")
     records.add_argument("--matrix", type=Path, default=REPO / "config/language-bench-matrix.json")
-    status = commands.add_parser("admission-status", help="the host's admission ledger and policy")
-    status.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
+    commands.add_parser("admission-status", help="the host's admission ledger and policy")
     args = parser.parse_args(argv)
     try:
         if args.command == "manifest":
@@ -975,7 +1064,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0 if not errors else 1
         if args.command == "admission-status":
             policy = AdmissionPolicy.from_registry(load_registry())
-            print(json.dumps(HostAdmission(args.lock_root, policy).status(), indent=2, sort_keys=True))
+            print(json.dumps(HostAdmission(None, policy).status(), indent=2, sort_keys=True))
             return 0
         if args.command == "replay-records":
             report = replay_committed_records(args.records, args.matrix)
@@ -994,7 +1083,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                           "failingTakes": written["failingTakes"], "run": result["header"]["run"],
                           "cache": result["header"]["cache"]}, indent=2, sort_keys=True))
         return 0
-    except (OrchestratorError, AdmissionError, EvidenceError, ValueError, OSError) as error:
+    except (OrchestratorError, AdmissionError, EvidenceError, JudgeRegistryError, ValueError, OSError,
+            RuntimeError) as error:
         print(f"audio-qc-orchestrator: FAIL\n{error}", file=sys.stderr)
         return 1
 

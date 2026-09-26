@@ -114,7 +114,8 @@ def validate(root: Path) -> None:
 
     for token in (
         "IOSReferenceAudioImportPolicy.selectedSourceURL(from: result)",
-        "ttsEngine.importReferenceAudio(from: sourceURL)",
+        # CORE-16: the copy runs off the main actor through the import policy.
+        "IOSReferenceAudioImportPolicy.importReference(",
         "importedVoicePresentation = ImportedVoicePresentation(reference: imported)",
         "PendingVoiceCloningHandoff(",
     ):

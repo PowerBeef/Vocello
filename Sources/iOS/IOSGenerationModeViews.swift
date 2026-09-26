@@ -563,6 +563,8 @@ struct IOSVoiceDesignView: View {
     /// SavedVoiceSheet flow.
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isVoiceReviewDecisionInFlight = false
+    /// IOS-21: one save at a time; a second Save tap is ignored.
+    @State private var isSavingVoice = false
     /// A designed voice that was just saved → drives the "Saved ✓ · Use in Clone" confirmation banner.
     @State private var savedDesignedResult: IOSDesignedVoiceSaveResult?
 
@@ -729,6 +731,7 @@ struct IOSVoiceDesignView: View {
                         suggestedName: $saveSheetSuggestedName,
                         transcript: $saveSheetTranscript,
                         errorMessage: saveError,
+                        isSaving: isSavingVoice,
                         clipAudioURL: URL(fileURLWithPath: saveSheetAudioPath),
                         onCancel: {
                             isSaveSheetPresented = false
@@ -737,7 +740,11 @@ struct IOSVoiceDesignView: View {
                             saveError = nil
                         },
                         onSave: {
+                            // Claimed synchronously at the tap, before the task runs.
+                            guard !isSavingVoice else { return }
+                            isSavingVoice = true
                             Task {
+                                defer { isSavingVoice = false }
                                 saveError = nil
                                 do {
                                     let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
@@ -1985,17 +1992,14 @@ struct IOSVoiceCloningView: View {
                         userInfo: [NSLocalizedDescriptionKey: IOSAppLanguage.shared.presentation.referenceAudioRequired]
                     )
                 }
-                if ttsEngine.clonePreparationState.phase != .failed || ttsEngine.clonePreparationState.identityKey != clonePrimingRequestKey {
-                    try? await ttsEngine.ensureCloneReferencePrimed(
-                        modelID: model.id,
-                        reference: CloneReference(
-                            audioPath: refPath,
-                            transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
-                            preparedVoiceID: draft.selectedSavedVoiceID
-                        )
-                    )
-                }
-
+                // IOS-18: the take is fixed at the tap, as in the other modes.
+                // Priming below awaits, and an edit made meanwhile (script,
+                // transcript, voice, language or seed) must not change it.
+                let reference = CloneReference(
+                    audioPath: refPath,
+                    transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+                    preparedVoiceID: draft.selectedSavedVoiceID
+                )
                 let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
                 let voiceName = selectedVoice?.name
                     ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
@@ -2008,13 +2012,7 @@ struct IOSVoiceCloningView: View {
                         shouldStream: true,
                         streamingInterval: GenerationSemantics.appStreamingInterval,
                         languageHint: draft.selectedLanguage.rawValue,
-                        payload: .clone(
-                            reference: CloneReference(
-                                audioPath: refPath,
-                                transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
-                                preparedVoiceID: draft.selectedSavedVoiceID
-                            )
-                        ),
+                        payload: .clone(reference: reference),
                         generationID: generationID,
                         seed: draft.pinnedSeed,
                         variation: IOSGenerationVariationPreference.requestValue()
@@ -2027,6 +2025,10 @@ struct IOSVoiceCloningView: View {
                     waveformSeed: seed,
                     persistenceCaller: "IOSVoiceCloningView"
                 )
+                if ttsEngine.clonePreparationState.phase != .failed || ttsEngine.clonePreparationState.identityKey != clonePrimingRequestKey {
+                    try? await ttsEngine.ensureCloneReferencePrimed(modelID: model.id, reference: reference)
+                }
+
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,
@@ -2082,7 +2084,7 @@ struct IOSVoiceCloningView: View {
             )
         } catch {
             if TelemetryGate.resolvedEnabled {
-                print("[IOSVoiceCloningView] clone priming failed: \(error.localizedDescription)")
+                print("[IOSVoiceCloningView] clone priming failed: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
     }

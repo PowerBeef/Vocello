@@ -344,6 +344,10 @@ struct IOSSaveVoiceSheet: View {
     var referenceLanguage: Binding<Qwen3SupportedLanguage>? = nil
     var requiresReferenceLanguageConfirmation = false
     let errorMessage: String?
+    /// IOS-21: the host's save is in flight. Save stays disabled so a second
+    /// tap cannot enroll the same name again and report a failure after the
+    /// first save succeeded.
+    var isSaving = false
     /// When present, show the clip-review card (review the recording before saving).
     var clipAudioURL: URL? = nil
     var onTranscriptEdited: ((String) -> Void)? = nil
@@ -480,8 +484,9 @@ struct IOSSaveVoiceSheet: View {
                         title: IOSInterfaceText.saveVoice,
                         symbol: "checkmark",
                         tint: tint,
-                        isEnabled: isSaveEnabled,
+                        isEnabled: isSaveEnabled && !isSaving,
                         action: {
+                            guard !isSaving else { return }
                             dismissKeyboard()
                             onSave()
                         }

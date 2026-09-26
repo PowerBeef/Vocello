@@ -8203,6 +8203,270 @@
         }
       }
     },
+    "vocello.settings.refinement.savedOutputsFolderUnavailable": {
+      "comment": "Saved outputs row when the chosen Files folder can no longer be opened; takes stay in History.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello can’t open this folder anymore. Choose it again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ne peut plus ouvrir ce dossier. Choisissez-le à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ya no puede abrir esta carpeta. Vuelve a elegirla."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello kann diesen Ordner nicht mehr öffnen. Wähle ihn erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non riesce più ad aprire questa cartella. Sceglila di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não consegue mais abrir esta pasta. Escolha-a novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法再打开此文件夹。请重新选择。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はこのフォルダを開けなくなりました。もう一度選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 더 이상 이 폴더를 열 수 없습니다. 다시 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello больше не может открыть эту папку. Выберите её снова."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsCopyFailed": {
+      "comment": "Saved outputs row when the last automatic copy into the chosen Files folder failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last take wasn’t copied to this folder. Choose it again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La dernière prise n’a pas été copiée dans ce dossier. Choisissez-le à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La última toma no se copió en esta carpeta. Vuelve a elegirla."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die letzte Aufnahme wurde nicht in diesen Ordner kopiert. Wähle ihn erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’ultimo take non è stato copiato in questa cartella. Sceglila di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A última tomada não foi copiada para esta pasta. Escolha-a novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一条音频未能复制到此文件夹。请重新选择。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前回のテイクはこのフォルダにコピーされませんでした。もう一度選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마지막 테이크가 이 폴더에 복사되지 않았습니다. 다시 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Последний дубль не скопирован в эту папку. Выберите её снова."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsFolderFailedTitle": {
+      "comment": "Alert title when the folder picked for saved outputs cannot be kept.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t use this folder"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’utiliser ce dossier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se puede usar esta carpeta"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Ordner kann nicht verwendet werden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile usare questa cartella"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível usar esta pasta"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法使用此文件夹"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このフォルダは使用できません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 사용할 수 없음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось использовать эту папку"
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsFolderFailedMessage": {
+      "comment": "Alert message when the folder picked for saved outputs cannot be kept.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another folder in Files. Takes stay in History."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un autre dossier dans Fichiers. Les prises restent dans l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige otra carpeta en Archivos. Las tomas se quedan en el historial."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle einen anderen Ordner in Dateien. Aufnahmen bleiben im Verlauf."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un’altra cartella in File. I take restano nella cronologia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha outra pasta em Arquivos. As tomadas continuam no histórico."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在“文件”中选择其他文件夹。音频仍保留在历史记录中。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「ファイル」で別のフォルダを選択してください。テイクは履歴に残ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일 앱에서 다른 폴더를 선택하세요. 테이크는 기록에 남습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите другую папку в «Файлах». Дубли остаются в истории."
+          }
+        }
+      }
+    },
     "vocello.settings.refinement.keepInHistory": {
       "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
       "extractionState": "manual",

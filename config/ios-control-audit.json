@@ -164,8 +164,8 @@
       "path": "Sources/iOS/Settings/SettingsScreen.swift",
       "screen": "Settings",
       "scenario": "stateful",
-      "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified. Both value-based Models & Files and Voice Models links retain their existing control identifiers. The PA-30 one-time removal of audio earlier History clears left adds its confirmation and failure alerts.",
-      "interactiveOccurrenceCount": 12
+      "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified. Both value-based Models & Files and Voice Models links retain their existing control identifiers. The PA-30 one-time removal of audio earlier History clears left adds its confirmation and failure alerts, and a Files folder that cannot be kept for saved outputs raises its own alert (IOS-25).",
+      "interactiveOccurrenceCount": 14
     },
     {
       "path": "Sources/iOS/Settings/VoiceModelsScreen.swift",

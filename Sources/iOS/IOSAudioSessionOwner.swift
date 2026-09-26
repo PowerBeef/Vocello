@@ -107,7 +107,7 @@ final class IOSAudioSessionOwner: Sendable {
                 try apply(step)
             }
         } catch {
-            log("claim for \(use.rawValue) failed: \(error.localizedDescription)")
+            log("claim for \(use.rawValue) failed: \(DiagnosticPrivacy.summary(of: error))")
             performIgnoringFailures(ledger.withLock { $0.activationFailed(claim, steps: steps) })
             throw error
         }
@@ -118,7 +118,7 @@ final class IOSAudioSessionOwner: Sendable {
             do {
                 try apply(step)
             } catch {
-                log("\(step) failed: \(error.localizedDescription)")
+                log("\(step) failed: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
     }

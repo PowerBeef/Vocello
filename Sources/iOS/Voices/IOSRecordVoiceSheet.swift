@@ -35,6 +35,8 @@ struct IOSRecordVoiceSheet: View {
     @State private var enrollError: String?
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
+    /// IOS-21: one enrollment at a time; a second Save tap is ignored.
+    @State private var isSaving = false
     @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var transcriptionTask: Task<Void, Never>?
@@ -125,6 +127,7 @@ struct IOSRecordVoiceSheet: View {
                 referenceLanguage: $detectedLanguage,
                 requiresReferenceLanguageConfirmation: requiresReferenceLanguageConfirmation,
                 errorMessage: enrollError,
+                isSaving: isSaving,
                 clipAudioURL: capturedURL,
                 onTranscriptEdited: handleTranscriptEdit,
                 onUseAudioOnly: confirmAudioOnly,
@@ -134,7 +137,15 @@ struct IOSRecordVoiceSheet: View {
                     cleanupCapturedFile()
                     onDismiss()
                 },
-                onSave: { Task { await performEnroll() } }
+                onSave: {
+                    // Claimed synchronously at the tap, before the task runs.
+                    guard !isSaving else { return }
+                    isSaving = true
+                    Task {
+                        await performEnroll()
+                        isSaving = false
+                    }
+                }
             )
         }
         .alert(

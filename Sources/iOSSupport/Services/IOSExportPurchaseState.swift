@@ -48,7 +48,13 @@ final class IOSExportPurchaseState {
     private(set) var notice: Notice?
     private let client: any IOSExportPurchaseClient
     private var revision = 0
-    private var refreshRevision = 0
+    /// IOS-19: one entitlement scan runs at a time and every `refresh()` joins
+    /// it. A caller that arrived after the running scan began waits for it and
+    /// then for one more scan, shared by every such caller, so no caller
+    /// returns with the value an older or superseded scan left behind.
+    @ObservationIgnored private var scanTask: Task<Void, Never>?
+    @ObservationIgnored private var requestedScans = 0
+    @ObservationIgnored private var coveredScans = 0
     @ObservationIgnored private var ownedTransactions: Set<UInt64> = []
     @ObservationIgnored private var revokedTransactions: Set<UInt64> = []
     @ObservationIgnored private var listener: Task<Void, Never>?
@@ -66,14 +72,34 @@ final class IOSExportPurchaseState {
         }
     }
 
+    /// Returns once a scan that began after this call has settled `access`
+    /// (or a newer transaction decided it), so the caller acts on current state.
     func refresh() async {
         start()
-        refreshRevision += 1
-        let requestRevision = refreshRevision
+        requestedScans += 1
+        let request = requestedScans
+        while coveredScans < request, !Task.isCancelled {
+            if let scanTask {
+                await scanTask.value
+            } else {
+                let task = Task { await self.scanEntitlements() }
+                scanTask = task
+                await task.value
+            }
+        }
+    }
+
+    private func scanEntitlements() async {
+        let covers = requestedScans
         let observedRevision = revision
+        defer {
+            coveredScans = max(coveredScans, covers)
+            scanTask = nil
+        }
         let transactions = await client.currentEntitlements()
-        guard !Task.isCancelled, requestRevision == refreshRevision,
-              observedRevision == revision else { return }
+        // A transaction received meanwhile is newer than this scan and already
+        // decided access; the older snapshot cannot undo it.
+        guard observedRevision == revision else { return }
         ownedTransactions = Set(transactions.filter {
             $0.grantsUnlock && !revokedTransactions.contains($0.id)
         }.map(\.id))

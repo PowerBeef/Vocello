@@ -92,7 +92,7 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
             player.play()
         } catch {
             if TelemetryGate.resolvedEnabled {
-                print("[IOSVoicePreviewPlayer] Failed to play '\(voiceID)': \(error)")
+                print("[IOSVoicePreviewPlayer] Failed to play '\(voiceID)': \(DiagnosticPrivacy.summary(of: error))")
             }
             stop()
         }

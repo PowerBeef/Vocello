@@ -64,6 +64,62 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         ) { _ in true })
     }
 
+    /// IOS-25: a copy that cannot land is recorded for the Settings row
+    /// instead of disappearing, and the next copy that lands clears it, as
+    /// choosing or clearing the folder does.
+    func testAFailedCopyIsRecordedUntilACopyLandsOrTheFolderChanges() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
+        let take = try clip("custom_take.wav")
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        let refused = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true })
+        let refusedCopied = await refused.value
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        XCTAssertFalse(refusedCopied)
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+
+        let landed = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true })
+        let landedCopied = await landed.value
+        XCTAssertTrue(landedCopied)
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue, "a copy that lands clears the issue")
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        let refusedAgain = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true })
+        _ = await refusedAgain.value
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+        try IOSSavedOutputsDestination.setFolder(folder)
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue, "choosing the folder again clears the issue")
+    }
+
+    /// IOS-25: a folder that went away is reported, not skipped in silence;
+    /// clearing the folder ends the report.
+    func testAFolderThatWentAwayIsRecorded() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        try FileManager.default.removeItem(at: folder)
+        let take = try clip("custom_take.wav")
+        let copy = IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true }
+        if let copy {
+            // The bookmark still resolved to the old place; the copy cannot land there.
+            let copied = await copy.value
+            XCTAssertFalse(copied)
+            XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+        } else {
+            XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .folderUnavailable)
+        }
+        IOSSavedOutputsDestination.clearFolder()
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
+    }
+
     func testPolicySeesTheSavedRowsModeNotAnyCurrentSelection() throws {
         try IOSSavedOutputsDestination.setFolder(folder)
         var seen: [IOSExportProvenance] = []

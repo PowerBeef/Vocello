@@ -274,6 +274,26 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.chooseFolder", defaultValue: "Choose Files folder…",
                comment: "Settings chooseFolder; preserve product and consent meaning.")
     }
+    static var savedOutputsFolderUnavailable: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsFolderUnavailable",
+               defaultValue: "Vocello can’t open this folder anymore. Choose it again.",
+               comment: "Saved outputs row when the chosen Files folder can no longer be opened; takes stay in History.")
+    }
+    static var savedOutputsCopyFailed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsCopyFailed",
+               defaultValue: "The last take wasn’t copied to this folder. Choose it again.",
+               comment: "Saved outputs row when the last automatic copy into the chosen Files folder failed.")
+    }
+    static var savedOutputsFolderFailedTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsFolderFailedTitle",
+               defaultValue: "Couldn’t use this folder",
+               comment: "Alert title when the folder picked for saved outputs cannot be kept.")
+    }
+    static var savedOutputsFolderFailedMessage: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsFolderFailedMessage",
+               defaultValue: "Choose another folder in Files. Takes stay in History.",
+               comment: "Alert message when the folder picked for saved outputs cannot be kept.")
+    }
     static var reduceMotion: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.reduceMotion", defaultValue: "Reduce Motion",
                comment: "Settings reduceMotion; preserve product and consent meaning.")
@@ -447,9 +467,11 @@ struct SettingsScreen: View {
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var reduceMotionEnabled = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var reduceTransparencyEnabled = false
     @AppStorage(IOSSavedOutputsDestination.displayNameKey) private var savedOutputsName = ""
+    @AppStorage(IOSSavedOutputsDestination.exportIssueKey) private var savedOutputsIssue = ""
 
     @State private var isSavedOutputsDialogPresented = false
     @State private var isFolderPickerPresented = false
+    @State private var isSavedOutputsFolderFailurePresented = false
     @State private var isExportPurchasePresented = false
     /// PA-30: audio earlier History clears left, offered once in Models & Files.
     @State private var leftoverAudio: IOSLeftoverAudioAnalysis.Leftovers?
@@ -475,6 +497,16 @@ struct SettingsScreen: View {
 
     private var savedOutputsSummary: String {
         savedOutputsName.isEmpty ? IOSSettingsText.historyOnly : savedOutputsName
+    }
+
+    /// IOS-25: the last automatic copy's failure, shown on the row with a
+    /// warning symbol until a copy lands or the folder changes.
+    private var savedOutputsIssueMessage: String? {
+        switch IOSSavedOutputsDestination.ExportIssue(rawValue: savedOutputsIssue) {
+        case .folderUnavailable: IOSSettingsText.savedOutputsFolderUnavailable
+        case .copyFailed: IOSSettingsText.savedOutputsCopyFailed
+        case nil: nil
+        }
     }
 
     var body: some View {
@@ -622,8 +654,26 @@ struct SettingsScreen: View {
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false
         ) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            try? IOSSavedOutputsDestination.setFolder(url)
+            // IOS-25: a folder that cannot be kept is reported, not dropped.
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                do {
+                    try IOSSavedOutputsDestination.setFolder(url)
+                } catch {
+                    isSavedOutputsFolderFailurePresented = true
+                }
+            case .failure(let error):
+                if (error as? CocoaError)?.code != .userCancelled {
+                    isSavedOutputsFolderFailurePresented = true
+                }
+            }
+        }
+        .alert(IOSSettingsText.savedOutputsFolderFailedTitle, isPresented: $isSavedOutputsFolderFailurePresented) {
+            Button(IOSInterfaceText.ok, role: .cancel) {}
+                .accessibilityIdentifier("iosSettings_savedOutputsFolderFailureDismiss")
+        } message: {
+            Text(IOSSettingsText.savedOutputsFolderFailedMessage)
         }
         .task { await refreshLeftoverAudio() }
         .alert(
@@ -746,11 +796,14 @@ struct SettingsScreen: View {
 
                 IOSSettingsDivider()
                 IOSSettingsValueRow(
-                    symbol: "bookmark",
+                    symbol: savedOutputsIssueMessage == nil ? "bookmark" : "exclamationmark.triangle",
                     title: IOSSettingsText.savedOutputs,
-                    subtitle: IOSSettingsText.savedOutputsDetail,
+                    subtitle: savedOutputsIssueMessage ?? IOSSettingsText.savedOutputsDetail,
                     accessibilityIdentifier: "iosSettings_savedOutputsRow",
                     value: savedOutputsSummary,
+                    // The label replaces the subtitle, so VoiceOver hears the
+                    // failure with the folder.
+                    accessibilityValue: savedOutputsIssueMessage.map { [savedOutputsSummary, $0].joined(separator: ", ") },
                     accessibilityHint: IOSSettingsText.savedOutputsHint,
                     action: { isSavedOutputsDialogPresented = true }
                 )

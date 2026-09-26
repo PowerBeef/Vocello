@@ -9,8 +9,8 @@ import SwiftUI
 ///
 /// Per design_references/Vocello iOS/studio.jsx (InlinePlayer): a waveform progress
 /// bar across the top, then a row with a mode-tinted Play/Pause button, voice meta,
-/// and phase-specific trailing controls (Cancel while streaming; Save / Download /
-/// Dismiss when complete). The same controller mirrors the shared `AudioPlayerViewModel`
+/// and phase-specific trailing controls (Cancel while streaming; Download / Dismiss
+/// when complete). The same controller mirrors the shared `AudioPlayerViewModel`
 /// throughout, so playback position + waveform continue smoothly across the morph.
 struct IOSStudioPlayerCard: View {
     enum Phase {
@@ -59,7 +59,6 @@ struct IOSStudioPlayerCard: View {
 
     let phase: Phase
     let tint: Color
-    var onSave: (() -> Void)?
     var onDismiss: () -> Void
     var onCancel: () -> Void
     var onRetry: (() -> Void)?
@@ -399,16 +398,9 @@ struct IOSStudioPlayerCard: View {
             .accessibilityIdentifier("studio_livePreview_cancel")
             .transition(.opacity)
         } else {
+            // IOS-25: no separate Save; with no host action it only repeated
+            // Download's share of the take.
             HStack(spacing: 8) {
-                iconButton(
-                    symbol: "bookmark",
-                    label: IOSInterfaceText.save,
-                    accessibilityIdentifier: "studio_inlinePlayer_save"
-                ) {
-                    if let onSave, case .complete(let item) = phase {
-                        exportGate.perform(provenance: [IOSExportProvenance(generationMode: item.mode.rawValue)]) { onSave() }
-                    } else { shareWAV() }
-                }
                 iconButton(
                     symbol: "arrow.down.to.line",
                     label: IOSInterfaceText.download,

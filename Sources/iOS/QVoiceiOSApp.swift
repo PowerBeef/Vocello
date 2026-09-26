@@ -161,7 +161,7 @@ struct QVoiceiOSApp: App {
                 didInitializeEngine = false
                 engineStartFailed = true
                 if TelemetryGate.resolvedEnabled {
-                    print("[QVoiceiOSApp] Engine initialization failed: \(error.localizedDescription)")
+                    print("[QVoiceiOSApp] Engine initialization failed: \(DiagnosticPrivacy.summary(of: error))")
                 }
                 let presentation = IOSAppLanguage.shared.presentation
                 engine.setVisibleError(IOSInterfaceText.engineStartFailed(presentation.generationFailureMessage(error)))

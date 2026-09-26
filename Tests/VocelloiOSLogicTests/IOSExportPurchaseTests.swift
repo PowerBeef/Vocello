@@ -183,6 +183,37 @@ final class IOSExportPurchaseTests: XCTestCase {
         XCTAssertEqual(store.access, .locked)
     }
 
+    /// IOS-19: a refresh that overlaps a running scan joins it instead of
+    /// superseding it, and no caller returns before a scan that began after
+    /// its call settled access. A superseded caller used to return while
+    /// access was still `.checking`, flashing the purchase sheet for an owner.
+    func testOverlappingRefreshesJoinTheRunningScanAndNeverReturnStale() async {
+        let client = FakeExportClient()
+        client.entitlements = [transaction()]
+        let store = IOSExportPurchaseState(client: client)
+        let entered = expectation(description: "entitlement scan suspended")
+        client.scanEntered = { entered.fulfill() }
+        client.suspendScan = true
+        let first = Task { await store.refresh(); return store.access }
+        await fulfillment(of: [entered], timeout: 2)
+        let second = Task { await store.refresh(); return store.access }
+        let third = Task { await store.refresh(); return store.access }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(client.scanCount, 1, "overlapping callers wait for the running scan")
+        XCTAssertEqual(store.access, .checking)
+
+        client.scanEntered = nil
+        client.suspendScan = false
+        client.resumeScan(with: [transaction()])
+        let firstAccess = await first.value
+        let secondAccess = await second.value
+        let thirdAccess = await third.value
+        XCTAssertEqual(firstAccess, .unlocked)
+        XCTAssertEqual(secondAccess, .unlocked)
+        XCTAssertEqual(thirdAccess, .unlocked)
+        XCTAssertEqual(client.scanCount, 2, "callers that arrived mid-scan share one follow-up scan")
+    }
+
     func testLateSuccessCannotUndoRefundAndOldRefundCannotRevokeNewPurchase() async {
         let client = FakeExportClient()
         let store = IOSExportPurchaseState(client: client)
@@ -252,6 +283,7 @@ private final class FakeExportClient: IOSExportPurchaseClient {
     var syncCount = 0
     var purchaseCount = 0
     var observerCount = 0
+    var scanCount = 0
     private var scanContinuation: CheckedContinuation<[IOSExportTransaction], Never>?
     private var purchaseContinuation: CheckedContinuation<Void, Never>?
     private var delivered: CheckedContinuation<Void, Never>?
@@ -264,6 +296,7 @@ private final class FakeExportClient: IOSExportPurchaseClient {
         return offeredProduct
     }
     func currentEntitlements() async -> [IOSExportTransaction] {
+        scanCount += 1
         if suspendScan {
             return await withCheckedContinuation { scanContinuation = $0; scanEntered?() }
         }

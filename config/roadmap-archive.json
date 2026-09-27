@@ -4149,6 +4149,26 @@
       "notes": "Closed 2026-09-26 (wave 11; decision 9a). One orchestrator (scripts/audio_qc_orchestrator.py) runs Stages 1-3 after the generator exits with one persistent worker per judge per run (scripts/audio_qc_worker.py), admitted by a budgeted semaphore (10 GiB provisional, one MLX GPU worker beside at most two CPU workers, registry ceilings enforced live on the worker's process group) under one host-wide analysis lock; an L0-L2 cache keyed by output identities with verdicts never cached; take-evidence/1 records and an untracked private bundle; DistilHuBERT and the fitted heads retired from every QC path. An adversarial review found nine defects (host-wide lock, orphaned worker, crash isolation, process-group ceilings, timeout scaling, trivially satisfiable binding evidence, cache keys, concurrent adoption); all were fixed with tests. First real run 2026-09-26: 19 lang-bench takes through the whisper-small worker reproduce witness_verdict exactly (status, expectation, error rates, channels, reasons). The child-attributed recovery rule stays report-only (candidateBinding false) until committed M6 recovery reports bind it.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-26"
+    },
+    {
+      "id": "AQ-06",
+      "title": "Judge panel acquisition and M6 qualification",
+      "status": "done",
+      "gate": "Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "config/delivery-evaluator-v2-candidates.json",
+        "config/audio-qc-judges.json",
+        "scripts/audio_qc_panel_qualification.py",
+        "benchmarks/audio-qc-qualification/20260927-aaba14fd/session.json"
+      ],
+      "notes": "Closed 2026-09-27 (decisions 1a, 2a, 9a; ResNet293 and DNSMOS accepted 2026-09-26 under CC BY 4.0). Acquisition (P7): 12 judges pinned with per-file SHA-256 and hash-locked runtimes through scripts/acquire_audio_qc_judges.py, hardened after a supply-chain review; the forced aligner has its own runtime with the Japanese tokenizer (soynlp stays excluded as GPL, so the aligner skips Korean). Qualification (P8, scripts/audio_qc_panel_qualification.py, session 20260927-aaba14fd): every judge passed two clean M6 runs over the canary set (nine procedural and 19 lang-bench takes) with a determinism class, a canary record and a recovery report per run. Flip analysis, whisper-small against large-v3: 0 language flips and 1 accuracy flip in 19 takes. All 12 judges are at shadow with ceilings at the measured peak x 1.2 (Whisper large-v3 6.84 GiB, Qwen3-ASR 6.52 GiB), and the child-attributed recovery rule is binding. Earlier sessions exposed provisional ceilings, stdout noise, an aligner adapter bug, a supervisor exit race and the missing tokenizer; all were fixed first. Calibration is AQ-07.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-27",
+      "blockedBy": [
+        "AQ-01",
+        "AQ-05"
+      ]
     }
   ]
 }

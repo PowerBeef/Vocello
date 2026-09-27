@@ -17,6 +17,19 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 27 — AV-17 steps 2 and 3 done; the AQ-06 judge panel reaches shadow
+
+The runner's System Audio Recording grant let the canonical M6 UI benchmark publish
+(macos-xcui-benchmark-20260927-101957-c37aa311, warm RTF 0.26-0.32); the stall gate calibrated at
+600 ms, three ui-perf sessions re-derived the warn-only ceilings, and the README and website moved
+to the M6 record. AQ-02 P2b (Traditional-to-Simplified folding, normalization v3) cleared the
+design-zh false fail, and lang-bench v5 published. AQ-06 closed: all 12 judges installed and passed
+two clean M6 runs (session 20260927-aaba14fd). The flip analysis found 0 language flips and 1
+accuracy flip, and the child-attributed recovery rule now binds. Still open: the memory profile
+stall (BT-06), PA-33, PA-26 B6, CI-16, CI-21 and DOC-10, and the iPhone lanes. Next is AQ-07
+calibration, starting with the CC0 ten-language script pool and a clean-take session with injected
+defects.
+
 ### September 26, evening — wave 11 shipped; lanes run; UI lanes wait for one permission
 
 Wave 11 is on `main` with CI green: AQ-05 (staged QC orchestrator) and AQ-04 (Stage 0 signals and

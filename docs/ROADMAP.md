@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audio-qc-audit-2026-09` | active | backend-mlx | 4/9 (44%) |
+| `audio-qc-audit-2026-09` | active | backend-mlx | 5/9 (56%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
@@ -95,7 +95,6 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `AQ-02` | in-flight | Normalization v2 and ten-language coverage | — |
-| `AQ-06` | in-flight | Judge panel acquisition and M6 qualification | `AQ-01`, `AQ-05` |
 | `AQ-07` | planned | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
 | `AQ-08` | planned | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
 | `AQ-09` | planned | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |
@@ -104,9 +103,6 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 
 - **`AQ-02`** (in-flight) — Normalization v2 and ten-language coverage.
   gate: Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.
-
-- **`AQ-06`** (in-flight) — Judge panel acquisition and M6 qualification.
-  gate: Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.
 
 - **`AQ-07`** (planned) — Detector qualification and lane gating sets.
   gate: Calibration records meeting A8 for detector classes A-D (then E, I, J) in declared scopes; correlated-failure audits recorded; the language bench gates on B, C and D and publishes two-family records; the clone lane gates on E.

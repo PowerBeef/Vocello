@@ -1146,7 +1146,7 @@
         "config/delivery-evaluator-v2-contract.json"
       ],
       "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
-      "notes": "M6 canonical since 2026-09-22 (maintainer decision). Step (1) done 2026-09-25: three seeded gate runs seeded the M6 baseline (RTF 0.265, first chunk 145 ms, 52 tokens/s); gate compares pass after waves 8-11 (mac-gate-bench-20260926-180734-fe43583b). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c calibrated the gap bound and retained-memory v2. Step (2) done 2026-09-27: macos-xcui-benchmark-20260927-101957-c37aa311 is the first canonical M6 UI record (29 takes with played-audio capture; warm RTF 0.26-0.32 by mode and length), with the README charts, prose and website figures moved to it in the same commit; the M2 record 379db820 stays an earlier series. The same run calibrated the stall gate at 600 ms. Step (3) done 2026-09-27: three M6 ui-perf sessions re-derived the warn-only ceilings (spread-v1). Step (6) emulation passed (exploratory). Step (5) is re-scoped by the audio QC audit: AQ-06 qualifies the new judge panel. Open: step (5) through AQ-06, and the 8 GB floor decision beyond emulation.",
+      "notes": "M6 canonical since 2026-09-22 (maintainer decision). Step (1) done 2026-09-25: three seeded gate runs seeded the M6 baseline (RTF 0.265, first chunk 145 ms, 52 tokens/s); gate compares pass after waves 8-11 (mac-gate-bench-20260926-180734-fe43583b). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c calibrated the gap bound and retained-memory v2. Step (2) done 2026-09-27: macos-xcui-benchmark-20260927-101957-c37aa311 is the first canonical M6 UI record (29 takes with played-audio capture; warm RTF 0.26-0.32 by mode and length), with the README charts, prose and website figures moved to it in the same commit; the M2 record 379db820 stays an earlier series. The same run calibrated the stall gate at 600 ms. Step (3) done 2026-09-27: three M6 ui-perf sessions re-derived the warn-only ceilings (spread-v1). Step (6) emulation passed (exploratory). Step (5) done 2026-09-27 through AQ-06: the new judge panel qualified on the M6 (session 20260927-aaba14fd) and sits at shadow; calibration continues in AQ-07. Open: the 8 GB floor decision beyond emulation.",
       "updated": "2026-09-27"
     },
     {
@@ -1537,23 +1537,6 @@
       "notes": "Wave 10 landed P2a (2026-09-26): normalization v2 in Python and Swift with byte-exact parity (Korean syllable CER, NFKC and casefold, Latin folds, recognizer-tag stripping, bracket and filler safety, space-free CER, ten-language tables), a corpus lint refusing digits, symbols and per-language abbreviations, language measurement version 4 and the in-app languageASR gate at algorithm 6. P2b part 1 landed 2026-09-26: the first real orchestrator run showed whisper writing a correct zh take in Traditional characters (CER 0.44, a false fail), so normalization v3 folds Traditional to Simplified for Chinese only through a committed 3,079-entry table derived from ICU Hant-Hans (Unicode-3.0 attributed; generator committed; the Swift copy is generated and byte-checked), measurement version 5, languageASR gate 7; that take drops to one real homophone error, and no committed verdict changes. Open: cn2an and num2words reconciliation and fugashi only if the corpus admits digits or unsegmented Japanese words need them; the CC0 ten-language script pool; a consented lang-bench under v3.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-26"
-    },
-    {
-      "id": "AQ-06",
-      "title": "Judge panel acquisition and M6 qualification",
-      "status": "in-flight",
-      "gate": "Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.",
-      "sourceOfTruth": [
-        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
-        "config/delivery-evaluator-v2-candidates.json"
-      ],
-      "notes": "Audit AQ-F13, F14, F20, F29 (P7, P8). P7 done 2026-09-27: 12 judges registered as candidates with Hugging Face (or GitHub, for DNSMOS) revisions and per-file SHA-256, hash-locked runtimes and scripts/acquire_audio_qc_judges.py (hardened after a supply-chain review: path-safe keys, redirect allowlist, RECORD-verified venvs, no shared model cache, isolated pip); maintainer decisions 2026-09-26 accept ResNet293 (CC BY 4.0, non-voting until the correlated-failure audit) and DNSMOS P.835 (CC BY 4.0, advisory, tier B). The maintainer's fetch installed and verify passed every judge: Whisper large-v3, Parakeet v3, Paraformer-zh, SenseVoice f16, Qwen3-ASR 1.7B and ForcedAligner (non-voting, same lab), VoxLingua107, CAM++, ResNet293, pYIN, Audiobox Aesthetics and DNSMOS (22 GB with runtimes). Open (P8): orchestrator jobs for the panel judges, two clean M6 resource runs, a determinism class and a canary record per judge, the whisper-small against large-v3 flip analysis, then shadow.",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-27",
-      "blockedBy": [
-        "AQ-01",
-        "AQ-05"
-      ]
     },
     {
       "id": "AQ-07",

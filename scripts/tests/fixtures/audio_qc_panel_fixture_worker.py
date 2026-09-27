@@ -21,10 +21,13 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import sys
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import audio_qc_worker  # noqa: E402
+
+MINIMUM_LIFE_SECONDS = 0.25
 
 
 def _launch(config) -> int:
@@ -59,6 +62,11 @@ def table_engine(job, emit) -> None:
         result.setdefault("sampleRateHz", 16_000)
         result["echo"] = {key: row[key] for key in ("language", "referenceText") if key in row}
         emit({"kind": "row", "id": row["id"], "result": result})
+    # A real model worker lives far longer than the supervisor's 50 ms sampling
+    # period; a fixture answering from a table can exit before the first
+    # sample, and an envelope without a sampled peak is a discarded run (CI saw
+    # it on a loaded runner). Live a few periods so every launch is measured.
+    time.sleep(float(config.get("minimumLifeSeconds", MINIMUM_LIFE_SECONDS)))
 
 
 PANEL = (*audio_qc_worker.PANEL_ENGINES, "whisper-mlx", "fixture")

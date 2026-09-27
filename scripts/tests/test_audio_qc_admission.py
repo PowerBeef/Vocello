@@ -19,8 +19,11 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from audio_qc_judges import JudgeRegistryError, load_registry  # noqa: E402
+from lib.qc_pipeline.qualification import admission_ceiling  # noqa: E402
+from test_audio_qc_judges import unpromoted_registry  # noqa: E402
 from delivery_resource_supervisor import (  # noqa: E402
     CANDIDATE_RECOVERY_RULE,
     HOST_LOCK_NAME,
@@ -81,7 +84,7 @@ class FakeClock:
 
 class AdmissionPolicyTests(unittest.TestCase):
     def test_the_registry_policy_is_budgeted_and_serial_until_the_switch(self) -> None:
-        policy = AdmissionPolicy.from_registry(load_registry())
+        policy = AdmissionPolicy.from_registry(unpromoted_registry())
         self.assertEqual(policy.budget_bytes, 10 * GIB)
         self.assertEqual(dict(policy.lane_limits), {"gpu": 1, "cpu": 2, "dsp": 4})
         self.assertEqual(policy.recovery_rule, WHOLE_HOST_RECOVERY_RULE)
@@ -89,7 +92,7 @@ class AdmissionPolicyTests(unittest.TestCase):
         self.assertEqual(policy.worker_cap, 1)
         # A local flip without its committed evidence never takes effect: the
         # registry's admission gate runs when the policy loads.
-        registry = copy.deepcopy(load_registry())
+        registry = unpromoted_registry()
         registry["admission"]["recoveryRule"]["candidateBinding"] = True
         with self.assertRaisesRegex(admission_module.AdmissionError, "recovery reports"):
             AdmissionPolicy.from_registry(registry)
@@ -99,8 +102,29 @@ class AdmissionPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(JudgeRegistryError, "may not load"):
                 load_registry(flipped_path)
 
+    def test_the_shipped_policy_lifts_the_cap_on_its_committed_m6_evidence(self) -> None:
+        """Decision 9a: the child-attributed rule binds, so admission runs to the lane limits."""
+        shipped = load_registry()
+        policy = AdmissionPolicy.from_registry(shipped)
+        self.assertEqual((policy.budget_bytes, dict(policy.lane_limits)), (10 * GIB, {"gpu": 1, "cpu": 2, "dsp": 4}))
+        self.assertEqual((policy.recovery_rule, policy.worker_cap), (CANDIDATE_RECOVERY_RULE, None))
+        # The same switch without the evidence it cites never loads.
+        uncited = copy.deepcopy(shipped)
+        uncited["admission"]["recoveryRule"]["promotion"]["evidence"] = []
+        with self.assertRaisesRegex(admission_module.AdmissionError, "recovery reports"):
+            AdmissionPolicy.from_registry(uncited)
+
     def test_a_judge_is_admitted_at_its_registry_ceiling(self) -> None:
-        registry = load_registry()
+        # The shipped panel judge is calibrated: every run, qualification included, admits it there.
+        shipped = load_registry()["judges"][PARAKEET]["resources"]
+        self.assertEqual((shipped["ceilingStatus"], shipped["ceilingBytes"]),
+                         ("calibrated", admission_ceiling(shipped["canonicalHostPeakBytes"])))
+        for measurement in (False, True):
+            admitted = judge_admission(load_registry(), PARAKEET, measurement=measurement)
+            self.assertEqual((admitted.ceiling_bytes, admitted.ceiling_basis),
+                             (shipped["ceilingBytes"], "calibrated-canonical-host-peak-x1.2"))
+        # Everything below starts from the panel as it stood before qualification.
+        registry = unpromoted_registry()
         whisper = judge_admission(registry, WHISPER)
         self.assertEqual((whisper.lane, whisper.ceiling_bytes, whisper.threads, whisper.engine),
                          ("gpu", 2684354560, 2, "whisper-mlx"))

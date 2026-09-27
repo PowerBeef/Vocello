@@ -42,6 +42,45 @@ CONTRACTS = (
 )
 ECAPA = "speaker.ecapa-voxceleb@1"
 WHISPER = "asr.whisper-small@1"
+REGISTRY_PATH = REPO / "config/audio-qc-judges.json"
+# The session whose committed canary records and recovery reports promoted the AQ-06 panel.
+PROMOTION_SESSION = "20260927-aaba14fd"
+
+
+def _unpromotion_edits(registry: dict) -> dict[tuple[str, ...], object]:
+    """The values that return every AQ-06 panel judge to candidate and the recovery switch to report-only."""
+    edits: dict[tuple[str, ...], object] = {}
+    for judge_id, judge in registry["judges"].items():
+        if "acquisition" not in judge:
+            continue
+        resources = {key: value for key, value in judge["resources"].items()
+                     if key not in ("ceilingBytes", "ceilingSession")}
+        resources.update(ceilingStatus="provisional", canonicalHostPeakBytes=None)
+        base = ("judges", judge_id)
+        edits.update({(*base, "status"): "candidate", (*base, "canary"): None,
+                      (*base, "determinismClass"): "unmeasured", (*base, "resources"): resources})
+    edits[("admission", "recoveryRule", "candidateBinding")] = False
+    edits[("admission", "recoveryRule", "promotion", "evidence")] = []
+    return edits
+
+
+def unpromoted_registry_text(text: str | None = None) -> str:
+    """The registry file as it read before any panel promotion, every other byte kept.
+
+    Tests of candidate-time behaviour (qualification sessions, promotion edits,
+    the provisional-ceiling measurement, the recovery switch needing evidence)
+    use this fixture, so a real promotion of the live registry never changes
+    what they exercise. A repository copy a test builds holds this text.
+    """
+    from lib.qc_pipeline.qualification import replace_json_values
+
+    text = text if text is not None else REGISTRY_PATH.read_text(encoding="utf-8")
+    return replace_json_values(text, _unpromotion_edits(json.loads(text)))
+
+
+def unpromoted_registry() -> dict:
+    """The live registry with the panel at candidate and the recovery rule report-only."""
+    return json.loads(unpromoted_registry_text())
 
 
 class JudgeRegistryTests(unittest.TestCase):
@@ -53,18 +92,23 @@ class JudgeRegistryTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def _errors(self, mutate) -> list[str]:
-        registry = copy.deepcopy(self.registry)
+    def _errors(self, mutate, registry: dict | None = None) -> list[str]:
+        registry = copy.deepcopy(registry if registry is not None else self.registry)
         mutate(registry)
         return validate_registry(registry, root=REPO)
 
     def _repository_copy(self) -> Path:
-        """A minimal repository: the contracts, the runtime locks and the files the registry names."""
+        """A minimal repository: the contracts, the runtime locks and the files the registry names.
+
+        It holds no canary record or recovery report, so its registry is the
+        un-promoted one (`unpromoted_registry_text`).
+        """
         locks = [spec["lock"] for spec in self.registry["acquisition"]["runtimes"].values() if "lock" in spec]
         for relative in (*CONTRACTS, *locks):
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(REPO / relative, target)
+        (self.root / "config/audio-qc-judges.json").write_text(unpromoted_registry_text(), encoding="utf-8")
         for judge in self.registry["judges"].values():
             if judge["status"] == "retired":
                 continue
@@ -237,9 +281,12 @@ class JudgeRegistryTests(unittest.TestCase):
         self.assertEqual(admission["policy"], "budgeted-admission-after-generator-exit")
         self.assertEqual({lane: value["maximumConcurrent"] for lane, value in admission["lanes"].items()},
                          {"gpu": 1, "cpu": 2, "dsp": 4})
-        self.assertIs(admission["recoveryRule"]["candidateBinding"], False)
         self.assertEqual(admission["recoveryRule"]["workerCapWhileWholeHostBinding"], 1)
-        self.assertEqual(admission["recoveryRule"]["promotion"]["evidence"], [])
+        # The switch as it stood before its M6 evidence: report-only, with nothing cited.
+        unpromoted = unpromoted_registry()
+        self.assertEqual(validate_registry(unpromoted, root=REPO), [])
+        self.assertIs(unpromoted["admission"]["recoveryRule"]["candidateBinding"], False)
+        self.assertEqual(unpromoted["admission"]["recoveryRule"]["promotion"]["evidence"], [])
 
         def two_gpu(registry):
             registry["admission"]["lanes"]["gpu"]["maximumConcurrent"] = 2
@@ -249,12 +296,12 @@ class JudgeRegistryTests(unittest.TestCase):
         def uncapped(registry):
             registry["admission"]["recoveryRule"]["workerCapWhileWholeHostBinding"] = 2
         self.assertIn("while the whole-host recovery rule binds, admission caps the host at one worker",
-                      self._errors(uncapped))
+                      self._errors(uncapped, unpromoted))
 
         def flipped(registry):
             registry["admission"]["recoveryRule"]["candidateBinding"] = True
         self.assertIn("a binding child-attributed recovery rule cites at least 2 recovery reports",
-                      self._errors(flipped))
+                      self._errors(flipped, unpromoted))
         # Self-declared digests and counts no longer satisfy the gate: each
         # report is a committed file (`RecoveryEvidenceTests`).
         declared = [{"path": "reports/a.json", "sha256": "a" * 64, "date": "2026-10-01"},
@@ -263,7 +310,7 @@ class JudgeRegistryTests(unittest.TestCase):
         def self_declared(registry):
             registry["admission"]["recoveryRule"]["candidateBinding"] = True
             registry["admission"]["recoveryRule"]["promotion"]["evidence"] = declared
-        self.assertTrue(any("not a file inside the repository" in e for e in self._errors(self_declared)))
+        self.assertTrue(any("not a file inside the repository" in e for e in self._errors(self_declared, unpromoted)))
 
         def oversized(registry):
             registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"] = 10 * 1024**3
@@ -380,7 +427,8 @@ class JudgeRegistryTests(unittest.TestCase):
         def unregistered_field(registry):
             registry["judges"]["quality.utmosv2@1"]["legacyIdentifiers"]["frozenContracts"][0]["fields"] = [
                 "acceptance.maximumMedianSpeakerSimilarityRegression"]
-        registry = copy.deepcopy(self.registry)
+        registry = unpromoted_registry()
+        self.assertEqual(validate_repository(root, copy.deepcopy(registry)), [])
         unregistered_field(registry)
         self.assertTrue(any("is not a retired guardrail it carries" in e
                             for e in validate_repository(root, registry)))
@@ -455,24 +503,30 @@ class PanelAcquisitionTests(unittest.TestCase):
         mutate(registry)
         return validate_registry(registry, root=root)
 
-    def test_the_panel_is_pinned_candidates_with_provisional_resources(self) -> None:
+    def test_the_panel_is_pinned_and_shadow_on_its_committed_canary_records(self) -> None:
         panel = {judge_id: judge for judge_id, judge in self.registry["judges"].items() if "acquisition" in judge}
         self.assertEqual(len(panel), 12)
+        records = f"benchmarks/audio-qc-qualification/{PROMOTION_SESSION}/judges/"
         for judge_id, judge in panel.items():
             with self.subTest(judge=judge_id):
-                if judge["status"] == "candidate":
-                    self.assertEqual((judge["determinismClass"], judge["canary"]), ("unmeasured", None))
-                    self.assertEqual(judge["resources"]["ceilingStatus"], "provisional")
-                    self.assertIsNone(judge["resources"]["canonicalHostPeakBytes"])
-                else:
-                    # Only `audio_qc_panel_qualification.py promote` moves a panel judge on, from a
-                    # committed canary record the registry validator re-reads (AQ-06 P8).
-                    self.assertEqual(judge["status"], "shadow")
-                    self.assertIn(judge["determinismClass"], ("D0", "D1"))
-                    self.assertEqual(judge["resources"]["ceilingStatus"], "calibrated")
-                    self.assertEqual(judge["resources"]["ceilingBytes"],
-                                     -(-judge["resources"]["canonicalHostPeakBytes"] * 12 // 10))
-                    self.assertTrue(judge["canary"]["record"].startswith("benchmarks/audio-qc-qualification/"))
+                # `audio_qc_panel_qualification.py promote` moved every panel judge to shadow from
+                # the committed canary records of one M6 session (AQ-06 P8).
+                self.assertEqual(judge["status"], "shadow")
+                canary = judge["canary"]
+                self.assertTrue(canary["record"].startswith(records), canary["record"])
+                record_path = REPO / canary["record"]
+                self.assertEqual(hashlib.sha256(record_path.read_bytes()).hexdigest(), canary["sha256"])
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+                self.assertEqual((record["judge"], record["outputIdentity"], record["session"]["id"]),
+                                 (judge_id, canary["outputIdentity"], PROMOTION_SESSION))
+                self.assertIn(judge["determinismClass"], ("D0", "D1"))
+                self.assertEqual(judge["determinismClass"], record["determinism"]["class"])
+                resources = judge["resources"]
+                self.assertEqual((resources["ceilingStatus"], resources["ceilingSession"]),
+                                 ("calibrated", PROMOTION_SESSION))
+                self.assertEqual(resources["canonicalHostPeakBytes"], record["resources"]["canonicalHostPeakBytes"])
+                self.assertEqual(resources["ceilingBytes"], -(-resources["canonicalHostPeakBytes"] * 12 // 10))
+                self.assertEqual(resources["ceilingBytes"], record["resources"]["admissionCeilingBytes"])
                 self.assertNotIn("plannedExecution", judge)
                 self.assertEqual(judge["execution"]["threadsStatus"], "provisional")
                 self.assertIn("threads", judge["identity"]["output"])
@@ -514,7 +568,32 @@ class PanelAcquisitionTests(unittest.TestCase):
         hyperparams = panel["lid.voxlingua107-ecapa@1"]["pins"]["files"]["hyperparams.yaml"]
         self.assertEqual(set(hyperparams), {"gitBlobID", "sha256", "size"})
 
+    def test_the_shipped_recovery_rule_binds_only_on_its_committed_m6_reports(self) -> None:
+        """Decision 9a: the child-attributed rule binds on two committed recovery reports of the session."""
+        recovery = self.registry["admission"]["recoveryRule"]
+        self.assertIs(recovery["candidateBinding"], True)
+        evidence = recovery["promotion"]["evidence"]
+        self.assertEqual(len(evidence), 2)
+        self.assertEqual(len({entry["sha256"] for entry in evidence}), 2)
+        for entry in evidence:
+            with self.subTest(report=entry["path"]):
+                self.assertTrue(entry["path"].startswith(f"benchmarks/audio-qc-qualification/{PROMOTION_SESSION}/"))
+                self.assertEqual(hashlib.sha256((REPO / entry["path"]).read_bytes()).hexdigest(), entry["sha256"])
+        self.assertEqual(validate_registry(self.registry, root=REPO), [])
+
+        def uncited(registry):
+            registry["admission"]["recoveryRule"]["promotion"]["evidence"] = []
+        self.assertIn("a binding child-attributed recovery rule cites at least 2 recovery reports",
+                      self._errors(uncited))
+
+        def repeated(registry):
+            cited = registry["admission"]["recoveryRule"]["promotion"]["evidence"]
+            cited[1] = dict(cited[0])
+        self.assertIn("recovery evidence reports must be distinct", self._errors(repeated))
+
     def test_snapshot_file_keys_repositories_and_pins_are_strict(self) -> None:
+        # Pin edits to a promoted judge also make its canary stale; the pin rules are checked on candidates.
+        self.registry = unpromoted_registry()
         judge_id = "speaker.campplus-voxceleb@1"
         label = f"judge {judge_id}"
 
@@ -847,7 +926,7 @@ class RecoveryEvidenceTests(unittest.TestCase):
         _git(self.root, "init", "-q")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-qm", "fixture repository")
-        self.registry = load_registry()
+        self.registry = unpromoted_registry()
 
     def tearDown(self) -> None:
         self.temporary.cleanup()

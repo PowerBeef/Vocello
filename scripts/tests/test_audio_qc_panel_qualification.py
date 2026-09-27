@@ -142,7 +142,10 @@ class AnalysisTests(unittest.TestCase):
 class RegistryEditTests(unittest.TestCase):
     def test_only_the_promoted_values_change(self) -> None:
         text = (REPO / "config/audio-qc-judges.json").read_text(encoding="utf-8")
-        edits = {("judges", PYIN, "status"): "shadow", ("judges", PYIN, "canary"): {"record": "a", "sha256": "b"}}
+        edits = {("judges", PYIN, "status"): "warn", ("judges", PYIN, "canary"): {"record": "a", "sha256": "b"}}
+        live = json.loads(text)["judges"][PYIN]
+        for (_judges, _judge, key), value in edits.items():
+            self.assertNotEqual(live[key], value, "each edit changes a live value")
         updated = q.replace_json_values(text, edits)
         before, after = text.splitlines(), updated.splitlines()
         self.assertEqual(len(before), len(after))
@@ -153,7 +156,8 @@ class RegistryEditTests(unittest.TestCase):
             q.replace_json_values(text, {("judges", PYIN, "missing"): 1})
 
     def test_the_acquisition_digest_ignores_qualification_state_and_old_receipts_stay_current(self) -> None:
-        judge = load_registry()["judges"][PARAKEET]
+        registry = registry_tests.unpromoted_registry()
+        judge = registry["judges"][PARAKEET]
         promoted = {**judge, "status": "shadow", "determinismClass": "D1", "canary": {"record": "x"},
                     "resources": {**judge["resources"], "canonicalHostPeakBytes": 5}}
         self.assertEqual(acquisition_entry_digest(promoted), acquisition_entry_digest(judge))
@@ -164,8 +168,12 @@ class RegistryEditTests(unittest.TestCase):
         # A receipt from before P8 (the whole entry) is current until the entry changes, promotion aside.
         self.assertTrue(receipt_current({"registryEntrySHA256": entry_digest(judge)}, judge))
         self.assertFalse(receipt_current({"registryEntrySHA256": entry_digest(judge)}, rethreaded))
-        registry = load_registry()
-        text = (REPO / "config/audio-qc-judges.json").read_text(encoding="utf-8")
+        # The live promotion kept every pre-promotion receipt current.
+        live = load_registry()["judges"][PARAKEET]
+        self.assertEqual(live["status"], "shadow")
+        self.assertEqual(acquisition_entry_digest(live), acquisition_entry_digest(judge))
+        self.assertTrue(receipt_current({"registryEntrySHA256": entry_digest(judge)}, live))
+        text = registry_tests.unpromoted_registry_text()
         record = {"identityComponents": {"registryEntrySHA256": acquisition_entry_digest(judge)},
                   "resources": {"canonicalHostPeakBytes": 3 * 1024**3,
                                 "admissionCeilingBytes": q.admission_ceiling(3 * 1024**3)},
@@ -183,7 +191,15 @@ class RegistryEditTests(unittest.TestCase):
 
 
 class SessionTests(PanelFixture):
-    """Both runs, the analysis, publication and promotion, end to end with fixture judges."""
+    """Both runs, the analysis, publication and promotion, end to end with fixture judges.
+
+    Qualification and promotion act on candidates, so the session runs on the
+    un-promoted registry, whatever the live registry has since promoted.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.registry = registry_tests.unpromoted_registry()
 
     def _judges(self, counter: Path) -> list:
         english = self.audio("speech-en", 180)

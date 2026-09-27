@@ -1,0 +1,938 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "maxAbsoluteDifference": 0.0,
+    "maxRelativeDifference": 0.0,
+    "numericDifferences": 0,
+    "rowsBitExact": 24,
+    "rowsCompared": 24,
+    "rowsWithDiscreteMismatch": 0
+  },
+  "identityComponents": {
+    "engine": "qwen3-aligner-mlx",
+    "hostProfileSHA256": "094976dd04adaf0542a13a28addbc11e2994b770d5bb2ecd8ca5a76e7fea7931",
+    "panelJobVersion": "panel-job-v1",
+    "registryEntrySHA256": "9340f2796e0465d63c04b7b9084f01b44a468960c84e3deed3343d4369c75d58",
+    "runtime": {
+      "family": "mlx-audio-aligner",
+      "interpreterSHA256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "kind": "venv",
+      "lockSHA256": "0dc5e2eab887c226238e5fda4e17506cda1e859d2aac0b4d310490bac976b0b3"
+    },
+    "threads": 2,
+    "workerSourceSHA256": {
+      "scripts/audio_qc_worker.py": "8bc67f577dbc3b67555cfa50f09863f5a22a26fbf2d078406d1a5436c08953c8",
+      "scripts/lib/qc_pipeline/panel_engines.py": "390ef8d539a7b751ba79186ba7155c963cf694c747e7d9420f3cfaff219788ca",
+      "scripts/lib/qc_pipeline/panel_jobs.py": "24a0360f3bdad7111dc4f9ed99c4795da65f06401a6efb872f266dcec719e2b6"
+    }
+  },
+  "judge": "align.qwen3-forcedaligner-0.6b@1",
+  "outputIdentity": "b50cc9cd7a8adf9a230da1d281bb515191fbb69b89d971c9a20d87592fb7aa65",
+  "qualification": {
+    "passed": true,
+    "reasons": []
+  },
+  "registrySHA256": "a161746b48e5a7247a03169d535ba54851935aeb0e25e6d55e618be1dd5f1386",
+  "resources": {
+    "admissionCeilingBytes": 5040423120,
+    "canonicalHostPeakBytes": 4200352600,
+    "fitsBudget": true,
+    "runPeakBytes": [
+      4198206296,
+      4200352600
+    ]
+  },
+  "runs": [
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 4198206296,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 4198206296,
+          "peakRSSBytes": 2292318208,
+          "waitMaxRSSBytes": 2292350976
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": 0.891,
+      "peakBytes": 4198206296,
+      "peakChildAttributedBytes": 4198206296,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 4198206296,
+      "peakRSSBytes": 2292318208,
+      "peakWaitMaxRSSBytes": 2292350976,
+      "rowsAccepted": 24,
+      "rowsUnavailable": 0,
+      "run": 1,
+      "sessionIDs": [
+        "3760626b58b6402fb513004321c7c100"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 4.028,
+      "warmupSeconds": 0.0
+    },
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 4200352600,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 4200352600,
+          "peakRSSBytes": 2292367360,
+          "waitMaxRSSBytes": 2292400128
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": 0.842,
+      "peakBytes": 4200352600,
+      "peakChildAttributedBytes": 4200352600,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 4200352600,
+      "peakRSSBytes": 2292367360,
+      "peakWaitMaxRSSBytes": 2292400128,
+      "rowsAccepted": 24,
+      "rowsUnavailable": 0,
+      "run": 2,
+      "sessionIDs": [
+        "27bb61cd8c3c49c686977ffe3cde0751"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 3.722,
+      "warmupSeconds": 0.0
+    }
+  ],
+  "schema": "vocello.audioqc.qc-canary/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-aaba14fd"
+  },
+  "takes": [
+    {
+      "audioSHA256": "28993e8ecc62f1fc36783c2705eb4b018322db3e351cf50e99698fa61f57be3a",
+      "canonicalPCMSHA256": "3b9909b4aba5bce051ab8dd82ebdf1e4a83cfbd392f54d17da23f45ad033fa44",
+      "language": "english",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.839672,
+        "spanEndSeconds": 2.88,
+        "spanStartSeconds": 0.24,
+        "tailGapSeconds": 0.264083,
+        "unitCoverage": 0.714286,
+        "unitsAligned": 5,
+        "unitsExpected": 7
+      },
+      "metricsSHA256": [
+        "da96ee827eca2cb7563902025066b761a61ac65f865aa00e558711f9b79e1eb6",
+        "da96ee827eca2cb7563902025066b761a61ac65f865aa00e558711f9b79e1eb6"
+      ],
+      "rawSHA256": [
+        "6352cb8860babf7c8ff18ead4f5568b4542f11a059626beda13ef1ea351306db",
+        "6352cb8860babf7c8ff18ead4f5568b4542f11a059626beda13ef1ea351306db"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-modal-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "2411ac5e2a3b45491afb86c4b71809342a5c78dc846db6c6abe13167eaab5f78",
+      "canonicalPCMSHA256": "9eb00cfe8aed414f589894d0ee28a69f1adc00e3d9a59a21258fab27a91474cc",
+      "language": "chinese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.856145,
+        "spanEndSeconds": 3.04,
+        "spanStartSeconds": 0.16,
+        "tailGapSeconds": 0.323917,
+        "unitCoverage": 0.102564,
+        "unitsAligned": 4,
+        "unitsExpected": 39
+      },
+      "metricsSHA256": [
+        "3f5ad7035c02858e4351eee770d47511d4c8e63845fb833915739c0f85ad81f0",
+        "3f5ad7035c02858e4351eee770d47511d4c8e63845fb833915739c0f85ad81f0"
+      ],
+      "rawSHA256": [
+        "0fb52f85f6468f73b496fc2d9e86dba5c925a4e2e6dbef925cc9f933c487b0d2",
+        "0fb52f85f6468f73b496fc2d9e86dba5c925a4e2e6dbef925cc9f933c487b0d2"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-breathy-chinese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "5a317cb2a14ffdcf70a5cd5608f0e7fd362f03d50e4b856ad59a6fec30a7a3a0",
+      "canonicalPCMSHA256": "a23e5cb24046e632a6b16958b5e34d476b9c191d4024a571db59f3758d7d1cf2",
+      "language": "japanese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.490592,
+        "spanEndSeconds": 2.4,
+        "spanStartSeconds": 0.64,
+        "tailGapSeconds": 1.1875,
+        "unitCoverage": 0.044444,
+        "unitsAligned": 2,
+        "unitsExpected": 45
+      },
+      "metricsSHA256": [
+        "43c534fbbe79bef47388c6dc4fd8676e449391868e906141ea8054689117fd79",
+        "43c534fbbe79bef47388c6dc4fd8676e449391868e906141ea8054689117fd79"
+      ],
+      "rawSHA256": [
+        "4b4ff8a29ed4286f7112cfcfbf3433873826ab6348a61b5b95fb0c19981ba3d4",
+        "4b4ff8a29ed4286f7112cfcfbf3433873826ab6348a61b5b95fb0c19981ba3d4"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-high-f0-japanese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c4e4fe190f7c33e004fe761697ff1a1634ee8d2580ae49946a2a676307efc63d",
+      "canonicalPCMSHA256": "4869a2ee8106b1df130f249985071ec33568554fe498367353256c209fe99830",
+      "language": "korean",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-quiet-korean",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4e5aae29e417782eae093b1366d70b57b89c1200f695c38dba98607fdb0e76de",
+      "canonicalPCMSHA256": "8657efbe9b49baa56a0a982a13a86b5af828923b1fe30d76eed572fe31d0e0be",
+      "language": "french",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.816464,
+        "spanEndSeconds": 4.0,
+        "spanStartSeconds": 0.16,
+        "tailGapSeconds": 0.703208,
+        "unitCoverage": 0.555556,
+        "unitsAligned": 5,
+        "unitsExpected": 9
+      },
+      "metricsSHA256": [
+        "bd0aa0f8a0d2d54bea47abd29a516956ab4c744d653d2d54d68e45c29f798742",
+        "bd0aa0f8a0d2d54bea47abd29a516956ab4c744d653d2d54d68e45c29f798742"
+      ],
+      "rawSHA256": [
+        "8a6828b936237a31ac287cdfe530c86411f4abe1b4e687ac3314eab3b2bb3d32",
+        "8a6828b936237a31ac287cdfe530c86411f4abe1b4e687ac3314eab3b2bb3d32"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-long-pause-french",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b7235cefab1b52ef0c2ba1c9ed15e7ea2e7c0d01bf18aa8278bf267efbb78caa",
+      "canonicalPCMSHA256": "96b27551586e7572ee16a202a3507502f4b34f7dd0404eedb2c4c4a56ad58369",
+      "language": "german",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.867927,
+        "spanEndSeconds": 4.0,
+        "spanStartSeconds": 0.16,
+        "tailGapSeconds": 0.424333,
+        "unitCoverage": 0.75,
+        "unitsAligned": 6,
+        "unitsExpected": 8
+      },
+      "metricsSHA256": [
+        "442cfc937aed6466d41faf4c7d788988aa6b40477ab977acdd67b15969097263",
+        "442cfc937aed6466d41faf4c7d788988aa6b40477ab977acdd67b15969097263"
+      ],
+      "rawSHA256": [
+        "ae095974bbb29837f7415eebf85ab84968d935ca7101bbdafd302d257da28364",
+        "ae095974bbb29837f7415eebf85ab84968d935ca7101bbdafd302d257da28364"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-modal-german",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+      "canonicalPCMSHA256": "55873fecc61a79e87ca550c7072e38ccdd7ecb600ace286fe4717952a97c42b0",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-silence-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e8d4d0bbd1c9efe72d27c2c93f964c3a511f7321096a0fc4dc83859149e14cd",
+      "canonicalPCMSHA256": "270fa4b4a1d29c5bdf295386a3b66b815ba64e967630fddf745137543e198433",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-noise-spanish",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8844254e7b5748d9a8baa05ecec316965f2622e0a03fdd1fd19944c068fc6cb8",
+      "canonicalPCMSHA256": "25922ea8ea9c2166f04de80c6511e22170e5aba907199d38aa11c740f57954c5",
+      "language": "italian",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-music-italian",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e16c7a1751a655c4b32513b437c5e057aa151a5364d2bcdbca65ed8eaf5601d",
+      "canonicalPCMSHA256": "44a59feff0dbc0ac09a4579c088e1c8c4e30e45bd7f1164ed93f3b3212325ccb",
+      "language": "english",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.970149,
+        "spanEndSeconds": 5.28,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 17,
+        "unitsExpected": 17
+      },
+      "metricsSHA256": [
+        "06d35bb73ccf0abfe5479ed63e1faaa6eaaa55d65793c67ce0593a122d3ed74c",
+        "06d35bb73ccf0abfe5479ed63e1faaa6eaaa55d65793c67ce0593a122d3ed74c"
+      ],
+      "rawSHA256": [
+        "1d64198f362bc8186367fd635cea12e91b8ef5c2cef1bf1d7680be747d77fa61",
+        "1d64198f362bc8186367fd635cea12e91b8ef5c2cef1bf1d7680be747d77fa61"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "f2c3fceba9877abe059fd11ce4132c76539dfac770d895a09b77b6bb81368496",
+      "canonicalPCMSHA256": "7b733bbd29eaf4dfc7a556d53bdebab6516153308c4ec92ece7fd9345fdc8cce",
+      "language": "english",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.953846,
+        "spanEndSeconds": 5.12,
+        "spanStartSeconds": 0.16,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 0.941176,
+        "unitsAligned": 16,
+        "unitsExpected": 17
+      },
+      "metricsSHA256": [
+        "d492efbb10181323e79bd68aede63e11dd42dfc2cc00e342dbaf32de965ba20b",
+        "d492efbb10181323e79bd68aede63e11dd42dfc2cc00e342dbaf32de965ba20b"
+      ],
+      "rawSHA256": [
+        "b3f2cbafcf990eae0438e4956920efd881ce06c2c2c480d4677e3604fdb899a4",
+        "b3f2cbafcf990eae0438e4956920efd881ce06c2c2c480d4677e3604fdb899a4"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-en-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b446a6929c3bc602ce02fa70b65bfcf3eb6e03fd1a2f283fc31937120de33cc2",
+      "canonicalPCMSHA256": "ad1c5bb5438e9d53bfeeb236145bf6858978813a8442f0ac26982db749e802b9",
+      "language": "english",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.984375,
+        "spanEndSeconds": 5.04,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 17,
+        "unitsExpected": 17
+      },
+      "metricsSHA256": [
+        "9888c56cdc3190adfd7db39a4472c7696858a1d5ddc0ac1f021b6721aa64c26c",
+        "9888c56cdc3190adfd7db39a4472c7696858a1d5ddc0ac1f021b6721aa64c26c"
+      ],
+      "rawSHA256": [
+        "647885f7d17b040ef3f84158143e718bda93fbb3e629db0f91cf3ea0b417b530",
+        "647885f7d17b040ef3f84158143e718bda93fbb3e629db0f91cf3ea0b417b530"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cc76d8def2776443099d6fef629f5af9efa81c7b20e466258347cc98b6976775",
+      "canonicalPCMSHA256": "3555859dd417726caca2d005802ec3a19f17503a726f809fbdeaf14046f0609f",
+      "language": "french",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.992806,
+        "spanEndSeconds": 11.12,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.0,
+        "unitCoverage": 1.0,
+        "unitsAligned": 32,
+        "unitsExpected": 32
+      },
+      "metricsSHA256": [
+        "6165ab32cbce64292f7df3448736b4e4b0c6a31493192e2d6b9cf45820e53ae4",
+        "6165ab32cbce64292f7df3448736b4e4b0c6a31493192e2d6b9cf45820e53ae4"
+      ],
+      "rawSHA256": [
+        "91e3a1433e79c58e1c4c3225b3a4ddc22088ca0052b704cf5caaee0e5274e051",
+        "91e3a1433e79c58e1c4c3225b3a4ddc22088ca0052b704cf5caaee0e5274e051"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "76bb7cc796e39257ddeb3cd66bfe70e6caf8112cc2c36b18d1e07fc21083dcc2",
+      "canonicalPCMSHA256": "71f9490bc1a9994b760cd7cd43ac3becaecc81c3b940f6c6993becfd62236001",
+      "language": "french",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.943231,
+        "spanEndSeconds": 18.24,
+        "spanStartSeconds": 0.96,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 0.9375,
+        "unitsAligned": 30,
+        "unitsExpected": 32
+      },
+      "metricsSHA256": [
+        "8c26a0a732247a1d2d3008f327a7d5a96982bfdf637756a7bb1af7a0118aea5d",
+        "8c26a0a732247a1d2d3008f327a7d5a96982bfdf637756a7bb1af7a0118aea5d"
+      ],
+      "rawSHA256": [
+        "60368ccc734f79d79d79c4f1f01f0b6ba07476866ee6f3d5470b3bd15a018096",
+        "60368ccc734f79d79d79c4f1f01f0b6ba07476866ee6f3d5470b3bd15a018096"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "293b389a3b167c326aaf60bbffac8708363f58efdb8854a36a1fcee8ed21df4c",
+      "canonicalPCMSHA256": "4149bcd87e2d1865caec633d9fcb0d87d24978c3a5dc496aee60727cd0b3612b",
+      "language": "french",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.987013,
+        "spanEndSeconds": 12.16,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.16,
+        "unitCoverage": 0.96875,
+        "unitsAligned": 31,
+        "unitsExpected": 32
+      },
+      "metricsSHA256": [
+        "881b3d0836e16c5a9fe75b02594c553eea3cad417a0b94960aaa0923ec658b54",
+        "881b3d0836e16c5a9fe75b02594c553eea3cad417a0b94960aaa0923ec658b54"
+      ],
+      "rawSHA256": [
+        "d62d115d2f5cb594f2e368678a9aa235a21fc2256b70286f15d07cfd6382083b",
+        "d62d115d2f5cb594f2e368678a9aa235a21fc2256b70286f15d07cfd6382083b"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b4693c92d71310e770deda8608737db2edd455813d8c98583341193d013ea644",
+      "canonicalPCMSHA256": "1eeaa5cd13735b823d3c928eb6bb188e1d23331957f5f726197fea11e2f05c29",
+      "language": "english",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.982143,
+        "spanEndSeconds": 13.28,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.16,
+        "unitCoverage": 1.0,
+        "unitsAligned": 32,
+        "unitsExpected": 32
+      },
+      "metricsSHA256": [
+        "adb888c688fcb529111d41aeef4385a9582c6c43f2daefdd6339d5c6b9350f85",
+        "adb888c688fcb529111d41aeef4385a9582c6c43f2daefdd6339d5c6b9350f85"
+      ],
+      "rawSHA256": [
+        "820ac019799b4339d7171bf482a08c0f9df013a57edec14dc1bcb23c8c1b2a71",
+        "820ac019799b4339d7171bf482a08c0f9df013a57edec14dc1bcb23c8c1b2a71"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-text-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b1a07b971c38a632def3f931861de14f487b818290e603b272a1d60a2350d42c",
+      "canonicalPCMSHA256": "412cfda2cc8b8c5b6a99b82a1dccff8d7156dc4e289be43f1439532fc3282d31",
+      "language": "german",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.986928,
+        "spanEndSeconds": 12.16,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 29,
+        "unitsExpected": 29
+      },
+      "metricsSHA256": [
+        "3a556bf33ce9f0566bc5f3bfd5e6b6638cdc5418ae1d3c74216258fed7ab76f6",
+        "3a556bf33ce9f0566bc5f3bfd5e6b6638cdc5418ae1d3c74216258fed7ab76f6"
+      ],
+      "rawSHA256": [
+        "ca3b4b4a192e8c36a4d4f862ec953d571de1f9233cec695095abe0cb15180ef4",
+        "ca3b4b4a192e8c36a4d4f862ec953d571de1f9233cec695095abe0cb15180ef4"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c431ffda35d9c710403bb142e9cd91f615cf86fac01de6877e299bad68b462ec",
+      "canonicalPCMSHA256": "fb573105ae4f113455c9a5c7f4dd87bec73970639a2ecabb02fa008876348878",
+      "language": "german",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.984615,
+        "spanEndSeconds": 10.32,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 29,
+        "unitsExpected": 29
+      },
+      "metricsSHA256": [
+        "863be9f168a4ea4e58f8bf85bf3e85b6a75bfeed74f6b271edab0b5575ab1c4a",
+        "863be9f168a4ea4e58f8bf85bf3e85b6a75bfeed74f6b271edab0b5575ab1c4a"
+      ],
+      "rawSHA256": [
+        "c401a3daa53d1680ca2a844732fa858feb235e48a6a2253cf5de5c2def64d891",
+        "c401a3daa53d1680ca2a844732fa858feb235e48a6a2253cf5de5c2def64d891"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-de-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8265d328ec03d31047f623e7aa28b5333d5cf5b771039c84b4c52b46cb4e5b3e",
+      "canonicalPCMSHA256": "a80f9ccc4d6de7c9ed8be4393447e9b60f8d7c4a93b817315c4c9a7599dacd72",
+      "language": "german",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.993243,
+        "spanEndSeconds": 11.76,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 29,
+        "unitsExpected": 29
+      },
+      "metricsSHA256": [
+        "4a645f7ec7be3333a8d3c93914ba10cf519644b7b352bfe1fa99e43c84a3d027",
+        "4a645f7ec7be3333a8d3c93914ba10cf519644b7b352bfe1fa99e43c84a3d027"
+      ],
+      "rawSHA256": [
+        "f2e23f8b35727e092e002dbd9d6a03166403455320c4dbc233d867ee1e6855d0",
+        "f2e23f8b35727e092e002dbd9d6a03166403455320c4dbc233d867ee1e6855d0"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "a6e25e631686702746321e7992bf944392a5352eba55dd93b04780077e4eeac2",
+      "canonicalPCMSHA256": "4a4b7554028b1c325c112837d8fc724d1306fa19ce5650563441c72fbf5406f9",
+      "language": "spanish",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.982759,
+        "spanEndSeconds": 9.2,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 21,
+        "unitsExpected": 21
+      },
+      "metricsSHA256": [
+        "062a81b211f3b63a7e7e887a789772d7575f075b501ab83c39fa4cfc423dcff7",
+        "062a81b211f3b63a7e7e887a789772d7575f075b501ab83c39fa4cfc423dcff7"
+      ],
+      "rawSHA256": [
+        "75d603d4dccc6d6850793f8ed595ce62b753c46aff86b77144d895ca858829ce",
+        "75d603d4dccc6d6850793f8ed595ce62b753c46aff86b77144d895ca858829ce"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4511dee774d12b2ad9afca87e9859a2739e3367778c2139498ed96890aa5d7e0",
+      "canonicalPCMSHA256": "43eb5c19dc956cf17000b29fcb183f230855f4f554954c6fd356de5755f29a04",
+      "language": "spanish",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.980952,
+        "spanEndSeconds": 8.32,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 1.0,
+        "unitsAligned": 21,
+        "unitsExpected": 21
+      },
+      "metricsSHA256": [
+        "8aac393eb9de59f560ce4862e2a1204ff87d369662aede27a47171e42eae728e",
+        "8aac393eb9de59f560ce4862e2a1204ff87d369662aede27a47171e42eae728e"
+      ],
+      "rawSHA256": [
+        "7e2e909af27d3995b6019eeb734314f4f67a43ce06940fe9a115261c567f63b0",
+        "7e2e909af27d3995b6019eeb734314f4f67a43ce06940fe9a115261c567f63b0"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-es-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c2c72aafef63669da6dfead0cf8ed52ea931f06fe372db42efe78154bd171ab9",
+      "canonicalPCMSHA256": "df498fb6cfb742e59671e7ca26b6394c9b6fcbec6ee073ae7e854ead33948214",
+      "language": "spanish",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.981982,
+        "spanEndSeconds": 8.72,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.16,
+        "unitCoverage": 0.952381,
+        "unitsAligned": 20,
+        "unitsExpected": 21
+      },
+      "metricsSHA256": [
+        "03601f4e186d69857516fff7c8c4eb27023836cbb0a6c740dfb879dc9e859a16",
+        "03601f4e186d69857516fff7c8c4eb27023836cbb0a6c740dfb879dc9e859a16"
+      ],
+      "rawSHA256": [
+        "8d89964d2131cec8f68eb4f9bd3851d2d589f9a6366b8754a1eca8a7d973771e",
+        "8d89964d2131cec8f68eb4f9bd3851d2d589f9a6366b8754a1eca8a7d973771e"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "71870580f687d67d2175abdf588fa698bfc862179281e02f18b76301e41d44ad",
+      "canonicalPCMSHA256": "ff2d8af848cd67e2b1686344293a6d55dde3588184f2cd18cc91c5f02c1d1b8b",
+      "language": "chinese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.964286,
+        "spanEndSeconds": 17.36,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.56,
+        "unitCoverage": 0.8,
+        "unitsAligned": 24,
+        "unitsExpected": 30
+      },
+      "metricsSHA256": [
+        "d085cd4938bf5a50c4e515522627cd56fd7893eaea9a6331477faa8d11be85be",
+        "d085cd4938bf5a50c4e515522627cd56fd7893eaea9a6331477faa8d11be85be"
+      ],
+      "rawSHA256": [
+        "84783d62f68fbf943d1f0aa52a3cf8169a09869973422a467d55960029712ce3",
+        "84783d62f68fbf943d1f0aa52a3cf8169a09869973422a467d55960029712ce3"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "3ac4c03baeff85c16f50b8df1d8244cebd9e3f036d8f951284ccfe05051e0045",
+      "canonicalPCMSHA256": "106ecf6f704ee23f0306bf7d450f299db80ed4abee7ce245a091eee4a6728ab9",
+      "language": "chinese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.993007,
+        "spanEndSeconds": 34.08,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.24,
+        "unitCoverage": 0.866667,
+        "unitsAligned": 26,
+        "unitsExpected": 30
+      },
+      "metricsSHA256": [
+        "b6b0e124f93250852d457a6db3b3ace00cd35e675baaa54dd0dedb315977e757",
+        "b6b0e124f93250852d457a6db3b3ace00cd35e675baaa54dd0dedb315977e757"
+      ],
+      "rawSHA256": [
+        "a4177ad15694f69d4d54cbe0b2fcc64ac9380d425b9eeb5fdd390c10bf0c3adb",
+        "a4177ad15694f69d4d54cbe0b2fcc64ac9380d425b9eeb5fdd390c10bf0c3adb"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-zh-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b01e52a2f66125e0139ed31139184a75befdaeb649b230a60571c4188245a7d3",
+      "canonicalPCMSHA256": "eff4bf5f94e6ef39026e218c8071844ec557b5cca429affcfa54e0b1159782ed",
+      "language": "chinese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.985714,
+        "spanEndSeconds": 5.52,
+        "spanStartSeconds": 0.0,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 0.9,
+        "unitsAligned": 27,
+        "unitsExpected": 30
+      },
+      "metricsSHA256": [
+        "88f56b12de97c5210f272c032e78d48317cfb82e8f74e16864f28f24ffad0315",
+        "88f56b12de97c5210f272c032e78d48317cfb82e8f74e16864f28f24ffad0315"
+      ],
+      "rawSHA256": [
+        "e91eefd2c912988c619b5ae68a96ee26fa2671fd540e0fbd7ac9101760fa91cf",
+        "e91eefd2c912988c619b5ae68a96ee26fa2671fd540e0fbd7ac9101760fa91cf"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "56e93b39ac7ea210789daa0335a3af0f829e1081b72d32f139f53ef2df6f94bf",
+      "canonicalPCMSHA256": "f544d9ba4ea609b180abbd1da00ad288120e573c91a9c7bd71b59b3de1ee49a5",
+      "language": "japanese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.973684,
+        "spanEndSeconds": 6.0,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 0.6,
+        "unitsAligned": 21,
+        "unitsExpected": 35
+      },
+      "metricsSHA256": [
+        "821ce85c09d6ab169890673ae41a0cbd167ba59a3b394b4c4ee48a6f2d922c6d",
+        "821ce85c09d6ab169890673ae41a0cbd167ba59a3b394b4c4ee48a6f2d922c6d"
+      ],
+      "rawSHA256": [
+        "a35b0e60bca38570091bc6d110ef93c4af617aa14f7c4a1ae5d1f5f294c202d3",
+        "a35b0e60bca38570091bc6d110ef93c4af617aa14f7c4a1ae5d1f5f294c202d3"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "24ce39ed1cd71652fd2a3273675d0c42c9d0f41f84f8b20284e5ce399db7900b",
+      "canonicalPCMSHA256": "2997c033475d73b2f6a9035a7c92b52ef6766088b9f00c6ea5e59c487df17cde",
+      "language": "japanese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.94898,
+        "spanEndSeconds": 7.76,
+        "spanStartSeconds": 0.32,
+        "tailGapSeconds": 0.08,
+        "unitCoverage": 0.6,
+        "unitsAligned": 21,
+        "unitsExpected": 35
+      },
+      "metricsSHA256": [
+        "834cc427838c25dbbd07a77227aa0c9d5b21944bdcdc0ceae1e1539e28f1da77",
+        "834cc427838c25dbbd07a77227aa0c9d5b21944bdcdc0ceae1e1539e28f1da77"
+      ],
+      "rawSHA256": [
+        "90fc09a5ad3b88f150804db2e9b18c601f19df74d3a3b8f214b6324c8a38c549",
+        "90fc09a5ad3b88f150804db2e9b18c601f19df74d3a3b8f214b6324c8a38c549"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "d4d3ff4ca2817a292cff7611f609579c62836f9a68d9d6757d4d131c2055763d",
+      "canonicalPCMSHA256": "be961ae63840551cee040010095e40fd0cf3a47836db9166569b92463baceade",
+      "language": "japanese",
+      "metrics": {
+        "monotonic": true,
+        "spanCoverage": 0.953488,
+        "spanEndSeconds": 6.64,
+        "spanStartSeconds": 0.08,
+        "tailGapSeconds": 0.24,
+        "unitCoverage": 0.6,
+        "unitsAligned": 21,
+        "unitsExpected": 35
+      },
+      "metricsSHA256": [
+        "29a45dc50ff699612b2a9ebe3504231509002782f7d7dd23f5325ee5f5e871cd",
+        "29a45dc50ff699612b2a9ebe3504231509002782f7d7dd23f5325ee5f5e871cd"
+      ],
+      "rawSHA256": [
+        "7bb61b1fb840f465e86037bc3bd43bbfb373b8f4a16fa049f21ee107031b4c39",
+        "7bb61b1fb840f465e86037bc3bd43bbfb373b8f4a16fa049f21ee107031b4c39"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    }
+  ]
+}

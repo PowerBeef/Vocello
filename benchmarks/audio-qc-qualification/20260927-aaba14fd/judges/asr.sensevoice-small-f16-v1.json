@@ -1,0 +1,899 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "maxAbsoluteDifference": 0.0,
+    "maxRelativeDifference": 0.0,
+    "numericDifferences": 0,
+    "rowsBitExact": 5,
+    "rowsCompared": 5,
+    "rowsWithDiscreteMismatch": 0
+  },
+  "identityComponents": {
+    "engine": "sensevoice-llamacpp",
+    "hostProfileSHA256": "094976dd04adaf0542a13a28addbc11e2994b770d5bb2ecd8ca5a76e7fea7931",
+    "panelJobVersion": "panel-job-v1",
+    "registryEntrySHA256": "8c6faa986a21c816eeda550242cf87da5234be6d26d7153eb5ae1edf92adefd7",
+    "runtime": {
+      "archiveSHA256": "2d5786784ad09d8f4def1d942f678728638fe601d00acf0dad7cf094a9328363",
+      "binarySHA256": "49d66b2f79d439e2db7933627e1deb9eb7f3ebf0d708473757828130f3619435",
+      "family": "sensevoice-llamacpp",
+      "interpreterSHA256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "kind": "native"
+    },
+    "threads": 2,
+    "workerSourceSHA256": {
+      "scripts/audio_qc_worker.py": "8bc67f577dbc3b67555cfa50f09863f5a22a26fbf2d078406d1a5436c08953c8",
+      "scripts/lib/qc_pipeline/panel_engines.py": "390ef8d539a7b751ba79186ba7155c963cf694c747e7d9420f3cfaff219788ca",
+      "scripts/lib/qc_pipeline/panel_jobs.py": "24a0360f3bdad7111dc4f9ed99c4795da65f06401a6efb872f266dcec719e2b6"
+    }
+  },
+  "judge": "asr.sensevoice-small-f16@1",
+  "outputIdentity": "4002df42e2a6ed63265ad5164acc79736112e279380bf86b9e405120359a38f9",
+  "qualification": {
+    "passed": true,
+    "reasons": []
+  },
+  "registrySHA256": "a161746b48e5a7247a03169d535ba54851935aeb0e25e6d55e618be1dd5f1386",
+  "resources": {
+    "admissionCeilingBytes": 627887309,
+    "canonicalHostPeakBytes": 523239424,
+    "fitsBudget": true,
+    "runPeakBytes": [
+      523239424,
+      523206656
+    ]
+  },
+  "runs": [
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 505382256,
+          "descendantPeakRSSBytes": 515604480,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 505382256,
+          "peakRSSBytes": 523239424,
+          "waitMaxRSSBytes": 515604480
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": null,
+      "peakBytes": 523239424,
+      "peakChildAttributedBytes": 505382256,
+      "peakDescendantRSSBytes": 515604480,
+      "peakPhysicalFootprintBytes": 505382256,
+      "peakRSSBytes": 523239424,
+      "peakWaitMaxRSSBytes": 515604480,
+      "rowsAccepted": 5,
+      "rowsUnavailable": 0,
+      "run": 1,
+      "sessionIDs": [
+        "3760626b58b6402fb513004321c7c100"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 0.767,
+      "warmupSeconds": null
+    },
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 505333080,
+          "descendantPeakRSSBytes": 515604480,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 505333080,
+          "peakRSSBytes": 523206656,
+          "waitMaxRSSBytes": 515604480
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": null,
+      "peakBytes": 523206656,
+      "peakChildAttributedBytes": 505333080,
+      "peakDescendantRSSBytes": 515604480,
+      "peakPhysicalFootprintBytes": 505333080,
+      "peakRSSBytes": 523206656,
+      "peakWaitMaxRSSBytes": 515604480,
+      "rowsAccepted": 5,
+      "rowsUnavailable": 0,
+      "run": 2,
+      "sessionIDs": [
+        "27bb61cd8c3c49c686977ffe3cde0751"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 0.796,
+      "warmupSeconds": null
+    }
+  ],
+  "schema": "vocello.audioqc.qc-canary/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-aaba14fd"
+  },
+  "takes": [
+    {
+      "audioSHA256": "28993e8ecc62f1fc36783c2705eb4b018322db3e351cf50e99698fa61f57be3a",
+      "canonicalPCMSHA256": "3b9909b4aba5bce051ab8dd82ebdf1e4a83cfbd392f54d17da23f45ad033fa44",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-modal-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "2411ac5e2a3b45491afb86c4b71809342a5c78dc846db6c6abe13167eaab5f78",
+      "canonicalPCMSHA256": "9eb00cfe8aed414f589894d0ee28a69f1adc00e3d9a59a21258fab27a91474cc",
+      "language": "chinese",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-breathy-chinese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "5a317cb2a14ffdcf70a5cd5608f0e7fd362f03d50e4b856ad59a6fec30a7a3a0",
+      "canonicalPCMSHA256": "a23e5cb24046e632a6b16958b5e34d476b9c191d4024a571db59f3758d7d1cf2",
+      "language": "japanese",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 42,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 42,
+        "character.referenceCount": 42,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": null,
+        "errorRate": 1.0,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "longestDeletionRun": 42,
+        "metric": "CER",
+        "outputParsed": false,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 7,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 7,
+        "word.referenceCount": 7,
+        "word.segmentationAwareEditDistance": 7,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "dbc764b9003f9da3c802e4e190f9c4baf70f2d9dc8dc837779c4eaac7401d0a3",
+        "dbc764b9003f9da3c802e4e190f9c4baf70f2d9dc8dc837779c4eaac7401d0a3"
+      ],
+      "rawSHA256": [
+        "73acb9b5c2285186557dca5b6d0bbfa06376a25fb2e36f6671ed684b59891c21",
+        "73acb9b5c2285186557dca5b6d0bbfa06376a25fb2e36f6671ed684b59891c21"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-high-f0-japanese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c4e4fe190f7c33e004fe761697ff1a1634ee8d2580ae49946a2a676307efc63d",
+      "canonicalPCMSHA256": "4869a2ee8106b1df130f249985071ec33568554fe498367353256c209fe99830",
+      "language": "korean",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 40,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 40,
+        "character.referenceCount": 40,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": null,
+        "diagnostics.jamoCharacterErrorRate": 1.0,
+        "errorRate": 1.0,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "longestDeletionRun": 40,
+        "metric": "CER",
+        "outputParsed": false,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 5,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 5,
+        "word.referenceCount": 5,
+        "word.segmentationAwareEditDistance": 5,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "35b99c0e1e5acc1b08e7284fa5f05bf718f3569804b2f8377103c08b00498d58",
+        "35b99c0e1e5acc1b08e7284fa5f05bf718f3569804b2f8377103c08b00498d58"
+      ],
+      "rawSHA256": [
+        "1118bc15af880e6b42105e76fe2445390671fd737cfef1d8345a0558c4dced39",
+        "1118bc15af880e6b42105e76fe2445390671fd737cfef1d8345a0558c4dced39"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-quiet-korean",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4e5aae29e417782eae093b1366d70b57b89c1200f695c38dba98607fdb0e76de",
+      "canonicalPCMSHA256": "8657efbe9b49baa56a0a982a13a86b5af828923b1fe30d76eed572fe31d0e0be",
+      "language": "french",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-long-pause-french",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b7235cefab1b52ef0c2ba1c9ed15e7ea2e7c0d01bf18aa8278bf267efbb78caa",
+      "canonicalPCMSHA256": "96b27551586e7572ee16a202a3507502f4b34f7dd0404eedb2c4c4a56ad58369",
+      "language": "german",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-modal-german",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+      "canonicalPCMSHA256": "55873fecc61a79e87ca550c7072e38ccdd7ecb600ace286fe4717952a97c42b0",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-silence-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e8d4d0bbd1c9efe72d27c2c93f964c3a511f7321096a0fc4dc83859149e14cd",
+      "canonicalPCMSHA256": "270fa4b4a1d29c5bdf295386a3b66b815ba64e967630fddf745137543e198433",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-noise-spanish",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8844254e7b5748d9a8baa05ecec316965f2622e0a03fdd1fd19944c068fc6cb8",
+      "canonicalPCMSHA256": "25922ea8ea9c2166f04de80c6511e22170e5aba907199d38aa11c740f57954c5",
+      "language": "italian",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-music-italian",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e16c7a1751a655c4b32513b437c5e057aa151a5364d2bcdbca65ed8eaf5601d",
+      "canonicalPCMSHA256": "44a59feff0dbc0ac09a4579c088e1c8c4e30e45bd7f1164ed93f3b3212325ccb",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "f2c3fceba9877abe059fd11ce4132c76539dfac770d895a09b77b6bb81368496",
+      "canonicalPCMSHA256": "7b733bbd29eaf4dfc7a556d53bdebab6516153308c4ec92ece7fd9345fdc8cce",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-en-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b446a6929c3bc602ce02fa70b65bfcf3eb6e03fd1a2f283fc31937120de33cc2",
+      "canonicalPCMSHA256": "ad1c5bb5438e9d53bfeeb236145bf6858978813a8442f0ac26982db749e802b9",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "design-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cc76d8def2776443099d6fef629f5af9efa81c7b20e466258347cc98b6976775",
+      "canonicalPCMSHA256": "3555859dd417726caca2d005802ec3a19f17503a726f809fbdeaf14046f0609f",
+      "language": "french",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "76bb7cc796e39257ddeb3cd66bfe70e6caf8112cc2c36b18d1e07fc21083dcc2",
+      "canonicalPCMSHA256": "71f9490bc1a9994b760cd7cd43ac3becaecc81c3b940f6c6993becfd62236001",
+      "language": "french",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-fr-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "293b389a3b167c326aaf60bbffac8708363f58efdb8854a36a1fcee8ed21df4c",
+      "canonicalPCMSHA256": "4149bcd87e2d1865caec633d9fcb0d87d24978c3a5dc496aee60727cd0b3612b",
+      "language": "french",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "design-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b4693c92d71310e770deda8608737db2edd455813d8c98583341193d013ea644",
+      "canonicalPCMSHA256": "1eeaa5cd13735b823d3c928eb6bb188e1d23331957f5f726197fea11e2f05c29",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-fr-text-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b1a07b971c38a632def3f931861de14f487b818290e603b272a1d60a2350d42c",
+      "canonicalPCMSHA256": "412cfda2cc8b8c5b6a99b82a1dccff8d7156dc4e289be43f1439532fc3282d31",
+      "language": "german",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c431ffda35d9c710403bb142e9cd91f615cf86fac01de6877e299bad68b462ec",
+      "canonicalPCMSHA256": "fb573105ae4f113455c9a5c7f4dd87bec73970639a2ecabb02fa008876348878",
+      "language": "german",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-de-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8265d328ec03d31047f623e7aa28b5333d5cf5b771039c84b4c52b46cb4e5b3e",
+      "canonicalPCMSHA256": "a80f9ccc4d6de7c9ed8be4393447e9b60f8d7c4a93b817315c4c9a7599dacd72",
+      "language": "german",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "design-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "a6e25e631686702746321e7992bf944392a5352eba55dd93b04780077e4eeac2",
+      "canonicalPCMSHA256": "4a4b7554028b1c325c112837d8fc724d1306fa19ce5650563441c72fbf5406f9",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4511dee774d12b2ad9afca87e9859a2739e3367778c2139498ed96890aa5d7e0",
+      "canonicalPCMSHA256": "43eb5c19dc956cf17000b29fcb183f230855f4f554954c6fd356de5755f29a04",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-es-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c2c72aafef63669da6dfead0cf8ed52ea931f06fe372db42efe78154bd171ab9",
+      "canonicalPCMSHA256": "df498fb6cfb742e59671e7ca26b6394c9b6fcbec6ee073ae7e854ead33948214",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "design-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "71870580f687d67d2175abdf588fa698bfc862179281e02f18b76301e41d44ad",
+      "canonicalPCMSHA256": "ff2d8af848cd67e2b1686344293a6d55dde3588184f2cd18cc91c5f02c1d1b8b",
+      "language": "chinese",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "3ac4c03baeff85c16f50b8df1d8244cebd9e3f036d8f951284ccfe05051e0045",
+      "canonicalPCMSHA256": "106ecf6f704ee23f0306bf7d450f299db80ed4abee7ce245a091eee4a6728ab9",
+      "language": "chinese",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "custom-zh-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b01e52a2f66125e0139ed31139184a75befdaeb649b230a60571c4188245a7d3",
+      "canonicalPCMSHA256": "eff4bf5f94e6ef39026e218c8071844ec557b5cca429affcfa54e0b1159782ed",
+      "language": "chinese",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": null,
+      "status": "out-of-scope",
+      "takeID": "design-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "56e93b39ac7ea210789daa0335a3af0f829e1081b72d32f139f53ef2df6f94bf",
+      "canonicalPCMSHA256": "f544d9ba4ea609b180abbd1da00ad288120e573c91a9c7bd71b59b3de1ee49a5",
+      "language": "japanese",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 32,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 32,
+        "character.referenceCount": 32,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": null,
+        "errorRate": 1.0,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "longestDeletionRun": 32,
+        "metric": "CER",
+        "outputParsed": false,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 3,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 3,
+        "word.referenceCount": 3,
+        "word.segmentationAwareEditDistance": 3,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08",
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08"
+      ],
+      "rawSHA256": [
+        "ab2604db6d245bef37cef909f8ed1f155dd5c417285898a88cfd77e2d453b476",
+        "ab2604db6d245bef37cef909f8ed1f155dd5c417285898a88cfd77e2d453b476"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "24ce39ed1cd71652fd2a3273675d0c42c9d0f41f84f8b20284e5ce399db7900b",
+      "canonicalPCMSHA256": "2997c033475d73b2f6a9035a7c92b52ef6766088b9f00c6ea5e59c487df17cde",
+      "language": "japanese",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 32,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 32,
+        "character.referenceCount": 32,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": null,
+        "errorRate": 1.0,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "longestDeletionRun": 32,
+        "metric": "CER",
+        "outputParsed": false,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 3,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 3,
+        "word.referenceCount": 3,
+        "word.segmentationAwareEditDistance": 3,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08",
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08"
+      ],
+      "rawSHA256": [
+        "c147c68a5115b566b895866c5533cb1b1e75073b71acc6e15874e1ef81098529",
+        "c147c68a5115b566b895866c5533cb1b1e75073b71acc6e15874e1ef81098529"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "d4d3ff4ca2817a292cff7611f609579c62836f9a68d9d6757d4d131c2055763d",
+      "canonicalPCMSHA256": "be961ae63840551cee040010095e40fd0cf3a47836db9166569b92463baceade",
+      "language": "japanese",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 32,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 32,
+        "character.referenceCount": 32,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": null,
+        "errorRate": 1.0,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "longestDeletionRun": 32,
+        "metric": "CER",
+        "outputParsed": false,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 3,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 3,
+        "word.referenceCount": 3,
+        "word.segmentationAwareEditDistance": 3,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08",
+        "f3617cb4228073d334cf52190d041bb44165bd68d8ef08ca3957864c035c9b08"
+      ],
+      "rawSHA256": [
+        "b350a75e4e8e92dad784ff28da11e06a5b7d9b7a524e68d4db19324b9a313639",
+        "b350a75e4e8e92dad784ff28da11e06a5b7d9b7a524e68d4db19324b9a313639"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    }
+  ]
+}

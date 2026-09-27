@@ -1,0 +1,1058 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "maxAbsoluteDifference": 0.0,
+    "maxRelativeDifference": 0.0,
+    "numericDifferences": 0,
+    "rowsBitExact": 28,
+    "rowsCompared": 28,
+    "rowsWithDiscreteMismatch": 0
+  },
+  "identityComponents": {
+    "engine": "pyin-librosa",
+    "hostProfileSHA256": "094976dd04adaf0542a13a28addbc11e2994b770d5bb2ecd8ca5a76e7fea7931",
+    "panelJobVersion": "panel-job-v1",
+    "registryEntrySHA256": "653053066ab63c65e2dc49b7148c7cb24de2397d67115596eddcbcac27ba13fa",
+    "runtime": {
+      "family": "librosa-dsp",
+      "interpreterSHA256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "kind": "venv",
+      "lockSHA256": "bb585a7a43ff7521cc2d8368bf7e2a0cc62581ba182f35dbb142fc5c8eba8f51"
+    },
+    "threads": 1,
+    "workerSourceSHA256": {
+      "scripts/audio_qc_worker.py": "8bc67f577dbc3b67555cfa50f09863f5a22a26fbf2d078406d1a5436c08953c8",
+      "scripts/lib/qc_pipeline/panel_engines.py": "390ef8d539a7b751ba79186ba7155c963cf694c747e7d9420f3cfaff219788ca",
+      "scripts/lib/qc_pipeline/panel_jobs.py": "24a0360f3bdad7111dc4f9ed99c4795da65f06401a6efb872f266dcec719e2b6"
+    }
+  },
+  "judge": "pitch.pyin@1",
+  "outputIdentity": "772bcaf2018a0b50452b7153d8433bf23824b6a772788a11404698935dd01d22",
+  "qualification": {
+    "passed": true,
+    "reasons": []
+  },
+  "registrySHA256": "a161746b48e5a7247a03169d535ba54851935aeb0e25e6d55e618be1dd5f1386",
+  "resources": {
+    "admissionCeilingBytes": 636262810,
+    "canonicalHostPeakBytes": 530219008,
+    "fitsBudget": true,
+    "runPeakBytes": [
+      523468800,
+      530219008
+    ]
+  },
+  "runs": [
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 456049744,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 456049744,
+          "peakRSSBytes": 523468800,
+          "waitMaxRSSBytes": 523468800
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": 0.001,
+      "peakBytes": 523468800,
+      "peakChildAttributedBytes": 456049744,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 456049744,
+      "peakRSSBytes": 523468800,
+      "peakWaitMaxRSSBytes": 523468800,
+      "rowsAccepted": 28,
+      "rowsUnavailable": 0,
+      "run": 1,
+      "sessionIDs": [
+        "3760626b58b6402fb513004321c7c100"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 1,
+      "wallSeconds": 31.699,
+      "warmupSeconds": 0.928
+    },
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "qualification-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 463045688,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 463045688,
+          "peakRSSBytes": 530219008,
+          "waitMaxRSSBytes": 530219008
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": 0.001,
+      "peakBytes": 530219008,
+      "peakChildAttributedBytes": 463045688,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 463045688,
+      "peakRSSBytes": 530219008,
+      "peakWaitMaxRSSBytes": 530219008,
+      "rowsAccepted": 28,
+      "rowsUnavailable": 0,
+      "run": 2,
+      "sessionIDs": [
+        "27bb61cd8c3c49c686977ffe3cde0751"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 1,
+      "wallSeconds": 32.038,
+      "warmupSeconds": 0.906
+    }
+  ],
+  "schema": "vocello.audioqc.qc-canary/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-aaba14fd"
+  },
+  "takes": [
+    {
+      "audioSHA256": "28993e8ecc62f1fc36783c2705eb4b018322db3e351cf50e99698fa61f57be3a",
+      "canonicalPCMSHA256": "3b9909b4aba5bce051ab8dd82ebdf1e4a83cfbd392f54d17da23f45ad033fa44",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": 116.3409,
+        "f0MedianHz": 116.8777,
+        "f0P05Hz": 108.1417,
+        "f0P95Hz": 130.4352,
+        "f0RangeSemitones": 3.2449,
+        "f0StdSemitones": 2.3955,
+        "frames": 315,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.25884,
+        "voicedFraction": 0.736508,
+        "voicedFrames": 232
+      },
+      "metricsSHA256": [
+        "9287ae8b4356546d96fc7f1386a229bda1d2223971576986aa92e23a4e12dc59",
+        "9287ae8b4356546d96fc7f1386a229bda1d2223971576986aa92e23a4e12dc59"
+      ],
+      "rawSHA256": [
+        "7f7af73b033eaf937ea9c11726ba23120b614c72896760aeba63935bbb6b815e",
+        "7f7af73b033eaf937ea9c11726ba23120b614c72896760aeba63935bbb6b815e"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-modal-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "2411ac5e2a3b45491afb86c4b71809342a5c78dc846db6c6abe13167eaab5f78",
+      "canonicalPCMSHA256": "9eb00cfe8aed414f589894d0ee28a69f1adc00e3d9a59a21258fab27a91474cc",
+      "language": "chinese",
+      "metrics": {
+        "f0MeanHz": 51.869,
+        "f0MedianHz": 51.4651,
+        "f0P05Hz": 50.9346,
+        "f0P95Hz": 53.0352,
+        "f0RangeSemitones": 0.6997,
+        "f0StdSemitones": 0.2625,
+        "frames": 337,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.009911,
+        "voicedFraction": 0.026706,
+        "voicedFrames": 9
+      },
+      "metricsSHA256": [
+        "d3ed1a37172891faac2cb5f59eb600ab09d6e70d8c29463d8bd4a761b84d49f5",
+        "d3ed1a37172891faac2cb5f59eb600ab09d6e70d8c29463d8bd4a761b84d49f5"
+      ],
+      "rawSHA256": [
+        "45fd4ca44367f8c0dbf4a98398cb9b63f56d7b435931f5a74629bcd911b677d9",
+        "45fd4ca44367f8c0dbf4a98398cb9b63f56d7b435931f5a74629bcd911b677d9"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-breathy-chinese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "5a317cb2a14ffdcf70a5cd5608f0e7fd362f03d50e4b856ad59a6fec30a7a3a0",
+      "canonicalPCMSHA256": "a23e5cb24046e632a6b16958b5e34d476b9c191d4024a571db59f3758d7d1cf2",
+      "language": "japanese",
+      "metrics": {
+        "f0MeanHz": 472.6794,
+        "f0MedianHz": 400.0,
+        "f0P05Hz": 335.3899,
+        "f0P95Hz": 800.0133,
+        "f0RangeSemitones": 15.0502,
+        "f0StdSemitones": 5.015,
+        "frames": 359,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.411808,
+        "voicedFraction": 0.643454,
+        "voicedFrames": 231
+      },
+      "metricsSHA256": [
+        "454b63d415883fffb45308de7799ef2bd768dfa5b0ee751f1716d337d998b5a2",
+        "454b63d415883fffb45308de7799ef2bd768dfa5b0ee751f1716d337d998b5a2"
+      ],
+      "rawSHA256": [
+        "feba917367cbd49783e216cad9f2d7916a22d15ad0ee74bbf751dabb11d2b291",
+        "feba917367cbd49783e216cad9f2d7916a22d15ad0ee74bbf751dabb11d2b291"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-high-f0-japanese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c4e4fe190f7c33e004fe761697ff1a1634ee8d2580ae49946a2a676307efc63d",
+      "canonicalPCMSHA256": "4869a2ee8106b1df130f249985071ec33568554fe498367353256c209fe99830",
+      "language": "korean",
+      "metrics": {
+        "f0MeanHz": 189.7116,
+        "f0MedianHz": 188.7749,
+        "f0P05Hz": 172.8082,
+        "f0P95Hz": 209.4588,
+        "f0RangeSemitones": 3.3299,
+        "f0StdSemitones": 0.9305,
+        "frames": 297,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.276562,
+        "voicedFraction": 0.521886,
+        "voicedFrames": 155
+      },
+      "metricsSHA256": [
+        "582a05528f96326616c090aa927b0d450168cbb6fdb5500ffc28ebddff9042cc",
+        "582a05528f96326616c090aa927b0d450168cbb6fdb5500ffc28ebddff9042cc"
+      ],
+      "rawSHA256": [
+        "4b8baf937c28bb40f9131aa2c7c4b3e84a58bbd5541ee4fc9509408ced2febe6",
+        "4b8baf937c28bb40f9131aa2c7c4b3e84a58bbd5541ee4fc9509408ced2febe6"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-quiet-korean",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4e5aae29e417782eae093b1366d70b57b89c1200f695c38dba98607fdb0e76de",
+      "canonicalPCMSHA256": "8657efbe9b49baa56a0a982a13a86b5af828923b1fe30d76eed572fe31d0e0be",
+      "language": "french",
+      "metrics": {
+        "f0MeanHz": 100.6606,
+        "f0MedianHz": 100.5793,
+        "f0P05Hz": 90.3306,
+        "f0P95Hz": 116.8777,
+        "f0RangeSemitones": 4.4606,
+        "f0StdSemitones": 2.8825,
+        "frames": 471,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.144683,
+        "voicedFraction": 0.509554,
+        "voicedFrames": 240
+      },
+      "metricsSHA256": [
+        "5a656e19292a5e0f2eb856f3f28d5004283d58331b4787d641243189163239b7",
+        "5a656e19292a5e0f2eb856f3f28d5004283d58331b4787d641243189163239b7"
+      ],
+      "rawSHA256": [
+        "f617704d5127e54424c544bacab2d4564f7923d259917672738c9aff326d5c48",
+        "f617704d5127e54424c544bacab2d4564f7923d259917672738c9aff326d5c48"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-long-pause-french",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b7235cefab1b52ef0c2ba1c9ed15e7ea2e7c0d01bf18aa8278bf267efbb78caa",
+      "canonicalPCMSHA256": "96b27551586e7572ee16a202a3507502f4b34f7dd0404eedb2c4c4a56ad58369",
+      "language": "german",
+      "metrics": {
+        "f0MeanHz": 187.2044,
+        "f0MedianHz": 189.8684,
+        "f0P05Hz": 168.1793,
+        "f0P95Hz": 204.6748,
+        "f0RangeSemitones": 3.4,
+        "f0StdSemitones": 1.1327,
+        "frames": 443,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.39957,
+        "voicedFraction": 0.72912,
+        "voicedFrames": 323
+      },
+      "metricsSHA256": [
+        "249a4514f7b6e329e56cf07e1122c4c270580ebd0c865fa73b6456cad4952d9a",
+        "249a4514f7b6e329e56cf07e1122c4c270580ebd0c865fa73b6456cad4952d9a"
+      ],
+      "rawSHA256": [
+        "bdd72f4ab45b713fd7223afb7932dcd872d12ad63cdf2c5d3d6b8045fbb1ff75",
+        "bdd72f4ab45b713fd7223afb7932dcd872d12ad63cdf2c5d3d6b8045fbb1ff75"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-modal-german",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+      "canonicalPCMSHA256": "55873fecc61a79e87ca550c7072e38ccdd7ecb600ace286fe4717952a97c42b0",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": null,
+        "f0MedianHz": null,
+        "f0P05Hz": null,
+        "f0P95Hz": null,
+        "f0RangeSemitones": null,
+        "f0StdSemitones": null,
+        "frames": 301,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.0,
+        "voicedFraction": 0.0,
+        "voicedFrames": 0
+      },
+      "metricsSHA256": [
+        "338c10e2cd693b555a0de3e1a09b7d146c3e99321c948cca0f41f1a802205f84",
+        "338c10e2cd693b555a0de3e1a09b7d146c3e99321c948cca0f41f1a802205f84"
+      ],
+      "rawSHA256": [
+        "86e61368bfeda75c36ece74fed62b3d92581cce35b0032f8c1090b1b2b190a6e",
+        "86e61368bfeda75c36ece74fed62b3d92581cce35b0032f8c1090b1b2b190a6e"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-silence-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e8d4d0bbd1c9efe72d27c2c93f964c3a511f7321096a0fc4dc83859149e14cd",
+      "canonicalPCMSHA256": "270fa4b4a1d29c5bdf295386a3b66b815ba64e967630fddf745137543e198433",
+      "language": "spanish",
+      "metrics": {
+        "f0MeanHz": 53.1722,
+        "f0MedianHz": 53.8991,
+        "f0P05Hz": 50.4062,
+        "f0P95Hz": 57.3833,
+        "f0RangeSemitones": 2.2444,
+        "f0StdSemitones": 0.7564,
+        "frames": 301,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.009967,
+        "voicedFraction": 0.096346,
+        "voicedFrames": 29
+      },
+      "metricsSHA256": [
+        "e75133528c4e9aec0c30de7db41f245e85e75a238aae5985956228f5ebb5ca5c",
+        "e75133528c4e9aec0c30de7db41f245e85e75a238aae5985956228f5ebb5ca5c"
+      ],
+      "rawSHA256": [
+        "7ca5320d8aa1f5949604e9993c10a5df639de47cadf1cf798fd1c18937d4075b",
+        "7ca5320d8aa1f5949604e9993c10a5df639de47cadf1cf798fd1c18937d4075b"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-noise-spanish",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8844254e7b5748d9a8baa05ecec316965f2622e0a03fdd1fd19944c068fc6cb8",
+      "canonicalPCMSHA256": "25922ea8ea9c2166f04de80c6511e22170e5aba907199d38aa11c740f57954c5",
+      "language": "italian",
+      "metrics": {
+        "f0MeanHz": 55.1589,
+        "f0MedianHz": 55.1589,
+        "f0P05Hz": 55.1589,
+        "f0P95Hz": 55.1589,
+        "f0RangeSemitones": 0.0,
+        "f0StdSemitones": 0.0,
+        "frames": 301,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.161221,
+        "voicedFraction": 0.996678,
+        "voicedFrames": 300
+      },
+      "metricsSHA256": [
+        "aed6faa37b7bf40962f9dc97e0315c3ea7db684fcfbc191a2f33fa7c6ccaa28a",
+        "aed6faa37b7bf40962f9dc97e0315c3ea7db684fcfbc191a2f33fa7c6ccaa28a"
+      ],
+      "rawSHA256": [
+        "6b8bc70fd5912b470b979dcc7dfde92cd9eb758c395b49d3c0fe3271ab0088e8",
+        "6b8bc70fd5912b470b979dcc7dfde92cd9eb758c395b49d3c0fe3271ab0088e8"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-music-italian",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e16c7a1751a655c4b32513b437c5e057aa151a5364d2bcdbca65ed8eaf5601d",
+      "canonicalPCMSHA256": "44a59feff0dbc0ac09a4579c088e1c8c4e30e45bd7f1164ed93f3b3212325ccb",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": 133.6154,
+        "f0MedianHz": 124.545,
+        "f0P05Hz": 87.1811,
+        "f0P95Hz": 260.1213,
+        "f0RangeSemitones": 18.9252,
+        "f0StdSemitones": 4.9111,
+        "frames": 537,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.16881,
+        "voicedFraction": 0.756052,
+        "voicedFrames": 406
+      },
+      "metricsSHA256": [
+        "453d09fa2780b489f006b218375a9dd4047655fc7a2f8ac487c9b41678328271",
+        "453d09fa2780b489f006b218375a9dd4047655fc7a2f8ac487c9b41678328271"
+      ],
+      "rawSHA256": [
+        "6c1930a556afee3d24aa82c39daf9a90daaf5b349537c4ef8a895ca372bde7e1",
+        "6c1930a556afee3d24aa82c39daf9a90daaf5b349537c4ef8a895ca372bde7e1"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "f2c3fceba9877abe059fd11ce4132c76539dfac770d895a09b77b6bb81368496",
+      "canonicalPCMSHA256": "7b733bbd29eaf4dfc7a556d53bdebab6516153308c4ec92ece7fd9345fdc8cce",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": 160.3833,
+        "f0MedianHz": 152.4497,
+        "f0P05Hz": 112.2462,
+        "f0P95Hz": 257.4285,
+        "f0RangeSemitones": 14.3701,
+        "f0StdSemitones": 3.9829,
+        "frames": 521,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.22885,
+        "voicedFraction": 0.742802,
+        "voicedFrames": 387
+      },
+      "metricsSHA256": [
+        "a50809c051d3e41a0ec916bdfc5bdf9e69942294247c8841b067ac3b13ded532",
+        "a50809c051d3e41a0ec916bdfc5bdf9e69942294247c8841b067ac3b13ded532"
+      ],
+      "rawSHA256": [
+        "f75123ab7c1a2c1f20b65eab91d61334022215e6ac4fb1c144146fd6394872b4",
+        "f75123ab7c1a2c1f20b65eab91d61334022215e6ac4fb1c144146fd6394872b4"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-en-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b446a6929c3bc602ce02fa70b65bfcf3eb6e03fd1a2f283fc31937120de33cc2",
+      "canonicalPCMSHA256": "ad1c5bb5438e9d53bfeeb236145bf6858978813a8442f0ac26982db749e802b9",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": 169.4654,
+        "f0MedianHz": 171.119,
+        "f0P05Hz": 127.7883,
+        "f0P95Hz": 223.9106,
+        "f0RangeSemitones": 9.71,
+        "f0StdSemitones": 4.0085,
+        "frames": 513,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.234345,
+        "voicedFraction": 0.721248,
+        "voicedFrames": 370
+      },
+      "metricsSHA256": [
+        "37a0cf135e14343b910ccc1db11f4f5f197daab03459cf998c0155f65e7d2abd",
+        "37a0cf135e14343b910ccc1db11f4f5f197daab03459cf998c0155f65e7d2abd"
+      ],
+      "rawSHA256": [
+        "e329e4b6591f774d87a623e0ecdd59223d845938e40e14a33f2ae139fc3a08a5",
+        "e329e4b6591f774d87a623e0ecdd59223d845938e40e14a33f2ae139fc3a08a5"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cc76d8def2776443099d6fef629f5af9efa81c7b20e466258347cc98b6976775",
+      "canonicalPCMSHA256": "3555859dd417726caca2d005802ec3a19f17503a726f809fbdeaf14046f0609f",
+      "language": "french",
+      "metrics": {
+        "f0MeanHz": 163.6489,
+        "f0MedianHz": 148.9677,
+        "f0P05Hz": 103.4371,
+        "f0P95Hz": 262.3816,
+        "f0RangeSemitones": 16.115,
+        "f0StdSemitones": 4.6338,
+        "frames": 1113,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.198674,
+        "voicedFraction": 0.645103,
+        "voicedFrames": 718
+      },
+      "metricsSHA256": [
+        "734e6c9da3ff8bb981bb421d11aaeccf59a1e3907923a972daec11e4e27e10ae",
+        "734e6c9da3ff8bb981bb421d11aaeccf59a1e3907923a972daec11e4e27e10ae"
+      ],
+      "rawSHA256": [
+        "a2f4d8be9d1d2a664678723f4a3d440be12bea772375c8dd76dfa0868b9e8063",
+        "a2f4d8be9d1d2a664678723f4a3d440be12bea772375c8dd76dfa0868b9e8063"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "76bb7cc796e39257ddeb3cd66bfe70e6caf8112cc2c36b18d1e07fc21083dcc2",
+      "canonicalPCMSHA256": "71f9490bc1a9994b760cd7cd43ac3becaecc81c3b940f6c6993becfd62236001",
+      "language": "french",
+      "metrics": {
+        "f0MeanHz": 169.327,
+        "f0MedianHz": 166.2476,
+        "f0P05Hz": 100.1448,
+        "f0P95Hz": 229.7397,
+        "f0RangeSemitones": 14.3749,
+        "f0StdSemitones": 3.8097,
+        "frames": 1833,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.193724,
+        "voicedFraction": 0.527005,
+        "voicedFrames": 966
+      },
+      "metricsSHA256": [
+        "a7cbdc2c185606a0a7e2d707f50d25a45ea5f06e19534ae2ab0edd68dacc3ff8",
+        "a7cbdc2c185606a0a7e2d707f50d25a45ea5f06e19534ae2ab0edd68dacc3ff8"
+      ],
+      "rawSHA256": [
+        "24a140ac0da181b35e69195e31da8a5c5702ad20d17b4f6c00b71511e63d85fa",
+        "24a140ac0da181b35e69195e31da8a5c5702ad20d17b4f6c00b71511e63d85fa"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "293b389a3b167c326aaf60bbffac8708363f58efdb8854a36a1fcee8ed21df4c",
+      "canonicalPCMSHA256": "4149bcd87e2d1865caec633d9fcb0d87d24978c3a5dc496aee60727cd0b3612b",
+      "language": "french",
+      "metrics": {
+        "f0MeanHz": 123.9838,
+        "f0MedianHz": 118.2358,
+        "f0P05Hz": 88.5768,
+        "f0P95Hz": 182.3445,
+        "f0RangeSemitones": 12.5,
+        "f0StdSemitones": 3.7366,
+        "frames": 1233,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.19602,
+        "voicedFraction": 0.624493,
+        "voicedFrames": 770
+      },
+      "metricsSHA256": [
+        "ae29c15679b6f4f7090a8e764706d64ac4621bada978dbf05cce0a2cf66c91aa",
+        "ae29c15679b6f4f7090a8e764706d64ac4621bada978dbf05cce0a2cf66c91aa"
+      ],
+      "rawSHA256": [
+        "712c5b406c5a3be8c9329d864d2906c9342bf497bde4b4ddd967bbd73a3ea1c8",
+        "712c5b406c5a3be8c9329d864d2906c9342bf497bde4b4ddd967bbd73a3ea1c8"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-fr-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b4693c92d71310e770deda8608737db2edd455813d8c98583341193d013ea644",
+      "canonicalPCMSHA256": "1eeaa5cd13735b823d3c928eb6bb188e1d23331957f5f726197fea11e2f05c29",
+      "language": "english",
+      "metrics": {
+        "f0MeanHz": 155.4621,
+        "f0MedianHz": 143.8934,
+        "f0P05Hz": 96.0373,
+        "f0P95Hz": 279.594,
+        "f0RangeSemitones": 18.5,
+        "f0StdSemitones": 5.5414,
+        "frames": 1345,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.177903,
+        "voicedFraction": 0.689219,
+        "voicedFrames": 927
+      },
+      "metricsSHA256": [
+        "5a41ae04c6e4df513596af8701a3d0f95c0e46c735359ce274276e78b4654511",
+        "5a41ae04c6e4df513596af8701a3d0f95c0e46c735359ce274276e78b4654511"
+      ],
+      "rawSHA256": [
+        "c0596591ad4e8fc3a8681eed0e57d629f4f59bf136db8e5e120067bf75a94945",
+        "c0596591ad4e8fc3a8681eed0e57d629f4f59bf136db8e5e120067bf75a94945"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-fr-text-en-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b1a07b971c38a632def3f931861de14f487b818290e603b272a1d60a2350d42c",
+      "canonicalPCMSHA256": "412cfda2cc8b8c5b6a99b82a1dccff8d7156dc4e289be43f1439532fc3282d31",
+      "language": "german",
+      "metrics": {
+        "f0MeanHz": 137.5133,
+        "f0MedianHz": 128.937,
+        "f0P05Hz": 99.424,
+        "f0P95Hz": 218.1015,
+        "f0RangeSemitones": 13.6,
+        "f0StdSemitones": 4.003,
+        "frames": 1225,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.247462,
+        "voicedFraction": 0.733061,
+        "voicedFrames": 898
+      },
+      "metricsSHA256": [
+        "cc84bc97821d49924707a58692c07480db292362901c7394d9307a8c9c6070b2",
+        "cc84bc97821d49924707a58692c07480db292362901c7394d9307a8c9c6070b2"
+      ],
+      "rawSHA256": [
+        "589ac797a62108d81a8952659244419d2306a2775eec5342f3ed9ea63029303c",
+        "589ac797a62108d81a8952659244419d2306a2775eec5342f3ed9ea63029303c"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c431ffda35d9c710403bb142e9cd91f615cf86fac01de6877e299bad68b462ec",
+      "canonicalPCMSHA256": "fb573105ae4f113455c9a5c7f4dd87bec73970639a2ecabb02fa008876348878",
+      "language": "german",
+      "metrics": {
+        "f0MeanHz": 193.0591,
+        "f0MedianHz": 193.1873,
+        "f0P05Hz": 123.8276,
+        "f0P95Hz": 280.4038,
+        "f0RangeSemitones": 14.1501,
+        "f0StdSemitones": 4.4002,
+        "frames": 1041,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.273004,
+        "voicedFraction": 0.702209,
+        "voicedFrames": 731
+      },
+      "metricsSHA256": [
+        "432af38bfd55e34c4c4cc7bc99f40fe00fe56d18d91e3a578efd897272dc7912",
+        "432af38bfd55e34c4c4cc7bc99f40fe00fe56d18d91e3a578efd897272dc7912"
+      ],
+      "rawSHA256": [
+        "ad60da6508ca9b12dc2073280366d1c240636f9b4e24885be9b50216bd3029b2",
+        "ad60da6508ca9b12dc2073280366d1c240636f9b4e24885be9b50216bd3029b2"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-de-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8265d328ec03d31047f623e7aa28b5333d5cf5b771039c84b4c52b46cb4e5b3e",
+      "canonicalPCMSHA256": "a80f9ccc4d6de7c9ed8be4393447e9b60f8d7c4a93b817315c4c9a7599dacd72",
+      "language": "german",
+      "metrics": {
+        "f0MeanHz": 111.3794,
+        "f0MedianHz": 111.5997,
+        "f0P05Hz": 68.243,
+        "f0P95Hz": 166.2476,
+        "f0RangeSemitones": 15.415,
+        "f0StdSemitones": 4.6801,
+        "frames": 1185,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.050818,
+        "voicedFraction": 0.538397,
+        "voicedFrames": 638
+      },
+      "metricsSHA256": [
+        "407d92524ab9770ebb755875ba82455d30938773df1d5238568d98793708ed37",
+        "407d92524ab9770ebb755875ba82455d30938773df1d5238568d98793708ed37"
+      ],
+      "rawSHA256": [
+        "b174fe569ebd5f6b1b6bd70f95e5bf0b1e6cc1381d96fb658402510dcb45d66b",
+        "b174fe569ebd5f6b1b6bd70f95e5bf0b1e6cc1381d96fb658402510dcb45d66b"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-de-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "a6e25e631686702746321e7992bf944392a5352eba55dd93b04780077e4eeac2",
+      "canonicalPCMSHA256": "4a4b7554028b1c325c112837d8fc724d1306fa19ce5650563441c72fbf5406f9",
+      "language": "spanish",
+      "metrics": {
+        "f0MeanHz": 138.4835,
+        "f0MedianHz": 133.484,
+        "f0P05Hz": 98.8514,
+        "f0P95Hz": 190.9683,
+        "f0RangeSemitones": 11.4,
+        "f0StdSemitones": 3.3487,
+        "frames": 929,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.227394,
+        "voicedFraction": 0.776103,
+        "voicedFrames": 721
+      },
+      "metricsSHA256": [
+        "361dda0ec5d1e82e8437e31cba35f85513ffc2420ce6ee3b4825feb13dba69df",
+        "361dda0ec5d1e82e8437e31cba35f85513ffc2420ce6ee3b4825feb13dba69df"
+      ],
+      "rawSHA256": [
+        "befbfa6370f806b1f70c651e7098c6f941481344a6e66c9477f2b2d4f3e2c74b",
+        "befbfa6370f806b1f70c651e7098c6f941481344a6e66c9477f2b2d4f3e2c74b"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "4511dee774d12b2ad9afca87e9859a2739e3367778c2139498ed96890aa5d7e0",
+      "canonicalPCMSHA256": "43eb5c19dc956cf17000b29fcb183f230855f4f554954c6fd356de5755f29a04",
+      "language": "spanish",
+      "metrics": {
+        "f0MeanHz": 126.9596,
+        "f0MedianHz": 120.9994,
+        "f0P05Hz": 94.3874,
+        "f0P95Hz": 169.5455,
+        "f0RangeSemitones": 10.1401,
+        "f0StdSemitones": 3.2046,
+        "frames": 841,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.180365,
+        "voicedFraction": 0.800238,
+        "voicedFrames": 673
+      },
+      "metricsSHA256": [
+        "f422e988e176ac319a16b18ee181b536e4f27d3e8499c15fe95df9c49b161d82",
+        "f422e988e176ac319a16b18ee181b536e4f27d3e8499c15fe95df9c49b161d82"
+      ],
+      "rawSHA256": [
+        "599b727c9c2647f60d4de452e30c1f0626449bacd0ecb2b46ab729b5fc59a12c",
+        "599b727c9c2647f60d4de452e30c1f0626449bacd0ecb2b46ab729b5fc59a12c"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-es-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c2c72aafef63669da6dfead0cf8ed52ea931f06fe372db42efe78154bd171ab9",
+      "canonicalPCMSHA256": "df498fb6cfb742e59671e7ca26b6394c9b6fcbec6ee073ae7e854ead33948214",
+      "language": "spanish",
+      "metrics": {
+        "f0MeanHz": 104.0379,
+        "f0MedianHz": 95.4842,
+        "f0P05Hz": 77.1105,
+        "f0P95Hz": 150.5251,
+        "f0RangeSemitones": 11.58,
+        "f0StdSemitones": 3.9349,
+        "frames": 889,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.145469,
+        "voicedFraction": 0.68054,
+        "voicedFrames": 605
+      },
+      "metricsSHA256": [
+        "da28bfb5f6faab9ca11bd12b5865238de3da6a127bae30c54ea180e9f94892e4",
+        "da28bfb5f6faab9ca11bd12b5865238de3da6a127bae30c54ea180e9f94892e4"
+      ],
+      "rawSHA256": [
+        "74bcc4bffc8192b86f0b71edfc848c7fe36593e367ea7a806988a0cbf67b3c7c",
+        "74bcc4bffc8192b86f0b71edfc848c7fe36593e367ea7a806988a0cbf67b3c7c"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-es-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "71870580f687d67d2175abdf588fa698bfc862179281e02f18b76301e41d44ad",
+      "canonicalPCMSHA256": "ff2d8af848cd67e2b1686344293a6d55dde3588184f2cd18cc91c5f02c1d1b8b",
+      "language": "chinese",
+      "metrics": {
+        "f0MeanHz": 447.1889,
+        "f0MedianHz": 406.9919,
+        "f0P05Hz": 262.3816,
+        "f0P95Hz": 877.46,
+        "f0RangeSemitones": 20.9,
+        "f0StdSemitones": 5.2737,
+        "frames": 1793,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.32542,
+        "voicedFraction": 0.615728,
+        "voicedFrames": 1104
+      },
+      "metricsSHA256": [
+        "a5f9bfe187fef16669eb015666a14327248de7c013fb372a60e4ed2f652c5806",
+        "a5f9bfe187fef16669eb015666a14327248de7c013fb372a60e4ed2f652c5806"
+      ],
+      "rawSHA256": [
+        "a579a67b8f6e84c9fa4d75bb5bfbf6b752088af3237f1a57054cd0456e6df6ef",
+        "a579a67b8f6e84c9fa4d75bb5bfbf6b752088af3237f1a57054cd0456e6df6ef"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "3ac4c03baeff85c16f50b8df1d8244cebd9e3f036d8f951284ccfe05051e0045",
+      "canonicalPCMSHA256": "106ecf6f704ee23f0306bf7d450f299db80ed4abee7ce245a091eee4a6728ab9",
+      "language": "chinese",
+      "metrics": {
+        "f0MeanHz": 663.639,
+        "f0MedianHz": 790.8112,
+        "f0P05Hz": 211.2214,
+        "f0P95Hz": 882.5431,
+        "f0RangeSemitones": 24.7549,
+        "f0StdSemitones": 7.863,
+        "frames": 3433,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.141818,
+        "voicedFraction": 0.550539,
+        "voicedFrames": 1890
+      },
+      "metricsSHA256": [
+        "4c835e53a3e0433db537dc6e791b5a78942c3d40e4fa77802b8f11567cdeb0e1",
+        "4c835e53a3e0433db537dc6e791b5a78942c3d40e4fa77802b8f11567cdeb0e1"
+      ],
+      "rawSHA256": [
+        "8676cad8e769fe5bc2af645ba62932d0a5682d122945e950f09ab21ae21c6eea",
+        "8676cad8e769fe5bc2af645ba62932d0a5682d122945e950f09ab21ae21c6eea"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-zh-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b01e52a2f66125e0139ed31139184a75befdaeb649b230a60571c4188245a7d3",
+      "canonicalPCMSHA256": "eff4bf5f94e6ef39026e218c8071844ec557b5cca429affcfa54e0b1159782ed",
+      "language": "chinese",
+      "metrics": {
+        "f0MeanHz": 205.4798,
+        "f0MedianHz": 201.1586,
+        "f0P05Hz": 139.797,
+        "f0P95Hz": 303.1433,
+        "f0RangeSemitones": 13.4,
+        "f0StdSemitones": 4.1714,
+        "frames": 561,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.196591,
+        "voicedFraction": 0.602496,
+        "voicedFrames": 338
+      },
+      "metricsSHA256": [
+        "a9c783f3965b2f44c442d655a53c3a14be6e5396733cd5c6c19495acfed1204f",
+        "a9c783f3965b2f44c442d655a53c3a14be6e5396733cd5c6c19495acfed1204f"
+      ],
+      "rawSHA256": [
+        "2dac78821d517dfb88dd8f8d14d652dfa42002b176a6b2117760fdd6a83194ce",
+        "2dac78821d517dfb88dd8f8d14d652dfa42002b176a6b2117760fdd6a83194ce"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-zh-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "56e93b39ac7ea210789daa0335a3af0f829e1081b72d32f139f53ef2df6f94bf",
+      "canonicalPCMSHA256": "f544d9ba4ea609b180abbd1da00ad288120e573c91a9c7bd71b59b3de1ee49a5",
+      "language": "japanese",
+      "metrics": {
+        "f0MeanHz": 268.5081,
+        "f0MedianHz": 253.4439,
+        "f0P05Hz": 198.8481,
+        "f0P95Hz": 386.3745,
+        "f0RangeSemitones": 11.5,
+        "f0StdSemitones": 3.7113,
+        "frames": 609,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.268564,
+        "voicedFraction": 0.756979,
+        "voicedFrames": 461
+      },
+      "metricsSHA256": [
+        "f99e94f7be2114be8efcf3c6477117735f79b8af7ece9d5b39649c53107ab8a8",
+        "f99e94f7be2114be8efcf3c6477117735f79b8af7ece9d5b39649c53107ab8a8"
+      ],
+      "rawSHA256": [
+        "91c0c17d8a704c10c52512c4a486b6bd3647af91348059e54aa44b0c1d0d43de",
+        "91c0c17d8a704c10c52512c4a486b6bd3647af91348059e54aa44b0c1d0d43de"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "24ce39ed1cd71652fd2a3273675d0c42c9d0f41f84f8b20284e5ce399db7900b",
+      "canonicalPCMSHA256": "2997c033475d73b2f6a9035a7c92b52ef6766088b9f00c6ea5e59c487df17cde",
+      "language": "japanese",
+      "metrics": {
+        "f0MeanHz": 249.7284,
+        "f0MedianHz": 239.9121,
+        "f0P05Hz": 190.8033,
+        "f0P95Hz": 332.7841,
+        "f0RangeSemitones": 9.63,
+        "f0StdSemitones": 2.8911,
+        "frames": 785,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.329276,
+        "voicedFraction": 0.68535,
+        "voicedFrames": 538
+      },
+      "metricsSHA256": [
+        "05e05ce17802fee4620360b3e0e2a437fc91cf7264ed2f4f0115aa4e898be069",
+        "05e05ce17802fee4620360b3e0e2a437fc91cf7264ed2f4f0115aa4e898be069"
+      ],
+      "rawSHA256": [
+        "4e9452048cb34ab41f2e24ac7f10b064e658546ef724ecd3c0a264bfd0fbca11",
+        "4e9452048cb34ab41f2e24ac7f10b064e658546ef724ecd3c0a264bfd0fbca11"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "custom-ja-auto",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "d4d3ff4ca2817a292cff7611f609579c62836f9a68d9d6757d4d131c2055763d",
+      "canonicalPCMSHA256": "be961ae63840551cee040010095e40fd0cf3a47836db9166569b92463baceade",
+      "language": "japanese",
+      "metrics": {
+        "f0MeanHz": 144.7651,
+        "f0MedianHz": 137.3954,
+        "f0P05Hz": 100.7832,
+        "f0P95Hz": 217.6619,
+        "f0RangeSemitones": 13.33,
+        "f0StdSemitones": 3.7962,
+        "frames": 689,
+        "hopSeconds": 0.01,
+        "meanVoicedProbability": 0.166173,
+        "voicedFraction": 0.534107,
+        "voicedFrames": 368
+      },
+      "metricsSHA256": [
+        "cba3671b527b8f99585bc18754e1c6b6613e091abe718bd1bc9f2655d63eae16",
+        "cba3671b527b8f99585bc18754e1c6b6613e091abe718bd1bc9f2655d63eae16"
+      ],
+      "rawSHA256": [
+        "66eed3d64c3ade694a52983f26c6186dfd12f695d588bca628b40130e2b0b9e0",
+        "66eed3d64c3ade694a52983f26c6186dfd12f695d588bca628b40130e2b0b9e0"
+      ],
+      "role": null,
+      "status": "complete",
+      "takeID": "design-ja-pinned",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    }
+  ]
+}

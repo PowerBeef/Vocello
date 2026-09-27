@@ -1,0 +1,360 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "flipAnalysis": "flip-analysis.json",
+  "judges": {
+    "align.qwen3-forcedaligner-0.6b@1": {
+      "admissionCeilingBytes": 5040423120,
+      "canonicalHostPeakBytes": 4200352600,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/align.qwen3-forcedaligner-0.6b-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        4198206296,
+        4200352600
+      ]
+    },
+    "asr.paraformer-zh@1": {
+      "admissionCeilingBytes": 3895099392,
+      "canonicalHostPeakBytes": 3245916160,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.paraformer-zh-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        3245015040,
+        3245916160
+      ]
+    },
+    "asr.parakeet-tdt-0.6b-v3@1": {
+      "admissionCeilingBytes": 5409239636,
+      "canonicalHostPeakBytes": 4507699696,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.parakeet-tdt-0.6b-v3-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        4507699696,
+        4474145168
+      ]
+    },
+    "asr.qwen3-asr-1.7b@1": {
+      "admissionCeilingBytes": 6996910407,
+      "canonicalHostPeakBytes": 5830758672,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.qwen3-asr-1.7b-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        5830758672,
+        5827137832
+      ]
+    },
+    "asr.sensevoice-small-f16@1": {
+      "admissionCeilingBytes": 627887309,
+      "canonicalHostPeakBytes": 523239424,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.sensevoice-small-f16-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        523239424,
+        523206656
+      ]
+    },
+    "asr.whisper-large-v3@1": {
+      "admissionCeilingBytes": 7349546976,
+      "canonicalHostPeakBytes": 6124622480,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.whisper-large-v3-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        6124409536,
+        6124622480
+      ]
+    },
+    "lid.voxlingua107-ecapa@1": {
+      "admissionCeilingBytes": 1701976474,
+      "canonicalHostPeakBytes": 1418313728,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/lid.voxlingua107-ecapa-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        1418313728,
+        1417232384
+      ]
+    },
+    "pitch.pyin@1": {
+      "admissionCeilingBytes": 636262810,
+      "canonicalHostPeakBytes": 530219008,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/pitch.pyin-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        523468800,
+        530219008
+      ]
+    },
+    "quality.audiobox-aesthetics@1": {
+      "admissionCeilingBytes": 3850058372,
+      "canonicalHostPeakBytes": 3208381976,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/quality.audiobox-aesthetics-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        3208332752,
+        3208381976
+      ]
+    },
+    "quality.dnsmos-p835@1": {
+      "admissionCeilingBytes": 607813632,
+      "canonicalHostPeakBytes": 506511360,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/quality.dnsmos-p835-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        506511360,
+        506101760
+      ]
+    },
+    "speaker.campplus-voxceleb@1": {
+      "admissionCeilingBytes": 348350055,
+      "canonicalHostPeakBytes": 290291712,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/speaker.campplus-voxceleb-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        289112064,
+        290291712
+      ]
+    },
+    "speaker.resnet293-voxceleb@1": {
+      "admissionCeilingBytes": 1464572314,
+      "canonicalHostPeakBytes": 1220476928,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/speaker.resnet293-voxceleb-v1.json",
+      "registryStatus": "candidate",
+      "runPeakBytes": [
+        1220460544,
+        1220476928
+      ]
+    }
+  },
+  "legacyJudges": {
+    "asr.whisper-small@1": {
+      "runs": [
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "provisional",
+              "ceilingBytes": 2684354560,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2402503128,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": 2402503128,
+              "peakRSSBytes": 948649984,
+              "waitMaxRSSBytes": 930086912
+            }
+          ],
+          "launches": 1,
+          "modelLoadSeconds": 0.066,
+          "peakBytes": 2402503128,
+          "peakChildAttributedBytes": 2402503128,
+          "peakDescendantRSSBytes": null,
+          "peakPhysicalFootprintBytes": 2402503128,
+          "peakRSSBytes": 948649984,
+          "peakWaitMaxRSSBytes": 930086912,
+          "rowsAccepted": 26,
+          "rowsUnavailable": 0,
+          "run": 1,
+          "sessionIDs": [
+            "3760626b58b6402fb513004321c7c100"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 7.494,
+          "warmupSeconds": 0.235
+        },
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "provisional",
+              "ceilingBytes": 2684354560,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2403535272,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": 2403535272,
+              "peakRSSBytes": 949092352,
+              "waitMaxRSSBytes": 930529280
+            }
+          ],
+          "launches": 1,
+          "modelLoadSeconds": 0.163,
+          "peakBytes": 2403535272,
+          "peakChildAttributedBytes": 2403535272,
+          "peakDescendantRSSBytes": null,
+          "peakPhysicalFootprintBytes": 2403535272,
+          "peakRSSBytes": 949092352,
+          "peakWaitMaxRSSBytes": 930529280,
+          "rowsAccepted": 26,
+          "rowsUnavailable": 0,
+          "run": 2,
+          "sessionIDs": [
+            "27bb61cd8c3c49c686977ffe3cde0751"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 7.456,
+          "warmupSeconds": 0.22
+        }
+      ]
+    },
+    "compact.sensevoice-small-q8@1": {
+      "runs": [
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "provisional",
+              "ceilingBytes": 5368709120,
+              "childPeakBasis": "resident",
+              "childPeakBytes": 398688256,
+              "descendantPeakRSSBytes": 398688256,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": null,
+              "peakRSSBytes": 365936640,
+              "waitMaxRSSBytes": 398688256
+            }
+          ],
+          "launches": 1,
+          "modelLoadSeconds": null,
+          "peakBytes": 398688256,
+          "peakChildAttributedBytes": 398688256,
+          "peakDescendantRSSBytes": 398688256,
+          "peakPhysicalFootprintBytes": null,
+          "peakRSSBytes": 365936640,
+          "peakWaitMaxRSSBytes": 398688256,
+          "rowsAccepted": 28,
+          "rowsUnavailable": 0,
+          "run": 1,
+          "sessionIDs": [
+            "3760626b58b6402fb513004321c7c100"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 5.402,
+          "warmupSeconds": null
+        },
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "provisional",
+              "ceilingBytes": 5368709120,
+              "childPeakBasis": "resident",
+              "childPeakBytes": 398704640,
+              "descendantPeakRSSBytes": 398704640,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": null,
+              "peakRSSBytes": 344752128,
+              "waitMaxRSSBytes": 398704640
+            }
+          ],
+          "launches": 1,
+          "modelLoadSeconds": null,
+          "peakBytes": 398704640,
+          "peakChildAttributedBytes": 398704640,
+          "peakDescendantRSSBytes": 398704640,
+          "peakPhysicalFootprintBytes": null,
+          "peakRSSBytes": 344752128,
+          "peakWaitMaxRSSBytes": 398704640,
+          "rowsAccepted": 28,
+          "rowsUnavailable": 0,
+          "run": 2,
+          "sessionIDs": [
+            "27bb61cd8c3c49c686977ffe3cde0751"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 5.323,
+          "warmupSeconds": null
+        }
+      ]
+    }
+  },
+  "manifest": {
+    "canaryTakes": 9,
+    "manifestSHA256": "66d61e5a2aea6b41ca0252ba11b557327a1a3cd0f7ecfcc641fa62b2df38d71d",
+    "takes": 28
+  },
+  "runs": [
+    {
+      "hostBusy": false,
+      "loadAverage1MAfter": 1.45,
+      "loadAverage1MBefore": 4.72,
+      "recoveryReport": "recovery-report-run-1.json",
+      "run": 1,
+      "sessionIDs": [
+        "3760626b58b6402fb513004321c7c100"
+      ],
+      "wallSeconds": 231.263,
+      "workersWithoutSerialEnvelope": []
+    },
+    {
+      "hostBusy": false,
+      "loadAverage1MAfter": 1.83,
+      "loadAverage1MBefore": 1.45,
+      "recoveryReport": "recovery-report-run-2.json",
+      "run": 2,
+      "sessionIDs": [
+        "27bb61cd8c3c49c686977ffe3cde0751"
+      ],
+      "wallSeconds": 229.416,
+      "workersWithoutSerialEnvelope": []
+    }
+  ],
+  "schema": "vocello.audioqc.qc-panel-session/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-aaba14fd"
+  }
+}

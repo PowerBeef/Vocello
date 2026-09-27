@@ -1,0 +1,58 @@
+{
+  "attribution": {
+    "recovered": 14
+  },
+  "bindingRecoveryFailures": 0,
+  "byJudge": {
+    "align.qwen3-forcedaligner-0.6b@1": 1,
+    "asr.paraformer-zh@1": 1,
+    "asr.parakeet-tdt-0.6b-v3@1": 1,
+    "asr.qwen3-asr-1.7b@1": 1,
+    "asr.sensevoice-small-f16@1": 1,
+    "asr.whisper-large-v3@1": 1,
+    "asr.whisper-small@1": 1,
+    "compact.sensevoice-small-q8@1": 1,
+    "lid.voxlingua107-ecapa@1": 1,
+    "pitch.pyin@1": 1,
+    "quality.audiobox-aesthetics@1": 1,
+    "quality.dnsmos-p835@1": 1,
+    "speaker.campplus-voxceleb@1": 1,
+    "speaker.resnet293-voxceleb@1": 1
+  },
+  "candidateFailures": 0,
+  "candidateRule": "attributed-post-exit-recovery-v2",
+  "candidateWouldFailBindingPass": 0,
+  "candidateWouldQualifyBindingFailure": 0,
+  "envelopes": 14,
+  "envelopesWithoutHost": 0,
+  "envelopesWithoutSession": 0,
+  "hostProfileIDs": [
+    "mac-mini-m6-16gb"
+  ],
+  "kind": "delivery-analyzer-recovery-report",
+  "overlapPossibleEnvelopes": 0,
+  "schemaVersion": 1,
+  "serialByJudge": {
+    "align.qwen3-forcedaligner-0.6b@1": 1,
+    "asr.paraformer-zh@1": 1,
+    "asr.parakeet-tdt-0.6b-v3@1": 1,
+    "asr.qwen3-asr-1.7b@1": 1,
+    "asr.sensevoice-small-f16@1": 1,
+    "asr.whisper-large-v3@1": 1,
+    "asr.whisper-small@1": 1,
+    "compact.sensevoice-small-q8@1": 1,
+    "lid.voxlingua107-ecapa@1": 1,
+    "pitch.pyin@1": 1,
+    "quality.audiobox-aesthetics@1": 1,
+    "quality.dnsmos-p835@1": 1,
+    "speaker.campplus-voxceleb@1": 1,
+    "speaker.resnet293-voxceleb@1": 1
+  },
+  "serialCandidateWouldQualifyBindingFailure": 0,
+  "serialEnvelopes": 14,
+  "sessionIDs": [
+    "3760626b58b6402fb513004321c7c100"
+  ],
+  "unattributed": 0,
+  "withCandidateVerdict": 14
+}

@@ -22,6 +22,7 @@ sourceOfTruth:
   - scripts/lib/audio_qc_observations.py
   - scripts/derive_audio_qc_bounds.py
   - scripts/audio_qc_qualification.py
+  - scripts/audio_qc_calibration_set.py
   - scripts/lib/qc_qualification/composer.py
   - scripts/audio_qc_orchestrator.py
   - scripts/audio_qc_worker.py
@@ -1092,6 +1093,27 @@ bound, and a rate on them describes the fixtures as much as the detector. The ru
   takes), and the 63 QC v8 takes (23 families) carry no warning. The v8 bound replay sees only each
   take's longest silence, never its pause budget or pause count, so its dropout column misses v8's
   0.9-1.2 s warnings without a declared pause, its excess-pause fails and its cadence warnings.
+
+**AQ-07 calibration set, M2 on natural takes.** `python3 scripts/audio_qc_calibration_set.py inject
+--takes <manifest> --output <dir>` applies the T1 catalog to every generated take of an
+`audio-qc-calibration-takes` manifest (population N3): the class A, C and signal-level F injectors at
+sham, mild, moderate and severe, about 40 clips per take, each seeded from the source WAV digest, the
+injector and the catalog seed. A recorded take has no word intervals, declared pauses, script or
+render voice (`scripts/lib/qc_qualification/recordings.py`), so `injectors.inject` refuses every
+variant that needs one with `InjectorNotApplicable`, counted with its reason in
+`injection-set.json`, and word-free recording variants (`take-*`) stand in: clicks anywhere, a
+dropout centred on the take, noise against the whole take's RMS, a cut at 80, 65 or 50% of the take
+(which may remove only the trailing pause) and a run-on of a middle span appended after the take's
+end. The catalog variants and their goldens are unchanged. Octave jumps and pitch breaks stay not
+applicable, content (B) and identity (E) injectors are out of scope, and identity swaps from donor
+pairs are deferred: the donor take has its own timing, not the time-aligned re-render the swap
+splices. `verify` replays every recipe from the source WAVs; `score` runs the v8 mirror and the
+Stage 0 observations over the takes, shams and positives and writes `measurements.json` (ids and
+digests only), `report.json` and `report.md`: per-family CP bounds per flag, A4 sham overlaps, TPR
+per injector and severity, per-language rows and the worst stratum. It is report-only: N3 carries
+no labels (FAR <= f / (1 - pi_max)) and T1 on N3 qualifies nothing (A2, A5). On synthetic 6 s takes
+with six jobs, 40 takes took about 1.5 s to inject, 1.2 s to verify and 14 s to score, and wrote
+about 12 MB of WAV per take.
 
 ### Staged pipeline, workers and admission (AQ-05, 2026-09-26)
 

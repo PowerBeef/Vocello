@@ -21,6 +21,8 @@ evidence.
 - `fixtures`: procedural speech-like sources and abstention fixtures.
 - `injectors`: the T1 PCM injector catalog, every family with a zero-magnitude
   sham and a severity sweep, every output bound to a golden digest.
+- `recordings`: natural takes (N3) as injector sources: PCM16 read at the
+  engine rate, with no word intervals, pauses, script or render voice.
 - `composer`: the pure Stage 3 verdict composer.
 - `policy`: the loader and validator of
   `config/audio-qc-qualification-policy.json`.

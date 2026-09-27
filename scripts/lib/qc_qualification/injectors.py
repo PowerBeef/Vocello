@@ -15,7 +15,15 @@ construction.
 
 Word-aligned edits (deletion, insertion, repetition, truncation) use the
 source's exact word intervals, which procedural fixtures carry by construction;
-on recorded speech they would come from the aligner on N1 and N2 only. Identity
+on recorded speech they would come from the aligner on N1 and N2 only. A
+recorded natural take (N3, `recordings.recording_fixture`) carries no word
+interval, declared pause, script or render voice, so `inject` refuses every
+variant that needs one with `InjectorNotApplicable` (`needs`). A few injectors
+declare word-free recording variants instead (`Injector.recording_variants`,
+named `take-*`): clicks anywhere, a dropout centred on the take, noise against
+the whole take's RMS, a cut at a fraction of the take and a run-on appended at
+its end. They are declared constructions with their own parameters, never a
+silent substitute, and leave every catalog variant's output unchanged. Identity
 swaps splice a second voice rendering the same script, so the splice is
 time-aligned and only the voice changes. Pitch and rate changes use a
 windowed-sinc resampler and plain overlap-add (no correlation search, whose
@@ -48,6 +56,15 @@ SINC_HALF_WIDTH = 16
 # Soft-knee clipping: samples above the knee are squashed by tanh toward an
 # asymptote this far above it (about +1 dB), so the output never exceeds it.
 SOFT_KNEE_HEADROOM = 0.12
+# A dropout centred on a recorded take keeps at least this much of it on each side.
+CENTRE_MARGIN_MS = 250.0
+# What a variant may need of its source (`needs`), and how a refusal names it.
+NEED_DESCRIPTIONS = {
+    "words": "word intervals (from the aligner, on N1 and N2 only)",
+    "pauses": "declared pause intervals",
+    "script": "a procedural script to re-render",
+    "voice": "a procedural render voice",
+}
 
 
 class InjectorNotApplicable(ValueError):
@@ -70,13 +87,16 @@ class Injector:
     description: str
     variants: tuple[Variant, ...]
     apply: Callable[[Fixture, dict, SeededStream], tuple[np.ndarray, list[dict]]] = field(repr=False)
+    # Word-free variants for recorded takes (N3). They stay out of `variants`
+    # and `describe`, so the catalog, M1 and the procedural goldens are as before.
+    recording_variants: tuple[Variant, ...] = ()
 
     @property
     def key(self) -> str:
         return f"{self.injector_id}@{self.version}"
 
     def variant(self, name: str) -> Variant:
-        for variant in self.variants:
+        for variant in (*self.variants, *self.recording_variants):
             if variant.name == name:
                 return variant
         raise KeyError(f"{self.key} has no variant {name!r}")
@@ -303,23 +323,30 @@ def _dropout(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
         output, _ = join([source.samples[:first], _room_tone(rng, length), source.samples[last:]], 0)
         return output, []
     placement = parameters["placement"]
-    if placement == "intra-word":
-        first, last = _longest_word(source)
-        start = (first + last) // 2 - length // 2
-    elif placement == "interior":
-        first, last = source.words[0][0], source.words[-1][1]
-        start = (first + last) // 2 - length // 2
-    elif placement == "pause":
-        if not source.pauses:
-            raise InjectorNotApplicable(f"{source.fixture_id} declares no pause")
-        first, last = source.pauses[0]
-        start = (first + last) // 2 - length // 2
+    if placement == "centre":
+        # Recorded takes: the span sits at the take's centre, a margin clear of
+        # either end, wherever its words fall (none are known).
+        if length + 2 * _samples(CENTRE_MARGIN_MS, rate) > source.samples.size:
+            raise InjectorNotApplicable(f"{source.fixture_id} is shorter than the span and its margins")
+        start = (source.samples.size - length) // 2
     else:
-        raise ValueError(f"unknown placement {placement!r}")
-    # Keep the span interior: it ends at least 100 ms before the last word does,
-    # unless the speech is shorter than the span itself.
-    latest = source.words[-1][1] - _samples(100.0, rate) - length
-    start = max(source.words[0][0], min(start, latest))
+        if placement == "intra-word":
+            first, last = _longest_word(source)
+            start = (first + last) // 2 - length // 2
+        elif placement == "interior":
+            first, last = source.words[0][0], source.words[-1][1]
+            start = (first + last) // 2 - length // 2
+        elif placement == "pause":
+            if not source.pauses:
+                raise InjectorNotApplicable(f"{source.fixture_id} declares no pause")
+            first, last = source.pauses[0]
+            start = (first + last) // 2 - length // 2
+        else:
+            raise ValueError(f"unknown placement {placement!r}")
+        # Keep the span interior: it ends at least 100 ms before the last word does,
+        # unless the speech is shorter than the span itself.
+        latest = source.words[-1][1] - _samples(100.0, rate) - length
+        start = max(source.words[0][0], min(start, latest))
     end = min(start + length, source.samples.size)
     attenuation = parameters["attenuationDB"]
     gain = 0.0 if attenuation is None else 10.0 ** (attenuation / 20.0)
@@ -416,7 +443,13 @@ def _noise(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.nda
     snr = parameters["snrDB"]
     if snr is None:
         return np.array(source.samples), []
-    scale = _speech_rms(source) / 10.0 ** (snr / 20.0) / float(np.sqrt(np.mean(noise ** 2)))
+    # `take`: against the whole take's RMS, pauses included (recorded takes,
+    # whose speech spans are unknown); by default against the speech RMS.
+    if parameters.get("snrReference", "speech") == "take":
+        reference = float(np.sqrt(np.mean(source.samples ** 2)))
+    else:
+        reference = _speech_rms(source)
+    scale = reference / 10.0 ** (snr / 20.0) / float(np.sqrt(np.mean(noise ** 2)))
     output = source.samples + scale * noise
     positive = snr < 60.0
     labels = [{"kind": "noise", "startSample": 0, "endSample": count}] if positive else []
@@ -439,6 +472,19 @@ def _silence(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
 
 
 def _truncate(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    if "keepFraction" in parameters:
+        # Recorded takes: a hard cut at a fraction of the take's length. The cut
+        # is sample-exact, but with no word interval known it cannot guarantee
+        # that speech, rather than the trailing pause, was removed.
+        size = source.samples.size
+        cut = int(round(parameters["keepFraction"] * size))
+        output = np.array(source.samples[:cut])
+        fade = min(_samples(parameters["fadeMS"], source.sample_rate), output.size)
+        if fade:
+            output[output.size - fade:] *= np.linspace(1.0, 0.0, fade + 1)[1:]
+        labels = [{"kind": "truncation", "startSample": cut, "endSample": cut, "removedSamples": size - cut,
+                   "basis": "take-fraction"}] if cut < size else []
+        return output, labels
     words = source.words
     removed = parameters["wordsRemoved"]
     partial = parameters["partialFraction"]
@@ -459,7 +505,35 @@ def _truncate(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.
     return output, labels
 
 
+def _run_on_take_end(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    """Recorded takes: material appended after the take's last sample.
+
+    With no word interval known, the repeated material is a `spanSeconds` span
+    of the take's own middle; the sham appends room tone.
+    """
+    rate = source.sample_rate
+    size = source.samples.size
+    wanted = _samples(parameters["appendSeconds"] * 1000.0, rate)
+    content = parameters["content"]
+    if content == "room-tone":
+        appended = [_room_tone(rng, wanted)]
+    elif content == "repeat-span":
+        span = _samples(parameters["spanSeconds"] * 1000.0, rate)
+        if 2 * span > size:
+            raise InjectorNotApplicable(f"{source.fixture_id} is shorter than twice the repeated span")
+        start = (size - span) // 2
+        appended = [source.samples[start:start + span]] * max(1, int(math.ceil(wanted / span)))
+    else:
+        raise ValueError(f"unknown run-on content {content!r}")
+    output, starts = join([source.samples, *appended], _fade(rate))
+    labels = [] if content == "room-tone" else [
+        {"kind": "run-on", "startSample": starts[0], "endSample": int(output.size), "basis": "take-end"}]
+    return output, labels
+
+
 def _run_on(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    if parameters.get("anchor") == "take-end":
+        return _run_on_take_end(source, parameters, rng)
     rate = source.sample_rate
     cuts = boundaries(source)
     insert = min(source.samples.size, source.words[-1][1] + _samples(60.0, rate))
@@ -589,10 +663,20 @@ def _variants(sham: dict, sweep: dict[str, dict], *, controls: dict[str, dict] |
     return tuple(variants)
 
 
+def _take_variants(sham: dict | None, sweep: dict[str, dict]) -> tuple[Variant, ...]:
+    """Recording variants `take-<severity>`: a sham (when the catalog's needs a word) and the sweep."""
+    variants = [Variant("take-sham", "sham", sham)] if sham is not None else []
+    return tuple(variants + [Variant(f"take-{name}", name, parameters) for name, parameters in sweep.items()])
+
+
 def _catalog() -> dict[str, Injector]:
     click = {"widthSamples": 1, "placement": "voiced", "clustered": False}
     drop = {"placement": "interior", "attenuationDB": None, "rampMS": 0.0, "mode": "attenuate"}
     swap = {"position": "middle", "renderSeed": 0}
+    take_click = {**click, "placement": "any"}
+    take_drop = {**drop, "placement": "centre"}
+    take_noise = {"kind": "white", "snrReference": "take"}
+    take_run_on = {"anchor": "take-end", "spanSeconds": 0.5}
     injectors = [
         Injector("SIG-CLICK", 1, "clicks", ("A",),
                  "Impulses of 1-3 samples at a rate per second, voiced, quiet or anywhere; "
@@ -604,7 +688,12 @@ def _catalog() -> dict[str, Injector]:
                            extra={"quiet-clustered": ("moderate", {"widthSamples": 3, "placement": "quiet",
                                                                    "clustered": True, "amplitude": 0.5,
                                                                    "ratePerSecond": 5.0})}),
-                 _click),
+                 _click,
+                 recording_variants=_take_variants(
+                     {**take_click, "amplitude": 0.0, "ratePerSecond": 5.0},
+                     {"mild": {**take_click, "amplitude": 0.2, "ratePerSecond": 1.0},
+                      "moderate": {**take_click, "amplitude": 0.5, "ratePerSecond": 5.0},
+                      "severe": {**take_click, "amplitude": 1.0, "ratePerSecond": 50.0}})),
         Injector("SIG-DROP", 2, "dropout", ("A", "C"),
                  "A span zeroed or attenuated inside a word, the interior or a pause, with optional ramps "
                  "that the label includes; sham: the moderate span at 0 dB; control: the first declared "
@@ -617,7 +706,12 @@ def _catalog() -> dict[str, Injector]:
                                                                "mode": "natural-pause"}},
                            extra={"attenuated-ramped": ("moderate", {**drop, "durationMS": 600.0,
                                                                      "attenuationDB": -60.0, "rampMS": 5.0})}),
-                 _dropout),
+                 _dropout,
+                 recording_variants=_take_variants(
+                     {**take_drop, "durationMS": 600.0, "attenuationDB": 0.0},
+                     {"mild": {**take_drop, "durationMS": 150.0},
+                      "moderate": {**take_drop, "durationMS": 600.0},
+                      "severe": {**take_drop, "durationMS": 2000.0}})),
         Injector("SIG-CLIP", 2, "clipping", ("A",),
                  "The loudest fraction of samples flattened at the level they exceed (hard) or squashed "
                  "above it by a soft knee, with no gain, so the label covers exactly the changed samples; "
@@ -649,7 +743,11 @@ def _catalog() -> dict[str, Injector]:
                             "severe": {"kind": "white", "snrDB": 0.0}},
                            controls={"control-80db": {"kind": "white", "snrDB": 80.0}},
                            extra={"hum-moderate": ("moderate", {"kind": "hum", "snrDB": 20.0})}),
-                 _noise),
+                 _noise,
+                 recording_variants=_take_variants(
+                     {**take_noise, "snrDB": None},
+                     {"mild": {**take_noise, "snrDB": 30.0}, "moderate": {**take_noise, "snrDB": 15.0},
+                      "severe": {**take_noise, "snrDB": 0.0}})),
         Injector("SIG-SIL", 1, "leading or terminal silence", ("A", "C"),
                  "Zeros or room tone added before or after the take; sham: 0 s.",
                  _variants({"position": "terminal", "seconds": 0.0, "fill": "zeros"},
@@ -666,7 +764,12 @@ def _catalog() -> dict[str, Injector]:
                            {"mild": {"wordsRemoved": 0, "partialFraction": 0.5, "fadeMS": 0.0},
                             "moderate": {"wordsRemoved": 1, "partialFraction": 0.5, "fadeMS": 0.0},
                             "severe": {"wordsRemoved": 3, "partialFraction": 0.5, "fadeMS": 0.0}}),
-                 _truncate),
+                 _truncate,
+                 # The catalog sham (a fade at the natural end) needs no word.
+                 recording_variants=_take_variants(
+                     None, {"mild": {"keepFraction": 0.8, "fadeMS": 0.0},
+                            "moderate": {"keepFraction": 0.65, "fadeMS": 0.0},
+                            "severe": {"keepFraction": 0.5, "fadeMS": 0.0}})),
         Injector("BND-RUNON", 1, "run-on", ("C",),
                  "The last word repeated (or reversed) after the script ends; sham: 300 ms of room tone.",
                  _variants({"appendSeconds": 0.3, "content": "room-tone"},
@@ -675,7 +778,12 @@ def _catalog() -> dict[str, Injector]:
                             "severe": {"appendSeconds": 4.0, "content": "repeat-tail"}},
                            extra={"reversed-moderate": ("moderate", {"appendSeconds": 1.5,
                                                                      "content": "reversed-tail"})}),
-                 _run_on),
+                 _run_on,
+                 recording_variants=_take_variants(
+                     {**take_run_on, "appendSeconds": 0.3, "content": "room-tone"},
+                     {"mild": {**take_run_on, "appendSeconds": 0.5, "content": "repeat-span"},
+                      "moderate": {**take_run_on, "appendSeconds": 1.5, "content": "repeat-span"},
+                      "severe": {**take_run_on, "appendSeconds": 4.0, "content": "repeat-span"}})),
         Injector("CNT-REP", 1, "repetition or loop", ("B", "I"),
                  "Words repeated in place; sham: the splice at the same boundary with no repeat.",
                  _variants({"words": 2, "repeats": 0, "position": "middle"},
@@ -740,11 +848,43 @@ def _catalog() -> dict[str, Injector]:
 CATALOG: dict[str, Injector] = _catalog()
 
 
+def needs(injector_id: str, parameters: Mapping[str, Any]) -> tuple[str, ...]:
+    """What a variant needs of its source beyond PCM (keys of NEED_DESCRIPTIONS)."""
+    if injector_id == "SIG-CLICK":
+        return ("words",) if parameters["placement"] in ("voiced", "quiet") else ()
+    if injector_id == "SIG-DROP":
+        if parameters.get("mode") == "natural-pause":
+            return ("pauses",)
+        placement = parameters["placement"]
+        return () if placement == "centre" else ("words", "pauses") if placement == "pause" else ("words",)
+    if injector_id == "SIG-NOISE":
+        return () if parameters["snrDB"] is None or parameters.get("snrReference") == "take" else ("words",)
+    if injector_id == "BND-TRUNC":
+        cut = "keepFraction" not in parameters and (parameters["wordsRemoved"] or parameters["partialFraction"])
+        return ("words",) if cut else ()
+    if injector_id == "BND-RUNON":
+        return () if parameters.get("anchor") == "take-end" else ("words",)
+    if injector_id in ("CNT-REP", "CNT-DEL", "CNT-INS", "PRS-OCT", "PRS-BRK"):
+        return ("words",)
+    if injector_id == "IDN-SWAP":
+        return ("script", "voice", "words")
+    return ()
+
+
+def _has(source: Fixture, need: str) -> bool:
+    return bool(source.words if need == "words" else source.pauses if need == "pauses"
+                else source.script is not None if need == "script" else source.voice is not None)
+
+
 def inject(injector_id: str, variant: str, source: Fixture, seed: int) -> Injection:
-    """Apply one catalog variant to a source under a seed."""
+    """Apply one catalog (or recording) variant to a source under a seed."""
     injector = CATALOG[injector_id]
     chosen = injector.variant(variant)
     parameters = dict(chosen.parameters)
+    missing = [need for need in needs(injector_id, parameters) if not _has(source, need)]
+    if missing:
+        raise InjectorNotApplicable(f"{source.fixture_id}: {injector.key} {chosen.name} needs "
+                                    + "; ".join(NEED_DESCRIPTIONS[need] for need in missing))
     # The stream depends on the injector, the source and the seed, never on the
     # variant: a sham draws the same positions as its positives.
     rng = SeededStream(seed, injector.key, source.digest)

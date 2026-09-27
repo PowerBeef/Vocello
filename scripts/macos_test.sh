@@ -12,6 +12,8 @@
 #   scripts/macos_test.sh tsan                      # core TSan subset (push CI blocking job + nightly cold run)
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
 #                                                 # headless macOS language-hint matrix (vocello CLI)
+#   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b] [--label L]
+#                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
 #   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
@@ -1123,6 +1125,133 @@ PY
   note "lang-bench PASS · $artifacts"
 }
 
+# qc-takes: the AQ-07 natural calibration takes (audio QC population N3). One
+# `vocello batch` per planned (language, voice, seed) batch over one split of the
+# committed CC0 script pool; the takes are calibration data, not a benchmark, so
+# nothing is published and no history record is written. A failed batch stops
+# only itself; every planned take without output is recorded as missing, and the
+# lane then exits non-zero with its artifacts preserved.
+cmd_qc_takes() {
+  local split="calibration" languages="" label=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --split) split="${2:-}"; shift 2 ;;
+      --split=*) split="${1#*=}"; shift ;;
+      --languages) languages="${2:-}"; shift 2 ;;
+      --languages=*) languages="${1#*=}"; shift ;;
+      --label) label="${2:-}"; shift 2 ;;
+      --label=*) label="${1#*=}"; shift ;;
+      *) die "unknown qc-takes arg '$1' (try --split calibration|confirmation --languages english,french --label L)" ;;
+    esac
+  done
+  validate_benchmark_label "$label"
+  [[ "$split" == "calibration" || "$split" == "confirmation" ]] || die "--split must be calibration or confirmation"
+  [[ -z "$languages" || "$languages" =~ ^[a-z]+(,[a-z]+)*$ ]] \
+    || die "--languages takes comma-separated canonical language ids (english,french,...)"
+
+  local pool="$ROOT_DIR/config/audio-qc-script-pool.json"
+  local policy="$ROOT_DIR/config/audio-qc-calibration-takes.json"
+  local takes_tool="$SCRIPT_DIR/audio_qc_calibration_takes.py"
+  [[ -f "$pool" ]] || die "qc-takes: missing the committed script pool (config/audio-qc-script-pool.json)"
+  [[ -f "$policy" ]] || die "qc-takes: missing the take policy (config/audio-qc-calibration-takes.json)"
+  python3 "$takes_tool" validate-policy --policy "$policy" >/dev/null \
+    || die "qc-takes: the take policy is invalid"
+
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
+  # Read-only: downloads stay an explicit `models ensure` repair action.
+  require_mac_benchmark_models pro_custom_speed pro_design_speed
+
+  local run_id
+  run_id="mac-qc-takes-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local artifacts="$QVOICE_ARTIFACTS_MACOS/audio-qc/qc-takes-$run_id"
+  mkdir -p "$artifacts/batches" "$artifacts/batch-results" "$artifacts/batch-out" "$artifacts/logs"
+  capture_benchmark_source "$artifacts"
+
+  local plan="$artifacts/take-plan.json"
+  local -a plan_command=(python3 "$takes_tool" plan --pool "$pool" --policy "$policy" --split "$split"
+    --run-id "$run_id" --output "$plan")
+  [[ -z "$languages" ]] || plan_command+=(--languages "$languages")
+  "${plan_command[@]}" >"$artifacts/plan-summary.json" \
+    || die "qc-takes: the immutable take plan could not be written"
+  local batch_index="$artifacts/batches/index.tsv"
+  python3 "$takes_tool" batch-files --plan "$plan" --out-dir "$artifacts/batches" >"$batch_index" \
+    || die "qc-takes: the batch line files could not be written"
+  local planned_count batch_total
+  planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
+  batch_total="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["batchCount"])' "$plan")"
+
+  # The debug data context holds the benchmark models `require_mac_benchmark_models` checked.
+  export QWENVOICE_DEBUG=1
+  note "qc-takes: runID=$run_id split=$split takes=$planned_count batches=$batch_total${label:+ label=$label}"
+
+  local row batch_count=0 batch_fail=0
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    batch_count=$((batch_count + 1))
+    local batch_id mode variant variation seed speaker brief count lines_file
+    # Unit-separated fields (texts and briefs are single lines; the plan refuses separators).
+    IFS=$'\x1f' read -r batch_id mode variant variation seed speaker brief count lines_file <<<"$row"
+    local -a batch_command=(
+      "$QVOICE_BUILD_ROOT/vocello" batch --file "$lines_file" --mode "$mode" --variant "$variant"
+      --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$batch_id" --json
+    )
+    case "$mode" in
+      custom)
+        [[ -n "$speaker" ]] || die "qc-takes batch $batch_id: the plan names no Built-in speaker"
+        batch_command+=(--speaker "$speaker")
+        ;;
+      design)
+        [[ -n "$brief" ]] || die "qc-takes batch $batch_id: the plan names no Voice Design brief"
+        batch_command+=(--voice-brief "$brief")
+        ;;
+      *) die "qc-takes batch $batch_id: unsupported mode '$mode'" ;;
+    esac
+    note "qc-takes batch $batch_count/$batch_total: $batch_id ($mode/$variant, $count takes)"
+    local st=0
+    # stdout is the batch's JSON (bound to the plan by item index); stdin is
+    # closed so the CLI never consumes this loop's batch rows.
+    "${batch_command[@]}" >"$artifacts/batch-results/$batch_id.json" \
+      2>"$artifacts/logs/$batch_id.log" </dev/null || st=$?
+    if (( st != 0 )); then
+      warn "qc-takes batch $batch_id: vocello batch exit $st (continuing with the other batches)"
+      batch_fail=$((batch_fail + 1))
+    fi
+  done <"$batch_index"
+  unset QWENVOICE_DEBUG
+
+  [[ "$batch_count" -eq "$batch_total" ]] \
+    || die "qc-takes: ran $batch_count of $batch_total planned batches; artifacts are preserved in $artifacts"
+
+  local manifest="$artifacts/takes-manifest.json" manifest_st=0 validate_st=0
+  python3 "$takes_tool" manifest --plan "$plan" --batch-results "$artifacts/batch-results" \
+    --wav-root "$artifacts/batch-out" --output "$manifest" >"$artifacts/manifest-counts.json" || manifest_st=$?
+  if (( manifest_st == 0 )); then
+    python3 "$takes_tool" validate-manifest --manifest "$manifest" --plan "$plan" \
+      >"$artifacts/manifest-validation.json" || validate_st=$?
+  fi
+
+  local generated="?" missing="?"
+  if (( manifest_st == 0 )); then
+    generated="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["counts"]["generated"])' "$manifest")"
+    missing="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["counts"]["missing"])' "$manifest")"
+  fi
+  {
+    echo "qc-takes runID=$run_id split=$split${label:+ label=$label}"
+    echo "planned=$planned_count generated=$generated missing=$missing"
+    echo "batches=$batch_total batch_fail=$batch_fail"
+    echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "manifest_validation=$([[ $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"
+  } | tee "$artifacts/verdict.txt"
+
+  if (( manifest_st != 0 || validate_st != 0 )); then
+    die "qc-takes FAIL: the takes manifest could not be bound or validated; artifacts are preserved in $artifacts"
+  fi
+  if [[ "$missing" != "0" ]]; then
+    die "qc-takes FAIL: $missing of $planned_count planned takes are missing; artifacts are preserved in $artifacts"
+  fi
+  note "qc-takes PASS · $planned_count takes · no benchmark record (calibration data) · $artifacts"
+}
+
 # test: deterministic Core and owned Qwen3 runtime tests. No UI process is
 # launched and no frontend action is synthesized.
 cmd_test() {
@@ -1702,6 +1831,11 @@ main() {
       require_quiet_host macos-lang-bench || die "language benchmark needs a quiet host"
       cmd_lang_bench "$@"
       ;;
+    qc-takes)
+      require_build_free_space language-benchmark || die "calibration-take storage preflight failed"
+      require_quiet_host macos-qc-takes || die "calibration takes need a quiet host"
+      cmd_qc_takes "$@"
+      ;;
     test)
       require_build_free_space runtime-tests || die "macOS test storage preflight failed"
       cmd_test "$@"
@@ -1725,7 +1859,7 @@ main() {
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2
       ;;
-    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
+    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|qc-takes|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
   esac
 }
 

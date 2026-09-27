@@ -36,6 +36,7 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import audio_qc_calibration_takes  # noqa: E402
 import audio_qc_orchestrator as orchestrator_module  # noqa: E402
 from audio_qc_judges import load_registry  # noqa: E402
 from audio_qc_orchestrator import (  # noqa: E402
@@ -43,6 +44,7 @@ from audio_qc_orchestrator import (  # noqa: E402
     OrchestratorError,
     Stage2Judge,
     compare_with_bundle,
+    manifest_from_calibration_takes,
     manifest_from_cascade_input,
     manifest_from_independent_asr,
     replay_committed_records,
@@ -309,6 +311,96 @@ class LanguageLaneTests(OrchestratorFixture):
             self.assertEqual(record["takeVerdict"]["status"], "unavailable")
             self.assertEqual(record["legacyVerdicts"]["languageWitness"]["status"], "unavailable")
             self.assertEqual(validate_take_evidence(record), [])
+
+
+class CalibrationTakesBridgeTests(OrchestratorFixture):
+    """AQ-07: the panel judges run over the natural calibration takes and injection sets."""
+
+    def _source(self, kind: str = "audio-qc-calibration-takes") -> dict:
+        run = self.root / "qc-takes-run"
+        (run / "wav").mkdir(parents=True, exist_ok=True)
+        entries = []
+        for take_id, language, frequency, transcript, detected in (
+            ("en-0001--aiden", "english", 180, SCRIPTS["english"], "en"),
+            ("fr-0001--design-calm-narrator", "french", 200, "Le jardin tranquille ouvre tot chaque matin", "fr"),
+        ):
+            wav = run / "wav" / f"{take_id}.wav"
+            _tone(wav, frequency)
+            self._answer(wav, transcript=transcript, detected=detected)
+            text = SCRIPTS[language]
+            entries.append({
+                "takeID": take_id, "family": f"{take_id}:1", "scriptID": take_id.split("--")[0],
+                "language": language, "role": "primary", "mode": "custom", "variant": "speed",
+                "variation": "expressive", "voice": {"kind": "builtin", "id": "aiden"}, "seed": 1,
+                "batchID": "calibration-x", "text": text, "textSHA256": text_sha256(text),
+                "wavPath": f"wav/{take_id}.wav", "wavSHA256": file_sha256(wav), "durationSeconds": 2.0,
+                "finishReason": "eos", "status": "generated", "missingReason": None, "textBinding": "text",
+            })
+        entries.append({
+            "takeID": "en-0002--serena", "language": "english", "text": SCRIPTS["english"],
+            "textSHA256": text_sha256(SCRIPTS["english"]), "wavPath": None, "wavSHA256": None,
+            "durationSeconds": None, "status": "missing", "missingReason": "no-batch-output",
+        })
+        source = {"schemaVersion": 1, "kind": kind, "runID": "mac-qc-takes-fixture", "planDigest": "b" * 64,
+                  "poolDigest": "c" * 64, "policyDigest": "d" * 64, "split": "calibration",
+                  "counts": {"planned": 3, "generated": 2, "missing": 1}, "takes": entries}
+        if kind == "audio-qc-calibration-takes":
+            source["manifestDigest"] = audio_qc_calibration_takes.self_digest(source, "manifestDigest")
+        else:
+            for entry in entries:
+                entry["injection"] = {"recipe": "sham", "expectedOutcome": "pass"}
+            entries[1]["injection"]["expectedOutcome"] = "fail"
+        self.run_dir = run
+        return source
+
+    def test_calibration_takes_become_language_lane_takes_and_run(self) -> None:
+        source = self._source()
+        manifest = manifest_from_calibration_takes(source, source_sha256="e" * 64, base_dir=self.run_dir)
+        orchestrator_module.validate_manifest(manifest)
+        self.assertEqual((manifest["lane"], manifest["runID"]), ("language-bench", "mac-qc-takes-fixture"))
+        self.assertEqual(manifest["source"], {"kind": "audio-qc-calibration-takes", "sha256": "e" * 64,
+                                              "skippedTakes": 1})
+        self.assertEqual([take["id"] for take in manifest["takes"]],
+                         ["en-0001--aiden", "fr-0001--design-calm-narrator"])
+        english = manifest["takes"][0]
+        self.assertEqual((english["language"], english["referenceText"], english["expectedOutcome"]),
+                         ("english", SCRIPTS["english"], "pass"))
+        self.assertEqual(Path(english["audioPath"]), (self.run_dir / "wav/en-0001--aiden.wav").resolve())
+        result = self._orchestrator().run(manifest)
+        witness = {record["take"]["takeID"]: record["legacyVerdicts"]["languageWitness"]["status"]
+                   for record in result["records"]}
+        self.assertEqual(witness, {"en-0001--aiden": "one-witness", "fr-0001--design-calm-narrator": "one-witness"})
+        self.assertEqual(result["header"]["run"]["languageWitness"]["rowCount"], 2)
+
+    def test_a_tampered_or_foreign_manifest_is_refused(self) -> None:
+        source = self._source()
+        source["takes"][0]["text"] = "Changed after the manifest was sealed."
+        with self.assertRaisesRegex(OrchestratorError, "manifest digest"):
+            manifest_from_calibration_takes(source, source_sha256="e" * 64, base_dir=self.run_dir)
+        with self.assertRaisesRegex(OrchestratorError, "must be one of"):
+            manifest_from_calibration_takes({**self._source(), "kind": "independent-asr-manifest"},
+                                            source_sha256="e" * 64, base_dir=self.run_dir)
+        empty = self._source("audio-qc-injection-set")
+        for entry in empty["takes"]:
+            entry["status"] = "missing"
+        with self.assertRaisesRegex(OrchestratorError, "no generated take"):
+            manifest_from_calibration_takes(empty, source_sha256="e" * 64, base_dir=self.run_dir)
+
+    def test_an_injection_set_maps_its_expectation_and_the_command_counts_skips(self) -> None:
+        source = self._source("audio-qc-injection-set")
+        manifest = manifest_from_calibration_takes(source, source_sha256="e" * 64, base_dir=self.run_dir)
+        self.assertEqual([take["expectedOutcome"] for take in manifest["takes"]], ["pass", "fail"])
+        path = self.run_dir / "injection-set.json"
+        path.write_text(json.dumps(source), encoding="utf-8")
+        output = self.root / "orchestrator-manifest.json"
+        with mock.patch("sys.stdout") as stdout:
+            self.assertEqual(orchestrator_module.main(
+                ["manifest", "--from-calibration-takes", str(path), "--output", str(output)]), 0)
+        printed = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertEqual(json.loads(printed), {"lane": "language-bench", "takes": 2, "skipped": 1})
+        written = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(written["source"]["kind"], "audio-qc-injection-set")
+        self.assertEqual(orchestrator_module.validate_manifest(written)["takes"][1]["expectedOutcome"], "fail")
 
 
 class DeliveryLaneTests(OrchestratorFixture):

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "audio-qc-calibration-takes-policy",
+  "version": 1,
+  "population": "N3",
+  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md sections 5.1, 5.4, 5.5 and 5.7; config/audio-qc-qualification-policy.json",
+  "description": "The take plan of the natural calibration takes (population N3): every script of one split of config/audio-qc-script-pool.json spoken by one primary voice, rotating over the language's three voices, plus a deterministic donor subset spoken by a second voice for same-script, different-voice pairs (identity-swap construction, class E). scripts/audio_qc_calibration_takes.py plans, binds and validates the takes; scripts/macos_test.sh qc-takes generates them. Takes are calibration data, never a benchmark: nothing is published and no history record is written.",
+  "generation": {
+    "customMode": "custom",
+    "designMode": "design",
+    "variant": "speed",
+    "variation": "expressive",
+    "language": "auto-per-text",
+    "note": "vocello batch refuses --language: every item resolves its language from its own text (Auto), as the delivered default does."
+  },
+  "familyRule": "One script x voice x seed is one family, the unit of independence (config/audio-qc-qualification-policy.json statistics.familyRule); a family is deduplicated by PCM digest.",
+  "seedRule": {
+    "policy": "sha256-audio-qc-takes-v1-generation-split-language-mode-voice-63bit",
+    "generation": 1,
+    "identity": "audio-qc-calibration-seed-v1|<generation>|<split>|<language>|<mode>|<voiceKey>",
+    "bits": 63,
+    "scope": "One seed per (split, language, mode, voice) batch: vocello batch --seed applies one seed to every item of a batch. It mirrors the seed-identity scheme of scripts/language_bench_evidence.py (the first 8 bytes of a SHA-256, masked to 63 bits). A new generation number draws new, independent families."
+  },
+  "assignment": {
+    "primary": "The split's scripts of a language, ordered by script ID, take the language's voices in declared order (Built-in, Built-in, Voice Design) in rotation.",
+    "donorScriptsPerLanguage": 20,
+    "donorSelection": "Scripts are ranked within each primary-voice group by SHA-256 of audio-qc-calibration-donor-v1|<split>|<language>|<scriptID>; donors are drawn round-robin over the groups in voice order until the count is reached, so every ordered voice pair is represented.",
+    "donorVoice": "The next voice in the rotation after the script's primary voice."
+  },
+  "speakerGenders": {
+    "aiden": "male",
+    "ryan": "male",
+    "vivian": "female",
+    "serena": "female",
+    "uncle_fu": "male",
+    "dylan": "male",
+    "eric": "male",
+    "ono_anna": "female",
+    "sohee": "female"
+  },
+  "designBriefs": {
+    "calm-narrator": {
+      "text": "A warm, friendly narrator with a calm, measured pace.",
+      "source": "config/language-bench-corpus.json designInstruction"
+    },
+    "bright-presenter": {
+      "text": "A bright, youthful presenter with a lively, upbeat pace.",
+      "source": "the contrasting brief of this policy"
+    }
+  },
+  "splits": {
+    "calibration": {
+      "designBrief": "calm-narrator",
+      "expectedScriptsPerLanguage": 60,
+      "expectedTakeCount": 800,
+      "expectedTakeCountRule": "10 languages x (60 primary takes + 20 donor takes)"
+    },
+    "confirmation": {
+      "designBrief": "bright-presenter"
+    }
+  },
+  "splitRule": "Calibration and confirmation are disjoint by family, speaker and script (audit section 5.5 step 1): each language's two splits share no Built-in speaker and no Voice Design brief. Japanese and Korean have one native Built-in speaker each; it speaks the calibration split, and their confirmation split relies on non-native Built-in speakers beside its Voice Design voice.",
+  "languages": [
+    {"language": "english", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
+    {"language": "french", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
+    {"language": "german", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
+    {"language": "spanish", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
+    {"language": "italian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
+    {"language": "portuguese", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
+    {"language": "russian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
+    {"language": "chinese", "calibration": ["vivian", "uncle_fu"], "confirmation": ["serena", "dylan"]},
+    {"language": "japanese", "calibration": ["ono_anna", "aiden"], "confirmation": ["vivian", "ryan"]},
+    {"language": "korean", "calibration": ["sohee", "aiden"], "confirmation": ["serena", "ryan"]}
+  ]
+}

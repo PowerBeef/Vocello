@@ -134,7 +134,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
   instead of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench` and `release.yml` run only on explicit request, in the lead session, with no
+  memory|lang-bench|qc-takes` and `release.yml` run only on explicit request, in the lead session, with no
   parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in
   `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
   level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;

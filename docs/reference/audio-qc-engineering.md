@@ -1453,6 +1453,40 @@ the session rerun. The offline tests (`test_audio_qc_panel_orchestration.py`,
 `test_audio_qc_panel_qualification.py`) drive the same code over fixture workers under the real
 supervisor and admission.
 
+### Natural calibration takes (AQ-07 N3, 2026-09-27)
+
+Population N3 is natural Vocello takes over one split of the CC0 script pool
+(`config/audio-qc-script-pool.json`). `config/audio-qc-calibration-takes.json` fixes the take
+plan. Each language has three voices per split: two Built-in speakers, a male and a female with
+the native speaker where one exists, and one Voice Design brief. The calibration split uses the
+corpus's calm narrator and the confirmation split a contrasting brief, and a language's two splits
+share no speaker (§5.5 step 1). Takes use the Speed variant, the expressive variation and Auto
+language per text.
+
+Each script gets one primary voice, rotating over the three voices. A stratified donor subset of
+20 scripts per language also gets the next voice, which gives same-script, different-voice pairs
+for class E constructions. `vocello batch --seed` applies one seed to a whole batch, so the seed
+belongs to one (split, language, mode, voice) batch, derived by SHA-256 like the language
+benchmark's seed identity. A family is still script × voice × seed. The calibration split plans
+800 takes: 10 languages × (60 + 20).
+
+`scripts/audio_qc_calibration_takes.py` works in four steps:
+
+- `plan` writes an immutable plan bound to the pool and policy digests.
+- `batch-files` writes one line file per batch.
+- `manifest` binds each batch's `--json` output to the plan by item index, checking each item's
+  text. It moves every WAV to `wav/<takeID>.wav` and records a planned take without output as
+  `missing` with its reason.
+- `validate-manifest` recomputes the digests and checks the manifest against the plan.
+
+The consent-bound lane `scripts/macos_test.sh qc-takes [--split calibration|confirmation]
+[--languages a,b] [--label L]` runs these steps around one `vocello batch` per batch on a quiet
+host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>/` and stay untracked. A
+failed batch stops only itself, and any missing take fails the lane. The lane publishes nothing and
+writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
+takes manifest, or an injection-set manifest, into a language-lane manifest for the panel judges;
+it skips and counts missing takes.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

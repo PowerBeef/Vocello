@@ -47,7 +47,8 @@ of takes and loads no model itself:
 
 Commands:
   manifest         build an orchestrator manifest from an independent-ASR
-                   manifest (language lane) or a delivery cascade input
+                   manifest (language lane), a calibration-takes or injection-set
+                   manifest (language lane, AQ-07) or a delivery cascade input
   run              run Stages 1-3 and write the private bundle
   replay           recompute Stage 3 from the cache (no model runs) and compare
                    it with a bundle's records
@@ -87,6 +88,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import numpy as np  # noqa: E402
 
+import audio_qc_calibration_takes  # noqa: E402
 from audio_qc_judges import JudgeRegistryError, load_registry  # noqa: E402
 from delivery_analysis_cache import (  # noqa: E402
     NO_MODEL_DIGEST,
@@ -243,6 +245,59 @@ def manifest_from_independent_asr(source: dict[str, Any], *, source_sha256: str)
         "schema": MANIFEST_SCHEMA, "runID": str(source.get("runID")), "lane": "language-bench",
         "platform": source.get("platform"), "generationProcessExited": True,
         "source": {"kind": "independent-asr-manifest", "sha256": source_sha256}, "takes": takes, "pairs": [],
+    }
+
+
+CALIBRATION_TAKE_KINDS = ("audio-qc-calibration-takes", "audio-qc-injection-set")
+
+
+def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: str, base_dir: Path) -> dict[str, Any]:
+    """The language lane over natural calibration takes (AQ-07, population N3) or an injection set.
+
+    Each generated take becomes one language-lane take: its planned text is the
+    reference text and its language the expected language, so the content and
+    language metrics of every judge apply. A WAV path is relative to the source
+    manifest (`base_dir`). A planned take without output is skipped and counted.
+    """
+    kind = source.get("kind")
+    if kind not in CALIBRATION_TAKE_KINDS:
+        raise OrchestratorError(f"a calibration-takes manifest must be one of {CALIBRATION_TAKE_KINDS}")
+    if kind == "audio-qc-calibration-takes":
+        if issues := audio_qc_calibration_takes.manifest_digest_issues(source):
+            raise OrchestratorError(issues[0])
+    entries = source.get("takes")
+    if not isinstance(entries, list) or not entries:
+        raise OrchestratorError("the calibration-takes manifest has no takes")
+    takes, skipped = [], 0
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("takeID"), str):
+            raise OrchestratorError("every calibration take names its takeID")
+        if entry.get("status") == "missing" or entry.get("wavPath") is None or entry.get("wavSHA256") is None:
+            skipped += 1
+            continue
+        take_id, text = entry["takeID"], entry.get("text")
+        if not isinstance(text, str) or not text or not isinstance(entry.get("wavPath"), str):
+            raise OrchestratorError(f"{take_id}: a generated take names its text and WAV path")
+        if entry.get("textSHA256") is not None and entry["textSHA256"] != text_sha256(text):
+            raise OrchestratorError(f"{take_id}: textSHA256 does not bind its text")
+        wav = Path(entry["wavPath"])
+        wav = wav if wav.is_absolute() else (base_dir / wav).resolve()
+        injection = entry.get("injection") if isinstance(entry.get("injection"), dict) else {}
+        expected = entry.get("expectedOutcome", injection.get("expectedOutcome", "pass"))
+        takes.append(_take(
+            take_id=take_id, generation_id=take_id, audio=str(wav), audio_sha256=entry["wavSHA256"],
+            language=entry.get("language"), reference_text=text, script_sha256=text_sha256(text),
+            expected_outcome=expected, duration=entry.get("durationSeconds"),
+        ))
+    if not takes:
+        raise OrchestratorError(f"the calibration-takes manifest has no generated take ({skipped} skipped)")
+    run_id = source.get("runID")
+    return {
+        "schema": MANIFEST_SCHEMA,
+        "runID": run_id if isinstance(run_id, str) and run_id else f"{kind}-{source_sha256[:12]}",
+        "lane": "language-bench", "platform": "macos", "generationProcessExited": True,
+        "source": {"kind": kind, "sha256": source_sha256, "skippedTakes": skipped},
+        "takes": takes, "pairs": [],
     }
 
 
@@ -1251,6 +1306,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     source = manifest.add_mutually_exclusive_group(required=True)
     source.add_argument("--from-independent-asr-manifest", type=Path)
     source.add_argument("--from-cascade-input", type=Path)
+    source.add_argument("--from-calibration-takes", type=Path,
+                        help="an AQ-07 calibration-takes manifest or an injection-set manifest")
     manifest.add_argument("--output", type=Path, required=True)
     for name in ("run", "replay"):
         command = commands.add_parser(name, help="run Stages 1-3" if name == "run" else "recompute Stage 3 from the cache")
@@ -1281,12 +1338,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "manifest":
-            path = args.from_independent_asr_manifest or args.from_cascade_input
+            path = args.from_independent_asr_manifest or args.from_cascade_input or args.from_calibration_takes
             payload = _read(path)
-            build = manifest_from_independent_asr if args.from_independent_asr_manifest else manifest_from_cascade_input
-            value = validate_manifest(build(payload, source_sha256=file_sha256(path)))
+            if args.from_calibration_takes:
+                value = manifest_from_calibration_takes(payload, source_sha256=file_sha256(path),
+                                                        base_dir=path.resolve().parent)
+            elif args.from_independent_asr_manifest:
+                value = manifest_from_independent_asr(payload, source_sha256=file_sha256(path))
+            else:
+                value = manifest_from_cascade_input(payload, source_sha256=file_sha256(path))
+            value = validate_manifest(value)
             atomic_json(args.output, value)
-            print(json.dumps({"lane": value["lane"], "takes": len(value["takes"])}))
+            summary = {"lane": value["lane"], "takes": len(value["takes"])}
+            if "skippedTakes" in value["source"]:
+                summary["skipped"] = value["source"]["skippedTakes"]
+            print(json.dumps(summary))
             return 0
         if args.command == "validate-bundle":
             errors = validate_private_bundle(args.bundle, repository=REPO)

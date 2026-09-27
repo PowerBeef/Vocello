@@ -108,6 +108,7 @@
       "Bash(./scripts/ios_device.sh *)",
       "Bash(scripts/macos_test.sh memory*)",
       "Bash(scripts/macos_test.sh lang-bench*)",
+      "Bash(scripts/macos_test.sh qc-takes*)",
       "Bash(scripts/macos_test.sh gate*)",
       "Bash(scripts/macos_test.sh profile*)",
       "Bash(scripts/macos_test.sh telemetry-overhead*)",

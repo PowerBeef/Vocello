@@ -295,29 +295,36 @@ def load_pool(path: Path) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]
         raise TakeError(f"the script pool is not {POOL_KIND} schema 1")
     if not is_sha256(pool.get("poolDigest")):
         raise TakeError("the script pool declares no poolDigest")
+    # The committed pool (scripts/audio_qc_script_pool.py) declares its
+    # languages once and lists every script in one flat `entries` list, each
+    # entry naming its language.
     languages = pool.get("languages")
     if not isinstance(languages, list) or not languages:
         raise TakeError("the script pool has no languages")
     by_language: dict[str, list[dict[str, Any]]] = {}
-    script_ids: set[str] = set()
     for entry in languages:
         language = entry.get("language") if isinstance(entry, dict) else None
         if not isinstance(language, str) or language in by_language:
             raise TakeError(f"the script pool repeats or omits a language: {language!r}")
-        scripts = entry.get("scripts")
-        if not isinstance(scripts, list):
-            raise TakeError(f"{language}: the pool's scripts must be a list")
-        for script in scripts:
-            script_id = script.get("id") if isinstance(script, dict) else None
-            if not isinstance(script_id, str) or not SCRIPT_ID.fullmatch(script_id) or script_id in script_ids:
-                raise TakeError(f"{language}: a pool script id is unsafe or repeated: {script_id!r}")
-            script_ids.add(script_id)
-            if script.get("split") not in SPLITS:
-                raise TakeError(f"{script_id}: unknown split {script.get('split')!r}")
-            text = script.get("text")
-            if not isinstance(text, str) or script.get("textSHA256") != text_sha256(text):
-                raise TakeError(f"{script_id}: textSHA256 does not bind the script text")
-        by_language[language] = scripts
+        by_language[language] = []
+    scripts = pool.get("entries")
+    if not isinstance(scripts, list):
+        raise TakeError("the script pool's entries must be a list")
+    script_ids: set[str] = set()
+    for script in scripts:
+        script_id = script.get("id") if isinstance(script, dict) else None
+        if not isinstance(script_id, str) or not SCRIPT_ID.fullmatch(script_id) or script_id in script_ids:
+            raise TakeError(f"a pool script id is unsafe or repeated: {script_id!r}")
+        script_ids.add(script_id)
+        language = script.get("language")
+        if language not in by_language:
+            raise TakeError(f"{script_id}: language {language!r} is not declared by the pool")
+        if script.get("split") not in SPLITS:
+            raise TakeError(f"{script_id}: unknown split {script.get('split')!r}")
+        text = script.get("text")
+        if not isinstance(text, str) or script.get("textSHA256") != text_sha256(text):
+            raise TakeError(f"{script_id}: textSHA256 does not bind the script text")
+        by_language[language].append(script)
     return pool, by_language
 
 

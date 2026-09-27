@@ -48,20 +48,22 @@ def sha(text: str) -> str:
 
 
 def pool_fixture(calibration: int = 60, confirmation: int = 9, languages=LANGUAGES) -> dict:
-    entries = []
+    """The committed pool's layout: languages declared once, scripts flat in `entries`."""
+    declared, entries = [], []
     for language, (locale, template) in languages.items():
         scripts = []
         for index in range(calibration + confirmation):
             text = template.format(i=index)
             # Pool order is not script-ID order: the plan sorts by ID itself.
             scripts.append({
-                "id": f"{locale}-{index + 1:04d}", "text": text, "textSHA256": sha(text),
+                "id": f"{locale}-{index + 1:04d}", "language": language, "text": text, "textSHA256": sha(text),
                 "split": "calibration" if index < calibration else "confirmation",
                 "unit": "characters" if language == "chinese" else "words", "length": 9, "sourceLine": index,
             })
-        entries.append({"language": language, "locale": locale, "scripts": list(reversed(scripts))})
+        declared.append({"language": language, "commonVoiceLocale": locale})
+        entries.extend(reversed(scripts))
     return {"schemaVersion": 1, "kind": "audio-qc-script-pool", "version": 1, "poolDigest": "a" * 64,
-            "languages": entries}
+            "languages": declared, "entries": entries}
 
 
 class Fixture(unittest.TestCase):
@@ -109,6 +111,14 @@ class PolicyTests(Fixture):
 
 
 class PlanTests(Fixture):
+    def test_the_committed_pool_plans_both_splits(self) -> None:
+        # The lane reads the committed pool; its layout must stay plannable.
+        for split in ("calibration", "confirmation"):
+            plan = build_plan(pool_path=takes_module.DEFAULT_POOL, policy_path=self.policy_path,
+                              split=split, run_id="run-1")
+            self.assertEqual(plan["takeCount"] if "takeCount" in plan else len(plan["takes"]), 800, split)
+            self.assertEqual(len({take["language"] for take in plan["takes"]}), 10, split)
+
     def test_the_plan_is_deterministic_and_bound_by_its_digests(self) -> None:
         first, second = self.plan(), self.plan()
         self.assertEqual(first, second)
@@ -190,16 +200,16 @@ class PlanTests(Fixture):
             self.plan(pool_fixture(confirmation=0), split="confirmation")
         for bad in ("two\nlines", "carriage\rreturn", "unit\x1fseparator", "para graph", " edge", "tab\tinside"):
             pool = pool_fixture(calibration=3, confirmation=0, languages={"english": LANGUAGES["english"]})
-            script = pool["languages"][0]["scripts"][0]
+            script = pool["entries"][0]
             script.update(text=bad, textSHA256=sha(bad))
             with self.assertRaisesRegex(TakeError, "one batch line", msg=repr(bad)):
                 self.plan(pool)
         pool = pool_fixture(calibration=3, confirmation=0, languages={"english": LANGUAGES["english"]})
-        pool["languages"][0]["scripts"][0]["textSHA256"] = "b" * 64
+        pool["entries"][0]["textSHA256"] = "b" * 64
         with self.assertRaisesRegex(TakeError, "textSHA256"):
             self.plan(pool)
         pool = pool_fixture(calibration=3, confirmation=0, languages={"english": LANGUAGES["english"]})
-        pool["languages"].append({"language": "klingon", "scripts": []})
+        pool["languages"].append({"language": "klingon"})
         with self.assertRaisesRegex(TakeError, "klingon"):
             self.plan(pool)
 

@@ -16,4 +16,10 @@ loads no model. This package holds its parts:
   `lib.qc_qualification.composer`.
 - `evidence`: the take-evidence schema (digests and metrics only) and the
   untracked private bundle.
+- `panel_engines`, `panel_jobs` and `panel_metrics` (AQ-06): the judge panel's
+  worker engines, its Stage 2 rows and output identities, and its L2 metrics
+  and report-only verdicts.
+- `qualification` (AQ-06 P8): the canary set, run analysis, determinism class,
+  flip analysis, qualification records and registry promotion behind
+  `scripts/audio_qc_panel_qualification.py`.
 """

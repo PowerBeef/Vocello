@@ -21,6 +21,10 @@ Then, per lane, the first matching rule decides the take:
 5. any gating `uncalibrated` -> `uncalibrated` (ranks above pass, as #41);
 6. otherwise `pass`; advisory uncalibrated verdicts are listed only.
 
+A verdict marked `reportOnly` (a judge that does not vote, or a candidate or
+shadow panel judge before qualification, AQ-06) is never gating in any lane:
+it is listed with the advisory verdicts and cannot decide a take.
+
 A lane whose required detector sent no verdict, or that has no gating verdict
 at all, is `unavailable`: a pass is never composed from nothing. The Swift
 registry spells the same order fail (unavailable folds into it) > abstained >
@@ -116,6 +120,9 @@ def normalize(verdict: Mapping) -> dict:
     if reported == "unavailable" and not (reasons and set(reasons) <= UNAVAILABLE_REASONS):
         raise CompositionError(f"{detector}: an unavailable verdict needs reasons from "
                                f"{sorted(UNAVAILABLE_REASONS)}")
+    report_only = verdict.get("reportOnly", False)
+    if not isinstance(report_only, bool):
+        raise CompositionError(f"{detector}: reportOnly must be a boolean")
     status = reported
     legacy = bool(calibration and calibration["level"] == "legacy-unqualified")
     if reported in ("pass", "warn", "fail"):
@@ -125,9 +132,12 @@ def normalize(verdict: Mapping) -> dict:
             status, reasons = "abstain", reasons + ["out-of-scope"]
         elif reported == "fail" and calibration["level"] == "warn":
             status, reasons = "warn", reasons + ["qualified-at-warn-only"]
-    return {"detector": detector, "class": detector_class, "stage": stage, "judges": sorted(judges),
-            "calibration": calibration, "reportedStatus": reported, "status": status,
-            "reasons": sorted(set(reasons)), "legacy": legacy}
+    entry = {"detector": detector, "class": detector_class, "stage": stage, "judges": sorted(judges),
+             "calibration": calibration, "reportedStatus": reported, "status": status,
+             "reasons": sorted(set(reasons)), "legacy": legacy}
+    if report_only:
+        entry["reportOnly"] = True
+    return entry
 
 
 def _gating_set(lane: str, gating_sets: Mapping[str, Mapping]) -> tuple[frozenset, frozenset]:
@@ -146,9 +156,12 @@ def compose(verdicts: Iterable[Mapping], lane: str, *, required: Sequence[str] =
         entry = normalize(verdict)
         if entry["detector"] in normalized:
             raise CompositionError(f"duplicate verdict for {entry['detector']}")
-        entry["gating"] = entry["stage"] in stages or entry["class"] in classes
+        entry["gating"] = not entry.get("reportOnly", False) and (
+            entry["stage"] in stages or entry["class"] in classes)
         normalized[entry["detector"]] = entry
     for detector in required:
+        if detector in normalized and normalized[detector].get("reportOnly"):
+            raise CompositionError(f"{detector}: a required detector cannot be report-only")
         if detector not in normalized:
             normalized[detector] = {"detector": detector, "class": None, "stage": None, "judges": [],
                                     "calibration": None, "reportedStatus": None, "status": "unavailable",

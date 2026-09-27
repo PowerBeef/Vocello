@@ -33,6 +33,7 @@ from lib.language_metrics import (
     NORMALIZATION_DATA_FILES,
     score_recognition,
 )
+from lib.qc_pipeline.panel_metrics import composer_reason
 from lib.qc_qualification.composer import compose
 
 REPO = Path(__file__).resolve().parents[3]
@@ -217,7 +218,7 @@ def channel_detectors(families: Mapping[str, list[dict[str, bool]]], *, unqualif
     for detector, klass, channel in ((CONTENT_DETECTOR, "B", "accuracy"), (LANGUAGE_DETECTOR, "D", "language")):
         votes = {family: [witness[channel] for witness in witnesses] for family, witnesses in families.items() if witnesses}
         if unavailable:
-            status, reasons = "unavailable", sorted(set(unavailable.values()))
+            status, reasons = "unavailable", sorted({composer_reason(reason) for reason in unavailable.values()})
         elif not votes:
             if unqualified:
                 status, reasons = "abstain", ["low-confidence"]

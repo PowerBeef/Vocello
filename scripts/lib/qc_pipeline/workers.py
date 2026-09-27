@@ -121,6 +121,8 @@ class WorkerOutcome:
             "rowsUnavailable": dict(sorted(self.unavailable.items())),
             "modelLoadSeconds": (self.ready or {}).get("modelLoadSeconds"),
             "warmupSeconds": (self.ready or {}).get("warmupSeconds"),
+            # The thread count the worker declared it ran with (checked against its environment).
+            "threads": (self.ready or {}).get("threads"),
         }
 
 

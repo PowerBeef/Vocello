@@ -460,10 +460,17 @@ class PanelAcquisitionTests(unittest.TestCase):
         self.assertEqual(len(panel), 12)
         for judge_id, judge in panel.items():
             with self.subTest(judge=judge_id):
-                self.assertEqual(judge["status"], "candidate")
-                self.assertEqual((judge["determinismClass"], judge["canary"]), ("unmeasured", None))
-                self.assertEqual(judge["resources"]["ceilingStatus"], "provisional")
-                self.assertIsNone(judge["resources"]["canonicalHostPeakBytes"])
+                if judge["status"] == "candidate":
+                    self.assertEqual((judge["determinismClass"], judge["canary"]), ("unmeasured", None))
+                    self.assertEqual(judge["resources"]["ceilingStatus"], "provisional")
+                    self.assertIsNone(judge["resources"]["canonicalHostPeakBytes"])
+                else:
+                    # Only `audio_qc_panel_qualification.py promote` moves a panel judge on, from a
+                    # committed canary record the registry validator re-reads (AQ-06 P8).
+                    self.assertEqual(judge["status"], "shadow")
+                    self.assertIn(judge["determinismClass"], ("D0", "D1"))
+                    self.assertEqual(judge["resources"]["ceilingStatus"], "measured")
+                    self.assertTrue(judge["canary"]["record"].startswith("benchmarks/audio-qc-qualification/"))
                 self.assertNotIn("plannedExecution", judge)
                 self.assertEqual(judge["execution"]["threadsStatus"], "provisional")
                 self.assertIn("threads", judge["identity"]["output"])
@@ -479,8 +486,8 @@ class PanelAcquisitionTests(unittest.TestCase):
         # ResNet293 (decision 2026-09-26): CC BY 4.0 accepted at tier B, a stage 2 candidate that votes
         # only after the correlated-failure audit against CAM++, with its attribution recorded.
         resnet = panel["speaker.resnet293-voxceleb@1"]
-        self.assertEqual((resnet["status"], resnet["voting"], resnet["license"]["tier"], resnet["ships"]),
-                         ("candidate", False, "B", False))
+        self.assertIn(resnet["status"], ("candidate", "shadow"))
+        self.assertEqual((resnet["voting"], resnet["license"]["tier"], resnet["ships"]), (False, "B", False))
         self.assertEqual((resnet["execution"]["engine"], resnet["acquisition"]["stage"]), ("wespeaker-onnx", 2))
         self.assertIn("correlated-failure audit", resnet["votingGate"]["requires"])
         self.assertEqual(resnet["votingGate"]["status"], "pending")

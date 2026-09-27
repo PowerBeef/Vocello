@@ -151,6 +151,20 @@ GIT_BLOB_MAX_BYTES = 10_000_000
 # Weight and pickle formats: a panel judge pins these by SHA-256, never by a SHA-1 blob ID alone.
 WEIGHT_SUFFIXES = (".bin", ".ckpt", ".gguf", ".h5", ".msgpack", ".npy", ".npz", ".onnx", ".pickle", ".pkl",
                    ".pt", ".pth", ".safetensors", ".tflite")
+# A judge entry's qualification state (AQ-06): what the panel qualification tool
+# writes and what a vote or a verdict reads. None of it changes what the judge
+# outputs, so none of it enters the acquisition digest a receipt, an output
+# identity or a canary record binds.
+QUALIFICATION_STATE_KEYS = frozenset({
+    "status", "resources", "determinismClass", "canary", "qualification", "calibration", "voting", "votingGate",
+})
+# Measured determinism (audit sections 3.1 and 5.8): D0 bit-exact, D1 exact on
+# discrete outputs and within a measured tolerance on scores, D2 neither.
+DETERMINISM_CLASSES = ("unmeasured", "D0", "D1", "D2")
+QUALIFIED_DETERMINISM_CLASSES = frozenset({"D0", "D1"})
+# Statuses a panel judge reaches only with a committed canary record (audit section 5.9).
+CANARY_STATUSES = frozenset({"shadow", "advisory", "warn", "gating"})
+CANARY_FIELDS = ("record", "sha256", "outputIdentity", "date")
 
 
 class JudgeRegistryError(ValueError):
@@ -165,6 +179,21 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise JudgeRegistryError(f"{path.name} must contain an object")
     return value
+
+
+def acquisition_entry_digest(judge: Any) -> str:
+    """The digest of what a judge entry fixes about its output: the entry without its qualification state.
+
+    A receipt, a panel judge's output identity and its canary record bind this
+    digest, so a promotion (status, measured resources, determinism class,
+    canary) never makes a fetched judge stale, while a change of pins, decode
+    options, configuration, preprocessing, runtime or threads does.
+    """
+    if not isinstance(judge, dict):
+        raise JudgeRegistryError("a judge entry must be an object")
+    subset = {key: value for key, value in judge.items() if key not in QUALIFICATION_STATE_KEYS}
+    return hashlib.sha256(json.dumps(subset, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def load_registry(path: Path = DEFAULT_REGISTRY, *, root: Path = REPO) -> dict[str, Any]:
@@ -325,6 +354,8 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
     restrictions = [entry for entry in restrictions or [] if isinstance(entry, dict)]
     for judge_id, judge in judges.items():
         errors.extend(_judge_errors(judge_id, judge, exclusions, restrictions, root))
+        if isinstance(judge, dict) and "acquisition" in judge and judge.get("status") in CANARY_STATUSES:
+            errors.extend(_canary_errors(judge_id, judge, registry, root))
     errors.extend(admission_errors(registry, root=root))
     errors.extend(acquisition_errors(registry, root=root))
     return errors
@@ -449,6 +480,64 @@ def _recovery_evidence_errors(evidence: Any, registry: dict[str, Any], root: Pat
         errors.append("recovery evidence reports must be distinct")
     if any(first & second for position, first in enumerate(sessions) for second in sessions[position + 1:]):
         errors.append("recovery evidence reports must come from separate sessions")
+    return errors
+
+
+def _canary_errors(judge_id: str, judge: dict[str, Any], registry: dict[str, Any], root: Path) -> list[str]:
+    """A shadow (or higher) panel judge cites the committed canary record that qualified it (audit 5.9).
+
+    The record is a committed file bound by its SHA-256, validated in full: its
+    judge, output identity and registry-entry digest are this entry's, both
+    resource runs were clean, its determinism class is D0 or D1 and equals the
+    registry's, and the measured peak it records is the registry's. A change of
+    what the entry fixes about the output (pins, decode options, configuration,
+    runtime, threads) makes the record stale: the judge returns to candidate and
+    is qualified again. A warn or gating judge's record must also match today's
+    worker sources and runtime lock (the canary rule of audit section 5.8).
+    """
+    from lib.qc_pipeline.qualification import (
+        CANARY_SCHEMA, identity_freshness_errors, validate_canary_record,
+    )
+
+    label = f"judge {judge_id}"
+    canary = judge.get("canary")
+    if not isinstance(canary, dict) or any(field not in canary for field in CANARY_FIELDS):
+        return [f"{label}: a {judge.get('status')} panel judge cites its canary record "
+                f"({', '.join(CANARY_FIELDS)})"]
+    relative = canary["record"]
+    if not isinstance(relative, str) or not relative or Path(relative).is_absolute() or ".." in Path(relative).parts:
+        return [f"{label}: the canary record is named by a repository-relative path"]
+    target = root / relative
+    if not target.is_file():
+        return [f"{label}: canary record {relative} does not exist"]
+    if not SHA256.match(str(canary["sha256"])) or _sha256(target) != canary["sha256"]:
+        return [f"{label}: canary record {relative} does not match its recorded SHA-256"]
+    errors = [f"{label}: canary record {relative} {problem}" for problem in _committed_file_errors(root, relative)]
+    try:
+        record = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return errors + [f"{label}: canary record {relative} is not JSON"]
+    problems = validate_canary_record(record)
+    if problems:
+        return errors + [f"{label}: canary record {relative}: {problem}" for problem in problems[:3]]
+    if record.get("schema") != CANARY_SCHEMA or record.get("judge") != judge_id:
+        errors.append(f"{label}: canary record {relative} belongs to another judge")
+    if record.get("outputIdentity") != canary["outputIdentity"]:
+        errors.append(f"{label}: the canary's output identity is not the one the registry cites")
+    if record["identityComponents"].get("registryEntrySHA256") != acquisition_entry_digest(judge):
+        errors.append(f"{label}: the registry entry changed since its canary record; qualify it again or "
+                      "return it to candidate")
+    if record["qualification"].get("passed") is not True:
+        errors.append(f"{label}: its canary record did not pass qualification")
+    determinism = record["determinism"].get("class")
+    if determinism not in QUALIFIED_DETERMINISM_CLASSES or judge.get("determinismClass") != determinism:
+        errors.append(f"{label}: determinismClass must be the canary's measured D0 or D1 class")
+    resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
+    if resources.get("canonicalHostPeakBytes") != record["resources"].get("canonicalHostPeakBytes"):
+        errors.append(f"{label}: canonicalHostPeakBytes must be the peak its canary record measured")
+    if judge.get("status") in VERDICT_STATUSES:
+        errors.extend(f"{label}: {problem}" for problem in identity_freshness_errors(record, judge_id, registry,
+                                                                                    root=root))
     return errors
 
 
@@ -798,6 +887,8 @@ def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]],
         and isinstance(planned.get("reason"), str) and planned["reason"].strip()
     ):
         errors.append(f"{label}: a planned retirement names its roadmap item, status deferred and a reason")
+    if not retired and judge.get("determinismClass") not in DETERMINISM_CLASSES:
+        errors.append(f"{label}: determinismClass is one of {', '.join(DETERMINISM_CLASSES)}")
     errors.extend(_pin_errors(label, judge, kind, blocked))
     errors.extend(_identity_errors(label, judge, kind, blocked))
     legacy = judge.get("legacyIdentifiers") if isinstance(judge.get("legacyIdentifiers"), dict) else {}

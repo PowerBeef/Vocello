@@ -12,7 +12,10 @@ of takes and loads no model itself:
   dsp slot of the admission ledger, which counts against the host's one-worker
   cap while the whole-host recovery rule binds.
 - **Stage 2 (workers).** Each requested neural judge (the whisper-small
-  recognizer, optionally SenseVoice) runs in **one persistent worker per run**
+  recognizer and the SenseVoice Q8 adapter from their prepared configurations
+  with `--judge-config`, and the AQ-06 panel judges with `--judge ID` or
+  `--panel`, launched from their acquisition receipts) runs in **one persistent
+  worker per run**
   (`audio_qc_worker.py`), admitted by the budgeted semaphore of
   `config/audio-qc-judges.json#admission` (decision 9a) under the shared host
   lock of the one host-wide analysis lock root, with the judge's registry
@@ -25,14 +28,20 @@ of takes and loads no model itself:
   without discarding the other judges' results.
 - **L2.** Each raw output is reduced to its metrics (for a recognizer: the
   edit operations and rates of `score_recognition`, without verdicts or
-  thresholds), keyed by the L1 key, the metric definition and the digest of
-  every source that shapes it (a declared list per judge).
+  thresholds; for a panel judge, its category's metrics in
+  `lib.qc_pipeline.panel_metrics`), keyed by the L1 key, the metric definition
+  and the digest of every source that shapes it (a declared list per judge).
+  A speaker judge also embeds the take's reference clip (the clone lane's
+  `referenceAudioPath`) as its own L1 row, and its L2 is their cosine.
 - **Stage 3 (never cached).** The current verdicts are replayed from L2: the
   language lane's witness verdict (`independent_asr.witness_verdict`) and the
   delivery lane's automated review and route (`run_local_delivery_cascade`),
   with each recognition scored from its L2 metrics. Beside them the pure
   composer emits one detector verdict per channel, each naming its judges and
-  calibration record, and the lane's take verdict.
+  calibration record, and the lane's take verdict. A panel judge's verdicts are
+  report-only (`uncalibrated`, never gating) while it is a candidate or shadow,
+  and always when the registry says it does not vote (same-lab judges,
+  ResNet293 before the correlated-failure audit).
 - **Stage 4.** A take-evidence record per take (digests and metrics only) and
   the untracked private bundle (`lib.qc_pipeline.evidence`).
 
@@ -123,6 +132,19 @@ from lib.qc_pipeline.layered_cache import (  # noqa: E402
     metric_sources_digest,
     output_identity_digest,
 )
+from lib.qc_pipeline import panel_metrics  # noqa: E402
+from lib.qc_pipeline.panel_jobs import (  # noqa: E402
+    REFERENCE_SUFFIX,
+    PanelJobError,
+    PanelProfile,
+    identity_components,
+    judge_scope,
+    panel_identity,
+    panel_job_row,
+    panel_judge_ids,
+    panel_request,
+    profile as panel_profile,
+)
 from lib.qc_pipeline.verdicts import (  # noqa: E402
     ASR_METRIC_DEFINITION,
     ASR_METRIC_SOURCES,
@@ -186,8 +208,9 @@ def _read(path: Path) -> dict[str, Any]:
 def _take(*, take_id: str, generation_id: str, audio: str, audio_sha256: str, language: str,
           reference_text: Any, script_sha256: Any, expected_outcome: str = "pass", role: str | None = None,
           stage0: Any = None, external: Any = None, apple: Any = None, duration: Any = None,
-          cell_id: str | None = None) -> dict[str, Any]:
-    return {
+          cell_id: str | None = None, reference_audio: str | None = None,
+          reference_audio_sha256: str | None = None) -> dict[str, Any]:
+    take = {
         "id": take_id, "generationID": generation_id, "cellID": cell_id, "role": role,
         "audioPath": audio, "audioSHA256": audio_sha256, "language": language,
         "referenceText": reference_text if isinstance(reference_text, str) else None,
@@ -197,6 +220,10 @@ def _take(*, take_id: str, generation_id: str, audio: str, audio_sha256: str, la
         "externalRecognitions": [item for item in external or [] if isinstance(item, dict)],
         "appleSpeechChannels": apple if isinstance(apple, dict) else None,
     }
+    if reference_audio is not None:
+        # The clone lane's reference clip: a speaker judge embeds it beside the take.
+        take.update(referenceAudioPath=reference_audio, referenceAudioSHA256=reference_audio_sha256)
+    return take
 
 
 def manifest_from_independent_asr(source: dict[str, Any], *, source_sha256: str) -> dict[str, Any]:
@@ -272,6 +299,11 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         text = take.get("referenceText")
         if text is not None and take.get("scriptSHA256") != text_sha256(text):
             raise OrchestratorError(f"{take['id']}: the script digest does not bind its reference text")
+        if ("referenceAudioPath" in take or "referenceAudioSHA256" in take) and (
+                not isinstance(take.get("referenceAudioPath"), str) or not is_sha256(take.get("referenceAudioSHA256"))):
+            raise OrchestratorError(f"{take['id']}: a reference clip names its path and digest")
+        if REFERENCE_SUFFIX in take["id"]:
+            raise OrchestratorError(f"{take['id']}: a take identity never contains {REFERENCE_SUFFIX}")
     if manifest["lane"] == "delivery-bench":
         pairs = manifest.get("pairs")
         if not isinstance(pairs, list) or not pairs or any(
@@ -308,6 +340,13 @@ class Stage2Judge:
     metric_sources: tuple[Path, ...] = ASR_METRIC_SOURCES
     # Raw output -> (L2 metrics, private text) for a judge that is not a recognizer.
     reduce: Callable[[dict[str, Any]], tuple[dict[str, Any], str | None]] | None = None
+    # An AQ-06 panel judge: its profile, its language scope and whether its verdicts only report.
+    panel: PanelProfile | None = None
+    scope: frozenset[str] | None = None
+    report_only: bool = False
+    detector_stage: int = 2
+    # A panel judge's output-identity components (its canary record carries them).
+    identity_components: Mapping[str, Any] | None = None
 
     @property
     def code_to_language(self) -> dict[str, str]:
@@ -315,12 +354,17 @@ class Stage2Judge:
 
     def request(self, take: Mapping[str, Any]) -> dict[str, Any] | None:
         """What the judge is asked for this take; None when it cannot judge it."""
+        if self.panel is not None:
+            return panel_request(self.panel, self.scope, take)
         if self.family is None:
             return {}
         code = self.language_codes.get(take["language"])
         return None if code is None else {"lockedLanguage": code}
 
-    def job_row(self, key: str, canonical: CanonicalAudio, request: Mapping[str, Any]) -> dict[str, Any]:
+    def job_row(self, key: str, canonical: CanonicalAudio, request: Mapping[str, Any],
+                take: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        if self.panel is not None:
+            return panel_job_row(self.panel, key, canonical, request, take)
         row = {"id": key, "pcmPath": str(canonical.derivative_path)}
         if self.family is not None:
             row["language"] = request["lockedLanguage"]
@@ -391,6 +435,50 @@ def stage2_judge_from_adapter_config(judge_id: str, config: dict[str, Any], regi
             metric_sources=SENSEVOICE_METRIC_SOURCES, reduce=reduce, row_timeout_seconds=row_timeout_seconds,
         )
     raise OrchestratorError(f"{judge_id} is not a Stage 2 judge the orchestrator runs")
+
+
+def panel_stage2_judge(judge_id: str, launch: Mapping[str, Any], registry: Mapping[str, Any], *,
+                       host: Mapping[str, Any] | None = None,
+                       row_timeout_seconds: float = DEFAULT_ROW_TIMEOUT_SECONDS) -> Stage2Judge:
+    """An AQ-06 panel judge as a Stage 2 job, from its worker launch (`acquire_audio_qc_judges.worker_launch`).
+
+    Admitted at the judge's registry ceiling and thread count; its L1 is keyed
+    by its output identity (`panel_jobs.identity_components`) and its request.
+    """
+    from audio_qc_judges import host_profile
+
+    judge = (registry.get("judges") or {}).get(judge_id)
+    if not isinstance(judge, Mapping) or "acquisition" not in judge:
+        raise OrchestratorError(f"{judge_id} is not a registered panel judge")
+    if launch.get("judge") != judge_id:
+        raise OrchestratorError(f"the worker launch is not {judge_id}'s")
+    try:
+        spec = panel_profile(judge_id)
+        admission = judge_admission(registry, judge_id)
+        execution = judge.get("execution") or {}
+        engine = str(execution.get("engine"))
+        if launch.get("engine") != engine or launch.get("threads") != admission.threads:
+            raise OrchestratorError(f"{judge_id}: the launch's engine and threads differ from the registry's")
+        components = identity_components(judge_id, registry, engine=engine, threads=admission.threads,
+                                         host=host if host is not None else host_profile())
+        identity = panel_identity(judge_id, registry, components)
+        scope = judge_scope(judge)
+    except (PanelJobError, AdmissionError) as error:
+        raise OrchestratorError(str(error)) from None
+    command = tuple(str(item) for item in launch.get("command") or ())
+    if not command:
+        raise OrchestratorError(f"{judge_id}: the worker launch names no command")
+    stage = execution.get("stage")
+    return Stage2Judge(
+        judge_id=judge_id, engine=engine, command=command,
+        engine_config=dict(launch.get("engineConfig") or {}), identity=identity, threads=admission.threads,
+        # MLX memory lives in the physical footprint; the ceiling binds it for every panel worker.
+        measure_physical_footprint=True, row_timeout_seconds=row_timeout_seconds,
+        metric_definition=panel_metrics.metric_definition(spec.category),
+        metric_sources=panel_metrics.metric_sources(spec.category),
+        panel=spec, scope=scope, report_only=panel_metrics.report_only(judge),
+        detector_stage=stage if stage in (1, 2) else 2, identity_components=components,
+    )
 
 
 @dataclass(frozen=True)
@@ -584,6 +672,16 @@ class Orchestrator:
                     if not path.is_file() or file_sha256(path) != take["audioSHA256"]:
                         raise OrchestratorError(f"{take['id']}: audio is missing or its bytes changed")
                     canonical[take["id"]] = self.layered.canonical(path)
+                # A reference clip is canonicalized only when a speaker judge embeds it.
+                references: dict[str, CanonicalAudio] = {}
+                if any(judge.panel is not None and judge.panel.needs_reference for judge in self.stage2.values()):
+                    for take in takes:
+                        if "referenceAudioPath" not in take:
+                            continue
+                        path = Path(take["referenceAudioPath"])
+                        if not path.is_file() or file_sha256(path) != take["referenceAudioSHA256"]:
+                            raise OrchestratorError(f"{take['id']}: its reference clip is missing or its bytes changed")
+                        references[take["id"]] = self.layered.canonical(path)
                 stage1 = {take["id"]: self._stage1(take, canonical[take["id"]]) for take in takes} \
                     if lane == "delivery-bench" else {}
             # Plan Stage 2: an L1 hit launches nothing; identical audio and
@@ -594,25 +692,33 @@ class Orchestrator:
             states: dict[str, dict[str, str]] = {judge_id: {} for judge_id in self.stage2}
             out_of_scope: dict[str, set[str]] = {judge_id: set() for judge_id in self.stage2}
             plans: dict[str, dict[str, Any]] = {judge_id: {} for judge_id in self.stage2}
+
+            def plan(judge_id: str, judge: Stage2Judge, unit: str, audio: CanonicalAudio,
+                     request: dict[str, Any], take: Mapping[str, Any]) -> None:
+                identity = l1_identity(audio, judge.identity, request)
+                l1_keys[judge_id][unit] = (identity, request)
+                cached = self.layered.load_l1(identity)
+                if cached is not None:
+                    raw[judge_id][unit] = cached
+                    states[judge_id][unit] = "hit"
+                    return
+                states[judge_id][unit] = "miss"
+                entry = plans[judge_id].setdefault(identity.key, {
+                    "identity": identity, "takes": [],
+                    "row": judge.job_row(identity.key, audio, request, take),
+                })
+                entry["takes"].append(unit)
+
             for judge_id, judge in self.stage2.items():
                 for take in takes:
                     request = judge.request(take)
                     if request is None:
                         out_of_scope[judge_id].add(take["id"])
                         continue
-                    identity = l1_identity(canonical[take["id"]], judge.identity, request)
-                    l1_keys[judge_id][take["id"]] = (identity, request)
-                    cached = self.layered.load_l1(identity)
-                    if cached is not None:
-                        raw[judge_id][take["id"]] = cached
-                        states[judge_id][take["id"]] = "hit"
-                        continue
-                    states[judge_id][take["id"]] = "miss"
-                    entry = plans[judge_id].setdefault(identity.key, {
-                        "identity": identity, "takes": [],
-                        "row": judge.job_row(identity.key, canonical[take["id"]], request),
-                    })
-                    entry["takes"].append(take["id"])
+                    plan(judge_id, judge, take["id"], canonical[take["id"]], request, take)
+                    if judge.panel is not None and judge.panel.needs_reference and take["id"] in references:
+                        # The reference clip is its own row (identical clips share one).
+                        plan(judge_id, judge, take["id"] + REFERENCE_SUFFIX, references[take["id"]], {}, take)
             if self.offline and any(plans.values()):
                 missing = sorted(judge_id for judge_id, plan in plans.items() if plan)
                 raise OrchestratorError(f"replay needs every L1 entry; a model would have to run for {', '.join(missing)}")
@@ -645,8 +751,14 @@ class Orchestrator:
 
             with tempfile.TemporaryDirectory(prefix="vocello-audio-qc-") as temporary:
                 workers = self._run_workers(plans, run_admission, Path(temporary), accept)
-            return self._compose(manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope,
-                                 workers, timings)
+            result = self._compose(manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope,
+                                   workers, timings)
+            # Private and in memory only, like `recognitions`: each judge's raw
+            # output (L1) per take, which the panel qualification compares run to run.
+            result["raw"] = {judge_id: {unit: value for unit, value in values.items()}
+                             for judge_id, values in raw.items()}
+            result["timings"] = timings
+            return result
 
     # -- L2, Stage 3 and Stage 4 -------------------------------------------- #
 
@@ -680,6 +792,7 @@ class Orchestrator:
         recognitions: dict[str, list[dict[str, Any]]] = {take["id"]: [] for take in takes}
         transcripts: dict[str, dict[str, str]] = {take["id"]: {} for take in takes}
         metric_source = {judge_id: metric_sources_digest(judge.metric_sources) for judge_id, judge in self.stage2.items()}
+        panel_detectors: dict[str, list[dict[str, Any]]] = {take["id"]: [] for take in takes}
         for take in takes:
             take_id = take["id"]
             for judge_id, judge in self.stage2.items():
@@ -689,17 +802,60 @@ class Orchestrator:
                     measurements[take_id].append({**base, "status": "out-of-scope", "metrics": {},
                                                   "cache": {"l1": "none", "l2": "none"}, "reasons": ["out-of-scope"]})
                     continue
-                if take_id not in raw[judge_id]:
+                reference_unit = take_id + REFERENCE_SUFFIX
+                missing = take_id not in raw[judge_id] or (
+                    reference_unit in l1_keys[judge_id] and reference_unit not in raw[judge_id])
+                if missing:
+                    reason = unavailable[judge_id].get(take_id) or unavailable[judge_id].get(reference_unit) or "crash"
                     measurements[take_id].append({**base, "status": "unavailable", "metrics": {},
                                                   "cache": {"l1": states[judge_id].get(take_id, "none"), "l2": "none"},
-                                                  "reasons": [unavailable[judge_id].get(take_id, "crash")]})
+                                                  "reasons": [reason]})
+                    if judge.panel is not None:
+                        panel_detectors[take_id].extend(self._panel_verdicts(
+                            judge, take, "unavailable", {}, unavailable_reason=reason))
                     continue
                 identity, request = l1_keys[judge_id][take_id]
                 value = raw[judge_id][take_id]
                 # Timing of this run's launch, never of the cached entry.
                 wall = timings[judge_id].get(take_id)
                 l2_state = "none"
-                if judge.family is not None:
+                if judge.panel is not None:
+                    reference = raw[judge_id].get(reference_unit)
+                    script = take.get("referenceText") if isinstance(take.get("referenceText"), str) else None
+                    duration = take.get("durationSeconds")
+                    duration = duration if isinstance(duration, (int, float)) else canonical[take_id].duration_seconds
+                    l2 = l2_identity(identity, metric_definition=judge.metric_definition,
+                                     metric_source_sha256=metric_source[judge_id],
+                                     inputs={"scriptSHA256": take.get("scriptSHA256"), "language": take["language"],
+                                             "durationSeconds": duration,
+                                             "referenceL1": l1_keys[judge_id][reference_unit][0].key
+                                             if reference is not None else None})
+                    produced: dict[str, Any] = {}
+
+                    def compute_panel(value=value, reference=reference, script=script, duration=duration,
+                                      judge=judge, produced=produced) -> dict[str, Any]:
+                        try:
+                            metrics, text = panel_metrics.reduce(
+                                judge.judge_id, judge.panel.category, value, script=script,
+                                language=take["language"], duration_seconds=float(duration), reference=reference)
+                        except (ValueError, KeyError, TypeError, ZeroDivisionError):
+                            metrics, text = {"reductionFailed": True}, None
+                        produced["text"] = text
+                        return {"metrics": metrics,
+                                "transcriptSHA256": hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None}
+
+                    stored, hit = self.layered.l2_or_compute(l2, compute_panel)
+                    l2_state = "hit" if hit else "miss"
+                    metrics = stored["metrics"]
+                    flat = _metrics(metrics)
+                    transcript_sha = stored.get("transcriptSHA256")
+                    text = produced.get("text")
+                    if text is None and hit and judge.panel.category == "asr":
+                        text = panel_metrics.recognizer_output(judge.judge_id, value)[0] or None
+                    if text:
+                        transcripts[take_id][judge_id] = text
+                    panel_detectors[take_id].extend(self._panel_verdicts(judge, take, "complete", metrics))
+                elif judge.family is not None:
                     recognition = self._recognition(
                         judge, take, canonical[take_id], value if wall is None else {**value, "wallSeconds": wall},
                         request,
@@ -767,7 +923,7 @@ class Orchestrator:
             take_id = take["id"]
             record = self._evidence(lane, take, canonical[take_id], registries, measurements[take_id],
                                     recognitions[take_id], stage1.get(take_id), unavailable, out_of_scope,
-                                    legacy.get(take_id, {}), scorer)
+                                    legacy.get(take_id, {}), scorer, panel_detectors[take_id])
             records.append(record)
             privates.append({
                 # The record's take identity, and the manifest's own beside it.
@@ -792,6 +948,17 @@ class Orchestrator:
         # it); the bundle writer stores the header, records and private files.
         return {"header": header, "records": records, "privates": privates, "recognitions": recognitions}
 
+    @staticmethod
+    def _panel_verdicts(judge: Stage2Judge, take: Mapping[str, Any], measurement: str, metrics: Mapping[str, Any],
+                        *, unavailable_reason: str | None = None) -> list[dict[str, Any]]:
+        script = take.get("referenceText")
+        return panel_metrics.panel_verdicts(
+            judge.judge_id, judge.panel.category, stage=judge.detector_stage, reporting_only=judge.report_only,
+            measurement=measurement, metrics=metrics, language=take["language"],
+            has_script=isinstance(script, str) and bool(script.strip()),
+            unavailable_reason=unavailable_reason, language_channel=judge.panel.language_channel,
+        )
+
     def _legacy(self, manifest, canonical, stage1, recognitions, unavailable, scorer):
         """The current verdicts, replayed from L2 metrics."""
         lane = manifest["lane"]
@@ -802,6 +969,11 @@ class Orchestrator:
             rows, cells = [], {}
             for take_id, take in takes.items():
                 whisper = [item for item in recognitions[take_id] if item.get("modelFamily") == "whisper"]
+                script = take.get("referenceText")
+                if not isinstance(script, str) or not script.strip():
+                    # A take without a script (a procedural canary) has no witness verdict.
+                    legacy[take_id]["languageWitness"] = {"status": "unavailable", "reasons": ["no-reference-text"]}
+                    continue
                 if len(whisper) != 1:
                     reason = unavailable.get(own or "", {}).get(take_id, "missing-verdict")
                     legacy[take_id]["languageWitness"] = {"status": "unavailable", "reasons": [reason]}
@@ -877,7 +1049,7 @@ class Orchestrator:
             for route in ("accepted-for-continued-screening", "rejected", "abstained")}}
 
     def _evidence(self, lane, take, canonical, registries, measurements, recognitions, stage1, unavailable,
-                  out_of_scope, legacy, scorer) -> dict[str, Any]:
+                  out_of_scope, legacy, scorer, panel_detectors=()) -> dict[str, Any]:
         take_id = take["id"]
         families: dict[str, list[dict[str, bool]]] = {}
         unqualified: list[str] = []
@@ -907,6 +1079,7 @@ class Orchestrator:
         if stage1 is not None:
             detectors.append(integrity_detector(stage1["layers"][INTEGRITY_JUDGE]))
         detectors.extend(channel_detectors(families, unqualified=unqualified, unavailable=failed, out_of_scope=scope))
+        detectors.extend(panel_detectors)
         composed = compose_take(lane, detectors)
         receipt = take.get("stage0")
         stage0 = None
@@ -1001,20 +1174,65 @@ def _parse_judge_configs(values: Sequence[str]) -> dict[str, Path]:
     return configs
 
 
+def select_panel_judges(registry: Mapping[str, Any], requested: Sequence[str], *, panel: bool) -> list[str]:
+    """The panel judges a run asks for: `--judge ID` (repeatable) and every runnable one with `--panel`."""
+    available = panel_judge_ids(registry)
+    chosen = list(available) if panel else []
+    for judge_id in requested:
+        if judge_id not in available:
+            judge = (registry.get("judges") or {}).get(judge_id)
+            if isinstance(judge, Mapping) and (judge.get("execution") or {}).get("orchestrated"):
+                raise OrchestratorError(f"{judge_id} runs from its prepared configuration: --judge-config {judge_id}=...")
+            raise OrchestratorError(f"{judge_id} is not a runnable panel judge")
+        if judge_id not in chosen:
+            chosen.append(judge_id)
+    return chosen
+
+
+def build_stage2_judges(registry: Mapping[str, Any], *, judge_configs: Mapping[str, Path],
+                        panel_judges: Sequence[str], model_root: Path | None,
+                        resampler: str | None = None,
+                        row_timeout_seconds: float = DEFAULT_ROW_TIMEOUT_SECONDS,
+                        launcher: Callable[..., Mapping[str, Any]] | None = None,
+                        ) -> tuple[list[Stage2Judge], str]:
+    """Every requested Stage 2 judge, and the one resampler they share."""
+    judges = []
+    chosen_resampler = None
+    for judge_id, path in judge_configs.items():
+        config = _read(path)
+        chosen = select_resampler(resampler, config)
+        if chosen_resampler not in (None, chosen):
+            raise OrchestratorError("every judge configuration must share one resampler")
+        chosen_resampler = chosen
+        judges.append(stage2_judge_from_adapter_config(judge_id, config, dict(registry),
+                                                      row_timeout_seconds=row_timeout_seconds))
+    if panel_judges:
+        if launcher is None:
+            from acquire_audio_qc_judges import AcquisitionError, default_model_root, worker_launch
+
+            root = (model_root or default_model_root()).resolve()
+
+            def launcher(judge_id: str) -> Mapping[str, Any]:
+                try:
+                    return worker_launch(root, dict(registry), judge_id)
+                except AcquisitionError as error:
+                    raise OrchestratorError(f"{error}; run scripts/acquire_audio_qc_judges.py verify") from None
+        for judge_id in panel_judges:
+            judges.append(panel_stage2_judge(judge_id, launcher(judge_id), registry,
+                                             row_timeout_seconds=row_timeout_seconds))
+    return judges, chosen_resampler or select_resampler(resampler)
+
+
 def _orchestrator(args: argparse.Namespace, *, offline: bool) -> Orchestrator:
     registry = load_registry()
-    configs = _parse_judge_configs(args.judge_config or [])
-    judges = []
-    resampler = None
-    for judge_id, path in configs.items():
-        config = _read(path)
-        chosen = select_resampler(args.resampler, config)
-        if resampler not in (None, chosen):
-            raise OrchestratorError("every judge configuration must share one resampler")
-        resampler = chosen
-        judges.append(stage2_judge_from_adapter_config(judge_id, config, registry,
-                                                      row_timeout_seconds=args.timeout_seconds))
-    cache = DeliveryAnalysisCache(args.cache_root, resampler_version=resampler or select_resampler(args.resampler))
+    judges, resampler = build_stage2_judges(
+        registry, judge_configs=_parse_judge_configs(args.judge_config or []),
+        panel_judges=select_panel_judges(registry, getattr(args, "judge", None) or [],
+                                         panel=bool(getattr(args, "panel", False))),
+        model_root=getattr(args, "model_root", None), resampler=args.resampler,
+        row_timeout_seconds=args.timeout_seconds,
+    )
+    cache = DeliveryAnalysisCache(args.cache_root, resampler_version=resampler)
     # The lock and the ledger are the host's, never the cache root's.
     return Orchestrator(registry=registry, cache=cache, stage2=judges, offline=offline)
 
@@ -1032,6 +1250,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         command.add_argument("--manifest", type=Path, required=True)
         command.add_argument("--judge-config", action="append", metavar="JUDGE=CONFIG",
                              help="a prepared adapter configuration per Stage 2 judge (asr.whisper-small@1=...)")
+        command.add_argument("--judge", action="append", metavar="ID",
+                             help="an AQ-06 panel judge to run from its acquisition receipt (repeatable)")
+        command.add_argument("--panel", action="store_true", help="every runnable AQ-06 panel judge")
+        command.add_argument("--model-root", type=Path,
+                             help="the judge model root (default: the owned external-models root)")
         command.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
         command.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
         command.add_argument("--timeout-seconds", type=float, default=DEFAULT_ROW_TIMEOUT_SECONDS,

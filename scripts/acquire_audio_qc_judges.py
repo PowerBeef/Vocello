@@ -37,7 +37,9 @@ fetches is pinned in `config/audio-qc-judges.json`:
   by SHA-256; an existing verified copy is reused.
 - **Receipts.** Each judge gets `<judge directory>/receipt.json`, written last:
   every verified file's SHA-256, the lock and interpreter digests and the
-  registry entry's digest, with names relative to the model root only.
+  registry entry's acquisition digest (the entry without its qualification
+  state, so a promotion by `audio_qc_panel_qualification.py` leaves the receipt
+  current), with names relative to the model root only.
 
 Quarantined and retired judges, and the panel judges listed in
 `acquisitionBlocked`, are never fetched; `plan` names each with its reason.
@@ -83,6 +85,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from audio_qc_judges import (  # noqa: E402
     BLOCKED_STATUSES,
+    acquisition_entry_digest,
     DEFAULT_SNAPSHOT_SOURCE,
     JudgeRegistryError,
     canonical_package,
@@ -214,6 +217,20 @@ def _sha256(path: Path) -> str:
 def entry_digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
                                      ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def receipt_current(receipt: dict[str, Any] | None, judge: dict[str, Any]) -> bool:
+    """A receipt binds the entry's acquisition digest, which a promotion never changes.
+
+    Receipts written before AQ-06 P8 bound the whole entry as it read then (a
+    candidate); they stay current while the entry, its promotion to shadow
+    aside, is unchanged, and a `fetch` of the judge (which re-verifies the files
+    on disk without downloading them) rewrites them.
+    """
+    from lib.qc_pipeline.qualification import candidate_entry
+
+    recorded = (receipt or {}).get("registryEntrySHA256")
+    return recorded in (acquisition_entry_digest(judge), entry_digest(judge), entry_digest(candidate_entry(judge)))
 
 
 def _atomic_json(path: Path, value: Any) -> None:
@@ -924,7 +941,7 @@ def fetch(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, o
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "judge": target.judge_id,
-            "registryEntrySHA256": entry_digest(target.judge),
+            "registryEntrySHA256": acquisition_entry_digest(target.judge),
             "repository": target.repository,
             "revision": target.revision,
             "snapshot": f"{target.directory}/{target.revision}" if target.files else None,
@@ -966,7 +983,7 @@ def verify(root: Path, registry: dict[str, Any], selected: Sequence[Target], *, 
         checks: dict[str, int] = {}
         if receipt.get("schema") != RECEIPT_SCHEMA or receipt.get("judge") != target.judge_id:
             problems.append("the receipt is not this judge's")
-        elif receipt.get("registryEntrySHA256") != entry_digest(target.judge):
+        elif not receipt_current(receipt, target.judge):
             problems.append("the registry entry changed since acquisition; fetch it again")
         family = target.runtime
         spec = acquisition["runtimes"][family]
@@ -1042,7 +1059,7 @@ def plan(root: Path, registry: dict[str, Any], selected: Sequence[Target]) -> di
         present = sum(1 for name in target.files if snapshot is not None and (snapshot / name).exists())
         if target.blocked_reason:
             state = "blocked"
-        elif receipt and receipt.get("registryEntrySHA256") == entry_digest(target.judge):
+        elif receipt and receipt_current(receipt, target.judge):
             state = "fetched"
         elif present:
             state = "partial"
@@ -1086,7 +1103,7 @@ def worker_launch(root: Path, registry: dict[str, Any], judge_id: str) -> dict[s
     if target is None or target.blocked_reason:
         raise AcquisitionError(f"{judge_id} is not a runnable panel judge")
     receipt = _read_json(root / target.directory / RECEIPT_NAME)
-    if receipt is None or receipt.get("registryEntrySHA256") != entry_digest(target.judge):
+    if receipt is None or not receipt_current(receipt, target.judge):
         raise AcquisitionError(f"{judge_id} is not fetched for the current registry entry")
     acquisition = registry["acquisition"]
     spec = acquisition["runtimes"][target.runtime]

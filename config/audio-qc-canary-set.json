@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "audio-qc-panel-canary-set",
+  "summary": "The fixed canary set of the AQ-06 panel qualification (audit sections 5.8 and 5.9): procedural takes rendered by scripts/lib/qc_qualification/fixtures.py, pinned by the golden SHA-256 of their canonical PCM16. No WAV, voice or user data is committed. Clean sources carry their pseudo-text as the script (aligner coverage, recognizer determinism); three carry a reference clip for the speaker judges (the same voice re-rendered, a close voice and a cross-gender voice); silence, noise and a chord are every judge's degenerate inputs. Languages rotate so every language-scoped judge sees at least one take. The lead's language-bench takes join it at run time for the recognizers and the whisper-small against large-v3 flip analysis.",
+  "owner": "scripts/audio_qc_panel_qualification.py",
+  "fixtureVersion": 2,
+  "sampleRateHz": 24000,
+  "takes": [
+    {"id": "canary-modal-english", "source": {"kind": "clean", "index": 0, "stratum": "modal"}, "language": "english", "script": "fixture-text", "pcmSHA256": "05b39a56f153b9801b170c21673b239d006486d39df66c16e69b8c5a07091135", "reference": {"relation": "self", "renderSeed": 1, "pcmSHA256": "bf08f9403da44e98e1343893a760667ed420b5e8b4976f471cdf37789b194a6d"}},
+    {"id": "canary-breathy-chinese", "source": {"kind": "clean", "index": 1, "stratum": "breathy"}, "language": "chinese", "script": "fixture-text", "pcmSHA256": "c128fea7cbebd51a677f5752b5cca10e553f4e77dd189ceb16d9dc7b738488b0"},
+    {"id": "canary-high-f0-japanese", "source": {"kind": "clean", "index": 2, "stratum": "high-f0"}, "language": "japanese", "script": "fixture-text", "pcmSHA256": "f20227ac63d91a92c49d409d3c9f56b025de7db82a2cc3d907a95b1bb69704cc"},
+    {"id": "canary-quiet-korean", "source": {"kind": "clean", "index": 3, "stratum": "quiet"}, "language": "korean", "script": "fixture-text", "pcmSHA256": "7772ebeeeee00f477912ec27d57adf66fb4484d07022c8c070a0ea2b5ba51e5f", "reference": {"relation": "cross-gender", "renderSeed": 0, "pcmSHA256": "6ef3c7dba509d9e9690fbd0cf558afe43c2167e56ab9c2bbdd660709dd7a2d4e"}},
+    {"id": "canary-long-pause-french", "source": {"kind": "clean", "index": 4, "stratum": "long-pause"}, "language": "french", "script": "fixture-text", "pcmSHA256": "79c420bb1be804a31beaec625f48e1bd36af5497eafc11fe727ab275299ab3c0"},
+    {"id": "canary-modal-german", "source": {"kind": "clean", "index": 5, "stratum": "modal"}, "language": "german", "script": "fixture-text", "pcmSHA256": "869efe862ab0b34c9b7ebab00f643274c1844680493e7fca85bffe88024040a5", "reference": {"relation": "close", "renderSeed": 0, "pcmSHA256": "89c031e0066e534881be5be2b09b56f45bff8da48d09aa33d5a85d5d26fa8ee1"}},
+    {"id": "canary-silence-english", "source": {"kind": "abstention", "abstention": "digital-silence"}, "language": "english", "script": null, "pcmSHA256": "16bc2b4d40e4f0d3c8b7299e7c13c531465a7a8078652a8b7082f3553a589dde"},
+    {"id": "canary-noise-spanish", "source": {"kind": "abstention", "abstention": "white-noise"}, "language": "spanish", "script": null, "pcmSHA256": "2e73414d72c66929f9c59b8abb6f17387c39f6068742db4957428016d470c6e6"},
+    {"id": "canary-music-italian", "source": {"kind": "abstention", "abstention": "music"}, "language": "italian", "script": null, "pcmSHA256": "707345cb777821659b387c91f50071098b9255daed7d7c81bd89001d4b4fa837"}
+  ]
+}

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -29,6 +29,11 @@ sourceOfTruth:
   - scripts/lib/qc_pipeline/workers.py
   - scripts/lib/qc_pipeline/layered_cache.py
   - scripts/lib/qc_pipeline/panel_engines.py
+  - scripts/lib/qc_pipeline/panel_jobs.py
+  - scripts/lib/qc_pipeline/panel_metrics.py
+  - scripts/lib/qc_pipeline/qualification.py
+  - scripts/audio_qc_panel_qualification.py
+  - config/audio-qc-canary-set.json
   - scripts/acquire_audio_qc_judges.py
   - config/audio-qc-runtimes/
   - scripts/delivery_resource_supervisor.py
@@ -1323,7 +1328,11 @@ interpreter, plus a 2 GiB margin (`plan` prints the figure; a clean `--all` need
   without a hash, such as RECORD itself and bytecode, are counted), and an offline import probe must
   pass. `fetch` reuses an existing venv only while all of that holds, and rebuilds it otherwise.
 - **Receipts.** A per-judge `receipt.json`, written last, records every digest, with names relative
-  to the model root.
+  to the model root. It binds the registry entry's acquisition digest: the entry without its
+  qualification state (`status`, `resources`, `determinismClass`, `canary`, `calibration`, `voting`,
+  `votingGate`), so a promotion never makes a fetched judge stale. A receipt written before AQ-06 P8
+  bound the whole entry; it stays current until the entry changes, and `fetch` of the judge rewrites
+  it without downloading anything.
 - **Workers.** The worker engines (`lib/qc_pipeline/panel_engines.py`, reached through
   `audio_qc_worker.py`) set the hubs offline and point `HF_HOME`, `HF_HUB_CACHE`, `TORCH_HOME`,
   `MODELSCOPE_CACHE` and `XDG_CACHE_HOME` into an empty directory created for the run, so a model
@@ -1332,14 +1341,98 @@ interpreter, plus a 2 GiB margin (`plan` prints the figure; a clean `--all` need
   symbolic link anywhere inside a panel snapshot refuses the load. The weightless pYIN judge runs
   `require_runnable` instead of the file check.
 
-**Still to do (consent-bound, P8).** Each judge needs two clean M6 resource runs, a measured
-determinism class and a canary record, and the whisper-small against large-v3 dual run must publish
-its flip analysis. The offline tests replace every model with a fake. Each backend's own library
-calls, such as `parakeet_mlx.from_pretrained`, FunASR's `AutoModel`, mlx-audio's `load_model`,
-SpeechBrain's `from_hparams` and the DNSMOS ONNX sessions, run for the first time in that session.
-The orchestrator does not yet build Stage 2 jobs for the panel judges;
-`acquire_audio_qc_judges.worker_launch` supplies their interpreter, engine and configuration from a
-current receipt.
+### Panel jobs and qualification (AQ-06 P8 tooling, 2026-09-27)
+
+**Orchestrator jobs.** `audio_qc_orchestrator.py run|replay` takes `--judge ID` (repeatable) or
+`--panel` beside `--judge-config`, and `--model-root` (default: the owned `external-models` root).
+Each panel judge runs from its receipt (`acquire_audio_qc_judges.worker_launch`): one persistent,
+supervised worker per run, admitted at its registry ceiling, lane and thread count, with the
+physical footprint measured. `lib/qc_pipeline/panel_jobs.py` shapes its rows and L1 key: Whisper,
+Parakeet, Paraformer and SenseVoice read the ISO code and the Qwen3 engines the language name; the
+aligner also reads the script (its digest is in the key); LID, speaker, pitch and quality judges ask
+nothing, so identical audio shares one entry. A judge whose `panel.languages` omit a take's language
+leaves it out of scope. Its output identity is the entry's acquisition digest, its runtime (lock or
+native binary, and the interpreter), its worker sources, the host and its threads.
+`lib/qc_pipeline/panel_metrics.py` reduces each family to L2 metrics:
+
+| Family | Metrics |
+|---|---|
+| Recognizers | Normalization-v3 WER/CER from `score_recognition` (with a script); the detected language where the judge identifies it (Whisper, SenseVoice); the transcript stays private |
+| VoxLingua107 | The posterior over the ten product languages plus `other`, the expected share, the top language and the margin |
+| CAM++, ResNet293 | With a reference clip (a take's `referenceAudioPath`, clone lane): whole-take and per-window cosine; without one, no metric |
+| pYIN | Voiced fraction, F0 median, mean, 5th and 95th percentiles, range and spread in semitones |
+| Audiobox, DNSMOS | CE, CU, PC, PQ; SIG, BAK, OVRL and P.808 |
+| Aligner | Units aligned of units expected, aligned span over the take, end gaps |
+
+Every panel verdict is `reportOnly`: the composer lists it (`uncalibrated`, or `unavailable`) and
+never gates on it, so a take's verdict is what it is without the panel. A judge votes only when the
+registry says it votes and it has reached `warn`; the same-lab judges and ResNet293 never do. A
+take without a script gets no language witness verdict (`no-reference-text`) instead of failing the
+run, and an admission timeout composes as `timeout`.
+
+**Qualification.** `scripts/audio_qc_panel_qualification.py` runs the AQ-06 gate. `run` renders the
+committed canary set (`config/audio-qc-canary-set.json`: nine procedural takes from
+`lib/qc_qualification/fixtures.py`, pinned by golden PCM digest, three with a reference clip), joins
+the latest language-bench takes and runs every judge twice. Each run is its own orchestrator session
+with a fresh cache, so every row runs a model. Everything stays in the untracked session directory
+(`build/artifacts/diagnostics/audio-qc-panel-qualification/<session>/`). Per judge it records:
+
+- **Resources.** Per run: the peak RSS and physical footprint, wall time, model load, warm-up and
+  threads.
+- **A clean run.** Every envelope qualified on `mac-mini-m6-16gb`, no retry, no unavailable row and a
+  quiet host (`require_quiet_host`).
+- **Determinism.** The two runs' raw outputs compared row by row: D0 is bit-exact; D1 equals every
+  discrete output, with the largest score difference as its measured tolerance; D2 is anything
+  else.
+- **The canary record.** Digests and flat metrics per canary take, never text or paths.
+
+Each run also gets a `recovery-report`, the evidence the recovery-rule switch reads. With
+whisper-small in the session, the flip analysis lists the language and accuracy verdicts that flip
+against large-v3 on the speech takes. A judge passes with two clean runs, D0 or D1, and a peak whose
+ceiling (x 1.2) fits the budget. `publish` copies the passing judges' canary records, the session
+record, the flip analysis and both recovery reports to
+`benchmarks/audio-qc-qualification/<session>/`; a failing judge's record stays private.
+`validate` (in the contract gate) checks every committed record.
+
+`promote` edits the registry for each passing candidate, and only from committed records:
+
+- the status becomes `shadow`;
+- `determinismClass` becomes the measured class;
+- `canonicalHostPeakBytes` becomes the measured peak, so the ceiling becomes the peak x 1.2;
+- `canary` cites the record by path, SHA-256 and output identity.
+
+It rewrites only those values, and the registry must still validate. The registry then requires,
+for every shadow or higher panel judge, a committed canary record whose judge, output identity,
+registry-entry digest, class and peak match. A warn or gating judge's record must also match
+today's worker sources and runtime. `--bind-recovery-rule` cites the two recovery reports and flips
+`candidateBinding`, and only when they meet its promotion. That needs whisper-small and SenseVoice
+Q8 in the session too.
+
+**Lead commands (consent-bound session on a quiet M6; no agent or native build alongside).**
+
+```sh
+python3 scripts/acquire_audio_qc_judges.py verify              # every receipt still verifies
+python3 scripts/prepare_delivery_compact_model_config.py whisper-small-mlx \
+  --output build/cache/delivery-analysis/whisper-small-mlx.json
+python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
+  --output build/cache/delivery-analysis/sensevoice-small-q8.json   # only for the recovery-rule evidence
+python3 scripts/audio_qc_panel_qualification.py plan \
+  --manifest build/artifacts/macos/language/<latest lang-bench run>/independent-asr-manifest.json \
+  --judge-config asr.whisper-small@1=build/cache/delivery-analysis/whisper-small-mlx.json \
+  --judge-config compact.sensevoice-small-q8@1=build/cache/delivery-analysis/sensevoice-small-q8.json
+python3 scripts/audio_qc_panel_qualification.py run  <the same arguments>
+python3 scripts/audio_qc_panel_qualification.py publish build/artifacts/diagnostics/audio-qc-panel-qualification/<session>
+# review, commit benchmarks/audio-qc-qualification/<session>/, then:
+python3 scripts/audio_qc_panel_qualification.py promote benchmarks/audio-qc-qualification/<session> [--bind-recovery-rule]
+```
+
+Every backend's own library calls run for the first time in `run` (`parakeet_mlx.from_pretrained`,
+FunASR's `AutoModel`, mlx-audio's `load_model`, SpeechBrain's `from_hparams`, the DNSMOS ONNX
+sessions, the Qwen3 language names). A judge whose worker fails is `unavailable` and stays a
+candidate, while the other judges' results stand. Its engine is corrected in a follow-up change and
+the session rerun. The offline tests (`test_audio_qc_panel_orchestration.py`,
+`test_audio_qc_panel_qualification.py`) drive the same code over fixture workers under the real
+supervisor and admission.
 
 ### Speech/defect calibration: independent references, no required listening
 

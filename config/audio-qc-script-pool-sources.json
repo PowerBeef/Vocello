@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "audio-qc-script-pool-sources",
+  "description": "The pinned Common Voice Sentence Collector files the AQ-02 script pool (config/audio-qc-script-pool.json) is selected from: human-reviewed sentence submissions, one file per product language, under the repository's CC0 1.0 Universal data license. scripts/audio_qc_script_pool.py fetch downloads exactly these files from raw.githubusercontent.com at the pinned commit, refusing any size or SHA-256 mismatch and any redirect; build and validate read nothing else.",
+  "repository": "common-voice/common-voice",
+  "commit": "d910b8578b57d74597c5972f217d72abb696c55a",
+  "host": "raw.githubusercontent.com",
+  "license": {
+    "path": "server/data/LICENSE",
+    "spdx": "CC0-1.0",
+    "bytes": 6556,
+    "sha256": "bf474cdfd02e162603358e4e3615182018cad27593d2bf5e75ca13e4a5a6af0c"
+  },
+  "languages": [
+    {"language": "english", "locale": "en", "path": "server/data/en/sentence-collector.txt", "bytes": 2803252, "sha256": "31ac8e200449ebd7aee4a8c6bd16d4dafd076cf11f7c3efe1035f0283712d136"},
+    {"language": "french", "locale": "fr", "path": "server/data/fr/sentence-collector.txt", "bytes": 4471382, "sha256": "214f3d5b0110e86e3f2018ca6971b918db8ad5cc4c5612ebab58cd0849fb0715"},
+    {"language": "german", "locale": "de", "path": "server/data/de/sentence-collector.txt", "bytes": 1981197, "sha256": "de6bd33fc5742350690fa4be6197aafd9be2c6c9fe4b70b8c5c8670971acc117"},
+    {"language": "spanish", "locale": "es", "path": "server/data/es/sentence-collector.txt", "bytes": 515674, "sha256": "0a125f0d1cd892c5d727abb8006f5fb964ef9fe1e41bdf4afd3c4b845c47286b"},
+    {"language": "italian", "locale": "it", "path": "server/data/it/sentence-collector.txt", "bytes": 155068, "sha256": "5917d71dc7e6e245becc1b50df04a650aea6877737bca3a9b60541b3f230c86e"},
+    {"language": "portuguese", "locale": "pt", "path": "server/data/pt/sentence-collector.txt", "bytes": 1670250, "sha256": "bdabc8258ab0955aada07f75f31fae9fad8b1ca5d40899b92074610bb5aed13d"},
+    {"language": "russian", "locale": "ru", "path": "server/data/ru/sentence-collector.txt", "bytes": 5251568, "sha256": "e0869a008310c452f63fd02e4d52f8abc58df2de73e558c486719161e3ad1b87"},
+    {"language": "chinese", "locale": "zh-CN", "path": "server/data/zh-CN/sentence-collector.txt", "bytes": 40528, "sha256": "c3431534ec4dc0a087546c6e9f254295babec6a42f70bce738da629d41c76ca8"},
+    {"language": "japanese", "locale": "ja", "path": "server/data/ja/sentence-collector.txt", "bytes": 594641, "sha256": "964acfaa4c6ed0f968fbeb152300ab800bb30fce5b2e4c234201ffb3a971598b"},
+    {"language": "korean", "locale": "ko", "path": "server/data/ko/sentence-collector.txt", "bytes": 487527, "sha256": "75be2666283aa11750903644eb0dfae9994ffe1ecbac20fc4e0d607aed5ffd1d"}
+  ]
+}

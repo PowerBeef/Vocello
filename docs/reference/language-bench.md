@@ -1,13 +1,14 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-25
+reviewed: 2026-09-27
 summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
 sourceOfTruth:
   - scripts/check_language_hints.py
   - scripts/check_language_output.py
   - scripts/lib/language_metrics.py
   - config/language-bench-matrix.json
+  - scripts/audio_qc_script_pool.py
 ---
 # Language bench (Phases 2–3)
 
@@ -24,6 +25,8 @@ Headless matrix for the Qwen3 language path:
 | `config/language-bench-corpus.json` | Versioned scripts plus Custom speaker and Design delivery fixtures per language |
 | `config/language-bench-matrix.json` | Cells: mode, `uiHint`, `scriptLang`, `expectedHint` |
 | `config/language-bench-diagnostic-cohort.json` | Fixed cells and five predeclared seeds for autonomous failure diagnosis |
+| `config/audio-qc-script-pool.json` | The AQ-02 CC0 ten-language script pool for audio QC qualification (below); not a bench cell input |
+| `config/audio-qc-script-pool-sources.json` | The pinned Common Voice commit and the size and SHA-256 of every file the pool is selected from |
 
 Cells tagged `"quick": true` form the **quick** subset (English + French + negative control, 7 cells).
 **full** runs all 19 cells (6 languages × Custom pinned/Auto + Design explicit-language + negative).
@@ -43,6 +46,40 @@ on-device recognizer reproduced one transcript for one WAV. They do not provide 
 independent accuracy observations. The 18 positive output cells (plus the expected-fail negative
 control) remain strict per-cell multilingual smoke acceptance, not a population estimate of
 language quality.
+
+### Qualification script pool (AQ-02)
+
+Detector qualification needs many scripts per language, not one, so the audio QC audit (section
+5.3, AQ-F27/F28/F32) adds a separate script pool; the corpus above stays the legacy cohort.
+`config/audio-qc-script-pool.json` holds 120 scripts in each of the ten product languages, split
+60 `calibration` and 60 `confirmation` (disjoint by script). It is the script source for natural
+Vocello calibration takes (population N3) in detector qualification (AQ-07), and later for matched
+human recordings (N1) and their codec resyntheses (N2).
+
+- **Source and license.** Common Voice Sentence Collector files
+  (`server/data/<locale>/sentence-collector.txt`, human-reviewed submissions) at one pinned commit of
+  `common-voice/common-voice`, whose `server/data/LICENSE` is CC0 1.0 Universal. The sources file
+  pins the commit, the license and every file's size and SHA-256. Only these texts are committed.
+- **Selection** (rules `audio-qc-script-pool-rules-v1`, recorded in the pool's `selection` block):
+  every text passes the corpus lint below; it is well formed, has no URL or email, is not all
+  capitals, and reads as one sentence (a capital or inverted mark first, `.`, `!`, `?` or `。` last,
+  no ellipsis); every letter is in the language's script (Simplified Chinese only under the
+  committed Hant-Hans fold table, Japanese with kana, Korean in Hangul, no Latin in CJK and no CJK
+  in alphabetic text); its length in the scoring unit (`normalized_tokens` words, or characters
+  for Chinese and Japanese and syllables for Korean) lies in a window sized for takes of about
+  3-8 s; it is unique after normalization within and across languages and overlaps no legacy corpus
+  script. Candidates are ordered by a seeded SHA-256 of the normalized text, the first 120 are kept
+  (ids `en-0001` onward), and a second seeded hash assigns the splits. Each language records its
+  candidate count after every filter, and `poolDigest` covers the entries.
+- **Commands.** `python3 scripts/audio_qc_script_pool.py fetch` downloads the pinned files into
+  `build/cache/audio-qc-corpora/` (verified, re-fetchable); `build` rewrites the pool from them;
+  `validate` checks the committed pool without network and runs in the contract gate, and
+  `validate --rebuild` also requires a byte-identical rebuild from the fetched files. A rule
+  change bumps the rules version and rebuilds the pool.
+- **No audio.** Human recordings (N1) are not in the pool. Common Voice audio comes from the Mozilla
+  Data Collective under its own terms and is never committed; FLEURS is the fallback N1 source.
+- **Deferred.** A per-language hard-case pool (the seed-tts test-hard design) and a digits and
+  abbreviations diagnostic pool.
 
 ## iOS (on-device)
 

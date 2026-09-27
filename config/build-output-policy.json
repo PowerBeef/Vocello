@@ -206,6 +206,15 @@
       "env": "QVOICE_DELIVERY_ANALYSIS_CACHE"
     },
     {
+      "id": "audio-qc-corpora-cache",
+      "path": "build/cache/audio-qc-corpora",
+      "class": "cache",
+      "owner": "Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch)",
+      "cleanup": "aggressive",
+      "retention": "Digest-pinned CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, one directory per pinned commit (re-fetchable); text only, never audio or evidence",
+      "env": "QVOICE_AUDIO_QC_CORPORA_CACHE"
+    },
+    {
       "id": "scratch-foundation",
       "path": "build/scratch/derived-data/foundation",
       "class": "scratch",

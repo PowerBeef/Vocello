@@ -17,6 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Paused September 27, night — resume AQ-07 at pool rules v2 and the DNSMOS teardown crash
+
+Paused by the maintainer with `main` clean and pushed (CI green on the last push); no agent,
+worktree or lane is running. Done since the evening entry: the full-cohort ceiling recalibration
+(session 20260927-70e86ea6, committed records) raised Parakeet to 6.52 GiB, SenseVoice, VoxLingua
+and, by hand, the legacy whisper-small to 2.74 GiB; ceiling histories now bind to their sessions'
+committed records (review fix); a CI flake in the panel fixture worker is fixed. The calibration
+takes, injection set, M2 report and panel bundles stay untracked under
+`build/artifacts/macos/audio-qc/qc-takes-mac-qc-takes-20260927-182513-872126ac/` for reuse.
+Resume in this order:
+
+1. Pool rules v2 (code only): refuse proper names (French hazards such as "Robin Poussepain").
+2. DNSMOS: its onnxruntime worker can abort at teardown (`recursive_mutex lock failed`).
+3. FLEURS N1 for the ten languages: prepare a pinned, digest-verified fetch; the maintainer runs it.
+4. The N2 codec-resynthesis lane (P9, native), then the pre-registered class A-D calibration.
+
 ### September 27, evening — AQ-07 starts: the first natural calibration cohort and its panel
 
 AQ-02 closed with the CC0 ten-language script pool (120 Common Voice sentences per language,

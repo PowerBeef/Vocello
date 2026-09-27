@@ -1541,15 +1541,15 @@
     {
       "id": "AQ-06",
       "title": "Judge panel acquisition and M6 qualification",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Each panel judge has two clean M6 resource runs, a measured determinism class and a canary record; the whisper-small against large-v3 dual run publishes its flip analysis; judges reach shadow.",
       "sourceOfTruth": [
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
         "config/delivery-evaluator-v2-candidates.json"
       ],
-      "notes": "Audit AQ-F13, F14, F20, F29 (P7, P8). Panel (section 4): Whisper large-v3 plus Parakeet v3 as voting families (Paraformer for zh, SenseVoice f16 for ja and ko), Qwen3-ASR non-voting, VoxLingua107 ECAPA LID, Qwen3-ForcedAligner, CAM++ and ResNet293 speaker families, pYIN, Audiobox and DNSMOS advisory. About 13.5 GB of models (est.). Needs decisions 2-4 and a consent-bound session. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
+      "notes": "Audit AQ-F13, F14, F20, F29 (P7, P8). P7 done 2026-09-27: 12 judges registered as candidates with Hugging Face (or GitHub, for DNSMOS) revisions and per-file SHA-256, hash-locked runtimes and scripts/acquire_audio_qc_judges.py (hardened after a supply-chain review: path-safe keys, redirect allowlist, RECORD-verified venvs, no shared model cache, isolated pip); maintainer decisions 2026-09-26 accept ResNet293 (CC BY 4.0, non-voting until the correlated-failure audit) and DNSMOS P.835 (CC BY 4.0, advisory, tier B). The maintainer's fetch installed and verify passed every judge: Whisper large-v3, Parakeet v3, Paraformer-zh, SenseVoice f16, Qwen3-ASR 1.7B and ForcedAligner (non-voting, same lab), VoxLingua107, CAM++, ResNet293, pYIN, Audiobox Aesthetics and DNSMOS (22 GB with runtimes). Open (P8): orchestrator jobs for the panel judges, two clean M6 resource runs, a determinism class and a canary record per judge, the whisper-small against large-v3 flip analysis, then shadow.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25",
+      "updated": "2026-09-27",
       "blockedBy": [
         "AQ-01",
         "AQ-05"

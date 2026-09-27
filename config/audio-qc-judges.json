@@ -96,6 +96,7 @@
       "whisper-mlx": {"kind": "venv", "lock": "config/audio-qc-runtimes/whisper-mlx.txt", "lockSHA256": "cdcef4165c16f6b8db9edd266922ab2792db69d7c377ebccb1a45ec4ee475bf8", "packages": 36, "downloadBytes": 243701110, "sourceBuilds": [], "venv": "audio-qc-runtime-whisper-mlx-py314", "importProbe": ["mlx.core", "mlx_whisper"]},
       "parakeet-mlx": {"kind": "venv", "lock": "config/audio-qc-runtimes/parakeet-mlx.txt", "lockSHA256": "a3ff575855d65c121beca439a837a448cd33adf42ea88c50f6cffab8c5ce2130", "packages": 54, "downloadBytes": 163463245, "sourceBuilds": [], "venv": "audio-qc-runtime-parakeet-mlx-py314", "importProbe": ["mlx.core", "parakeet_mlx"]},
       "mlx-audio": {"kind": "venv", "lock": "config/audio-qc-runtimes/mlx-audio.txt", "lockSHA256": "373f3934a2a66189e40db3bd4202719de1d6c89b0736de97c59fcacbcb43c955", "packages": 35, "downloadBytes": 128530906, "sourceBuilds": [], "venv": "audio-qc-runtime-mlx-audio-py314", "importProbe": ["mlx.core", "mlx_audio.stt.utils"]},
+      "mlx-audio-aligner": {"kind": "venv", "lock": "config/audio-qc-runtimes/mlx-audio-aligner.txt", "lockSHA256": "0dc5e2eab887c226238e5fda4e17506cda1e859d2aac0b4d310490bac976b0b3", "packages": 39, "downloadBytes": 155913860, "sourceBuilds": [], "venv": "audio-qc-runtime-mlx-audio-aligner-py314", "importProbe": ["mlx.core", "mlx_audio.stt.utils", "nagisa"], "note": "The mlx-audio pins plus the Qwen3-ForcedAligner Japanese tokenizer (nagisa with DyNet38), a family of its own so Qwen3-ASR's mlx-audio runtime keeps its identity. Korean needs soynlp (GPL-3.0, excluded), so the aligner does not align Korean."},
       "funasr-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/funasr-torch.txt", "lockSHA256": "b1ecb8dd052e354ef531a885b5bad9d67e2aeb0a0b8f7221b7eb821082ae405e", "packages": 88, "downloadBytes": 254042833, "sourceBuilds": ["antlr4-python3-runtime", "crcmod", "jieba", "oss2"], "venv": "audio-qc-runtime-funasr-torch-py314", "importProbe": ["torch", "torchaudio", "funasr"]},
       "speechbrain-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/speechbrain-torch.txt", "lockSHA256": "47e8c7c155eee7d81e102731fa91de38c93858dc7dea7bbc09da18b47f29f0d8", "packages": 39, "downloadBytes": 148024547, "sourceBuilds": [], "venv": "audio-qc-runtime-speechbrain-torch-py314", "importProbe": ["torch", "torchaudio", "speechbrain.inference.classifiers"]},
       "audiobox-torch": {"kind": "venv", "lock": "config/audio-qc-runtimes/audiobox-torch.txt", "lockSHA256": "bbdd46beb50f71a0e5fb9e381189e59bf5641ba129b95b26bad526a64dd2e8b8", "packages": 36, "downloadBytes": 115142340, "sourceBuilds": [], "venv": "audio-qc-runtime-audiobox-torch-py314", "importProbe": ["torch", "torchaudio", "audiobox_aesthetics.infer"]},
@@ -897,7 +898,7 @@
       "voting": false,
       "family": "qwen3-aligner",
       "ships": false,
-      "panel": {"audit": "4.1", "languages": {"aligns": ["en", "de", "fr", "es", "it", "pt", "ru", "zh", "ja", "ko"]}},
+      "panel": {"audit": "4.1", "languages": {"aligns": ["en", "de", "fr", "es", "it", "pt", "ru", "zh", "ja"]}, "scopeNote": "Korean is out of scope: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses."},
       "pins": {
         "repository": "mlx-community/Qwen3-ForcedAligner-0.6B-bf16",
         "revision": "53c8c0e46733eec430e4b53dd6471d0e5dee45f8",
@@ -948,7 +949,7 @@
       "determinismClass": "unmeasured",
       "expectedDeterminismClass": "D1",
       "canary": null,
-      "acquisition": {"directory": "qwen3-forcedaligner-0.6b-bf16-mlx", "stage": 2, "runtime": "mlx-audio"}
+      "acquisition": {"directory": "qwen3-forcedaligner-0.6b-bf16-mlx", "stage": 2, "runtime": "mlx-audio-aligner"}
     },
     "lid.voxlingua107-ecapa@1": {
       "role": "Audio language-ID vote 1 (audit section 4.2): posteriors over 107 languages, restricted downstream to the ten product languages plus an other mass; warn-only until calibrated per language and voice.",

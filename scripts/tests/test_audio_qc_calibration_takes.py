@@ -30,6 +30,7 @@ from audio_qc_calibration_takes import (  # noqa: E402
     build_plan,
     contract_speakers,
     load_policy,
+    next_segment_offset,
     policy_issues,
     validate_manifest,
     validate_plan,
@@ -247,11 +248,14 @@ class ManifestTests(Fixture):
         self.results.mkdir(parents=True)
         self.takes = {take["takeID"]: take for take in self.plan_value["takes"]}
 
-    def _batch_json(self, batch: dict, *, failed_at: int | None = None, text_override: dict | None = None) -> dict:
-        out_dir = self.wav_root / batch["batchID"]
+    def _batch_json(self, batch: dict, *, failed_at: int | None = None, text_override: dict | None = None,
+                    offset: int = 0, failed_id: str = "00000000-0000-0000-0000-000000000001") -> dict:
+        # One invocation's stdout; a resumed segment runs the batch's items from `offset`.
+        out_dir = self.wav_root / (batch["batchID"] + (f"@{offset}" if offset else ""))
         out_dir.mkdir(parents=True, exist_ok=True)
         items, rows = [], []
-        for index, take_id in enumerate(batch["takeIDs"]):
+        take_ids = batch["takeIDs"][offset:]
+        for index, take_id in enumerate(take_ids):
             path = out_dir / f"stamp_{batch['mode']}_{index:03d}.wav"
             if failed_at is None or index < failed_at:
                 path.write_bytes(b"RIFF" + take_id.encode("utf-8"))
@@ -262,7 +266,7 @@ class ManifestTests(Fixture):
                              "status": "completed", "audioPath": str(path), "durationSeconds": 2.5,
                              "finishReason": "eos"})
             elif index == failed_at:
-                rows.append({"index": index, "generationID": "00000000-0000-0000-0000-000000000001",
+                rows.append({"index": index, "generationID": failed_id,
                              "status": "failed", "errorCode": "generation_failed"})
             else:
                 rows.append({"index": index, "generationID": "00000000-0000-0000-0000-000000000002",
@@ -272,22 +276,37 @@ class ManifestTests(Fixture):
             return {"count": len(items), "items": items, "mode": batch["mode"], "modelID": model,
                     "variant": "speed", "wallSeconds": 12.0}
         return {"completedCount": failed_at, "items": rows, "mode": batch["mode"], "modelID": model,
-                "plannedCount": len(batch["takeIDs"]), "schemaVersion": 2, "variant": "speed", "wallSeconds": 3.0}
+                "plannedCount": len(take_ids), "schemaVersion": 2, "variant": "speed", "wallSeconds": 3.0}
 
-    def _emit(self, batch: dict, payload: dict) -> None:
+    def _emit(self, batch: dict, payload: dict, *, offset: int = 0) -> Path:
         # The CLI prints sorted-key JSON on one line, as emitJSON does.
-        (self.results / f"{batch['batchID']}.json").write_text(json.dumps(payload, sort_keys=True) + "\n",
-                                                                encoding="utf-8")
+        path = self.results / (f"{batch['batchID']}@{offset}.json" if offset else f"{batch['batchID']}.json")
+        path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+        return path
 
-    def _manifest(self) -> dict:
+    def _manifest(self, diagnostics: Path | None = None) -> dict:
         return build_manifest(plan_path=self.plan_path, batch_results=self.results, wav_root=self.wav_root,
-                              output=self.run_dir / "takes-manifest.json")
+                              output=self.run_dir / "takes-manifest.json", diagnostics=diagnostics)
+
+    def _diagnostics(self, records: dict[str, tuple[str, str | None]]) -> Path:
+        """An engine diagnostics root recording each generation's failure code and QC flags."""
+        engine = self.root / "diagnostics" / "engine"
+        engine.mkdir(parents=True, exist_ok=True)
+        with (engine / "generation-failures.jsonl").open("w", encoding="utf-8") as failures, \
+                (engine / "generations.jsonl").open("w", encoding="utf-8") as generations:
+            for generation_id, (code, flags) in records.items():
+                failures.write(json.dumps({"generationID": generation_id, "errorCode": code,
+                                           "stage": "stream_failed"}) + "\n")
+                notes = {"nativeRuntimeFailureCode": code, **({"audioQCFlags": flags} if flags else {})}
+                generations.write(json.dumps({"generationID": generation_id, "notes": notes}) + "\n")
+        return self.root / "diagnostics"
 
     def test_every_output_binds_to_its_planned_take_and_validates(self) -> None:
         for batch in self.plan_value["batches"]:
             self._emit(batch, self._batch_json(batch))
         manifest = self._manifest()
-        self.assertEqual(manifest["counts"], {"planned": 16, "generated": 16, "missing": 0})
+        self.assertEqual(manifest["counts"],
+                         {"planned": 16, "generated": 16, "rejected": 0, "failed": 0, "missing": 0})
         self.assertEqual([take["takeID"] for take in manifest["takes"]],
                          [take["takeID"] for take in self.plan_value["takes"]])
         for take in manifest["takes"]:
@@ -340,10 +359,64 @@ class ManifestTests(Fixture):
             self.assertEqual((by_id[take_id]["status"], by_id[take_id]["missingReason"]), ("missing", "no-batch-output"))
             self.assertIsNone(by_id[take_id]["wavPath"])
         missing = len(failed["takeIDs"]) - 1 + len(absent["takeIDs"])
-        self.assertEqual(manifest["counts"], {"planned": 16, "generated": 16 - missing, "missing": missing})
+        self.assertEqual(manifest["counts"], {"planned": 16, "generated": 16 - missing, "rejected": 0,
+                                              "failed": 0, "missing": missing})
         report = validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)
         self.assertEqual(report["status"], "PASS", report)
         self.assertEqual(report["counts"]["missing"], missing)
+
+    def test_a_resumed_batch_binds_its_segments_and_the_engine_rejection(self) -> None:
+        # Item 1 is refused by the engine's mandatory Fast QC; the lane resumes at 2.
+        batch = max(self.plan_value["batches"], key=lambda value: len(value["takeIDs"]))
+        rest = [other for other in self.plan_value["batches"] if other is not batch]
+        self.assertGreater(len(batch["takeIDs"]), 2)
+        rejected_id = "0A1B2C3D-0000-4000-8000-00000000AAAA"
+        first = self._emit(batch, self._batch_json(batch, failed_at=1, failed_id=rejected_id))
+        self.assertEqual(next_segment_offset(first, 0, len(batch["takeIDs"])), "2")
+        self._emit(batch, self._batch_json(batch, offset=2), offset=2)
+        for other in rest:
+            self._emit(other, self._batch_json(other))
+        diagnostics = self._diagnostics({rejected_id: ("audio.quality_rejected", "dropout:2512ms,speaking_rate_slow")})
+        manifest = self._manifest(diagnostics)
+        by_id = {take["takeID"]: take for take in manifest["takes"]}
+        head, refused, *resumed = batch["takeIDs"]
+        self.assertEqual(by_id[head]["status"], "generated")
+        self.assertEqual(by_id[refused]["status"], "rejected")
+        self.assertEqual(by_id[refused]["rejection"], {"errorCode": "audio.quality_rejected",
+                                                       "audioQCFlags": ["dropout:2512ms", "speaking_rate_slow"]})
+        for take_id in resumed:
+            self.assertEqual((by_id[take_id]["status"], by_id[take_id]["textBinding"]), ("generated", "text"))
+        self.assertEqual(manifest["counts"], {"planned": 16, "generated": 15, "rejected": 1, "failed": 0,
+                                              "missing": 0})
+        report = validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)
+        self.assertEqual(report["status"], "PASS", report)
+
+    def test_an_unrecorded_or_other_engine_failure_is_not_a_rejection(self) -> None:
+        batch, *rest = self.plan_value["batches"]
+        other_id = "0A1B2C3D-0000-4000-8000-00000000BBBB"
+        self._emit(batch, self._batch_json(batch, failed_at=0, failed_id=other_id))
+        self._emit(batch, self._batch_json(batch, offset=1), offset=1)
+        for later in rest:
+            self._emit(later, self._batch_json(later))
+        take_id = batch["takeIDs"][0]
+        manifest = self._manifest()
+        self.assertEqual(manifest["takes"][[t["takeID"] for t in manifest["takes"]].index(take_id)]["status"],
+                         "missing")
+        manifest = self._manifest(self._diagnostics({other_id: ("model.load_failed", None)}))
+        take = {t["takeID"]: t for t in manifest["takes"]}[take_id]
+        self.assertEqual((take["status"], take["failure"]), ("failed", {"errorCode": "model.load_failed"}))
+        self.assertEqual(validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)["status"], "PASS")
+
+    def test_next_offset_resumes_only_after_a_generation_failure(self) -> None:
+        batch = self.plan_value["batches"][0]
+        count = len(batch["takeIDs"])
+        last = self._emit(batch, self._batch_json(batch, failed_at=count - 1))
+        self.assertEqual(next_segment_offset(last, 0, count), "done")
+        cancelled = self._batch_json(batch, failed_at=0)
+        cancelled["items"][0].update(status="cancelled", errorCode="cancelled")
+        self.assertEqual(next_segment_offset(self._emit(batch, cancelled), 0, count), "stop")
+        self.assertEqual(next_segment_offset(self._emit(batch, self._batch_json(batch)), 0, count), "stop")
+        self.assertEqual(next_segment_offset(self.results / "absent.json", 0, count), "stop")
 
     def test_validate_manifest_catches_tampering(self) -> None:
         for batch in self.plan_value["batches"]:
@@ -386,7 +459,7 @@ class ManifestTests(Fixture):
             code = takes_module.main(["manifest", "--plan", str(self.plan_path), "--batch-results", str(self.results),
                                       "--wav-root", str(self.wav_root), "--output", str(manifest_path)])
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(out.getvalue()), {"planned": 16, "generated": 16, "missing": 0})
+        self.assertEqual(json.loads(out.getvalue()), {"planned": 16, "generated": 16, "rejected": 0, "failed": 0, "missing": 0})
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(takes_module.main(["validate-manifest", "--manifest", str(manifest_path),
                                                 "--plan", str(self.plan_path)]), 0)

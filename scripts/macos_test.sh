@@ -1164,6 +1164,8 @@ cmd_qc_takes() {
   local run_id
   run_id="mac-qc-takes-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/audio-qc/qc-takes-$run_id"
+  # The debug engine records each failure's code and Fast QC flags here.
+  local diag_root="${HOME}/Library/Application Support/QwenVoice-Debug/diagnostics"
   mkdir -p "$artifacts/batches" "$artifacts/batch-results" "$artifacts/batch-out" "$artifacts/logs"
   capture_benchmark_source "$artifacts"
 
@@ -1184,38 +1186,64 @@ cmd_qc_takes() {
   export QWENVOICE_DEBUG=1
   note "qc-takes: runID=$run_id split=$split takes=$planned_count batches=$batch_total${label:+ label=$label}"
 
-  local row batch_count=0 batch_fail=0
+  local row batch_count=0 batch_fail=0 batch_resumes=0
   while IFS= read -r row; do
     [[ -n "$row" ]] || continue
     batch_count=$((batch_count + 1))
     local batch_id mode variant variation seed speaker brief count lines_file
     # Unit-separated fields (texts and briefs are single lines; the plan refuses separators).
     IFS=$'\x1f' read -r batch_id mode variant variation seed speaker brief count lines_file <<<"$row"
-    local -a batch_command=(
-      "$QVOICE_BUILD_ROOT/vocello" batch --file "$lines_file" --mode "$mode" --variant "$variant"
-      --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$batch_id" --json
-    )
+    local -a voice_args=()
     case "$mode" in
       custom)
         [[ -n "$speaker" ]] || die "qc-takes batch $batch_id: the plan names no Built-in speaker"
-        batch_command+=(--speaker "$speaker")
+        voice_args=(--speaker "$speaker")
         ;;
       design)
         [[ -n "$brief" ]] || die "qc-takes batch $batch_id: the plan names no Voice Design brief"
-        batch_command+=(--voice-brief "$brief")
+        voice_args=(--voice-brief "$brief")
         ;;
       *) die "qc-takes batch $batch_id: unsupported mode '$mode'" ;;
     esac
     note "qc-takes batch $batch_count/$batch_total: $batch_id ($mode/$variant, $count takes)"
-    local st=0
-    # stdout is the batch's JSON (bound to the plan by item index); stdin is
-    # closed so the CLI never consumes this loop's batch rows.
-    "${batch_command[@]}" >"$artifacts/batch-results/$batch_id.json" \
-      2>"$artifacts/logs/$batch_id.log" </dev/null || st=$?
-    if (( st != 0 )); then
-      warn "qc-takes batch $batch_id: vocello batch exit $st (continuing with the other batches)"
-      batch_fail=$((batch_fail + 1))
-    fi
+    # `vocello batch` stops at its first failed item, and the engine's
+    # mandatory Fast QC refuses a take as a failure. The lane resumes after
+    # that item in a new segment (`<batchID>@<offset>`): the seed is the
+    # batch's and each item's sampling depends only on the seed and its text,
+    # so a resumed item is the one the first invocation would have made. The
+    # manifest binds every segment and each refused item's recorded QC flags.
+    local offset=0 segment
+    while :; do
+      segment="$batch_id"
+      local segment_lines="$lines_file"
+      if (( offset > 0 )); then
+        segment="$batch_id@$offset"
+        segment_lines="$artifacts/batches/$segment.txt"
+        tail -n "+$((offset + 1))" "$lines_file" >"$segment_lines"
+      fi
+      local st=0
+      # stdout is the segment's JSON (bound to the plan by item index); stdin
+      # is closed so the CLI never consumes this loop's batch rows.
+      "$QVOICE_BUILD_ROOT/vocello" batch --file "$segment_lines" --mode "$mode" --variant "$variant" \
+        --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$segment" --json \
+        "${voice_args[@]}" >"$artifacts/batch-results/$segment.json" \
+        2>"$artifacts/logs/$segment.log" </dev/null || st=$?
+      (( st != 0 )) || break
+      local next
+      next="$(python3 "$takes_tool" next-offset --result "$artifacts/batch-results/$segment.json" \
+        --offset "$offset" --count "$count")" || next="stop"
+      if [[ "$next" == "done" ]]; then
+        break
+      elif [[ "$next" =~ ^[0-9]+$ ]] && (( next > offset )); then
+        note "qc-takes batch $batch_id: item $((next - 1)) failed; resuming at item $next"
+        batch_resumes=$((batch_resumes + 1))
+        offset="$next"
+      else
+        warn "qc-takes batch $batch_id: vocello batch exit $st (continuing with the other batches)"
+        batch_fail=$((batch_fail + 1))
+        break
+      fi
+    done
   done <"$batch_index"
   unset QWENVOICE_DEBUG
 
@@ -1224,21 +1252,23 @@ cmd_qc_takes() {
 
   local manifest="$artifacts/takes-manifest.json" manifest_st=0 validate_st=0
   python3 "$takes_tool" manifest --plan "$plan" --batch-results "$artifacts/batch-results" \
-    --wav-root "$artifacts/batch-out" --output "$manifest" >"$artifacts/manifest-counts.json" || manifest_st=$?
+    --wav-root "$artifacts/batch-out" --diagnostics "$diag_root" --output "$manifest" \
+    >"$artifacts/manifest-counts.json" || manifest_st=$?
   if (( manifest_st == 0 )); then
     python3 "$takes_tool" validate-manifest --manifest "$manifest" --plan "$plan" \
       >"$artifacts/manifest-validation.json" || validate_st=$?
   fi
 
-  local generated="?" missing="?"
+  local generated="?" rejected="?" failed="?" missing="?"
   if (( manifest_st == 0 )); then
-    generated="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["counts"]["generated"])' "$manifest")"
-    missing="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["counts"]["missing"])' "$manifest")"
+    read -r generated rejected failed missing < <(python3 -c 'import json, sys
+counts = json.load(open(sys.argv[1]))["counts"]
+print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"])' "$manifest")
   fi
   {
     echo "qc-takes runID=$run_id split=$split${label:+ label=$label}"
-    echo "planned=$planned_count generated=$generated missing=$missing"
-    echo "batches=$batch_total batch_fail=$batch_fail"
+    echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing"
+    echo "batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes"
     echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
     echo "manifest_validation=$([[ $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"
   } | tee "$artifacts/verdict.txt"
@@ -1246,8 +1276,10 @@ cmd_qc_takes() {
   if (( manifest_st != 0 || validate_st != 0 )); then
     die "qc-takes FAIL: the takes manifest could not be bound or validated; artifacts are preserved in $artifacts"
   fi
-  if [[ "$missing" != "0" ]]; then
-    die "qc-takes FAIL: $missing of $planned_count planned takes are missing; artifacts are preserved in $artifacts"
+  # A take the engine's mandatory QC refused is an outcome, recorded with its
+  # flags; a take with no output or another engine failure fails the lane.
+  if [[ "$missing" != "0" || "$failed" != "0" ]]; then
+    die "qc-takes FAIL: $missing missing and $failed failed of $planned_count planned takes; artifacts are preserved in $artifacts"
   fi
   note "qc-takes PASS · $planned_count takes · no benchmark record (calibration data) · $artifacts"
 }

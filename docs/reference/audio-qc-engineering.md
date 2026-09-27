@@ -1497,15 +1497,20 @@ benchmark's seed identity. A family is still script × voice × seed. The calibr
 - `plan` writes an immutable plan bound to the pool and policy digests.
 - `batch-files` writes one line file per batch.
 - `manifest` binds each batch's `--json` output to the plan by item index, checking each item's
-  text. It moves every WAV to `wav/<takeID>.wav` and records a planned take without output as
-  `missing` with its reason.
+  text. It moves every WAV to `wav/<takeID>.wav`. A take the engine's mandatory Fast QC refused is
+  `rejected`, with the flag families the engine recorded (from the debug diagnostics, by generation
+  id); another engine failure is `failed` with its code; a planned take with no output is `missing`
+  with its reason.
 - `validate-manifest` recomputes the digests and checks the manifest against the plan.
 
 The consent-bound lane `scripts/macos_test.sh qc-takes [--split calibration|confirmation]
 [--languages a,b] [--label L]` runs these steps around one `vocello batch` per batch on a quiet
-host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>/` and stay untracked. A
-failed batch stops only itself, and any missing take fails the lane. The lane publishes nothing and
-writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
+host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>/` and stay untracked.
+`vocello batch` stops at its first failed item, so the lane resumes the batch after that item in a
+new segment (`<batchID>@<offset>`, `next-offset`): the seed is the batch's, and each item's sampling
+depends only on the seed and its text. A rejected take is an outcome that N3 flag rates must count
+(`audio_qc_calibration_set.py score` counts it as a v8 fail without audio); any failed or missing
+take fails the lane. The lane publishes nothing and writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
 takes manifest, or an injection-set manifest, into a language-lane manifest for the panel judges;
 it skips and counts missing takes.
 

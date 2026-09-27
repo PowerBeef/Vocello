@@ -50,7 +50,7 @@ RECORDING_GOLDENS = {
 }
 
 
-def write_takes(root: Path, *, shared_family: bool = False) -> Path:
+def write_takes(root: Path, *, shared_family: bool = False, rejected: bool = False) -> Path:
     """Three scripts, each rendered by two voices (donor pairs), and one missing take."""
     takes = []
     voices = {"aiden": fixtures.VOICES["low"], "serena": fixtures.VOICES["high"]}
@@ -71,6 +71,14 @@ def write_takes(root: Path, *, shared_family: bool = False) -> Path:
                   "language": "english", "mode": "custom", "variant": "speed",
                   "voice": {"kind": "builtin", "id": "aiden"}, "seed": 9, "text": "", "wavPath": None,
                   "wavSHA256": None, "durationSeconds": None, "finishReason": None, "status": "missing"})
+    if rejected:
+        # The engine's mandatory Fast QC refused this take: no audio, only its flags.
+        takes.append({"takeID": "s0008__custom-serena__s8", "family": "s0008__custom-serena__s8",
+                      "scriptID": "s0008", "language": "french", "mode": "custom", "variant": "speed",
+                      "voice": {"kind": "builtin", "id": "serena"}, "seed": 8, "text": "", "wavPath": None,
+                      "wavSHA256": None, "durationSeconds": None, "finishReason": None, "status": "rejected",
+                      "rejection": {"errorCode": "audio.quality_rejected",
+                                    "audioQCFlags": ["dropout:2512ms", "speaking_rate_slow"]}})
     manifest = {"schemaVersion": 1, "kind": "audio-qc-calibration-takes", "runID": "test-run",
                 "planDigest": "0" * 64, "poolDigest": "1" * 64, "split": "calibration", "takes": takes}
     path = root / "takes.json"
@@ -289,7 +297,7 @@ class CalibrationSetTests(unittest.TestCase):
                 self.assertNotIn(text, written, name)
         self.assertEqual(report["schema"], "vocello.audioqc.calibration-report/1")
         self.assertTrue(report["reportOnly"])
-        self.assertEqual(report["populations"]["N3"], {"clips": 6, "families": 6})
+        self.assertEqual(report["populations"]["N3"], {"clips": 6, "families": 6, "engineRejected": 0})
         self.assertEqual(set(report["languages"]["rows"]), {"english", "french"})
         self.assertIn(report["languages"]["worstN3Alarm"]["language"], {"english", "french"})
         self.assertEqual({row["flag"] for row in report["flags"]}, set(m2.audio_qc.FASTQC_V8_FLAGS))
@@ -314,6 +322,35 @@ class CalibrationSetTests(unittest.TestCase):
         self.assertIn("f / (1 - pi_max)", json.dumps(report["n3"]["unlabeledBound"]))
         self.assertIn("### Detection of T1 injections on natural takes (P1)", markdown)
         self.assertIn("qualifies nothing", markdown)
+
+    def test_an_engine_rejected_take_counts_as_a_natural_fail_without_audio(self) -> None:
+        root = self.root / "rejected"
+        root.mkdir()
+        takes_path = write_takes(root, rejected=True)
+        summary = quiet(m2.run_inject, takes_path, root / "set", catalog_seed=7, classes=m2.DEFAULT_CLASSES, jobs=1)
+        self.assertEqual(summary["counts"]["generatedTakes"], 6)
+        self.assertNotIn("s0008__custom-serena__s8", {entry["sourceTakeID"] for entry in summary["entries"]})
+        report = quiet(m2.run_score, takes_path, root / "set" / "injection-set.json", root / "score", jobs=1)
+        self.assertEqual(report["populations"]["N3"], {"clips": 7, "families": 7, "engineRejected": 1})
+        self.assertEqual(report["n3"]["engineRejected"]["takes"], 1)
+        self.assertEqual(report["n3"]["engineRejected"]["flags"], {"dropout": 1, "speaking_rate_slow": 1})
+        self.assertEqual(report["n3"]["fail"]["events"], self.report["n3"]["fail"]["events"] + 1)
+        self.assertEqual(report["n3"]["fail"]["units"], 7)
+        dropout = next(row for row in report["flags"] if row["flag"] == "dropout")
+        before = next(row for row in self.report["flags"] if row["flag"] == "dropout")
+        self.assertEqual(dropout["n3"]["fail"]["events"], before["n3"]["fail"]["events"] + 1)
+        self.assertTrue(any("mandatory Fast QC refused" in line for line in report["headline"]))
+
+    def test_rejection_levels_never_overcount_a_fail(self) -> None:
+        self.assertEqual(m2.rejection_levels(["dropout:2512ms", "speaking_rate_slow"]),
+                         {"dropout": "fail", "speaking_rate_slow": "warn"})
+        # A fail-only family explains the fail; a warn-or-fail family then counts at warn.
+        self.assertEqual(m2.rejection_levels(["terminal_silence:3100ms", "clicks"]),
+                         {"clicks": "warn", "terminal_silence": "fail"})
+        # Two warn-or-fail families: which one failed is unknown, so both count at warn.
+        self.assertEqual(m2.rejection_levels(["dropout:1300ms", "clipping"]),
+                         {"clipping": "warn", "dropout": "warn"})
+        self.assertEqual(m2.rejection_levels(["not_a_v8_flag"]), {})
 
     def test_rates_use_exact_clopper_pearson_bounds(self) -> None:
         report = self.report
@@ -394,7 +431,7 @@ class FamilyClusteringTests(unittest.TestCase):
             takes = write_takes(root / "takes", shared_family=True)
             quiet(m2.run_inject, takes, root / "set", catalog_seed=7, classes=("A",), jobs=1)
             report = quiet(m2.run_score, takes, root / "set" / "injection-set.json", root / "score", jobs=1)
-        self.assertEqual(report["populations"]["N3"], {"clips": 6, "families": 3})
+        self.assertEqual(report["populations"]["N3"], {"clips": 6, "families": 3, "engineRejected": 0})
         self.assertEqual(report["n3"]["alarm"]["units"], 3)
         for row in report["detection"]:
             self.assertEqual(row["alarm"]["units"], 3, row["injector"])

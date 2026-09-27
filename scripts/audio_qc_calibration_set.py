@@ -56,6 +56,8 @@ from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
 
 TAKES_KIND = "audio-qc-calibration-takes"
+# The take lane's statuses (scripts/audio_qc_calibration_takes.py): only generated takes have audio.
+TAKE_STATUSES = ("generated", "rejected", "failed", "missing")
 SET_KIND = "audio-qc-injection-set"
 MEASUREMENTS_KIND = "audio-qc-calibration-measurements"
 REPORT_SCHEMA = "vocello.audioqc.calibration-report/1"
@@ -143,10 +145,14 @@ def load_takes(path: Path) -> tuple[dict, str]:
         if not isinstance(take_id, str) or not TAKE_ID.fullmatch(take_id) or take_id in seen:
             raise CalibrationError("every take has a unique takeID of letters, digits, '.', '_' and '-'")
         seen.add(take_id)
-        if take.get("status") not in ("generated", "missing"):
-            raise CalibrationError(f"{take_id}: status is generated or missing")
+        if take.get("status") not in TAKE_STATUSES:
+            raise CalibrationError(f"{take_id}: status is one of {', '.join(TAKE_STATUSES)}")
         if not isinstance(take.get("family"), str) or not take["family"]:
             raise CalibrationError(f"{take_id}: it names its source family")
+        if take["status"] == "rejected":
+            flags = (take.get("rejection") or {}).get("audioQCFlags")
+            if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
+                raise CalibrationError(f"{take_id}: a rejected take names the Fast QC flags that refused it")
         if take["status"] != "generated":
             continue
         if not SHA256.fullmatch(str(take.get("wavSHA256", ""))):
@@ -155,6 +161,32 @@ def load_takes(path: Path) -> tuple[dict, str]:
             raise CalibrationError(f"{take_id}: a generated take names its language and text")
         _relative_path(path.parent, take.get("wavPath"), f"{take_id}: wavPath")
     return manifest, hashlib.sha256(raw).hexdigest()
+
+
+def rejected_takes(manifest: dict) -> list[dict]:
+    """Takes the engine's mandatory Fast QC refused: no audio, but the fielded
+    detector's fail on a natural take, so the N3 rates count them."""
+    return [take for take in manifest["takes"] if take["status"] == "rejected"]
+
+
+def rejection_levels(flags: Iterable[str]) -> dict[str, str]:
+    """The v8 level of each flag family a rejection names.
+
+    The engine records the flags without their levels. A rejection is a fail,
+    and a family that can raise only one level raised that one; a family that
+    can raise warn or fail raised fail when it is the only such family and no
+    fail-only family fired (then it alone caused the fail), else it counts as
+    warn, so a fail-level rate never overcounts.
+    """
+    families = [audio_qc.flag_family(flag) for flag in flags]
+    families = [family for family in dict.fromkeys(families) if family in audio_qc.FASTQC_V8_FLAGS]
+    levels = {family: audio_qc.FASTQC_V8_FLAGS[family][0] for family in families
+              if len(audio_qc.FASTQC_V8_FLAGS[family]) == 1}
+    either = [family for family in families if len(audio_qc.FASTQC_V8_FLAGS[family]) > 1]
+    sole_cause = len(either) == 1 and "fail" not in levels.values()
+    for family in either:
+        levels[family] = "fail" if sole_cause else "warn"
+    return dict(sorted(levels.items()))
 
 
 def generated_takes(manifest: dict) -> list[dict]:
@@ -608,8 +640,16 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
         return sum((skipped.get(key, {}).get("byVariant", {}).get(variant) or {}).values())
 
     n3_alarm = _family_rate((record["family"], _alarm(record)) for record in negatives)
+    rejected = [record for record in negatives if record.get("engineRejected")]
     n3 = {
         "clips": len(negatives), "families": len({record["family"] for record in negatives}),
+        "engineRejected": {
+            "takes": len(rejected),
+            "rate": _family_rate((record["family"], bool(record.get("engineRejected"))) for record in negatives),
+            "flags": dict(sorted(Counter(flag for record in rejected for flag in record["flagLevels"]).items())),
+            "note": "refused by the engine's mandatory Fast QC, so no audio exists; each counts as a v8 fail "
+                    "with the flag families it recorded, and carries no Stage 0 observation",
+        },
         "alarm": n3_alarm, "fail": _family_rate((record["family"], record["verdict"] == "fail")
                                                 for record in negatives),
         "flags": _flag_rates(negatives),
@@ -728,7 +768,7 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
                     "observations": audio_qc_observations.OBSERVATIONS_MIRROR, "calibration": "legacy-unqualified"},
         "inputs": inputs,
         "populations": {
-            "N3": {"clips": len(negatives), "families": n3["families"]},
+            "N3": {"clips": len(negatives), "families": n3["families"], "engineRejected": len(rejected)},
             "S": {"clips": len(shams), "families": len({record["family"] for record in shams})},
             "P1": {"clips": len(positives), "families": len({record["family"] for record in positives})},
         },
@@ -764,6 +804,9 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
             "Fast QC runs each clip through the v8 mirror's limiter as if the engine had produced it, as M1 "
             "does; the Stage 0 observations read the PCM16 that limiter writes.",
             "Identity swaps from the donor pairs are deferred (identitySwap).",
+            "Takes the engine's mandatory Fast QC refused have no audio: they count in the N3 rates as v8 fails "
+            "with the flag families the engine recorded (a warn-or-fail family counts at fail only when it alone "
+            "caused the fail), carry no Stage 0 observation, and are no source of any injection.",
         ],
     }
     report["headline"] = headline(report)
@@ -776,6 +819,9 @@ def headline(report: dict) -> list[str]:
     lines = [f"N3 natural takes: v8 alarmed on {fraction(n3['alarm'])} families (flag rate <= "
              f"{bound(n3['alarm'])}, one-sided CP 95%) and failed {fraction(n3['fail'])}; unlabeled, so FAR <= "
              f"{n3['unlabeledBound']['farBoundAtPiMax'].get('0.1')} if at most 10% of takes are defective."]
+    if n3["engineRejected"]["takes"]:
+        lines.append(f"The engine's mandatory Fast QC refused {n3['engineRejected']['takes']} of these takes "
+                     f"(no audio; counted as v8 fails).")
     frequent = sorted(((row["n3"][row["basis"]]["events"], row["flag"]) for row in report["flags"]
                        if row["n3"][row["basis"]]["events"]), reverse=True)[:3]
     if frequent:
@@ -930,7 +976,9 @@ def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> d
                                                                            f"{entry['takeID']}: wavPath")),
                       "wavSHA256": entry["wavSHA256"], "text": take["text"],
                       "meta": _meta(take, entry["takeID"], injection["population"], injection)})
-    log(f"score: {len(takes)} natural takes and {len(injection_set['entries'])} injected clips, {jobs} jobs")
+    rejected = rejected_takes(manifest)
+    log(f"score: {len(takes)} natural takes ({len(rejected)} engine-rejected, no audio) and "
+        f"{len(injection_set['entries'])} injected clips, {jobs} jobs")
     records: list[dict] = []
 
     def measured() -> Iterator[dict]:
@@ -945,6 +993,13 @@ def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> d
                         "observations": audio_qc_observations.OBSERVATIONS_MIRROR}}
     measurements_sha256 = _write_streamed(output / "measurements.json", head, "clips", measured(),
                                           lambda digest: {"clipsSHA256": digest, "clipCount": len(records)})
+    for take in rejected:
+        records.append({**{key: value for key, value in _meta(take, take["takeID"], "N3", None).items()
+                           if key in ("clipID", "population", "family", "sourceTakeID", "language")},
+                        "injector": None, "injectorID": None, "variant": None, "severity": None,
+                        "verdict": "fail", "engineRejected": True,
+                        "flagLevels": rejection_levels(take["rejection"]["audioQCFlags"]),
+                        "observations": {name: None for name in OBSERVATION_MEASURES}})
     inputs = {"takesManifestSHA256": manifest_sha256, "injectionSetSHA256": file_sha256(set_path),
               "entriesSHA256": injection_set["entriesSHA256"], "measurementsSHA256": measurements_sha256,
               "policySHA256": policy_module.policy_digest(), "catalogVersion": injectors.CATALOG_VERSION,

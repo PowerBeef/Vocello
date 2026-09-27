@@ -89,7 +89,15 @@ PLANNED_FIELDS = (
     "takeID", "family", "scriptID", "language", "role", "mode", "variant", "variation", "voice", "seed",
     "batchID", "text", "textSHA256",
 )
-OUTPUT_FIELDS = ("wavPath", "wavSHA256", "durationSeconds", "finishReason", "status", "missingReason", "textBinding")
+OUTPUT_FIELDS = ("wavPath", "wavSHA256", "durationSeconds", "finishReason", "status", "missingReason", "textBinding",
+                 "rejection", "failure")
+TAKE_STATUSES = ("generated", "rejected", "failed", "missing")
+# A resumed batch segment's stdout: `<batchID>@<offset>.json` (offset 0 is `<batchID>.json`).
+GENERATION_ID = re.compile(r"^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$")
+SEGMENT_FILE = re.compile(r"^(?P<batch>.+)@(?P<offset>[1-9][0-9]{0,5})\.json$")
+QC_REJECTION_CODE = "audio.quality_rejected"
+ENGINE_CODE = re.compile(r"^[a-z0-9_.]{1,96}$")
+QC_FLAG = re.compile(r"^[a-z0-9_:(),.-]{1,96}$")
 
 
 class TakeError(ValueError):
@@ -581,7 +589,11 @@ def batch_outcomes(result_path: Path, batch: dict[str, Any], planned: Sequence[d
             code = row.get("errorCode")
             if isinstance(code, str) and re.fullmatch(r"[a-z_]{1,64}", code) and code != status:
                 reason += f":{code}"
-            outcomes.append({"status": "missing", "missingReason": reason})
+            outcome = {"status": "missing", "missingReason": reason}
+            generation_id = row.get("generationID")
+            if status == "failed" and isinstance(generation_id, str) and GENERATION_ID.fullmatch(generation_id):
+                outcome["generationID"] = generation_id.upper()
+            outcomes.append(outcome)
         return outcomes
     if payload.get("schemaVersion") is not None:
         raise TakeError(f"{batch_id}: unsupported batch output schema {payload.get('schemaVersion')!r}")
@@ -602,6 +614,103 @@ def batch_outcomes(result_path: Path, batch: dict[str, Any], planned: Sequence[d
     return outcomes
 
 
+def batch_segments(batch_results: Path, batch_id: str) -> list[tuple[int, Path]]:
+    """The batch's stdout segments, by start offset: the first invocation, then
+    each resumption after a failed item (`<batchID>@<offset>.json`)."""
+    segments = [(0, batch_results / f"{batch_id}.json")]
+    if batch_results.is_dir():
+        for path in batch_results.iterdir():
+            match = SEGMENT_FILE.match(path.name)
+            if match and match["batch"] == batch_id:
+                segments.append((int(match["offset"]), path))
+    return sorted(segments)
+
+
+def segmented_outcomes(batch_results: Path, batch: dict[str, Any],
+                       planned: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each planned item's outcome across the batch's segments.
+
+    A segment at offset o re-runs the items from o (one seed for the whole
+    batch, and each item's sampling depends only on the seed and its text, so a
+    resumed item is the item the first invocation would have produced). An
+    item's outcome comes from the last segment that starts at or before it.
+    """
+    outcomes: list[dict[str, Any]] = [{"status": "missing", "missingReason": "no-batch-output"} for _ in planned]
+    for offset, path in batch_segments(batch_results, batch["batchID"]):
+        if offset >= len(planned):
+            raise TakeError(f"{batch['batchID']}: a resumed segment starts past the batch ({offset})")
+        if offset and not path.is_file():
+            continue
+        for index, outcome in enumerate(batch_outcomes(path, batch, planned[offset:]), start=offset):
+            outcomes[index] = outcome
+    return outcomes
+
+
+def next_segment_offset(result_path: Path, offset: int, count: int) -> str:
+    """Where a stopped batch resumes: after its one failed item, or `stop`.
+
+    Only a genuine generation failure resumes (the engine's mandatory QC
+    rejection is one); a cancellation, an unreadable output or anything else
+    stops the batch. `done` when the failed item was the batch's last.
+    """
+    payload = _parse_batch_stdout(result_path)
+    if not isinstance(payload, dict) or payload.get("schemaVersion") != 2 or not isinstance(payload.get("items"), list):
+        return "stop"
+    rows = sorted((row for row in payload["items"] if isinstance(row, dict) and isinstance(row.get("index"), int)
+                   and not isinstance(row.get("index"), bool)), key=lambda row: row["index"])
+    for row in rows:
+        if row.get("status") == "completed":
+            continue
+        if row.get("status") == "failed" and row.get("errorCode") == "generation_failed":
+            following = offset + row["index"] + 1
+            return str(following) if following < count else "done"
+        return "stop"
+    return "stop"
+
+
+def _jsonl(path: Path) -> Iterable[dict[str, Any]]:
+    try:
+        handle = path.open(encoding="utf-8")
+    except FileNotFoundError:
+        return
+    with handle:
+        for line in handle:
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                yield value
+
+
+def engine_failures(diagnostics: Path | None, generation_ids: set[str]) -> dict[str, dict[str, Any]]:
+    """The engine's recorded failure for each generation id: its failure code
+    and, for a mandatory QC rejection, the Fast QC flags that fired.
+
+    Reads only codes and flag names (privacy-safe summaries), never messages.
+    """
+    found: dict[str, dict[str, Any]] = {}
+    if diagnostics is None or not generation_ids:
+        return found
+    engine = diagnostics / "engine"
+    for record in _jsonl(engine / "generation-failures.jsonl"):
+        generation_id = str(record.get("generationID", "")).upper()
+        code = record.get("errorCode")
+        if generation_id in generation_ids and isinstance(code, str) and ENGINE_CODE.fullmatch(code):
+            found.setdefault(generation_id, {})["errorCode"] = code
+    for record in _jsonl(engine / "generations.jsonl"):
+        generation_id = str(record.get("generationID", "")).upper()
+        notes = record.get("notes")
+        if generation_id not in generation_ids or not isinstance(notes, dict):
+            continue
+        flags = notes.get("audioQCFlags")
+        if isinstance(flags, str):
+            names = [flag for flag in flags.split(",") if QC_FLAG.fullmatch(flag)]
+            if names:
+                found.setdefault(generation_id, {})["audioQCFlags"] = names
+    return found
+
+
 def _inside(path: Path, root: Path) -> bool:
     try:
         path.relative_to(root)
@@ -611,7 +720,7 @@ def _inside(path: Path, root: Path) -> bool:
 
 
 def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, output: Path,
-                   copy: bool = False) -> dict[str, Any]:
+                   copy: bool = False, diagnostics: Path | None = None) -> dict[str, Any]:
     plan = validate_plan(load_json(plan_path))
     run_dir = output.resolve().parent
     wav_dir = run_dir / "wav"
@@ -619,41 +728,53 @@ def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, outp
     wav_root = wav_root.resolve()
     takes_by_id = {take["takeID"]: take for take in plan["takes"]}
     records: dict[str, dict[str, Any]] = {}
+    bound: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for batch in plan["batches"]:
         planned = [takes_by_id[take_id] for take_id in batch["takeIDs"]]
-        outcomes = batch_outcomes(batch_results / f"{batch['batchID']}.json", batch, planned)
-        for take, outcome in zip(planned, outcomes):
-            record = {field: take[field] for field in PLANNED_FIELDS}
-            record.update({field: None for field in OUTPUT_FIELDS})
-            if outcome["status"] == "generated":
-                source = Path(outcome["audioPath"])
-                source = (source if source.is_absolute() else wav_root / source).resolve()
-                if not _inside(source, wav_root):
-                    raise TakeError(f"{take['takeID']}: the batch wrote its audio outside the WAV root")
-                destination = wav_dir / f"{take['takeID']}.wav"
-                if source.is_file():
-                    if copy:
-                        shutil.copyfile(source, destination)
-                    else:
-                        shutil.move(str(source), str(destination))
-                elif not destination.is_file():
-                    outcome = {"status": "missing", "missingReason": "output-file-missing"}
-            if outcome["status"] == "generated":
-                record.update(
-                    status="generated", wavPath=os.path.relpath(destination, run_dir),
-                    wavSHA256=jsonio.sha256_file(destination), durationSeconds=outcome["durationSeconds"],
-                    finishReason=outcome["finishReason"] if isinstance(outcome["finishReason"], str) else None,
-                    textBinding=outcome["textBinding"],
-                )
+        bound.extend(zip(planned, segmented_outcomes(batch_results, batch, planned)))
+    failures = engine_failures(diagnostics, {outcome["generationID"] for _, outcome in bound
+                                             if "generationID" in outcome})
+    for take, outcome in bound:
+        record = {field: take[field] for field in PLANNED_FIELDS}
+        record.update({field: None for field in OUTPUT_FIELDS})
+        if outcome["status"] == "generated":
+            source = Path(outcome["audioPath"])
+            source = (source if source.is_absolute() else wav_root / source).resolve()
+            if not _inside(source, wav_root):
+                raise TakeError(f"{take['takeID']}: the batch wrote its audio outside the WAV root")
+            destination = wav_dir / f"{take['takeID']}.wav"
+            if source.is_file():
+                if copy:
+                    shutil.copyfile(source, destination)
+                else:
+                    shutil.move(str(source), str(destination))
+            elif not destination.is_file():
+                outcome = {"status": "missing", "missingReason": "output-file-missing"}
+        if outcome["status"] == "generated":
+            record.update(
+                status="generated", wavPath=os.path.relpath(destination, run_dir),
+                wavSHA256=jsonio.sha256_file(destination), durationSeconds=outcome["durationSeconds"],
+                finishReason=outcome["finishReason"] if isinstance(outcome["finishReason"], str) else None,
+                textBinding=outcome["textBinding"],
+            )
+        elif outcome.get("generationID") in failures and "errorCode" in failures[outcome["generationID"]]:
+            # The engine recorded why this item failed. Its mandatory Fast QC
+            # rejection is an outcome of the take, not a missing take: the
+            # fielded detector flagged it, so N3 flag rates must count it.
+            failure = failures[outcome["generationID"]]
+            if failure["errorCode"].startswith(QC_REJECTION_CODE):
+                record.update(status="rejected", rejection={
+                    "errorCode": failure["errorCode"], "audioQCFlags": failure.get("audioQCFlags", [])})
             else:
-                record.update(status="missing", missingReason=outcome["missingReason"])
-            records[take["takeID"]] = record
+                record.update(status="failed", failure={"errorCode": failure["errorCode"]})
+        else:
+            record.update(status="missing", missingReason=outcome["missingReason"])
+        records[take["takeID"]] = record
     takes = [records[take["takeID"]] for take in plan["takes"]]
-    generated = sum(1 for take in takes if take["status"] == "generated")
     manifest: dict[str, Any] = {
         "schemaVersion": 1, "kind": MANIFEST_KIND, "runID": plan["runID"], "planDigest": plan["planDigest"],
         "poolDigest": plan["poolDigest"], "policyDigest": plan["policyDigest"], "split": plan["split"],
-        "counts": {"planned": len(takes), "generated": generated, "missing": len(takes) - generated},
+        "counts": status_counts(takes),
         "takes": takes,
     }
     manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
@@ -664,6 +785,13 @@ def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, outp
 # --------------------------------------------------------------------------- #
 # Validation
 # --------------------------------------------------------------------------- #
+
+def status_counts(takes: Sequence[dict[str, Any]]) -> dict[str, int]:
+    counts = {"planned": len(takes)}
+    for status in TAKE_STATUSES:
+        counts[status] = sum(1 for take in takes if isinstance(take, dict) and take.get("status") == status)
+    return counts
+
 
 def manifest_digest_issues(manifest: Any) -> list[str]:
     """The manifest's own structure and self digest, without its plan or audio."""
@@ -713,13 +841,26 @@ def validate_manifest(manifest: Any, plan: Any, *, manifest_dir: Path) -> dict[s
                 digests.append(take["wavSHA256"])
             if _number(take.get("durationSeconds")) is None or take.get("textBinding") not in ("text", "index"):
                 errors.append(f"{take_id}: invalid duration or text binding")
-        elif take.get("status") == "missing":
-            if not isinstance(take.get("missingReason"), str) or any(
-                    take.get(field) is not None for field in ("wavPath", "wavSHA256", "durationSeconds")):
-                errors.append(f"{take_id}: a missing take names its reason and no output")
+        elif take.get("status") in ("missing", "rejected", "failed"):
+            if any(take.get(field) is not None for field in ("wavPath", "wavSHA256", "durationSeconds")):
+                errors.append(f"{take_id}: a take without output names no output")
+            status = take["status"]
+            if status == "missing" and not isinstance(take.get("missingReason"), str):
+                errors.append(f"{take_id}: a missing take names its reason")
+            rejection = take.get("rejection")
+            if status == "rejected" and not (
+                    isinstance(rejection, dict) and isinstance(rejection.get("errorCode"), str)
+                    and rejection["errorCode"].startswith(QC_REJECTION_CODE)
+                    and isinstance(rejection.get("audioQCFlags"), list)
+                    and all(isinstance(flag, str) and QC_FLAG.fullmatch(flag) for flag in rejection["audioQCFlags"])):
+                errors.append(f"{take_id}: a rejected take names the engine's QC rejection and its flags")
+            failure = take.get("failure")
+            if status == "failed" and not (isinstance(failure, dict) and isinstance(failure.get("errorCode"), str)
+                                           and ENGINE_CODE.fullmatch(failure["errorCode"])):
+                errors.append(f"{take_id}: a failed take names the engine's failure code")
         else:
             errors.append(f"{take_id}: unknown status {take.get('status')!r}")
-    counts = {"planned": len(takes), "generated": generated, "missing": len(takes) - generated}
+    counts = status_counts(takes)
     if manifest.get("counts") != counts:
         errors.append("the manifest's counts do not match its takes")
     duplicates = len(digests) - len(set(digests))
@@ -755,6 +896,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                           help="the directory every batch output WAV must lie under")
     manifest.add_argument("--output", type=Path, required=True)
     manifest.add_argument("--copy", action="store_true", help="copy the WAVs instead of moving them")
+    manifest.add_argument("--diagnostics", type=Path,
+                          help="the engine diagnostics root; binds each failed item to its recorded failure code")
+    resume = commands.add_parser("next-offset", help="where a stopped batch resumes (an offset, done or stop)")
+    resume.add_argument("--result", type=Path, required=True)
+    resume.add_argument("--offset", type=int, required=True)
+    resume.add_argument("--count", type=int, required=True)
     validate = commands.add_parser("validate-manifest", help="recompute digests and check the plan binding")
     validate.add_argument("--manifest", type=Path, required=True)
     validate.add_argument("--plan", type=Path, required=True)
@@ -781,8 +928,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "manifest":
             value = build_manifest(plan_path=args.plan, batch_results=args.batch_results, wav_root=args.wav_root,
-                                   output=args.output, copy=args.copy)
+                                   output=args.output, copy=args.copy, diagnostics=args.diagnostics)
             print(json.dumps(value["counts"]))
+            return 0
+        if args.command == "next-offset":
+            print(next_segment_offset(args.result, args.offset, args.count))
             return 0
         report = validate_manifest(load_json(args.manifest), load_json(args.plan), manifest_dir=args.manifest.parent)
         print(json.dumps(report, indent=2))

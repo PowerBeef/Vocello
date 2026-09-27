@@ -383,6 +383,12 @@ class PanelMetricTests(unittest.TestCase):
         self.assertEqual((aligned["unitsAligned"], aligned["unitCoverage"], aligned["tailGapSeconds"]), (1, 0.5, 1.0))
         unparsed, text = panel_metrics.asr_reduce(SENSEVOICE, {"stdout": "no tags"}, script=None, language="korean")
         self.assertEqual((unparsed["outputParsed"], unparsed["transcriptEmpty"], text), (False, True, None))
+        # The pinned llama.cpp binary prints two tags; the FunASR form prints four.
+        for stdout in ("<|ko|><|EMO_UNKNOWN|>안녕하세요\n", "<|ko|><|NEUTRAL|><|Speech|><|withitn|>안녕하세요"):
+            parsed, _ = panel_metrics.asr_reduce(SENSEVOICE, {"stdout": stdout}, script="안녕하세요",
+                                                 language="korean")
+            self.assertEqual((parsed["outputParsed"], parsed["transcriptEmpty"], parsed["errorRate"],
+                              parsed["detectedLanguage"]), (True, False, 0.0, "korean"), stdout)
 
     def test_report_only_verdicts_never_decide_a_take(self) -> None:
         gating = {"detector": "content.accuracy@1", "class": "B", "stage": 2, "judges": [WHISPER_SMALL],

@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import re
 from typing import Any, Mapping, Sequence
 
 from lib.language_metrics import (
@@ -105,13 +106,24 @@ def _language_name(value: Any) -> str | None:
     return CODE_TO_LANGUAGE.get(code, code if code.isascii() and code.replace("-", "").isalnum() else None)
 
 
+# The panel's pinned llama.cpp SenseVoice prints the language and emotion tags
+# before the transcript (`<|ja|><|EMO_UNKNOWN|>...`); the FunASR runtime the
+# delivery adapter reads (delivery_compact_model_adapter.SENSEVOICE_OUTPUT) adds
+# the event and text-normalization tags. Both forms parse; the missing tags are
+# None. Before 2026-09-27 the panel required all four, so every llama.cpp row
+# parsed as an empty transcript (outputParsed false).
+PANEL_SENSEVOICE_OUTPUT = re.compile(
+    r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
+    r"(?:<\|(?P<event>[^|]+)\|><\|(?P<textnorm>[^|]+)\|>)?(?P<transcript>.*)$",
+    re.DOTALL,
+)
+
+
 def recognizer_output(judge_id: str, raw: Mapping[str, Any]) -> tuple[str, str | None, dict[str, Any]]:
     """(transcript, detected language, extra metrics) from one recognizer's raw output."""
     extra: dict[str, Any] = {}
     if judge_id == "asr.sensevoice-small-f16@1":
-        from delivery_compact_model_adapter import SENSEVOICE_OUTPUT
-
-        match = SENSEVOICE_OUTPUT.fullmatch(str(raw.get("stdout", "")).strip())
+        match = PANEL_SENSEVOICE_OUTPUT.fullmatch(str(raw.get("stdout", "")).strip())
         extra["outputParsed"] = match is not None
         if match is None:
             return "", None, extra

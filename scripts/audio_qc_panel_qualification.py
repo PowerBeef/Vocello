@@ -59,7 +59,23 @@ Commands:
             its session, canary citation); `--bind-recovery-rule` also cites
             the session's two recovery reports and makes the child-attributed
             recovery rule binding when they meet its promotion
+  recalibrate
+            after a `run --recalibrate` session's records are committed: move each
+            shadow-or-later judge's ceiling to the full-cohort measurement
+            (resources only: peak, ceiling = peak x 1.2, ceilingSession, and the
+            replaced ceiling appended to ceilingHistory); refuses an unclean or
+            off-host run, another output identity, a candidate, a ceiling the
+            admission budget cannot hold and, without --allow-lower, a lower one
   validate  every committed record under benchmarks/audio-qc-qualification/
+
+Ceiling recalibration. The canary session's 28 rows under-measure a real
+cohort: MLX workers grow with every row and rows vary in length, so on the
+first 791-take cohort Parakeet peaked above its canary ceiling. `plan
+--recalibrate` and `run --recalibrate --manifest <full cohort>` run a session
+whose purpose is `ceiling-recalibration`: every judge, calibrated or not, runs
+under the measurement ceiling, the flip analysis is skipped, and each judge
+publishes a ceiling record (digests and metrics only, the take rows as a count
+and a digest), passed or not, for `recalibrate` to read.
 """
 
 from __future__ import annotations
@@ -174,8 +190,13 @@ def combined_manifest(session_id: str, canary_takes: Sequence[Mapping[str, Any]]
 
 def start_session(session_root: Path, *, speech: Mapping[str, Any] | None, panel: Sequence[str],
                   legacy: Sequence[str], spec: Mapping[str, Any] | None = None,
-                  today: dt.date | None = None) -> tuple[Path, dict[str, Any]]:
+                  today: dt.date | None = None,
+                  purpose: str = q.QUALIFICATION_PURPOSE) -> tuple[Path, dict[str, Any]]:
     """A new private session directory: the rendered canary set, the combined manifest and the session plan."""
+    if purpose not in q.PURPOSES:
+        raise QualificationRunError(f"a session's purpose is one of {', '.join(q.PURPOSES)}")
+    if purpose == q.RECALIBRATION_PURPOSE and not (speech or {}).get("takes"):
+        raise QualificationRunError("a ceiling recalibration runs over a full-cohort manifest (--manifest)")
     today = today or dt.date.today()
     session_id = f"{today:%Y%m%d}-{uuid.uuid4().hex[:8]}"
     session_dir = session_root / session_id
@@ -187,9 +208,16 @@ def start_session(session_root: Path, *, speech: Mapping[str, Any] | None, panel
     atomic_json(session_dir / "session.json", {
         "schema": PRIVATE_SESSION_SCHEMA, "id": session_id, "date": today.isoformat(),
         "manifestSHA256": q.json_digest(manifest), "canarySet": q.canary_set_identity(spec),
-        "judges": {"panel": list(panel), "legacy": list(legacy)},
+        "judges": {"panel": list(panel), "legacy": list(legacy)}, "purpose": purpose,
     })
     return session_dir, manifest
+
+
+def _purpose(session_dir: Path) -> str:
+    purpose = _read(session_dir / "session.json").get("purpose", q.QUALIFICATION_PURPOSE)
+    if purpose not in q.PURPOSES:
+        raise QualificationRunError(f"the session's purpose is one of {', '.join(q.PURPOSES)}")
+    return purpose
 
 
 # --------------------------------------------------------------------------- #
@@ -222,7 +250,12 @@ def run_session(*, registry: dict[str, Any], manifest: dict[str, Any], judges: S
                 lock_root: Path | None = None, admission_wait_seconds: float = DEFAULT_ADMISSION_WAIT_SECONDS,
                 preflight: Callable[[], Mapping[str, Any]] = quiet_host_preflight,
                 host: Mapping[str, Any] | None = None, host_profile_id: str | None = None) -> None:
-    """Both runs, each its own orchestrator session with a fresh cache; everything private."""
+    """Both runs, each its own orchestrator session with a fresh cache; everything private.
+
+    A `ceiling-recalibration` session admits every judge at the measurement
+    ceiling, a calibrated one included, so no canary ceiling cuts it short.
+    """
+    purpose = _purpose(session_dir)
     policy = AdmissionPolicy.from_registry(registry)
     identities = {judge.judge_id: {"outputIdentity": judge.identity.output_identity,
                                    "components": dict(judge.identity_components)
@@ -239,7 +272,7 @@ def run_session(*, registry: dict[str, Any], manifest: dict[str, Any], judges: S
         runner = orchestrator.Orchestrator(
             registry=registry, cache=cache, stage2=judges, supervisor=supervisor, lock_root=lock_root,
             host_admission=HostAdmission(lock_root, policy, wait_seconds=admission_wait_seconds),
-            measurement_ceilings=True,
+            measurement_ceilings=True, recalibration=purpose == q.RECALIBRATION_PURPOSE,
         )
         result = runner.run(manifest)
         after = dict(preflight())
@@ -249,7 +282,7 @@ def run_session(*, registry: dict[str, Any], manifest: dict[str, Any], judges: S
         atomic_json(directory / "worker-stderr.json", {"schema": STDERR_SCHEMA,
                                                        "workers": result.get("workerStderr") or {}})
         atomic_json(directory / "run.json", {
-            "schema": RUN_SCHEMA, "run": run, "startedAt": started_at,
+            "schema": RUN_SCHEMA, "run": run, "purpose": purpose, "startedAt": started_at,
             "wallSeconds": round(time.monotonic() - started, 3), "hostBefore": before, "hostAfter": after,
             "hostProfile": dict(host if host is not None else host_profile()),
             "hostProfileID": host_profile_id if host_profile_id is not None else host_hardware_profile_id(),
@@ -367,6 +400,8 @@ def diagnostics(runs: Sequence[Mapping[str, Any]], judges: Sequence[str], resour
 def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[str, Any]:
     """Every record of a session, from its saved runs: publishable ones under `records/`, the rest private."""
     private = _read(session_dir / "session.json")
+    purpose = _purpose(session_dir)
+    recalibration = purpose == q.RECALIBRATION_PURPOSE
     profiles = canonical_profiles(dict(registry))
     canonical = str(profiles[0]["id"]) if len(profiles) == 1 else None
     runs = []
@@ -419,20 +454,24 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
                         measurements[record["take"]["takeID"]] = measurement
             run_data.append({"resources": resources[index], "raw": run["raw"].get(judge_id) or {},
                              "measurements": measurements})
-        record = q.judge_analysis(
+        analysis, validator, verdict = (q.ceiling_analysis, q.validate_ceiling_record, "recalibration") \
+            if recalibration else (q.judge_analysis, q.validate_canary_record, "qualification")
+        record = analysis(
             judge_id, runs=run_data, identity=runs[0]["meta"]["identities"][judge_id], takes=takes, session=session,
             canary_set=private["canarySet"], registry_sha256=runs[0]["meta"]["registrySHA256"],
             budget_bytes=admission["budgetBytes"], reservation_bytes=admission["orchestratorReservationBytes"],
         )
-        problems = q.validate_canary_record(record)
+        problems = validator(record)
         if problems:
-            raise QualificationRunError(f"{judge_id}: its canary record does not validate: {problems[0]}")
-        passed = record["qualification"]["passed"]
-        target = (records_dir / "judges" if passed else failed_dir) / q.record_file_name(judge_id)
+            raise QualificationRunError(f"{judge_id}: its {verdict} record does not validate: {problems[0]}")
+        passed = record[verdict]["passed"]
+        # A recalibration publishes every judge's ceiling record, so `recalibrate` can name why it refuses one.
+        published = passed or recalibration
+        target = (records_dir / "judges" if published else failed_dir) / q.record_file_name(judge_id)
         atomic_json(target, record)
         judges_summary[judge_id] = {
-            "passed": passed, "reasons": record["qualification"]["reasons"],
-            "record": f"judges/{q.record_file_name(judge_id)}" if passed else None,
+            "passed": passed, "reasons": record[verdict]["reasons"],
+            "record": f"judges/{q.record_file_name(judge_id)}" if published else None,
             "determinismClass": record["determinism"]["class"],
             "canonicalHostPeakBytes": record["resources"]["canonicalHostPeakBytes"],
             "runPeakBytes": record["resources"]["runPeakBytes"],
@@ -454,14 +493,16 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
             "workersWithoutSerialEnvelope": [judge_id for judge_id in required if not serial.get(judge_id)],
         })
     flip = None
-    if q.BASELINE_RECOGNIZER in private["judges"]["legacy"] and q.CANDIDATE_RECOGNIZER in private["judges"]["panel"]:
+    # A recalibration measures memory; its cohort's flips are the calibration's business, not a record's.
+    if not recalibration and q.BASELINE_RECOGNIZER in private["judges"]["legacy"] \
+            and q.CANDIDATE_RECOGNIZER in private["judges"]["panel"]:
         first = q.flip_analysis(runs[0]["records"])
         second = q.flip_analysis(runs[1]["records"])
         flip_record = {**first, "session": session, "run2Consistent": q.flipped_ids(first) == q.flipped_ids(second)}
         atomic_json(records_dir / "flip-analysis.json", flip_record)
         flip = "flip-analysis.json"
     session_record = {
-        "schema": q.SESSION_SCHEMA, "session": session, "canarySet": private["canarySet"],
+        "schema": q.SESSION_SCHEMA, "session": session, "purpose": purpose, "canarySet": private["canarySet"],
         "manifest": {"takes": len(takes), "canaryTakes": sum(1 for take in takes if take["role"] == q.CANARY_ROLE),
                      "manifestSHA256": private["manifestSHA256"]},
         "runs": run_rows, "judges": judges_summary, "legacyJudges": legacy, "flipAnalysis": flip,
@@ -476,7 +517,7 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
         "judges": diagnostics(runs, list(all_resources), all_resources,
                               {**judges_summary, **{judge_id: {"legacy": True} for judge_id in legacy}}),
     })
-    return {"session": session, "judges": judges_summary, "runs": run_rows, "flipAnalysis": flip,
+    return {"session": session, "purpose": purpose, "judges": judges_summary, "runs": run_rows, "flipAnalysis": flip,
             "recordsDirectory": str(records_dir), "diagnostics": str(session_dir / "diagnostics.json")}
 
 
@@ -513,6 +554,9 @@ def promote(records_dir: Path, *, root: Path = REPO, registry_path: Path | None 
     if errors:
         raise QualificationRunError("the session's records do not validate: " + "; ".join(errors[:3]))
     session, records = q.session_records(records_dir)
+    if q.session_purpose(session) != q.QUALIFICATION_PURPOSE:
+        raise QualificationRunError(f"{records_dir.name} is a {q.session_purpose(session)} session; "
+                                    "only a qualification session promotes")
     relative = records_dir.relative_to(root.resolve()).as_posix()
     paths = {judge_id: f"{relative}/{entry['record']}" for judge_id, entry in session["judges"].items()
              if entry.get("record")}
@@ -548,6 +592,49 @@ def promote(records_dir: Path, *, root: Path = REPO, registry_path: Path | None 
             "written": not dry_run}
 
 
+def recalibrate(records_dir: Path, *, root: Path = REPO, registry_path: Path | None = None, dry_run: bool = False,
+                allow_lower: bool = False) -> dict[str, Any]:
+    """Move each shadow-or-later judge's ceiling to a committed recalibration session's; write only if valid.
+
+    Only `resources` changes (`q.recalibration_edits`). The registry must still
+    validate with the edits, or nothing is written; `dry_run` writes nothing.
+    """
+    registry_path = registry_path or root / "config/audio-qc-judges.json"
+    records_dir = records_dir.resolve()
+    errors = q.validate_session_directory(records_dir)
+    if errors:
+        raise QualificationRunError("the session's records do not validate: " + "; ".join(errors[:3]))
+    session, records = q.session_records(records_dir)
+    if q.session_purpose(session) != q.RECALIBRATION_PURPOSE:
+        raise QualificationRunError(f"{records_dir.name} is not a {q.RECALIBRATION_PURPOSE} session; "
+                                    "run one with `run --recalibrate`")
+    relative = records_dir.relative_to(root.resolve()).as_posix()
+    uncommitted = q.committed_errors(root, [f"{relative}/session.json",
+                                            *(f"{relative}/{entry['record']}" for entry in session["judges"].values()
+                                              if entry.get("record"))])
+    if uncommitted:
+        raise QualificationRunError("commit the session's records before recalibrating: "
+                                    + "; ".join(uncommitted[:3]))
+    text = registry_path.read_text(encoding="utf-8")
+    registry = json.loads(text)
+    profiles = canonical_profiles(registry, root)
+    canonical = str(profiles[0]["id"]) if len(profiles) == 1 else None
+    edits, changed, refused = q.recalibration_edits(registry, session, records, canonical_host=canonical,
+                                                    allow_lower=allow_lower)
+    if not edits:
+        return {"recalibrated": {}, "refused": refused, "written": False}
+    updated = q.replace_json_values(text, edits)
+    problems = validate_repository(root, json.loads(updated))
+    if problems:
+        raise QualificationRunError("the recalibrated registry would not validate; nothing was written: "
+                                    + "; ".join(problems[:3]))
+    if not dry_run:
+        temporary = registry_path.with_name(f".{registry_path.name}.recalibrate")
+        temporary.write_text(updated, encoding="utf-8")
+        os.replace(temporary, registry_path)
+    return {"recalibrated": changed, "refused": refused, "written": not dry_run}
+
+
 # --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
@@ -573,19 +660,22 @@ def _plan(args: argparse.Namespace, registry: dict[str, Any]) -> dict[str, Any]:
              for entry in spec["takes"]] + list((speech or {}).get("takes") or [])
     rows = []
     for judge in judges:
-        admission = orchestrator.judge_admission(registry, judge.judge_id, measurement=True)
+        admission = orchestrator.judge_admission(registry, judge.judge_id, measurement=True,
+                                                 recalibration=args.recalibrate)
         in_scope = sum(1 for take in takes if judge.request(take) is not None)
         rows.append({"judge": judge.judge_id, "lane": admission.lane, "threads": admission.threads,
                      "ceilingBytes": admission.ceiling_bytes, "ceilingBasis": admission.ceiling_basis,
                      "takesInScope": in_scope, "reportOnly": judge.report_only if judge.panel else None})
     covered = {judge.judge_id for judge in judges}
     return {
+        "purpose": q.RECALIBRATION_PURPOSE if args.recalibrate else q.QUALIFICATION_PURPOSE,
         "judges": rows, "canaryTakes": len(spec["takes"]), "speechTakes": len((speech or {}).get("takes") or []),
         "resampler": resampler,
         "recoveryReportsCoverEveryWorker": not [judge_id for judge_id in _orchestrated_workers(registry)
                                                 if judge_id not in covered],
         "workersNotRun": [judge_id for judge_id in _orchestrated_workers(registry) if judge_id not in covered],
-        "flipAnalysis": q.BASELINE_RECOGNIZER in legacy and q.CANDIDATE_RECOGNIZER in panel and speech is not None,
+        "flipAnalysis": not args.recalibrate and q.BASELINE_RECOGNIZER in legacy and q.CANDIDATE_RECOGNIZER in panel
+        and speech is not None,
     }
 
 
@@ -603,6 +693,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                                   "(asr.whisper-small@1=..., compact.sensevoice-small-q8@1=...)")
         command.add_argument("--model-root", type=Path)
         command.add_argument("--timeout-seconds", type=float, default=orchestrator.DEFAULT_ROW_TIMEOUT_SECONDS)
+        command.add_argument("--recalibrate", action="store_true",
+                             help="a ceiling-recalibration session over a full cohort (--manifest): every judge "
+                                  "runs under the measurement ceiling")
         if name == "run":
             command.add_argument("--session-root", type=Path, default=DEFAULT_SESSION_PARENT)
             command.add_argument("--admission-wait-seconds", type=float, default=DEFAULT_ADMISSION_WAIT_SECONDS)
@@ -615,6 +708,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     promoter.add_argument("records", type=Path, help="benchmarks/audio-qc-qualification/<session>")
     promoter.add_argument("--dry-run", action="store_true")
     promoter.add_argument("--bind-recovery-rule", action="store_true")
+    recalibrator = commands.add_parser("recalibrate")
+    recalibrator.add_argument("records", type=Path, help="benchmarks/audio-qc-qualification/<recalibration session>")
+    recalibrator.add_argument("--dry-run", action="store_true")
+    recalibrator.add_argument("--allow-lower", action="store_true",
+                              help="also move a ceiling down (a full cohort measuring less than the canary)")
     validator = commands.add_parser("validate")
     validator.add_argument("--records-root", type=Path, default=q.RECORDS_ROOT)
     args = parser.parse_args(argv)
@@ -634,8 +732,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "run":
             judges, resampler, panel, legacy = _judges(args, registry)
-            session_dir, manifest = start_session(args.session_root, speech=speech_manifest(args.manifest),
-                                                  panel=panel, legacy=legacy)
+            session_dir, manifest = start_session(
+                args.session_root, speech=speech_manifest(args.manifest), panel=panel, legacy=legacy,
+                purpose=q.RECALIBRATION_PURPOSE if args.recalibrate else q.QUALIFICATION_PURPOSE)
             run_session(registry=registry, manifest=manifest, judges=judges, resampler=resampler,
                         session_dir=session_dir, admission_wait_seconds=args.admission_wait_seconds)
             summary = analyze_session(session_dir, registry=registry)
@@ -643,8 +742,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary = analyze_session(args.session, registry=registry)
         elif args.command == "publish":
             destination = publish(args.session, args.records_root)
+            step = "recalibrate" if q.session_purpose(_read(destination / "session.json")) \
+                == q.RECALIBRATION_PURPOSE else "promote"
             print(json.dumps({"published": str(destination),
-                              "next": "commit it, then run: promote " + str(destination)}, indent=2))
+                              "next": f"commit it, then run: {step} {destination}"}, indent=2))
+            return 0
+        elif args.command == "recalibrate":
+            result = recalibrate(args.records, dry_run=args.dry_run, allow_lower=args.allow_lower)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            if result["refused"]:
+                print("audio-qc-panel-qualification: refused " + ", ".join(sorted(result["refused"])),
+                      file=sys.stderr)
             return 0
         else:
             print(json.dumps(promote(args.records, dry_run=args.dry_run, bind_recovery_rule=args.bind_recovery_rule),

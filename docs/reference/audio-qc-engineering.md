@@ -1475,6 +1475,47 @@ the session rerun. The offline tests (`test_audio_qc_panel_orchestration.py`,
 `test_audio_qc_panel_qualification.py`) drive the same code over fixture workers under the real
 supervisor and admission.
 
+**Full-cohort ceiling recalibration.** The 28-row canary session under-measures a real run. MLX
+workers grow with every row, and row length varies. On the first full cohort (791 natural takes,
+2026-09-27), Parakeet peaked at 5.44 GiB against its 5.04 GiB ceiling, and whisper-small at 2.68 GiB
+against its 2.50 GiB provisional ceiling. Even in 64-row chunks (`ROWS_PER_LAUNCH`), two Parakeet
+chunks reached 5.05-5.06 GiB. `run --recalibrate` runs a `ceiling-recalibration` session over a
+full-cohort manifest. It runs twice, like qualification, but every judge, calibrated ones included,
+runs under the measurement ceiling (`recalibration-measurement-budget`), and no flip analysis is
+made. Each judge gets a ceiling record (`vocello.audioqc.qc-ceiling/1`) with the canary record's
+identity, both runs' resources and the determinism class. Its take rows are kept as a count and a
+digest, so a record stays under 256 KB. `publish` copies every judge's record, passed or not.
+`recalibrate` changes only `resources`, and only for a shadow-or-later judge whose record measured
+the output identity its canary cites:
+
+- `canonicalHostPeakBytes` becomes the larger clean-run peak;
+- `ceilingBytes` becomes that peak x 1.2;
+- `ceilingSession` becomes the new session;
+- `ceilingHistory` gains the replaced ceiling, with its session and date.
+
+It refuses an unclean or off-host run, a candidate, another identity, and a ceiling that the
+admission budget less the orchestrator reservation cannot hold. It also refuses a lower ceiling
+unless `--allow-lower` is given. The registry then requires a recalibrated ceiling to be its
+committed ceiling record's, with the history starting at the canary session. Legacy judges
+(whisper-small, SenseVoice Q8) are measured but never edited; their provisional ceilings are
+changed by hand. With every judge reserving the measurement ceiling, workers run one at a time. The
+791-take panel's worker time (about 85 minutes), plus chunk reloads, puts each run at about
+1.5-2 hours, so a session takes 3-4 hours.
+
+```sh
+python3 scripts/audio_qc_orchestrator.py manifest \
+  --from-calibration-takes build/artifacts/macos/audio-qc/<qc-takes run>/takes-manifest.json \
+  --output build/artifacts/macos/audio-qc/<qc-takes run>/panel-manifest.json
+python3 scripts/audio_qc_panel_qualification.py plan --recalibrate \
+  --manifest build/artifacts/macos/audio-qc/<qc-takes run>/panel-manifest.json \
+  --judge-config asr.whisper-small@1=build/cache/delivery-analysis/whisper-small-mlx.json
+python3 scripts/audio_qc_panel_qualification.py run --recalibrate <the same arguments>
+python3 scripts/audio_qc_panel_qualification.py publish build/artifacts/diagnostics/audio-qc-panel-qualification/<session>
+# review, commit benchmarks/audio-qc-qualification/<session>/, then:
+python3 scripts/audio_qc_panel_qualification.py recalibrate benchmarks/audio-qc-qualification/<session> --dry-run
+python3 scripts/audio_qc_panel_qualification.py recalibrate benchmarks/audio-qc-qualification/<session>
+```
+
 ### Natural calibration takes (AQ-07 N3, 2026-09-27)
 
 Population N3 is natural Vocello takes over one split of the CC0 script pool

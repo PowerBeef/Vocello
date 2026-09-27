@@ -613,7 +613,7 @@ class Orchestrator:
         self, *, registry: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path | None = None,
         stage2: Sequence[Stage2Judge] = (), host_admission: HostAdmission | None = None,
         supervisor: Callable[..., Any] = run_supervised, supervisor_options: Mapping[str, Any] | None = None,
-        offline: bool = False, measurement_ceilings: bool = False,
+        offline: bool = False, measurement_ceilings: bool = False, recalibration: bool = False,
     ) -> None:
         self.registry = registry
         self.policy = AdmissionPolicy.from_registry(registry)
@@ -629,6 +629,8 @@ class Orchestrator:
         # The AQ-06 qualification run: a judge whose ceiling is still provisional
         # is admitted at the measurement ceiling (`admission.judge_admission`).
         self.measurement_ceilings = measurement_ceilings
+        # A full-cohort ceiling recalibration: every judge, calibrated ones included.
+        self.recalibration = recalibration
 
     # -- Stage 1 ----------------------------------------------------------- #
 
@@ -682,7 +684,8 @@ class Orchestrator:
 
         def launch(judge_id: str) -> WorkerOutcome:
             judge = self.stage2[judge_id]
-            admission = judge_admission(self.registry, judge_id, measurement=self.measurement_ceilings)
+            admission = judge_admission(self.registry, judge_id, measurement=self.measurement_ceilings,
+                                        recalibration=self.recalibration)
             rows = [entry["row"] for entry in plans[judge_id].values()]
             return run_persistent_worker(
                 judge.spec(admission.ceiling_bytes, admission.lane), rows,

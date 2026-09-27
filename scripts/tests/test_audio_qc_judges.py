@@ -54,7 +54,7 @@ def _unpromotion_edits(registry: dict) -> dict[tuple[str, ...], object]:
         if "acquisition" not in judge:
             continue
         resources = {key: value for key, value in judge["resources"].items()
-                     if key not in ("ceilingBytes", "ceilingSession")}
+                     if key not in ("ceilingBytes", "ceilingSession", "ceilingHistory")}
         resources.update(ceilingStatus="provisional", canonicalHostPeakBytes=None)
         base = ("judges", judge_id)
         edits.update({(*base, "status"): "candidate", (*base, "canary"): None,
@@ -522,11 +522,14 @@ class PanelAcquisitionTests(unittest.TestCase):
                 self.assertIn(judge["determinismClass"], ("D0", "D1"))
                 self.assertEqual(judge["determinismClass"], record["determinism"]["class"])
                 resources = judge["resources"]
-                self.assertEqual((resources["ceilingStatus"], resources["ceilingSession"]),
-                                 ("calibrated", PROMOTION_SESSION))
-                self.assertEqual(resources["canonicalHostPeakBytes"], record["resources"]["canonicalHostPeakBytes"])
+                self.assertEqual(resources["ceilingStatus"], "calibrated")
                 self.assertEqual(resources["ceilingBytes"], -(-resources["canonicalHostPeakBytes"] * 12 // 10))
-                self.assertEqual(resources["ceilingBytes"], record["resources"]["admissionCeilingBytes"])
+                # A full-cohort recalibration may since have moved the ceiling; its history starts at the canary.
+                history = resources.get("ceilingHistory") or []
+                first = history[0] if history else resources
+                self.assertEqual(first["ceilingSession"], PROMOTION_SESSION)
+                self.assertEqual(first["canonicalHostPeakBytes"], record["resources"]["canonicalHostPeakBytes"])
+                self.assertEqual(first["ceilingBytes"], record["resources"]["admissionCeilingBytes"])
                 self.assertNotIn("plannedExecution", judge)
                 self.assertEqual(judge["execution"]["threadsStatus"], "provisional")
                 self.assertIn("threads", judge["identity"]["output"])

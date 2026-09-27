@@ -36,7 +36,11 @@ workers, by a semaphore over memory:
   a judge whose peak x 1.2 does not fit fails qualification on its measured
   number (`ceiling-exceeds-budget`). The budget stays a bound: admission
   reserves the measurement ceiling, so nothing else is admitted beside it.
-  Every other run keeps the provisional ceiling.
+  Every other run keeps the provisional ceiling. A ceiling recalibration
+  (`judge_admission(..., recalibration=True)`, the full-cohort session of
+  `audio_qc_panel_qualification.py run --recalibrate`) admits every judge,
+  calibrated ones included, at the measurement ceiling, so a canary ceiling
+  that a real cohort outgrows never cuts the new measurement short.
 - **The recovery rule sets the host-wide worker cap.** While the whole-host
   post-exit recovery rule binds, one worker's drop in host free memory cannot
   be told apart from another's allocation, so at most
@@ -201,6 +205,7 @@ CALIBRATED_BASIS = "calibrated-canonical-host-peak-x1.2"
 MEASURED_BASIS = "measured-canonical-host-peak-x1.2"
 PROVISIONAL_BASIS = "provisional"
 MEASUREMENT_BASIS = "qualification-measurement-budget"
+RECALIBRATION_BASIS = "recalibration-measurement-budget"
 
 
 def judge_ceiling(judge: Mapping[str, Any]) -> tuple[int, str]:
@@ -228,13 +233,16 @@ def measurement_ceiling(registry: Mapping[str, Any]) -> int:
     return budget - reservation
 
 
-def judge_admission(registry: Mapping[str, Any], judge_id: str, *, measurement: bool = False) -> JudgeAdmission:
+def judge_admission(registry: Mapping[str, Any], judge_id: str, *, measurement: bool = False,
+                    recalibration: bool = False) -> JudgeAdmission:
     """What one orchestrated worker judge is admitted as, from the registry.
 
     `measurement` is the AQ-06 qualification run: a judge whose ceiling is
     still provisional (`ceilingStatus: provisional`) is admitted at the
     measurement ceiling (`measurement_ceiling`) so its peak is measured, not
     cut off at an estimate. A calibrated judge keeps its calibrated ceiling.
+    `recalibration` is a full-cohort ceiling recalibration: every judge,
+    calibrated or not, is admitted at the measurement ceiling.
     """
     judge = (registry.get("judges") or {}).get(judge_id)
     if not isinstance(judge, Mapping):
@@ -253,7 +261,9 @@ def judge_admission(registry: Mapping[str, Any], judge_id: str, *, measurement: 
     except AdmissionRefused as error:
         raise AdmissionRefused(f"audio QC judge {judge_id}: {error}") from None
     resources = judge.get("resources") if isinstance(judge.get("resources"), Mapping) else {}
-    if measurement and basis == PROVISIONAL_BASIS and resources.get("ceilingStatus") == "provisional":
+    if recalibration:
+        ceiling, basis = measurement_ceiling(registry), RECALIBRATION_BASIS
+    elif measurement and basis == PROVISIONAL_BASIS and resources.get("ceilingStatus") == "provisional":
         ceiling, basis = measurement_ceiling(registry), MEASUREMENT_BASIS
     return JudgeAdmission(judge_id, str(execution["lane"]), ceiling, basis, threads, str(execution.get("engine")))
 

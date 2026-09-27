@@ -499,6 +499,14 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
     cites its committed canary record, and that record is of the named session
     and derived exactly this ceiling from exactly this peak. Only a calibrated
     ceiling records `ceilingBytes`.
+
+    `recalibrate` may later move the ceiling to a full-cohort session: then
+    `ceilingSession` names a committed `ceiling-recalibration` session whose
+    ceiling record for this judge passed, measured the canary's output identity
+    and derived exactly this peak and ceiling, and `ceilingHistory` lists every
+    replaced ceiling, oldest first from the canary session's. Either way the
+    session is published under benchmarks/audio-qc-qualification/ with a record
+    for the judge.
     """
     from lib.qc_pipeline.qualification import SESSION_ID, admission_ceiling
 
@@ -511,8 +519,9 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
     if status not in CEILING_STATUSES:
         return [f"{label}: ceilingStatus is {' or '.join(CEILING_STATUSES)}"]
     if status != "calibrated":
-        if resources.get("ceilingBytes") is not None or resources.get("ceilingSession") is not None:
-            return [f"{label}: only a calibrated ceiling records ceilingBytes and ceilingSession"]
+        if resources.get("ceilingBytes") is not None or resources.get("ceilingSession") is not None \
+                or resources.get("ceilingHistory") is not None:
+            return [f"{label}: only a calibrated ceiling records ceilingBytes, ceilingSession and ceilingHistory"]
         return []
     ceiling, peak, session = (resources.get("ceilingBytes"), resources.get("canonicalHostPeakBytes"),
                               resources.get("ceilingSession"))
@@ -538,10 +547,120 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
         return errors + [f"{label}: the canary record {relative} behind its calibrated ceiling is not an object"]
     measured = record.get("resources") if isinstance(record.get("resources"), dict) else {}
     recorded = record.get("session") if isinstance(record.get("session"), dict) else {}
-    if recorded.get("id") != session:
-        errors.append(f"{label}: its calibrated ceiling names session {session}, not its canary record's")
-    if measured.get("admissionCeilingBytes") != ceiling or measured.get("canonicalHostPeakBytes") != peak:
-        errors.append(f"{label}: its calibrated ceiling is not the one its canary record measured")
+    canary_session = recorded.get("id")
+    history = resources.get("ceilingHistory")
+    errors.extend(_ceiling_session_errors(label, judge_id, session, root))
+    if canary_session == session:
+        if history is not None:
+            errors.append(f"{label}: a ceiling still measured by its canary session records no ceilingHistory")
+        if measured.get("admissionCeilingBytes") != ceiling or measured.get("canonicalHostPeakBytes") != peak:
+            errors.append(f"{label}: its calibrated ceiling is not the one its canary record measured")
+        return errors
+    if not isinstance(history, list) or not history:
+        errors.append(f"{label}: its calibrated ceiling names session {session}, not its canary record's, "
+                      "and records no ceilingHistory of a recalibration")
+        return errors
+    errors.extend(_recalibrated_ceiling_errors(label, judge_id, judge, session, root))
+    errors.extend(_ceiling_history_errors(label, judge_id, history, session, canary_session, root))
+    return errors
+
+
+QUALIFICATION_RECORDS = "benchmarks/audio-qc-qualification"
+
+
+def _session_record(root: Path, session: str) -> dict[str, Any] | None:
+    try:
+        value = json.loads((root / QUALIFICATION_RECORDS / session / "session.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _ceiling_session_errors(label: str, judge_id: str, session: Any, root: Path) -> list[str]:
+    """A ceiling's session is a published session under benchmarks/audio-qc-qualification/ with the judge's record."""
+    record = _session_record(root, str(session))
+    if record is None:
+        return [f"{label}: its ceiling session {session} is not a published session under {QUALIFICATION_RECORDS}/"]
+    entry = (record.get("judges") or {}).get(judge_id) if isinstance(record.get("judges"), dict) else None
+    relative = entry.get("record") if isinstance(entry, dict) else None
+    if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts \
+            or not (root / QUALIFICATION_RECORDS / str(session) / relative).is_file():
+        return [f"{label}: its ceiling session {session} holds no record for it"]
+    return []
+
+
+def _recalibrated_ceiling_errors(label: str, judge_id: str, judge: dict[str, Any], session: str,
+                                 root: Path) -> list[str]:
+    """A recalibrated ceiling is the one its committed recalibration session's ceiling record measured."""
+    from lib.qc_pipeline.qualification import (
+        CEILING_SCHEMA, RECALIBRATION_PURPOSE, session_purpose, validate_ceiling_record,
+    )
+
+    record_session = _session_record(root, session)
+    if record_session is None:
+        return []
+    if session_purpose(record_session) != RECALIBRATION_PURPOSE:
+        return [f"{label}: its ceiling session {session} is not a ceiling recalibration"]
+    session_relative = f"{QUALIFICATION_RECORDS}/{session}/session.json"
+    entry = (record_session.get("judges") or {}).get(judge_id) or {}
+    relative = f"{QUALIFICATION_RECORDS}/{session}/{entry.get('record')}"
+    errors = [f"{label}: the recalibration record {path} {problem}" for path in (session_relative, relative)
+              for problem in _committed_file_errors(root, path)]
+    try:
+        record = json.loads((root / relative).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return errors + [f"{label}: the recalibration record {relative} is not JSON"]
+    problems = validate_ceiling_record(record)
+    if problems:
+        return errors + [f"{label}: the recalibration record {relative}: {problem}" for problem in problems[:3]]
+    if record.get("schema") != CEILING_SCHEMA or record.get("judge") != judge_id \
+            or record["session"].get("id") != session:
+        errors.append(f"{label}: the recalibration record {relative} is not its record of session {session}")
+    if record["recalibration"].get("passed") is not True:
+        errors.append(f"{label}: its recalibration record did not pass")
+    canary = judge.get("canary") if isinstance(judge.get("canary"), dict) else {}
+    if record.get("outputIdentity") != canary.get("outputIdentity"):
+        errors.append(f"{label}: its recalibration measured another output identity than its canary record")
+    resources = judge.get("resources") or {}
+    if record["resources"].get("canonicalHostPeakBytes") != resources.get("canonicalHostPeakBytes") \
+            or record["resources"].get("admissionCeilingBytes") != resources.get("ceilingBytes"):
+        errors.append(f"{label}: its calibrated ceiling is not the one its recalibration record measured")
+    return errors
+
+
+def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], session: str, canary_session: Any,
+                            root: Path) -> list[str]:
+    """Each replaced ceiling, oldest first from the canary session's, before the current session."""
+    from lib.qc_pipeline.qualification import (
+        CEILING_HISTORY_FIELDS, SESSION_ID, admission_ceiling, session_date,
+    )
+
+    errors = []
+    sessions = []
+    for index, item in enumerate(history):
+        where = f"{label}: ceilingHistory[{index}]"
+        if not isinstance(item, dict) or set(item) != set(CEILING_HISTORY_FIELDS):
+            errors.append(f"{where} records exactly {', '.join(CEILING_HISTORY_FIELDS)}")
+            continue
+        entry_session = item["ceilingSession"]
+        if not isinstance(entry_session, str) or not SESSION_ID.fullmatch(entry_session):
+            errors.append(f"{where} names the session that measured the replaced ceiling")
+            continue
+        sessions.append(entry_session)
+        if item["date"] != session_date(entry_session):
+            errors.append(f"{where}: its date is its session's")
+        if not _positive_int(item["canonicalHostPeakBytes"]) \
+                or item["ceilingBytes"] != admission_ceiling(item["canonicalHostPeakBytes"]):
+            errors.append(f"{where}: a replaced ceiling is its peak x 1.2, rounded up")
+        errors.extend(_ceiling_session_errors(where, judge_id, entry_session, root))
+    if errors:
+        return errors
+    if sessions[0] != canary_session:
+        errors.append(f"{label}: ceilingHistory starts at the canary record's session")
+    dates = [session_date(item) for item in sessions]
+    if len(set(sessions)) != len(sessions) or session in sessions or dates != sorted(dates) \
+            or dates[-1] > session_date(session):
+        errors.append(f"{label}: ceilingHistory lists distinct earlier sessions in order")
     return errors
 
 
@@ -595,7 +714,11 @@ def _canary_errors(judge_id: str, judge: dict[str, Any], registry: dict[str, Any
     if determinism not in QUALIFIED_DETERMINISM_CLASSES or judge.get("determinismClass") != determinism:
         errors.append(f"{label}: determinismClass must be the canary's measured D0 or D1 class")
     resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
-    if resources.get("canonicalHostPeakBytes") != record["resources"].get("canonicalHostPeakBytes"):
+    # A recalibrated judge's peak is its recalibration record's, which `_ceiling_errors` checks.
+    recalibrated = resources.get("ceilingSession") != record["session"].get("id") \
+        and isinstance(resources.get("ceilingHistory"), list) and bool(resources["ceilingHistory"])
+    if not recalibrated \
+            and resources.get("canonicalHostPeakBytes") != record["resources"].get("canonicalHostPeakBytes"):
         errors.append(f"{label}: canonicalHostPeakBytes must be the peak its canary record measured")
     if judge.get("status") in VERDICT_STATUSES:
         errors.extend(f"{label}: {problem}" for problem in identity_freshness_errors(record, judge_id, registry,

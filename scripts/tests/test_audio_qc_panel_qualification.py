@@ -299,7 +299,16 @@ class SessionTests(PanelFixture):
             self.assertNotIn(str(self.root), text, "no private path in a record")
 
     def test_promotion_moves_passing_candidates_to_shadow_from_committed_records_only(self) -> None:
-        session_dir, _summary = self._session()
+        session_dir, summary = self._session()
+        # A judge that did not pass names why (CI once saw whisper-large-v3 fail here, not locally).
+        diagnostics = json.loads((session_dir / "diagnostics.json").read_text(encoding="utf-8"))
+        for judge in (WHISPER_LARGE, AUDIOBOX, PYIN, CAMPPLUS):
+            entry = diagnostics["judges"].get(judge) or {}
+            self.assertTrue(summary["judges"][judge]["passed"], json.dumps({
+                "reasons": summary["judges"][judge].get("reasons"), "verdict": entry.get("verdict"),
+                "launches": [[{key: launch.get(key) for key in ("failures", "hostCondition", "unavailableReason",
+                                                                "ceilingBasis")} for launch in run.get("launches", [])]
+                             for run in entry.get("runs", [])]}, default=str)[:4000])
         repository = self.root / "repository"
         repository.mkdir()
         copier = registry_tests.JudgeRegistryTests("_repository_copy")

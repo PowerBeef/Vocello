@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import audio_qc_worker  # noqa: E402
 from delivery_resource_supervisor import HostSnapshot, SupervisedResult, run_supervised  # noqa: E402
 from lib.qc_pipeline.admission import AdmissionPolicy, HostAdmission, JudgeAdmission  # noqa: E402
+from lib.qc_pipeline import workers  # noqa: E402
 from lib.qc_pipeline.workers import (  # noqa: E402
     WorkerProtocolError,
     WorkerSpec,
@@ -129,13 +130,13 @@ class PersistentWorkerTests(unittest.TestCase):
                           engine_config={"table": self.table, **config},
                           row_timeout_seconds=row_timeout, startup_seconds=startup)
 
-    def _run(self, spec: WorkerSpec, *, supervisor=quiet_supervisor, rows=None, adopt=None):
+    def _run(self, spec: WorkerSpec, *, supervisor=quiet_supervisor, rows=None, adopt=None, **options):
         host = HostAdmission(self.root / "locks", self.policy)
         with host.run() as run:
             outcome = run_persistent_worker(
                 spec, [{key: row[key] for key in ("id", "pcmPath", "language")} for row in rows or self.rows],
                 workdir=self.root / "work", lock_root=self.root / "locks", run_admission=run,
-                judge_admission=self.judge, supervisor=supervisor, adopt=adopt,
+                judge_admission=self.judge, supervisor=supervisor, adopt=adopt, **options,
             )
         self.assertEqual(host.status()["tickets"], [])
         return outcome
@@ -152,6 +153,20 @@ class PersistentWorkerTests(unittest.TestCase):
         self.assertEqual(envelope["admission"]["judge"], "asr.fixture@1")
         self.assertEqual(envelope["maximumAllowedRSSBytes"], GIB)
         self.assertEqual(outcome.ready["threads"], 2)
+
+    def test_rows_run_in_bounded_chunks_each_in_a_fresh_admitted_worker(self) -> None:
+        # A worker's MLX cache grows with every row it sees; a fresh worker per
+        # chunk bounds it, and every row is still analyzed exactly once.
+        rows = self._clips(7)
+        outcome = self._run(self._spec(), rows=rows, rows_per_launch=3)
+        self.assertEqual([(launch["kind"], launch["rows"], launch["retry"]) for launch in outcome.launches],
+                         [("job", 3, False), ("job", 3, False), ("job", 1, False)])
+        self.assertEqual(sorted(outcome.results), sorted(row["id"] for row in rows))
+        self.assertEqual(outcome.unavailable, {})
+        self.assertTrue(all(launch["resourceEnvelope"]["qualified"] for launch in outcome.launches))
+        with self.assertRaises(ValueError):
+            self._run(self._spec(), rows_per_launch=0)
+        self.assertGreaterEqual(workers.ROWS_PER_LAUNCH, 28, "a chunk holds at least the canary's rows")
 
     def test_library_output_on_stdout_never_reaches_the_protocol(self) -> None:
         # funasr and audiobox print banners to stdout from Python and native code.

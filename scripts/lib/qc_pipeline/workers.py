@@ -1,5 +1,7 @@
 """One persistent, supervised worker per judge per run (audit AQ-F42, section 3.4).
 
+A judge's rows run in chunks of at most `ROWS_PER_LAUNCH`, each in a fresh
+worker, so a worker's cache growth stays bounded (see the constant).
 `run_persistent_worker` writes the job, admits the worker (when the caller runs
 under an orchestrator's `RunAdmission`), launches `scripts/audio_qc_worker.py`
 (or any command speaking its JSONL protocol) under the resource supervisor with
@@ -75,6 +77,15 @@ DEFAULT_STARTUP_SECONDS = 900.0
 TIMING_KEYS = frozenset({"wallSeconds"})
 # The end of a launch's stderr kept for private diagnostics (a traceback's last frames).
 STDERR_TAIL_BYTES = 8192
+# A worker process analyzes at most this many rows; the next rows get a fresh
+# process. MLX keeps freed buffers cached across rows of varying length, so a
+# worker's footprint grows with every row it has seen (on the M6, Parakeet
+# about 6 MB and whisper-small about 2.6 MB per row) and a whole-cohort launch
+# outgrows a ceiling measured on the 28-row canary. A fresh process per chunk
+# bounds that growth near the canary's peak without touching the judge's
+# output identity: the launcher is envelope provenance, and a row's result
+# does not depend on which process analyzed it.
+ROWS_PER_LAUNCH = 64
 
 
 class WorkerProtocolError(ValueError):
@@ -225,8 +236,15 @@ def run_persistent_worker(
     recovery_rule: str = WHOLE_HOST_RECOVERY_RULE,
     supervisor_options: Mapping[str, Any] | None = None,
     adopt: Callable[[Sequence[Mapping[str, Any]]], Mapping[str, dict[str, Any]]] | None = None,
+    rows_per_launch: int = ROWS_PER_LAUNCH,
 ) -> WorkerOutcome:
-    """Run one judge's rows through one worker, isolating a row that crashes it."""
+    """Run one judge's rows through its workers, isolating a row that crashes one.
+
+    The rows run in chunks of at most `rows_per_launch`, each in a fresh
+    worker (ROWS_PER_LAUNCH), each chunk its own admitted launch.
+    """
+    if rows_per_launch < 1:
+        raise ValueError("a worker launch needs room for at least one row")
     if run_admission is not None and judge_admission is None:
         raise ValueError("an admitted worker needs its judge admission")
     if judge_admission is not None and judge_admission.ceiling_bytes != spec.ceiling_bytes:
@@ -237,7 +255,9 @@ def run_persistent_worker(
     outcome = WorkerOutcome(spec.judge_id)
     workdir.mkdir(parents=True, exist_ok=True)
     # Each queued batch: its rows and why it runs.
-    queue: deque[tuple[list[dict[str, Any]], str]] = deque([([dict(row) for row in rows], "job")])
+    planned = [dict(row) for row in rows]
+    queue: deque[tuple[list[dict[str, Any]], str]] = deque(
+        (planned[start:start + rows_per_launch], "job") for start in range(0, len(planned), rows_per_launch))
     crashes: dict[str, int] = {}
     unready_failures = 0
 
@@ -320,7 +340,9 @@ def run_persistent_worker(
             reason = "crash" if protocol_error else unavailable_reason(failures)
         outcome.launches.append({
             "launch": launch,
-            "retry": launch > 1,
+            # A planned chunk is a first launch of its rows; only a relaunch after an
+            # abnormal end (isolated, remainder or retry) is a retry.
+            "retry": kind != "job",
             "kind": kind,
             "rows": len(batch),
             "timeoutSeconds": timeout,

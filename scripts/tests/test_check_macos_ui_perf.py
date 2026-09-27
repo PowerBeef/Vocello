@@ -222,9 +222,11 @@ class UIPerfFixture(unittest.TestCase):
     def test_the_shipped_contract_names_its_calibration(self):
         contract = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
         self.assertEqual(
-            (contract["calibrationProfile"], contract["calibrationRefreshIntervalMS"]),
-            ("mac-mini-m2-8gb", 16.67),
+            (contract["calibrationProfile"], contract["calibrationRefreshIntervalMS"], contract["derivationRule"]),
+            ("mac-mini-m6-16gb", 16.67, "spread-v1"),
         )
+        self.assertEqual(len(contract["calibrationRuns"]), 3)
+        self.assertNotIn("calibrationStale", contract)
         for field in ("calibrationProfile", "calibrationRefreshIntervalMS"):
             broken = {key: value for key, value in self.contract.items() if key != field}
             self.thresholds.write_text(json.dumps(broken))
@@ -514,10 +516,17 @@ class DerivationTests(unittest.TestCase):
     def setUp(self):
         self.base = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
 
+    # The baseline-v3 M2 ceilings (2026-09-15) the contract carried until the
+    # M6 re-derivation of 2026-09-27; the v3 rule must still reproduce them.
+    V3_M2_HITCH = {"idle-baseline": 5.0, "sidebar-navigation": 224.5, "delivery-menu": 233.0,
+                   "settings-scroll": 5.0, "composer-typing": 37.0}
+    V3_M2_GAP = {"idle-baseline": 50.0, "sidebar-navigation": 350.0, "delivery-menu": 160.0,
+                 "settings-scroll": 40.0, "composer-typing": 120.0}
+
     def test_the_v3_rule_reproduces_the_committed_ceilings(self):
         derived = rules.derive(v3_records(), self.base, rule=rules.V3_RULE)
-        self.assertEqual(derived["hitchCeilingMSPerS"], self.base["hitchCeilingMSPerS"])
-        self.assertEqual(derived["maxGapCeilingMS"], self.base["maxGapCeilingMS"])
+        self.assertEqual(derived["hitchCeilingMSPerS"], self.V3_M2_HITCH)
+        self.assertEqual(derived["maxGapCeilingMS"], self.V3_M2_GAP)
         self.assertEqual(derived["calibrationProfile"], "mac-mini-m2-8gb")
 
     def test_the_spread_rule_floors_low_spread_scenarios_at_1_3x(self):

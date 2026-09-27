@@ -1,16 +1,14 @@
 {
   "schemaVersion": 1,
-  "basis": "baseline-v3 medians (2026-09-15: three counted perf sessions on the converged macOS app after the last legacy screen left in CONV-22, Mac mini M2 8 GB, English pinned, runs macos-xcui-perf-20260915-220611-0bb33592, macos-xcui-perf-20260915-221935-636488c2, macos-xcui-perf-20260915-222752-64610737). Ceilings are twice the hitch median and 1.5x the gap median, never below 1.25x the observed maximum, rounded up, with floors of 5 ms/s and 40 ms so a quiet scenario never warns on one frame. Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated sessions showing stable spread. Supersedes the baseline-v2 decision of 2026-08-05 (wave-2 tree). These M2 ceilings apply only on mac-mini-m2-8gb at a 60 Hz refresh; since the canonical Mac became mac-mini-m6-16gb every run there carries uiperf.uncalibrated:mac-mini-m2-8gb instead of ceiling verdicts (audit #77) until AV-17 step 3 re-derives this contract from at least three counted M6 sessions with check_macos_ui_perf.py --derive-thresholds (rule spread-v1, maintainer decision 2026-09-25: from counted canonical sessions of one comparison lineage, max(1.3 x median, median + 3 x run-to-run range)). footprintGrowthCeilingMB (2026-09-25, audit #33) warns when a confirmatory window grows the footprint past 250 MB; sidebar-navigation's in-window growth (footprintPeakMB - footprintStartMB, the gated statistic) was 57-68 MB on the 18 macOS ui-perf records before the in-process engine (09-15) and 1018-2405 MB of product warms on the 19 since.",
-  "calibrationProfile": "mac-mini-m2-8gb",
+  "basis": "Derived with spread-v1 from 3 counted ui-perf runs on mac-mini-m6-16gb (macos-xcui-perf-20260927-112952-a17db9fe, macos-xcui-perf-20260927-123958-bfbe8242, macos-xcui-perf-20260927-133001-8484a1d1) by check_*_ui_perf.py --derive-thresholds. Per confirmatory scenario: max(1.3 x median, median + 3 x (max - min)); hitch rounded up to 0.5 ms/s (floor 5), gap to 10 ms (floor 40). Warn-only. Supersedes the baseline-v3 M2 ceilings (2026-09-15, runs macos-xcui-perf-20260915-*; mac-mini-m2-8gb stays the support floor), which judged quantities the 2026-09-25 driver no longer measures (audit #32, #33, #81). footprintGrowthCeilingMB (2026-09-25, audit #33) warns when a confirmatory window grows the footprint past 250 MB.",
+  "calibrationProfile": "mac-mini-m6-16gb",
   "calibrationRefreshIntervalMS": 16.67,
-  "derivationRule": "v3",
   "calibrationRuns": [
-    "macos-xcui-perf-20260915-220611-0bb33592",
-    "macos-xcui-perf-20260915-221935-636488c2",
-    "macos-xcui-perf-20260915-222752-64610737"
+    "macos-xcui-perf-20260927-112952-a17db9fe",
+    "macos-xcui-perf-20260927-123958-bfbe8242",
+    "macos-xcui-perf-20260927-133001-8484a1d1"
   ],
-  "calibrationStale": "Since 2026-09-25 (audit #32, #33, #81) sidebar-navigation measures pure UI with a new driver (product warms suppressed, phased readiness polls, clicks and destination waits) and uiMaxGapMS is clipped to the measured window, so these ceilings judge quantities the scenarios no longer measure. Every run carries uiperf.uncalibrated:mac-mini-m2-8gb until AV-17 step 3 re-derives the contract from at least three counted M6 sessions of the new driver (--derive-thresholds writes a contract without this field).",
-  "footprintGrowthCeilingMB": 250.0,
+  "derivationRule": "spread-v1",
   "warnOnly": true,
   "confirmatoryScenarios": [
     "idle-baseline",
@@ -20,17 +18,150 @@
     "composer-typing"
   ],
   "hitchCeilingMSPerS": {
-    "idle-baseline": 5.0,
-    "sidebar-navigation": 224.5,
-    "delivery-menu": 233.0,
+    "idle-baseline": 8.0,
+    "sidebar-navigation": 77.5,
+    "delivery-menu": 89.0,
     "settings-scroll": 5.0,
-    "composer-typing": 37.0
+    "composer-typing": 23.0
   },
   "maxGapCeilingMS": {
     "idle-baseline": 50.0,
-    "sidebar-navigation": 350.0,
-    "delivery-menu": 160.0,
+    "sidebar-navigation": 150.0,
+    "delivery-menu": 150.0,
     "settings-scroll": 40.0,
-    "composer-typing": 120.0
+    "composer-typing": 90.0
+  },
+  "footprintGrowthCeilingMB": 250.0,
+  "derivationInputs": {
+    "idle-baseline": {
+      "hitchTimeMSPerS": {
+        "values": [
+          2.977,
+          1.426,
+          2.872
+        ],
+        "median": 2.872,
+        "range": 1.551,
+        "relativeRange": 0.54,
+        "multiplier": 2.6201,
+        "ceiling": 8.0
+      },
+      "maxGapMS": {
+        "values": [
+          37.56,
+          33.33,
+          33.33
+        ],
+        "median": 33.33,
+        "range": 4.23,
+        "relativeRange": 0.1269,
+        "multiplier": 1.3807,
+        "ceiling": 50.0
+      }
+    },
+    "sidebar-navigation": {
+      "hitchTimeMSPerS": {
+        "values": [
+          41.729,
+          51.309,
+          48.727
+        ],
+        "median": 48.727,
+        "range": 9.58,
+        "relativeRange": 0.1966,
+        "multiplier": 1.5898,
+        "ceiling": 77.5
+      },
+      "maxGapMS": {
+        "values": [
+          116.67,
+          104.28,
+          109.57
+        ],
+        "median": 109.57,
+        "range": 12.39,
+        "relativeRange": 0.1131,
+        "multiplier": 1.3392,
+        "ceiling": 150.0
+      }
+    },
+    "delivery-menu": {
+      "hitchTimeMSPerS": {
+        "values": [
+          69.811,
+          66.961,
+          68.275
+        ],
+        "median": 68.275,
+        "range": 2.85,
+        "relativeRange": 0.0417,
+        "multiplier": 1.3,
+        "ceiling": 89.0
+      },
+      "maxGapMS": {
+        "values": [
+          76.39,
+          76.5,
+          100.0
+        ],
+        "median": 76.5,
+        "range": 23.61,
+        "relativeRange": 0.3086,
+        "multiplier": 1.9259,
+        "ceiling": 150.0
+      }
+    },
+    "settings-scroll": {
+      "hitchTimeMSPerS": {
+        "values": [
+          1.173,
+          2.069,
+          0.965
+        ],
+        "median": 1.173,
+        "range": 1.104,
+        "relativeRange": 0.9412,
+        "multiplier": 3.8235,
+        "ceiling": 5.0
+      },
+      "maxGapMS": {
+        "values": [
+          16.67,
+          16.67,
+          16.67
+        ],
+        "median": 16.67,
+        "range": 0.0,
+        "relativeRange": 0.0,
+        "multiplier": 1.3,
+        "ceiling": 40.0
+      }
+    },
+    "composer-typing": {
+      "hitchTimeMSPerS": {
+        "values": [
+          14.361,
+          11.249,
+          10.464
+        ],
+        "median": 11.249,
+        "range": 3.897,
+        "relativeRange": 0.3464,
+        "multiplier": 2.0393,
+        "ceiling": 23.0
+      },
+      "maxGapMS": {
+        "values": [
+          61.45,
+          63.11,
+          66.8
+        ],
+        "median": 63.11,
+        "range": 5.35,
+        "relativeRange": 0.0848,
+        "multiplier": 1.3,
+        "ceiling": 90.0
+      }
+    }
   }
 }

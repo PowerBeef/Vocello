@@ -1763,3 +1763,4 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-27 | [`macos-xcui-perf-20260927-112952-a17db9fe`](runs/ui-perf/macos-xcui-perf-20260927-112952-a17db9fe.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `5c2c73726f3c` | `069502f6473f` | baseline | macos-xcui-perf-20260927-112952-a17db9fe |
+| 2026-09-27 | [`macos-xcui-perf-20260927-123958-bfbe8242`](runs/ui-perf/macos-xcui-perf-20260927-123958-bfbe8242.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `87f2aa391019` | `069502f6473f` | vs macos-xcui-perf-20260927-112952-a17db9fe: compatible | macos-xcui-perf-20260927-123958-bfbe8242 |

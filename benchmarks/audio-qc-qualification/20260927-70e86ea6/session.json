@@ -1,0 +1,496 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "flipAnalysis": null,
+  "judges": {
+    "align.qwen3-forcedaligner-0.6b@1": {
+      "admissionCeilingBytes": 4347832205,
+      "canonicalHostPeakBytes": 3623193504,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/align.qwen3-forcedaligner-0.6b-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        3622849440,
+        3623193504
+      ]
+    },
+    "asr.paraformer-zh@1": {
+      "admissionCeilingBytes": 3894784820,
+      "canonicalHostPeakBytes": 3245654016,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.paraformer-zh-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        3245260800,
+        3245654016
+      ]
+    },
+    "asr.parakeet-tdt-0.6b-v3@1": {
+      "admissionCeilingBytes": 7002944544,
+      "canonicalHostPeakBytes": 5835787120,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.parakeet-tdt-0.6b-v3-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        5835787120,
+        5833493360
+      ]
+    },
+    "asr.qwen3-asr-1.7b@1": {
+      "admissionCeilingBytes": 6649759661,
+      "canonicalHostPeakBytes": 5541466384,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.qwen3-asr-1.7b-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        5528162552,
+        5541466384
+      ]
+    },
+    "asr.sensevoice-small-f16@1": {
+      "admissionCeilingBytes": 683822285,
+      "canonicalHostPeakBytes": 569851904,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.sensevoice-small-f16-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        569851904,
+        559349760
+      ]
+    },
+    "asr.whisper-large-v3@1": {
+      "admissionCeilingBytes": 7197765428,
+      "canonicalHostPeakBytes": 5998137856,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/asr.whisper-large-v3-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        5997990352,
+        5998137856
+      ]
+    },
+    "lid.voxlingua107-ecapa@1": {
+      "admissionCeilingBytes": 1714146509,
+      "canonicalHostPeakBytes": 1428455424,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/lid.voxlingua107-ecapa-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        1428209664,
+        1428455424
+      ]
+    },
+    "pitch.pyin@1": {
+      "admissionCeilingBytes": 562928026,
+      "canonicalHostPeakBytes": 469106688,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/pitch.pyin-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        469106688,
+        459751424
+      ]
+    },
+    "quality.audiobox-aesthetics@1": {
+      "admissionCeilingBytes": 3808986960,
+      "canonicalHostPeakBytes": 3174155800,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/quality.audiobox-aesthetics-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        3174155800,
+        3170764264
+      ]
+    },
+    "quality.dnsmos-p835@1": {
+      "admissionCeilingBytes": 605650944,
+      "canonicalHostPeakBytes": 504709120,
+      "determinismClass": "D0",
+      "passed": false,
+      "reasons": [
+        "rows-missing",
+        "run-2-not-clean"
+      ],
+      "record": "judges/quality.dnsmos-p835-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        504709120,
+        499499008
+      ]
+    },
+    "speaker.campplus-voxceleb@1": {
+      "admissionCeilingBytes": 252012135,
+      "canonicalHostPeakBytes": 210010112,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/speaker.campplus-voxceleb-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        209158144,
+        210010112
+      ]
+    },
+    "speaker.resnet293-voxceleb@1": {
+      "admissionCeilingBytes": 991336858,
+      "canonicalHostPeakBytes": 826114048,
+      "determinismClass": "D0",
+      "passed": true,
+      "reasons": [],
+      "record": "judges/speaker.resnet293-voxceleb-v1.json",
+      "registryStatus": "shadow",
+      "runPeakBytes": [
+        826114048,
+        825589760
+      ]
+    }
+  },
+  "legacyJudges": {
+    "asr.whisper-small@1": {
+      "runs": [
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2260797768,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": 2260797768,
+              "peakRSSBytes": 946077696,
+              "waitMaxRSSBytes": 927449088
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2095712440,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 2,
+              "peakPhysicalFootprintBytes": 2095712440,
+              "peakRSSBytes": 910442496,
+              "waitMaxRSSBytes": 891879424
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2080409904,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 3,
+              "peakPhysicalFootprintBytes": 2080409904,
+              "peakRSSBytes": 910884864,
+              "waitMaxRSSBytes": 892338176
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2145814880,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 4,
+              "peakPhysicalFootprintBytes": 2145814880,
+              "peakRSSBytes": 914767872,
+              "waitMaxRSSBytes": 896139264
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2100349304,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 5,
+              "peakPhysicalFootprintBytes": 2100349304,
+              "peakRSSBytes": 911687680,
+              "waitMaxRSSBytes": 893009920
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2448804264,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 6,
+              "peakPhysicalFootprintBytes": 2448804264,
+              "peakRSSBytes": 928448512,
+              "waitMaxRSSBytes": 909819904
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2325825864,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 7,
+              "peakPhysicalFootprintBytes": 2325825864,
+              "peakRSSBytes": 929447936,
+              "waitMaxRSSBytes": 910884864
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2319845824,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 8,
+              "peakPhysicalFootprintBytes": 2319845824,
+              "peakRSSBytes": 933675008,
+              "waitMaxRSSBytes": 915062784
+            }
+          ],
+          "launches": 8,
+          "modelLoadSeconds": 0.162,
+          "peakBytes": 2448804264,
+          "peakChildAttributedBytes": 2448804264,
+          "peakDescendantRSSBytes": null,
+          "peakPhysicalFootprintBytes": 2448804264,
+          "peakRSSBytes": 946077696,
+          "peakWaitMaxRSSBytes": 927449088,
+          "rowsAccepted": 485,
+          "rowsUnavailable": 0,
+          "run": 1,
+          "sessionIDs": [
+            "5bd1e3e657f7479b9dcf4875fc90940a"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 96.293,
+          "warmupSeconds": 0.221
+        },
+        {
+          "clean": true,
+          "failures": [],
+          "launchEnvelopes": [
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2259929368,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 1,
+              "peakPhysicalFootprintBytes": 2259929368,
+              "peakRSSBytes": 945946624,
+              "waitMaxRSSBytes": 927350784
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2095942008,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 2,
+              "peakPhysicalFootprintBytes": 2095942008,
+              "peakRSSBytes": 910540800,
+              "waitMaxRSSBytes": 891912192
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2080213320,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 3,
+              "peakPhysicalFootprintBytes": 2080213320,
+              "peakRSSBytes": 910639104,
+              "waitMaxRSSBytes": 892043264
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2145224936,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 4,
+              "peakPhysicalFootprintBytes": 2145224936,
+              "peakRSSBytes": 914309120,
+              "waitMaxRSSBytes": 895762432
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2100136336,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 5,
+              "peakPhysicalFootprintBytes": 2100136336,
+              "peakRSSBytes": 911458304,
+              "waitMaxRSSBytes": 892764160
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2449459696,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 6,
+              "peakPhysicalFootprintBytes": 2449459696,
+              "peakRSSBytes": 929054720,
+              "waitMaxRSSBytes": 910491648
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2331314600,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 7,
+              "peakPhysicalFootprintBytes": 2331314600,
+              "peakRSSBytes": 929349632,
+              "waitMaxRSSBytes": 910770176
+            },
+            {
+              "ceilingBasis": "recalibration-measurement-budget",
+              "ceilingBytes": 10200547328,
+              "childPeakBasis": "physical-footprint",
+              "childPeakBytes": 2319436104,
+              "descendantPeakRSSBytes": null,
+              "failures": [],
+              "kind": "job",
+              "launch": 8,
+              "peakPhysicalFootprintBytes": 2319436104,
+              "peakRSSBytes": 933642240,
+              "waitMaxRSSBytes": 915046400
+            }
+          ],
+          "launches": 8,
+          "modelLoadSeconds": 0.165,
+          "peakBytes": 2449459696,
+          "peakChildAttributedBytes": 2449459696,
+          "peakDescendantRSSBytes": null,
+          "peakPhysicalFootprintBytes": 2449459696,
+          "peakRSSBytes": 945946624,
+          "peakWaitMaxRSSBytes": 927350784,
+          "rowsAccepted": 485,
+          "rowsUnavailable": 0,
+          "run": 2,
+          "sessionIDs": [
+            "d9f92ada36664eca9687ee6f9af565f8"
+          ],
+          "swapDeltaBytes": 0,
+          "threads": 2,
+          "wallSeconds": 98.177,
+          "warmupSeconds": 0.229
+        }
+      ]
+    }
+  },
+  "manifest": {
+    "canaryTakes": 9,
+    "manifestSHA256": "2eaf2f4d03224141221b093f8283f0a40e2f4dc0c52ad33c7e0385208b45f920",
+    "takes": 800
+  },
+  "purpose": "ceiling-recalibration",
+  "runs": [
+    {
+      "hostBusy": false,
+      "loadAverage1MAfter": 2.79,
+      "loadAverage1MBefore": 1.25,
+      "recoveryReport": "recovery-report-run-1.json",
+      "run": 1,
+      "sessionIDs": [
+        "5bd1e3e657f7479b9dcf4875fc90940a"
+      ],
+      "wallSeconds": 3787.936,
+      "workersWithoutSerialEnvelope": [
+        "align.qwen3-forcedaligner-0.6b@1",
+        "asr.paraformer-zh@1",
+        "asr.parakeet-tdt-0.6b-v3@1",
+        "asr.qwen3-asr-1.7b@1",
+        "asr.sensevoice-small-f16@1",
+        "asr.whisper-large-v3@1",
+        "asr.whisper-small@1",
+        "compact.sensevoice-small-q8@1",
+        "lid.voxlingua107-ecapa@1",
+        "quality.audiobox-aesthetics@1",
+        "quality.dnsmos-p835@1",
+        "speaker.campplus-voxceleb@1",
+        "speaker.resnet293-voxceleb@1"
+      ]
+    },
+    {
+      "hostBusy": false,
+      "loadAverage1MAfter": 2.0,
+      "loadAverage1MBefore": 2.79,
+      "recoveryReport": "recovery-report-run-2.json",
+      "run": 2,
+      "sessionIDs": [
+        "d9f92ada36664eca9687ee6f9af565f8"
+      ],
+      "wallSeconds": 3569.059,
+      "workersWithoutSerialEnvelope": [
+        "align.qwen3-forcedaligner-0.6b@1",
+        "asr.paraformer-zh@1",
+        "asr.parakeet-tdt-0.6b-v3@1",
+        "asr.qwen3-asr-1.7b@1",
+        "asr.sensevoice-small-f16@1",
+        "asr.whisper-large-v3@1",
+        "asr.whisper-small@1",
+        "compact.sensevoice-small-q8@1",
+        "lid.voxlingua107-ecapa@1",
+        "quality.audiobox-aesthetics@1",
+        "quality.dnsmos-p835@1",
+        "speaker.campplus-voxceleb@1",
+        "speaker.resnet293-voxceleb@1"
+      ]
+    }
+  ],
+  "schema": "vocello.audioqc.qc-panel-session/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-70e86ea6"
+  }
+}

@@ -1,0 +1,449 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "maxAbsoluteDifference": 0.0,
+    "maxRelativeDifference": 0.0,
+    "numericDifferences": 0,
+    "rowsBitExact": 803,
+    "rowsCompared": 803,
+    "rowsWithDiscreteMismatch": 0
+  },
+  "identityComponents": {
+    "engine": "wespeaker-onnx",
+    "hostProfileSHA256": "094976dd04adaf0542a13a28addbc11e2994b770d5bb2ecd8ca5a76e7fea7931",
+    "panelJobVersion": "panel-job-v1",
+    "registryEntrySHA256": "c8fee15a86525a1fc2d9a49b5b16787dc50fb3b23865ec48e552f3fd0e423a56",
+    "runtime": {
+      "family": "onnx-cpu",
+      "interpreterSHA256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "kind": "venv",
+      "lockSHA256": "d9328ed263b6818cbce98894e98a2bd38b7eb00d741f2751ebda56fab4224dd3"
+    },
+    "threads": 2,
+    "workerSourceSHA256": {
+      "scripts/audio_qc_worker.py": "8bc67f577dbc3b67555cfa50f09863f5a22a26fbf2d078406d1a5436c08953c8",
+      "scripts/lib/qc_pipeline/panel_engines.py": "390ef8d539a7b751ba79186ba7155c963cf694c747e7d9420f3cfaff219788ca",
+      "scripts/lib/qc_pipeline/panel_jobs.py": "24a0360f3bdad7111dc4f9ed99c4795da65f06401a6efb872f266dcec719e2b6"
+    }
+  },
+  "judge": "speaker.resnet293-voxceleb@1",
+  "outputIdentity": "91f85e1da05aedc03d1409b60a3064f3482fd547f29baa6f4d0cffaa74b16777",
+  "recalibration": {
+    "passed": true,
+    "reasons": []
+  },
+  "registrySHA256": "eb276bad91d2aa369c208fe4f8a61b40986829e3765cb555395a180aa6ffc429",
+  "resources": {
+    "admissionCeilingBytes": 991336858,
+    "canonicalHostPeakBytes": 826114048,
+    "fitsBudget": true,
+    "runPeakBytes": [
+      826114048,
+      825589760
+    ]
+  },
+  "runs": [
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 368133176,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 368133176,
+          "peakRSSBytes": 405389312,
+          "waitMaxRSSBytes": 405422080
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 492438656,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 2,
+          "peakPhysicalFootprintBytes": 492438656,
+          "peakRSSBytes": 529072128,
+          "waitMaxRSSBytes": 529678336
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 504857728,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 3,
+          "peakPhysicalFootprintBytes": 504857728,
+          "peakRSSBytes": 541818880,
+          "waitMaxRSSBytes": 542097408
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 753108408,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 4,
+          "peakPhysicalFootprintBytes": 753108408,
+          "peakRSSBytes": 790151168,
+          "waitMaxRSSBytes": 790151168
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 512328904,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 5,
+          "peakPhysicalFootprintBytes": 512328904,
+          "peakRSSBytes": 549404672,
+          "waitMaxRSSBytes": 549502976
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 499811504,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 6,
+          "peakPhysicalFootprintBytes": 499811504,
+          "peakRSSBytes": 535887872,
+          "waitMaxRSSBytes": 537034752
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 570737888,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 7,
+          "peakPhysicalFootprintBytes": 570737888,
+          "peakRSSBytes": 607928320,
+          "waitMaxRSSBytes": 607928320
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 521782472,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 8,
+          "peakPhysicalFootprintBytes": 521782472,
+          "peakRSSBytes": 558989312,
+          "waitMaxRSSBytes": 558989312
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 748176704,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 9,
+          "peakPhysicalFootprintBytes": 748176704,
+          "peakRSSBytes": 780206080,
+          "waitMaxRSSBytes": 785301504
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 789022088,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 10,
+          "peakPhysicalFootprintBytes": 789022088,
+          "peakRSSBytes": 824197120,
+          "waitMaxRSSBytes": 826114048
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 561333448,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 11,
+          "peakPhysicalFootprintBytes": 561333448,
+          "peakRSSBytes": 597393408,
+          "waitMaxRSSBytes": 598523904
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 565888200,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 12,
+          "peakPhysicalFootprintBytes": 565888200,
+          "peakRSSBytes": 602210304,
+          "waitMaxRSSBytes": 603095040
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 499106992,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 13,
+          "peakPhysicalFootprintBytes": 499106992,
+          "peakRSSBytes": 536346624,
+          "waitMaxRSSBytes": 536346624
+        }
+      ],
+      "launches": 13,
+      "modelLoadSeconds": 0.13,
+      "peakBytes": 826114048,
+      "peakChildAttributedBytes": 789022088,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 789022088,
+      "peakRSSBytes": 824197120,
+      "peakWaitMaxRSSBytes": 826114048,
+      "rowsAccepted": 803,
+      "rowsUnavailable": 0,
+      "run": 1,
+      "sessionIDs": [
+        "5bd1e3e657f7479b9dcf4875fc90940a"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 580.517,
+      "warmupSeconds": 0.0
+    },
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 369067088,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 369067088,
+          "peakRSSBytes": 406339584,
+          "waitMaxRSSBytes": 406339584
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 491816064,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 2,
+          "peakPhysicalFootprintBytes": 491816064,
+          "peakRSSBytes": 528449536,
+          "waitMaxRSSBytes": 529072128
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 504087704,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 3,
+          "peakPhysicalFootprintBytes": 504087704,
+          "peakRSSBytes": 541163520,
+          "waitMaxRSSBytes": 541360128
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 753026464,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 4,
+          "peakPhysicalFootprintBytes": 753026464,
+          "peakRSSBytes": 790085632,
+          "waitMaxRSSBytes": 790102016
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 512623816,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 5,
+          "peakPhysicalFootprintBytes": 512623816,
+          "peakRSSBytes": 548667392,
+          "waitMaxRSSBytes": 549830656
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 499434648,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 6,
+          "peakPhysicalFootprintBytes": 499434648,
+          "peakRSSBytes": 535625728,
+          "waitMaxRSSBytes": 536674304
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 570016992,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 7,
+          "peakPhysicalFootprintBytes": 570016992,
+          "peakRSSBytes": 607223808,
+          "waitMaxRSSBytes": 607223808
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 521929904,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 8,
+          "peakPhysicalFootprintBytes": 521929904,
+          "peakRSSBytes": 559120384,
+          "waitMaxRSSBytes": 559120384
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 747816232,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 9,
+          "peakPhysicalFootprintBytes": 747816232,
+          "peakRSSBytes": 779862016,
+          "waitMaxRSSBytes": 784973824
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 788514184,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 10,
+          "peakPhysicalFootprintBytes": 788514184,
+          "peakRSSBytes": 825344000,
+          "waitMaxRSSBytes": 825589760
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 561497312,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 11,
+          "peakPhysicalFootprintBytes": 561497312,
+          "peakRSSBytes": 597327872,
+          "waitMaxRSSBytes": 598654976
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 565904584,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 12,
+          "peakPhysicalFootprintBytes": 565904584,
+          "peakRSSBytes": 603127808,
+          "waitMaxRSSBytes": 603127808
+        },
+        {
+          "ceilingBasis": "recalibration-measurement-budget",
+          "ceilingBytes": 10200547328,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 499467416,
+          "descendantPeakRSSBytes": null,
+          "failures": [],
+          "kind": "job",
+          "launch": 13,
+          "peakPhysicalFootprintBytes": 499467416,
+          "peakRSSBytes": 536739840,
+          "waitMaxRSSBytes": 536739840
+        }
+      ],
+      "launches": 13,
+      "modelLoadSeconds": 0.132,
+      "peakBytes": 825589760,
+      "peakChildAttributedBytes": 788514184,
+      "peakDescendantRSSBytes": null,
+      "peakPhysicalFootprintBytes": 788514184,
+      "peakRSSBytes": 825344000,
+      "peakWaitMaxRSSBytes": 825589760,
+      "rowsAccepted": 803,
+      "rowsUnavailable": 0,
+      "run": 2,
+      "sessionIDs": [
+        "d9f92ada36664eca9687ee6f9af565f8"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 607.731,
+      "warmupSeconds": 0.0
+    }
+  ],
+  "schema": "vocello.audioqc.qc-ceiling/1",
+  "session": {
+    "date": "2026-09-27",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260927-70e86ea6"
+  },
+  "takes": {
+    "canaryRows": 9,
+    "rows": 800,
+    "rowsSHA256": "1fbc4a643dd1af55454c464b3afb73d62f4bd2b88da84956102ba39ca3715442"
+  }
+}

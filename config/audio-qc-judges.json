@@ -55,7 +55,7 @@
     "recoveryRule": {
       "binding": "whole-host-free-percent-v1",
       "candidate": "attributed-post-exit-recovery-v2",
-      "candidateBinding": false,
+      "candidateBinding": true,
       "workerCapWhileWholeHostBinding": 1,
       "reason": "While the whole-host rule binds, one worker's post-exit drop in host free memory cannot be told apart from another worker's allocation, so admission caps the host at one supervised worker, and each orchestrator's in-process L0 and Stage 1 DSP take a slot of that cap. Making the child-attributed rule binding lifts the cap to the lane limits.",
       "promotion": {
@@ -67,7 +67,7 @@
           "Each report has serialEnvelopes of at least 1 and serialCandidateWouldQualifyBindingFailure of 0: when nothing else ran, the candidate never blamed a post-exit drop on another allocator.",
           "Each report has unattributed 0: the kernel pressure level and physical memory read on every envelope."
         ],
-        "evidence": []
+        "evidence": [{"path": "benchmarks/audio-qc-qualification/20260927-aaba14fd/recovery-report-run-1.json", "sha256": "3aaeb1c5e21279df68f23e705cc57e6445838c4e491c84c545c92fe1c9c86c73", "date": "2026-09-27"}, {"path": "benchmarks/audio-qc-qualification/20260927-aaba14fd/recovery-report-run-2.json", "sha256": "72e34680f2e7432f3caa0bb462ff16967eaa31f029a7427c978f29ac4e21f49b", "date": "2026-09-27"}]
       }
     }
   },
@@ -609,7 +609,7 @@
     "asr.whisper-large-v3@1": {
       "role": "Content voter for en, de, fr, es, it, pt, ru, ja and ko and secondary voter for zh (audit section 4.1): a language-locked full-file transcript, plus audio language identification from the same process (language-ID vote 2, section 4.2), after the generator exits. Succeeds asr.whisper-small@1 only after the dual run records every flip (audit section 7.1).",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "whisper",
@@ -653,16 +653,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "whisper-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
-      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (about 4-4.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (about 4-4.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 6124622480, "ceilingBytes": 7349546976, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json", "sha256": "9b37e19760c4c1dc78509462709d10d7591956b93e5059165c897b569a11aca3", "outputIdentity": "815045ab8a6a740b6c9a13007fcf9d1cf8a430b61e8fe7a1f588b3b77a8693ef", "date": "2026-09-27"},
       "acquisition": {"directory": "whisper-large-v3-mlx", "stage": 1, "runtime": "whisper-mlx"}
     },
     "asr.parakeet-tdt-0.6b-v3@1": {
       "role": "Secondary literal voter for en, de, fr, es, it, pt and ru (audit section 4.1): a transducer transcript beside Whisper's, which bounds Whisper's hallucination on non-speech.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "parakeet",
@@ -711,16 +711,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "parakeet-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
-      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 4507699696, "ceilingBytes": 5409239636, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json", "sha256": "cce97f99ed5f6f14ef96cf0994395eb810367a35701771543490c058d98e7fef", "outputIdentity": "c42785b420fbb3fc3936cd15a6103c23414795f3e0a1c862571c8041d44fb0d1", "date": "2026-09-27"},
       "acquisition": {"directory": "parakeet-tdt-0.6b-v3-mlx", "stage": 1, "runtime": "parakeet-mlx"}
     },
     "asr.paraformer-zh@1": {
       "role": "Content voter for zh (audit section 4.1): a non-autoregressive transcript with no hotwords, punctuation or VAD model.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "paraformer",
@@ -771,16 +771,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "funasr-paraformer", "worker": "scripts/audio_qc_worker.py", "threads": 3, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 2684354560, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (1.2-1.8 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 2684354560, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (1.2-1.8 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 3245916160, "ceilingBytes": 3895099392, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.paraformer-zh-v1.json", "sha256": "db0d12b46148e101b223e7e9c5c96c9eaa62f6377074273680a0072e459b4413", "outputIdentity": "de8bd7fd3c9cffdb3736654b9e214d7d25cc9d8b2f32ef729215e1dc1d328373", "date": "2026-09-27"},
       "acquisition": {"directory": "paraformer-zh", "stage": 1, "runtime": "funasr-torch"}
     },
     "asr.sensevoice-small-f16@1": {
       "role": "Secondary content voter for ja and ko (audit section 4.1), replacing the q8 compact representation: the f16 GGUF on the pinned llama.cpp runtime.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "sensevoice",
@@ -823,16 +823,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "sensevoice-llamacpp", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu", "note": "The native binary reads no thread flag, so its own default on the recorded host applies (hostProfile is output identity), and it reloads its model on every invocation."},
-      "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 523239424, "ceilingBytes": 627887309, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json", "sha256": "193ebdf73e817947d4dc51f1cca0373b216729800dc900eb707373ecca8797ef", "outputIdentity": "4002df42e2a6ed63265ad5164acc79736112e279380bf86b9e405120359a38f9", "date": "2026-09-27"},
       "acquisition": {"directory": "sensevoice-small-f16-gguf", "stage": 1, "runtime": "sensevoice-llamacpp"}
     },
     "asr.qwen3-asr-1.7b@1": {
       "role": "Adjudicator, non-voting (decision 3a; audit sections 4.1 and 4.2): transcribes inconclusive rows only and may corroborate a fail as diagnostic-corroborated, never turn a disagreement into a pass; a language=None pass is its language-ID adjudication.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": "qwen3-asr",
@@ -884,16 +884,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "qwen3-asr-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
-      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (3.5-4 GB resident, section 4.1); admitted only beside CPU judges of 2.5 GB or less; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (3.5-4 GB resident, section 4.1); admitted only beside CPU judges of 2.5 GB or less; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 5830758672, "ceilingBytes": 6996910407, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.qwen3-asr-1.7b-v1.json", "sha256": "5d4ce2a56c4b33077d33668413b5a8ed5e315823cd4f7b2caaedbfc30e65e532", "outputIdentity": "7a23e1253d6171c9828cfe689806eb03640cd6953fb1b77137b2b138bbd44eea", "date": "2026-09-27"},
       "acquisition": {"directory": "qwen3-asr-1.7b-bf16-mlx", "stage": 2, "runtime": "mlx-audio"}
     },
     "align.qwen3-forcedaligner-0.6b@1": {
       "role": "Timing instrument, non-voting (decision 3a; audit section 4.1): word intervals for alphabetic languages and character intervals for zh and ja, whitespace eojeol for ko (no soynlp), supplied only to class B, C and F detectors that already have content consensus.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": "qwen3-aligner",
@@ -945,16 +945,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "qwen3-aligner-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
-      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (2-2.4 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (2-2.4 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 4200352600, "ceilingBytes": 5040423120, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json", "sha256": "ad296d77db4fdbea055d86f2f71e4d4a0b673bb4181d103aaea6eab09aa7018f", "outputIdentity": "b50cc9cd7a8adf9a230da1d281bb515191fbb69b89d971c9a20d87592fb7aa65", "date": "2026-09-27"},
       "acquisition": {"directory": "qwen3-forcedaligner-0.6b-bf16-mlx", "stage": 2, "runtime": "mlx-audio-aligner"}
     },
     "lid.voxlingua107-ecapa@1": {
       "role": "Audio language-ID vote 1 (audit section 4.2): posteriors over 107 languages, restricted downstream to the ten product languages plus an other mass; warn-only until calibrated per language and voice.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "lid-voxlingua107",
@@ -1003,16 +1003,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "speechbrain-lid", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1418313728, "ceilingBytes": 1701976474, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json", "sha256": "1334a67d06825e9e7a18d93d7f0714d9099bf42c2217cdef4427e861053c9abd", "outputIdentity": "587770eaaebb9e9db972004803a8d1651627073b3ef809034f41b79613a99f67", "date": "2026-09-27"},
       "acquisition": {"directory": "lang-id-voxlingua107-ecapa", "stage": 1, "runtime": "speechbrain-torch"}
     },
     "speaker.campplus-voxceleb@1": {
       "role": "Speaker-identity family 1 (audit section 4.3): whole-take and windowed (2 s, 0.5 s hop) embeddings for clone identity and drift; it fails a take only jointly with family 2, once both are calibrated.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": true,
       "family": "speaker-campplus",
@@ -1055,16 +1055,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit estimate 0.12-0.2 GB resident (section 4.3), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "calibrated", "ceilingBasis": "Audit estimate 0.12-0.2 GB resident (section 4.3), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 290291712, "ceilingBytes": 348350055, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.campplus-voxceleb-v1.json", "sha256": "e668d243c1a2e14219420e140161763c75d00ed7be6ed2cc1c147466e1f56411", "outputIdentity": "567113ff49594c8412f5a62c214c4f8f4707fdb8cef849c56f41c37ff0336f8e", "date": "2026-09-27"},
       "acquisition": {"directory": "wespeaker-voxceleb-campplus-lm", "stage": 1, "runtime": "onnx-cpu"}
     },
     "speaker.resnet293-voxceleb@1": {
       "role": "Speaker-identity family 2 (audit section 4.3): a second architecture on the same VoxCeleb data, replacing the excluded WavLM-large SV checkpoint.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": "speaker-resnet293",
@@ -1118,16 +1118,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "wespeaker-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit estimate about 0.3 GB (section 3.4), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "calibrated", "ceilingBasis": "Audit estimate about 0.3 GB (section 3.4), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1220476928, "ceilingBytes": 1464572314, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json", "sha256": "d30ff3feffdce284b1cb07a20e2f77411651649923bac06c35f7ebbe4f6dbd67", "outputIdentity": "91f85e1da05aedc03d1409b60a3064f3482fd547f29baa6f4d0cffaa74b16777", "date": "2026-09-27"},
       "acquisition": {"directory": "wespeaker-voxceleb-resnet293-lm", "stage": 2, "runtime": "onnx-cpu"}
     },
     "pitch.pyin@1": {
       "role": "Pitch tracker (audit section 4.4): probabilistic YIN over the full 50-1,000 Hz range with a fixed frame and hop, voicing probabilities kept; feeds class E and F detectors.",
       "kind": "dsp",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": null,
@@ -1161,16 +1161,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 1, "lane": "dsp", "orchestrated": true, "engine": "pyin-librosa", "worker": "scripts/audio_qc_worker.py", "threads": 1, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 DSP-pool estimate (0.3 GB), raised to 512 MiB for librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 DSP-pool estimate (0.3 GB), raised to 512 MiB for librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 530219008, "ceilingBytes": 636262810, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json", "sha256": "f35e85af0142dd95c467ee30d3a3bfbf63f8fa46b1461babac6be2981902dfbd", "outputIdentity": "772bcaf2018a0b50452b7153d8433bf23824b6a772788a11404698935dd01d22", "date": "2026-09-27"},
       "acquisition": {"directory": "pitch-pyin", "stage": 1, "runtime": "librosa-dsp"}
     },
     "quality.audiobox-aesthetics@1": {
       "role": "Primary relative quality, advisory (audit section 4.6): production quality (PQ) and content enjoyment (CE) as deltas against the cell baseline, with duration as a covariate; never reaches warn.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": null,
@@ -1212,16 +1212,16 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "audiobox-aesthetics", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 1288490189, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.8-1.2 GB, section 4.6); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 1288490189, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.8-1.2 GB, section 4.6); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 3208381976, "ceilingBytes": 3850058372, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.audiobox-aesthetics-v1.json", "sha256": "9a5a77025ada3e6bbcc6e2b28324a5e16bced627e88f08f12006c931cbff7678", "outputIdentity": "68d2d6af4387cb59808b1fd56433529e8afabfe59f8f890f90559d36e2ceb471", "date": "2026-09-27"},
       "acquisition": {"directory": "audiobox-aesthetics", "stage": 2, "runtime": "audiobox-torch"}
     },
     "quality.dnsmos-p835@1": {
       "role": "Secondary advisory quality screen (audit section 4.6): DNSMOS P.835 SIG, BAK and OVRL (and the P.808 MOS its reference script reports), a screen, not a naturalness judge; never reaches warn.",
       "kind": "neural",
-      "status": "candidate",
+      "status": "shadow",
       "calibration": "legacy-unqualified",
       "voting": false,
       "family": null,
@@ -1273,10 +1273,10 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "dnsmos-onnx", "worker": "scripts/audio_qc_worker.py", "threads": 1, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 805306368, "ceilingStatus": "provisional", "ceilingBasis": "Audit section 4.6 estimate (about 0.25 GB), raised to 768 MiB for the interpreter, ONNX Runtime, librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
-      "determinismClass": "unmeasured",
+      "resources": {"provisionalCeilingBytes": 805306368, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 4.6 estimate (about 0.25 GB), raised to 768 MiB for the interpreter, ONNX Runtime, librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 506511360, "ceilingBytes": 607813632, "ceilingSession": "20260927-aaba14fd"},
+      "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": null,
+      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.dnsmos-p835-v1.json", "sha256": "e40d1234db97b008c2324dfa76e649cdc1224c6b130bb41f8a2706942370a7d9", "outputIdentity": "461fbe8a780bf3e15a85dd75453c950fe763c0a3302dd911d73d85f505e078ab", "date": "2026-09-27"},
       "acquisition": {"directory": "dnsmos-p835", "stage": 2, "runtime": "onnx-librosa"}
     }
   },

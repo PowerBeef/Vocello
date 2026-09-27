@@ -159,8 +159,8 @@
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "whisper-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
       "resources": {
-        "provisionalCeilingBytes": 2684354560,
-        "ceilingBasis": "Set before any canonical-host measurement (AQ-F43); about 0.85 GB was measured on the M2.",
+        "provisionalCeilingBytes": 2939351636,
+        "ceilingBasis": "The legacy recognizer has no canary record, so its ceiling stays provisional: the measured M6 peak x 1.2 from two clean full-cohort runs of recalibration session 20260927-70e86ea6 (791 takes in 64-row chunks, peak 2449459696 bytes, recorded in that session's legacyJudges). It replaces 2.5 GiB, set before any canonical-host measurement (AQ-F43), which an unchunked 478-row run passed at 2.68 GiB on 2026-09-27.",
         "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)",
         "canonicalHostPeakBytes": null
       },
@@ -711,7 +711,7 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "parakeet-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
-      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 4507699696, "ceilingBytes": 5409239636, "ceilingSession": "20260927-aaba14fd"},
+      "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 5835787120, "ceilingBytes": 7002944544, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 4507699696, "ceilingBytes": 5409239636}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
       "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json", "sha256": "cce97f99ed5f6f14ef96cf0994395eb810367a35701771543490c058d98e7fef", "outputIdentity": "c42785b420fbb3fc3936cd15a6103c23414795f3e0a1c862571c8041d44fb0d1", "date": "2026-09-27"},
@@ -823,7 +823,7 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "sensevoice-llamacpp", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu", "note": "The native binary reads no thread flag, so its own default on the recorded host applies (hostProfile is output identity), and it reloads its model on every invocation."},
-      "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 523239424, "ceilingBytes": 627887309, "ceilingSession": "20260927-aaba14fd"},
+      "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 569851904, "ceilingBytes": 683822285, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 523239424, "ceilingBytes": 627887309}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
       "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json", "sha256": "193ebdf73e817947d4dc51f1cca0373b216729800dc900eb707373ecca8797ef", "outputIdentity": "4002df42e2a6ed63265ad5164acc79736112e279380bf86b9e405120359a38f9", "date": "2026-09-27"},
@@ -1003,7 +1003,7 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "speechbrain-lid", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadsStatus": "provisional", "threadControl": "environment", "batchSize": 1, "device": "cpu"},
-      "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1418313728, "ceilingBytes": 1701976474, "ceilingSession": "20260927-aaba14fd"},
+      "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1428455424, "ceilingBytes": 1714146509, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 1418313728, "ceilingBytes": 1701976474}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
       "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json", "sha256": "1334a67d06825e9e7a18d93d7f0714d9099bf42c2217cdef4427e861053c9abd", "outputIdentity": "587770eaaebb9e9db972004803a8d1651627073b3ef809034f41b79613a99f67", "date": "2026-09-27"},

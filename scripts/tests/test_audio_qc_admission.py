@@ -127,7 +127,8 @@ class AdmissionPolicyTests(unittest.TestCase):
         registry = unpromoted_registry()
         whisper = judge_admission(registry, WHISPER)
         self.assertEqual((whisper.lane, whisper.ceiling_bytes, whisper.threads, whisper.engine),
-                         ("gpu", 2684354560, 2, "whisper-mlx"))
+                         ("gpu", registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"], 2,
+                          "whisper-mlx"))
         self.assertEqual(whisper.ceiling_basis, "provisional")
         sensevoice = judge_admission(registry, SENSEVOICE)
         self.assertEqual((sensevoice.lane, sensevoice.ceiling_bytes), ("cpu", 5 * GIB))

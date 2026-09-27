@@ -201,8 +201,10 @@ class LanguageLaneTests(OrchestratorFixture):
         self.assertEqual(workers[0]["launches"][0]["rows"], 8)
         envelope = workers[0]["launches"][0]["resourceEnvelope"]
         self.assertEqual(envelope["exclusion"], "budgeted-admission")
-        self.assertEqual(envelope["admission"]["ceilingBytes"], 2684354560)
-        self.assertEqual(envelope["maximumAllowedRSSBytes"], 2684354560)
+        # The worker runs under whisper-small's registry ceiling, whatever its current value.
+        ceiling = self.registry["judges"]["asr.whisper-small@1"]["resources"]["provisionalCeilingBytes"]
+        self.assertEqual(envelope["admission"]["ceilingBytes"], ceiling)
+        self.assertEqual(envelope["maximumAllowedRSSBytes"], ceiling)
         self.assertEqual(header["cache"]["L1"], {"hits": 0, "misses": 9 - 1, "adopted": 0})
         for record in result["records"]:
             self.assertEqual(validate_take_evidence(record), [], record["take"]["takeID"])

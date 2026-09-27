@@ -315,6 +315,51 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
                 self.assertIn("resource-probe-failed", report["qualificationFailures"])
                 self.assertNotIn("private path", str(report))
 
+    def _absent_footprint_while_exiting(self, *, polls_until_exit):
+        """The footprint reads absent while the child exits; `waitid` sees the exit only later."""
+        child = Mock(pid=123456)
+        polls = {"count": 0}
+
+        def poll():
+            if polls_until_exit is None:
+                return None
+            polls["count"] += 1
+            return 0 if polls["count"] > polls_until_exit else None
+
+        child.poll.side_effect = poll
+        child.wait.side_effect = lambda timeout: 0 if polls_until_exit is not None else (_ for _ in ()).throw(
+            subprocess.TimeoutExpired("fixture", timeout))
+        with patch("delivery_resource_supervisor.subprocess.Popen", return_value=child), \
+             patch("delivery_resource_supervisor.os.killpg") as kill, \
+             patch("delivery_resource_supervisor.EXITING_PROBE_WAIT_SECONDS", 0.2), \
+             patch("delivery_resource_supervisor.SHUTDOWN_WAIT_SECONDS", 0.01), \
+             patch("delivery_resource_supervisor.time.sleep"):
+            result = run_supervised(
+                ["fixture"], lock_root=self.root, snapshotter=self._snapshot,
+                rss_sampler=lambda _: 1024,
+                physical_footprint_sampler=Mock(side_effect=[4096, None, None, None]),
+            )
+        return result.report, kill.call_count
+
+    def test_an_absent_footprint_of_an_exiting_child_is_not_a_probe_failure(self) -> None:
+        # AQ-06 session 20260927-6025d39a: a worker that finished its job read an
+        # absent footprint before `waitid` saw it exit; the probe failed, the
+        # group signal drew EPERM, and every row it emitted was discarded.
+        report, signals = self._absent_footprint_while_exiting(polls_until_exit=3)
+        self.assertEqual(signals, 0)
+        self.assertTrue(report["qualified"], report["qualificationFailures"])
+        self.assertEqual(report["probeFailures"], [])
+        self.assertEqual(report["shutdownFailures"], [])
+        self.assertEqual(report["returnCode"], 0)
+        self.assertEqual(report["peakPhysicalFootprintBytes"], 4096)
+
+    def test_an_absent_footprint_of_a_live_child_still_fails_closed(self) -> None:
+        report, signals = self._absent_footprint_while_exiting(polls_until_exit=None)
+        self.assertGreater(signals, 0)
+        self.assertFalse(report["qualified"])
+        self.assertIn("resource-probe-failed", report["qualificationFailures"])
+        self.assertEqual(report["probeFailures"], [{"stage": "physical-footprint", "reason": "missing-live-measurement"}])
+
     def test_footprint_parser_requires_exact_pid_byte_measurement(self) -> None:
         payload = {"unit": "byte", "bytes per unit": 1, "errors": [], "warnings": [],
                    "processes": [{"pid": 42, "footprint": 1024}]}
@@ -491,7 +536,7 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
             )
         report = result.report
         self.assertTrue(report["qualified"], report["qualificationFailures"])
-        self.assertEqual(report["probeAlgorithmVersion"], "owned-process-probe-v4")
+        self.assertEqual(report["probeAlgorithmVersion"], "owned-process-probe-v5")
         self.assertIn(report["processProbe"], ("libproc-rusage-v4", "procfs-status"))
         self.assertGreater(report["peakRSSBytes"], 0)
         self.assertGreaterEqual(report["resourceSampleCount"], 2)

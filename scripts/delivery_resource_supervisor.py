@@ -25,7 +25,8 @@ AQ-F43; `config/audio-qc-judges.json`). The 8 GB Mac is a product floor, not an
 evaluator host. This module's source is envelope identity: it is recorded with
 each run and never keys a cache entry.
 
-``owned-process-probe-v4`` (audit #7, #38, #101, #102; v4 AQ-05 review):
+``owned-process-probe-v5`` (audit #7, #38, #101, #102; v4 AQ-05 review; v5
+AQ-06 qualification):
 
 - The owned child's whole process group is sampled in-process
   (``proc_listpids`` and ``proc_pid_rusage`` on macOS, ``/proc`` elsewhere),
@@ -37,6 +38,12 @@ each run and never keys a cache entry.
 - Physical footprint, when measured, peaks at the larger of the samples and the
   kernel's lifetime high-water mark, read once more from the exited child before
   it is reaped. ``ru_maxrss`` from the reap is recorded beside the sampled RSS.
+- An absent footprint from a child that is exiting is not a probe failure: the
+  kernel reads an exiting task's footprint as absent before ``waitid`` reports
+  the exit, so the probe waits up to ``EXITING_PROBE_WAIT_SECONDS`` for the exit
+  to become observable, and fails closed only when the child is still running
+  (v5; in v4 that race failed the probe of a worker that had finished its job,
+  and the shutdown's group signal then drew ``EPERM`` from the exiting group).
 - Host memory is read through ``sysctlbyname`` (locale-free); the text fallbacks
   run under ``LC_ALL=C`` and accept either decimal separator, and a host probe
   failure is typed apart from a real pressure, swap or recovery failure.
@@ -95,8 +102,14 @@ RECOVERY_TOLERANCE_PERCENT_POINTS = 5.0
 PRESSURE_WARNING_FREE_PERCENT = 10.0
 SHUTDOWN_WAIT_SECONDS = 2.0
 PROBE_EXIT_WAIT_SECONDS = 0.25
+# How long an absent footprint may wait for the owned child's exit to become
+# observable before it counts as a probe failure. On the M6, an MLX worker that
+# finished its job read an absent footprint while `waitid` still saw it running,
+# and its exit was observed well within the shutdown wait (AQ-06 session
+# 20260927-6025d39a); the probe then failed and every row it emitted was lost.
+EXITING_PROBE_WAIT_SECONDS = 2.0
 REAP_POLL_SECONDS = 0.01
-PROBE_ALGORITHM_VERSION = "owned-process-probe-v4"
+PROBE_ALGORITHM_VERSION = "owned-process-probe-v5"
 # What the ceilings bind: the owned child and every process in its group.
 SAMPLED_PROCESS_SCOPE = "process-group"
 # Text probes are only a fallback for the sysctl reads; they run in the C
@@ -662,6 +675,16 @@ def _still_running(process: subprocess.Popen) -> bool:
     return not state
 
 
+def _exit_observed_within(process: subprocess.Popen, timeout: float) -> bool:
+    """True once the owned child is observed to have exited within `timeout` (never reaps it)."""
+    deadline = time.monotonic() + timeout
+    while _still_running(process):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(REAP_POLL_SECONDS)
+    return True
+
+
 def _reap_exited(process: subprocess.Popen) -> Any | None:
     """Reap an exited child with ``wait4`` so its ``ru_maxrss`` is kept."""
     try:
@@ -1127,9 +1150,13 @@ def run_supervised(
                                 lifetime_peak_footprint = max(lifetime_peak_footprint, lifetime)
                             if footprint is None or footprint is _MALFORMED:
                                 # A process may exit between the liveness check and
-                                # the probe. Only absence, never malformed values,
-                                # can be explained by independently observed exit.
-                                resource_probe_failed = footprint is _MALFORMED or _still_running(process)
+                                # the probe: while the kernel tears an exiting task
+                                # down its footprint already reads absent, but
+                                # `waitid` may not report the exit yet. Only
+                                # absence, never malformed values, can be explained
+                                # by an exit observed within a bounded wait.
+                                resource_probe_failed = footprint is _MALFORMED or not _exit_observed_within(
+                                    process, EXITING_PROBE_WAIT_SECONDS)
                                 if resource_probe_failed:
                                     probe_failures.append({"stage": probe_stage, "reason": "missing-live-measurement"})
                             else:

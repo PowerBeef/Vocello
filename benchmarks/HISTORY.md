@@ -1757,3 +1757,9 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-22 | [`macos-xcui-perf-20260922-052539-af73c69c`](runs/ui-perf/macos-xcui-perf-20260922-052539-af73c69c.json) | canonical | exploratory | passed | not-applicable | 9 | — | `d7058ea6ddf0` dirty | `excluded` | baseline | macos-xcui-perf-20260922-052539-af73c69c |
+
+## ui-perf / macos / mac-mini-m6-16gb / config `069502f6473f`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-27 | [`macos-xcui-perf-20260927-112952-a17db9fe`](runs/ui-perf/macos-xcui-perf-20260927-112952-a17db9fe.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `5c2c73726f3c` | `069502f6473f` | baseline | macos-xcui-perf-20260927-112952-a17db9fe |

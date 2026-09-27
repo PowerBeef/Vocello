@@ -710,6 +710,9 @@ class RecalibrationSessionTests(QualificationFixture):
                                                    resources["canonicalHostPeakBytes"] + 10)))))
         self.assertTrue(any("peak x 1.2" in error for error in errors(
             history(ceilingBytes=promoted["judges"][PYIN]["resources"]["ceilingBytes"] + 1))))
+        # A replaced ceiling is the one its session's committed record measured (review of 5082578e).
+        self.assertTrue(any("its session's record measured" in error for error in errors(
+            history(canonicalHostPeakBytes=1000, ceilingBytes=q.admission_ceiling(1000)))))
         self.assertTrue(any("its date is its session's" in error for error in errors(history(date="2026-09-30"))))
         self.assertTrue(any("records exactly" in error for error in errors(history(note="lowered"))))
         self.assertTrue(any("not a published session" in error for error in errors(

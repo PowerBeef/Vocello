@@ -628,6 +628,35 @@ def _recalibrated_ceiling_errors(label: str, judge_id: str, judge: dict[str, Any
     return errors
 
 
+def _replaced_ceiling_errors(where: str, judge_id: str, item: dict[str, Any], session: str,
+                             root: Path) -> list[str]:
+    """A replaced ceiling is the one its session's committed record measured.
+
+    The record is the canary record (the history's first session) or a passing
+    ceiling record of a recalibration session: a hand edit cannot rewrite what
+    a replaced ceiling was, and a failed recalibration never enters the history.
+    """
+    entry = ((_session_record(root, session) or {}).get("judges") or {}).get(judge_id) or {}
+    relative = f"{QUALIFICATION_RECORDS}/{session}/{entry.get('record')}"
+    errors = [f"{where}: its record {path} {problem}"
+              for path in (f"{QUALIFICATION_RECORDS}/{session}/session.json", relative)
+              for problem in _committed_file_errors(root, path)]
+    try:
+        record = json.loads((root / relative).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return errors + [f"{where}: its record {relative} is not JSON"]
+    resources = record.get("resources") if isinstance(record, dict) else None
+    if not isinstance(resources, dict) or record.get("judge") != judge_id:
+        return errors + [f"{where}: its record {relative} is not this judge's"]
+    if resources.get("canonicalHostPeakBytes") != item["canonicalHostPeakBytes"] \
+            or resources.get("admissionCeilingBytes") != item["ceilingBytes"]:
+        errors.append(f"{where}: its peak and ceiling are not the ones its session's record measured")
+    recalibration = record.get("recalibration")
+    if recalibration is not None and (not isinstance(recalibration, dict) or recalibration.get("passed") is not True):
+        errors.append(f"{where}: a replaced recalibrated ceiling comes from a passing ceiling record")
+    return errors
+
+
 def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], session: str, canary_session: Any,
                             root: Path) -> list[str]:
     """Each replaced ceiling, oldest first from the canary session's, before the current session."""
@@ -652,7 +681,8 @@ def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], sessi
         if not _positive_int(item["canonicalHostPeakBytes"]) \
                 or item["ceilingBytes"] != admission_ceiling(item["canonicalHostPeakBytes"]):
             errors.append(f"{where}: a replaced ceiling is its peak x 1.2, rounded up")
-        errors.extend(_ceiling_session_errors(where, judge_id, entry_session, root))
+        session_errors = _ceiling_session_errors(where, judge_id, entry_session, root)
+        errors.extend(session_errors or _replaced_ceiling_errors(where, judge_id, item, entry_session, root))
     if errors:
         return errors
     if sessions[0] != canary_session:

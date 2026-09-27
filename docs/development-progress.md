@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 27, evening — AQ-07 starts: the first natural calibration cohort and its panel
+
+AQ-02 closed with the CC0 ten-language script pool (120 Common Voice sentences per language,
+split 60/60). The new `qc-takes` lane generated 800 calibration takes on the M6 (791 generated, 9
+refused by the engine's mandatory Fast QC and now recorded with their flags; the lane resumes a
+batch after a refusal). The M2 report (T1 injections on these takes, report-only) shows v8 blind to
+sub-full-scale clipping, truncation and noise, weak on run-on and rate, and Korean-heavy on cadence
+warns. The full panel ran over all 791 takes after two fixes found by this first real cohort:
+workers now run in 64-row chunks (MLX cache growth outran the 28-row canary ceilings), and the
+panel parses the llama.cpp SenseVoice output (AQ-06 had qualified an always-empty transcript).
+Next: a full-cohort ceiling recalibration (an agent is adding the path; the maintainer notes the
+16 GB host allows more than the canary ceilings), pool rules v2 without proper names, FLEURS N1 and
+the N2 resynthesis lane, then pre-registered class A-D calibration.
+
 ### September 27 — AV-17 steps 2 and 3 done; the AQ-06 judge panel reaches shadow
 
 The runner's System Audio Recording grant let the canonical M6 UI benchmark publish

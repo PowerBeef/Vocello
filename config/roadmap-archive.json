@@ -4169,6 +4169,23 @@
         "AQ-01",
         "AQ-05"
       ]
+    },
+    {
+      "id": "AQ-02",
+      "title": "Normalization v2 and ten-language coverage",
+      "status": "done",
+      "gate": "Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "scripts/lib/language_metrics.py",
+        "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+        "config/language-normalization/hant-hans-v1.json",
+        "config/audio-qc-script-pool.json",
+        "scripts/audio_qc_script_pool.py"
+      ],
+      "notes": "Closed 2026-09-27. P2a (wave 10): normalization v2 with byte-exact Python/Swift parity (Korean syllable CER, NFKC and casefold, Latin folds, tag stripping, bracket and filler safety, space-free CER, ten-language tables), a corpus lint refusing digits, symbols and abbreviations, language measurement v4. P2b: v3 folds Traditional to Simplified for Chinese through a committed 3,079-entry ICU Hant-Hans table (measurement v5, languageASR gate 7), clearing the design-zh false fail; lang-bench v5 published. The CC0 script pool (config/audio-qc-script-pool.json, scripts/audio_qc_script_pool.py) holds 120 Common Voice Sentence Collector sentences per language from a pinned commit, split 60 calibration and 60 confirmation, with an auditable filter funnel (Chinese is the limiting source: 136 candidates). Not needed: cn2an, num2words and fugashi (the lint admits no digits, the pool no unsegmented edge cases). Deferred to AQ-07: the hard-case and digits diagnostic pools; human recordings come from FLEURS (N1), never committed.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-27"
     }
   ]
 }

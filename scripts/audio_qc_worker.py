@@ -19,6 +19,13 @@ A crash leaves the rows already emitted intact; the runner
 (`lib.qc_pipeline.workers`) keeps them and retries the remainder once in a
 fresh worker. Nothing here prints paths or transcripts anywhere but stdout.
 
+The protocol owns stdout alone. Before the job is read, the worker keeps a
+private duplicate of its stdout descriptor for the protocol and points
+descriptor 1 (and `sys.stdout`) at stderr, so whatever a library prints, from
+Python or from native code (funasr's version banner, a loader's progress line),
+lands on stderr and can never tear the JSONL stream. The duplicate is not
+inheritable, so a command the worker runs never writes to it either.
+
 Thread counts are declared per judge in the registry and fixed by the
 launcher's environment before this interpreter starts (`OMP_NUM_THREADS` and
 friends); the job repeats the count and the worker refuses a mismatch, so the
@@ -117,6 +124,21 @@ def validate_job(job: Any, environment: dict[str, str] | None = None) -> dict[st
     if not isinstance(job.get("engineConfig"), dict):
         raise WorkerJobError("the job has no engine configuration")
     return job
+
+
+def isolate_protocol_stdout() -> Any:
+    """Keep the real stdout for the protocol; send every other write to fd 1 to stderr.
+
+    Returns a text stream on a private (non-inheritable) duplicate of the
+    original stdout descriptor. Afterwards descriptor 1 is a copy of
+    descriptor 2 and `sys.stdout` is `sys.stderr`, so a library print at the
+    Python or the C level reaches stderr, never the protocol.
+    """
+    sys.stdout.flush()
+    protocol = os.dup(1)  # non-inheritable by default (PEP 446)
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
+    return os.fdopen(protocol, "w", encoding="utf-8", closefd=True)
 
 
 def _emitter(stream: Any) -> Emit:
@@ -275,13 +297,18 @@ def run(job: dict[str, Any], *, emit: Emit, engines: dict[str, Callable[[dict[st
 
 
 def main(argv: list[str] | None = None, *,
-         engines: dict[str, Callable[[dict[str, Any], Emit], None]] = ENGINES) -> int:
+         engines: dict[str, Callable[[dict[str, Any], Emit], None]] = ENGINES,
+         protocol: Any | None = None) -> int:
+    """The worker process. `protocol` is the stream the JSONL goes to; by default
+    the process's real stdout, isolated from every other write (`isolate_protocol_stdout`)."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--job", type=Path, required=True)
     args = parser.parse_args(argv)
+    if protocol is None:
+        protocol = isolate_protocol_stdout()
     try:
         job = json.loads(args.job.read_text(encoding="utf-8"))
-        run(job, emit=_emitter(sys.stdout), engines=engines)
+        run(job, emit=_emitter(protocol), engines=engines)
     except (WorkerJobError, OSError, ValueError, KeyError) as error:
         print(f"audio-qc-worker: FAIL\n{type(error).__name__}: {error}", file=sys.stderr)
         return 1

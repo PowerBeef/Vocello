@@ -558,7 +558,7 @@ class Orchestrator:
         self, *, registry: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path | None = None,
         stage2: Sequence[Stage2Judge] = (), host_admission: HostAdmission | None = None,
         supervisor: Callable[..., Any] = run_supervised, supervisor_options: Mapping[str, Any] | None = None,
-        offline: bool = False,
+        offline: bool = False, measurement_ceilings: bool = False,
     ) -> None:
         self.registry = registry
         self.policy = AdmissionPolicy.from_registry(registry)
@@ -571,6 +571,9 @@ class Orchestrator:
         self.supervisor_options = dict(supervisor_options or {})
         # Replay: every Stage 2 row must already be in L1; no model may run.
         self.offline = offline
+        # The AQ-06 qualification run: a judge whose ceiling is still provisional
+        # is admitted at the measurement ceiling (`admission.judge_admission`).
+        self.measurement_ceilings = measurement_ceilings
 
     # -- Stage 1 ----------------------------------------------------------- #
 
@@ -624,7 +627,7 @@ class Orchestrator:
 
         def launch(judge_id: str) -> WorkerOutcome:
             judge = self.stage2[judge_id]
-            admission = judge_admission(self.registry, judge_id)
+            admission = judge_admission(self.registry, judge_id, measurement=self.measurement_ceilings)
             rows = [entry["row"] for entry in plans[judge_id].values()]
             return run_persistent_worker(
                 judge.spec(admission.ceiling_bytes, admission.lane), rows,
@@ -723,9 +726,11 @@ class Orchestrator:
                 missing = sorted(judge_id for judge_id, plan in plans.items() if plan)
                 raise OrchestratorError(f"replay needs every L1 entry; a model would have to run for {', '.join(missing)}")
             unavailable: dict[str, dict[str, str]] = {judge_id: {} for judge_id in self.stage2}
+            worker_stderr: dict[str, dict[str, str]] = {}
 
             def accept(judge_id: str, outcome: WorkerOutcome) -> None:
                 """Store one finished judge's rows in L1 (adopting what another run stored first)."""
+                worker_stderr[judge_id] = {str(launch): text for launch, text in sorted(outcome.stderr.items())}
                 for key, entry in plans[judge_id].items():
                     adopted = outcome.adopted.get(key)
                     if adopted is not None:
@@ -758,6 +763,8 @@ class Orchestrator:
             result["raw"] = {judge_id: {unit: value for unit, value in values.items()}
                              for judge_id, values in raw.items()}
             result["timings"] = timings
+            # Private and in memory only: the tail of each worker launch's stderr.
+            result["workerStderr"] = worker_stderr
             return result
 
     # -- L2, Stage 3 and Stage 4 -------------------------------------------- #

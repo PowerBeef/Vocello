@@ -227,6 +227,34 @@ class PanelEngineTests(unittest.TestCase):
         self.assertEqual(panel_engines.alignment_units("Bonjour le monde", "fr"), ["Bonjour", "le", "monde"])
         self.assertEqual(panel_engines._finite([1.0, math.nan, 2.5]), [1.0, None, 2.5])
 
+    def test_the_aligner_reads_dict_and_attribute_intervals(self) -> None:
+        """mlx-audio's aligner yields dict segments (text/start/end) and object items (start_time/end_time)."""
+        core = SimpleNamespace(array=lambda audio: audio)
+        shapes = {
+            "dict segments": [{"text": "Bonjour", "start": 0.0, "end": 0.42}, {"text": "monde", "start": 0.5, "end": 0.9}],
+            "dict items": [{"text": "Bonjour", "start_time": 0.0, "end_time": 0.42},
+                           {"text": "monde", "start_time": 0.5, "end_time": 0.9}],
+            "attribute segments": [SimpleNamespace(text="Bonjour", start=0.0, end=0.42),
+                                   SimpleNamespace(text="monde", start=0.5, end=0.9)],
+            "attribute items": [SimpleNamespace(text="Bonjour", start_time=0.0, end_time=0.42),
+                                SimpleNamespace(text="monde", start_time=0.5, end_time=0.9)],
+        }
+        expected = [{"unit": "Bonjour", "start": 0.0, "end": 0.42}, {"unit": "monde", "start": 0.5, "end": 0.9}]
+        row = {"referenceText": "Bonjour monde", "language": "fr"}
+        for name, segments in shapes.items():
+            backend = object.__new__(panel_engines.Qwen3AlignerBackend)
+            backend.model = SimpleNamespace(generate=lambda audio, text, language, segments=segments:
+                                            SimpleNamespace(segments=segments))
+            with self.subTest(shape=name), mock.patch.dict(sys.modules, {"mlx": SimpleNamespace(core=core),
+                                                                         "mlx.core": core}):
+                result = backend.analyze(np.zeros(16, dtype=np.float32), row)
+                self.assertEqual(result["intervals"], expected)
+                self.assertEqual(result["units"], ["Bonjour", "monde"])
+        for broken in ({"text": "x", "start": 0.1}, SimpleNamespace(text="x", start=None, end=0.2),
+                       {"text": "x", "start": "soon", "end": 0.2}, {"text": "x", "start": object(), "end": 0.2}):
+            with self.subTest(broken=repr(broken)), self.assertRaises(ValueError):
+                panel_engines.aligned_interval(broken)
+
 
     def test_every_engine_runs_offline_with_empty_per_run_caches(self) -> None:
         """A model cached anywhere on the host can never load: every cache points into an empty run directory."""

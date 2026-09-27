@@ -49,6 +49,7 @@ GIB = 1024**3
 MIB = 1024**2
 WHISPER = "asr.whisper-small@1"
 SENSEVOICE = "compact.sensevoice-small-q8@1"
+PARAKEET = "asr.parakeet-tdt-0.6b-v3@1"
 
 
 def _policy(*, budget: int = 10 * GIB, cap: int | None = 1) -> AdmissionPolicy:
@@ -111,6 +112,28 @@ class AdmissionPolicyTests(unittest.TestCase):
         admitted = judge_admission(measured, WHISPER)
         self.assertEqual((admitted.ceiling_bytes, admitted.ceiling_basis),
                          (1_200_000_002, "measured-canonical-host-peak-x1.2"))
+        # A calibrated ceiling (what `promote` writes) is the ceiling every run admits at.
+        calibrated = copy.deepcopy(registry)
+        calibrated["judges"][PARAKEET]["resources"].update(
+            canonicalHostPeakBytes=1_000_000_001, ceilingBytes=1_200_000_002, ceilingStatus="calibrated",
+            ceilingSession="20260928-0123abcd")
+        for measurement in (False, True):
+            admitted = judge_admission(calibrated, PARAKEET, measurement=measurement)
+            self.assertEqual((admitted.ceiling_bytes, admitted.ceiling_basis),
+                             (1_200_000_002, "calibrated-canonical-host-peak-x1.2"))
+        # The qualification run measures a provisional judge under the budget, never its estimate;
+        # every other run keeps the estimate, and a legacy judge without a ceilingStatus keeps it too.
+        provisional = judge_admission(registry, PARAKEET)
+        self.assertEqual((provisional.ceiling_bytes, provisional.ceiling_basis),
+                         (registry["judges"][PARAKEET]["resources"]["provisionalCeilingBytes"], "provisional"))
+        measuring = judge_admission(registry, PARAKEET, measurement=True)
+        budget = registry["admission"]["budgetBytes"] - registry["admission"]["orchestratorReservationBytes"]
+        self.assertEqual((measuring.ceiling_bytes, measuring.ceiling_basis),
+                         (budget, "qualification-measurement-budget"))
+        self.assertEqual(admission_decision(_policy(cap=1), [{"lane": "orchestrator",
+                                                              "ceilingBytes": 512 * 1024**2}],
+                                            "gpu", measuring.ceiling_bytes), ("admit", None))
+        self.assertEqual(judge_admission(registry, WHISPER, measurement=True).ceiling_basis, "provisional")
         for judge_id, reason in (("compact.distilhubert@1", "retired"), ("fastqc@8", "not an orchestrated worker"),
                                  ("prosody@3", "neither a measured nor a provisional"),
                                  ("asr.unregistered@1", "not registered")):

@@ -15,6 +15,9 @@ timeout and timing handling:
 - `sleepPerRow`: seconds each row takes.
 - `measureWall`: report each row's real wall time, as a recognizer does, so
   two runs of one row differ in timing only.
+- `printJunk`: write to stdout the way a library does (a Python `print`, a raw
+  write to descriptor 1 and C stdio) before it is ready and on every row; the
+  worker host must keep all of it off the protocol stream.
 """
 
 from __future__ import annotations
@@ -30,15 +33,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import audio_qc_worker  # noqa: E402
 
 
+def print_junk(label: str) -> None:
+    """Library-style stdout noise at the Python, descriptor and C stdio levels."""
+    print(f"Notice: python junk {label}")
+    os.write(1, f"funasr version: fd junk {label}\n".encode())
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None)
+        libc.puts(f"Loading weights: c junk {label}".encode())
+        libc.fflush(None)
+    except (OSError, AttributeError):
+        pass
+
+
 def fixture_engine(job, emit) -> None:
     config = job["engineConfig"]
     table = config.get("table") or {}
+    junk = bool(config.get("printJunk"))
+    if junk:
+        print_junk("load")
     emit({"kind": "ready", "engine": "fixture", "threads": job["threads"],
           "modelLoadSeconds": 0.0, "warmupSeconds": 0.0})
     marker = Path(config["crashMarker"]) if config.get("crashMarker") else None
     sleep = float(config.get("sleepPerRow") or 0.0)
     for row in job["rows"]:
         started = time.monotonic()
+        if junk:
+            print_junk(row["id"])
         digest = hashlib.sha256(Path(row["pcmPath"]).read_bytes()).hexdigest()
         if digest == config.get("crashAlways"):
             os._exit(3)

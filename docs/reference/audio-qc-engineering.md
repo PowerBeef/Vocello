@@ -1111,11 +1111,14 @@ for the language lane, `--from-cascade-input` for the delivery lane) must declar
   exclusively. An orchestrator run holds it shared and admits each worker against
   `config/audio-qc-judges.json#admission`: a 10 GiB budget (16 GiB less about 4.5 GiB for macOS and
   tooling and a 1.5 GiB margin, provisional until AQ-06 measures it), one MLX GPU worker at a time
-  beside at most two CPU workers, and each judge at its ceiling (measured canonical-host peak x 1.2,
-  else its provisional ceiling). The supervisor (`owned-process-probe-v4`) samples the worker's whole
-  process group every 50 ms and enforces the same ceiling live on the group's summed resident memory
-  and footprint, so a native judge binary the worker runs is stopped while it runs, not after it
-  exits; it refuses a child above its ticket. The ticket learns the child's PID inside the
+  beside at most two CPU workers, and each judge at its ceiling (its calibrated `ceilingBytes` once
+  AQ-06 promoted it, else its provisional ceiling; the qualification run alone measures a
+  provisional judge under the budget less the orchestrator reservation instead). The supervisor
+  (`owned-process-probe-v5`) samples the worker's whole process group every 50 ms and enforces the
+  same ceiling live on the group's summed resident memory and footprint, so a native judge binary
+  the worker runs is stopped while it runs, not after it exits; it refuses a child above its ticket. An absent footprint from a child that is exiting waits
+  up to 2 s for the exit to become observable before it counts as a probe failure (v5: in v4 that
+  race failed finished MLX workers and discarded every row they had emitted). The ticket learns the child's PID inside the
   supervision's `try`, so a failed ledger write (a full disk, an unreadable ledger) still terminates
   and reaps the child, and a ticket is released only once its child is gone. The ledger records each
   owner and child by PID and process start time, so a reused PID never pins a stale entry; a live
@@ -1126,7 +1129,10 @@ for the language lane, `--from-cascade-input` for the delivery lane) must declar
   warms it and streams the job's rows in job order as JSON lines (`whisper-mlx` wraps
   `independent_asr_worker.py`'s recognizer; `native-command` runs the pinned SenseVoice binary per
   row, whose model reload per invocation stays, and also reports each invocation's `wait4` peak as a
-  second, per-row check). A launch's timeout is a start-up allowance (900 s) plus a per-row budget for
+  second, per-row check). The protocol owns stdout alone: the worker keeps a private duplicate of
+  its stdout for the JSON lines and points descriptor 1 at stderr before any library loads, so a
+  banner a library prints (FunASR's, a loader's progress line), from Python or native code, lands on
+  stderr. A launch's timeout is a start-up allowance (900 s) plus a per-row budget for
   each row it holds (900 s by default, the old per-clip allowance; the orchestrator's
   `--timeout-seconds` and the compact batch path's `timeout_seconds` set it per row). A worker that
   ends abnormally keeps the rows it emitted; the row in flight is retried alone once, then the rest
@@ -1220,7 +1226,10 @@ LFS SHA-256, or, for a small non-LFS file, its git blob ID; the pins were read f
 metadata on 2026-09-26, and nothing was downloaded. DNSMOS is the one GitHub-sourced snapshot: each
 file pins its size, content SHA-256 and git blob ID at a commit. Each judge also records its license
 tier, its voting role, its output identity, and a ceiling and thread count marked `provisional`.
-These are audit estimates; the two clean M6 runs replace each with its measured peak × 1.2.
+These are audit estimates; the two clean M6 runs replace each ceiling with the larger measured peak
+× 1.2 (`ceilingStatus: calibrated`). The estimates never bound the measurement: the qualification run
+admits a provisional judge at the budget less the orchestrator reservation, the largest ceiling
+admission can grant one worker, so a judge it stops could never be admitted at all.
 
 | Judge | Repository @ revision | GB | Stage | Tier | Votes | Status |
 |---|---|---|---|---|---|---|
@@ -1377,14 +1386,21 @@ the latest language-bench takes and runs every judge twice. Each run is its own 
 with a fresh cache, so every row runs a model. Everything stays in the untracked session directory
 (`build/artifacts/diagnostics/audio-qc-panel-qualification/<session>/`). Per judge it records:
 
-- **Resources.** Per run: the peak RSS and physical footprint, wall time, model load, warm-up and
-  threads.
+- **Resources.** Per launch: the ceiling it ran under and why, the sampled peak RSS and physical
+  footprint, the reaped `ru_maxrss`, the child-attributed peak, a native binary's own peak and the
+  failure codes. Per run: the largest of those peaks, wall time, model load, warm-up and threads.
+  A provisional judge runs under the measurement ceiling (the admission budget less the orchestrator
+  reservation), never its estimate.
 - **A clean run.** Every envelope qualified on `mac-mini-m6-16gb`, no retry, no unavailable row and a
   quiet host (`require_quiet_host`).
 - **Determinism.** The two runs' raw outputs compared row by row: D0 is bit-exact; D1 equals every
   discrete output, with the largest score difference as its measured tolerance; D2 is anything
   else.
 - **The canary record.** Digests and flat metrics per canary take, never text or paths.
+- **Private diagnostics.** `diagnostics.json` in the session directory names why each run was not
+  clean: per launch its failure codes, probe and shutdown failures, whether a failed host condition
+  discarded its rows, the reason its unresolved rows were given, its peaks against its ceiling and
+  the tail of its stderr (`run-N/worker-stderr.json`). It is never published.
 
 Each run also gets a `recovery-report`, the evidence the recovery-rule switch reads. With
 whisper-small in the session, the flip analysis lists the language and accuracy verdicts that flip
@@ -1398,12 +1414,15 @@ record, the flip analysis and both recovery reports to
 
 - the status becomes `shadow`;
 - `determinismClass` becomes the measured class;
-- `canonicalHostPeakBytes` becomes the measured peak, so the ceiling becomes the peak x 1.2;
+- `canonicalHostPeakBytes` becomes the measured peak (the larger of the two runs), `ceilingBytes`
+  that peak x 1.2, `ceilingStatus` `calibrated` and `ceilingSession` the session id; every later run
+  admits the judge at that ceiling;
 - `canary` cites the record by path, SHA-256 and output identity.
 
 It rewrites only those values, and the registry must still validate. The registry then requires,
 for every shadow or higher panel judge, a committed canary record whose judge, output identity,
-registry-entry digest, class and peak match. A warn or gating judge's record must also match
+registry-entry digest, class and peak match, and a calibrated ceiling must be the one that record
+derived in the session it names. A warn or gating judge's record must also match
 today's worker sources and runtime. `--bind-recovery-rule` cites the two recovery reports and flips
 `candidateBinding`, and only when they meet its promotion. That needs whisper-small and SenseVoice
 Q8 in the session too.

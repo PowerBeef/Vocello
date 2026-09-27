@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -152,6 +153,31 @@ class PersistentWorkerTests(unittest.TestCase):
         self.assertEqual(envelope["maximumAllowedRSSBytes"], GIB)
         self.assertEqual(outcome.ready["threads"], 2)
 
+    def test_library_output_on_stdout_never_reaches_the_protocol(self) -> None:
+        # funasr and audiobox print banners to stdout from Python and native code.
+        outcome = self._run(self._spec(printJunk=True))
+        self.assertEqual(len(outcome.launches), 1)
+        self.assertFalse(outcome.launches[0]["protocolError"])
+        self.assertEqual(sorted(outcome.results), [row["id"] for row in self.rows])
+        job = self.root / "junk-job.json"
+        job.write_text(json.dumps({
+            "kind": audio_qc_worker.JOB_KIND, "protocol": audio_qc_worker.PROTOCOL, "engine": "fixture",
+            "threads": 2, "engineConfig": {"table": self.table, "printJunk": True},
+            "rows": [{key: row[key] for key in ("id", "pcmPath", "language")} for row in self.rows],
+        }), encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, str(FIXTURE_WORKER), "--job", str(job)], capture_output=True, check=False,
+            env={**os.environ, **audio_qc_worker.thread_environment(2)}, timeout=60,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        lines = completed.stdout.decode("utf-8").splitlines()
+        self.assertEqual([json.loads(line)["kind"] for line in lines], ["ready", *["row"] * 4, "done"])
+        stderr = completed.stderr.decode("utf-8")
+        self.assertIn("python junk load", stderr)
+        self.assertIn("fd junk row-3", stderr)
+        if sys.platform == "darwin" or sys.platform.startswith("linux"):
+            self.assertIn("c junk row-0", stderr)
+
     def test_a_crash_keeps_emitted_rows_and_isolates_the_row_in_flight(self) -> None:
         marker = self.root / "crashed"
         outcome = self._run(self._spec(crashOnce=self.rows[2]["digest"], crashMarker=str(marker)))
@@ -163,6 +189,15 @@ class PersistentWorkerTests(unittest.TestCase):
         self.assertIn("nonzero-exit", outcome.launches[0]["resourceEnvelope"]["qualificationFailures"])
         self.assertEqual(sorted(outcome.results), [row["id"] for row in self.rows])
         self.assertEqual(outcome.row_launch, {"row-0": 1, "row-1": 1, "row-2": 2, "row-3": 3})
+        self.assertEqual([(launch["hostCondition"], launch["unavailableReason"]) for launch in outcome.launches],
+                         [(False, "crash"), (False, None), (False, None)])
+        self.assertEqual({(launch["ceilingBytes"], launch["ceilingBasis"]) for launch in outcome.launches},
+                         {(GIB, "provisional")})
+        # Each launch's stderr tail is kept apart for private diagnostics, never in the report.
+        self.assertEqual(sorted(outcome.stderr), [1, 2, 3])
+        report = outcome.report()
+        self.assertNotIn("stderr", report)
+        self.assertFalse(any("stderr" in launch for launch in report["launches"]))
 
     def test_one_bad_row_of_eight_never_costs_the_other_seven(self) -> None:
         rows = self._clips(8)
@@ -202,6 +237,10 @@ class PersistentWorkerTests(unittest.TestCase):
         self.assertEqual(len(outcome.launches), 1)
         self.assertEqual(outcome.results, {})
         self.assertEqual(set(outcome.unavailable.values()), {"envelope-breach"})
+        # The launch names why its emitted rows were lost.
+        launch = outcome.launches[0]
+        self.assertEqual((launch["hostCondition"], launch["rowsDiscarded"], launch["unavailableReason"]),
+                         (True, 4, "envelope-breach"))
 
     def test_a_worker_without_its_thread_environment_never_emits(self) -> None:
         def stripped(command, **kwargs):

@@ -469,7 +469,9 @@ class PanelAcquisitionTests(unittest.TestCase):
                     # committed canary record the registry validator re-reads (AQ-06 P8).
                     self.assertEqual(judge["status"], "shadow")
                     self.assertIn(judge["determinismClass"], ("D0", "D1"))
-                    self.assertEqual(judge["resources"]["ceilingStatus"], "measured")
+                    self.assertEqual(judge["resources"]["ceilingStatus"], "calibrated")
+                    self.assertEqual(judge["resources"]["ceilingBytes"],
+                                     -(-judge["resources"]["canonicalHostPeakBytes"] * 12 // 10))
                     self.assertTrue(judge["canary"]["record"].startswith("benchmarks/audio-qc-qualification/"))
                 self.assertNotIn("plannedExecution", judge)
                 self.assertEqual(judge["execution"]["threadsStatus"], "provisional")

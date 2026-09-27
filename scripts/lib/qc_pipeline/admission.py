@@ -19,12 +19,24 @@ workers, by a semaphore over memory:
   ceilings of every admitted worker plus the orchestrators' own reservations
   stay within `admission.budgetBytes` of `config/audio-qc-judges.json`
   (about 10 GiB on the M6, est.), with at most `lanes.gpu` (1) MLX worker and
-  `lanes.cpu` (2) CPU workers at once. A judge's ceiling is its measured
-  canonical-host peak x 1.2 once measured (AQ-06), else its provisional
-  ceiling; a judge with neither, or a ceiling the budget can never hold, is
-  refused outright. The supervisor then enforces that same ceiling live on
-  the child's whole process group (the worker and every command it runs), so
-  the budget is a bound, not an estimate.
+  `lanes.cpu` (2) CPU workers at once. A judge's ceiling is its calibrated
+  ceiling once AQ-06 qualification promoted it (`resources.ceilingBytes`, the
+  larger of its two clean canonical-host runs' peaks x 1.2, `ceilingStatus:
+  calibrated`), else its provisional ceiling; a judge with neither, or a
+  ceiling the budget can never hold, is refused outright. The supervisor then
+  enforces that same ceiling live on the child's whole process group (the
+  worker and every command it runs), so the budget is a bound, not an
+  estimate.
+- **Qualification measures under the budget, not the estimate.** A
+  provisional ceiling is an estimate the measurement replaces, so the AQ-06
+  qualification run (`judge_admission(..., measurement=True)`) admits a judge
+  whose `ceilingStatus` is `provisional` at the measurement ceiling instead:
+  the budget less the orchestrator reservation, the largest ceiling admission
+  can ever grant one worker. A judge it stops could never be admitted at all;
+  a judge whose peak x 1.2 does not fit fails qualification on its measured
+  number (`ceiling-exceeds-budget`). The budget stays a bound: admission
+  reserves the measurement ceiling, so nothing else is admitted beside it.
+  Every other run keeps the provisional ceiling.
 - **The recovery rule sets the host-wide worker cap.** While the whole-host
   post-exit recovery rule binds, one worker's drop in host free memory cannot
   be told apart from another's allocation, so at most
@@ -185,21 +197,45 @@ class JudgeAdmission:
         }
 
 
+CALIBRATED_BASIS = "calibrated-canonical-host-peak-x1.2"
+MEASURED_BASIS = "measured-canonical-host-peak-x1.2"
+PROVISIONAL_BASIS = "provisional"
+MEASUREMENT_BASIS = "qualification-measurement-budget"
+
+
 def judge_ceiling(judge: Mapping[str, Any]) -> tuple[int, str]:
-    """A judge's admission ceiling: measured peak x 1.2, else the provisional ceiling."""
+    """A judge's admission ceiling: calibrated, else measured peak x 1.2, else provisional."""
     resources = judge.get("resources") if isinstance(judge.get("resources"), Mapping) else {}
+    calibrated = resources.get("ceilingBytes")
+    if resources.get("ceilingStatus") == "calibrated" and _positive_int(calibrated):
+        return calibrated, CALIBRATED_BASIS
     measured = resources.get("canonicalHostPeakBytes")
     if _positive_int(measured):
         # Exact integer ceil(peak x 1.2), the registry validator's arithmetic.
-        return -(-measured * 12 // 10), "measured-canonical-host-peak-x1.2"
+        return -(-measured * 12 // 10), MEASURED_BASIS
     provisional = resources.get("provisionalCeilingBytes")
     if _positive_int(provisional):
-        return provisional, "provisional"
+        return provisional, PROVISIONAL_BASIS
     raise AdmissionRefused("the judge has neither a measured nor a provisional memory ceiling")
 
 
-def judge_admission(registry: Mapping[str, Any], judge_id: str) -> JudgeAdmission:
-    """What one orchestrated worker judge is admitted as, from the registry."""
+def measurement_ceiling(registry: Mapping[str, Any]) -> int:
+    """The qualification run's ceiling for a provisional judge: the budget less the orchestrator reservation."""
+    admission = registry.get("admission") if isinstance(registry.get("admission"), Mapping) else {}
+    budget, reservation = admission.get("budgetBytes"), admission.get("orchestratorReservationBytes")
+    if not _positive_int(budget) or not _positive_int(reservation) or reservation >= budget:
+        raise AdmissionRefused("the admission budget and orchestrator reservation must be positive bytes")
+    return budget - reservation
+
+
+def judge_admission(registry: Mapping[str, Any], judge_id: str, *, measurement: bool = False) -> JudgeAdmission:
+    """What one orchestrated worker judge is admitted as, from the registry.
+
+    `measurement` is the AQ-06 qualification run: a judge whose ceiling is
+    still provisional (`ceilingStatus: provisional`) is admitted at the
+    measurement ceiling (`measurement_ceiling`) so its peak is measured, not
+    cut off at an estimate. A calibrated judge keeps its calibrated ceiling.
+    """
     judge = (registry.get("judges") or {}).get(judge_id)
     if not isinstance(judge, Mapping):
         raise AdmissionRefused(f"audio QC judge {judge_id} is not registered")
@@ -216,6 +252,9 @@ def judge_admission(registry: Mapping[str, Any], judge_id: str) -> JudgeAdmissio
         ceiling, basis = judge_ceiling(judge)
     except AdmissionRefused as error:
         raise AdmissionRefused(f"audio QC judge {judge_id}: {error}") from None
+    resources = judge.get("resources") if isinstance(judge.get("resources"), Mapping) else {}
+    if measurement and basis == PROVISIONAL_BASIS and resources.get("ceilingStatus") == "provisional":
+        ceiling, basis = measurement_ceiling(registry), MEASUREMENT_BASIS
     return JudgeAdmission(judge_id, str(execution["lane"]), ceiling, basis, threads, str(execution.get("engine")))
 
 

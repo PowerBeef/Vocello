@@ -167,13 +167,18 @@ class RegistryEditTests(unittest.TestCase):
         registry = load_registry()
         text = (REPO / "config/audio-qc-judges.json").read_text(encoding="utf-8")
         record = {"identityComponents": {"registryEntrySHA256": acquisition_entry_digest(judge)},
-                  "resources": {"canonicalHostPeakBytes": 3 * 1024**3}, "determinism": {"class": "D1"},
-                  "outputIdentity": "a" * 64, "session": {"date": "2026-09-28"}}
+                  "resources": {"canonicalHostPeakBytes": 3 * 1024**3,
+                                "admissionCeilingBytes": q.admission_ceiling(3 * 1024**3)},
+                  "determinism": {"class": "D1"},
+                  "outputIdentity": "a" * 64, "session": {"id": "20260928-0123abcd", "date": "2026-09-28"}}
         edits, _skipped = q.promotion_edits(registry, {"judges": {PARAKEET: {"passed": True}}}, {PARAKEET: record},
                                             record_paths={PARAKEET: "benchmarks/x.json"},
                                             record_digests={PARAKEET: "b" * 64})
         shadow = json.loads(q.replace_json_values(text, edits))["judges"][PARAKEET]
         self.assertEqual(shadow["status"], "shadow")
+        self.assertEqual((shadow["resources"]["ceilingStatus"], shadow["resources"]["ceilingBytes"],
+                          shadow["resources"]["ceilingSession"]),
+                         ("calibrated", q.admission_ceiling(3 * 1024**3), "20260928-0123abcd"))
         self.assertTrue(receipt_current({"registryEntrySHA256": entry_digest(judge)}, shadow))
 
 
@@ -228,8 +233,34 @@ class SessionTests(PanelFixture):
         self.assertEqual(q.validate_canary_record(audiobox), [])
         self.assertAlmostEqual(audiobox["determinism"]["maxAbsoluteDifference"], 1e-7, places=12)
         self.assertEqual([run["clean"] for run in audiobox["runs"]], [True, True])
-        self.assertEqual(audiobox["resources"]["canonicalHostPeakBytes"], 48 * 1024**2)
-        self.assertEqual(audiobox["resources"]["admissionCeilingBytes"], -(-48 * 1024**2 * 12 // 10))
+        # The peak is every launch's largest measurement: the sampled footprint (48 MiB here), the
+        # reaped ru_maxrss and the child-attributed peak, over both runs.
+        launches = [launch for run in audiobox["runs"] for launch in run["launchEnvelopes"]]
+        peak = max(48 * 1024**2, *(launch["waitMaxRSSBytes"] or 0 for launch in launches))
+        self.assertEqual(audiobox["resources"]["canonicalHostPeakBytes"], peak)
+        self.assertEqual(audiobox["resources"]["admissionCeilingBytes"], -(-peak * 12 // 10))
+        self.assertEqual({launch["childPeakBytes"] for launch in launches}, {48 * 1024**2})
+        self.assertEqual({launch["peakPhysicalFootprintBytes"] for launch in launches}, {48 * 1024**2})
+        # Qualification measures a provisional judge under the budget, not its estimate.
+        budget = self.registry["admission"]["budgetBytes"] - self.registry["admission"]["orchestratorReservationBytes"]
+        self.assertEqual({(launch["ceilingBytes"], launch["ceilingBasis"]) for launch in launches},
+                         {(budget, "qualification-measurement-budget")})
+        self.assertEqual(len(audiobox["resources"]["runPeakBytes"]), 2)
+        session = json.loads((records / "session.json").read_text(encoding="utf-8"))
+        self.assertEqual(session["judges"][AUDIOBOX]["runPeakBytes"], audiobox["resources"]["runPeakBytes"])
+        self.assertEqual(session["judges"][AUDIOBOX]["admissionCeilingBytes"], -(-peak * 12 // 10))
+        # The private diagnostics name each launch's codes, peaks and stderr; they stay out of the records.
+        diagnostics = json.loads((session_dir / "diagnostics.json").read_text(encoding="utf-8"))
+        parakeet = diagnostics["judges"][PARAKEET]
+        self.assertEqual(parakeet["verdict"]["reasons"], judges[PARAKEET]["reasons"])
+        launch = parakeet["runs"][0]["launches"][0]
+        self.assertEqual((launch["hostCondition"], launch["failures"], launch["ceilingBasis"]),
+                         (False, [], "qualification-measurement-budget"))
+        self.assertIsInstance(launch["stderrTail"], str)
+        self.assertEqual(diagnostics["judges"][q.BASELINE_RECOGNIZER]["verdict"], {"legacy": True})
+        # The legacy whisper-small judge has no ceilingStatus: it keeps its provisional ceiling.
+        small = diagnostics["judges"][q.BASELINE_RECOGNIZER]["runs"][0]["launches"][0]
+        self.assertEqual(small["ceilingBasis"], "provisional")
         # Two runs are two orchestrator sessions, each with its own recovery report.
         sessions = [set(run["sessionIDs"]) for run in summary["runs"]]
         self.assertTrue(sessions[0] and sessions[1] and not sessions[0] & sessions[1])
@@ -289,8 +320,14 @@ class SessionTests(PanelFixture):
         promoted = json.loads(registry_path.read_text(encoding="utf-8"))
         audiobox = promoted["judges"][AUDIOBOX]
         self.assertEqual((audiobox["status"], audiobox["determinismClass"], audiobox["resources"]["ceilingStatus"]),
-                         ("shadow", "D1", "measured"))
-        self.assertEqual(audiobox["resources"]["canonicalHostPeakBytes"], 48 * 1024**2)
+                         ("shadow", "D1", "calibrated"))
+        record = json.loads((published / "judges" / q.record_file_name(AUDIOBOX)).read_text(encoding="utf-8"))
+        self.assertEqual(audiobox["resources"]["canonicalHostPeakBytes"], record["resources"]["canonicalHostPeakBytes"])
+        self.assertEqual(audiobox["resources"]["ceilingBytes"], record["resources"]["admissionCeilingBytes"])
+        self.assertEqual(audiobox["resources"]["ceilingSession"], published.name)
+        # Normal runs admit a calibrated judge at its calibrated ceiling.
+        self.assertEqual(cli.orchestrator.judge_admission(promoted, AUDIOBOX, measurement=True).ceiling_bytes,
+                         record["resources"]["admissionCeilingBytes"])
         self.assertEqual(audiobox["canary"]["record"],
                          f"benchmarks/audio-qc-qualification/{published.name}/judges/{q.record_file_name(AUDIOBOX)}")
         self.assertEqual(promoted["judges"][PARAKEET]["status"], "candidate")
@@ -315,6 +352,19 @@ class SessionTests(PanelFixture):
         self.assertTrue(any("D0 or D1" in error for error in errors(lambda judge: judge.update(determinismClass="D2"))))
         self.assertTrue(any("canonicalHostPeakBytes" in error for error in errors(
             lambda judge: judge["resources"].update(canonicalHostPeakBytes=1))))
+        # A calibrated ceiling is the one its committed canary record measured, in the session it names.
+        self.assertTrue(any("peak x 1.2" in error for error in errors(
+            lambda judge: judge["resources"].update(ceilingBytes=judge["resources"]["ceilingBytes"] + 1))))
+        self.assertTrue(any("names session" in error for error in errors(
+            lambda judge: judge["resources"].update(ceilingSession="20260101-00000000"))))
+        self.assertTrue(any("names the qualification session" in error for error in errors(
+            lambda judge: judge["resources"].update(ceilingSession=None))))
+        self.assertTrue(any("cites the committed canary record" in error for error in errors(
+            lambda judge: judge.update(status="candidate", canary=None, determinismClass="unmeasured"))))
+        self.assertTrue(any("only a calibrated ceiling" in error for error in errors(
+            lambda judge: judge["resources"].update(ceilingStatus="provisional"))))
+        self.assertTrue(any("ceilingStatus is" in error for error in errors(
+            lambda judge: judge["resources"].update(ceilingStatus="measured"))))
         self.assertTrue(any("determinismClass is one of" in error for error in errors(
             lambda judge: judge.update(status="candidate", determinismClass="bitwise"))))
         # A warn judge's canary must also match today's worker sources.

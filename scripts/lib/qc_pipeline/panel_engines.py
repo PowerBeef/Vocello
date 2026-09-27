@@ -279,11 +279,36 @@ class Qwen3AlignerBackend(_MlxAudioBackend):
         if not isinstance(text, str) or not text.strip() or not isinstance(language, str):
             raise ValueError("an alignment row names its reference text and language")
         output = self.model.generate(mx.array(audio), text=text, language=language)
-        intervals = [
-            {"unit": str(getattr(item, "text", "")), "start": float(item.start), "end": float(item.end)}
-            for item in getattr(output, "segments", None) or []
-        ]
+        intervals = [aligned_interval(item) for item in getattr(output, "segments", None) or []]
         return {"language": language, "units": alignment_units(text, language), "intervals": intervals}
+
+
+def _field(item: Any, *names: str) -> Any:
+    for name in names:
+        value = item.get(name) if isinstance(item, dict) else getattr(item, name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def aligned_interval(item: Any) -> dict[str, Any]:
+    """One aligned unit as `{unit, start, end}` (seconds).
+
+    mlx-audio's `ForcedAlignResult.segments` yields dicts (`text`, `start`,
+    `end`); its items are objects (`text`, `start_time`, `end_time`). Both
+    shapes, keyed either way, are read; a unit without both times is a row
+    failure, never a zero.
+    """
+    start = _field(item, "start", "start_time")
+    end = _field(item, "end", "end_time")
+    try:
+        if start is None or end is None:
+            raise ValueError
+        start, end = float(start), float(end)
+    except (TypeError, ValueError):
+        raise ValueError("an aligned unit carries numeric start and end times") from None
+    text = _field(item, "text", "unit")
+    return {"unit": "" if text is None else str(text), "start": start, "end": end}
 
 
 def alignment_units(text: str, language: str) -> list[str]:

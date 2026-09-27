@@ -165,6 +165,8 @@ QUALIFIED_DETERMINISM_CLASSES = frozenset({"D0", "D1"})
 # Statuses a panel judge reaches only with a committed canary record (audit section 5.9).
 CANARY_STATUSES = frozenset({"shadow", "advisory", "warn", "gating"})
 CANARY_FIELDS = ("record", "sha256", "outputIdentity", "date")
+# A worker judge's ceiling: an estimate until AQ-06 qualification calibrates it.
+CEILING_STATUSES = ("provisional", "calibrated")
 
 
 class JudgeRegistryError(ValueError):
@@ -356,6 +358,8 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
         errors.extend(_judge_errors(judge_id, judge, exclusions, restrictions, root))
         if isinstance(judge, dict) and "acquisition" in judge and judge.get("status") in CANARY_STATUSES:
             errors.extend(_canary_errors(judge_id, judge, registry, root))
+        if isinstance(judge, dict) and judge.get("status") not in BLOCKED_STATUSES:
+            errors.extend(_ceiling_errors(judge_id, judge, root))
     errors.extend(admission_errors(registry, root=root))
     errors.extend(acquisition_errors(registry, root=root))
     return errors
@@ -366,8 +370,10 @@ def _positive_int(value: Any) -> bool:
 
 
 def judge_admission_ceiling(judge: dict[str, Any]) -> int | None:
-    """A worker judge's admission ceiling: measured peak x 1.2, else provisional."""
+    """A worker judge's admission ceiling: calibrated, else measured peak x 1.2, else provisional."""
     resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
+    if resources.get("ceilingStatus") == "calibrated" and _positive_int(resources.get("ceilingBytes")):
+        return resources["ceilingBytes"]
     measured = resources.get("canonicalHostPeakBytes")
     if _positive_int(measured):
         return -(-measured * 12 // 10)
@@ -480,6 +486,62 @@ def _recovery_evidence_errors(evidence: Any, registry: dict[str, Any], root: Pat
         errors.append("recovery evidence reports must be distinct")
     if any(first & second for position, first in enumerate(sessions) for second in sessions[position + 1:]):
         errors.append("recovery evidence reports must come from separate sessions")
+    return errors
+
+
+def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[str]:
+    """A calibrated ceiling is the one a committed canary record measured (AQ-06).
+
+    `ceilingStatus` is `provisional` (an estimate; the qualification run
+    measures past it) or `calibrated`: `promote` wrote `ceilingBytes`, the
+    larger peak of two clean canonical-host runs x 1.2, and `ceilingSession`,
+    the session that measured it. A calibrated ceiling belongs to a judge that
+    cites its committed canary record, and that record is of the named session
+    and derived exactly this ceiling from exactly this peak. Only a calibrated
+    ceiling records `ceilingBytes`.
+    """
+    from lib.qc_pipeline.qualification import SESSION_ID, admission_ceiling
+
+    resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
+    status = resources.get("ceilingStatus")
+    label = f"judge {judge_id}"
+    if status is None:
+        return [f"{label}: only a calibrated ceiling records ceilingBytes"] \
+            if resources.get("ceilingBytes") is not None else []
+    if status not in CEILING_STATUSES:
+        return [f"{label}: ceilingStatus is {' or '.join(CEILING_STATUSES)}"]
+    if status != "calibrated":
+        if resources.get("ceilingBytes") is not None or resources.get("ceilingSession") is not None:
+            return [f"{label}: only a calibrated ceiling records ceilingBytes and ceilingSession"]
+        return []
+    ceiling, peak, session = (resources.get("ceilingBytes"), resources.get("canonicalHostPeakBytes"),
+                              resources.get("ceilingSession"))
+    if not _positive_int(ceiling) or not _positive_int(peak) or ceiling != admission_ceiling(peak):
+        return [f"{label}: a calibrated ceiling is its measured canonical-host peak x 1.2, rounded up"]
+    if not isinstance(session, str) or not SESSION_ID.fullmatch(session):
+        return [f"{label}: a calibrated ceiling names the qualification session that measured it"]
+    canary = judge.get("canary")
+    relative = canary.get("record") if isinstance(canary, dict) else None
+    if judge.get("status") not in CANARY_STATUSES or not isinstance(relative, str) or not relative \
+            or Path(relative).is_absolute() or ".." in Path(relative).parts:
+        return [f"{label}: a calibrated ceiling cites the committed canary record that measured it"]
+    target = root / relative
+    if not target.is_file():
+        return [f"{label}: the canary record {relative} behind its calibrated ceiling does not exist"]
+    errors = [f"{label}: the canary record behind its calibrated ceiling {problem}"
+              for problem in _committed_file_errors(root, relative)]
+    try:
+        record = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return errors + [f"{label}: the canary record {relative} behind its calibrated ceiling is not JSON"]
+    if not isinstance(record, dict):
+        return errors + [f"{label}: the canary record {relative} behind its calibrated ceiling is not an object"]
+    measured = record.get("resources") if isinstance(record.get("resources"), dict) else {}
+    recorded = record.get("session") if isinstance(record.get("session"), dict) else {}
+    if recorded.get("id") != session:
+        errors.append(f"{label}: its calibrated ceiling names session {session}, not its canary record's")
+    if measured.get("admissionCeilingBytes") != ceiling or measured.get("canonicalHostPeakBytes") != peak:
+        errors.append(f"{label}: its calibrated ceiling is not the one its canary record measured")
     return errors
 
 

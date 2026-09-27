@@ -13,12 +13,15 @@ module is the pure half of `scripts/audio_qc_panel_qualification.py`:
   every judge's degenerate inputs. No user data and no WAV is committed; the
   lead's latest language-bench takes (generated from the committed corpus)
   join it at run time for the recognizers.
-- **Run analysis.** Per judge and run: the peak resident memory and physical
-  footprint over every launch, wall time, model load and warm-up, threads, and
-  whether the run was clean (every envelope qualified on the canonical host, no
-  retry, no unavailable row). Determinism compares the two runs' raw outputs
-  (L1) row by row: D0 bit-exact, D1 equal on every discrete output with the
-  largest numeric difference recorded as the measured tolerance, D2 otherwise.
+- **Run analysis.** Per judge and run: every launch's measured peaks (sampled
+  resident memory, physical footprint, the reaped `ru_maxrss`, the
+  child-attributed peak and a native binary's own peak), the ceiling it ran
+  under and its failure codes; the run's peak is the largest of them. Also wall
+  time, model load and warm-up, threads, and whether the run was clean (every
+  envelope qualified on the canonical host, no retry, no unavailable row).
+  Determinism compares the two runs' raw outputs (L1) row by row: D0
+  bit-exact, D1 equal on every discrete output with the largest numeric
+  difference recorded as the measured tolerance, D2 otherwise.
 - **Flip analysis.** whisper-small against Whisper large-v3 over the same
   speech takes: which language and accuracy verdicts flip, in each direction.
 - **Records.** A privacy-safe canary record per judge (digests and metrics
@@ -27,8 +30,9 @@ module is the pure half of `scripts/audio_qc_panel_qualification.py`:
   published, and only the canary records of judges that passed.
 - **Promotion.** `promote` edits `config/audio-qc-judges.json` in place for each
   candidate whose committed record passed: status `shadow`, its determinism
-  class, its measured peak (so its admission ceiling becomes peak x 1.2) and
-  its canary citation. Nothing else changes, and the registry must still
+  class, its measured peak and calibrated ceiling (`ceilingBytes`, the larger
+  peak of the two runs x 1.2, `ceilingStatus: calibrated`, `ceilingSession`)
+  and its canary citation. Nothing else changes, and the registry must still
   validate, or nothing is written.
 """
 
@@ -206,10 +210,46 @@ def _positive(value: Any) -> int | None:
     return value if type(value) is int and value > 0 else None
 
 
+def launch_envelope(launch: Mapping[str, Any]) -> dict[str, Any]:
+    """One worker launch's measured peaks, ceiling and failure codes (no text, no path)."""
+    envelope = launch.get("resourceEnvelope") or {}
+    attribution = envelope.get("recoveryAttribution") if isinstance(envelope.get("recoveryAttribution"), Mapping) \
+        else {}
+    admission = envelope.get("admission") if isinstance(envelope.get("admission"), Mapping) else {}
+    ceiling = _positive(launch.get("ceilingBytes")) or _positive(admission.get("ceilingBytes")) \
+        or _positive(envelope.get("maximumAllowedRSSBytes"))
+    basis = launch.get("ceilingBasis")
+    return {
+        "launch": launch.get("launch"),
+        "kind": launch.get("kind"),
+        "ceilingBytes": ceiling,
+        "ceilingBasis": basis if isinstance(basis, str) else None,
+        "peakRSSBytes": _positive(envelope.get("peakRSSBytes")),
+        "peakPhysicalFootprintBytes": _positive(envelope.get("peakPhysicalFootprintBytes")),
+        "waitMaxRSSBytes": _positive(envelope.get("waitMaxRSSBytes")),
+        "childPeakBytes": _positive(attribution.get("childPeakBytes")),
+        "childPeakBasis": attribution.get("childPeakBasis") if isinstance(attribution.get("childPeakBasis"), str)
+        else None,
+        "descendantPeakRSSBytes": _positive(launch.get("descendantPeakRSSBytes")),
+        "failures": sorted({str(code) for code in envelope.get("qualificationFailures") or []}),
+    }
+
+
+PEAK_FIELDS = ("peakRSSBytes", "peakPhysicalFootprintBytes", "waitMaxRSSBytes", "childPeakBytes",
+               "descendantPeakRSSBytes")
+
+
 def run_resources(worker: Mapping[str, Any] | None, *, canonical_host: str | None) -> dict[str, Any]:
-    """One judge's resources in one run, and whether the run was clean, from its worker report."""
+    """One judge's resources in one run, and whether the run was clean, from its worker report.
+
+    The run's peak is the largest measurement of any launch: the sampled
+    resident memory and physical footprint, the exact `ru_maxrss` of the reaped
+    worker, the child-attributed peak and a native binary's own peak. A spike
+    between two samples still reaches the calibrated ceiling.
+    """
     launches = list((worker or {}).get("launches") or [])
     envelopes = [launch.get("resourceEnvelope") or {} for launch in launches]
+    details = [launch_envelope(launch) for launch in launches]
     failures: set[str] = set()
     if not launches:
         failures.add("not-launched")
@@ -228,10 +268,9 @@ def run_resources(worker: Mapping[str, Any] | None, *, canonical_host: str | Non
         failures.add("rows-unavailable")
     if (worker or {}).get("rowsAdopted"):
         failures.add("rows-adopted")
-    rss = [value for value in (_positive(item.get("peakRSSBytes")) for item in envelopes) if value]
-    footprint = [value for value in (_positive(item.get("peakPhysicalFootprintBytes")) for item in envelopes)
-                 if value]
-    peak = max([*rss, *footprint], default=None)
+    rss = [item["peakRSSBytes"] for item in details if item["peakRSSBytes"]]
+    footprint = [item["peakPhysicalFootprintBytes"] for item in details if item["peakPhysicalFootprintBytes"]]
+    peak = max((item[name] for item in details for name in PEAK_FIELDS if item[name]), default=None)
     if launches and peak is None:
         failures.add("peak-unmeasured")
     walls = [float(item["wallSeconds"]) for item in envelopes
@@ -246,7 +285,14 @@ def run_resources(worker: Mapping[str, Any] | None, *, canonical_host: str | Non
         "rowsUnavailable": len((worker or {}).get("rowsUnavailable") or {}),
         "peakRSSBytes": max(rss, default=None),
         "peakPhysicalFootprintBytes": max(footprint, default=None),
+        "peakWaitMaxRSSBytes": max((item["waitMaxRSSBytes"] for item in details if item["waitMaxRSSBytes"]),
+                                   default=None),
+        "peakChildAttributedBytes": max((item["childPeakBytes"] for item in details if item["childPeakBytes"]),
+                                        default=None),
+        "peakDescendantRSSBytes": max((item["descendantPeakRSSBytes"] for item in details
+                                       if item["descendantPeakRSSBytes"]), default=None),
         "peakBytes": peak,
+        "launchEnvelopes": details,
         "wallSeconds": round(sum(walls), 3) if walls else None,
         "modelLoadSeconds": _rounded((worker or {}).get("modelLoadSeconds")),
         "warmupSeconds": _rounded((worker or {}).get("warmupSeconds")),
@@ -391,7 +437,8 @@ def judge_analysis(judge_id: str, *, runs: Sequence[Mapping[str, Any]], identity
         "canarySet": dict(canary_set),
         "runs": [{"run": index, **{key: value for key, value in run["resources"].items()}}
                  for index, run in enumerate(runs, start=1)],
-        "resources": {"canonicalHostPeakBytes": peak, "admissionCeilingBytes": ceiling, "fitsBudget": fits},
+        "resources": {"canonicalHostPeakBytes": peak, "admissionCeilingBytes": ceiling, "fitsBudget": fits,
+                      "runPeakBytes": [run["resources"]["peakBytes"] for run in runs]},
         "determinism": measured,
         "takes": take_rows,
         "qualification": {"passed": not reasons, "reasons": sorted(reasons)},
@@ -815,7 +862,9 @@ def promotion_edits(registry: Mapping[str, Any], session: Mapping[str, Any], rec
             continue
         resources = dict(judge.get("resources") or {})
         resources["canonicalHostPeakBytes"] = record["resources"]["canonicalHostPeakBytes"]
-        resources["ceilingStatus"] = "measured"
+        resources["ceilingBytes"] = record["resources"]["admissionCeilingBytes"]
+        resources["ceilingStatus"] = "calibrated"
+        resources["ceilingSession"] = record["session"]["id"]
         base = ("judges", judge_id)
         edits[(*base, "status")] = "shadow"
         edits[(*base, "determinismClass")] = record["determinism"]["class"]
@@ -834,6 +883,8 @@ def candidate_entry(judge: Mapping[str, Any]) -> dict[str, Any]:
     entry.update(status="candidate", determinismClass="unmeasured", canary=None)
     resources = dict(entry.get("resources") or {})
     resources.update(canonicalHostPeakBytes=None, ceilingStatus="provisional")
+    resources.pop("ceilingBytes", None)
+    resources.pop("ceilingSession", None)
     entry["resources"] = resources
     return entry
 

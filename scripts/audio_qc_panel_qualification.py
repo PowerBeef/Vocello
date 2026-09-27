@@ -12,12 +12,22 @@ admitted workers (`scripts/audio_qc_orchestrator.py`). A panel judge moves from
   digests) plus the lead's latest language-bench takes (`--manifest`, an
   independent-ASR or orchestrator manifest; generated from the committed
   corpus). Each run is its own orchestrator session with a fresh cache, so
-  every row runs a model. Per judge and run it records the peak resident memory
-  and physical footprint, wall time, model load, warm-up and threads, and
+  every row runs a model. A judge whose ceiling is still provisional runs
+  under the measurement ceiling (the admission budget less the orchestrator
+  reservation, `admission.measurement_ceiling`), so an estimate never cuts the
+  measurement short. Per judge and run it records every launch's peaks
+  (resident memory, physical footprint, the reaped `ru_maxrss`, the
+  child-attributed peak), wall time, model load, warm-up and threads, and
   whether the run was clean: every envelope qualified on the canonical
   hardware profile, no retry, no unavailable row, and a quiet host
   (`require_quiet_host`; `QVOICE_ALLOW_BUSY_HOST=1` records a busy host and
   makes the run unclean).
+- **Private diagnostics.** `diagnostics.json` in the session directory names
+  why each run of each judge was not clean: per launch its failure codes,
+  probe and shutdown failures, whether a host condition discarded its rows,
+  the reason its unresolved rows were given, its peaks against its ceiling,
+  and the tail of its stderr. It never leaves the untracked session
+  directory; the committed records keep codes and numbers only.
 - **Determinism class.** The two runs' raw outputs are compared row by row:
   D0 bit-exact, D1 equal on every discrete output with the largest numeric
   difference as the measured tolerance, D2 otherwise (never shadow).
@@ -45,7 +55,8 @@ Commands:
             <session>/; it never stages or commits
   promote   after the records are committed: move each passing candidate to
             shadow in config/audio-qc-judges.json (status, determinism class,
-            measured peak, canary citation); `--bind-recovery-rule` also cites
+            measured peak, calibrated ceiling = the larger run peak x 1.2 with
+            its session, canary citation); `--bind-recovery-rule` also cites
             the session's two recovery reports and makes the child-attributed
             recovery rule binding when they meet its promotion
   validate  every committed record under benchmarks/audio-qc-qualification/
@@ -88,6 +99,7 @@ from delivery_resource_supervisor import (  # noqa: E402
 from lib.qc_pipeline import qualification as q  # noqa: E402
 from lib.qc_pipeline.admission import AdmissionError, AdmissionPolicy, HostAdmission  # noqa: E402
 from lib.qc_pipeline.evidence import EvidenceError, write_private_bundle  # noqa: E402
+from lib.qc_pipeline.workers import host_condition_failed, unavailable_reason  # noqa: E402
 
 REPO = SCRIPT_DIR.parent
 REGISTRY_PATH = REPO / "config/audio-qc-judges.json"
@@ -95,6 +107,8 @@ DEFAULT_SESSION_PARENT = Path(os.environ.get("QVOICE_ARTIFACTS_DIAGNOSTICS", REP
     / "audio-qc-panel-qualification"
 HOST_PREFLIGHT = SCRIPT_DIR / "lib/host_preflight.sh"
 PRIVATE_SESSION_SCHEMA = "vocello.audioqc.qualification-session-private/1"
+DIAGNOSTICS_SCHEMA = "vocello.audioqc.qualification-diagnostics-private/1"
+STDERR_SCHEMA = "vocello.audioqc.qualification-worker-stderr-private/1"
 RUN_SCHEMA = "vocello.audioqc.qualification-run/1"
 RAW_SCHEMA = "vocello.audioqc.qualification-raw/1"
 LANE = "audio-qc-panel-qualification"
@@ -225,12 +239,15 @@ def run_session(*, registry: dict[str, Any], manifest: dict[str, Any], judges: S
         runner = orchestrator.Orchestrator(
             registry=registry, cache=cache, stage2=judges, supervisor=supervisor, lock_root=lock_root,
             host_admission=HostAdmission(lock_root, policy, wait_seconds=admission_wait_seconds),
+            measurement_ceilings=True,
         )
         result = runner.run(manifest)
         after = dict(preflight())
         write_private_bundle(directory / "bundle", header=result["header"],
                              takes=zip(result["records"], result["privates"]), repository=REPO)
         atomic_json(directory / "raw.json", {"schema": RAW_SCHEMA, "raw": result["raw"]})
+        atomic_json(directory / "worker-stderr.json", {"schema": STDERR_SCHEMA,
+                                                       "workers": result.get("workerStderr") or {}})
         atomic_json(directory / "run.json", {
             "schema": RUN_SCHEMA, "run": run, "startedAt": started_at,
             "wallSeconds": round(time.monotonic() - started, 3), "hostBefore": before, "hostAfter": after,
@@ -264,6 +281,89 @@ def _orchestrated_workers(registry: Mapping[str, Any]) -> list[str]:
     )
 
 
+def _launch_diagnostics(launch: Mapping[str, Any], stderr: Mapping[str, str]) -> dict[str, Any]:
+    """One launch, private: what it ran, what it measured and why it failed."""
+    envelope = launch.get("resourceEnvelope") or {}
+    peaks = q.launch_envelope(launch)
+    failures = set(peaks["failures"])
+    # A bundle written before the launch recorded these derives them the runner's way.
+    host = launch["hostCondition"] if isinstance(launch.get("hostCondition"), bool) \
+        else host_condition_failed(failures)
+    reason = launch.get("unavailableReason") if "unavailableReason" in launch else (
+        "envelope-breach" if host else None if launch.get("completed")
+        else "crash" if launch.get("protocolError") else unavailable_reason(failures))
+    return {
+        **peaks,
+        "rows": launch.get("rows"), "rowsEmitted": launch.get("rowsEmitted"),
+        "rowsAccepted": launch.get("rowsAccepted"), "rowErrors": launch.get("rowErrors"),
+        "completed": launch.get("completed"), "protocolError": launch.get("protocolError"),
+        "returnCode": envelope.get("returnCode"), "timedOut": envelope.get("timedOut"),
+        "resourceLimitTerminated": envelope.get("resourceLimitTerminated"),
+        "hostCondition": host,
+        "rowsDiscarded": launch.get("rowsDiscarded") if "rowsDiscarded" in launch
+        else (launch.get("rowsEmitted") or 0) + (launch.get("rowErrors") or 0) if host else 0,
+        "unavailableReason": reason,
+        "shutdownFailures": list(envelope.get("shutdownFailures") or []),
+        "probeFailures": list(envelope.get("probeFailures") or []),
+        "wholeHostRecoveryFailures": list(envelope.get("wholeHostRecoveryFailures") or []),
+        "postExitMemoryRecovered": envelope.get("postExitMemoryRecovered"),
+        "freeMemoryPercent": [(envelope.get("hostBefore") or {}).get("freeMemoryPercent"),
+                              (envelope.get("hostAfter") or {}).get("freeMemoryPercent")],
+        "admissionWaitSeconds": (envelope.get("admission") or {}).get("waitSeconds"),
+        "wallSeconds": envelope.get("wallSeconds"),
+        "stderrTail": stderr.get(str(launch.get("launch"))),
+    }
+
+
+def not_clean_causes(summary: Mapping[str, Any], launches: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Each code that made a run not clean, with the launches that produced it."""
+    by_code: dict[str, list[int]] = {}
+    for launch in launches:
+        codes = set(launch["failures"])
+        if launch.get("kind") != "job":
+            codes.add("retried")
+        if not launch.get("completed"):
+            codes.add("incomplete")
+        if launch.get("protocolError"):
+            codes.add("protocol-error")
+        if launch.get("hostCondition"):
+            codes.add("rows-discarded-by-host-condition")
+        if launch.get("hostCondition") or launch.get("unavailableReason") or launch.get("rowErrors"):
+            codes.add("rows-unavailable")
+        for code in codes:
+            by_code.setdefault(code, []).append(launch["launch"])
+    if "rows-unavailable" not in summary["failures"]:
+        # A launch whose rows were retried and then accepted left none unavailable.
+        by_code.pop("rows-unavailable", None)
+    causes = [{"code": code, "launches": sorted(by_code.get(code, []))}
+              for code in sorted(set(summary["failures"]) | set(by_code))]
+    return causes
+
+
+def diagnostics(runs: Sequence[Mapping[str, Any]], judges: Sequence[str], resources: Mapping[str, Sequence[Any]],
+                verdicts: Mapping[str, Any]) -> dict[str, Any]:
+    """The session's private diagnostics: why each run of each judge was or was not clean."""
+    output: dict[str, Any] = {}
+    for judge_id in judges:
+        entry: dict[str, Any] = {"verdict": verdicts.get(judge_id), "runs": []}
+        for index, run in enumerate(runs):
+            worker = {item["judge"]: item for item in run["bundle"].get("workers") or []}.get(judge_id) or {}
+            stderr = (run.get("stderr") or {}).get(judge_id) or {}
+            launches = [_launch_diagnostics(launch, stderr) for launch in worker.get("launches") or []]
+            summary = resources[judge_id][index]
+            reasons: dict[str, int] = {}
+            for reason in (worker.get("rowsUnavailable") or {}).values():
+                reasons[str(reason)] = reasons.get(str(reason), 0) + 1
+            entry["runs"].append({
+                "run": index + 1, "clean": summary["clean"], "failures": summary["failures"],
+                "causes": not_clean_causes(summary, launches),
+                "rowsAccepted": summary["rowsAccepted"], "rowsUnavailableByReason": dict(sorted(reasons.items())),
+                "peakBytes": summary["peakBytes"], "launches": launches,
+            })
+        output[judge_id] = entry
+    return output
+
+
 def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[str, Any]:
     """Every record of a session, from its saved runs: publishable ones under `records/`, the rest private."""
     private = _read(session_dir / "session.json")
@@ -277,7 +377,10 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
         meta = _read(directory / "run.json")
         bundle, records, units = _bundle(directory / "bundle")
         raw = _read(directory / "raw.json")["raw"]
-        runs.append({"meta": meta, "bundle": bundle, "records": records, "units": units, "raw": raw})
+        stderr_path = directory / "worker-stderr.json"
+        stderr = _read(stderr_path).get("workers") if stderr_path.is_file() else {}
+        runs.append({"meta": meta, "bundle": bundle, "records": records, "units": units, "raw": raw,
+                     "stderr": stderr if isinstance(stderr, dict) else {}})
     session = {"id": private["id"], "date": private["date"], "hostProfileID": runs[0]["meta"].get("hostProfileID")
                or "unknown"}
     admission = registry["admission"]
@@ -294,6 +397,7 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
     busy = [bool(run["meta"]["hostBefore"].get("busy") or run["meta"]["hostAfter"].get("busy")) for run in runs]
     judges_summary: dict[str, Any] = {}
     legacy: dict[str, Any] = {}
+    all_resources: dict[str, list[dict[str, Any]]] = {}
     for judge_id in private["judges"]["panel"] + private["judges"]["legacy"]:
         resources = []
         for index, run in enumerate(runs):
@@ -302,6 +406,7 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
                 summary["failures"] = sorted({*summary["failures"], "host-busy"})
                 summary["clean"] = False
             resources.append(summary)
+        all_resources[judge_id] = resources
         if judge_id in private["judges"]["legacy"]:
             legacy[judge_id] = {"runs": [{"run": index, **summary} for index, summary in enumerate(resources, 1)]}
             continue
@@ -330,6 +435,8 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
             "record": f"judges/{q.record_file_name(judge_id)}" if passed else None,
             "determinismClass": record["determinism"]["class"],
             "canonicalHostPeakBytes": record["resources"]["canonicalHostPeakBytes"],
+            "runPeakBytes": record["resources"]["runPeakBytes"],
+            "admissionCeilingBytes": record["resources"]["admissionCeilingBytes"],
             "registryStatus": (registry["judges"].get(judge_id) or {}).get("status"),
         }
     run_rows = []
@@ -363,8 +470,14 @@ def analyze_session(session_dir: Path, *, registry: Mapping[str, Any]) -> dict[s
     if problems:
         raise QualificationRunError(f"the session record does not validate: {problems[0]}")
     atomic_json(records_dir / "session.json", session_record)
+    # Private, beside the records and never published: why each run was or was not clean.
+    atomic_json(session_dir / "diagnostics.json", {
+        "schema": DIAGNOSTICS_SCHEMA, "session": session,
+        "judges": diagnostics(runs, list(all_resources), all_resources,
+                              {**judges_summary, **{judge_id: {"legacy": True} for judge_id in legacy}}),
+    })
     return {"session": session, "judges": judges_summary, "runs": run_rows, "flipAnalysis": flip,
-            "recordsDirectory": str(records_dir)}
+            "recordsDirectory": str(records_dir), "diagnostics": str(session_dir / "diagnostics.json")}
 
 
 # --------------------------------------------------------------------------- #
@@ -460,7 +573,7 @@ def _plan(args: argparse.Namespace, registry: dict[str, Any]) -> dict[str, Any]:
              for entry in spec["takes"]] + list((speech or {}).get("takes") or [])
     rows = []
     for judge in judges:
-        admission = orchestrator.judge_admission(registry, judge.judge_id)
+        admission = orchestrator.judge_admission(registry, judge.judge_id, measurement=True)
         in_scope = sum(1 for take in takes if judge.request(take) is not None)
         rows.append({"judge": judge.judge_id, "lane": admission.lane, "threads": admission.threads,
                      "ceilingBytes": admission.ceiling_bytes, "ceilingBasis": admission.ceiling_basis,

@@ -34,6 +34,14 @@ each launch, an `adopt` hook may resolve rows another run already stored;
 adopted rows launch nothing.
 
 Accepted rows are what the caller may cache (L1); unavailable rows never are.
+
+Each launch records, beside its resource envelope, the ceiling it ran under and
+why, whether a failed host condition discarded its rows (`hostCondition`,
+`rowsDiscarded`) and the reason the rows it left were given
+(`unavailableReason`): codes and counts only, so a failed launch names its
+cause. The tail of each launch's stderr is kept apart, in memory
+(`WorkerOutcome.stderr`), for a caller's private diagnostics only; it never
+enters the report.
 """
 
 from __future__ import annotations
@@ -65,6 +73,8 @@ DEFAULT_ROW_TIMEOUT_SECONDS = 900.0
 DEFAULT_STARTUP_SECONDS = 900.0
 # Row fields that record how long a row took, never what the judge measured.
 TIMING_KEYS = frozenset({"wallSeconds"})
+# The end of a launch's stderr kept for private diagnostics (a traceback's last frames).
+STDERR_TAIL_BYTES = 8192
 
 
 class WorkerProtocolError(ValueError):
@@ -111,6 +121,8 @@ class WorkerOutcome:
     # The launch (1-based) whose worker emitted each accepted row.
     row_launch: dict[str, int] = field(default_factory=dict)
     ready: dict[str, Any] | None = None
+    # The tail of each launch's stderr (1-based launch -> text): private, never in `report()`.
+    stderr: dict[int, str] = field(default_factory=dict)
 
     def report(self) -> dict[str, Any]:
         return {
@@ -188,7 +200,7 @@ def host_condition_failed(failures: set[str]) -> bool:
     return bool(failures - tolerated)
 
 
-def _unavailable_reason(failures: set[str]) -> str:
+def unavailable_reason(failures: set[str]) -> str:
     """Why a row whose worker ended abnormally is unavailable."""
     if "timeout" in failures:
         return "timeout"
@@ -297,22 +309,36 @@ def run_persistent_worker(
                 accepted += 1
             for identity, reason in parsed.row_errors.items():
                 outcome.unavailable[identity] = reason
+        stderr = result.stderr if isinstance(result.stderr, (bytes, bytearray)) else b""
+        outcome.stderr[launch] = bytes(stderr[-STDERR_TAIL_BYTES:]).decode("utf-8", errors="replace")
+        remaining = [row for row in batch
+                     if str(row["id"]) not in outcome.results and str(row["id"]) not in outcome.unavailable]
+        reason = None
+        if host_condition:
+            reason = "envelope-breach"
+        elif remaining:
+            reason = "crash" if protocol_error else unavailable_reason(failures)
         outcome.launches.append({
             "launch": launch,
             "retry": launch > 1,
             "kind": kind,
             "rows": len(batch),
             "timeoutSeconds": timeout,
+            "ceilingBytes": spec.ceiling_bytes,
+            "ceilingBasis": judge_admission.ceiling_basis if judge_admission is not None else None,
             "rowsEmitted": len(parsed.rows),
             "rowsAccepted": accepted,
             "rowErrors": len(parsed.row_errors),
             "completed": completed,
             "protocolError": protocol_error is not None,
+            # A failed host condition accepts nothing: every row this launch emitted is discarded.
+            "hostCondition": host_condition,
+            "rowsDiscarded": len(parsed.rows) + len(parsed.row_errors) if host_condition else 0,
+            # What the rows this launch left unresolved were given (or retried for).
+            "unavailableReason": reason,
             "descendantPeakRSSBytes": max(parsed.child_peaks.values(), default=None),
             "resourceEnvelope": envelope,
         })
-        remaining = [row for row in batch
-                     if str(row["id"]) not in outcome.results and str(row["id"]) not in outcome.unavailable]
         if host_condition:
             for row in remaining + queued_rows():
                 outcome.unavailable[str(row["id"])] = "envelope-breach"
@@ -320,7 +346,6 @@ def run_persistent_worker(
             break
         if not remaining:
             continue
-        reason = "crash" if protocol_error else _unavailable_reason(failures)
         if parsed.ready is None:
             # Nothing was in flight: the worker never started its rows.
             unready_failures += 1

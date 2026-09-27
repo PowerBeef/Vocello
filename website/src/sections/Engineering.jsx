@@ -7,7 +7,7 @@ import React from "react";
     one (the anchor). The provenance line below mirrors the chart footer, as the generator prints
     it: "Record <anchor>" for one record, "Median of N records through <anchor>" for more. Today
     the pool is one record,
-    benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json; the
+    benchmarks/runs/ui-generation/macos-xcui-benchmark-20260927-101957-c37aa311.json; the
     generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
     faster, below 1.0 audio is produced quicker than it plays. This record was published after the
@@ -16,17 +16,17 @@ import React from "react";
   - The retired gate chart's pinned A/B pair (…-9b6f267b / …-d02005ae) stays as history in
     benchmarks/HISTORY.md and OPTIMIZATION.md §K; per policy it is never re-promoted to a
     chart. The gate survives as one figcaption sentence below.
-  Values are warm-take medians measured on the Mac mini M2 (8 GB), the support floor and the
-  canonical host until 2026-09-22. The Mac mini M6 (16 GB) is canonical since then; its records
-  start a new series, and `--check` forces an update here when the first one lands (roadmap AV-17).
+  Values are warm-take medians measured on the Mac mini M6 (16 GB), the canonical host since
+  2026-09-22 (roadmap AV-17). The Mac mini M2 (8 GB) remains the support floor; its records
+  (last canonical: 379db820, 0.53 to 0.82) are an earlier series, never compared with the M6's.
   This section is a maintained whole-package surface (docs/reference/macos-release-qa.md
   "Technical sections are maintained surfaces"): refresh facts each release, never a
   single-release billboard.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.69, 0.6, 0.58] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.71, 0.56, 0.53] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.82, 0.62, 0.55] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.32, 0.28, 0.27] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.31, 0.27, 0.26] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.31, 0.28, 0.27] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;
@@ -110,7 +110,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M2 with 8 GB. Built-in Voice 0.58 to 0.69, Voice Design 0.53 to 0.71, Voice Cloning 0.55 to 0.82. Every bar sits below the real-time line at 1.0."
+      aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.27 to 0.32, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.31. Every bar sits below the real-time line at 1.0."
     >
       {gridlines}
       {rows}
@@ -123,10 +123,11 @@ export const Engineering = () => (
     <div className="container">
       <header className="perf-head">
         <p className="section-note">Measured, not promised</p>
-        <h2 id="eng-title" className="section-title">A first-party engine, measured on the minimum Mac.</h2>
+        <h2 id="eng-title" className="section-title">A first-party engine, measured take by take.</h2>
         <p className="section-sub">
-          These figures were measured on Vocello's support floor, a Mac mini M2 with 8 GB;
-          the chart comes from a Vocello 3.0 build from source.
+          These figures were measured on Vocello's benchmark host, a Mac mini M6 with 16 GB;
+          the chart comes from a Vocello 3.0 build from source. The 8 GB Mac mini M2 remains
+          the support floor.
           Speed is the real-time factor: seconds of generation per second of audio.
           Below 1.0, audio generates ahead of playback, and every number here traces
           to a tracked record in the open repository.
@@ -154,7 +155,7 @@ export const Engineering = () => (
       </div>
 
       <p className="perf-provenance">
-        Record <span className="perf-mono">379db820</span> in{" "}
+        Record <span className="perf-mono">c37aa311</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

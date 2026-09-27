@@ -1,11 +1,13 @@
 {
   "schemaVersion": 1,
-  "policyID": "macos-ui-stall-gate-provisional-250ms",
+  "policyID": "macos-ui-stall-gate-m6-600ms",
   "statistic": "maximumDelayedHeartbeatMS",
-  "maximumAllowed": 250,
+  "maximumAllowed": 600,
   "definition": "No main-thread heartbeat in any gated take of the macOS UI benchmark is delayed more than maximumAllowed milliseconds. The statistic is each take's maximumDelayedHeartbeatMS from MainThreadStallWatchdog (a 100 ms heartbeat, so a stall of D ms reads between D-100 and D), including the censored lower bound of any heartbeat still queued when the take ended (frontend heartbeatDelayDefinition completedAndCensoredPending). Gated takes are those scripts/check_macos_ui_bench.py stall_gate_applies selects: the floor tier always, every other Mac tier when it is the host's native tier. calibrationStatus decides what the limit does: provisional reports only (the checker records every gated take's value and whether the run would fail, stallGate.wouldFail in the evidence manifest and the run warning stall.provisional.wouldfail(<above>/<gated>) in the tracked record, and never fails the run); calibrated, which must list the calibrating run IDs in calibrationRuns, fails a run with a take above the limit.",
   "calibrationProfile": "mac-mini-m6-16gb",
-  "calibrationStatus": "provisional",
-  "calibrationRuns": [],
-  "basis": "Maintainer decisions 2026-09-25 (benchmark and telemetry audit #6). Replaces the zero-tolerance delayedHeartbeatCount50 gate, which 419 of 464 canonical M2 takes (90.3%) would have failed, with Apple's 250 ms hang threshold. 250 ms is not calibrated either: replayed on the same 464 takes (16 canonical mac-mini-m2-8gb runs, uiMaximumDelayedHeartbeatMS from completed heartbeats only, so before the censored lower bounds, which can only raise it), it fails 189 takes (40.7%) and all 16 runs (1 to 23 of 29 takes each); the four 2026-09-14 runs have 16 to 23 takes above it and per-run medians of 295-353 ms. The M6 runs another tier on faster hardware, so its distribution is unknown. The provisional limit therefore reports only and never fails a run (second decision, same day): the checker prints every gated take's value (cell=value) to benchmark-gate.txt and keeps the distribution in the evidence manifest whether or not the run would fail. It stays provisional until one exploratory scripts/ui_test.sh macos benchmark on mac-mini-m6-16gb has recorded that distribution; the statistic and limit are then re-declared here with calibrationStatus calibrated and that run in calibrationRuns, and only then does the limit gate."
+  "calibrationStatus": "calibrated",
+  "calibrationRuns": [
+    "macos-xcui-benchmark-20260927-101957-c37aa311"
+  ],
+  "basis": "Maintainer decisions 2026-09-25 (benchmark and telemetry audit #6): replace the zero-tolerance delayedHeartbeatCount50 gate, which 419 of 464 canonical M2 takes (90.3%) would have failed, with a declared per-take statistic, provisional at Apple's 250 ms hang threshold until one M6 run calibrates it. Calibrated 2026-09-27 on macos-xcui-benchmark-20260927-101957-c37aa311 (mac-mini-m6-16gb, 29 gated takes, played-audio capture on): median 188 ms, p90 259 ms, maximum 480 ms, 5 takes above 250 ms (custom/short/warm#0 293, #1 259, #2 480, design/long/warm#1 251, clone/short/warm#2 430) and 6 censored heartbeats. The limit is that maximum times the 1.25 floor the ui-perf ceilings use (600 ms), so the gate fails a regression beyond the calibrated distribution rather than the current completion-phase hitches; Apple's 250 ms threshold stays a report in benchmark-gate.txt. Recalibrate when the matrix, the watchdog definition or the host changes."
 }

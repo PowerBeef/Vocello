@@ -214,7 +214,13 @@ class UICheckerRoundTripTests(unittest.TestCase):
             layers["app"][1]["frontendMetrics"]["maximumDelayedHeartbeatMS"] = 420
 
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
-        result = checker.run_checker(checker.expected_order, mutate_layers=realistic, evidence=True)
+        with tempfile.TemporaryDirectory() as temporary:
+            # The report-only semantics under test, whatever the shipped contract is calibrated to.
+            contract = checker.write_stall_contract(Path(temporary))
+            result = checker.run_checker(
+                checker.expected_order, mutate_layers=realistic, evidence=True,
+                extra_args=["--stall-contract", str(contract)],
+            )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
         self.assertIn("stall.provisional.wouldfail(1/5)", record["run"]["warnings"])

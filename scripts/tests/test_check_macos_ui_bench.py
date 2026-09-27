@@ -584,12 +584,26 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
             frontend["delayedHeartbeatCount250"] = 1 if maximum_ms > 250 else 0
             frontend["maximumDelayedHeartbeatMS"] = maximum_ms
 
+        if not any(argument == "--stall-contract" for argument in (extra_args or [])):
+            temporary = tempfile.TemporaryDirectory()
+            self.addCleanup(temporary.cleanup)
+            extra_args = [*(extra_args or []), "--stall-contract", str(self.write_stall_contract(Path(temporary.name)))]
         return self.run_checker(
             self.expected_order, set_device_class, add_stalls, extra_args=extra_args, evidence=evidence,
         )
 
+    # The stall tests run against a fixed provisional 250 ms contract, so the
+    # gate's semantics stay pinned whatever the shipped contract is calibrated to.
+    PROVISIONAL_STALL_FIXTURE = {
+        "policyID": "macos-ui-stall-gate-provisional-250ms",
+        "maximumAllowed": 250,
+        "calibrationStatus": "provisional",
+        "calibrationRuns": [],
+    }
+
     def write_stall_contract(self, directory: Path, **overrides) -> Path:
         contract = json.loads((ROOT / "config" / "macos-ui-stall-gate.json").read_text(encoding="utf-8"))
+        contract.update(self.PROVISIONAL_STALL_FIXTURE)
         contract.update(overrides)
         path = directory / "stall-contract.json"
         path.write_text(json.dumps(contract), encoding="utf-8")
@@ -640,7 +654,7 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
             sys.path.insert(0, str(ROOT / "scripts"))
         import check_macos_ui_bench as checker
 
-        shipped = checker.load_stall_contract(checker.DEFAULT_STALL_CONTRACT)
+        shipped = {**checker.load_stall_contract(checker.DEFAULT_STALL_CONTRACT), **self.PROVISIONAL_STALL_FIXTURE}
         self.assertFalse(checker.stall_contract_enforced(shipped))
         calibrated = {**shipped, "calibrationStatus": "calibrated", "calibrationRuns": ["run-a"]}
         self.assertTrue(checker.stall_contract_enforced(calibrated))
@@ -699,7 +713,10 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         import check_macos_ui_bench as checker
 
         shipped = checker.load_stall_contract(checker.DEFAULT_STALL_CONTRACT)
-        self.assertEqual((shipped["statistic"], shipped["maximumAllowed"]), ("maximumDelayedHeartbeatMS", 250))
+        # The shipped contract is calibrated on the M6 and names the run it came from.
+        self.assertEqual(shipped["statistic"], "maximumDelayedHeartbeatMS")
+        self.assertTrue(checker.stall_contract_enforced(shipped))
+        self.assertTrue(shipped["calibrationRuns"])
         with tempfile.TemporaryDirectory() as temporary:
             for overrides in (
                 {"statistic": "uiStallCount50"},

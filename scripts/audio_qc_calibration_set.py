@@ -1186,6 +1186,38 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
             task["swaps"] = {variant: {"donor": takes[donor], "wav": str(take_wav(takes_path, takes[donor]))}
                              for variant, donor in donors[source].items()}
         tasks.append(task)
+    # Completeness (review of 6b1135e9): every scheduled T1 variant is accounted for on exactly its cell's
+    # sampled families, as an entry or a recorded not-applicable skip, and no entry comes from outside them.
+    # A set filtered after the fact, even with a recomputed entriesSHA256, fails here.
+    if sampling is not None:
+        skipped = injection_set.get("notApplicable") or {}
+        cells = sampling.get("injectors") or {}
+        family_takes: dict[str, set[str]] = {}
+        for take in generated:
+            family_takes.setdefault(take["family"], set()).add(take["takeID"])
+        recorded: dict[tuple[str, str], list[str]] = {}
+        for entry in injection_set["entries"]:
+            injection = entry.get("injection") or {}
+            if injection.get("injectorID") == language_swap.INJECTOR_ID:
+                continue
+            recorded.setdefault((str(injection.get("injector")), str(injection.get("variant"))), []).append(
+                str(entry.get("sourceTakeID")))
+        for row in plan:
+            if row["status"] == "out-of-scope" or row["variant"] is None \
+                    or row["injectorID"] not in injectors.CATALOG:
+                continue
+            key, variant = row["injector"], row["variant"]
+            families = (cells.get(key) or {}).get("families") or []
+            sampled = {take_id for family in families for take_id in family_takes.get(family, ())}
+            sources = recorded.get((key, variant), [])
+            outside = sorted(set(sources) - sampled)
+            if outside:
+                failures.append(["<set>", f"{key} {variant}: {len(outside)} entries come from families outside "
+                                          "its sample"])
+            skips = sum(((skipped.get(key) or {}).get("byVariant", {}).get(variant) or {}).values())
+            if len(set(sources)) + skips != len(sampled) or len(set(sources)) != len(sources):
+                failures.append(["<set>", f"{key} {variant}: {len(sources)} entries and {skips} skips account for "
+                                          f"{len(sampled)} sampled sources"])
     expected_swaps = len(swaps_scheduled(plan)) * len(donors)
     recorded_swaps = sum(1 for entry in injection_set["entries"]
                          if (entry.get("injection") or {}).get("injectorID") == language_swap.INJECTOR_ID)

@@ -199,6 +199,9 @@ class CohortAndAlignmentTests(N2Fixture):
         self.assertIn("fewer than", recordings.word_alignment(pairs[3:], frames=3 * RATE).issue)
         squeezed = [(0.1 * k, 0.1 * k) for k in range(3)] + pairs[3:]
         self.assertIn("squeezed", recordings.word_alignment(squeezed, frames=3 * RATE).issue)
+        # A reversed interval is malformed, never counted as squeezed.
+        reversed_interval = [(0.4, 0.2)] + pairs[1:]
+        self.assertIn("ends before it starts", recordings.word_alignment(reversed_interval, frames=3 * RATE).issue)
 
     def test_the_export_rebuilds_the_orchestrators_l1_key_and_keeps_no_text(self) -> None:
         export = self.alignments
@@ -431,6 +434,20 @@ class N2InjectionTests(N2Fixture):
         self.assertIn("re-derived swap", failed[swap["takeID"]])
         self.assertIn("text", failed[word["takeID"]])
         shutil.rmtree(tampered)
+        # A set filtered after the fact, with a recomputed entriesSHA256, is incomplete against its sample.
+        filtered = self.root / "filtered"
+        shutil.copytree(self.set_dir, filtered)
+        injection_set = json.loads((filtered / "injection-set.json").read_text())
+        dropped = next(entry for entry in injection_set["entries"] if entry["injection"]["injectorID"] == "SIG-CLICK")
+        injection_set["entries"].remove(dropped)
+        injection_set["entriesSHA256"] = pcm.json_digest(injection_set["entries"])
+        (filtered / "injection-set.json").write_text(json.dumps(injection_set))
+        result = quiet(m2.run_verify, filtered / "injection-set.json", self.manifest_path, jobs=1,
+                       alignments_path=self.alignments_path)
+        self.assertFalse(result["verified"])
+        self.assertTrue(any("account for" in reason and dropped["injection"]["variant"] in reason
+                            for _where, reason in result["failures"]), result["failures"][:3])
+        shutil.rmtree(filtered)
 
     def test_the_orchestrator_bridge_takes_the_n2_set_with_each_expectation(self) -> None:
         source = json.loads(self.set_path.read_text())

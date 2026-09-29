@@ -160,6 +160,9 @@ def word_alignment(intervals: Iterable[Sequence[float]], *, frames: int,
 
     if any(not (math.isfinite(start) and math.isfinite(end)) or start < 0.0 for start, end in spans):
         return refused("an interval is not a finite, non-negative time")
+    if any(end < start for start, end in spans):
+        # A reversed interval is a malformed alignment, not a squeezed unit (only end == start is squeezed).
+        return refused("an interval ends before it starts")
     positive = [(start, end) for start, end in spans if end > start]
     squeezed = total - len(positive)
     tolerance = int(round(ALIGNER_FRAME_SECONDS * sample_rate))

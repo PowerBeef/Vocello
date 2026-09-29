@@ -1747,8 +1747,12 @@ entry without its record, and any plan, ledger entry or record that a later comm
 modified or renamed: they are written once, so an unconfirmed plan cannot be dropped to plan the
 same confirmation cohort again.
 
-The lead's sequence (all 12 plans before any confirmation panel or score, since a plan refuses a
-scored confirmation cohort):
+The lead's sequence (all 11 plans before any confirmation panel or score, since a plan refuses a
+scored confirmation cohort). `signal.band-limit@1` gets no plan: without an injector its
+confirmation cannot start, and a write-once plan would bind this cohort for good. It waits for a
+catalog with a band-limit injector and a new confirmation cohort. The confirmation panels run the
+six judges the detectors read (Whisper large-v3, Parakeet, Paraformer, SenseVoice, VoxLingua and
+the aligner) rather than the whole panel:
 
 ```sh
 CAL=build/artifacts/macos/audio-qc/qc-n2-mac-qc-n2-20260929-082348-92817b0c
@@ -1771,13 +1775,22 @@ $Q plan --detector content.consensus-error@1 --calibration-cohort $CAL/n2-manife
   --injection-classes A,B,C,D,F
 # 3. Preview the thresholds (calibration data only).
 $Q derive --detector content.consensus-error@1 --calibration-scores $OUT/calibration/content.consensus-error@1.json
-# 4. After the plans are committed: the confirmation injection set as planned (verified complete),
-#    its Stage 0 measurements, and each confirmation panel on its own new, empty cache root; then the scores.
+# 4. After the plans are committed, in this order: the cohort panel on its own new, empty cache root
+#    (J = the six --judge flags); its word intervals; the injection set as planned, verified complete;
+#    Stage 0 over the cohort and the set; the positives panel on another new cache root; the scores.
+python3 scripts/audio_qc_orchestrator.py run --manifest <CON orchestrator manifest> $J \
+  --cache-root build/cache/delivery-analysis/confirmation/cohort --bundle $CON/panel-bundle-v2
+python3 scripts/audio_qc_calibration_set.py alignments --takes $CON/n2-manifest.json --bundle $CON/panel-bundle-v2 \
+  --cache-root build/cache/delivery-analysis/confirmation/cohort --output <CON alignments.json>
+python3 scripts/audio_qc_calibration_set.py inject --takes $CON/n2-manifest.json --output <set> \
+  --alignments <CON alignments.json> --catalog-seed 7 --sample-seed 1 --sample-per-cell 150 --classes A,B,C,D,F
 python3 scripts/audio_qc_calibration_set.py verify --set <set>/injection-set.json --takes $CON/n2-manifest.json \
   --alignments <CON alignments.json>
-python3 scripts/audio_qc_orchestrator.py run --manifest <CON orchestrator manifest> --panel \
-  --cache-root build/cache/delivery-analysis/confirmation/cohort --bundle $CON/panel-bundle-v2
-python3 scripts/audio_qc_orchestrator.py run --manifest <injection-set orchestrator manifest> --panel \
+python3 scripts/audio_qc_calibration_set.py score --takes $CON/n2-manifest.json --set <set>/injection-set.json \
+  --output <CON measurements>   # both --measurements and --positive-measurements of class A
+python3 scripts/audio_qc_orchestrator.py manifest --from-calibration-takes <set>/injection-set.json \
+  --output <set>/panel-manifest.json
+python3 scripts/audio_qc_orchestrator.py run --manifest <set>/panel-manifest.json $J \
   --cache-root build/cache/delivery-analysis/confirmation/positives --bundle <set panel bundle>
 $Q scores --detector content.consensus-error@1 --role confirmation --cohort $CON/n2-manifest.json \
   --n1-manifest $N1CON --bundle $CON/panel-bundle-v2 --injection-set <set>/injection-set.json \

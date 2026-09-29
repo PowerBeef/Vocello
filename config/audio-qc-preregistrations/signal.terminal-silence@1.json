@@ -1,0 +1,64 @@
+{
+  "alpha": 0.05,
+  "bindings": {
+    "calibrationScoresSHA256": "aec2e20f7be8c9458b53be310b0d4b3f821151233aae8d611cd67f72a7376173",
+    "detectorDefinitionSHA256": "8b6f07920b20a306ba391f686828099ee1fbfc9dee9f91cc4d45174ecbb6fbf3",
+    "evidenceIdentitySHA256": "8d083ac03e451da8f9ce6fc8742d571a582dda08465488ebc7634f408ddd3f0b",
+    "injectionCatalogSeed": "7",
+    "injectionClasses": "A,B,C,D,F",
+    "injectionSamplePerCell": "150",
+    "injectionSampleSeed": "1",
+    "injectorCatalogVersion": "2",
+    "operatingPoint": "warn",
+    "policySHA256": "653ce8a2783e514d581ede273bf14cadbffbe994f51dab97e84904fde13403ec",
+    "scoringCodeSHA256": "ebe039c1b63b809c1ed74c1b899452261127338019b2e646347d1511be81f23b"
+  },
+  "confidence": 0.95,
+  "detector": "signal.terminal-silence@1",
+  "direction": "above",
+  "grid": [],
+  "population": "N2",
+  "rule": "split-conformal",
+  "schema": "vocello.audioqc.preregistration/1",
+  "split": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "59221512a00b2b4a2de06eb35f433fac8f5dad3556fab520b15930679d4994c2",
+      "source": "fleurs-dev"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "ae62a87f35ed9b7c4f5bfa57003339c6ba6b0e92ae86f7a1be2460bef117e544",
+      "source": "fleurs-test"
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "limitations": [
+      {
+        "id": "fleurs-no-speaker-ids",
+        "statement": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown."
+      },
+      {
+        "id": "fleurs-speaker-lower-bound",
+        "statement": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages."
+      },
+      {
+        "id": "n2-one-codec",
+        "statement": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn)."
+      }
+    ],
+    "method": "declared-cohorts",
+    "speakers": {
+      "claim": "lower-bound",
+      "unit": "language:fleurs-unidentified"
+    }
+  },
+  "strata": [
+    {
+      "name": "language",
+      "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."
+    }
+  ]
+}

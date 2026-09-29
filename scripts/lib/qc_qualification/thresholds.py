@@ -31,7 +31,9 @@
    per-language bound at the Bonferroni confidence over the languages the
    claim covers), the pooled N3 flag rate, clean abstention, detection per
    severity cell on enough mechanisms, the minimum units, and a matched sham
-   for every positive mechanism whose FAR interval overlaps the N2 one (A4).
+   for every sham cell (each positive mechanism by default; the detector
+   driver names one per injector, with a minimum) whose FAR interval overlaps
+   the N2 one (A4).
 """
 
 from __future__ import annotations
@@ -270,6 +272,11 @@ def _git(root: Path, *arguments: str) -> int:
                           stderr=subprocess.DEVNULL, check=False).returncode
 
 
+def _git_output(root: Path, *arguments: str) -> str | None:
+    result = subprocess.run(["git", "-C", str(root), *arguments], capture_output=True, text=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
 class PreRegistrationStore:
     """Committed plans, one canonical JSON file per plan.
 
@@ -353,6 +360,22 @@ class PreRegistrationStore:
             if _git(self.git_root, "diff", "--quiet", "HEAD", "--", relative) != 0:
                 raise PreRegistrationError(f"{relative} differs from its committed version (A5)")
         return stored
+
+    def commit_time(self, plan: PreRegistration) -> int:
+        """The committer time (Unix seconds) of the last commit that touched the plan's file.
+
+        Evidence that must postdate the plan (a confirmation panel computed
+        from scratch) is compared against it; the latest touching commit is the
+        conservative choice.
+        """
+        self.require(plan)
+        if self.git_root is None:
+            raise PreRegistrationError("only a Git-backed store knows when a plan was committed")
+        relative = self.plan_path(plan).resolve().relative_to(self.git_root.resolve()).as_posix()
+        stamp = _git_output(self.git_root, "log", "-1", "--format=%ct", "--", relative)
+        if not stamp or not stamp.isdigit():
+            raise PreRegistrationError(f"{relative} has no commit time in Git (A5)")
+        return int(stamp)
 
 
 # --------------------------------------------------------------------------- #
@@ -566,15 +589,23 @@ def evaluate_confirmation(plan: PreRegistration, threshold: float | Mapping[str,
                           operating_point: Mapping, confidence: float, n2_negatives: Sequence[ScoredUnit],
                           n3_negatives: Sequence[ScoredUnit] = (),
                           positives: Mapping[str, Mapping[str, Sequence[ScoredUnit]]],
-                          shams: Mapping[str, Sequence[ScoredUnit]]) -> dict:
+                          shams: Mapping[str, Sequence[ScoredUnit]],
+                          sham_cells: Sequence[str] | None = None, sham_minimum: int | None = None,
+                          sham_informative: Mapping[str, bool] | None = None) -> dict:
     """Score the untouched confirmation cohort against one policy operating point.
 
     `operating_point` is `operatingPoints.warn`, `.fail` or `.evidenceLaneFail`
     of the qualification policy. `positives` maps each construction mechanism
-    to its cells, keyed by severity or "subtype/severity"; `shams` maps each
-    positive mechanism to its matched sham scores. Every rate counts families.
-    `threshold` is recorded as given: one value, or one per declared stratum
-    (the units' alarms were already taken at their stratum's threshold).
+    to its cells, keyed by severity or "subtype/severity". `shams` maps each
+    sham cell to its scores; the cells that need one are `sham_cells` (by
+    default each positive mechanism), each with at least `sham_minimum` judged
+    families when given, and each tested alone (A4), so one cell's sham never
+    stands in for another's. `sham_informative` marks a cell whose sham cannot
+    depart from the clean negatives by construction (its audio is clean
+    cohort audio); it is still tested and recorded. Every rate counts
+    families. `threshold` is recorded as given: one value, or one per declared
+    stratum (the units' alarms were already taken at their stratum's
+    threshold).
     """
     fail_like = "farPopulation" in operating_point
     units = operating_point["minimumUnits"]
@@ -642,17 +673,22 @@ def evaluate_confirmation(plan: PreRegistration, threshold: float | Mapping[str,
         reasons.append("cross-mechanism-detection-not-met")
 
     sham_results = {}
-    for mechanism in sorted(positives):
-        scored = shams.get(mechanism)
+    for cell in sorted(positives if sham_cells is None else set(sham_cells)):
+        scored = shams.get(cell)
+        extra = {} if sham_informative is None else {"informative": bool(sham_informative.get(cell, True))}
         if not scored:
-            sham_results[mechanism] = {"present": False, "overlaps": False}
-            reasons.append(f"sham-missing:{mechanism}")
+            sham_results[cell] = {"present": False, "overlaps": False, **extra}
+            reasons.append(f"sham-missing:{cell}")
             continue
         rate = _alarm_rate(scored, confidence)
         overlaps = _overlap(rate, far)
-        sham_results[mechanism] = {**rate.as_dict(), "present": True, "overlaps": overlaps}
+        sham_results[cell] = {**rate.as_dict(), "present": True, "overlaps": overlaps, **extra}
+        if sham_minimum is not None:
+            sham_results[cell]["minimumUnits"] = sham_minimum
+            if rate.units < sham_minimum:
+                reasons.append(f"sham-too-few:{cell}")
         if not overlaps:
-            reasons.append(f"sham-departs:{mechanism}")
+            reasons.append(f"sham-departs:{cell}")
 
     return {
         "schema": CONFIRMATION_SCHEMA,
@@ -695,7 +731,9 @@ class ConfirmationLedger:
                 operating_point: Mapping, confidence: float, n2_negatives: Sequence[ScoredUnit],
                 n3_negatives: Sequence[ScoredUnit] = (),
                 positives: Mapping[str, Mapping[str, Sequence[ScoredUnit]]],
-                shams: Mapping[str, Sequence[ScoredUnit]]) -> dict:
+                shams: Mapping[str, Sequence[ScoredUnit]],
+                sham_cells: Sequence[str] | None = None, sham_minimum: int | None = None,
+                sham_informative: Mapping[str, bool] | None = None) -> dict:
         """Check the committed plan, refuse a second confirmation, score once and record it."""
         store.require(plan)
         path = self.path(plan.digest())
@@ -703,7 +741,8 @@ class ConfirmationLedger:
             raise PreRegistrationError("this plan was already confirmed; confirmation runs once (A5)")
         outcome = evaluate_confirmation(plan, threshold, operating_point=operating_point, confidence=confidence,
                                         n2_negatives=n2_negatives, n3_negatives=n3_negatives,
-                                        positives=positives, shams=shams)
+                                        positives=positives, shams=shams, sham_cells=sham_cells,
+                                        sham_minimum=sham_minimum, sham_informative=sham_informative)
         self.directory.mkdir(parents=True, exist_ok=True)
         try:
             with path.open("x", encoding="utf-8") as handle:

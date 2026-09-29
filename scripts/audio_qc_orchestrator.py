@@ -43,7 +43,13 @@ of takes and loads no model itself:
   and always when the registry says it does not vote (same-lab judges,
   ResNet293 before the correlated-failure audit).
 - **Stage 4.** A take-evidence record per take (digests and metrics only) and
-  the untracked private bundle (`lib.qc_pipeline.evidence`).
+  the untracked private bundle (`lib.qc_pipeline.evidence`). Beside the cache
+  counts, the bundle header records when the run started (`startedAt`, UTC,
+  before admission) and whether the cache root held no L1 or L2 entry then
+  (`cacheRootEmptyAtStart`), so a qualification can tell a panel computed from
+  scratch after its plan; its `registries` also name the detector registry,
+  and `judgeMetrics` each judge's L2 metric definition and sources digest.
+  None of these is part of any judge's identity or of the take records.
 
 Commands:
   manifest         build an orchestrator manifest from an independent-ASR
@@ -76,6 +82,7 @@ if __name__ == "__main__":
 import argparse
 import concurrent.futures
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -181,6 +188,8 @@ ORCHESTRATOR_SOURCE = Path(__file__).resolve()
 WORKER_HOST = SCRIPT_DIR / "audio_qc_worker.py"
 REGISTRY_PATH = REPO / "config/audio-qc-judges.json"
 POLICY_PATH = REPO / "config/audio-qc-qualification-policy.json"
+DETECTORS_PATH = REPO / "config/audio-qc-detectors.json"
+STARTED_AT_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 DEFAULT_CACHE_ROOT = Path(os.environ.get("QVOICE_DELIVERY_ANALYSIS_CACHE", REPO / "build/cache/delivery-analysis"))
 DEFAULT_BUNDLE_PARENT = Path(os.environ.get("QVOICE_ARTIFACTS_MACOS", REPO / "build/artifacts/macos")) / "audio-qc"
 WHISPER_JUDGE = "asr.whisper-small@1"
@@ -633,6 +642,14 @@ def _safe_take_id(take_id: str) -> str:
     return take_id if is_token(take_id) else digest(take_id)
 
 
+def cache_root_empty(root: Path) -> bool:
+    """True when the cache root holds no L1 or L2 entry (`layers/`), so any hit is this run's own."""
+    try:
+        return not any(path.is_file() for path in (Path(root) / "layers").rglob("*"))
+    except OSError:
+        return False
+
+
 # --------------------------------------------------------------------------- #
 # The orchestrator
 # --------------------------------------------------------------------------- #
@@ -751,6 +768,9 @@ class Orchestrator:
         manifest = validate_manifest(manifest)
         lane = manifest["lane"]
         takes = manifest["takes"]
+        # Envelope only: when the run began (before admission) and whether the cache could serve it anything.
+        started_at = datetime.now(timezone.utc).strftime(STARTED_AT_FORMAT)
+        empty_at_start = cache_root_empty(self.layered.cache.root)
         with self.host.run() as run_admission:
             # L0 and Stage 1 run in this process. They hold a dsp slot, which
             # counts against the host's one-worker cap while the whole-host
@@ -845,6 +865,7 @@ class Orchestrator:
                 workers = self._run_workers(plans, run_admission, Path(temporary), accept)
             result = self._compose(manifest, canonical, stage1, raw, l1_keys, states, unavailable, out_of_scope,
                                    workers, timings)
+            result["header"].update(startedAt=started_at, cacheRootEmptyAtStart=empty_at_start)
             # Private and in memory only, like `recognitions`: each judge's raw
             # output (L1) per take, which the panel qualification compares run to run.
             result["raw"] = {judge_id: {unit: value for unit, value in values.items()}
@@ -1029,9 +1050,14 @@ class Orchestrator:
         run_id = manifest["runID"] if is_token(manifest.get("runID")) else digest(manifest.get("runID"))
         header = {
             "runID": run_id, "lane": lane, "manifestSHA256": digest(manifest),
-            "registries": registries,
+            # The header names the detector registry; the take records keep theirs as they were.
+            "registries": {**registries, "detectors": file_sha256(DETECTORS_PATH)},
             "orchestratorSHA256": file_sha256(ORCHESTRATOR_SOURCE),
             "workerHostSHA256": file_sha256(WORKER_HOST),
+            # What reduced each judge's raw output to its metrics (its L2 key's definition and sources).
+            "judgeMetrics": {judge_id: {"definition": judge.metric_definition,
+                                        "sourcesSHA256": metric_source[judge_id]}
+                             for judge_id, judge in sorted(self.stage2.items())},
             "admission": self.policy.report(),
             "cache": self.layered.report(),
             "scorer": {"l2Metrics": scorer.cached, "suppliedRecognitionsScored": scorer.computed},

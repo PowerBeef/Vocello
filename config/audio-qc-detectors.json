@@ -214,7 +214,7 @@
       "id": "boundary.truncation@1",
       "class": "C",
       "stage": 2,
-      "measures": "The smaller of two independent recognizer families' trailing unmatched fraction: the reference units (words, or characters in zh, ja and ko) after the last unit the family matched, over the reference length, from language_metrics' own alignment of the private transcript; only the score leaves the bundle.",
+      "measures": "The smaller of two independent recognizer families' trailing unmatched fraction: the reference units (words, or characters in zh, ja and ko) after the family's last matched unit, anchored as early as any minimum-cost alignment of the private transcript allows (language_metrics' units and edit costs, independent of tie order), over the reference length; only the score leaves the bundle.",
       "score": {"combination": "consensus-min", "unit": "reference-fraction", "groups": [
         {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
          "components": [{"source": "transcript-tail", "judge": "asr.whisper-large-v3@1", "measure": "trailingUnmatchedFraction"},

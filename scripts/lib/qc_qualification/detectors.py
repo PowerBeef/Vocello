@@ -27,16 +27,23 @@ A consensus component must come from a voting judge of its own family that is
 not correlated with the generator's lab (A6), and both components of a group
 must be in the judges' declared language scope.
 
-`trailing_unmatched` aligns a transcript with its reference on the primary
-units of `lib/language_metrics.py` (words, or characters in zh, ja and ko) with
-the same Levenshtein tie order as `language_metrics.edit_metrics` (match or
-substitution, then deletion, then insertion), and counts the reference units
-after the last matched one. The counts along its path equal `edit_metrics`'s.
+`trailing_unmatched` compares a transcript with its reference on the primary
+units of `lib/language_metrics.py` (words, or characters in zh, ja and ko) and
+`edit_metrics`'s unit costs. It anchors the last matched reference unit as early
+as any minimum-cost alignment that matches a unit allows and counts the
+reference units after it (see its docstring): a definition over the set of
+optimal alignments, so no backtrace tie order can pin a recurring last word to
+a later occurrence.
+
+`scoring_code_sha256` digests the code a score depends on (this module,
+`language_metrics` and its normalization data); a plan binds it (A7).
 """
 
 from __future__ import annotations
 
+import hashlib
 import math
+from pathlib import Path
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -85,6 +92,24 @@ class DetectorError(ValueError):
 def definition_digest(entry: Mapping[str, Any]) -> str:
     """The digest a plan binds (A7): any change to the entry makes a new definition."""
     return json_digest(dict(entry))
+
+
+def scoring_sources() -> tuple[Path, ...]:
+    """The files whose bytes decide a take's score: this module, language_metrics and its data."""
+    return (Path(__file__).resolve(), Path(language_metrics.__file__).resolve(),
+            *(Path(path).resolve() for path in language_metrics.NORMALIZATION_DATA_FILES))
+
+
+def scoring_code_sha256() -> str:
+    """One digest over the scoring sources (name and bytes of each), which a plan binds (A7).
+
+    A module-source digest: any edit to these files between a plan and its
+    confirmation makes the confirmation refuse, whether or not it moves a score.
+    """
+    digest = hashlib.sha256()
+    for path in scoring_sources():
+        digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
 
 
 def detector_entry(registry: Mapping[str, Any], detector: str) -> dict:
@@ -450,7 +475,7 @@ def registry_errors(registry: Any, judges_registry: Mapping[str, Any]) -> list[s
 # --------------------------------------------------------------------------- #
 
 def _alignment_path(reference: Sequence[Any], hypothesis: Sequence[Any]) -> list[str]:
-    """Operations from start to end (M, S, D, I) on edit_metrics's tie order."""
+    """Operations from start to end (M, S, D, I) on edit_metrics's tie order (for its totals only)."""
     rows, columns = len(reference), len(hypothesis)
     cost = [[0] * (columns + 1) for _ in range(rows + 1)]
     step = [[""] * (columns + 1) for _ in range(rows + 1)]
@@ -481,23 +506,77 @@ def _alignment_path(reference: Sequence[Any], hypothesis: Sequence[Any]) -> list
     return path
 
 
-def trailing_unmatched(reference: Sequence[Any], hypothesis: Sequence[Any]) -> dict:
-    """Reference units after the last matched one, on edit_metrics's alignment.
+def _prefix_costs(reference: Sequence[Any], hypothesis: Sequence[Any]) -> list[list[int]]:
+    """cost[i][j]: the edit distance (unit costs) between reference[:i] and hypothesis[:j]."""
+    rows, columns = len(reference), len(hypothesis)
+    cost = [[column for column in range(columns + 1)]] + [[row] + [0] * columns for row in range(1, rows + 1)]
+    for row in range(1, rows + 1):
+        for column in range(1, columns + 1):
+            cost[row][column] = min(cost[row - 1][column - 1] + (reference[row - 1] != hypothesis[column - 1]),
+                                    cost[row - 1][column] + 1, cost[row][column - 1] + 1)
+    return cost
 
-    `trailingUnmatched` counts them (deleted or substituted);
-    `trailingDeletions` counts the deleted ones; the fraction is over the
-    reference length. The substitution, insertion and deletion totals are the
-    path's, equal to `language_metrics.edit_metrics`.
+
+def _match_free_costs(reference: Sequence[Any], hypothesis: Sequence[Any]) -> list[list[int]]:
+    """cost[i][j]: the cheapest alignment of reference[i:] with hypothesis[j:] that matches no unit
+    (every pair it makes is a substitution of two different units, every other unit an insertion or
+    a deletion)."""
+    rows, columns = len(reference), len(hypothesis)
+    cost = [[0] * (columns + 1) for _ in range(rows + 1)]
+    for column in range(columns + 1):
+        cost[rows][column] = columns - column
+    for row in range(rows - 1, -1, -1):
+        cost[row][columns] = rows - row
+        for column in range(columns - 1, -1, -1):
+            best = min(cost[row + 1][column], cost[row][column + 1]) + 1
+            if reference[row] != hypothesis[column]:
+                best = min(best, cost[row + 1][column + 1] + 1)
+            cost[row][column] = best
+    return cost
+
+
+def trailing_unmatched(reference: Sequence[Any], hypothesis: Sequence[Any]) -> dict:
+    """Reference units after the last matched one, anchored as early as any optimal alignment allows.
+
+    Among every alignment of minimum edit cost (unit costs, as
+    `language_metrics.edit_metrics`) that matches at least one unit, take the
+    earliest reference position `k` at which one of them makes its last match:
+    the reference units after `k` are the ones no optimal reading of the
+    transcript needs to have been spoken. `trailingUnmatched` is
+    `len(reference) - k`, the whole reference when no optimal alignment matches
+    any unit (an optimal alignment without a match has no last match, so where
+    one ties with a matching alignment the match anchors: `[a, b]` heard as
+    `[b, c]` scores 0). The definition is over the set of optimal alignments,
+    so it does not depend on a backtrace's tie order: a truncated take whose
+    last heard word recurs later in the reference is not pinned to that later
+    occurrence, while a complete take, whose only optimal alignments match its
+    last unit, scores 0. It resolves ties only: a spurious late word that
+    matches a later reference unit (a hallucination at the end of the audio)
+    lowers the cost strictly and still anchors the tail there. A match at
+    (i, j) is the last of an optimal alignment exactly when the prefix cost to
+    (i - 1, j - 1) plus the cheapest match-free alignment of the two suffixes
+    equals the total.
+
+    `trailingDeletions` counts the trailing units such an alignment deletes
+    rather than substitutes (the most, over the alignments anchored at `k`);
+    the fraction is over the reference length. The substitution, insertion and
+    deletion totals are `edit_metrics`'s own alignment's.
     """
-    path = _alignment_path(reference, hypothesis)
-    unmatched = deletions = 0
-    for operation in reversed(path):
-        if operation == "M":
+    count, heard = len(reference), len(hypothesis)
+    prefix = _prefix_costs(reference, hypothesis)
+    suffix = _match_free_costs(reference, hypothesis)
+    total = prefix[count][heard]
+    anchor, deletions = 0, total - heard
+    for row in range(1, count + 1):
+        # The suffix after a last match at (row, column) deletes its cost minus the hypothesis units it consumes.
+        found = [suffix[row][column] - (heard - column) for column in range(1, heard + 1)
+                 if reference[row - 1] == hypothesis[column - 1]
+                 and prefix[row - 1][column - 1] + suffix[row][column] == total]
+        if found:
+            anchor, deletions = row, max(found)
             break
-        if operation in ("S", "D"):
-            unmatched += 1
-            deletions += operation == "D"
-    count = len(reference)
+    path = _alignment_path(reference, hypothesis)
+    unmatched = count - anchor
     return {
         "referenceUnits": count,
         "trailingUnmatched": unmatched,

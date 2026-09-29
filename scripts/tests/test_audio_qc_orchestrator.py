@@ -206,6 +206,12 @@ class LanguageLaneTests(OrchestratorFixture):
         self.assertEqual(envelope["admission"]["ceilingBytes"], ceiling)
         self.assertEqual(envelope["maximumAllowedRSSBytes"], ceiling)
         self.assertEqual(header["cache"]["L1"], {"hits": 0, "misses": 9 - 1, "adopted": 0})
+        # The envelope: when the run began, on a cache root with no L1 or L2 entry (L0 canonicals do not count),
+        # and the detector registry it ran beside; the take records keep their registries as they were.
+        self.assertRegex(header["startedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$")
+        self.assertIs(header["cacheRootEmptyAtStart"], True)
+        self.assertEqual(header["registries"]["detectors"], file_sha256(REPO / "config/audio-qc-detectors.json"))
+        self.assertTrue(all(record["registries"]["detectors"] is None for record in result["records"]))
         for record in result["records"]:
             self.assertEqual(validate_take_evidence(record), [], record["take"]["takeID"])
 
@@ -262,6 +268,7 @@ class LanguageLaneTests(OrchestratorFixture):
         replay = self._orchestrator(supervisor=refusing_supervisor, offline=True).run(manifest)
         self.assertEqual(replay["header"]["cache"]["L1"]["misses"], 0)
         self.assertEqual(replay["header"]["cache"]["L2"]["misses"], 0)
+        self.assertIs(replay["header"]["cacheRootEmptyAtStart"], False)
         self.assertEqual(replay["header"]["workers"], [])
         self.assertEqual(replay["header"]["scorer"]["l2Metrics"], header["scorer"]["l2Metrics"])
         comparison = compare_with_bundle(replay, bundle)

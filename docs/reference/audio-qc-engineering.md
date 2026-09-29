@@ -1647,9 +1647,14 @@ entry's digest, so any change needs a new version (A7). The v1 set:
 | `boundary.run-on@1` | C | Whisper last segment end minus the aligner's script end (not ko) | above |
 | `language.consensus-lid@1` | D | max of Whisper's expected-language probability and VoxLingua's posterior | below |
 
-Truncation aligns each private transcript with its reference on `language_metrics`' primary units
-and tie order and counts the reference units after the last matched one; only the fraction leaves
-the bundle. Run-on subtracts the aligner's script end from Whisper's last segment end because neither
+Truncation compares each private transcript with its reference on `language_metrics`' primary units
+and edit costs and counts the reference units after the last matched one, anchored as early as any
+minimum-cost alignment that matches a unit allows (the whole script when none does). The definition
+is over the set of optimal alignments, not a backtrace, so a truncated take whose last heard word
+recurs later in the script is not pinned to the later occurrence ("the cat sat on the" against a
+nine-word script scores 4/9, not 1/9), while a complete take scores 0. It resolves ties only: a
+spurious late word that matches a later script unit (a hallucination at the end of the audio)
+lowers the cost and still anchors the tail there. Only the fraction leaves the bundle. Run-on subtracts the aligner's script end from Whisper's last segment end because neither
 works against the file end on FLEURS: Whisper's end follows the speech, so an inserted run-on leaves
 duration minus it unchanged, and the aligner's tail gap carries the natural trailing silence (clean
 N2 95th percentile 3.8 s, against 0.7 s for the difference). Every v1 detector declares per-language
@@ -1665,19 +1670,82 @@ limitations) instead of a hash salt; the component-hash plans' digests are uncha
 publishes no speaker ids, so units carry the speaker `<language>:fleurs-unidentified`, a lower
 bound: warn's three speakers are met only by covering three languages, and the record says so.
 `scores` writes per-unit scores (ids, digests, components, abstentions; no text or path) under
-`build/`; a confirmation role needs the committed plan that names the cohort, and a cohort a plan
-names as confirmation is never scored under another role. `plan` writes
-`config/audio-qc-preregistrations/<id>.json` (split-conformal, alpha below the warn FAR bound,
-bindings to the definition, the calibration scores and the policy) and refuses a confirmation cohort
-that already holds a panel bundle, measurements or scores. `derive` returns one split-conformal
-threshold per stratum from clean calibration families and refuses a plan not committed at HEAD.
-`confirm` runs once per plan digest: before anything is recorded it checks the bindings, the judges'
-output identities (equal across cohorts, A7), the declared split and the minimum units counted from
-ids (60 negative families, 3 languages, speakers and scripts, 60 families per severe cell, a sham per
-mechanism); then `evaluate_confirmation` at warn writes the ledger entry beside the plan and the
-tracked record `benchmarks/audio-qc-calibration/<id>/record-<plan digest 16>.json` (digests, counts,
-rates with Clopper-Pearson bounds, thresholds, scope, limitations, the phi audit of each consensus
-pair, the verdict). `validate` ties every record to its plan and ledger entry.
+`build/`, with the digest of the scoring code (`detectors.py`, `language_metrics.py` and its
+normalization data) and the evidence identity: the bundles' orchestrator source digest, each consumed
+judge's L2 metric definition and sources digest (the header's `judgeMetrics`), and the metric
+versions the panel records (`accuracyMetricVersion`, `textNormalization`).
+
+*Evidence is bound to the cohort.* A cohort manifest must match its own `manifestDigest`. A panel
+bundle must match its `bundleDigest`, and every evidence record must carry its take's audio digest
+(the cohort's or the injection entry's `wavSHA256`), text digest and language; a private reference
+text must be the manifest's. `measurements.json` must match its `clipsSHA256`, name the cohort
+manifest (`takesManifestSHA256`) and, for positives, the injection set (`entriesSHA256`), and each
+clip must carry its take's audio digest. An injection set must match its `entriesSHA256` and name
+the cohort manifest it was built on; that check never skips. Positives are the injection set's
+entries, so `--positive-bundle` and `--positive-measurements` need `--injection-set`. An in-scope
+unit whose evidence is absent abstains as `no-evidence` (a consumed judge not run on it, as
+`not-measured`); one whose consumed judge's row failed (`unavailable`: an admission or row timeout,
+a crash, an envelope breach) abstains as `judge-unavailable`, the run's failure rather than the
+detector's. The driver checks each T1 entry's own catalog version, but not that the set is complete
+(every sampled family and scheduled variant present): run `audio_qc_calibration_set.py verify` on
+the confirmation set before scoring it.
+
+*A5 is enforced, not a convention.* An N2 cohort names its FLEURS split through the N1 manifest it
+pins by `n1ManifestSHA256` (`scores --n1-manifest`, `plan --confirmation-n1-manifest`). The
+calibration and informational roles refuse a FLEURS test cohort and any cohort a plan in the store
+names as confirmation; a plan refuses a confirmation cohort that is not FLEURS test, a calibration
+cohort another plan confirms on and a confirmation cohort another plan fits on. The plan also binds
+the confirmation-side construction: the injection set's catalog seed, sample seed, sample per cell
+and classes (`--injection-catalog-seed`, `--injection-sample-seed`, `--injection-sample-per-cell`,
+`--injection-classes`) and the injector catalog version. `confirm` (and `scores --role
+confirmation`, earlier) refuses an injection set built otherwise. Every confirmation panel bundle,
+the cohort's and the positives', must be computed from scratch after the plan was committed. Its
+`startedAt` must be later than the last commit touching the plan file (so the plan lands on main,
+never amended, rebased or cherry-picked afterwards, before any panel runs), it must have started on an
+empty cache root (`cacheRootEmptyAtStart`), and it must show no L1 hit and no adoption. So each
+confirmation panel runs with its own new, empty `--cache-root`. L2 hits inside such a run are its
+own: identical audio under one request (an identity sham of two injectors, a language swap's donor)
+shares one L1 row and is reduced once. The orchestrator stamps both fields in the bundle header
+only, outside any judge's identity. The directory scan at `plan` stays as a convenience. Stage 0
+`measurements.json` carries no start time, so a class A confirmation still rests on that scan.
+
+*A7 covers what shapes a score.* The plan binds the scoring-code digest and the digest of the
+calibration evidence identity; `confirm` requires both cohorts' judge output identities, scoring
+code and evidence identity to be equal and to match the plan. An orchestrator, metric-reduction or
+metric-version change between the panels, or any edit to `detectors.py` or `language_metrics.py`
+after the plan, therefore refuses the confirmation. Since the confirmation panels run the current
+code, `plan` refuses calibration evidence the current code would not reproduce (another
+orchestrator, reduction or metric version), so no plan is dead on arrival. Write the calibration
+bundle again with the current orchestrator first (its L1 entries may be reused), and freeze the
+orchestrator, the panel's metric sources, `detectors.py` and `language_metrics.py` from the
+calibration panel to the confirmation.
+
+`plan` writes `config/audio-qc-preregistrations/<id>.json` (split-conformal, alpha below the warn
+FAR bound, bindings to the definition, the calibration scores, the policy, the scoring code, the
+evidence identity and the injection construction). It refuses calibration scores with missing
+evidence or with fewer than `warn.minimumUnits.calibration` (60) scored families in any stratum,
+and a confirmation cohort that already holds a panel bundle, measurements or scores. `derive`
+returns one split-conformal threshold per stratum from clean calibration families, none for a
+stratum below that floor, and refuses a plan not committed at HEAD. `confirm` runs once per plan
+digest. Before anything is recorded it checks the bindings, the identities above, the construction,
+the panels' freshness, the declared split, and that every expected unit is present with its
+evidence and no failed judge row (rerun that panel on a new cache root). The minimum units are
+counted on scored units only: 60 negative families, 3 languages,
+speakers and scripts, 60 families per severe cell, and a sham cell per injector with 60 families.
+So a detector that (nearly) always abstains refuses to start instead of recording a refusal. Its
+`--n3-scores` must be the same detector's informational N3 scores under the same definition,
+scoring code and judge identities. Then `evaluate_confirmation` at warn tests each injector's sham
+alone (A4), so one injector's sham never stands in for another's. A sham cell whose every clip is
+clean cohort audio (LNG-SWAP's same-language donor, or an identity sham whose output PCM is its
+source's) cannot depart from the negatives; it is kept and recorded as uninformative (`a4`,
+`rates.shams.<injector>.informative`). The ledger entry is written beside the plan with the tracked
+record `benchmarks/audio-qc-calibration/<id>/record-<plan digest 16>.json`: digests, the evidence
+block, counts, rates with Clopper-Pearson bounds, thresholds, scope, limitations, the phi audit of
+each consensus pair and the verdict. `validate` ties every record to its plan and ledger entry. It
+fails a plan or record whose registry entry changed in place without a version bump, a ledger
+entry without its record, and any plan, ledger entry or record that a later commit deleted,
+modified or renamed: they are written once, so an unconfirmed plan cannot be dropped to plan the
+same confirmation cohort again.
 
 The lead's sequence (all 12 plans before any confirmation panel or score, since a plan refuses a
 scored confirmation cohort):
@@ -1686,23 +1754,33 @@ scored confirmation cohort):
 CAL=build/artifacts/macos/audio-qc/qc-n2-mac-qc-n2-20260929-082348-92817b0c
 CON=build/artifacts/macos/audio-qc/qc-n2-mac-qc-n2-20260929-163642-8035d59e
 OUT=build/artifacts/macos/audio-qc/detector-scores
+N1CAL=<N1 dev manifest $CAL pins>; N1CON=<N1 test manifest $CON pins>
 Q="python3 scripts/audio_qc_detector_calibration.py"
-# 1. Calibration scores: panel detectors from the bundle, class A from the cohort's Stage 0
-#    measurements (audio_qc_calibration_set.py score over the N2 calibration cohort).
+# 1. Calibration scores: panel detectors from the bundle (written by the current orchestrator),
+#    class A from the cohort's Stage 0 measurements (audio_qc_calibration_set.py score).
 $Q scores --detector content.consensus-error@1 --role calibration --cohort $CAL/n2-manifest.json \
-  --bundle $CAL/panel-bundle-v2 --output $OUT/calibration/content.consensus-error@1.json
-$Q scores --detector signal.level@1 --role calibration --cohort $CAL/n2-manifest.json \
+  --n1-manifest $N1CAL --bundle $CAL/panel-bundle-v2 --output $OUT/calibration/content.consensus-error@1.json
+$Q scores --detector signal.level@1 --role calibration --cohort $CAL/n2-manifest.json --n1-manifest $N1CAL \
   --measurements <calibration measurements.json> --output $OUT/calibration/signal.level@1.json
-# 2. Plans, once the confirmation manifest exists and before anything scores it; review, then commit.
+# 2. Plans, once the confirmation manifest exists and before anything scores it; review, then commit
+#    on main. The injection flags declare how the confirmation injection set will be built.
 $Q plan --detector content.consensus-error@1 --calibration-cohort $CAL/n2-manifest.json \
-  --confirmation-cohort $CON/n2-manifest.json \
-  --calibration-scores $OUT/calibration/content.consensus-error@1.json --alpha 0.05
+  --confirmation-cohort $CON/n2-manifest.json --confirmation-n1-manifest $N1CON \
+  --calibration-scores $OUT/calibration/content.consensus-error@1.json --alpha 0.05 \
+  --injection-catalog-seed 7 --injection-sample-seed 1 --injection-sample-per-cell 150 \
+  --injection-classes A,B,C,D,F
 # 3. Preview the thresholds (calibration data only).
 $Q derive --detector content.consensus-error@1 --calibration-scores $OUT/calibration/content.consensus-error@1.json
-# 4. Confirmation panel over $CON, its Stage 0 measurements, the P1/S injection sets and their
-#    panel bundles or measurements; then the confirmation scores.
+# 4. After the plans are committed: the confirmation injection set as planned (verified complete),
+#    its Stage 0 measurements, and each confirmation panel on its own new, empty cache root; then the scores.
+python3 scripts/audio_qc_calibration_set.py verify --set <set>/injection-set.json --takes $CON/n2-manifest.json \
+  --alignments <CON alignments.json>
+python3 scripts/audio_qc_orchestrator.py run --manifest <CON orchestrator manifest> --panel \
+  --cache-root build/cache/delivery-analysis/confirmation/cohort --bundle $CON/panel-bundle-v2
+python3 scripts/audio_qc_orchestrator.py run --manifest <injection-set orchestrator manifest> --panel \
+  --cache-root build/cache/delivery-analysis/confirmation/positives --bundle <set panel bundle>
 $Q scores --detector content.consensus-error@1 --role confirmation --cohort $CON/n2-manifest.json \
-  --bundle $CON/panel-bundle-v2 --injection-set <set>/injection-set.json \
+  --n1-manifest $N1CON --bundle $CON/panel-bundle-v2 --injection-set <set>/injection-set.json \
   --positive-bundle <set panel bundle> --output $OUT/confirmation/content.consensus-error@1.json
 # 5. Confirm once; commit the ledger entry and the record; summarize.
 $Q confirm --detector content.consensus-error@1 \

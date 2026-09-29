@@ -4,11 +4,18 @@
    committed as a file in a `PreRegistrationStore` before any confirmation
    score exists, and every derivation and confirmation reads it back from
    there (A5); a plan held only in memory is refused. The repository store,
-   `config/audio-qc-preregistrations/`, also requires the file to be committed
-   in Git and unmodified at HEAD.
-2. The split is by connected component of family, speaker and script, so the
-   calibration and confirmation cohorts share no family, no speaker and no
-   script.
+   `config/audio-qc-preregistrations/`, names each plan by its detector
+   (`<id@version>.json`, so a detector version has one plan and a changed plan
+   needs a new version) and requires the file to be committed in Git and
+   unmodified at HEAD. A plan may also bind digests it depends on (the
+   detector definition, the calibration scores, the policy) as `bindings`.
+2. The split is either by connected component of family, speaker and script
+   over one pool (`component-hash`), so the calibration and confirmation
+   cohorts share no family, no speaker and no script; or declared
+   (`CohortSplit`): two cohort manifests pinned by kind and digest, with what
+   they are disjoint by and the speaker limitation stated, for corpora whose
+   split is already defined (FLEURS dev and test) and which publish no speaker
+   ids. `check_cohort_disjointness` verifies a declared split on the units.
 3. Every rate and quantile counts source families, not clips (audit 5.4).
 4. A single threshold is the split-conformal quantile of clean calibration
    scores, one per family: the ceil((n + 1)(1 - alpha))-th order statistic,
@@ -32,6 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +55,12 @@ PREREGISTRATION_DIRECTORY = REPO / "config" / "audio-qc-preregistrations"
 PLAN_SCHEMA = "vocello.audioqc.preregistration/1"
 CONFIRMATION_SCHEMA = "vocello.audioqc.confirmation/1"
 SEVERITY_FLOORS = {"severe": "tprSevereMin", "moderate": "tprModerateMin"}
+SPLIT_METHODS = ("component-hash", "declared-cohorts")
+DISJOINT_KEYS = ("family", "speaker", "script")
+SPEAKER_CLAIMS = ("identified", "lower-bound")
+STORE_NAMINGS = ("digest", "detector")
+_SHA256_TEXT = re.compile(r"^[0-9a-f]{64}$")
+_BINDING_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
 
 
 class PreRegistrationError(ValueError):
@@ -54,18 +68,108 @@ class PreRegistrationError(ValueError):
 
 
 @dataclass(frozen=True)
+class CohortReference:
+    """One cohort manifest, pinned by its kind and its own manifest digest."""
+    kind: str
+    manifest_digest: str
+    source: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.kind:
+            raise PreRegistrationError("a cohort names its manifest kind")
+        if not _SHA256_TEXT.fullmatch(self.manifest_digest or ""):
+            raise PreRegistrationError("a cohort is pinned by its manifest's SHA-256 digest")
+
+    def as_dict(self) -> dict:
+        entry = {"kind": self.kind, "manifestDigest": self.manifest_digest}
+        if self.source:
+            entry["source"] = self.source
+        return entry
+
+    @classmethod
+    def from_dict(cls, value: Mapping) -> "CohortReference":
+        return cls(str(value.get("kind", "")), str(value.get("manifestDigest", "")), str(value.get("source", "")))
+
+
+@dataclass(frozen=True)
+class CohortSplit:
+    """A split defined by two cohorts (FLEURS dev = calibration, test = confirmation).
+
+    `disjoint_by` states what the two cohorts share nothing of; a key left out
+    (FLEURS publishes no speaker ids) must be covered by a declared limitation,
+    and a `lower-bound` speaker unit says a speaker count is a floor, not a
+    measurement.
+    """
+    calibration: CohortReference
+    confirmation: CohortReference
+    disjoint_by: tuple[str, ...]
+    speaker_unit: str
+    speaker_claim: str
+    limitations: tuple[tuple[str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.calibration.manifest_digest == self.confirmation.manifest_digest:
+            raise PreRegistrationError("the calibration and confirmation cohorts must be different manifests")
+        if self.calibration.kind != self.confirmation.kind:
+            raise PreRegistrationError("both cohorts must be manifests of one kind")
+        keys = tuple(self.disjoint_by)
+        if not keys or "family" not in keys or len(set(keys)) != len(keys) or not set(keys) <= set(DISJOINT_KEYS):
+            raise PreRegistrationError(f"disjoint_by must include family and draw from {DISJOINT_KEYS}")
+        if not self.speaker_unit:
+            raise PreRegistrationError("the plan states the speaker unit")
+        if self.speaker_claim not in SPEAKER_CLAIMS:
+            raise PreRegistrationError(f"speaker_claim must be one of {SPEAKER_CLAIMS}")
+        for identifier, statement in self.limitations:
+            if not identifier or not statement:
+                raise PreRegistrationError("every limitation has an id and a statement")
+        if ("speaker" not in keys or self.speaker_claim == "lower-bound") and not self.limitations:
+            raise PreRegistrationError("a split that cannot show speaker disjointness declares the limitation")
+
+    def as_dict(self) -> dict:
+        return {
+            "method": "declared-cohorts",
+            "calibration": self.calibration.as_dict(),
+            "confirmation": self.confirmation.as_dict(),
+            "disjointBy": sorted(self.disjoint_by),
+            "speakers": {"unit": self.speaker_unit, "claim": self.speaker_claim},
+            "limitations": [{"id": identifier, "statement": statement}
+                            for identifier, statement in self.limitations],
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping) -> "CohortSplit":
+        speakers = value.get("speakers") or {}
+        return cls(
+            calibration=CohortReference.from_dict(value.get("calibration") or {}),
+            confirmation=CohortReference.from_dict(value.get("confirmation") or {}),
+            disjoint_by=tuple(value.get("disjointBy") or ()),
+            speaker_unit=str(speakers.get("unit", "")), speaker_claim=str(speakers.get("claim", "")),
+            limitations=tuple((str(item.get("id", "")), str(item.get("statement", "")))
+                              for item in value.get("limitations") or ()),
+        )
+
+
+@dataclass(frozen=True)
 class PreRegistration:
-    """The plan for one detector's threshold (A5)."""
+    """The plan for one detector's threshold (A5).
+
+    A plan splits one pool by component hash (`split_salt`) or declares its
+    two cohorts (`cohorts`, with no salt). `bindings` pins digests the plan
+    depends on. Both are left out of the canonical form when unused, so the
+    digest of a component-hash plan without bindings is what it always was.
+    """
     detector: str
     rule: str
     alpha: float
     direction: str
-    split_salt: str
+    split_salt: str = ""
     calibration_fraction: float = 0.5
     strata: tuple[tuple[str, str], ...] = ()
     grid: tuple[float, ...] = ()
     confidence: float = DEFAULT_CONFIDENCE
     population: str = "N2"
+    cohorts: CohortSplit | None = None
+    bindings: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.detector or "@" not in self.detector:
@@ -76,10 +180,16 @@ class PreRegistration:
             raise PreRegistrationError("alpha must lie in (0, 1)")
         if self.direction not in DIRECTIONS:
             raise PreRegistrationError(f"direction must be one of {DIRECTIONS}")
-        if not self.split_salt:
-            raise PreRegistrationError("the split needs a committed salt")
-        if not 0.0 < self.calibration_fraction < 1.0:
-            raise PreRegistrationError("calibration_fraction must lie in (0, 1)")
+        if self.cohorts is None:
+            if not self.split_salt:
+                raise PreRegistrationError("the split needs a committed salt")
+            if not 0.0 < self.calibration_fraction < 1.0:
+                raise PreRegistrationError("calibration_fraction must lie in (0, 1)")
+        else:
+            if not isinstance(self.cohorts, CohortSplit):
+                raise PreRegistrationError("cohorts must be a CohortSplit")
+            if self.split_salt or self.calibration_fraction != 0.5:
+                raise PreRegistrationError("a plan with declared cohorts has no salt and no calibration fraction")
         for name, reason in self.strata:
             if not name or not reason:
                 raise PreRegistrationError("every stratum is declared in advance with its reason")
@@ -87,20 +197,68 @@ class PreRegistration:
             raise PreRegistrationError("Learn-then-Test needs a pre-ordered grid")
         if self.rule == "split-conformal" and self.grid:
             raise PreRegistrationError("a split-conformal plan has no grid")
+        # Bindings are a set of named digests: held sorted, so equal plans compare equal.
+        object.__setattr__(self, "bindings", tuple(sorted(tuple(pair) for pair in self.bindings)))
+        keys = [key for key, _ in self.bindings]
+        if len(set(keys)) != len(keys):
+            raise PreRegistrationError("each binding is declared once")
+        for key, value in self.bindings:
+            if not _BINDING_KEY.fullmatch(key or "") or not isinstance(value, str) or not value:
+                raise PreRegistrationError("a binding is a camelCase key and a non-empty value")
+
+    def split_dict(self) -> dict:
+        if self.cohorts is not None:
+            return self.cohorts.as_dict()
+        return {"method": "component-hash", "disjointBy": ["family", "speaker", "script"],
+                "salt": self.split_salt, "calibrationFraction": self.calibration_fraction}
+
+    def binding(self, key: str) -> str | None:
+        return dict(self.bindings).get(key)
 
     def as_dict(self) -> dict:
-        return {
+        plan = {
             "schema": PLAN_SCHEMA,
             "detector": self.detector, "rule": self.rule, "alpha": self.alpha,
             "direction": self.direction, "confidence": self.confidence, "population": self.population,
-            "split": {"method": "component-hash", "disjointBy": ["family", "speaker", "script"],
-                      "salt": self.split_salt, "calibrationFraction": self.calibration_fraction},
+            "split": self.split_dict(),
             "strata": [{"name": name, "reason": reason} for name, reason in self.strata],
             "grid": list(self.grid),
         }
+        if self.bindings:
+            plan["bindings"] = dict(sorted(self.bindings))
+        return plan
 
     def digest(self) -> str:
         return hashlib.sha256(canonical_json(self.as_dict())).hexdigest()
+
+    @classmethod
+    def from_dict(cls, value: Mapping) -> "PreRegistration":
+        """The plan a committed file holds; refused unless it reproduces the file exactly."""
+        if not isinstance(value, Mapping) or value.get("schema") != PLAN_SCHEMA:
+            raise PreRegistrationError(f"a plan declares {PLAN_SCHEMA}")
+        split = value.get("split") or {}
+        method = split.get("method")
+        if method not in SPLIT_METHODS:
+            raise PreRegistrationError(f"split.method must be one of {SPLIT_METHODS}")
+        common = dict(
+            detector=str(value.get("detector", "")), rule=str(value.get("rule", "")),
+            alpha=value.get("alpha"), direction=str(value.get("direction", "")),
+            strata=tuple((str(item.get("name", "")), str(item.get("reason", "")))
+                         for item in value.get("strata") or ()),
+            grid=tuple(value.get("grid") or ()), confidence=value.get("confidence", DEFAULT_CONFIDENCE),
+            population=str(value.get("population", "")),
+            bindings=tuple(sorted((str(key), item) for key, item in (value.get("bindings") or {}).items())),
+        )
+        if not isinstance(common["alpha"], (int, float)) or isinstance(common["alpha"], bool):
+            raise PreRegistrationError("alpha must be a number")
+        if method == "declared-cohorts":
+            plan = cls(**common, cohorts=CohortSplit.from_dict(split))
+        else:
+            plan = cls(**common, split_salt=str(split.get("salt", "")),
+                       calibration_fraction=split.get("calibrationFraction", 0.5))
+        if plan.as_dict() != dict(value):
+            raise PreRegistrationError("the plan file holds fields its schema does not reproduce")
+        return plan
 
 
 # --------------------------------------------------------------------------- #
@@ -113,31 +271,64 @@ def _git(root: Path, *arguments: str) -> int:
 
 
 class PreRegistrationStore:
-    """Committed plans, one canonical JSON file per plan digest.
+    """Committed plans, one canonical JSON file per plan.
 
     `commit` writes the file; `require` reads it back and checks it is the
     plan, byte for byte in canonical form. With `git_root`, `require` also
     demands that the file exists at HEAD and the working tree matches it, so
     the plan was committed before this run scored anything.
+
+    `naming` picks the file name: `digest` (`plan-<digest>.json`) or
+    `detector` (`<id@version>.json`), which allows one plan per detector
+    version, so no second plan for the same detector can be confirmed. The
+    repository store names by detector.
     """
 
-    def __init__(self, directory: Path, *, git_root: Path | None = None) -> None:
+    def __init__(self, directory: Path, *, git_root: Path | None = None, naming: str = "digest") -> None:
+        if naming not in STORE_NAMINGS:
+            raise ValueError(f"naming must be one of {STORE_NAMINGS}")
         self.directory = Path(directory)
         self.git_root = None if git_root is None else Path(git_root)
+        self.naming = naming
 
     @classmethod
-    def repository(cls) -> "PreRegistrationStore":
-        return cls(PREREGISTRATION_DIRECTORY, git_root=REPO)
+    def repository(cls, root: Path = REPO) -> "PreRegistrationStore":
+        root = Path(root)
+        return cls(root / PREREGISTRATION_DIRECTORY.relative_to(REPO), git_root=root, naming="detector")
 
     def path(self, digest: str) -> Path:
         return self.directory / f"plan-{digest}.json"
 
+    def plan_path(self, plan: PreRegistration) -> Path:
+        return self.detector_path(plan.detector) if self.naming == "detector" else self.path(plan.digest())
+
+    def detector_path(self, detector: str) -> Path:
+        if not detector or "/" in detector or detector.startswith("."):
+            raise PreRegistrationError(f"{detector!r} cannot name a plan file")
+        return self.directory / f"{detector}.json"
+
+    def load(self, detector: str) -> PreRegistration | None:
+        """The plan filed for a detector (detector naming only), or None when there is none."""
+        if self.naming != "detector":
+            raise PreRegistrationError("only a store named by detector can look a plan up by detector")
+        path = self.detector_path(detector)
+        if not path.is_file():
+            return None
+        try:
+            plan = PreRegistration.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError as error:
+            raise PreRegistrationError(f"{path.name} is unreadable: {error}") from error
+        if plan.detector != detector:
+            raise PreRegistrationError(f"{path.name} holds the plan of {plan.detector}")
+        return plan
+
     def commit(self, plan: PreRegistration) -> Path:
-        path = self.path(plan.digest())
+        path = self.plan_path(plan)
         text = json.dumps(plan.as_dict(), indent=2, sort_keys=True) + "\n"
         if path.exists():
             if path.read_text(encoding="utf-8") != text:
-                raise PreRegistrationError(f"{path.name} exists with other content")
+                raise PreRegistrationError(f"{path.name} exists with other content; a changed plan needs a new "
+                                           "detector version")
             return path
         self.directory.mkdir(parents=True, exist_ok=True)
         with path.open("x", encoding="utf-8") as handle:
@@ -146,7 +337,7 @@ class PreRegistrationStore:
 
     def require(self, plan: PreRegistration) -> dict:
         digest = plan.digest()
-        path = self.path(digest)
+        path = self.plan_path(plan)
         if not path.is_file():
             raise PreRegistrationError(f"plan {digest[:12]} was not committed before derivation (A5)")
         try:
@@ -176,6 +367,8 @@ def split_families(units: Iterable[tuple[str, str, str]], plan: PreRegistration)
     land on one side; the side comes from a salted hash of the component's
     smallest family id, so it is reproducible and never looks at a score.
     """
+    if plan.cohorts is not None:
+        raise PreRegistrationError("this plan declares its cohorts; there is no pool to split")
     parent: dict[tuple[str, str], tuple[str, str]] = {}
 
     def find(node: tuple[str, str]) -> tuple[str, str]:
@@ -209,6 +402,28 @@ def split_families(units: Iterable[tuple[str, str, str]], plan: PreRegistration)
         raise PreRegistrationError(f"the split left a cohort empty ({len(components)} disjoint components); "
                                    "choose another salt before committing the plan")
     return assignment
+
+
+def check_cohort_disjointness(plan: PreRegistration, calibration: Iterable[tuple[str, str, str]],
+                              confirmation: Iterable[tuple[str, str, str]]) -> dict:
+    """Verify a declared split on its units: (family, speaker, script) triples of each cohort.
+
+    Every key the plan declares disjoint must share no value between the two
+    cohorts; a shared value is refused. Keys it does not declare (speakers,
+    for FLEURS) are counted, never claimed.
+    """
+    if plan.cohorts is None:
+        raise PreRegistrationError("this plan splits by component hash; use split_families")
+    sides = [list(calibration), list(confirmation)]
+    report: dict = {"disjointBy": sorted(plan.cohorts.disjoint_by), "counts": {}}
+    for position, key in enumerate(DISJOINT_KEYS):
+        values = [{str(unit[position]) for unit in side} for side in sides]
+        report["counts"][key] = {"calibration": len(values[0]), "confirmation": len(values[1])}
+        shared = values[0] & values[1]
+        if key in plan.cohorts.disjoint_by and shared:
+            raise PreRegistrationError(f"the cohorts share {len(shared)} {key} value(s); the declared split "
+                                       "does not hold")
+    return report
 
 
 # --------------------------------------------------------------------------- #
@@ -347,8 +562,8 @@ def _severity(cell: str) -> str:
     return cell.rsplit("/", 1)[-1]
 
 
-def evaluate_confirmation(plan: PreRegistration, threshold: float, *, operating_point: Mapping,
-                          confidence: float, n2_negatives: Sequence[ScoredUnit],
+def evaluate_confirmation(plan: PreRegistration, threshold: float | Mapping[str, float], *,
+                          operating_point: Mapping, confidence: float, n2_negatives: Sequence[ScoredUnit],
                           n3_negatives: Sequence[ScoredUnit] = (),
                           positives: Mapping[str, Mapping[str, Sequence[ScoredUnit]]],
                           shams: Mapping[str, Sequence[ScoredUnit]]) -> dict:
@@ -358,6 +573,8 @@ def evaluate_confirmation(plan: PreRegistration, threshold: float, *, operating_
     of the qualification policy. `positives` maps each construction mechanism
     to its cells, keyed by severity or "subtype/severity"; `shams` maps each
     positive mechanism to its matched sham scores. Every rate counts families.
+    `threshold` is recorded as given: one value, or one per declared stratum
+    (the units' alarms were already taken at their stratum's threshold).
     """
     fail_like = "farPopulation" in operating_point
     units = operating_point["minimumUnits"]
@@ -464,8 +681,8 @@ class ConfirmationLedger:
         self.directory = Path(directory)
 
     @classmethod
-    def repository(cls) -> "ConfirmationLedger":
-        return cls(PREREGISTRATION_DIRECTORY)
+    def repository(cls, root: Path = REPO) -> "ConfirmationLedger":
+        return cls(Path(root) / PREREGISTRATION_DIRECTORY.relative_to(REPO))
 
     def path(self, digest: str) -> Path:
         return self.directory / f"confirmation-{digest}.json"
@@ -474,7 +691,7 @@ class ConfirmationLedger:
         path = self.path(digest)
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
-    def confirm(self, plan: PreRegistration, store: PreRegistrationStore, threshold: float, *,
+    def confirm(self, plan: PreRegistration, store: PreRegistrationStore, threshold: float | Mapping[str, float], *,
                 operating_point: Mapping, confidence: float, n2_negatives: Sequence[ScoredUnit],
                 n3_negatives: Sequence[ScoredUnit] = (),
                 positives: Mapping[str, Mapping[str, Sequence[ScoredUnit]]],

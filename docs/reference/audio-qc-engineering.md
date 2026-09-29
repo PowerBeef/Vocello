@@ -1009,15 +1009,16 @@ miss (`stats`); a cluster bootstrap that draws whole source families (`resamplin
 correlated-failure audit between two judges, with phi and conditional failure rates per unit and the
 joint failure bound per family (`correlation`); and threshold derivation from clean negatives only
 (`thresholds`). A derivation reads its plan back from a committed plan file
-(`config/audio-qc-preregistrations/plan-<digest>.json`, which must exist at HEAD unmodified), so a
-plan held only in memory is refused (A5); it takes one score per family, by the split-conformal
-quantile or fixed-sequence Learn-then-Test; the calibration and confirmation cohorts are split by
-connected component of family, speaker and script, so they share none of the three; and the one
-confirmation per plan checks every requirement of the chosen operating point (pooled and
-per-language N2 FAR, the pooled N3 flag rate, clean abstention, detection per severity cell on two
-mechanisms, the minimum units and a matched sham per mechanism, A4) and records its outcome, qualified
-or refused, in a ledger file created exclusively beside the plan, so no process can confirm the plan
-again. The rest: procedural speech-like sources and the abstention fixtures (`fixtures`); the T1
+(`config/audio-qc-preregistrations/<detector id@version>.json`, one plan per detector version,
+which must exist at HEAD unmodified), so a plan held only in memory is refused (A5); it takes one
+score per family, by the split-conformal quantile or fixed-sequence Learn-then-Test; the
+calibration and confirmation cohorts are split by connected component of family, speaker and
+script, so they share none of the three, or declared as two pinned cohort manifests (the FLEURS
+split, below); and the one confirmation per plan checks every requirement of the chosen operating
+point (pooled and per-language N2 FAR, the pooled N3 flag rate, clean abstention, detection per
+severity cell on two mechanisms, the minimum units and a matched sham per mechanism, A4) and records
+its outcome, qualified or refused, in a ledger file created exclusively beside the plan, so no
+process can confirm the plan again. The rest: procedural speech-like sources and the abstention fixtures (`fixtures`); the T1
 injector catalog (`injectors`); the Stage 3 composer (`composer`); and the policy validator
 (`policy`). No WAV is committed: fixtures are generated from seeds, and randomness comes from
 `PCG64.random_raw()` words, the part of NumPy's random API that stays stable across releases.
@@ -1614,6 +1615,100 @@ scripts/macos_test.sh qc-n2 --n1-manifest <n1-cohort-manifest.json> [--label L]
 
 Its artifacts go to `build/artifacts/macos/audio-qc/qc-n2-<run>/` and stay untracked. It publishes
 nothing and writes no benchmark history.
+
+### Detector qualification at warn (AQ-07, 2026-09-29)
+
+**Registry.** `config/audio-qc-detectors.json` declares each detector as `id@version`: class and
+stage; its score, read from a Fast QC v8 or Stage 0 field of `measurements.json`, from panel judge
+metrics, or from a judge's private transcript aligned against the reference; the combination
+(`single`; `consensus-min`, direction above, and `consensus-max`, direction below, over two
+independent voting families per language, so both must alarm; or `difference`); its strata; its
+language scope with a declared reason per exclusion; the injectors and severities its detection
+rate is measured on with their matched shams; and its population roles. The contract gate's
+`audio_qc_detector_calibration.py validate` checks it against `config/audio-qc-judges.json`: a
+consensus family must vote, be of another family than its partner, not share the generator's lab
+(Qwen3-ASR and the aligner never vote, A6), and cover the group's languages; the aligner may only
+time a `difference` whose group requires both content voters to have completed. A plan binds the
+entry's digest, so any change needs a new version (A7). The v1 set:
+
+| Detector | Class | Score | Direction |
+|---|---|---|---|
+| `signal.clicks@1` | A | Fast QC `clickEventsPerSecond` | above |
+| `signal.dropout@1` | A | Fast QC `longestSilenceMS` (interior) | above |
+| `signal.terminal-silence@1` | A | Fast QC `trailingSilenceMS` | above |
+| `signal.dc-offset@1` | A | \|Fast QC `dcOffset`\| | above |
+| `signal.level@1` | A | Fast QC `rmsDBFS` | below |
+| `signal.clipping@1` | A | Fast QC `hotSamples` (above 0.965; blind below it) | above |
+| `signal.noise@1` | A | Stage 0 `wadaSNRDB` | below |
+| `signal.band-limit@1` | A | Stage 0 `effectiveBandwidthHz` (no injector yet) | below |
+| `content.consensus-error@1` | B | min of Whisper large-v3 and Parakeet (zh Paraformer, ja/ko SenseVoice) `errorRate` | above |
+| `boundary.truncation@1` | C | min of the same pairs' trailing unmatched fraction | above |
+| `boundary.run-on@1` | C | Whisper last segment end minus the aligner's script end (not ko) | above |
+| `language.consensus-lid@1` | D | max of Whisper's expected-language probability and VoxLingua's posterior | below |
+
+Truncation aligns each private transcript with its reference on `language_metrics`' primary units
+and tie order and counts the reference units after the last matched one; only the fraction leaves
+the bundle. Run-on subtracts the aligner's script end from Whisper's last segment end because neither
+works against the file end on FLEURS: Whisper's end follows the speech, so an inserted run-on leaves
+duration minus it unchanged, and the aligner's tail gap carries the natural trailing silence (clean
+N2 95th percentile 3.8 s, against 0.7 s for the difference). Every v1 detector declares per-language
+strata: on the calibration cohort a pooled threshold already puts 27% of clean English above the
+run-on bound, 20% of German below the language bound and 13% of Japanese above the content bound,
+where warn allows 20% per language. The registry records the declared risks (SenseVoice's codec
+degradation in ja and ko, VoxLingua's weakness in de and ru, Parakeet's Whisper label lineage).
+
+**Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
+confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A
+plan declares its cohorts (`CohortSplit`: both manifests by kind and digest, `disjointBy`, the
+limitations) instead of a hash salt; the component-hash plans' digests are unchanged. FLEURS
+publishes no speaker ids, so units carry the speaker `<language>:fleurs-unidentified`, a lower
+bound: warn's three speakers are met only by covering three languages, and the record says so.
+`scores` writes per-unit scores (ids, digests, components, abstentions; no text or path) under
+`build/`; a confirmation role needs the committed plan that names the cohort, and a cohort a plan
+names as confirmation is never scored under another role. `plan` writes
+`config/audio-qc-preregistrations/<id>.json` (split-conformal, alpha below the warn FAR bound,
+bindings to the definition, the calibration scores and the policy) and refuses a confirmation cohort
+that already holds a panel bundle, measurements or scores. `derive` returns one split-conformal
+threshold per stratum from clean calibration families and refuses a plan not committed at HEAD.
+`confirm` runs once per plan digest: before anything is recorded it checks the bindings, the judges'
+output identities (equal across cohorts, A7), the declared split and the minimum units counted from
+ids (60 negative families, 3 languages, speakers and scripts, 60 families per severe cell, a sham per
+mechanism); then `evaluate_confirmation` at warn writes the ledger entry beside the plan and the
+tracked record `benchmarks/audio-qc-calibration/<id>/record-<plan digest 16>.json` (digests, counts,
+rates with Clopper-Pearson bounds, thresholds, scope, limitations, the phi audit of each consensus
+pair, the verdict). `validate` ties every record to its plan and ledger entry.
+
+The lead's sequence (all 12 plans before any confirmation panel or score, since a plan refuses a
+scored confirmation cohort):
+
+```sh
+CAL=build/artifacts/macos/audio-qc/qc-n2-mac-qc-n2-20260929-082348-92817b0c
+CON=build/artifacts/macos/audio-qc/qc-n2-mac-qc-n2-20260929-163642-8035d59e
+OUT=build/artifacts/macos/audio-qc/detector-scores
+Q="python3 scripts/audio_qc_detector_calibration.py"
+# 1. Calibration scores: panel detectors from the bundle, class A from the cohort's Stage 0
+#    measurements (audio_qc_calibration_set.py score over the N2 calibration cohort).
+$Q scores --detector content.consensus-error@1 --role calibration --cohort $CAL/n2-manifest.json \
+  --bundle $CAL/panel-bundle-v2 --output $OUT/calibration/content.consensus-error@1.json
+$Q scores --detector signal.level@1 --role calibration --cohort $CAL/n2-manifest.json \
+  --measurements <calibration measurements.json> --output $OUT/calibration/signal.level@1.json
+# 2. Plans, once the confirmation manifest exists and before anything scores it; review, then commit.
+$Q plan --detector content.consensus-error@1 --calibration-cohort $CAL/n2-manifest.json \
+  --confirmation-cohort $CON/n2-manifest.json \
+  --calibration-scores $OUT/calibration/content.consensus-error@1.json --alpha 0.05
+# 3. Preview the thresholds (calibration data only).
+$Q derive --detector content.consensus-error@1 --calibration-scores $OUT/calibration/content.consensus-error@1.json
+# 4. Confirmation panel over $CON, its Stage 0 measurements, the P1/S injection sets and their
+#    panel bundles or measurements; then the confirmation scores.
+$Q scores --detector content.consensus-error@1 --role confirmation --cohort $CON/n2-manifest.json \
+  --bundle $CON/panel-bundle-v2 --injection-set <set>/injection-set.json \
+  --positive-bundle <set panel bundle> --output $OUT/confirmation/content.consensus-error@1.json
+# 5. Confirm once; commit the ledger entry and the record; summarize.
+$Q confirm --detector content.consensus-error@1 \
+  --calibration-scores $OUT/calibration/content.consensus-error@1.json \
+  --confirmation-scores $OUT/confirmation/content.consensus-error@1.json
+$Q report --scores $OUT/calibration/*.json
+```
 
 ### Speech/defect calibration: independent references, no required listening
 

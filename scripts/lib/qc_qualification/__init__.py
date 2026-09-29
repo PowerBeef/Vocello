@@ -13,9 +13,13 @@ evidence.
   conditional failure rates, and the joint failure bound per family).
 - `thresholds`: pre-registered threshold derivation from clean clips only:
   plans committed as files and read back (A5), a split disjoint by family,
-  speaker and script, the split-conformal quantile or fixed-sequence
-  Learn-then-Test, and one confirmation per plan against every requirement of
-  a policy operating point, recorded in an exclusive ledger file.
+  speaker and script or two declared cohorts pinned by digest (FLEURS dev and
+  test), the split-conformal quantile or fixed-sequence Learn-then-Test, and
+  one confirmation per plan against every requirement of a policy operating
+  point, recorded in an exclusive ledger file.
+- `detectors`: the detector registry (`config/audio-qc-detectors.json`) and
+  per-take detector scores: single, consensus and difference combinations,
+  abstention reasons, and the trailing alignment of a transcript.
 - `pcm`: canonical PCM16 digests and seeded randomness that is stable across
   NumPy releases.
 - `fixtures`: procedural speech-like sources and abstention fixtures.

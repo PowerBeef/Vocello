@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "kind": "audio-qc-detector-registry",
+  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md sections 5.5-5.9; config/audio-qc-qualification-policy.json",
+  "note": "Each detector is id@version: what it scores (a Fast QC or Stage 0 field from measurements.json, or judge metrics from panel evidence), how its components combine, its direction, its language scope with a reason for each exclusion, the injectors and severities its detection rate is measured on with their matched shams, and the population roles. scripts/audio_qc_detector_calibration.py validates this file in the contract gate, and a plan binds each detector's definition by digest, so any change to a definition needs a new version (A7).",
+  "operatingPoint": "warn",
+  "roleSets": {
+    "fleurs-n2": {
+      "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-dev"},
+      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-test"},
+      "positives": {"population": "P1", "cohort": "confirmation"},
+      "shams": {"population": "S", "cohort": "confirmation"},
+      "informational": ["N3", "N1"]
+    }
+  },
+  "limitations": {
+    "fleurs-no-speaker-ids": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.",
+    "fleurs-speaker-lower-bound": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.",
+    "n2-one-codec": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn)."
+  },
+  "exclusionReasons": {
+    "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
+  },
+  "risks": {
+    "parakeet-whisper-label-lineage": "Parakeet's training labels include Whisper pseudo-labels (Granary), so the pair may fail together; the phi audit in the record measures it before the pair gates.",
+    "sensevoice-codec-degradation": "SenseVoice degrades through the codec: its error rate exceeds 0.5 on 0% (ja) and 9.6% (ko) of N1 FLEURS dev recordings and on 5.6% and 18.5% of their N2 resyntheses (panels of 2026-09-29). Under min() a failed SenseVoice transcript leaves Whisper as the effective vote in ja and ko; the confirmation decides and the phi audit shows it.",
+    "voxlingua-weak-german-russian": "VoxLingua's expected-language posterior is below 0.5 on 21.4% (de) and 43.5% (ru) of N1 FLEURS dev recordings, 22.2% and 44.1% on N2 (panels of 2026-09-29). Under max() a low VoxLingua posterior never alarms alone, so in German and Russian the consensus reduces to Whisper's vote.",
+    "no-band-limit-injector": "Injector catalog version 2 has no band-limit family (SIG-BAND); until one exists the detector has no positives and its confirmation cannot start.",
+    "fleurs-bandwidth": "N2 inherits FLEURS's 16 kHz sampling, so clean N2 effective bandwidth sits near 8 kHz and a threshold fitted there flags only band-limits below it; natural 24 kHz takes (N3) reach about 11.5 kHz.",
+    "v8-sub-full-scale-clipping": "Fast QC v8 counts only samples above its 0.965 ceiling; hard or soft-knee clipping below that level (the SIG-CLIP sweep flattens at the source's own level) leaves no trace in any v8 field (AQ-07 M2), so detection is expected only for over-range clipping. A plateau-run measure is the successor.",
+    "fleurs-trailing-silence": "FLEURS recordings end in natural trailing silence (clean N2 aligner tail gap: median 1.3 s, 95th percentile 3.8 s), which swamps a run-on measured against the file end; the run-on score subtracts it by measuring against the script's aligned end instead.",
+    "aligner-anchoring": "The run-on score assumes the aligner places the script's last unit on its first occurrence; a repeated tail the aligner anchors on its last copy is missed.",
+    "whisper-segment-timing": "Whisper segment ends come from 20 ms timestamp tokens and can end early or snap to round seconds (clean N2: 5% end more than 1.1 s before the aligner's script end)."
+  },
+  "detectors": [
+    {
+      "id": "signal.clicks@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "Click events per second (Fast QC v8 clustered click events over the take's duration).",
+      "score": {"combination": "single", "unit": "events-per-second", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "clickEventsPerSecond"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-CLICK", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-CLICK", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": []
+    },
+    {
+      "id": "signal.dropout@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The longest interior silent run, in milliseconds (Fast QC v8 longestSilenceMS).",
+      "score": {"combination": "single", "unit": "milliseconds", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "longestSilenceMS"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-DROP", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-DROP", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": []
+    },
+    {
+      "id": "signal.terminal-silence@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The trailing silent run, in milliseconds (Fast QC v8 trailingSilenceMS).",
+      "score": {"combination": "single", "unit": "milliseconds", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "trailingSilenceMS"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-SIL", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-SIL", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["fleurs-trailing-silence"]
+    },
+    {
+      "id": "signal.dc-offset@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The magnitude of the DC offset (the absolute value of Fast QC v8 dcOffset).",
+      "score": {"combination": "single", "unit": "full-scale", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "dcOffset", "transform": "absolute"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-DC", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-DC", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": []
+    },
+    {
+      "id": "signal.level@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The take's RMS level in dBFS (Fast QC v8 rmsDBFS); a low level alarms.",
+      "score": {"combination": "single", "unit": "dbfs", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "rmsDBFS"}]}
+      ]},
+      "direction": "below",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-LEVEL", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-LEVEL", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": []
+    },
+    {
+      "id": "signal.clipping@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "Samples above the 0.965 ceiling (Fast QC v8 hotSamples), the only v8 trace of clipping in a written PCM16 take.",
+      "score": {"combination": "single", "unit": "samples", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "fastqc", "field": "hotSamples"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-CLIP", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-CLIP", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["v8-sub-full-scale-clipping"]
+    },
+    {
+      "id": "signal.noise@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The WADA signal-to-noise ratio in dB (Stage 0 observation wadaSNRDB); a low ratio alarms.",
+      "score": {"combination": "single", "unit": "db", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "observations", "field": "wadaSNRDB"}]}
+      ]},
+      "direction": "below",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-NOISE", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-NOISE", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": []
+    },
+    {
+      "id": "signal.band-limit@1",
+      "class": "A",
+      "stage": 0,
+      "measures": "The effective bandwidth in Hz (Stage 0 observation effectiveBandwidthHz); a narrow band alarms.",
+      "score": {"combination": "single", "unit": "hertz", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "observations", "field": "effectiveBandwidthHz"}]}
+      ]},
+      "direction": "below",
+      "strata": {"by": "language", "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-BAND", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-BAND", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["no-band-limit-injector", "fleurs-bandwidth"]
+    },
+    {
+      "id": "content.consensus-error@1",
+      "class": "B",
+      "stage": 2,
+      "measures": "The smaller of two independent recognizer families' error rates (WER, or CER in zh, ja and ko) against the script, so both must be high to alarm. Qwen3-ASR is same-lab and never votes (A6).",
+      "score": {"combination": "consensus-min", "unit": "error-rate", "groups": [
+        {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "errorRate"},
+                        {"source": "panel", "judge": "asr.parakeet-tdt-0.6b-v3@1", "metric": "errorRate"}]},
+        {"languages": ["chinese"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "errorRate"},
+                        {"source": "panel", "judge": "asr.paraformer-zh@1", "metric": "errorRate"}]},
+        {"languages": ["japanese", "korean"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "errorRate"},
+                        {"source": "panel", "judge": "asr.sensevoice-small-f16@1", "metric": "errorRate"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Error rates differ by language: word against character units and each recognizer's quality per language (clean N2 95th percentile: 0.037 in it to 0.14 in ja; 13% of ja above the pooled 0.094)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [
+        {"injectorID": "CNT-DEL", "severities": ["severe"], "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-INS", "severities": ["severe"], "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-REP", "severities": ["severe"], "mechanism": "T1-pcm-construction"}
+      ],
+      "shams": [
+        {"injectorID": "CNT-DEL", "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-INS", "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-REP", "mechanism": "T1-pcm-construction"}
+      ],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["parakeet-whisper-label-lineage", "sensevoice-codec-degradation"]
+    },
+    {
+      "id": "boundary.truncation@1",
+      "class": "C",
+      "stage": 2,
+      "measures": "The smaller of two independent recognizer families' trailing unmatched fraction: the reference units (words, or characters in zh, ja and ko) after the last unit the family matched, over the reference length, from language_metrics' own alignment of the private transcript; only the score leaves the bundle.",
+      "score": {"combination": "consensus-min", "unit": "reference-fraction", "groups": [
+        {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+         "components": [{"source": "transcript-tail", "judge": "asr.whisper-large-v3@1", "measure": "trailingUnmatchedFraction"},
+                        {"source": "transcript-tail", "judge": "asr.parakeet-tdt-0.6b-v3@1", "measure": "trailingUnmatchedFraction"}]},
+        {"languages": ["chinese"],
+         "components": [{"source": "transcript-tail", "judge": "asr.whisper-large-v3@1", "measure": "trailingUnmatchedFraction"},
+                        {"source": "transcript-tail", "judge": "asr.paraformer-zh@1", "measure": "trailingUnmatchedFraction"}]},
+        {"languages": ["japanese", "korean"],
+         "components": [{"source": "transcript-tail", "judge": "asr.whisper-large-v3@1", "measure": "trailingUnmatchedFraction"},
+                        {"source": "transcript-tail", "judge": "asr.sensevoice-small-f16@1", "measure": "trailingUnmatchedFraction"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Word against character units and per-language recognizer behaviour at the end of a take; a pooled threshold would let one language's tail errors set every language's bound."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "BND-TRUNC", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "BND-TRUNC", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["parakeet-whisper-label-lineage", "sensevoice-codec-degradation"]
+    },
+    {
+      "id": "boundary.run-on@1",
+      "class": "C",
+      "stage": 2,
+      "measures": "Seconds of recognized speech after the script ends: Whisper large-v3's last segment end minus the aligner's last aligned script unit end, only where both content voters of the language completed (the aligner times, never votes). Neither end alone against the file end works on FLEURS: Whisper's end follows the speech, so an inserted run-on leaves duration minus it unchanged, and the aligner's tail gap carries the natural trailing silence (clean N2 95th percentile 3.8 s against 0.7 s for the difference).",
+      "score": {"combination": "difference", "unit": "seconds", "groups": [
+        {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "lastSegmentEndSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.parakeet-tdt-0.6b-v3@1"]},
+        {"languages": ["chinese"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "lastSegmentEndSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.paraformer-zh@1"]},
+        {"languages": ["japanese"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "lastSegmentEndSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.sensevoice-small-f16@1"]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Whisper's last segment end overshoots the script end differently by language (clean N2 share above the pooled 95th percentile, 0.72 s: 27% in en, 12% in ja, at most 2% in fr, it, pt, ru and es)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "portuguese", "russian", "spanish"],
+                "exclusions": [{"language": "korean", "reason": "aligner-excludes-korean"}]},
+      "targets": [{"injectorID": "BND-RUNON", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "BND-RUNON", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["fleurs-trailing-silence", "aligner-anchoring", "whisper-segment-timing"]
+    },
+    {
+      "id": "language.consensus-lid@1",
+      "class": "D",
+      "stage": 2,
+      "measures": "The larger of Whisper large-v3's expected-language probability and VoxLingua's expected-language posterior, so both must be low to alarm.",
+      "score": {"combination": "consensus-max", "unit": "probability", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "panel", "judge": "asr.whisper-large-v3@1", "metric": "expectedLanguageProbability"},
+                        {"source": "panel", "judge": "lid.voxlingua107-ecapa@1", "metric": "expectedPosterior"}]}
+      ]},
+      "direction": "below",
+      "strata": {"by": "language", "reason": "Expected-language confidence differs by language (clean N2 share below the pooled 5th percentile, 0.983: 20% in de, 15% in en, at most 4% elsewhere)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "LNG-SWAP", "severities": ["severe"], "mechanism": "T1-parallel-corpus"}],
+      "shams": [{"injectorID": "LNG-SWAP", "mechanism": "T1-parallel-corpus"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "risks": ["voxlingua-weak-german-russian"]
+    }
+  ]
+}

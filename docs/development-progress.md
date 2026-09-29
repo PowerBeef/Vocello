@@ -17,6 +17,23 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 29, evening — AQ-07 warn plans committed; the confirmation chain runs
+
+Whisper large-v3 returned a NaN segment statistic on one FLEURS Chinese round trip, and the strict
+worker protocol crashed on it every run. That statistic is now recorded as unknown (ee9ae6f9). The
+calibration panel (six judges), the Stage 0 measurements and the N3 panel were rerun under that fix
+with no failing take. The 11 warn-level plans (seven signal detectors, then consensus error,
+truncation, run-on and consensus LID; alpha 0.05, per-language split conformal) are committed in
+f822517b before any confirmation feature exists. Band-limit gets no plan until an injector exists.
+A benchmark-history false positive (`run-on@1.json` read as an email address) was fixed on the way
+(c01a9a19). The unattended chain runs over the 3,718-take confirmation cohort. It builds a fresh-cache
+cohort panel, alignments, and a verified injection set (seed 7/1, 150 per cell, classes A-D and F),
+then Stage 0, a fresh-cache positives panel, confirmation scores and one `confirm` per plan. Its logs
+are in the session scratchpad, and its outputs go under the confirmation run directory and
+`detector-scores/`. Next, commit each ledger entry and record the chain writes. Do not edit the
+orchestrator, `panel_metrics`, `detectors` or `language_metrics` before then (A7). If the chain
+failed partway, its fresh-output preconditions refuse a silent rerun: diagnose it first.
+
 ### September 29 — AQ-07 gets human speech: N1 from FLEURS and N2 through the codec
 
 The four resume items of the September 27 pause are done. Judge workers now exit without interpreter

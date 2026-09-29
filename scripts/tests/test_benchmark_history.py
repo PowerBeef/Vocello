@@ -2770,6 +2770,19 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.assertRaises(history.HistoryError):
                 self.publish(record, f"privacy-{index}")
 
+    def test_versioned_file_names_in_changed_paths_are_not_addresses(self) -> None:
+        # A dirty registry file (`<id>@<version>.json`) or scaled asset (`@2x.png`) is a path, not an email.
+        record = record_fixture(run_id="versioned-names-20260712", dirty=True)
+        record["source"]["changedPaths"] = [
+            "config/audio-qc-preregistrations/boundary.run-on@1.json",
+            "Sources/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+        ]
+        history.privacy_scan(record)
+        for address in ("docs/person@example.com.md", "notes/person@163.com", "person@1.json and x@y.org"):
+            record["source"]["changedPaths"] = [address]
+            with self.assertRaisesRegex(history.HistoryError, "email address"):
+                history.privacy_scan(record)
+
     def test_oversized_record_is_rejected_before_publish(self) -> None:
         record = record_fixture()
         record["run"]["warnings"] = ["x" * 260_000]

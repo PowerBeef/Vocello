@@ -696,6 +696,10 @@ SENSITIVE_KEY_PARTS = {
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$")
 EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
+# The repository's own file names that EMAIL_RE also matches: a registry id with its version
+# (`boundary.run-on@1.json`) or an asset scale (`icon_16x16@2x.png`). A dirty one reaches a record
+# through source.changedPaths; it is never an address, and neither is any real TLD in this list.
+VERSIONED_FILE_NAME_RE = re.compile(r"[\w.+-]+@\d+x?\.(?:json|jsonl|png|jpe?g|pdf|svg|md)")
 URL_RE = re.compile(r"\b(?:https?|file)://", re.IGNORECASE)
 WINDOWS_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 SECRET_RE = re.compile(
@@ -2264,6 +2268,10 @@ def reject_unknown_keys(value: dict[str, Any], allowed: set[str], location: str)
         raise HistoryError(f"{location} contains non-allowlisted fields: {', '.join(unknown)}")
 
 
+def contains_email(value: str) -> bool:
+    return any(not VERSIONED_FILE_NAME_RE.fullmatch(match.group(0)) for match in EMAIL_RE.finditer(value))
+
+
 def validate_safe_scalar(value: Any, location: str) -> None:
     if value is None or isinstance(value, bool):
         return
@@ -2275,7 +2283,7 @@ def validate_safe_scalar(value: Any, location: str) -> None:
         raise HistoryError(f"{location} contains an unsupported value type")
     if "\n" in value or "\r" in value:
         raise HistoryError(f"{location} contains a newline")
-    if EMAIL_RE.search(value) or URL_RE.search(value):
+    if contains_email(value) or URL_RE.search(value):
         raise HistoryError(f"{location} contains an email address or URL")
     if SECRET_RE.search(value):
         raise HistoryError(f"{location} contains a secret-like token")

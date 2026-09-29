@@ -15,7 +15,8 @@ construction.
 
 Word-aligned edits (deletion, insertion, repetition, truncation) use the
 source's exact word intervals, which procedural fixtures carry by construction;
-on recorded speech they would come from the aligner on N1 and N2 only. A
+on recorded speech they come from the aligner on N1 and N2 only
+(`recordings.word_alignment`). A
 recorded natural take (N3, `recordings.recording_fixture`) carries no word
 interval, declared pause, script or render voice, so `inject` refuses every
 variant that needs one with `InjectorNotApplicable` (`needs`). A few injectors
@@ -254,7 +255,8 @@ def _longest_word(source: Fixture) -> tuple[int, int]:
 
 def _word_index(position: str, count: int, words: int) -> int:
     if count > words - 1:
-        raise ValueError(f"needs more than {count} words")
+        # A refusal, not a failure: a recorded take may carry fewer aligned words.
+        raise InjectorNotApplicable(f"needs more than {count} words")
     if position == "start":
         return 0
     if position == "middle":
@@ -489,6 +491,8 @@ def _truncate(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.
     removed = parameters["wordsRemoved"]
     partial = parameters["partialFraction"]
     size = source.samples.size
+    if (removed or partial) and removed > len(words) - 1:
+        raise InjectorNotApplicable(f"{source.fixture_id} has too few words to cut {removed}")
     if removed == 0 and partial == 0:
         cut = size
     elif partial == 0:

@@ -763,10 +763,12 @@ class BridgeTests(CorpusFixture):
         self.assertEqual((summary["counts"]["generatedTakes"], summary["counts"]["ineligibleTakes"],
                           summary["counts"]["missingTakes"]), (2, 3, 0))
         self.assertTrue(summary["entries"])
+        texts = {take["takeID"]: take["text"] for take in self.manifest["takes"]}
         for entry in summary["entries"]:
             self.assertEqual(entry["injection"]["sourceResampling"], recordings.resampling_recipe(16_000))
             self.assertIn(entry["sourceTakeID"], ("n1-en-10001", "n1-fr-30001"))
-            self.assertNotIn("text", entry)
+            # An N1 set carries its text for the orchestrator's content and language metrics.
+            self.assertEqual(entry["text"], texts[entry["sourceTakeID"]])
             with wave.open(str(output / entry["wavPath"]), "rb") as reader:
                 self.assertEqual(reader.getframerate(), 24_000)
         sham = next(entry for entry in summary["entries"]
@@ -782,8 +784,11 @@ class BridgeTests(CorpusFixture):
         (output / "injection-set.json").write_text(json.dumps(injection_set))
         result = quiet(m2.run_verify, output / "injection-set.json", self.path, jobs=1)
         self.assertIn("source resampling differs", " ".join(reason for _, reason in result["failures"]))
-        with self.assertRaisesRegex(m2.CalibrationError, "does not score an N1 cohort"):
-            quiet(m2.run_score, self.path, output / "injection-set.json", self.tmp / "score", jobs=1)
+        # score labels an N1 cohort's clean recordings N1 (resampled to 24 kHz) and frames no N3 bound.
+        report = quiet(m2.run_score, self.path, None, self.tmp / "score", jobs=1)
+        self.assertEqual(report["populations"]["N1"], {"clips": 2, "families": 2, "engineRejected": 0})
+        self.assertIn("labeledBound", report["n1"])
+        self.assertNotIn("unlabeledBound", json.dumps(report))
 
     def test_a_tampered_n1_manifest_is_refused_by_the_calibration_set(self) -> None:
         tampered = copy.deepcopy(self.manifest)

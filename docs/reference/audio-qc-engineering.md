@@ -1119,7 +1119,8 @@ recordings (`scripts/audio_qc_n1_corpus.py`, [language-bench.md](language-bench.
 eligible recordings only. Each 16 kHz recording is resampled to 24 kHz with the Kaiser-5 polyphase
 design of `polyphase-kaiser5-v2` (`lib.playback_capture.resample`) before any injector runs, because
 click widths, cluster spacing and the overlap-add window are counted in 24 kHz samples and `score`
-and `verify` read 24 kHz; every recipe records it as `sourceResampling`. `score` stays N3-only.
+and `verify` read 24 kHz; every recipe records it as `sourceResampling`. `score` also scores an N1
+or N2 cohort, labeling its clean recordings N1 or N2 (see "Injections on N2" below).
 
 ### Staged pipeline, workers and admission (AQ-05, 2026-09-26)
 
@@ -1708,6 +1709,58 @@ $Q confirm --detector content.consensus-error@1 \
   --calibration-scores $OUT/calibration/content.consensus-error@1.json \
   --confirmation-scores $OUT/confirmation/content.consensus-error@1.json
 $Q report --scores $OUT/calibration/*.json
+```
+
+**Injections on N2 (AQ-07 positives).** `scripts/audio_qc_calibration_set.py` reads an N2 cohort as
+an injection source: every take is an eligible, generated 24 kHz resynthesis whose family is its N1
+recording. Four additions serve warn-level qualification:
+
+- **Sampling.** Injecting every variant into every recording would write about 80 GB, so `inject
+  --sample-per-cell N --sample-seed S` draws N source families per injector. The draw is stratified
+  by language as evenly as the eligible pool allows, by a seeded SHA-256 rank, and recorded in the
+  set; `verify` redraws it. The injector's sham and every severity share the same families. N2
+  defaults to 150 per cell (N1 and N3 keep every source). At 150 on the 1,888-take calibration
+  cohort that is 9,300 clips from 1,369 source takes: 15 T1 injectors x 4 variants x 150, plus 300
+  language swaps. They take about 5.2 GB of WAV, 0.16 GB of it the swaps' copies.
+- **Word intervals.** The panel's forced aligner left its raw units and intervals in the
+  orchestrator's L1 cache; the bundle keeps only reduced metrics. `alignments` rebuilds each take's
+  L1 key as the orchestrator computed it. The key combines the evidence's audio and canonical
+  digests, the aligner's output identity from the evidence, its registry pins, and the request of
+  `panel_jobs.panel_request`. The export writes takeID -> intervals in seconds, with unit texts as
+  SHA-256 only. With `inject --alignments`, `recordings.word_alignment` turns each positive-length
+  interval into a 24 kHz word interval and each gap over 0.2 s into a declared pause. A zero-length
+  interval is a unit the aligner squeezed at its 80 ms resolution, not a word. It refuses an
+  alignment that overlaps, overruns the take by more than one frame, has fewer than 5 words, or
+  squeezes more than 20% of its units. The catalog variants of CNT-DEL, CNT-REP, CNT-INS, PRS-OCT,
+  PRS-BRK and BND-TRUNC's word cuts then run on the usable takes. CNT-INS's donor words come from
+  the same recording, so it needs no donor voice. On the calibration cohort 1,727 of 1,888 takes
+  are usable. Korean (157) is outside the aligner's scope, and 4 squeeze too many units.
+- **Language swaps (class D, `T1-parallel-corpus`).** A source's FLoRes sentence (`scriptID`) is
+  presented with the source's language and text. For the positive it is read by a recording in
+  another language; for the sham, by another recording in the source's language. The clip is a
+  byte copy of the donor's file (never a hard link, which would share the cohort's own audio), and
+  its family is the donor recording's. Donors come from the same cohort
+  manifest, so from the same split. `lib/qc_qualification/language_swap.py` holds the construction.
+- **Text.** N1 and N2 sets carry each entry's text (for a swap, the expected text) bound by
+  `textSHA256`. N3 sets carry it only with `--embed-text`, so their bytes stay as before.
+  `audio_qc_orchestrator.py manifest --from-calibration-takes` reads a set's `entries`, checks
+  `entriesSHA256`, and expects `fail` for a positive and `pass` for a sham. `score` labels the
+  clean recordings N2 (or N1), and it scores them alone when `--set` is omitted. Their flag rate
+  bounds FAR directly, with no f / (1 - pi_max) framing.
+
+```sh
+D=build/artifacts/macos/audio-qc/qc-n2-<run>
+python3 scripts/audio_qc_calibration_set.py alignments --takes $D/n2-manifest.json \
+  --bundle $D/panel-bundle-v2 --output $D/alignments.json
+python3 scripts/audio_qc_calibration_set.py inject --takes $D/n2-manifest.json \
+  --alignments $D/alignments.json --output $D/injection-set   # A,B,C,D,F; 150 per cell
+python3 scripts/audio_qc_calibration_set.py verify --set $D/injection-set/injection-set.json \
+  --takes $D/n2-manifest.json --alignments $D/alignments.json
+python3 scripts/audio_qc_calibration_set.py score --takes $D/n2-manifest.json \
+  --set $D/injection-set/injection-set.json --output $D/injection-score
+python3 scripts/audio_qc_orchestrator.py manifest \
+  --from-calibration-takes $D/injection-set/injection-set.json \
+  --output $D/injection-panel-manifest.json
 ```
 
 ### Speech/defect calibration: independent references, no required listening

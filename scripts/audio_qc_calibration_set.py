@@ -3,26 +3,73 @@
 
 Commands:
   inject  --takes <manifest> --output <dir> [--catalog-seed N] [--classes A,C,F] [--jobs N]
+          [--alignments <alignments.json>] [--sample-per-cell N] [--sample-seed S] [--embed-text]
           Apply every applicable T1 injector of the selected classes (by default
-          A signal, C boundary and the signal-level F prosody ones) to every
-          generated natural take (population N3) of an `audio-qc-calibration-takes`
-          manifest, at mild, moderate and severe plus the family's sham. Writes
-          <dir>/wav/<clip>.wav and <dir>/injection-set.json.
-  verify  --set <injection-set.json> --takes <manifest> [--jobs N]
+          A signal, C boundary and the signal-level F prosody ones; A, B, C, D and
+          F on N2) to every generated natural take (population N3) of an
+          `audio-qc-calibration-takes` manifest, at mild, moderate and severe plus
+          the family's sham. Writes <dir>/wav/<clip>.wav and
+          <dir>/injection-set.json.
+  verify  --set <injection-set.json> --takes <manifest> [--alignments <alignments.json>] [--jobs N]
           Replay every recipe from the source WAVs and require byte-identical
           output digests (and untouched output WAVs).
-  score   --takes <manifest> --set <injection-set.json> --output <dir> [--jobs N]
+  score   --takes <manifest> [--set <injection-set.json>] --output <dir> [--jobs N]
           Run Fast QC v8 (the Python mirror in scripts/lib/audio_qc.py) and the
-          Stage 0 observations over every clean take (N3), sham (S) and positive
-          (P1); write measurements.json (ids and digests only), report.json and
-          report.md.
+          Stage 0 observations over every clean take (N3, or N1/N2 for a cohort),
+          sham (S) and positive (P1); write measurements.json (ids and digests
+          only), report.json and report.md. Without --set it scores the clean
+          takes alone.
+  alignments --takes <cohort manifest> --bundle <panel bundle> --output <alignments.json>
+          [--cache-root <dir>]
+          Export the forced aligner's word intervals for the cohort's takes from
+          the orchestrator's L1 cache (see "Word intervals" below).
 
 `inject` and `verify` also take an `audio-qc-n1-cohort` manifest
 (`scripts/audio_qc_n1_corpus.py`): its eligible FLEURS recordings (population
 N1) are the sources, resampled from 16 kHz to the engine rate before any
 injector runs, and every recipe records that resampling (`sourceResampling`,
 `lib/qc_qualification/recordings.py`). Ineligible recordings are counted, never
-injected. `score` reports on N3 only and refuses an N1 cohort.
+injected. An `audio-qc-n2-cohort` manifest (`scripts/audio_qc_n2_resynthesis.py`)
+is read the same way: every take is an eligible, generated 24 kHz PCM16
+resynthesis whose `family` is its N1 recording. `score` labels a cohort's clean
+takes N1 or N2: they carry published text (T4), so their flag rate bounds FAR
+directly, without N3's f / (1 - pi_max) framing.
+
+Sampling (`--sample-per-cell N --sample-seed S`). Injecting every variant into
+every recording of a human cohort would write tens of gigabytes. For each
+injector, N source families are drawn, stratified by language as evenly as the
+eligible pool allows, by a seeded SHA-256 rank, so a rerun picks the same
+families; the injector's sham and every severity use those same families, so
+each (injector, severity) cell and its sham hold the same N families. The pool
+of a word-level injector is the takes whose alignment is usable. The draw is
+recorded in the set (`sampling`) and re-derived by `verify`. N2 defaults to 150
+per cell; N1 and N3 default to every source (0 means every source).
+
+Word intervals. The panel's forced aligner (`align.qwen3-forcedaligner-0.6b@1`)
+stored its raw output (units and intervals) in the orchestrator's L1 cache;
+the bundle keeps only reduced metrics. `alignments` rebuilds each take's L1 key
+as the orchestrator did (the evidence's audio and canonical digests, the
+aligner's output identity from the evidence, its registry pins and the request
+`panel_jobs.panel_request` builds), loads the digest-verified entry and writes
+takeID -> intervals in seconds, each unit's text as a SHA-256 only. With
+`--alignments`, the recording adapter gives every take with a usable alignment
+word and pause intervals (`recordings.word_alignment`), and the word-level
+injectors run through their catalog variants: CNT-DEL, CNT-REP, CNT-INS,
+PRS-OCT, PRS-BRK and BND-TRUNC's word cuts (which then replace its take-* cut
+at a fraction of the take). Korean is outside the aligner's scope, so its takes
+keep no word interval.
+
+Language swaps (class D, `LNG-SWAP`, `lib/qc_qualification/language_swap.py`):
+on an N2 cohort, a source's FLoRes sentence read in another language (severe)
+or by another recording in its own language (sham), presented with the
+source's language and text; the clip is a byte copy of the donor's audio file.
+Its `family` is the donor recording's.
+
+Text. Entries built from an N1 or N2 cohort carry their source take's `text`
+(for a language swap, the expected L1 text) bound by `textSHA256`, so
+`audio_qc_orchestrator.py manifest --from-calibration-takes` can take the set;
+N3 sets keep it in the takes manifest unless `--embed-text` is given. Sets are
+untracked build artifacts, like the manifests that already carry the text.
 
 Recorded takes carry no word intervals (they exist only from the aligner on N1
 and N2), no declared pause, no script and no render voice
@@ -57,16 +104,38 @@ from typing import Any, Callable, Iterable, Iterator
 import numpy as np
 
 import audio_qc_n1_corpus
+import audio_qc_n2_resynthesis
 import audio_qc_qualification as m1
 from lib import audio_qc, audio_qc_observations
-from lib.qc_qualification import injectors, policy as policy_module, recordings, resampling
+from lib.playback_capture import resample as polyphase_resample
+from lib.qc_qualification import injectors, language_swap, policy as policy_module, recordings, resampling
 from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
 
 TAKES_KIND = "audio-qc-calibration-takes"
 # FLEURS human recordings (population N1), in the same take shape.
 N1_KIND = audio_qc_n1_corpus.MANIFEST_KIND
-TAKES_KINDS = (TAKES_KIND, N1_KIND)
+# Their codec resyntheses (population N2): eligible, generated 24 kHz takes.
+N2_KIND = audio_qc_n2_resynthesis.MANIFEST_KIND
+TAKES_KINDS = (TAKES_KIND, N1_KIND, N2_KIND)
+COHORT_KINDS = (N1_KIND, N2_KIND)
+POPULATIONS = {TAKES_KIND: "N3", N1_KIND: "N1", N2_KIND: "N2"}
+DEFAULT_N2_CLASSES = ("A", "B", "C", "D", "F")
+# Source families per (injector, severity) cell, by population; 0 is every source.
+DEFAULT_SAMPLE_PER_CELL = {"N3": 0, "N1": 0, "N2": 150}
+DEFAULT_SAMPLE_SEED = 1
+SAMPLE_SCHEMA = "vocello.audioqc.injection-sampling/1"
+ALIGNMENTS_KIND = "audio-qc-alignments"
+ALIGNER_JUDGE = "align.qwen3-forcedaligner-0.6b@1"
+ALIGNMENT_STATUSES = ("complete", "no-evidence", "audio-differs", "text-differs", "not-run", "out-of-scope",
+                      "unavailable", "not-in-cache", "cache-entry-invalid")
+# With word intervals, these injectors run their catalog variants instead of their word-free take-* ones.
+WORD_CATALOG_INJECTORS = ("BND-TRUNC",)
+TEXT_POLICY_N3 = ("entries carry the source take's fields except its text, bound by textSHA256; the text stays in "
+                  "the takes manifest")
+TEXT_POLICY_EMBEDDED = ("entries carry their text (the source take's; for a language swap the expected L1 text), "
+                        "bound by textSHA256, for the orchestrator's content and language metrics; the set is an "
+                        "untracked build artifact, like the takes manifest")
 # The take lane's statuses (scripts/audio_qc_calibration_takes.py): only generated takes have audio.
 TAKE_STATUSES = ("generated", "rejected", "failed", "missing")
 SET_KIND = "audio-qc-injection-set"
@@ -78,6 +147,8 @@ SEVERITY_SWEEP = ("sham", "mild", "moderate", "severe")
 DEFAULT_CLASSES = ("A", "C", "F")
 DEFAULT_CATALOG_SEED = 7
 PI_MAX = (0.05, 0.10, 0.20)
+DEFAULT_CACHE_ROOT = Path(os.environ.get("QVOICE_DELIVERY_ANALYSIS_CACHE",
+                                         Path(__file__).resolve().parents[1] / "build/cache/delivery-analysis"))
 TAKE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 # The v8 report's numeric fields that measurements.json keeps (no text, no path).
@@ -93,6 +164,18 @@ DONOR_SWAP_STATUS = {
     "status": "deferred",
     "reason": "a donor pair's second take is another rendering with its own timing, not the time-aligned "
               "re-render the swap splices; aligning them needs word intervals, which N3 never has",
+}
+COHORT_SWAP_STATUS = {
+    "injector": injectors.CATALOG["IDN-SWAP"].key,
+    "status": "not-applicable",
+    "reason": "an identity swap splices a time-aligned re-render of the same script by a second voice; a human "
+              "recording has no script to re-render and no render voice",
+}
+# Why a language swap cannot be built from a manifest of this kind (None: it can).
+LANGUAGE_SWAP_ISSUES = {
+    TAKES_KIND: "natural takes read the CC0 script pool, not FLoRes parallel sentences",
+    N1_KIND: "N1 recordings are 16 kHz and a swap presents the donor's audio as it is; build swaps on the N2 cohort",
+    N2_KIND: None,
 }
 
 
@@ -148,7 +231,10 @@ def load_takes(path: Path) -> tuple[dict, str]:
     if not isinstance(manifest, dict) or manifest.get("kind") not in TAKES_KINDS or manifest.get("schemaVersion") != 1:
         raise CalibrationError(f"{path.name} is not an {' or '.join(TAKES_KINDS)} schema 1 manifest")
     n1 = manifest["kind"] == N1_KIND
+    n2 = manifest["kind"] == N2_KIND
     if n1 and (issues := audio_qc_n1_corpus.manifest_digest_issues(manifest)):
+        raise CalibrationError(f"{path.name}: {issues[0]}")
+    if n2 and (issues := audio_qc_n2_resynthesis.manifest_digest_issues(manifest)):
         raise CalibrationError(f"{path.name}: {issues[0]}")
     takes = manifest.get("takes")
     if not isinstance(takes, list):
@@ -159,6 +245,11 @@ def load_takes(path: Path) -> tuple[dict, str]:
         if not isinstance(take_id, str) or not TAKE_ID.fullmatch(take_id) or take_id in seen:
             raise CalibrationError("every take has a unique takeID of letters, digits, '.', '_' and '-'")
         seen.add(take_id)
+        if n2:
+            # An N2 manifest lists only completed round trips: each take is an eligible, generated 24 kHz file.
+            if take.get("population") != "N2" or take.get("eligible") is not True or "recording" in take:
+                raise CalibrationError(f"{take_id}: an N2 take is an eligible population N2 resynthesis")
+            take.setdefault("status", "generated")
         if take.get("status") not in TAKE_STATUSES:
             raise CalibrationError(f"{take_id}: status is one of {', '.join(TAKE_STATUSES)}")
         if not isinstance(take.get("family"), str) or not take["family"]:
@@ -252,9 +343,17 @@ def derive_seed(source_wav_sha256: str, injector_key: str, catalog_seed: int) ->
 
 
 def stratum(take: dict) -> str:
-    if take.get("population") == "N1":
-        return f"N1/{take.get('language')}"
+    if take.get("population") in ("N1", "N2"):
+        return f"{take['population']}/{take.get('language')}"
     return f"N3/{take.get('language')}/{take.get('mode')}"
+
+
+def population_of(manifest: dict) -> str:
+    return POPULATIONS[manifest["kind"]]
+
+
+def text_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def voice_label(take: dict) -> dict:
@@ -271,9 +370,18 @@ def voice_label(take: dict) -> dict:
 # The plan
 # --------------------------------------------------------------------------- #
 
-def build_plan(classes: Iterable[str]) -> list[dict]:
-    """Every catalog injector at sham, mild, moderate and severe: scheduled, replaced or out of scope."""
+def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_issue: str | None = None,
+               language_swap_rows: bool = False) -> list[dict]:
+    """Every catalog injector at sham, mild, moderate and severe: scheduled, replaced or out of scope.
+
+    `words`: the sources carry the aligner's word intervals, so a catalog
+    variant that needs only words (and pauses) is scheduled, and the injectors
+    of `WORD_CATALOG_INJECTORS` run their catalog variants instead of their
+    take-* ones. `language_swap_rows` adds the LNG-SWAP rows (class D), refused
+    with `language_swap_issue` when the manifest cannot build them.
+    """
     scope = sorted(set(classes))
+    available = {"words", "pauses"} if words else set()
     rows = []
     for injector in injectors.CATALOG.values():
         in_scope = bool(set(injector.classes) & set(scope))
@@ -284,23 +392,313 @@ def build_plan(classes: Iterable[str]) -> list[dict]:
             chosen = recording.get(f"take-{severity}")
             row = {"injector": injector.key, "injectorID": injector.injector_id, "classes": list(injector.classes),
                    "severity": severity, "catalogVariant": catalog.name, "catalogNeeds": catalog_needs}
+            word_catalog = words and injector.injector_id in WORD_CATALOG_INJECTORS
             if not in_scope:
                 row.update(status="out-of-scope", variant=None,
                            reason=f"classes {'/'.join(injector.classes)} are outside this set ({'/'.join(scope)})")
-            elif chosen is not None:
+            elif chosen is not None and not word_catalog:
                 row.update(status="scheduled", variant=chosen.name, parameters=dict(chosen.parameters),
                            replaces=catalog.name if catalog_needs else None)
             else:
                 # A catalog variant that needs what no recording has is still attempted on every
                 # take, so the refusals it raises are counted with their reason.
-                row.update(status="not-applicable" if catalog_needs else "scheduled", variant=catalog.name,
-                           parameters=dict(catalog.parameters))
+                row.update(status="not-applicable" if set(catalog_needs) - available else "scheduled",
+                           variant=catalog.name, parameters=dict(catalog.parameters))
+                if word_catalog and chosen is not None:
+                    row["replacesRecordingVariant"] = chosen.name
+            rows.append(row)
+    if language_swap_rows or "D" in scope:
+        description = language_swap.describe()
+        for variant, parameters in language_swap.VARIANTS.items():
+            row = {"injector": language_swap.KEY, "injectorID": language_swap.INJECTOR_ID,
+                   "classes": list(language_swap.CLASSES), "severity": variant, "catalogVariant": None,
+                   "catalogNeeds": ["parallel recordings"], "mechanism": description["mechanism"]}
+            if "D" not in scope:
+                row.update(status="out-of-scope", variant=None,
+                           reason=f"classes D are outside this set ({'/'.join(scope)})")
+            elif language_swap_issue is not None:
+                row.update(status="not-applicable", variant=None, reason=language_swap_issue)
+            else:
+                row.update(status="scheduled", variant=variant, parameters=dict(parameters))
             rows.append(row)
     return rows
 
 
 def schedule(plan: list[dict]) -> list[tuple[str, str]]:
-    return [(row["injectorID"], row["variant"]) for row in plan if row["status"] != "out-of-scope"]
+    """The T1 catalog variants to attempt on each source (language swaps are built apart)."""
+    return [(row["injectorID"], row["variant"]) for row in plan
+            if row["status"] != "out-of-scope" and row["injectorID"] in injectors.CATALOG]
+
+
+def swaps_scheduled(plan: list[dict]) -> list[str]:
+    return [row["variant"] for row in plan
+            if row["injectorID"] == language_swap.INJECTOR_ID and row["status"] == "scheduled"]
+
+
+def injector_classes(injector_id: str) -> tuple[str, ...]:
+    if injector_id == language_swap.INJECTOR_ID:
+        return language_swap.CLASSES
+    return injectors.CATALOG[injector_id].classes
+
+
+# --------------------------------------------------------------------------- #
+# Word intervals (the aligner's L1 output)
+# --------------------------------------------------------------------------- #
+
+def interval_pairs(record: dict) -> list[tuple[float, float]]:
+    return [(float(item["start"]), float(item["end"])) for item in record.get("intervals") or []]
+
+
+def load_alignments(path: Path, manifest_sha256: str) -> tuple[dict, str]:
+    """An alignments export bound to this takes manifest, and the SHA-256 of its bytes."""
+    raw = path.read_bytes()
+    try:
+        alignments = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise CalibrationError(f"{path.name} is not JSON: {error}") from error
+    if not isinstance(alignments, dict) or alignments.get("kind") != ALIGNMENTS_KIND \
+            or alignments.get("schemaVersion") != 1 or not isinstance(alignments.get("takes"), dict):
+        raise CalibrationError(f"{path.name} is not an {ALIGNMENTS_KIND} schema 1 file")
+    if (alignments.get("takesManifest") or {}).get("sha256") != manifest_sha256:
+        raise CalibrationError(f"{path.name} was exported for another takes manifest")
+    if json_digest(alignments["takes"]) != alignments.get("takesSHA256"):
+        raise CalibrationError(f"{path.name}: its takes differ from its takesSHA256")
+    for take_id, record in alignments["takes"].items():
+        if not isinstance(record, dict) or record.get("status") not in ALIGNMENT_STATUSES:
+            raise CalibrationError(f"{path.name}: {take_id} names no alignment status")
+    return alignments, hashlib.sha256(raw).hexdigest()
+
+
+def alignment_context(record: dict | None) -> dict:
+    """What `_source_fixture` needs of a take's alignment: the record, or why there is none."""
+    if record is None:
+        return {"record": None, "status": "no alignment was exported for the take"}
+    if record["status"] != "complete":
+        return {"record": None, "status": f"aligner: {record['status']}"}
+    return {"record": record, "status": "complete"}
+
+
+def preview_alignment(take: dict, record: dict | None) -> recordings.WordAlignment | None:
+    """The take's word alignment at its declared duration (the sampler's view; inject re-derives it)."""
+    if record is None or record.get("status") != "complete":
+        return None
+    frames = int(round(float(take.get("durationSeconds") or 0.0) * recordings.ENGINE_SAMPLE_RATE))
+    return recordings.word_alignment(interval_pairs(record), frames=frames)
+
+
+def export_alignments(takes_path: Path, bundle: Path, output: Path, *, cache_root: Path,
+                      judge_id: str = ALIGNER_JUDGE, registry_path: Path | None = None) -> dict:
+    """The aligner's intervals per take, from the L1 entries the orchestrator stored for a panel bundle.
+
+    The L1 key is rebuilt as the orchestrator computed it per row
+    (`layered_cache.l1_identity`): the take's original WAV and canonical
+    derivative digests (the evidence records both), the judge's identity with
+    its output identity as the evidence records it and its model fields from
+    the registry pins (`panel_jobs.panel_identity`), and the request
+    `panel_jobs.panel_request` builds from the take's language and text. The
+    entry is loaded through `DeliveryAnalysisCache.load`, which verifies its
+    record, identity and payload digests. Unit texts leave as SHA-256 digests.
+    """
+    from dataclasses import replace as replace_identity
+    from types import SimpleNamespace
+
+    from delivery_analysis_cache import AnalysisCacheError, DeliveryAnalysisCache
+    from lib.jsonio import sha256_json
+    from lib.qc_pipeline.evidence import BUNDLE_SCHEMA
+    from lib.qc_pipeline.layered_cache import L1_LAYER, l1_identity
+    from lib.qc_pipeline.panel_jobs import judge_scope, panel_identity, panel_request, profile
+
+    manifest, manifest_sha256 = load_takes(takes_path)
+    registry_path = registry_path or Path(__file__).resolve().parents[1] / "config" / "audio-qc-judges.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    judge = (registry.get("judges") or {}).get(judge_id)
+    spec = profile(judge_id)
+    if not isinstance(judge, dict) or spec.category != "alignment":
+        raise CalibrationError(f"{judge_id} is not a registered forced aligner")
+    scope = judge_scope(judge)
+    # The model fields of the judge's L1 identity; each take's output identity comes from its evidence.
+    model = panel_identity(judge_id, registry, {"threads": None})
+    try:
+        bundle_record = json.loads((bundle / "bundle.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise CalibrationError(f"the bundle's bundle.json is unreadable ({type(error).__name__})") from error
+    body = {key: value for key, value in bundle_record.items() if key != "bundleDigest"}
+    if bundle_record.get("schema") != BUNDLE_SCHEMA \
+            or bundle_record.get("bundleDigest") != sha256_json(body, ascii=False, allow_nan=False):
+        raise CalibrationError(f"the bundle is not a {BUNDLE_SCHEMA} whose digest matches its content")
+    evidence: dict[str, dict] = {}
+    base = bundle.resolve()
+    for entry in bundle_record.get("takes") or []:
+        relative = entry.get("evidence") if isinstance(entry, dict) else None
+        target = (bundle / str(relative)).resolve()
+        if not isinstance(relative, str) or base not in target.parents or not target.is_file() \
+                or file_sha256(target) != entry.get("evidenceSHA256"):
+            raise CalibrationError(f"take {entry.get('takeID') if isinstance(entry, dict) else '?'}: its evidence "
+                                   "file is missing, outside the bundle or changed")
+        record = json.loads(target.read_text(encoding="utf-8"))
+        evidence[str((record.get("take") or {}).get("takeID"))] = record
+    cache = DeliveryAnalysisCache(cache_root)
+    takes: dict[str, dict] = {}
+    identities: set[str] = set()
+    for take in generated_takes(manifest):
+        take_id, text = take["takeID"], take["text"]
+        record = evidence.get(take_id)
+        base_record = {"language": take["language"], "audioSHA256": take["wavSHA256"]}
+        if record is None:
+            takes[take_id] = {**base_record, "status": "no-evidence"}
+            continue
+        seen = record.get("take") or {}
+        if seen.get("audioSHA256") != take["wavSHA256"]:
+            takes[take_id] = {**base_record, "status": "audio-differs"}
+            continue
+        if seen.get("textSHA256") != text_sha256(text):
+            takes[take_id] = {**base_record, "status": "text-differs"}
+            continue
+        measurement = next((item for item in record.get("measurements") or [] if item.get("judge") == judge_id), None)
+        request = panel_request(spec, scope, {"language": take["language"], "referenceText": text,
+                                              "scriptSHA256": text_sha256(text)})
+        if measurement is None:
+            takes[take_id] = {**base_record, "status": "out-of-scope" if request is None else "not-run"}
+            continue
+        if measurement.get("status") != "complete" or request is None:
+            status = measurement.get("status") if measurement.get("status") in ALIGNMENT_STATUSES else "unavailable"
+            takes[take_id] = {**base_record, "status": "out-of-scope" if request is None else status,
+                              "reasons": [str(reason) for reason in measurement.get("reasons") or []]}
+            continue
+        identity = replace_identity(model, output_identity=measurement["outputIdentity"])
+        canonical = SimpleNamespace(original_wav_sha256=seen["audioSHA256"],
+                                    canonical_derivative_sha256=seen["canonicalPCMSHA256"])
+        key = l1_identity(canonical, identity, request)
+        try:
+            payload = cache.load(key)
+        except AnalysisCacheError:
+            takes[take_id] = {**base_record, "status": "cache-entry-invalid"}
+            continue
+        if payload is None:
+            takes[take_id] = {**base_record, "status": "not-in-cache", "l1Key": key.key}
+            continue
+        units = [str(unit) for unit in payload.get("units") or []]
+        identities.add(identity.output_identity)
+        takes[take_id] = {
+            **base_record, "status": "complete", "canonicalPCMSHA256": seen["canonicalPCMSHA256"],
+            "outputIdentity": identity.output_identity, "l1Key": key.key,
+            "units": len(units), "unitsSHA256": json_digest(units),
+            "intervals": [{"start": float(item["start"]), "end": float(item["end"]),
+                           "unitSHA256": text_sha256(str(item.get("unit", "")))}
+                          for item in payload.get("intervals") or []],
+        }
+    statuses = Counter(record["status"] for record in takes.values())
+    issues = Counter()
+    for take in generated_takes(manifest):
+        preview = preview_alignment(take, takes.get(take["takeID"]))
+        if preview is not None:
+            issues[preview.issue or "usable"] += 1
+    export = {
+        "schemaVersion": 1, "kind": ALIGNMENTS_KIND, "generator": GENERATOR,
+        "privacy": "intervals in seconds and each unit's text as a SHA-256 only: no text, transcript or path",
+        "takesManifest": {"sha256": manifest_sha256, "kind": manifest["kind"], "runID": manifest.get("runID")},
+        "bundle": {"bundleDigest": bundle_record.get("bundleDigest"), "runID": bundle_record.get("runID"),
+                   "manifestSHA256": bundle_record.get("manifestSHA256")},
+        "aligner": {"judge": judge_id, "layer": f"{L1_LAYER}:{judge_id}", "modelID": model.model_id,
+                    "modelRevision": model.model_revision, "weightsSHA256": model.weights_sha256,
+                    "outputIdentities": sorted(identities),
+                    "timeline": "seconds on the take's own timeline: the aligner read the take's 16 kHz canonical "
+                                "derivative, which the zero-phase resampler keeps sample-aligned"},
+        "wordRule": {"rule": recordings.ALIGNMENT_RULE, "pauseGapSeconds": recordings.PAUSE_GAP_SECONDS,
+                     "minimumWords": recordings.MINIMUM_WORDS,
+                     "maximumSqueezedFraction": recordings.MAXIMUM_SQUEEZED_FRACTION,
+                     "overrunToleranceSeconds": recordings.ALIGNER_FRAME_SECONDS},
+        "counts": {"takes": len(takes), "byStatus": dict(sorted(statuses.items())),
+                   "wordAlignment": dict(sorted(issues.items()))},
+        "takes": takes, "takesSHA256": json_digest(takes),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(export, indent=1, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
+                         encoding="utf-8")
+    os.replace(temporary, output)
+    return export
+
+
+# --------------------------------------------------------------------------- #
+# Sampling
+# --------------------------------------------------------------------------- #
+
+def _sample_rank(seed: int, key: str, kind: str, value: str) -> str:
+    return hashlib.sha256("|".join((SAMPLE_SCHEMA, str(seed), key, kind, value)).encode("utf-8")).hexdigest()
+
+
+def stratified_sample(pool: dict[str, str], count: int, *, seed: int, key: str) -> list[str]:
+    """`count` families of `pool` (family -> language), as even across languages as the pool allows.
+
+    Within a language, families go in ascending seeded rank; the quotas fill
+    round-robin over the languages in their own seeded order until `count` is
+    reached or every language is exhausted. Deterministic in (pool, count,
+    seed, key); the result is sorted.
+    """
+    by_language: dict[str, list[str]] = {}
+    for family, language in pool.items():
+        by_language.setdefault(language, []).append(family)
+    for language, families in by_language.items():
+        families.sort(key=lambda family: _sample_rank(seed, key, "family", family))
+    order = sorted(by_language, key=lambda language: _sample_rank(seed, key, "language", language))
+    quota = dict.fromkeys(order, 0)
+    left = count
+    while left > 0:
+        progressed = False
+        for language in order:
+            if left and quota[language] < len(by_language[language]):
+                quota[language] += 1
+                left -= 1
+                progressed = True
+        if not progressed:
+            break
+    return sorted(family for language in order for family in by_language[language][:quota[language]])
+
+
+def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: int,
+                   usable_words: set[str] | None) -> dict:
+    """One seeded, language-stratified family sample per injector, shared by its sham and every severity.
+
+    `usable_words`: the takes whose alignment is usable, when the set has word
+    intervals; a word-level injector draws only from their families.
+    """
+    languages: dict[str, str] = {}
+    for take in takes:
+        languages.setdefault(take["family"], str(take.get("language")))
+    swap_families = {take["family"] for take in language_swap.eligible_sources(takes)}
+    worded = None if usable_words is None else {take["family"] for take in takes if take["takeID"] in usable_words}
+    chosen: dict[str, dict] = {}
+    for row in plan:
+        if row["status"] == "out-of-scope" or row["variant"] is None or row["injector"] in chosen:
+            continue
+        rows = [other for other in plan if other["injector"] == row["injector"] and other["variant"] is not None
+                and other["status"] != "out-of-scope"]
+        if row["injectorID"] == language_swap.INJECTOR_ID:
+            needs = ["parallel recordings"]
+            pool = {family: language for family, language in languages.items() if family in swap_families}
+        else:
+            needs = sorted({need for other in rows for need in injectors.needs(
+                other["injectorID"], injectors.CATALOG[other["injectorID"]].variant(other["variant"]).parameters)})
+            pool = dict(languages)
+            if "words" in needs and worded is not None:
+                pool = {family: language for family, language in pool.items() if family in worded}
+        families = stratified_sample(pool, per_cell, seed=seed, key=row["injector"])
+        chosen[row["injector"]] = {
+            "needs": needs, "eligible": dict(sorted(Counter(pool.values()).items())),
+            "chosen": dict(sorted(Counter(pool[family] for family in families).items())),
+            "families": families, "familiesSHA256": json_digest(families),
+        }
+    return {
+        "schema": SAMPLE_SCHEMA, "perCell": per_cell, "seed": seed, "unit": "source family", "stratum": "language",
+        "rank": f"within each language, ascending SHA-256('{SAMPLE_SCHEMA}|<seed>|<injector>|family|<family>'); "
+                f"quotas fill round-robin over the languages in ascending SHA-256('{SAMPLE_SCHEMA}|<seed>|<injector>|"
+                "language|<language>') until perCell families or the eligible pool runs out",
+        "shared": "one sample per injector: its sham and every severity use the same families, so each (injector, "
+                  "severity) cell and its sham hold the same families (for LNG-SWAP, the same source families; "
+                  "each clip's family is its donor audio's)",
+        "injectors": chosen,
+    }
 
 
 def recording_variants_description() -> list[dict]:
@@ -349,7 +747,8 @@ def parallel(function: Callable[[Any], Any], tasks: list[Any], jobs: int, label:
 # --------------------------------------------------------------------------- #
 
 def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: str, wav_sha256: str,
-           source_wav_sha256: str, rate: int, source_resampling: dict | None = None) -> dict:
+           source_wav_sha256: str, rate: int, source_resampling: dict | None = None, *, embed_text: bool = False,
+           source_alignment: dict | None = None) -> dict:
     injector = injectors.CATALOG[injection.injector.split("@")[0]]
     entry = {key: value for key, value in take.items() if key != "text"}
     entry.update(
@@ -357,6 +756,8 @@ def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: s
         wavPath=wav_path, wavSHA256=wav_sha256, durationSeconds=round(injection.samples.size / rate, 6),
         textSHA256=hashlib.sha256(take["text"].encode("utf-8")).hexdigest(),
     )
+    if embed_text:
+        entry["text"] = take["text"]
     entry["injection"] = {
         "mechanism": injectors.MECHANISM, "catalogVersion": injectors.CATALOG_VERSION,
         "injector": injection.injector, "injectorID": injector.injector_id, "injectorVersion": injector.version,
@@ -368,17 +769,59 @@ def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: s
     if source_resampling is not None:
         # The source reached the engine rate through this resampler; sourcePCMSHA256 is the resampled PCM's.
         entry["injection"]["sourceResampling"] = source_resampling
+    if source_alignment is not None:
+        # The source carried the aligner's word and pause intervals (`recordings.word_alignment`).
+        entry["injection"]["sourceAlignment"] = source_alignment
     return _plain(entry)
+
+
+def _swap_entry(take: dict, donor: dict, variant: str, clip_id: str, wav_path: str, wav_sha256: str,
+                samples: np.ndarray, source_pcm_sha256: str, seed: int, *, embed_text: bool) -> dict:
+    """A language swap: the donor's audio and identity, presented with the source's language and text."""
+    entry = {key: value for key, value in donor.items() if key != "text"}
+    entry.update(
+        takeID=clip_id, sourceTakeID=take["takeID"], family=donor["family"], language=take["language"],
+        status="generated", wavPath=wav_path, wavSHA256=wav_sha256,
+        durationSeconds=round(samples.size / recordings.ENGINE_SAMPLE_RATE, 6), textSHA256=text_sha256(take["text"]),
+    )
+    if embed_text:
+        entry["text"] = take["text"]
+    entry["injection"] = language_swap.injection(
+        variant=variant, source=take, donor=donor, seed=seed, source_pcm_sha256=source_pcm_sha256,
+        output_pcm_sha256=pcm_digest(samples), frames=int(samples.size))
+    return _plain(entry)
+
+
+def _source_fixture(task: dict) -> tuple[Any, str, dict | None, str | None]:
+    """The take as an injector source: its fixture, WAV digest, word alignment (if usable) and why not."""
+    take = task["take"]
+    fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"], family=take["family"],
+                                                stratum=stratum(take), text=take["text"],
+                                                expected_sha256=take["wavSHA256"], source_rate=source_rate(take))
+    context = task.get("alignment")
+    if context is None:
+        return fixture, digest, None, None
+    record = context["record"]
+    if record is None:
+        return fixture, digest, None, context["status"]
+    alignment = recordings.word_alignment(interval_pairs(record), frames=fixture.samples.size)
+    if not alignment.usable:
+        return fixture, digest, None, f"alignment refused: {alignment.issue}"
+    description = {**alignment.describe(), "recordSHA256": json_digest(record)}
+    return recordings.with_alignment(fixture, alignment), digest, description, None
+
+
+def _needs_words(injector_id: str, variant: str) -> bool:
+    return "words" in injectors.needs(injector_id, injectors.CATALOG[injector_id].variant(variant).parameters)
 
 
 def _inject_take(task: dict) -> dict:
     take = task["take"]
     rate = source_rate(take)
-    fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"], family=take["family"],
-                                                stratum=stratum(take), text=take["text"],
-                                                expected_sha256=take["wavSHA256"], source_rate=rate)
+    fixture, digest, source_alignment, word_status = _source_fixture(task)
     source_resampling = recordings.resampling_recipe(rate)
     output = Path(task["output"])
+    embed_text = bool(task.get("embedText"))
     entries, skips = [], []
     written = 0
     for injector_id, variant in task["schedule"]:
@@ -387,7 +830,10 @@ def _inject_take(task: dict) -> dict:
         try:
             injection = injectors.inject(injector_id, variant, fixture, seed)
         except injectors.InjectorNotApplicable as error:
-            skips.append([key, variant, _reason(error, fixture.fixture_id, key, variant)])
+            reason = _reason(error, fixture.fixture_id, key, variant)
+            if word_status is not None and _needs_words(injector_id, variant):
+                reason = f"{reason} ({word_status})"
+            skips.append([key, variant, reason])
             continue
         clip_id = f"{take['takeID']}__{injector_id}__{variant}"
         relative = f"wav/{clip_id}.wav"
@@ -395,7 +841,19 @@ def _inject_take(task: dict) -> dict:
                                                 sample_rate=fixture.sample_rate)
         written += (output / relative).stat().st_size
         entries.append(_entry(take, injection, clip_id, relative, wav_sha256, digest, fixture.sample_rate,
-                              source_resampling))
+                              source_resampling, embed_text=embed_text, source_alignment=source_alignment))
+    for swap in task.get("languageSwap") or ():
+        donor, variant = swap["donor"], swap["variant"]
+        donor_wav = Path(swap["wav"])
+        if not donor_wav.is_file() or file_sha256(donor_wav) != donor["wavSHA256"]:
+            raise recordings.RecordingError(f"{donor['takeID']}: its WAV is missing or differs from the manifest")
+        clip_id = f"{take['takeID']}__{language_swap.INJECTOR_ID}__{variant}"
+        relative = f"wav/{clip_id}.wav"
+        language_swap.copy_as_is(donor_wav, output / relative)
+        samples = recordings.read_pcm16_wav(output / relative)
+        written += (output / relative).stat().st_size
+        entries.append(_swap_entry(take, donor, variant, clip_id, relative, file_sha256(output / relative), samples,
+                                   fixture.digest, task["sampleSeed"], embed_text=embed_text))
     return {"takeID": take["takeID"], "entries": entries, "skips": skips, "bytes": written}
 
 
@@ -438,14 +896,80 @@ def _stream_json(temporary: Path, head: dict, key: str, items: Iterable[dict], t
         stream.write(",\n".join(body) + "\n}\n")
 
 
-def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: Iterable[str], jobs: int) -> dict:
+def default_classes(manifest: dict) -> tuple[str, ...]:
+    return DEFAULT_N2_CLASSES if manifest["kind"] == N2_KIND else DEFAULT_CLASSES
+
+
+def plan_for(manifest: dict, classes: Iterable[str], *, words: bool) -> list[dict]:
+    cohort = manifest["kind"] in COHORT_KINDS
+    return build_plan(classes, words=words, language_swap_issue=LANGUAGE_SWAP_ISSUES[manifest["kind"]],
+                      language_swap_rows=cohort)
+
+
+def usable_word_takes(generated: list[dict], alignments: dict | None) -> set[str] | None:
+    if alignments is None:
+        return None
+    usable = set()
+    for take in generated:
+        preview = preview_alignment(take, alignments["takes"].get(take["takeID"]))
+        if preview is not None and preview.usable:
+            usable.add(take["takeID"])
+    return usable
+
+
+def swap_sources(generated: list[dict], plan: list[dict], sampling: dict | None) -> list[str]:
+    """The takes that receive language swaps, in manifest order (sampled when the set samples)."""
+    if not swaps_scheduled(plan):
+        return []
+    eligible = language_swap.eligible_sources(generated)
+    if sampling is not None:
+        families = set((sampling["injectors"].get(language_swap.KEY) or {}).get("families") or ())
+        eligible = [take for take in eligible if take["family"] in families]
+    return [take["takeID"] for take in eligible]
+
+
+def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: Iterable[str] | None, jobs: int,
+               alignments_path: Path | None = None, sample_per_cell: int | None = None,
+               sample_seed: int = DEFAULT_SAMPLE_SEED, embed_text: bool | None = None) -> dict:
     manifest, manifest_sha256 = load_takes(takes_path)
-    plan = build_plan(classes)
+    population = population_of(manifest)
+    classes = tuple(sorted(set(classes if classes is not None else default_classes(manifest))))
+    per_cell = DEFAULT_SAMPLE_PER_CELL[population] if sample_per_cell is None else sample_per_cell
+    embed = (manifest["kind"] in COHORT_KINDS) if embed_text is None else bool(embed_text)
+    alignments, alignments_sha256 = (None, None)
+    if alignments_path is not None:
+        alignments, alignments_sha256 = load_alignments(alignments_path, manifest_sha256)
+    plan = plan_for(manifest, classes, words=alignments is not None)
     scheduled = schedule(plan)
     generated = generated_takes(manifest)
-    tasks = [{"take": take, "wav": str(take_wav(takes_path, take)), "output": str(output),
-              "schedule": scheduled, "catalogSeed": catalog_seed} for take in generated]
-    log(f"inject: {len(generated)} generated takes x {len(scheduled)} scheduled variants, {jobs} jobs")
+    usable = usable_word_takes(generated, alignments)
+    sampling = build_sampling(generated, plan, per_cell=per_cell, seed=sample_seed, usable_words=usable) \
+        if per_cell else None
+    by_id = {take["takeID"]: take for take in generated}
+    sources = swap_sources(generated, plan, sampling)
+    donors = language_swap.choose_donors(generated, sources, seed=sample_seed)
+    swap_variants = swaps_scheduled(plan)
+    chosen = {key: set(value["families"]) for key, value in (sampling or {}).get("injectors", {}).items()}
+    tasks = []
+    for take in generated:
+        task = {"take": take, "wav": str(take_wav(takes_path, take)), "output": str(output),
+                "schedule": scheduled, "catalogSeed": catalog_seed}
+        if sampling is not None:
+            task["schedule"] = [(injector_id, variant) for injector_id, variant in scheduled
+                                if take["family"] in chosen[injectors.CATALOG[injector_id].key]]
+        if alignments is not None:
+            task["alignment"] = alignment_context(alignments["takes"].get(take["takeID"]))
+        if embed:
+            task["embedText"] = True
+        if take["takeID"] in donors:
+            task["sampleSeed"] = sample_seed
+            task["languageSwap"] = [{"variant": variant, "donor": by_id[donors[take["takeID"]][variant]],
+                                     "wav": str(take_wav(takes_path, by_id[donors[take["takeID"]][variant]]))}
+                                    for variant in swap_variants]
+        if sampling is None or task["schedule"] or task.get("languageSwap"):
+            tasks.append(task)
+    log(f"inject: {len(tasks)} of {len(generated)} generated takes x {len(scheduled)} scheduled variants"
+        + (f" ({per_cell} families per cell)" if sampling is not None else "") + f", {jobs} jobs")
     skipped: dict[str, dict[str, Counter]] = {}
     counts = Counter()
     written = 0
@@ -472,20 +996,41 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
                           "sham draws the same positions as its positives",
         "plan": plan, "recordingVariants": recording_variants_description(),
         "identitySwap": {**DONOR_SWAP_STATUS, "donorPairs": donor_pairs(manifest)},
-        "textPolicy": "entries carry the source take's fields except its text, bound by textSHA256; the text "
-                      "stays in the takes manifest",
+        "textPolicy": TEXT_POLICY_EMBEDDED if embed else TEXT_POLICY_N3,
     }
+    if manifest["kind"] in COHORT_KINDS:
+        head["identitySwap"] = dict(COHORT_SWAP_STATUS)
+        head["sourceManifest"]["population"] = population
+    if alignments is not None:
+        head["alignments"] = {
+            "sha256": alignments_sha256, "takesSHA256": alignments["takesSHA256"],
+            "aligner": alignments.get("aligner"), "wordRule": alignments.get("wordRule"),
+            "usableTakes": len(usable or ()),
+            "note": "word-level variants run on the takes whose alignment is usable (recordings.word_alignment); "
+                    "each such entry records sourceAlignment",
+        }
+    if sampling is not None:
+        head["sampling"] = sampling
+    if swap_variants:
+        head["languageSwap"] = {**language_swap.describe(), "seed": sample_seed,
+                                "eligibleSources": len(language_swap.eligible_sources(generated)),
+                                "sources": len(donors),
+                                "pool": "this cohort manifest (one split): donors share the source's FLoRes "
+                                        "sentence (scriptID)"}
 
     def tail(entries_sha256: str) -> dict:
         not_applicable = {key: {"count": sum(sum(reasons.values()) for reasons in variants.values()),
                                 "byVariant": {variant: dict(sorted(reasons.items()))
                                               for variant, reasons in sorted(variants.items())}}
                           for key, variants in sorted(skipped.items())}
-        return {"entriesSHA256": entries_sha256, "notApplicable": not_applicable,
-                "counts": {"generatedTakes": len(generated),
-                           "missingTakes": sum(1 for take in manifest["takes"] if take["status"] != "generated"),
-                           "ineligibleTakes": len(ineligible_takes(manifest)),
-                           "shams": counts["S"], "positives": counts["P1"], "wavBytes": written}}
+        summary = {"entriesSHA256": entries_sha256, "notApplicable": not_applicable,
+                   "counts": {"generatedTakes": len(generated),
+                              "missingTakes": sum(1 for take in manifest["takes"] if take["status"] != "generated"),
+                              "ineligibleTakes": len(ineligible_takes(manifest)),
+                              "shams": counts["S"], "positives": counts["P1"], "wavBytes": written}}
+        if sampling is not None:
+            summary["counts"]["sourceTakes"] = len(tasks)
+        return summary
 
     path = output / "injection-set.json"
     _write_streamed(path, head, "entries", entries(), tail)
@@ -507,20 +1052,54 @@ def load_set(path: Path) -> dict:
     return injection_set
 
 
+def _verify_swap(entry: dict, task: dict, fixture_digest: str, digest: str) -> str | None:
+    """A language swap: the donor the choice re-derives, its audio as it is, and what it was presented as."""
+    take = task["take"]
+    recipe = entry.get("injection") or {}
+    variant = str(recipe.get("variant"))
+    swap = (task.get("swaps") or {}).get(variant)
+    if variant not in language_swap.VARIANTS or swap is None:
+        return "no such language swap was chosen for this source"
+    donor = swap["donor"]
+    output = Path(task["setDir"]) / entry["wavPath"]
+    if not output.is_file() or file_sha256(output) != entry.get("wavSHA256"):
+        return "output WAV is missing or its file digest differs"
+    donor_wav = Path(swap["wav"])
+    samples = recordings.read_pcm16_wav(output)
+    expected = language_swap.injection(
+        variant=variant, source=take, donor=donor, seed=task["swapSeed"], source_pcm_sha256=fixture_digest,
+        output_pcm_sha256=pcm_digest(samples), frames=int(samples.size))
+    checks = [
+        (recipe == _plain(expected), "the recipe differs from the re-derived swap (donor, digests or labels)"),
+        (donor_wav.is_file() and file_sha256(donor_wav) == donor["wavSHA256"], "the donor WAV differs"),
+        (entry.get("wavSHA256") == donor["wavSHA256"], "the clip is not the donor's audio as it is"),
+        (recipe.get("sourceWAVSHA256") == digest, "source WAV digest differs"),
+        (entry.get("family") == donor["family"], "family differs from the donor recording's"),
+        (entry.get("language") == take["language"], "the presented language is not the source's"),
+    ]
+    problems = [message for ok, message in checks if not ok]
+    return "; ".join(problems) if problems else None
+
+
 def _verify_take(task: dict) -> list[list[str]]:
     take = task["take"]
     failures: list[list[str]] = []
     rate = source_rate(take)
     try:
-        fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"],
-                                                    family=take["family"], stratum=stratum(take),
-                                                    text=take["text"], expected_sha256=take["wavSHA256"],
-                                                    source_rate=rate)
+        fixture, digest, source_alignment, _status = _source_fixture(task)
     except recordings.RecordingError as error:
         return [[entry["takeID"], f"source: {error}"] for entry in task["entries"]]
     for entry in task["entries"]:
         clip = entry["takeID"]
         recipe = entry.get("injection") or {}
+        if entry.get("textSHA256") != text_sha256(take["text"]) or ("text" in entry and entry["text"] != take["text"]):
+            failures.append([clip, "its text is not its source take's"])
+            continue
+        if recipe.get("injectorID") == language_swap.INJECTOR_ID:
+            problem = _verify_swap(entry, task, fixture.digest, digest)
+            if problem:
+                failures.append([clip, problem])
+            continue
         try:
             injector = injectors.CATALOG[str(recipe.get("injectorID"))]
             variant = injector.variant(str(recipe.get("variant")))
@@ -537,6 +1116,7 @@ def _verify_take(task: dict) -> list[list[str]]:
             (recipe.get("seed") == derive_seed(digest, injector.key, task["catalogSeed"]),
              "seed differs from its derivation"),
             (entry.get("family") == take["family"], "family differs from the source take's"),
+            (recipe.get("sourceAlignment") == _plain(source_alignment), "source word alignment differs"),
         ]
         problems = [message for ok, message in checks if not ok]
         if problems:
@@ -555,7 +1135,7 @@ def _verify_take(task: dict) -> list[list[str]]:
     return failures
 
 
-def run_verify(set_path: Path, takes_path: Path, *, jobs: int) -> dict:
+def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: Path | None = None) -> dict:
     injection_set = load_set(set_path)
     manifest, manifest_sha256 = load_takes(takes_path)
     failures: list[list[str]] = []
@@ -563,7 +1143,31 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int) -> dict:
         failures.append(["<set>", "the set was built from another takes manifest"])
     if json_digest(injection_set["entries"]) != injection_set.get("entriesSHA256"):
         failures.append(["<set>", "entriesSHA256 differs from the entries"])
-    takes = {take["takeID"]: take for take in generated_takes(manifest)}
+    generated = generated_takes(manifest)
+    takes = {take["takeID"]: take for take in generated}
+    alignments = None
+    declared = injection_set.get("alignments")
+    if declared is not None:
+        if alignments_path is None:
+            failures.append(["<set>", "the set used the aligner's word intervals; verify needs its --alignments"])
+        else:
+            alignments, digest = load_alignments(alignments_path, manifest_sha256)
+            if digest != declared.get("sha256"):
+                failures.append(["<set>", "the alignments differ from the ones the set was built with"])
+                alignments = None
+    sampling = injection_set.get("sampling")
+    plan = injection_set.get("plan") or []
+    if sampling is not None and (declared is None or alignments is not None):
+        redrawn = build_sampling(generated, plan, per_cell=int(sampling.get("perCell") or 0),
+                                 seed=int(sampling.get("seed") or 0),
+                                 usable_words=usable_word_takes(generated, alignments))
+        if _plain(redrawn) != sampling:
+            failures.append(["<set>", "the sampled families differ from a redraw with the set's seed"])
+    swap = injection_set.get("languageSwap")
+    donors: dict[str, dict[str, str]] = {}
+    if swap is not None:
+        donors = language_swap.choose_donors(generated, swap_sources(generated, plan, sampling),
+                                             seed=int(swap.get("seed") or 0))
     grouped: "OrderedDict[str, list[dict]]" = OrderedDict()
     for entry in injection_set["entries"]:
         source = entry.get("sourceTakeID")
@@ -571,9 +1175,22 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int) -> dict:
             failures.append([str(entry.get("takeID")), "its source take is not a generated take of the manifest"])
             continue
         grouped.setdefault(source, []).append(entry)
-    tasks = [{"take": takes[source], "wav": str(take_wav(takes_path, takes[source])), "entries": entries,
-              "setDir": str(set_path.parent), "catalogSeed": injection_set.get("catalogSeed")}
-             for source, entries in grouped.items()]
+    tasks = []
+    for source, entries in grouped.items():
+        task = {"take": takes[source], "wav": str(take_wav(takes_path, takes[source])), "entries": entries,
+                "setDir": str(set_path.parent), "catalogSeed": injection_set.get("catalogSeed")}
+        if alignments is not None:
+            task["alignment"] = alignment_context(alignments["takes"].get(source))
+        if source in donors:
+            task["swapSeed"] = int(swap["seed"])
+            task["swaps"] = {variant: {"donor": takes[donor], "wav": str(take_wav(takes_path, takes[donor]))}
+                             for variant, donor in donors[source].items()}
+        tasks.append(task)
+    expected_swaps = len(swaps_scheduled(plan)) * len(donors)
+    recorded_swaps = sum(1 for entry in injection_set["entries"]
+                         if (entry.get("injection") or {}).get("injectorID") == language_swap.INJECTOR_ID)
+    if recorded_swaps != expected_swaps:
+        failures.append(["<set>", f"{recorded_swaps} language swaps recorded, {expected_swaps} re-derived"])
     for result in parallel(_verify_take, tasks, jobs, "verify"):
         failures.extend(result)
     return {"entries": len(injection_set["entries"]), "sources": len(tasks), "failures": failures,
@@ -588,7 +1205,11 @@ def _score_clip(task: dict) -> dict:
     path = Path(task["wav"])
     if not path.is_file() or file_sha256(path) != task["wavSHA256"]:
         raise CalibrationError(f"{task['clipID']}: its WAV is missing or differs from its digest")
-    samples = recordings.read_pcm16_wav(path)
+    rate = int(task.get("sourceRate") or recordings.ENGINE_SAMPLE_RATE)
+    samples = recordings.read_pcm16_wav(path, sample_rate=rate)
+    if recordings.resampling_recipe(rate) is not None:
+        # An N1 recording reaches the engine rate as it does before any injector (recordings.load_recording).
+        samples = polyphase_resample(samples, rate, recordings.ENGINE_SAMPLE_RATE)
     report = audio_qc.fast_qc_v8(samples, sample_rate=recordings.ENGINE_SAMPLE_RATE, text=task["text"], signal=True)
     fast = {"verdict": report["verdict"], "instabilityVerdict": report["instabilityVerdict"],
             "writtenOutputVerdict": report["writtenOutputVerdict"], "flags": list(report["flags"]),
@@ -598,9 +1219,11 @@ def _score_clip(task: dict) -> dict:
                    "fastQC": fast, "observations": report["signal"]})
 
 
-def _meta(take: dict, clip_id: str, population: str, injection: dict | None) -> dict:
+def _meta(take: dict, clip_id: str, population: str, injection: dict | None, *, family: str | None = None) -> dict:
+    # A clip's family is its entry's: the source take's for a T1 construction, the donor's for a language swap.
     return {
-        "clipID": clip_id, "population": population, "family": take["family"], "sourceTakeID": take["takeID"],
+        "clipID": clip_id, "population": population, "family": family or take["family"],
+        "sourceTakeID": take["takeID"],
         "scriptID": take.get("scriptID"), "language": take.get("language"), "mode": take.get("mode"),
         "takeVariant": take.get("variant"), "voice": voice_label(take), "seed": take.get("seed"),
         "injection": None if injection is None else {
@@ -675,8 +1298,31 @@ def _median(values: list[float]) -> float | None:
     return round(float(np.median(values)), 6) if values else None
 
 
-def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> dict:
-    negatives = [record for record in records if record["population"] == "N3"]
+LABELED_NOTES = {
+    "N2": "N2 negatives are human recordings with published text (T4) resynthesized through the codec: a flag on "
+          "one is a false alarm, so the flag rate's one-sided CP upper bound bounds FAR directly (A2); shown for "
+          "the calibration cohort, report-only until a pre-registered plan scores the confirmation cohort (A5)",
+    "N1": "N1 negatives are human recordings with published text (T4): a flag on one is a false alarm, so the flag "
+          "rate's one-sided CP upper bound bounds FAR directly; N1 alone never qualifies a fail (A2)",
+}
+COHORT_CAVEATS = {
+    "N2": "Nothing here qualifies anything: a record needs a pre-registered plan scored once on the confirmation "
+          "cohort (A5), TPR on two mechanisms (A3) and shams that stay with the clean rate (A4). Fast QC v8's "
+          "bounds stay legacy-unqualified (A10).",
+    "N1": "Nothing here qualifies anything: N1 alone never qualifies a fail (A2), and a record needs N2, a "
+          "pre-registered plan (A5) and TPR on two mechanisms (A3). Fast QC v8's bounds stay legacy-unqualified "
+          "(A10).",
+}
+
+
+def clean_population(report: dict) -> str:
+    """The report's clean population: N3, or N1/N2 for a cohort."""
+    return next(name for name in report["populations"] if name not in ("S", "P1"))
+
+
+def build_report(records: list[dict], *, inputs: dict, injection_set: dict, population: str = "N3") -> dict:
+    clean_key = population.lower()
+    negatives = [record for record in records if record["population"] == population]
     shams = [record for record in records if record["population"] == "S"]
     positives = [record for record in records if record["population"] == "P1"]
     clean_by_take = {record["sourceTakeID"]: record for record in negatives}
@@ -699,15 +1345,18 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
         "alarm": n3_alarm, "fail": _family_rate((record["family"], record["verdict"] == "fail")
                                                 for record in negatives),
         "flags": _flag_rates(negatives),
-        "unlabeledBound": {
+    }
+    if population == "N3":
+        n3["unlabeledBound"] = {
             "note": "N3 carries no labels: FAR <= f / (1 - pi_max), f the flag rate and pi_max the maximum "
                     "defect prevalence; shown for the flag rate's one-sided CP upper bound",
             "flagRateUpper": n3_alarm["upper"],
             "farBoundAtPiMax": {str(pi): (None if n3_alarm["upper"] is None
                                           else round(min(1.0, n3_alarm["upper"] / (1.0 - pi)), 6))
                                 for pi in PI_MAX},
-        },
-    }
+        }
+    else:
+        n3["labeledBound"] = {"note": LABELED_NOTES[population], "farUpper": n3_alarm["upper"]}
 
     sham_rows = []
     for (key, variant), group in _grouped(shams).items():
@@ -736,7 +1385,7 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
     for flag, levels in audio_qc.FASTQC_V8_FLAGS.items():
         level = "warnOrWorse" if "warn" in levels else "fail"
         n3_rate, sham_rate = n3["flags"][flag][level], sham_flags[flag][level]
-        flags.append({"flag": flag, "levels": list(levels), "basis": level, "n3": n3["flags"][flag],
+        flags.append({"flag": flag, "levels": list(levels), "basis": level, clean_key: n3["flags"][flag],
                       "shams": sham_flags[flag], "overlaps": _overlap(sham_rate, n3_rate),
                       "targetedBy": sorted(injector for injector, targets in m1.TARGETS.items()
                                            if flag in targets)})
@@ -756,7 +1405,7 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
             deltas[name] = _median(values)
         detection.append({
             "injector": key, "variant": variant, "severity": group[0]["severity"],
-            "classes": list(injectors.CATALOG[injector_id].classes), "targets": list(targets),
+            "classes": list(injector_classes(injector_id)), "targets": list(targets),
             "units": len({record["family"] for record in group}), "notApplicable": skips(key, variant),
             "target": _family_detection((record["family"], _hit(record, targets)) for record in group)
             if targets else None,
@@ -777,7 +1426,7 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
             if record["language"] == language and record["severity"] == "severe" and _targets(record["injectorID"]):
                 severe.setdefault(record["injector"], []).append(record)
         per_language[language] = {
-            "n3Families": len({record["family"] for record in clean}),
+            f"{clean_key}Families": len({record["family"] for record in clean}),
             "alarm": _family_rate(units),
             "alarmSimultaneous": Rate(*resampling.family_level_events(units), confidence=confidence).as_dict(),
             "fail": _family_rate((record["family"], record["verdict"] == "fail") for record in clean),
@@ -802,8 +1451,8 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
     observations = {}
     for name in OBSERVATION_MEASURES:
         observations[name] = {
-            "N3": m1._summary([record["observations"][name] for record in negatives
-                               if record["observations"].get(name) is not None]),
+            population: m1._summary([record["observations"][name] for record in negatives
+                                     if record["observations"].get(name) is not None]),
             "S": m1._summary([record["observations"][name] for record in shams
                               if record["observations"].get(name) is not None]),
         }
@@ -814,21 +1463,22 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
                     "observations": audio_qc_observations.OBSERVATIONS_MIRROR, "calibration": "legacy-unqualified"},
         "inputs": inputs,
         "populations": {
-            "N3": {"clips": len(negatives), "families": n3["families"], "engineRejected": len(rejected)},
+            population: {"clips": len(negatives), "families": n3["families"], "engineRejected": len(rejected)},
             "S": {"clips": len(shams), "families": len({record["family"] for record in shams})},
             "P1": {"clips": len(positives), "families": len({record["family"] for record in positives})},
         },
         "unit": "source family (policy thresholdDerivation.unitOfRates): a negative family errs if any of its "
                 "clips alarms; a positive family is detected only if every one of its clips is",
-        "n3": n3,
+        clean_key: n3,
         "flags": flags,
         "shams": sham_rows,
-        "shamsPooled": {"alarm": sham_pooled, "n3Alarm": n3_alarm, "overlaps": _overlap(sham_pooled, n3_alarm),
+        "shamsPooled": {"alarm": sham_pooled, f"{clean_key}Alarm": n3_alarm,
+                        "overlaps": _overlap(sham_pooled, n3_alarm),
                         "clusterBootstrap": resampling.cluster_bootstrap_rate(
                             [(record["family"], _alarm(record)) for record in shams], label="calibration-shams")},
         "detection": detection,
         "languages": {"rows": per_language, "simultaneousConfidence": round(confidence, 6),
-                      "worstN3Alarm": None if worst_alarm is None else
+                      f"worst{population}Alarm": None if worst_alarm is None else
                       {"language": worst_alarm[0], **worst_alarm[1]["alarm"]},
                       "worstSevereDetection": worst_detection},
         "observations": observations,
@@ -855,28 +1505,53 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict) -> d
             "caused the fail), carry no Stage 0 observation, and are no source of any injection.",
         ],
     }
+    if population != "N3":
+        report["caveats"] = [
+            LABELED_NOTES[population] + ".",
+            COHORT_CAVEATS[population],
+            "Word-level variants run on the takes whose forced alignment is usable (sourceAlignment in the set); "
+            "without it they are not applicable. The take-* variants remain declared word-free constructions.",
+            "Injections cover a seeded, language-stratified sample of source families per injector when the set "
+            "samples (sampling in the set); the clean rates cover every eligible recording.",
+            "A language swap (LNG-SWAP) is another recording's audio as it is, presented with the source's "
+            "language and text; its family is that recording's, and v8 has no language detector.",
+            "Per-injection seeds derive from the source WAV digest, the injector and the catalog seed, not "
+            "the variant, so a sham draws the same positions as its positives (injectors.inject).",
+            "Fast QC runs each clip through the v8 mirror's limiter as if the engine had produced it, as M1 "
+            "does; the Stage 0 observations read the PCM16 that limiter writes.",
+        ]
+        if population == "N1":
+            report["caveats"].append("N1 recordings are 16 kHz and reach 24 kHz through the Kaiser-5 polyphase "
+                                     "resampler before Fast QC, as they do before any injector.")
     report["headline"] = headline(report)
     return report
 
 
 def headline(report: dict) -> list[str]:
-    n3 = report["n3"]
     fraction, bound = m1._fraction, m1._bound
-    lines = [f"N3 natural takes: v8 alarmed on {fraction(n3['alarm'])} families (flag rate <= "
-             f"{bound(n3['alarm'])}, one-sided CP 95%) and failed {fraction(n3['fail'])}; unlabeled, so FAR <= "
-             f"{n3['unlabeledBound']['farBoundAtPiMax'].get('0.1')} if at most 10% of takes are defective."]
+    population = clean_population(report)
+    key = population.lower()
+    n3 = report[key]
+    if population == "N3":
+        lines = [f"N3 natural takes: v8 alarmed on {fraction(n3['alarm'])} families (flag rate <= "
+                 f"{bound(n3['alarm'])}, one-sided CP 95%) and failed {fraction(n3['fail'])}; unlabeled, so FAR <= "
+                 f"{n3['unlabeledBound']['farBoundAtPiMax'].get('0.1')} if at most 10% of takes are defective."]
+    else:
+        lines = [f"{population} human recordings: v8 alarmed on {fraction(n3['alarm'])} families (FAR <= "
+                 f"{bound(n3['alarm'])}, one-sided CP 95%) and failed {fraction(n3['fail'])}."]
     if n3["engineRejected"]["takes"]:
         lines.append(f"The engine's mandatory Fast QC refused {n3['engineRejected']['takes']} of these takes "
                      f"(no audio; counted as v8 fails).")
-    frequent = sorted(((row["n3"][row["basis"]]["events"], row["flag"]) for row in report["flags"]
-                       if row["n3"][row["basis"]]["events"]), reverse=True)[:3]
+    frequent = sorted(((row[key][row["basis"]]["events"], row["flag"]) for row in report["flags"]
+                       if row[key][row["basis"]]["events"]), reverse=True)[:3]
     if frequent:
-        lines.append("Most frequent N3 flags: " + ", ".join(f"{flag} {events}" for events, flag in frequent) + ".")
+        lines.append(f"Most frequent {population} flags: "
+                     + ", ".join(f"{flag} {events}" for events, flag in frequent) + ".")
     pooled = report["shamsPooled"]
     departing = [row for row in report["shams"] if row["a4"]["overlaps"] is False]
     judged = [row for row in report["shams"] if row["a4"]["overlaps"] is not None]
-    lines.append(f"Shams: {fraction(pooled['alarm'])} families alarmed against {fraction(pooled['n3Alarm'])} on "
-                 f"N3 (intervals {'overlap' if pooled['overlaps'] else 'do not overlap' if pooled['overlaps'] is False else 'n/a'}); "
+    lines.append(f"Shams: {fraction(pooled['alarm'])} families alarmed against {fraction(pooled[f'{key}Alarm'])} on "
+                 f"{population} (intervals {'overlap' if pooled['overlaps'] else 'do not overlap' if pooled['overlaps'] is False else 'n/a'}); "
                  f"{len(departing)} of {len(judged)} sham rows depart on their target flags (A4)"
                  + (": " + ", ".join(f"{row['injector']} {row['variant']}" for row in departing) if departing else "")
                  + ".")
@@ -888,20 +1563,26 @@ def headline(report: dict) -> list[str]:
     blind = sorted({row["injector"].split("@")[0] for row in report["detection"] if not row["target"]})
     if blind:
         lines.append(f"No v8 detector: {', '.join(blind)} (their alarms are incidental).")
-    worst = report["languages"]["worstN3Alarm"]
+    worst = report["languages"][f"worst{population}Alarm"]
     if worst:
-        lines.append(f"Worst language on N3: {worst['language']} ({worst['events']}/{worst['units']} families, "
-                     f"flag rate <= {worst['upper']:.3f}).")
-    lines.append("Report-only: T1 on N3 qualifies nothing (A2, A5).")
+        lines.append(f"Worst language on {population}: {worst['language']} ({worst['events']}/{worst['units']} "
+                     f"families, flag rate <= {worst['upper']:.3f}).")
+    lines.append({"N3": "Report-only: T1 on N3 qualifies nothing (A2, A5).",
+                  "N2": "Report-only: nothing qualifies before a pre-registered plan scores the confirmation "
+                        "cohort (A5).",
+                  "N1": "Report-only: N1 alone never qualifies a fail (A2)."}[population])
     return lines
 
 
 def markdown(report: dict) -> str:
     fraction, bound = m1._fraction, m1._bound
     yes = {True: "yes", False: "NO", None: "n/a"}
+    population = clean_population(report)
+    key = population.lower()
+    subject = {"N3": "natural takes", "N2": "N2 codec resyntheses", "N1": "N1 human recordings"}[population]
     out = [
         "<!-- Generated by scripts/audio_qc_calibration_set.py score. Do not edit. -->",
-        "## Audio QC calibration set M2: Fast QC v8 on natural takes, shams and T1 injections",
+        f"## Audio QC calibration set M2: Fast QC v8 on {subject}, shams and T1 injections",
         "",
         f"Subject `{report['subject']['detector']}` through `{report['subject']['mirror']}` and "
         f"`{report['subject']['observations']}`; calibration `{report['subject']['calibration']}` (A10). "
@@ -917,29 +1598,34 @@ def markdown(report: dict) -> str:
         "| Population | Clips | Families |", "|---|---|---|",
         *[f"| {name} | {entry['clips']} | {entry['families']} |" for name, entry in report["populations"].items()],
         "",
-        "### Flags: N3 rate and shams (A4)",
+        f"### Flags: {population} rate and shams (A4)",
         "",
-        "| Flag | Level | N3 | N3 upper | Shams | Shams upper | Overlap | Targeted by |",
+        f"| Flag | Level | {population} | {population} upper | Shams | Shams upper | Overlap | Targeted by |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for row in report["flags"]:
-        n3, sham = row["n3"][row["basis"]], row["shams"][row["basis"]]
+        n3, sham = row[key][row["basis"]], row["shams"][row["basis"]]
         out.append(f"| {row['flag']} | {row['basis']} | {fraction(n3)} | {bound(n3)} | {fraction(sham)} | "
                    f"{bound(sham)} | {yes[row['overlaps']]} | {', '.join(row['targetedBy']) or 'none'} |")
-    bound_row = report["n3"]["unlabeledBound"]
-    out += ["", f"Any flag on N3: {fraction(report['n3']['alarm'])} (upper {bound(report['n3']['alarm'])}); "
-                f"FAR bound f/(1 - pi_max): " + ", ".join(f"{value} at pi_max {pi}" for pi, value in
-                                                        bound_row["farBoundAtPiMax"].items()) + ".",
-            "", "### Shams (A4, against N3 on the same families)", "",
-            "| Injector | Variant | Families | Not applicable | Alarm | N3 alarm | Overlap | Target flags | "
-            "Sham target | N3 target | A4 overlap |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+    clean = report[key]
+    if population == "N3":
+        bound_row = clean["unlabeledBound"]
+        out += ["", f"Any flag on N3: {fraction(clean['alarm'])} (upper {bound(clean['alarm'])}); "
+                    f"FAR bound f/(1 - pi_max): " + ", ".join(f"{value} at pi_max {pi}" for pi, value in
+                                                            bound_row["farBoundAtPiMax"].items()) + "."]
+    else:
+        out += ["", f"Any flag on {population}: {fraction(clean['alarm'])} (FAR upper {bound(clean['alarm'])}; "
+                    "labeled negatives, so the flag rate bounds FAR directly)."]
+    out += ["", f"### Shams (A4, against {population} on the same families)", "",
+            f"| Injector | Variant | Families | Not applicable | Alarm | {population} alarm | Overlap | Target flags | "
+            f"Sham target | {population} target | A4 overlap |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for row in report["shams"]:
         a4 = row["a4"]
         out.append(f"| {row['injector']} | {row['variant']} | {row['units']} | {row['notApplicable']} | "
                    f"{fraction(row['alarm'])} | {fraction(row['cleanAlarmSameFamilies'])} | "
                    f"{yes[row['alarmOverlaps']]} | {', '.join(row['targets']) or 'none'} | "
                    f"{fraction(a4.get('sham'))} | {fraction(a4.get('cleanSameFamilies'))} | {yes[a4['overlaps']]} |")
-    out += ["", "### Detection of T1 injections on natural takes (P1)", "",
+    out += ["", f"### Detection of {'T1 ' if population == 'N3' else ''}injections on {subject} (P1)", "",
             "| Injector | Variant | Severity | Families | Not applicable | Target v8 flags | Detected | TPR lower | "
             "Any alarm | Fail |", "|---|---|---|---|---|---|---|---|---|---|"]
     for row in report["detection"]:
@@ -950,28 +1636,29 @@ def markdown(report: dict) -> str:
     languages = report["languages"]
     out += ["", "### Languages", "",
             f"Simultaneous per-language bounds use Bonferroni confidence {languages['simultaneousConfidence']}.",
-            "", "| Language | N3 families | N3 alarm | Upper | Upper (simultaneous) | Fail | Sham alarm | "
-                "Severe positives detected by their target flags |", "|---|---|---|---|---|---|---|---|"]
+            "", f"| Language | {population} families | {population} alarm | Upper | Upper (simultaneous) | Fail | "
+                "Sham alarm | Severe positives detected by their target flags |", "|---|---|---|---|---|---|---|---|"]
     for language, row in languages["rows"].items():
-        severe = ", ".join(f"{key.split('@')[0]} {fraction(rate)}"
-                           for key, rate in row["severeTargetDetection"].items()) or "none"
-        out.append(f"| {language} | {row['n3Families']} | {fraction(row['alarm'])} | {bound(row['alarm'])} | "
+        severe = ", ".join(f"{injector.split('@')[0]} {fraction(rate)}"
+                           for injector, rate in row["severeTargetDetection"].items()) or "none"
+        out.append(f"| {language} | {row[f'{key}Families']} | {fraction(row['alarm'])} | {bound(row['alarm'])} | "
                    f"{bound(row['alarmSimultaneous'])} | {fraction(row['fail'])} | {fraction(row['shamAlarm'])} | "
                    f"{severe} |")
-    worst = languages["worstN3Alarm"]
+    worst = languages[f"worst{population}Alarm"]
     if worst:
-        out += ["", f"Worst stratum on N3: {worst['language']} (alarm {worst['events']}/{worst['units']}, "
+        out += ["", f"Worst stratum on {population}: {worst['language']} (alarm {worst['events']}/{worst['units']}, "
                     f"upper {worst['upper']:.3f})."]
     if languages["worstSevereDetection"]:
         out += ["", "Worst stratum per detected severe injector: " + ", ".join(
             f"{entry['injector'].split('@')[0]} {entry['language']} {entry['events']}/{entry['units']} "
             f"(TPR >= {entry['lower']:.3f})" for entry in languages["worstSevereDetection"]) + "."]
     measures = list(OBSERVATION_MEASURES)
-    out += ["", "### Stage 0 observations", "", "N3 distribution (median / p90 / max):", "",
-            "| Measure | N3 median | N3 p90 | N3 max | Sham median |", "|---|---|---|---|---|"]
+    out += ["", "### Stage 0 observations", "", f"{population} distribution (median / p90 / max):", "",
+            f"| Measure | {population} median | {population} p90 | {population} max | Sham median |",
+            "|---|---|---|---|---|"]
     for name in measures:
         entry = report["observations"][name]
-        n3, sham = entry["N3"] or {}, entry["S"] or {}
+        n3, sham = entry[population] or {}, entry["S"] or {}
         out.append(f"| {name} | {n3.get('median', 'n/a')} | {n3.get('p90', 'n/a')} | {n3.get('max', 'n/a')} | "
                    f"{sham.get('median', 'n/a')} |")
     out += ["", "Median paired change (positive minus its source take):", "",
@@ -992,30 +1679,36 @@ def markdown(report: dict) -> str:
                    f"{needs} | {reasons} |")
     swap = report.get("identitySwap") or {}
     if swap:
-        out += ["", f"Identity swap ({swap.get('injector')}): {swap.get('status')}; {swap.get('reason')} "
-                    f"({swap.get('donorPairs', 0)} donor pairs in the manifest)."]
+        pairs = f" ({swap.get('donorPairs', 0)} donor pairs in the manifest)" if "donorPairs" in swap else ""
+        out += ["", f"Identity swap ({swap.get('injector')}): {swap.get('status')}; {swap.get('reason')}{pairs}."]
     out += ["", "### Caveats", "", *[f"- {caveat}" for caveat in report["caveats"]], "",
             f"Inputs: takes manifest `{report['inputs']['takesManifestSHA256'][:12]}`, injection set entries "
-            f"`{report['inputs']['entriesSHA256'][:12]}`, measurements `{report['inputs']['measurementsSHA256'][:12]}`, "
+            f"`{(report['inputs']['entriesSHA256'] or 'none')[:12]}`, "
+            f"measurements `{report['inputs']['measurementsSHA256'][:12]}`, "
             f"policy `{report['inputs']['policySHA256'][:12]}`, catalog v{report['inputs']['catalogVersion']}, "
             f"NumPy {report['inputs']['numpy']}.", ""]
     return "\n".join(out)
 
 
-def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> dict:
+def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: int) -> dict:
+    """Score the clean takes (N3, or N1/N2 for a cohort) and, with a set, its shams and positives."""
     manifest, manifest_sha256 = load_takes(takes_path)
-    if manifest["kind"] != TAKES_KIND:
-        raise CalibrationError("score reports on natural takes (N3), whose flag rate only bounds FAR; it does not "
-                               "score an N1 cohort (inject and verify do)")
-    injection_set = load_set(set_path)
-    if injection_set.get("sourceManifest", {}).get("sha256") != manifest_sha256:
-        raise CalibrationError("the injection set was built from another takes manifest")
-    if json_digest(injection_set["entries"]) != injection_set.get("entriesSHA256"):
-        raise CalibrationError("the injection set's entries differ from its entriesSHA256")
+    population = population_of(manifest)
+    injection_set: dict = {"entries": [], "entriesSHA256": None}
+    if set_path is not None:
+        injection_set = load_set(set_path)
+        if injection_set.get("sourceManifest", {}).get("sha256") != manifest_sha256:
+            raise CalibrationError("the injection set was built from another takes manifest")
+        if json_digest(injection_set["entries"]) != injection_set.get("entriesSHA256"):
+            raise CalibrationError("the injection set's entries differ from its entriesSHA256")
     takes = {take["takeID"]: take for take in generated_takes(manifest)}
-    tasks = [{"clipID": take_id, "wav": str(take_wav(takes_path, take)), "wavSHA256": take["wavSHA256"],
-              "text": take["text"], "meta": _meta(take, take_id, "N3", None)}
-             for take_id, take in takes.items()]
+    tasks = []
+    for take_id, take in takes.items():
+        task = {"clipID": take_id, "wav": str(take_wav(takes_path, take)), "wavSHA256": take["wavSHA256"],
+                "text": take["text"], "meta": _meta(take, take_id, population, None)}
+        if source_rate(take) != recordings.ENGINE_SAMPLE_RATE:
+            task["sourceRate"] = source_rate(take)
+        tasks.append(task)
     for entry in injection_set["entries"]:
         take = takes.get(entry.get("sourceTakeID"))
         if take is None:
@@ -1024,9 +1717,10 @@ def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> d
         tasks.append({"clipID": entry["takeID"], "wav": str(_relative_path(set_path.parent, entry["wavPath"],
                                                                            f"{entry['takeID']}: wavPath")),
                       "wavSHA256": entry["wavSHA256"], "text": take["text"],
-                      "meta": _meta(take, entry["takeID"], injection["population"], injection)})
+                      "meta": _meta(take, entry["takeID"], injection["population"], injection,
+                                    family=entry.get("family"))})
     rejected = rejected_takes(manifest)
-    log(f"score: {len(takes)} natural takes ({len(rejected)} engine-rejected, no audio) and "
+    log(f"score: {len(takes)} {population} takes ({len(rejected)} engine-rejected, no audio) and "
         f"{len(injection_set['entries'])} injected clips, {jobs} jobs")
     records: list[dict] = []
 
@@ -1043,17 +1737,18 @@ def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> d
     measurements_sha256 = _write_streamed(output / "measurements.json", head, "clips", measured(),
                                           lambda digest: {"clipsSHA256": digest, "clipCount": len(records)})
     for take in rejected:
-        records.append({**{key: value for key, value in _meta(take, take["takeID"], "N3", None).items()
+        records.append({**{key: value for key, value in _meta(take, take["takeID"], population, None).items()
                            if key in ("clipID", "population", "family", "sourceTakeID", "language")},
                         "injector": None, "injectorID": None, "variant": None, "severity": None,
                         "verdict": "fail", "engineRejected": True,
                         "flagLevels": rejection_levels(take["rejection"]["audioQCFlags"]),
                         "observations": {name: None for name in OBSERVATION_MEASURES}})
-    inputs = {"takesManifestSHA256": manifest_sha256, "injectionSetSHA256": file_sha256(set_path),
+    inputs = {"takesManifestSHA256": manifest_sha256,
+              "injectionSetSHA256": None if set_path is None else file_sha256(set_path),
               "entriesSHA256": injection_set["entriesSHA256"], "measurementsSHA256": measurements_sha256,
               "policySHA256": policy_module.policy_digest(), "catalogVersion": injectors.CATALOG_VERSION,
               "catalogSeed": injection_set.get("catalogSeed"), "numpy": np.__version__}
-    report = build_report(records, inputs=inputs, injection_set=injection_set)
+    report = build_report(records, inputs=inputs, injection_set=injection_set, population=population)
     (output / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
                                         encoding="utf-8")
     (output / "report.md").write_text(markdown(report), encoding="utf-8")
@@ -1078,29 +1773,54 @@ def main(argv: list[str] | None = None) -> int:
     inject.add_argument("--takes", type=Path, required=True)
     inject.add_argument("--output", type=Path, required=True)
     inject.add_argument("--catalog-seed", type=int, default=DEFAULT_CATALOG_SEED)
-    inject.add_argument("--classes", type=_classes, default=DEFAULT_CLASSES,
-                        help="defect classes to inject (default A,C,F)")
+    inject.add_argument("--classes", type=_classes, default=None,
+                        help="defect classes to inject (default A,C,F; A,B,C,D,F on an N2 cohort)")
+    inject.add_argument("--alignments", type=Path,
+                        help="an `alignments` export for this manifest: word-level variants on its usable takes")
+    inject.add_argument("--sample-per-cell", type=int, default=None,
+                        help="source families per (injector, severity) cell, stratified by language; 0 is every "
+                             "source (default 150 on an N2 cohort, every source otherwise)")
+    inject.add_argument("--sample-seed", type=int, default=DEFAULT_SAMPLE_SEED,
+                        help=f"seed of the family draw and the language-swap donors (default {DEFAULT_SAMPLE_SEED})")
+    inject.add_argument("--embed-text", action="store_true", default=None,
+                        help="carry each entry's text on an N3 set too (N1 and N2 sets always carry it)")
     verify = commands.add_parser("verify", help="replay every recipe and compare output digests")
     verify.add_argument("--set", type=Path, required=True)
     verify.add_argument("--takes", type=Path, required=True)
-    score = commands.add_parser("score", help="run Fast QC v8 and Stage 0 over N3, shams and positives")
+    verify.add_argument("--alignments", type=Path, help="the alignments the set was built with, if any")
+    score = commands.add_parser("score", help="run Fast QC v8 and Stage 0 over the clean takes, shams and positives")
     score.add_argument("--takes", type=Path, required=True)
-    score.add_argument("--set", type=Path, required=True)
+    score.add_argument("--set", type=Path, help="the injection set (omit it to score the clean takes alone)")
     score.add_argument("--output", type=Path, required=True)
+    alignments = commands.add_parser("alignments", help="export the forced aligner's word intervals from L1")
+    alignments.add_argument("--takes", type=Path, required=True, help="the cohort manifest the panel ran over")
+    alignments.add_argument("--bundle", type=Path, required=True, help="the panel's private bundle directory")
+    alignments.add_argument("--output", type=Path, required=True)
+    alignments.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT,
+                            help="the orchestrator's analysis cache (default build/cache/delivery-analysis or "
+                                 "$QVOICE_DELIVERY_ANALYSIS_CACHE)")
     for command in (inject, verify, score):
         command.add_argument("--jobs", type=int, default=default_jobs(),
                              help="worker processes (default: half the cores)")
     args = parser.parse_args(argv)
-    if args.jobs < 1:
+    if getattr(args, "jobs", 1) < 1:
         parser.error("--jobs must be positive")
     try:
+        if args.command == "alignments":
+            export = export_alignments(args.takes, args.bundle, args.output, cache_root=args.cache_root)
+            print(json.dumps(export["counts"], sort_keys=True))
+            return 0
         if args.command == "inject":
             if args.catalog_seed < 0:
                 parser.error("--catalog-seed must be non-negative")
-            run_inject(args.takes, args.output, catalog_seed=args.catalog_seed, classes=args.classes, jobs=args.jobs)
+            if args.sample_per_cell is not None and args.sample_per_cell < 0:
+                parser.error("--sample-per-cell must be non-negative")
+            run_inject(args.takes, args.output, catalog_seed=args.catalog_seed, classes=args.classes, jobs=args.jobs,
+                       alignments_path=args.alignments, sample_per_cell=args.sample_per_cell,
+                       sample_seed=args.sample_seed, embed_text=args.embed_text)
             return 0
         if args.command == "verify":
-            result = run_verify(args.set, args.takes, jobs=args.jobs)
+            result = run_verify(args.set, args.takes, jobs=args.jobs, alignments_path=args.alignments)
             for clip, reason in result["failures"][:20]:
                 print(f"FAIL {clip}: {reason}", file=sys.stderr)
             status = "PASS" if result["verified"] else "FAIL"

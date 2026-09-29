@@ -25,14 +25,31 @@ no declared pause intervals, no script to re-render and no render voice. Its
 for the pause budget and the speaking rate; no injector reads it, and nothing
 here writes it out. Injectors that need any of the rest refuse the source with
 `InjectorNotApplicable` (`injectors.needs`).
+
+On N1 and N2 the forced aligner's intervals (`audio_qc_calibration_set.py
+alignments`, seconds on the take's own timeline) become word intervals
+(`word_alignment`, rule `ALIGNMENT_RULE`): each positive-length interval is one
+word, mapped to 24 kHz samples by rounding (the aligner's 80 ms frames land on
+whole samples), and a gap longer than `PAUSE_GAP_SECONDS` between two words is
+a declared pause. A zero-length interval is a unit the aligner squeezed into
+its neighbour at its frame resolution: it is no word, so a word-level edit may
+carry it with that neighbour. An alignment is refused whole (the take keeps no
+word interval) when its words overlap or run backwards, overrun the take by
+more than one aligner frame, number fewer than `MINIMUM_WORDS`, or when more
+than `MAXIMUM_SQUEEZED_FRACTION` of its intervals are squeezed. For Chinese and
+Japanese the aligner's units are characters or short character runs, so a
+"word" there is that unit.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 import hashlib
+import math
 import os
 import wave
 from pathlib import Path
+from typing import Iterable, Sequence
 
 import numpy as np
 
@@ -44,6 +61,12 @@ from .pcm import ENGINE_SAMPLE_RATE, PCM16_FULL_SCALE, to_pcm16
 SOURCE_RATES = frozenset({ENGINE_SAMPLE_RATE, 16_000})
 RESAMPLER = "kaiser5-polyphase"
 RESAMPLER_IMPLEMENTATION = "scripts/lib/playback_capture.py resample"
+# Aligner intervals as word intervals (`word_alignment`).
+ALIGNMENT_RULE = "aligner-words-v1"
+ALIGNER_FRAME_SECONDS = 0.08
+PAUSE_GAP_SECONDS = 0.2
+MINIMUM_WORDS = 5
+MAXIMUM_SQUEEZED_FRACTION = 0.2
 
 
 class RecordingError(ValueError):
@@ -105,6 +128,68 @@ def recording_fixture(take_id: str, family: str, stratum: str, samples: np.ndarr
     """A `Fixture` for a recorded take: its PCM and request text, and nothing it cannot honestly know."""
     return make_fixture(take_id, family, stratum, samples, sample_rate=sample_rate, words=(), pauses=(),
                         text=text, script=None, voice=None)
+
+
+@dataclass(frozen=True)
+class WordAlignment:
+    """An aligner's intervals as word and pause intervals in samples; `issue` names why none are usable."""
+
+    words: tuple[tuple[int, int], ...]
+    pauses: tuple[tuple[int, int], ...]
+    intervals: int
+    squeezed: int
+    issue: str | None
+
+    @property
+    def usable(self) -> bool:
+        return self.issue is None
+
+    def describe(self) -> dict:
+        return {"rule": ALIGNMENT_RULE, "intervals": self.intervals, "squeezed": self.squeezed,
+                "words": len(self.words), "pauses": len(self.pauses), "issue": self.issue}
+
+
+def word_alignment(intervals: Iterable[Sequence[float]], *, frames: int,
+                   sample_rate: int = ENGINE_SAMPLE_RATE) -> WordAlignment:
+    """Word intervals, and pauses between them, from (start, end) seconds on a take of `frames` samples."""
+    spans = [(float(start), float(end)) for start, end in intervals]
+    total = len(spans)
+
+    def refused(issue: str, squeezed: int = 0) -> WordAlignment:
+        return WordAlignment((), (), total, squeezed, issue)
+
+    if any(not (math.isfinite(start) and math.isfinite(end)) or start < 0.0 for start, end in spans):
+        return refused("an interval is not a finite, non-negative time")
+    positive = [(start, end) for start, end in spans if end > start]
+    squeezed = total - len(positive)
+    tolerance = int(round(ALIGNER_FRAME_SECONDS * sample_rate))
+    words: list[tuple[int, int]] = []
+    for start, end in positive:
+        first, last = int(round(start * sample_rate)), int(round(end * sample_rate))
+        if last > frames + tolerance:
+            return refused("an interval overruns the take by more than one aligner frame", squeezed)
+        first, last = min(first, frames), min(last, frames)
+        if last <= first:
+            squeezed += 1
+            continue
+        words.append((first, last))
+    if any(later[0] < earlier[1] for earlier, later in zip(words, words[1:])):
+        return refused("intervals overlap or run backwards", squeezed)
+    if total and squeezed / total > MAXIMUM_SQUEEZED_FRACTION:
+        return refused(f"more than {MAXIMUM_SQUEEZED_FRACTION:.0%} of the intervals are squeezed to zero length",
+                       squeezed)
+    if len(words) < MINIMUM_WORDS:
+        return refused(f"fewer than {MINIMUM_WORDS} aligned words", squeezed)
+    gap = PAUSE_GAP_SECONDS * sample_rate
+    pauses = tuple((earlier[1], later[0]) for earlier, later in zip(words, words[1:]) if later[0] - earlier[1] > gap)
+    return WordAlignment(tuple(words), pauses, total, squeezed, None)
+
+
+def with_alignment(fixture: Fixture, alignment: WordAlignment) -> Fixture:
+    """The recording with the aligner's word and pause intervals (unchanged PCM, so an unchanged digest)."""
+    if not alignment.usable:
+        return fixture
+    return replace(fixture, words=alignment.words, pauses=alignment.pauses)
 
 
 def load_recording(path: Path, *, take_id: str, family: str, stratum: str, text: str = "",

@@ -138,6 +138,7 @@ from lib.qc_pipeline.layered_cache import (  # noqa: E402
     output_identity_digest,
 )
 from lib.qc_pipeline import panel_metrics  # noqa: E402
+from lib.qc_qualification.pcm import json_digest as injection_entries_digest  # noqa: E402
 from lib.qc_pipeline.panel_jobs import (  # noqa: E402
     REFERENCE_SUFFIX,
     PanelJobError,
@@ -267,7 +268,11 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
     manifest (`base_dir`). A planned take without output is skipped and counted,
     and so is an N1 recording (`scripts/audio_qc_n1_corpus.py`) or its N2
     resynthesis (`scripts/audio_qc_n2_resynthesis.py`) that its manifest marks
-    ineligible: only eligible recordings go in.
+    ineligible: only eligible recordings go in. An injection-set entry
+    (`scripts/audio_qc_calibration_set.py`, which embeds the text for N1 and N2
+    sets) expects `fail` when it is a positive (`injection.population` P1) and
+    `pass` when it is a sham, unless it names its expected outcome; a language
+    swap's language and text are the expected ones, not its audio's.
     """
     kind = source.get("kind")
     if kind not in CALIBRATION_TAKE_KINDS:
@@ -282,6 +287,11 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
         if issues := audio_qc_n2_resynthesis.manifest_digest_issues(source):
             raise OrchestratorError(issues[0])
     entries = source.get("takes")
+    if kind == "audio-qc-injection-set" and entries is None:
+        # A set written by audio_qc_calibration_set.py inject lists its clips as `entries`, bound by entriesSHA256.
+        entries = source.get("entries")
+        if "entriesSHA256" in source and injection_entries_digest(entries) != source["entriesSHA256"]:
+            raise OrchestratorError("the injection set's entries differ from its entriesSHA256")
     if not isinstance(entries, list) or not entries:
         raise OrchestratorError("the calibration-takes manifest has no takes")
     takes, skipped = [], 0
@@ -300,7 +310,9 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
         wav = Path(entry["wavPath"])
         wav = wav if wav.is_absolute() else (base_dir / wav).resolve()
         injection = entry.get("injection") if isinstance(entry.get("injection"), dict) else {}
-        expected = entry.get("expectedOutcome", injection.get("expectedOutcome", "pass"))
+        # An injection-set positive (population P1) is a defect a detector should fail; a sham (S) should pass.
+        expected = entry.get("expectedOutcome", injection.get(
+            "expectedOutcome", "fail" if injection.get("population") == "P1" else "pass"))
         takes.append(_take(
             take_id=take_id, generation_id=take_id, audio=str(wav), audio_sha256=entry["wavSHA256"],
             language=entry.get("language"), reference_text=text, script_sha256=text_sha256(text),

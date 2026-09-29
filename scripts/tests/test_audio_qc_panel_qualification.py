@@ -420,7 +420,11 @@ GIB = 1024**3
 CANARY_SESSION = "20260928-89abcdef"
 RECALIBRATION_SESSION = "20260929-0123abcd"
 # The recalibration fixture's workers outgrow the footprint (48 MiB) their canary session measured.
-COHORT_FOOTPRINT = 256 * MIB
+# A run's peak is also the reaped ru_maxrss, and on Linux a forked child's ru_maxrss can carry the
+# RSS it inherited from its parent before exec (here the pytest worker, which grows as tests run):
+# CI once measured about 426 MiB for both sessions, so a 256 MiB footprint left the ceilings equal.
+# 3 GiB dominates any plausible inherited RSS and, x 1.2, still fits the 9.5 GiB admission budget.
+COHORT_FOOTPRINT = 3 * GIB
 
 
 def cohort_supervisor(command, **kwargs):

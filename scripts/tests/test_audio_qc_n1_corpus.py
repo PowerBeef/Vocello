@@ -85,6 +85,19 @@ def wav_bytes(samples: int, *, frequency: float = 180.0, rate: int = RATE, chann
     return buffer.getvalue()
 
 
+def float_wav_bytes(values: np.ndarray, *, bits: int = 32, fact: bool = True) -> bytes:
+    """A mono 16 kHz IEEE-float WAV (format 3) with a fact chunk, as FLEURS ships its recordings."""
+    import struct
+    payload = values.astype("<f4" if bits == 32 else "<f8").tobytes()
+    width = bits // 8
+    fmt = struct.pack("<HHIIHHH", 3, 1, RATE, RATE * width, width, bits, 0)
+    chunks = b"fmt " + struct.pack("<I", len(fmt)) + fmt
+    if fact:
+        chunks += b"fact" + struct.pack("<I", 4) + struct.pack("<I", len(values))
+    chunks += b"data" + struct.pack("<I", len(payload)) + payload
+    return b"RIFF" + struct.pack("<I", 4 + len(chunks)) + b"WAVE" + chunks
+
+
 def tsv_bytes(rows) -> bytes:
     lines = []
     for sentence, file, text, samples, gender in rows:
@@ -529,13 +542,43 @@ class ExtractTests(CorpusFixture):
         rows = ROWS[("english", "dev")]
         cases = {
             "24000 Hz, not 16000 Hz": ("dev/10001.wav", wav_bytes(rows[0][3], rate=24_000)),
-            "not mono PCM16": ("dev/10001.wav", wav_bytes(rows[0][3], channels=2)),
+            "2 channels, not mono": ("dev/10001.wav", wav_bytes(rows[0][3], channels=2)),
             "its TSV row says 40000": ("dev/10001.wav", wav_bytes(rows[0][3] - 1)),
-            "not a readable PCM WAV": ("dev/10001.wav", b"RIFF not really a wave file"),
+            "not a RIFF/WAVE file": ("dev/10001.wav", b"RIFF not really a wave file"),
+            "non-finite sample": ("dev/10001.wav", float_wav_bytes(np.full(rows[0][3], np.nan))),
+            "neither mono PCM16 nor 32-bit float": ("dev/10001.wav",
+                                                    float_wav_bytes(tone(rows[0][3], 180.0), bits=64)),
         }
         for expected, replacement in cases.items():
             with self.subTest(expected=expected):
                 self._refused([good[0], replacement, *good[2:]], expected)
+
+    def test_a_float_recording_is_written_as_pcm16_with_its_clips_counted(self) -> None:
+        # FLEURS ships 32-bit IEEE float WAVs; consumers read PCM16.
+        rows = ROWS[("english", "dev")]
+        values = tone(rows[0][3], 180.0)
+        values[:3] = [1.5, -2.0, 0.5]  # two samples beyond full scale
+        members = split_members("english", "dev")
+        members[1] = ("dev/10001.wav", float_wav_bytes(values))  # members[0] is the directory entry
+        files = corpus_files({"data/en_us/audio/dev.tar.gz": tar_gz(members)})
+        sources = make_sources(files)
+        self.place(files)
+        quiet(n1.extract, sources, root=self.root)
+        directory = n1.extraction_directory(sources, "en_us", self.root)
+        with wave.open(str(directory / "dev" / "10001.wav"), "rb") as reader:
+            self.assertEqual((reader.getnchannels(), reader.getsampwidth(), reader.getframerate(),
+                              reader.getnframes()), (1, 2, 16_000, rows[0][3]))
+            pcm = np.frombuffer(reader.readframes(reader.getnframes()), dtype="<i2")
+        expected = np.clip(np.rint(values.astype("<f4").astype(np.float64) * 32767), -32767, 32767)
+        self.assertTrue(np.array_equal(pcm, expected.astype("<i2")))
+        self.assertEqual(pcm[:3].tolist(), [32767, -32767, 16384])
+        receipt = json.loads((directory / n1.RECEIPT_NAME).read_text())
+        dev = receipt["splits"]["dev"]
+        self.assertEqual((dev["files"]["10001.wav"]["sourceFormat"], dev["files"]["10001.wav"]["clippedSamples"]),
+                         ("ieee-float32", 2))
+        self.assertEqual((dev["sourceFormats"], dev["clippedSamples"]), (["ieee-float32", "pcm16"], 2))
+        self.assertEqual(dev["files"]["10002.wav"]["sourceFormat"], "pcm16")
+        self.assertEqual(receipt["extractor"], "audio-qc-n1-extract-v2")
 
     def test_a_member_count_other_than_the_tsv_rows_is_refused(self) -> None:
         self._refused(split_members("english", "dev")[:-1], "holds 3 recordings, its TSV lists 4")

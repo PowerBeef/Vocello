@@ -60,6 +60,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import sys
 import tarfile
 import time
@@ -68,6 +69,8 @@ import urllib.parse
 import urllib.request
 import wave
 import zlib
+
+import numpy as np
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -89,7 +92,7 @@ SCHEMA_VERSION = 1
 SOURCES_KIND = "audio-qc-n1-sources"
 MANIFEST_KIND = "audio-qc-n1-cohort"
 RECEIPT_KIND = "audio-qc-n1-extraction"
-EXTRACTOR = "audio-qc-n1-extract-v1"
+EXTRACTOR = "audio-qc-n1-extract-v2"  # v2: FLEURS float WAVs are written as PCM16 (`decode_wav`)
 ELIGIBILITY_VERSION = "audio-qc-n1-eligibility-v1"
 POPULATION = "N1"
 DATASET = "google/fleurs"
@@ -548,21 +551,76 @@ def read_tsv(path: Path, pin: Mapping[str, Any]) -> list[Row]:
     return parse_tsv(path.read_bytes(), pin["path"])
 
 
-def check_wav(data: bytes, name: str, samples: int) -> None:
-    """Mono PCM16 at 16 kHz holding exactly the TSV's sample count."""
-    try:
-        with wave.open(io.BytesIO(data), "rb") as reader:
-            channels, width, rate = reader.getnchannels(), reader.getsampwidth(), reader.getframerate()
-            frames, compression = reader.getnframes(), reader.getcomptype()
-            payload = reader.readframes(frames)
-    except (wave.Error, EOFError, ValueError) as error:
-        raise N1Error(f"{name} is not a readable PCM WAV ({type(error).__name__}: {error})") from None
-    if channels != 1 or width != 2 or compression != "NONE":
-        raise N1Error(f"{name} is not mono PCM16 ({channels} channels, {8 * width} bits, {compression})")
+# WAV format tags: PCM, IEEE float and WAVE_FORMAT_EXTENSIBLE (whose subformat GUID starts with the tag).
+WAV_PCM, WAV_FLOAT, WAV_EXTENSIBLE = 1, 3, 0xFFFE
+PCM16_FULL_SCALE = 32767
+
+
+def _wav_chunks(data: bytes, name: str) -> tuple[bytes, bytes]:
+    """The `fmt ` and `data` chunk bodies of a RIFF/WAVE file; anything malformed refuses it."""
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise N1Error(f"{name} is not a RIFF/WAVE file")
+    chunks: dict[bytes, bytes] = {}
+    position = 12
+    while position + 8 <= len(data):
+        identifier, size = data[position:position + 4], struct.unpack("<I", data[position + 4:position + 8])[0]
+        body = data[position + 8:position + 8 + size]
+        if len(body) != size:
+            raise N1Error(f"{name}: its {identifier!r} chunk is truncated")
+        if identifier in chunks and identifier in (b"fmt ", b"data"):
+            raise N1Error(f"{name}: its {identifier!r} chunk appears twice")
+        chunks[identifier] = body
+        position += 8 + size + (size & 1)
+    if b"fmt " not in chunks or b"data" not in chunks:
+        raise N1Error(f"{name} has no fmt or data chunk")
+    return chunks[b"fmt "], chunks[b"data"]
+
+
+def decode_wav(data: bytes, name: str, samples: int) -> tuple[bytes, dict[str, Any]]:
+    """A recording as mono PCM16 at 16 kHz holding exactly the TSV's sample count.
+
+    FLEURS ships its recordings as 32-bit IEEE float (format 3, with a `fact`
+    chunk). Every consumer (the L0 canonicalizer, the recording adapter, the N2
+    plan) reads PCM16, so a float recording is converted here, deterministically:
+    each sample times 32767, rounded half to even and clipped to +-32767, with
+    the clipped samples counted. A non-finite sample refuses the recording. A
+    PCM16 recording is kept byte for byte. Returns the WAV to write and what the
+    conversion did (`sourceFormat`, `sourceSHA256`, `clippedSamples`).
+    """
+    fmt, payload = _wav_chunks(data, name)
+    if len(fmt) < 16:
+        raise N1Error(f"{name}: its fmt chunk is too short")
+    tag, channels, rate, _byte_rate, align, bits = struct.unpack("<HHIIHH", fmt[:16])
+    if tag == WAV_EXTENSIBLE:
+        if len(fmt) < 40:
+            raise N1Error(f"{name}: its extensible fmt chunk is too short")
+        tag = struct.unpack("<H", fmt[24:26])[0]
+    if channels != 1:
+        raise N1Error(f"{name} has {channels} channels, not mono")
     if rate != SAMPLE_RATE:
         raise N1Error(f"{name} is {rate} Hz, not {SAMPLE_RATE} Hz")
-    if frames != samples or len(payload) != 2 * frames:
-        raise N1Error(f"{name} holds {len(payload) // 2} samples; its TSV row says {samples}")
+    info = {"sourceSHA256": hashlib.sha256(data).hexdigest(), "clippedSamples": 0}
+    if tag == WAV_PCM and bits == 16 and align == 2:
+        if len(payload) != 2 * samples:
+            raise N1Error(f"{name} holds {len(payload) // 2} samples; its TSV row says {samples}")
+        return data, {**info, "sourceFormat": "pcm16"}
+    if tag == WAV_FLOAT and bits == 32 and align == 4:
+        if len(payload) != 4 * samples:
+            raise N1Error(f"{name} holds {len(payload) // 4} samples; its TSV row says {samples}")
+        values = np.frombuffer(payload, dtype="<f4").astype(np.float64)
+        if not np.all(np.isfinite(values)):
+            raise N1Error(f"{name} holds a non-finite sample")
+        scaled = np.rint(values * PCM16_FULL_SCALE)
+        clipped = int(np.count_nonzero(np.abs(scaled) > PCM16_FULL_SCALE))
+        pcm = np.clip(scaled, -PCM16_FULL_SCALE, PCM16_FULL_SCALE).astype("<i2")
+        output = io.BytesIO()
+        with wave.open(output, "wb") as writer:
+            writer.setnchannels(1)
+            writer.setsampwidth(2)
+            writer.setframerate(SAMPLE_RATE)
+            writer.writeframes(pcm.tobytes())
+        return output.getvalue(), {**info, "sourceFormat": "ieee-float32", "clippedSamples": clipped}
+    raise N1Error(f"{name} is neither mono PCM16 nor 32-bit float (format {tag}, {bits} bits)")
 
 
 def _refuse(archive: str, member: tarfile.TarInfo, reason: str) -> N1Error:
@@ -633,11 +691,11 @@ def extract_split(archive: Path, pin: Mapping[str, Any], split: str, rows: Seque
                 data = stream.read() if stream is not None else b""
                 if len(data) != member.size:
                     raise _refuse(label, member, "is truncated")
-                check_wav(data, f"{label}: {name}", expected[name].samples)
+                written, conversion = decode_wav(data, f"{label}: {name}", expected[name].samples)
                 with (destination / name).open("xb") as handle:
-                    handle.write(data)
-                files[name] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
-                               "samples": expected[name].samples}
+                    handle.write(written)
+                files[name] = {"sha256": hashlib.sha256(written).hexdigest(), "bytes": len(written),
+                               "samples": expected[name].samples, **conversion}
     except (tarfile.TarError, EOFError, zlib.error) as error:
         raise N1Error(f"{label} is not a readable tar.gz archive ({type(error).__name__})") from None
     if len(files) != len(expected) or member_directory is None:
@@ -733,6 +791,8 @@ def _extract_language(sources: Mapping[str, Any], entry: Mapping[str, Any], dire
                                                     rows[name], staging / name)
             splits[name] = {"role": split["role"], "memberDirectory": member_directory, "recordings": len(files),
                             "samples": sum(file["samples"] for file in files.values()),
+                            "sourceFormats": sorted({file["sourceFormat"] for file in files.values()}),
+                            "clippedSamples": sum(file["clippedSamples"] for file in files.values()),
                             "wavBytes": sum(file["bytes"] for file in files.values()), "files": files}
         shared = ({row.sentence_id for row in rows["dev"]} & {row.sentence_id for row in rows["test"]})
         receipt = {**_receipt_pins(sources, entry), "splits": splits, "sharedSentenceIDs": len(shared)}

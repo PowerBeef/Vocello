@@ -119,8 +119,11 @@ languages. `scripts/audio_qc_n1_corpus.py` fetches, extracts and lists it.
   only to its CDNs), resume from `.part` files and are kept only once size and pin match. `extract`
   writes only the `<digits>.wav` members each TSV lists, all from one `<split>/` directory (a path
   prefix before it is allowed). It refuses links, absolute paths, `..`, device files, other names
-  or directories and a member count other than the TSV's, checks that every WAV is mono PCM16 at
-  16 kHz with its TSV sample count, and writes a receipt per language.
+  or directories and a member count other than the TSV's, checks that every WAV is mono at 16 kHz
+  with its TSV sample count, and writes a receipt per language. FLEURS ships 32-bit IEEE float
+  WAVs, and every consumer reads PCM16, so extraction (extractor v2) converts each one
+  deterministically (x 32767, rounded half to even, clipped to +-32767, with the clipped samples
+  counted in the receipt) and refuses a non-finite sample; a PCM16 WAV is kept byte for byte.
 - **Splits.** FLEURS `dev` is the `calibration` cohort and `test` the `confirmation` cohort. They
   read disjoint FLoRes sentence sets, so the split is disjoint by script, and by family: each
   recording is its own family and lies in one split. `manifest` marks any sentence id found in

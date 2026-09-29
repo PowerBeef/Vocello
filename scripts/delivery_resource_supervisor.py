@@ -96,7 +96,13 @@ PROVISIONAL_MAXIMUM_RSS_BYTES = 5 * 1024**3
 MEANINGFUL_SWAP_GROWTH_BYTES = 64 * 1024**2
 DEFAULT_TIMEOUT_SECONDS = 900.0
 SAMPLE_INTERVAL_SECONDS = 0.05
-DEFAULT_RECOVERY_TIMEOUT_SECONDS = 15.0
+# How long the post-exit check waits for host free memory to come back. macOS
+# returns an MLX worker's 2.5-3.5 GB lazily after exit: on 2026-09-29, in the
+# panel runs over the N1 and N2 cohorts, free memory was still 55-64% (from
+# about 72%) when a 15 s wait ended, and back at 71-72% by the next launch's
+# end, so 20 launches failed a recovery that was only slow. The wait ends as
+# soon as memory is back; only a recovery that never comes costs the full wait.
+DEFAULT_RECOVERY_TIMEOUT_SECONDS = 120.0
 RECOVERY_SAMPLE_INTERVAL_SECONDS = 0.5
 RECOVERY_TOLERANCE_PERCENT_POINTS = 5.0
 PRESSURE_WARNING_FREE_PERCENT = 10.0

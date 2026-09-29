@@ -6,7 +6,8 @@ existing local `main` checkout, owns integration and is the only one that pushes
 allowed when they save time on the 16 GB development Mac: read-only subagents research, review, audit
 and triage; editing agents work only in Claude Code worktrees (`.claude/worktrees/<name>`, branch
 `worktree-<name>`) that the lead integrates into `main`. Native builds are serialized machine-wide by
-the host lock; device, UI, model and benchmark lanes stay with the lead on a quiet host. Keep tooling
+the host lock; device, UI, model and benchmark lanes stay with the lead on a quiet host (non-timing
+audio-QC model runs may run beside code-only agents; see the workflow doc). Keep tooling
 proportional to product work: reuse scripts and tests, load guidance only when relevant, and add a
 check only for a demonstrated product or workflow risk. Parallel rules and budget:
 `docs/reference/development-workflow.md#parallel-agents-and-worktrees`.
@@ -108,7 +109,9 @@ npm --prefix website run check       # independent website acceptance
   coordinate, browser or MCP native UI routes. Genuine controls only; no hidden shippable test UI.
 - **Explicit consent:** device/UI/model/benchmark runs, releases and publication need an explicit
   request. Consent covers that request only; none carries over. Lanes run one at a time on committed
-  source, in the lead session, with no agent or native build running alongside. Tool or skill
+  source, in the lead session, with no agent or native build running alongside, except that the
+  non-timing audio-QC model runs (`qc-takes`, `qc-n2`, orchestrator panels) may run beside code-only
+  agents (maintainer decision, 2026-09-29). Never edit a script a running lane executes. Tool or skill
   availability grants no consent. Never retry a failed evidence run silently.
 - **Generated project:** edit `project.yml`, never `project.pbxproj`; run
   `./scripts/regenerate_project.sh --fast` after project inputs change.

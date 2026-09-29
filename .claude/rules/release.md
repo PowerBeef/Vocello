@@ -135,7 +135,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   instead of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
   memory|lang-bench|qc-takes|qc-n2` and `release.yml` run only on explicit request, in the lead session, with no
-  parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in
+  parallel agent active, except that the non-timing audio-QC model runs (`qc-takes`, `qc-n2` and
+  orchestrator panels, which measure outputs, not timing) may run beside code-only agents
+  (`require_quiet_host <lane> agents-allowed`; maintainer decision 2026-09-29). Timing lanes refuse to start on a busy host (`require_quiet_host` in
   `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
   level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;
   `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues; the gate summarizer then reports a loaded,

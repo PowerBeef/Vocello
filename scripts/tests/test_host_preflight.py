@@ -108,6 +108,28 @@ class HostPreflightTests(unittest.TestCase):
                                     env={"QVOICE_ALLOW_BUSY_HOST": "1"})
             self.assertEqual(allowed.returncode, 0, allowed.stderr)
 
+    def test_a_non_timing_model_lane_runs_beside_code_only_agents(self) -> None:
+        # qc-takes and qc-n2 measure outputs, not timing: a locked agent worktree is recorded, not refused.
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+            subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "i"], check=True)
+            worktree = repo / ".claude" / "worktrees" / "agent"
+            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "worktree-agent",
+                            str(worktree)], check=True)
+            subprocess.run(["git", "-C", str(repo), "worktree", "lock", str(worktree)], check=True)
+            allowed = run_preflight(load="0.50", cores="8", level="1", cwd=repo,
+                                    command="require_quiet_host fixture-lane agents-allowed")
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            self.assertIn("agents:1(allowed)", allowed.stderr)
+            # Load and memory pressure still refuse it.
+            pressured = run_preflight(load="0.50", cores="8", level="2", cwd=repo,
+                                      command="require_quiet_host fixture-lane agents-allowed")
+            self.assertEqual(pressured.returncode, 1)
+        unknown = run_preflight(load="0.50", cores="8", level="1", command="require_quiet_host fixture-lane sometimes")
+        self.assertEqual(unknown.returncode, 2)
+
     def test_settle_hands_the_host_to_the_quiet_host_rule(self) -> None:
         """audit #28/V-8: after the lane's build, the bounded settle ends in the
         ordinary rule: within twice the core count continues, above it refuses."""

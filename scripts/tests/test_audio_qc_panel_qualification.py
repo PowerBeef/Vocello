@@ -534,7 +534,8 @@ class RecalibrationEditTests(unittest.TestCase):
             "not-canonical-host": ceiling_record(self.registry, PYIN, peak=600 * MIB, host="mac-mini-m2-8gb"),
             "identity-mismatch": ceiling_record(self.registry, PYIN, peak=600 * MIB, identity="9" * 64),
             # The record already fails the session's budget.
-            "ceiling-exceeds-budget": ceiling_record(self.registry, PYIN, peak=9 * GIB),
+            # Peak x 1.2 above the whole budget never fits, whatever the budget.
+            "ceiling-exceeds-budget": ceiling_record(self.registry, PYIN, peak=self.registry["admission"]["budgetBytes"]),
         }
         for reason, record in cases.items():
             with self.subTest(reason=reason):
@@ -547,7 +548,8 @@ class RecalibrationEditTests(unittest.TestCase):
                                                 host="mac-mini-m2-8gb")
         self.assertEqual(refused, {PYIN: "not-canonical-host"})
         # A record that fit a larger session budget still refuses against the registry's own budget.
-        roomy = ceiling_record(self.registry, PYIN, peak=9 * GIB, budget_bytes=64 * GIB)
+        roomy = ceiling_record(self.registry, PYIN, peak=self.registry["admission"]["budgetBytes"],
+                               budget_bytes=64 * GIB)
         self.assertTrue(roomy["recalibration"]["passed"])
         self.assertEqual(self._edits({PYIN: roomy})[2], {PYIN: "ceiling-exceeds-budget"})
         # A candidate is qualified by `promote`, never recalibrated.

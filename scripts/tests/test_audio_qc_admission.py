@@ -84,8 +84,10 @@ class FakeClock:
 
 class AdmissionPolicyTests(unittest.TestCase):
     def test_the_registry_policy_is_budgeted_and_serial_until_the_switch(self) -> None:
-        policy = AdmissionPolicy.from_registry(unpromoted_registry())
-        self.assertEqual(policy.budget_bytes, 10 * GIB)
+        registry = unpromoted_registry()
+        policy = AdmissionPolicy.from_registry(registry)
+        # The budget is the registry's (12 GiB on the M6 since 2026-09-29), never a literal here.
+        self.assertEqual(policy.budget_bytes, registry["admission"]["budgetBytes"])
         self.assertEqual(dict(policy.lane_limits), {"gpu": 1, "cpu": 2, "dsp": 4})
         self.assertEqual(policy.recovery_rule, WHOLE_HOST_RECOVERY_RULE)
         # While the whole-host recovery rule binds, one worker at a time host-wide.
@@ -106,7 +108,8 @@ class AdmissionPolicyTests(unittest.TestCase):
         """Decision 9a: the child-attributed rule binds, so admission runs to the lane limits."""
         shipped = load_registry()
         policy = AdmissionPolicy.from_registry(shipped)
-        self.assertEqual((policy.budget_bytes, dict(policy.lane_limits)), (10 * GIB, {"gpu": 1, "cpu": 2, "dsp": 4}))
+        self.assertEqual((policy.budget_bytes, dict(policy.lane_limits)),
+                         (shipped["admission"]["budgetBytes"], {"gpu": 1, "cpu": 2, "dsp": 4}))
         self.assertEqual((policy.recovery_rule, policy.worker_cap), (CANDIDATE_RECOVERY_RULE, None))
         # The same switch without the evidence it cites never loads.
         uncited = copy.deepcopy(shipped)
@@ -155,8 +158,9 @@ class AdmissionPolicyTests(unittest.TestCase):
         budget = registry["admission"]["budgetBytes"] - registry["admission"]["orchestratorReservationBytes"]
         self.assertEqual((measuring.ceiling_bytes, measuring.ceiling_basis),
                          (budget, "qualification-measurement-budget"))
-        self.assertEqual(admission_decision(_policy(cap=1), [{"lane": "orchestrator",
-                                                              "ceilingBytes": 512 * 1024**2}],
+        registry_budget = registry["admission"]["budgetBytes"]
+        self.assertEqual(admission_decision(_policy(cap=1, budget=registry_budget),
+                                            [{"lane": "orchestrator", "ceilingBytes": 512 * 1024**2}],
                                             "gpu", measuring.ceiling_bytes), ("admit", None))
         self.assertEqual(judge_admission(registry, WHISPER, measurement=True).ceiling_basis, "provisional")
         for judge_id, reason in (("compact.distilhubert@1", "retired"), ("fastqc@8", "not an orchestrated worker"),

@@ -312,12 +312,13 @@ class JudgeRegistryTests(unittest.TestCase):
             registry["admission"]["recoveryRule"]["promotion"]["evidence"] = declared
         self.assertTrue(any("not a file inside the repository" in e for e in self._errors(self_declared, unpromoted)))
 
+        # A ceiling of the whole budget never fits beside the orchestrator reservation, whatever the budget.
         def oversized(registry):
-            registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"] = 10 * 1024**3
+            registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"] = registry["admission"]["budgetBytes"]
         self.assertIn(f"judge {WHISPER}: its ceiling never fits the admission budget", self._errors(oversized))
 
         def measured(registry):
-            registry["judges"][WHISPER]["resources"]["canonicalHostPeakBytes"] = 9 * 1024**3
+            registry["judges"][WHISPER]["resources"]["canonicalHostPeakBytes"] = registry["admission"]["budgetBytes"]
         self.assertIn(f"judge {WHISPER}: its ceiling never fits the admission budget", self._errors(measured))
 
         def threadless(registry):

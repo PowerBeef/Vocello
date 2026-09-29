@@ -7,7 +7,7 @@
 # Refusing to start applies the same rule before the model loads, so the
 # operator does not spend a 20-minute run to learn that the host was busy.
 #
-#   require_quiet_host <lane>
+#   require_quiet_host <lane> [agents-allowed]
 #   settle_host_load <lane> <max-seconds>   (after the lane's own build)
 #
 # Refuses (exit 1) when the 1-minute load average exceeds twice the core count
@@ -16,12 +16,22 @@
 # prints the numbers either way. It also refuses while parallel work is active:
 # another process holds the host-wide native lock ($QVOICE_NATIVE_LOCK), or a
 # Claude Code agent worktree is locked (an agent is still running). Evidence
-# lanes run alone. `QVOICE_ALLOW_BUSY_HOST=1` records the numbers
+# lanes run alone. A non-timing model lane (audio-QC calibration: `qc-takes`,
+# `qc-n2`) passes `agents-allowed`: it measures outputs, not timing, so
+# code-only agents may work beside it (maintainer decision, 2026-09-29); they
+# are recorded, and load, memory pressure and a held native lock still refuse.
+# `QVOICE_ALLOW_BUSY_HOST=1` records the numbers
 # and continues, for an explicitly exploratory run the publisher will classify
 # from the run's own load sample. No dependency on the caller's note/warn/die.
 
 require_quiet_host() {
-    local lane="${1:-}"
+    local lane="${1:-}" agents_allowed=0
+    if [ "${2:-}" = "agents-allowed" ]; then
+        agents_allowed=1
+    elif [ -n "${2:-}" ]; then
+        echo "error: require_quiet_host takes a lane and optionally agents-allowed" >&2
+        return 2
+    fi
     if [ -z "$lane" ]; then
         echo "error: require_quiet_host needs a lane identifier" >&2
         return 2
@@ -58,9 +68,14 @@ require_quiet_host() {
     local locked_worktrees
     locked_worktrees="$(git -C "${ROOT_DIR:-$PWD}" worktree list --porcelain 2>/dev/null | grep -c '^locked' || true)"
     case "$locked_worktrees" in ''|*[!0-9]*) locked_worktrees=0 ;; esac
+    local agents_note=""
     if [ "$locked_worktrees" -gt 0 ]; then
-        busy=1
-        parallel="$parallel active-agent-worktrees($locked_worktrees)"
+        if [ "$agents_allowed" -eq 1 ]; then
+            agents_note=" agents:$locked_worktrees(allowed)"
+        else
+            busy=1
+            parallel="$parallel active-agent-worktrees($locked_worktrees)"
+        fi
     fi
     if [ "$busy" -eq 1 ]; then
         if [ "${QVOICE_ALLOW_BUSY_HOST:-0}" = "1" ]; then
@@ -74,7 +89,7 @@ require_quiet_host() {
         echo "error: wait for the load to settle or close other work; QVOICE_ALLOW_BUSY_HOST=1 runs anyway and the run's own load sample decides its classification." >&2
         return 1
     fi
-    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level" >&2
+    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level$agents_note" >&2
     return 0
 }
 

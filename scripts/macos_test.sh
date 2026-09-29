@@ -1941,12 +1941,12 @@ main() {
       ;;
     qc-takes)
       require_build_free_space language-benchmark || die "calibration-take storage preflight failed"
-      require_quiet_host macos-qc-takes || die "calibration takes need a quiet host"
+      require_quiet_host macos-qc-takes agents-allowed || die "calibration takes need a quiet host"
       cmd_qc_takes "$@"
       ;;
     qc-n2)
       require_build_free_space language-benchmark || die "N2 resynthesis storage preflight failed"
-      require_quiet_host macos-qc-n2 || die "N2 resynthesis needs a quiet host"
+      require_quiet_host macos-qc-n2 agents-allowed || die "N2 resynthesis needs a quiet host"
       cmd_qc_n2 "$@"
       ;;
     test)

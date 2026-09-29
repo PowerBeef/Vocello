@@ -389,6 +389,12 @@ def _clip(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndar
         peak = float(np.max(np.abs(samples)))
         return samples * (parameters["targetPeak"] / max(peak, 1e-12)), []
     level, over = _clip_level(samples, parameters["clippedFraction"])
+    if parameters["clippedFraction"] > 0 and over == 0:
+        # The loudest samples share one magnitude (the source is already flat at its peak), so
+        # none lies above the level: every mode would change and label nothing. Only these
+        # sources change; every other output stays byte-identical under catalog version 2.
+        raise InjectorNotApplicable(f"{source.fixture_id} is already flat at its peak: nothing lies above "
+                                    "the clip level")
     magnitude = np.abs(samples)
     if mode == "overdrive":
         # Level beyond full scale, nothing flattened: the physical over-range

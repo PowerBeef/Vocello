@@ -1102,7 +1102,9 @@ sham, mild, moderate and severe, about 40 clips per take, each seeded from the s
 injector and the catalog seed. A recorded take has no word intervals, declared pauses, script or
 render voice (`scripts/lib/qc_qualification/recordings.py`), so `injectors.inject` refuses every
 variant that needs one with `InjectorNotApplicable`, counted with its reason in
-`injection-set.json`, and word-free recording variants (`take-*`) stand in: clicks anywhere, a
+`injection-set.json`. SIG-CLIP refuses the same way a source already flat at its peak, whose loudest
+fraction shares one magnitude so that nothing lies above the clip level (first met on the N2
+confirmation cohort, 2026-09-29; every other output is byte-identical). Word-free recording variants (`take-*`) stand in: clicks anywhere, a
 dropout centred on the take, noise against the whole take's RMS, a cut at 80, 65 or 50% of the take
 (which may remove only the trailing pause) and a run-on of a middle span appended after the take's
 end. The catalog variants and their goldens are unchanged. Octave jumps and pitch breaks stay not

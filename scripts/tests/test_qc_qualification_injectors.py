@@ -8,6 +8,7 @@ injector or fixture: bump its version and replace the golden in the same change.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import sys
 import unittest
@@ -231,6 +232,19 @@ class InjectorTests(unittest.TestCase):
         self.assertEqual(bare.pauses, ())
         with self.assertRaises(injectors.InjectorNotApplicable):
             injectors.inject("SIG-DROP", "control-natural-pause", bare, SEED)
+
+    def test_clipping_needs_a_sample_above_its_level(self) -> None:
+        # A source already flat at its peak (its loudest 5% share one magnitude) has nothing to
+        # clip: every clipping variant is not applicable, while the sham and the control still run.
+        samples = self.source.samples.copy()
+        loudest = np.argsort(np.abs(samples))[-int(0.06 * samples.size):]
+        samples[loudest] = np.sign(samples[loudest]) * np.abs(samples).max()
+        flat = replace(self.source, samples=samples)
+        for variant in ("mild", "moderate", "severe", "soft-knee-moderate", "over-range-moderate"):
+            with self.assertRaises(injectors.InjectorNotApplicable, msg=variant):
+                injectors.inject("SIG-CLIP", variant, flat, SEED)
+        self.assertEqual(injectors.inject("SIG-CLIP", "sham", flat, SEED).labels, ())
+        self.assertEqual(injectors.inject("SIG-CLIP", "control-peak-normalized", flat, SEED).labels, ())
 
     def test_splices_change_length_by_the_edited_content(self) -> None:
         source = self.source

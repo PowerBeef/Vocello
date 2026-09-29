@@ -209,9 +209,9 @@
       "id": "audio-qc-corpora-cache",
       "path": "build/cache/audio-qc-corpora",
       "class": "cache",
-      "owner": "Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch)",
+      "owner": "Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch; scripts/audio_qc_n1_corpus.py fetch and extract)",
       "cleanup": "aggressive",
-      "retention": "Digest-pinned CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, one directory per pinned commit (re-fetchable); text only, never audio or evidence",
+      "retention": "Digest-pinned corpus files, one directory per pinned commit or revision (re-fetchable): the CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, and the FLEURS N1 TSVs, audio archives and their extracted WAVs, under fleurs; third-party corpus data, never committed and never evidence",
       "env": "QVOICE_AUDIO_QC_CORPORA_CACHE"
     },
     {

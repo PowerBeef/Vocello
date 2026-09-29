@@ -47,8 +47,9 @@ of takes and loads no model itself:
 
 Commands:
   manifest         build an orchestrator manifest from an independent-ASR
-                   manifest (language lane), a calibration-takes or injection-set
-                   manifest (language lane, AQ-07) or a delivery cascade input
+                   manifest (language lane), a calibration-takes, injection-set
+                   or N1 cohort manifest (language lane, AQ-07; eligible N1
+                   recordings only) or a delivery cascade input
   run              run Stages 1-3 and write the private bundle
   replay           recompute Stage 3 from the cache (no model runs) and compare
                    it with a bundle's records
@@ -90,6 +91,7 @@ import numpy as np  # noqa: E402
 
 import audio_qc_calibration_takes  # noqa: E402
 from audio_qc_judges import JudgeRegistryError, load_registry  # noqa: E402
+import audio_qc_n1_corpus  # noqa: E402
 from delivery_analysis_cache import (  # noqa: E402
     NO_MODEL_DIGEST,
     SUPPORTED_RESAMPLERS,
@@ -248,22 +250,27 @@ def manifest_from_independent_asr(source: dict[str, Any], *, source_sha256: str)
     }
 
 
-CALIBRATION_TAKE_KINDS = ("audio-qc-calibration-takes", "audio-qc-injection-set")
+CALIBRATION_TAKE_KINDS = ("audio-qc-calibration-takes", "audio-qc-injection-set", audio_qc_n1_corpus.MANIFEST_KIND)
 
 
 def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: str, base_dir: Path) -> dict[str, Any]:
-    """The language lane over natural calibration takes (AQ-07, population N3) or an injection set.
+    """The language lane over natural calibration takes (AQ-07, population N3), an injection set or an N1 cohort.
 
     Each generated take becomes one language-lane take: its planned text is the
     reference text and its language the expected language, so the content and
     language metrics of every judge apply. A WAV path is relative to the source
-    manifest (`base_dir`). A planned take without output is skipped and counted.
+    manifest (`base_dir`). A planned take without output is skipped and counted,
+    and so is an N1 recording (`scripts/audio_qc_n1_corpus.py`) its manifest
+    marks ineligible: only eligible human recordings go in.
     """
     kind = source.get("kind")
     if kind not in CALIBRATION_TAKE_KINDS:
         raise OrchestratorError(f"a calibration-takes manifest must be one of {CALIBRATION_TAKE_KINDS}")
     if kind == "audio-qc-calibration-takes":
         if issues := audio_qc_calibration_takes.manifest_digest_issues(source):
+            raise OrchestratorError(issues[0])
+    if kind == audio_qc_n1_corpus.MANIFEST_KIND:
+        if issues := audio_qc_n1_corpus.manifest_digest_issues(source):
             raise OrchestratorError(issues[0])
     entries = source.get("takes")
     if not isinstance(entries, list) or not entries:
@@ -272,7 +279,8 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
     for entry in entries:
         if not isinstance(entry, dict) or not isinstance(entry.get("takeID"), str):
             raise OrchestratorError("every calibration take names its takeID")
-        if entry.get("status") == "missing" or entry.get("wavPath") is None or entry.get("wavSHA256") is None:
+        if entry.get("status") == "missing" or entry.get("wavPath") is None or entry.get("wavSHA256") is None \
+                or (kind == audio_qc_n1_corpus.MANIFEST_KIND and entry.get("eligible") is not True):
             skipped += 1
             continue
         take_id, text = entry["takeID"], entry.get("text")
@@ -1310,7 +1318,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     source.add_argument("--from-independent-asr-manifest", type=Path)
     source.add_argument("--from-cascade-input", type=Path)
     source.add_argument("--from-calibration-takes", type=Path,
-                        help="an AQ-07 calibration-takes manifest or an injection-set manifest")
+                        help="an AQ-07 calibration-takes, injection-set or N1 cohort manifest")
     manifest.add_argument("--output", type=Path, required=True)
     for name in ("run", "replay"):
         command = commands.add_parser(name, help="run Stages 1-3" if name == "run" else "recompute Stage 3 from the cache")

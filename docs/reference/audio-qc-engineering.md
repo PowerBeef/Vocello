@@ -1113,7 +1113,12 @@ digests only), `report.json` and `report.md`: per-family CP bounds per flag, A4 
 per injector and severity, per-language rows and the worst stratum. It is report-only: N3 carries
 no labels (FAR <= f / (1 - pi_max)) and T1 on N3 qualifies nothing (A2, A5). On synthetic 6 s takes
 with six jobs, 40 takes took about 1.5 s to inject, 1.2 s to verify and 14 s to score, and wrote
-about 12 MB of WAV per take.
+about 12 MB of WAV per take. `inject` and `verify` also take an N1 cohort manifest of FLEURS human
+recordings (`scripts/audio_qc_n1_corpus.py`, [language-bench.md](language-bench.md#human-recordings-n1-aq-07)),
+eligible recordings only. Each 16 kHz recording is resampled to 24 kHz with the Kaiser-5 polyphase
+design of `polyphase-kaiser5-v2` (`lib.playback_capture.resample`) before any injector runs, because
+click widths, cluster spacing and the overlap-add window are counted in 24 kHz samples and `score`
+and `verify` read 24 kHz; every recipe records it as `sourceResampling`. `score` stays N3-only.
 
 ### Staged pipeline, workers and admission (AQ-05, 2026-09-26)
 
@@ -1552,8 +1557,8 @@ new segment (`<batchID>@<offset>`, `next-offset`): the seed is the batch's, and 
 depends only on the seed and its text. A rejected take is an outcome that N3 flag rates must count
 (`audio_qc_calibration_set.py score` counts it as a v8 fail without audio); any failed or missing
 take fails the lane. The lane publishes nothing and writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
-takes manifest, or an injection-set manifest, into a language-lane manifest for the panel judges;
-it skips and counts missing takes.
+takes manifest, an injection-set manifest or an N1 cohort manifest into a language-lane manifest for
+the panel judges; it skips and counts missing takes and ineligible N1 recordings.
 
 ### Speech/defect calibration: independent references, no required listening
 

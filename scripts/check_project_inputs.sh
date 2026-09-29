@@ -82,6 +82,7 @@ python3 "$SCRIPT_DIR/audio_qc_qualification.py" validate-policy
 python3 "$SCRIPT_DIR/audio_qc_judges.py" validate
 python3 "$SCRIPT_DIR/audio_qc_panel_qualification.py" validate
 python3 "$SCRIPT_DIR/audio_qc_script_pool.py" validate
+python3 "$SCRIPT_DIR/audio_qc_n1_corpus.py" validate
 python3 "$SCRIPT_DIR/audio_qc_calibration_takes.py" validate-policy
 python3 "$SCRIPT_DIR/prepare_delivery_compact_model_config.py" --validate-only
 

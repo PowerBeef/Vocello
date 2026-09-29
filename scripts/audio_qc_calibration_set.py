@@ -17,6 +17,13 @@ Commands:
           (P1); write measurements.json (ids and digests only), report.json and
           report.md.
 
+`inject` and `verify` also take an `audio-qc-n1-cohort` manifest
+(`scripts/audio_qc_n1_corpus.py`): its eligible FLEURS recordings (population
+N1) are the sources, resampled from 16 kHz to the engine rate before any
+injector runs, and every recipe records that resampling (`sourceResampling`,
+`lib/qc_qualification/recordings.py`). Ineligible recordings are counted, never
+injected. `score` reports on N3 only and refuses an N1 cohort.
+
 Recorded takes carry no word intervals (they exist only from the aligner on N1
 and N2), no declared pause, no script and no render voice
 (`lib/qc_qualification/recordings.py`), so every variant that needs one raises
@@ -49,6 +56,7 @@ from typing import Any, Callable, Iterable, Iterator
 
 import numpy as np
 
+import audio_qc_n1_corpus
 import audio_qc_qualification as m1
 from lib import audio_qc, audio_qc_observations
 from lib.qc_qualification import injectors, policy as policy_module, recordings, resampling
@@ -56,6 +64,9 @@ from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
 
 TAKES_KIND = "audio-qc-calibration-takes"
+# FLEURS human recordings (population N1), in the same take shape.
+N1_KIND = audio_qc_n1_corpus.MANIFEST_KIND
+TAKES_KINDS = (TAKES_KIND, N1_KIND)
 # The take lane's statuses (scripts/audio_qc_calibration_takes.py): only generated takes have audio.
 TAKE_STATUSES = ("generated", "rejected", "failed", "missing")
 SET_KIND = "audio-qc-injection-set"
@@ -134,8 +145,11 @@ def load_takes(path: Path) -> tuple[dict, str]:
         manifest = json.loads(raw)
     except json.JSONDecodeError as error:
         raise CalibrationError(f"{path.name} is not JSON: {error}") from error
-    if not isinstance(manifest, dict) or manifest.get("kind") != TAKES_KIND or manifest.get("schemaVersion") != 1:
-        raise CalibrationError(f"{path.name} is not an {TAKES_KIND} schema 1 manifest")
+    if not isinstance(manifest, dict) or manifest.get("kind") not in TAKES_KINDS or manifest.get("schemaVersion") != 1:
+        raise CalibrationError(f"{path.name} is not an {' or '.join(TAKES_KINDS)} schema 1 manifest")
+    n1 = manifest["kind"] == N1_KIND
+    if n1 and (issues := audio_qc_n1_corpus.manifest_digest_issues(manifest)):
+        raise CalibrationError(f"{path.name}: {issues[0]}")
     takes = manifest.get("takes")
     if not isinstance(takes, list):
         raise CalibrationError(f"{path.name} lists no takes")
@@ -160,7 +174,22 @@ def load_takes(path: Path) -> tuple[dict, str]:
         if not isinstance(take.get("language"), str) or not isinstance(take.get("text"), str):
             raise CalibrationError(f"{take_id}: a generated take names its language and text")
         _relative_path(path.parent, take.get("wavPath"), f"{take_id}: wavPath")
+        if n1:
+            recording = take.get("recording")
+            if take.get("population") != "N1" or not isinstance(take.get("eligible"), bool) \
+                    or not isinstance(recording, dict) or type(recording.get("sampleRate")) is not int \
+                    or recording["sampleRate"] not in recordings.SOURCE_RATES:
+                raise CalibrationError(f"{take_id}: an N1 recording names its population, eligibility and "
+                                       "source sample rate")
     return manifest, hashlib.sha256(raw).hexdigest()
+
+
+def source_rate(take: dict) -> int:
+    """The sample rate of a take's WAV: an N1 recording declares its own; an engine take is 24 kHz."""
+    recording = take.get("recording")
+    if isinstance(recording, dict) and "sampleRate" in recording:
+        return int(recording["sampleRate"])
+    return recordings.ENGINE_SAMPLE_RATE
 
 
 def rejected_takes(manifest: dict) -> list[dict]:
@@ -190,7 +219,12 @@ def rejection_levels(flags: Iterable[str]) -> dict[str, str]:
 
 
 def generated_takes(manifest: dict) -> list[dict]:
-    return [take for take in manifest["takes"] if take["status"] == "generated"]
+    """Takes with audio that may be sources: an N1 recording its manifest marks ineligible is not one."""
+    return [take for take in manifest["takes"] if take["status"] == "generated" and take.get("eligible", True)]
+
+
+def ineligible_takes(manifest: dict) -> list[dict]:
+    return [take for take in manifest["takes"] if take["status"] == "generated" and not take.get("eligible", True)]
 
 
 def take_wav(manifest_path: Path, take: dict) -> Path:
@@ -218,6 +252,8 @@ def derive_seed(source_wav_sha256: str, injector_key: str, catalog_seed: int) ->
 
 
 def stratum(take: dict) -> str:
+    if take.get("population") == "N1":
+        return f"N1/{take.get('language')}"
     return f"N3/{take.get('language')}/{take.get('mode')}"
 
 
@@ -313,7 +349,7 @@ def parallel(function: Callable[[Any], Any], tasks: list[Any], jobs: int, label:
 # --------------------------------------------------------------------------- #
 
 def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: str, wav_sha256: str,
-           source_wav_sha256: str, rate: int) -> dict:
+           source_wav_sha256: str, rate: int, source_resampling: dict | None = None) -> dict:
     injector = injectors.CATALOG[injection.injector.split("@")[0]]
     entry = {key: value for key, value in take.items() if key != "text"}
     entry.update(
@@ -329,14 +365,19 @@ def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: s
         "seed": injection.seed, "sourceWAVSHA256": source_wav_sha256, "sourcePCMSHA256": injection.source_digest,
         "outputPCMSHA256": injection.digest, "labels": list(injection.labels),
     }
+    if source_resampling is not None:
+        # The source reached the engine rate through this resampler; sourcePCMSHA256 is the resampled PCM's.
+        entry["injection"]["sourceResampling"] = source_resampling
     return _plain(entry)
 
 
 def _inject_take(task: dict) -> dict:
     take = task["take"]
+    rate = source_rate(take)
     fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"], family=take["family"],
                                                 stratum=stratum(take), text=take["text"],
-                                                expected_sha256=take["wavSHA256"])
+                                                expected_sha256=take["wavSHA256"], source_rate=rate)
+    source_resampling = recordings.resampling_recipe(rate)
     output = Path(task["output"])
     entries, skips = [], []
     written = 0
@@ -353,7 +394,8 @@ def _inject_take(task: dict) -> dict:
         wav_sha256 = recordings.write_pcm16_wav(output / relative, injection.samples,
                                                 sample_rate=fixture.sample_rate)
         written += (output / relative).stat().st_size
-        entries.append(_entry(take, injection, clip_id, relative, wav_sha256, digest, fixture.sample_rate))
+        entries.append(_entry(take, injection, clip_id, relative, wav_sha256, digest, fixture.sample_rate,
+                              source_resampling))
     return {"takeID": take["takeID"], "entries": entries, "skips": skips, "bytes": written}
 
 
@@ -420,7 +462,7 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
 
     head = {
         "schemaVersion": 1, "kind": SET_KIND, "generator": GENERATOR,
-        "sourceManifest": {"sha256": manifest_sha256, "runID": manifest.get("runID"),
+        "sourceManifest": {"sha256": manifest_sha256, "kind": manifest["kind"], "runID": manifest.get("runID"),
                            "planDigest": manifest.get("planDigest"), "poolDigest": manifest.get("poolDigest"),
                            "split": manifest.get("split")},
         "catalogVersion": injectors.CATALOG_VERSION, "catalogSeed": catalog_seed,
@@ -442,6 +484,7 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
         return {"entriesSHA256": entries_sha256, "notApplicable": not_applicable,
                 "counts": {"generatedTakes": len(generated),
                            "missingTakes": sum(1 for take in manifest["takes"] if take["status"] != "generated"),
+                           "ineligibleTakes": len(ineligible_takes(manifest)),
                            "shams": counts["S"], "positives": counts["P1"], "wavBytes": written}}
 
     path = output / "injection-set.json"
@@ -467,10 +510,12 @@ def load_set(path: Path) -> dict:
 def _verify_take(task: dict) -> list[list[str]]:
     take = task["take"]
     failures: list[list[str]] = []
+    rate = source_rate(take)
     try:
         fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"],
                                                     family=take["family"], stratum=stratum(take),
-                                                    text=take["text"], expected_sha256=take["wavSHA256"])
+                                                    text=take["text"], expected_sha256=take["wavSHA256"],
+                                                    source_rate=rate)
     except recordings.RecordingError as error:
         return [[entry["takeID"], f"source: {error}"] for entry in task["entries"]]
     for entry in task["entries"]:
@@ -488,6 +533,7 @@ def _verify_take(task: dict) -> list[list[str]]:
             (recipe.get("severity") == variant.severity, "severity differs from the catalog"),
             (recipe.get("parameters") == _plain(dict(variant.parameters)), "parameters differ from the catalog"),
             (recipe.get("sourceWAVSHA256") == digest, "source WAV digest differs"),
+            (recipe.get("sourceResampling") == recordings.resampling_recipe(rate), "source resampling differs"),
             (recipe.get("seed") == derive_seed(digest, injector.key, task["catalogSeed"]),
              "seed differs from its derivation"),
             (entry.get("family") == take["family"], "family differs from the source take's"),
@@ -958,6 +1004,9 @@ def markdown(report: dict) -> str:
 
 def run_score(takes_path: Path, set_path: Path, output: Path, *, jobs: int) -> dict:
     manifest, manifest_sha256 = load_takes(takes_path)
+    if manifest["kind"] != TAKES_KIND:
+        raise CalibrationError("score reports on natural takes (N3), whose flag rate only bounds FAR; it does not "
+                               "score an N1 cohort (inject and verify do)")
     injection_set = load_set(set_path)
     if injection_set.get("sourceManifest", {}).get("sha256") != manifest_sha256:
         raise CalibrationError("the injection set was built from another takes manifest")

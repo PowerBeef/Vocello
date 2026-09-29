@@ -141,10 +141,15 @@ languages. `scripts/audio_qc_n1_corpus.py` fetches, extracts and lists it.
   record that in every recipe.
 - **Commands.** The maintainer runs these. The download is 40 files, 6.74 GB; extraction needs
   about as much again, computed from the TSV sample counts and checked before anything is written.
+  The TSVs come first: `yield` reports, from them alone, how many recordings and FLoRes sentences
+  each language keeps after the eligibility rules, so the audio is fetched only once FLEURS is known
+  to meet the N1 and N2 minimums of `config/audio-qc-qualification-policy.json`.
 
   ```sh
   python3 scripts/audio_qc_n1_corpus.py plan      # files, sizes and local state; no network
-  python3 scripts/audio_qc_n1_corpus.py fetch     # optionally --languages english french ...
+  python3 scripts/audio_qc_n1_corpus.py fetch --tsv-only   # the transcripts alone, about 6 MB
+  python3 scripts/audio_qc_n1_corpus.py yield     # eligible recordings per language and split
+  python3 scripts/audio_qc_n1_corpus.py fetch     # the audio; optionally --languages english french ...
   python3 scripts/audio_qc_n1_corpus.py extract
   python3 scripts/audio_qc_n1_corpus.py manifest --split calibration \
     --output build/artifacts/macos/audio-qc/n1-calibration/n1-manifest.json

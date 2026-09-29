@@ -297,12 +297,13 @@ def _languages(sources: Mapping[str, Any], requested: Sequence[str] | None) -> l
     return [language for language in pinned if language in requested]
 
 
-def pinned_files(sources: Mapping[str, Any], languages: Sequence[str] | None = None) -> list[dict[str, Any]]:
+def pinned_files(sources: Mapping[str, Any], languages: Sequence[str] | None = None,
+                 kinds: Sequence[str] = ("tsv", "archive")) -> list[dict[str, Any]]:
     """Every pinned file of the selected languages: per language its TSVs, then its archives."""
     files = []
     for language in _languages(sources, languages):
         entry = language_entry(sources, language)
-        for kind in ("tsv", "archive"):
+        for kind in kinds:
             for split in entry["splits"]:
                 files.append({"language": language, "config": entry["config"], "split": split["split"],
                               "role": split["role"], "kind": kind, **split[kind]})
@@ -429,10 +430,15 @@ def _with_progress(opener: Opener, label: str, total: int) -> Opener:
 
 
 def fetch(sources: Mapping[str, Any], *, root: Path | None = None, languages: Sequence[str] | None = None,
-          opener: Opener = _open, sleep: Callable[[float], None] = time.sleep) -> list[dict[str, Any]]:
-    """Download every selected pinned file not already present and verified; refuse any mismatch."""
+          opener: Opener = _open, sleep: Callable[[float], None] = time.sleep,
+          tsv_only: bool = False) -> list[dict[str, Any]]:
+    """Download every selected pinned file not already present and verified; refuse any mismatch.
+
+    `tsv_only` fetches the transcript TSVs alone (about 6 MB), enough for the
+    `yield` report before the audio is downloaded.
+    """
     directory = corpus_root(sources, root)
-    files = pinned_files(sources, languages)
+    files = pinned_files(sources, languages, ("tsv",) if tsv_only else ("tsv", "archive"))
     for pin in files:
         final = directory / pin["path"]
         if not _inside(directory, final) or not _inside(directory, directory / PARTIAL_DIRECTORY / pin["path"]):
@@ -845,6 +851,58 @@ def build_manifest(sources: Mapping[str, Any], *, split: str, output: Path, root
     return manifest
 
 
+def eligibility_yield(sources: Mapping[str, Any], *, root: Path | None = None,
+                      languages: Sequence[str] | None = None) -> dict[str, Any]:
+    """Per language and cohort split, the recordings and FLoRes sentences the manifest would mark
+    eligible, from the fetched TSVs alone (no audio): whether FLEURS meets the N1 and N2 minimums
+    (`operatingPoints` in config/audio-qc-qualification-policy.json) before its audio is fetched."""
+    corpus = corpus_root(sources, root)
+    report: dict[str, Any] = {}
+    for language in _languages(sources, languages):
+        entry = language_entry(sources, language)
+        rows = {}
+        for fleurs_split in SPLIT_ROLES:
+            pin = split_entry(entry, fleurs_split)["tsv"]
+            path = corpus / pin["path"]
+            if not path.is_file():
+                raise N1Error(f"{language} {fleurs_split}: {pin['path']} is not fetched; run `fetch --tsv-only`")
+            rows[fleurs_split] = read_tsv(path, pin)
+        ids = {split: {row.sentence_id for row in value} for split, value in rows.items()}
+        splits = {}
+        for fleurs_split, value in rows.items():
+            other = ids[next(name for name in SPLIT_ROLES if name != fleurs_split)]
+            reasons: dict[str, int] = {}
+            eligible = []
+            for row in value:
+                found, _lint, _proper = ineligible_reasons(row.text, language,
+                                                           shared_script=row.sentence_id in other)
+                for reason in {reason.split(":", 1)[0] for reason in found}:
+                    reasons[reason] = reasons.get(reason, 0) + 1
+                if not found:
+                    eligible.append(row)
+            splits[SPLIT_ROLES[fleurs_split]] = {
+                "fleursSplit": fleurs_split,
+                "recordings": len(value),
+                "sentences": len(ids[fleurs_split]),
+                "eligibleRecordings": len(eligible),
+                "eligibleSentences": len({row.sentence_id for row in eligible}),
+                "eligibleByGender": {gender: sum(1 for row in eligible if row.gender == gender)
+                                     for gender in sorted({row.gender for row in value})},
+                "ineligibleReasons": dict(sorted(reasons.items())),
+            }
+        report[language] = splits
+    return report
+
+
+def _print_yield(report: Mapping[str, Any]) -> None:
+    print(f"{'language':11} {'split':12} {'recordings':>10} {'eligible':>8} {'sentences':>9} {'eligible':>8}  reasons")
+    for language, splits in report.items():
+        for split, value in splits.items():
+            print(f"{language:11} {split:12} {value['recordings']:>10} {value['eligibleRecordings']:>8} "
+                  f"{value['sentences']:>9} {value['eligibleSentences']:>8}  "
+                  + ", ".join(f"{name} {count}" for name, count in value["ineligibleReasons"].items()))
+
+
 def cohort_counts(takes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     reasons: dict[str, int] = {}
     by_language: dict[str, dict[str, int]] = {}
@@ -890,14 +948,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                        ("fetch", "download and verify the pinned files (maintainer-run)"),
                        ("extract", "extract and verify the fetched archives"),
                        ("manifest", "write an N1 cohort manifest"),
+                       ("yield", "eligible recordings per language and split, from the fetched TSVs alone"),
                        ("validate", "check the committed sources file (no network)")):
         command = commands.add_parser(name, help=text)
         command.add_argument("--sources", type=Path, default=SOURCES_PATH)
         if name != "validate":
             command.add_argument("--languages", nargs="+", choices=lm.PRODUCT_LANGUAGES, metavar="LANGUAGE",
                                  help="product language ids (default: all ten)")
-        if name == "plan":
+        if name in ("plan", "yield"):
             command.add_argument("--json", action="store_true")
+        if name == "fetch":
+            command.add_argument("--tsv-only", action="store_true",
+                                 help="fetch only the transcript TSVs (about 6 MB), for the yield report")
         if name == "manifest":
             command.add_argument("--split", choices=tuple(ROLE_SPLITS), required=True)
             command.add_argument("--output", type=Path, required=True)
@@ -921,8 +983,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _print_plan(value)
             return 0
         if args.command == "fetch":
-            report = fetch(sources, languages=args.languages)
+            report = fetch(sources, languages=args.languages, tsv_only=args.tsv_only)
             print(json.dumps({"status": "PASS", "files": report}, sort_keys=True))
+            return 0
+        if args.command == "yield":
+            value = eligibility_yield(sources, languages=args.languages)
+            if args.json:
+                print(json.dumps(value, indent=2, sort_keys=True))
+            else:
+                _print_yield(value)
             return 0
         if args.command == "extract":
             report = extract(sources, languages=args.languages)

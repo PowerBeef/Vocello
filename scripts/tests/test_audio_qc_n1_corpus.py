@@ -370,6 +370,11 @@ class FetchTests(CorpusFixture):
         self.assertEqual({item["path"].split("/")[1] for item in report}, {"fr_fr"})
         self.assertFalse((self.corpus / "data/en_us").exists())
 
+    def test_tsv_only_fetches_the_transcripts_alone(self) -> None:
+        report = self.fetch(FakeHub(self.files), tsv_only=True)
+        self.assertTrue(report and all(item["path"].endswith(".tsv") for item in report))
+        self.assertFalse(any((self.corpus / path).exists() for path in self.files if path.endswith(".tar.gz")))
+
     def test_an_interrupted_download_resumes_from_its_part_file(self) -> None:
         path = "data/en_us/audio/dev.tar.gz"
         part = self.corpus / n1.PARTIAL_DIRECTORY / f"{path}.part"
@@ -557,6 +562,28 @@ class ExtractTests(CorpusFixture):
 # --------------------------------------------------------------------------- #
 # Manifest
 # --------------------------------------------------------------------------- #
+
+class YieldTests(CorpusFixture):
+    def test_the_yield_report_counts_what_the_manifest_would_mark_eligible_from_the_tsvs(self) -> None:
+        with self.assertRaisesRegex(n1.N1Error, "fetch --tsv-only"):
+            n1.eligibility_yield(self.sources, root=self.root)
+        self.place({path: data for path, data in self.files.items() if path.endswith(".tsv")})
+        report = n1.eligibility_yield(self.sources, root=self.root)
+        calibration, confirmation = report["english"]["calibration"], report["english"]["confirmation"]
+        self.assertEqual({key: calibration[key] for key in ("fleursSplit", "recordings", "sentences",
+                                                            "eligibleRecordings", "eligibleSentences")},
+                         {"fleursSplit": "dev", "recordings": 4, "sentences": 4, "eligibleRecordings": 1,
+                          "eligibleSentences": 1})
+        self.assertEqual(calibration["ineligibleReasons"], {"properName": 1, "scriptLint": 1, "sharedScript": 1})
+        self.assertEqual((confirmation["recordings"], confirmation["eligibleRecordings"],
+                          confirmation["ineligibleReasons"]), (2, 1, {"sharedScript": 1}))
+        self.assertEqual(report["french"]["calibration"]["eligibleRecordings"], 1)
+        # The report agrees with the manifest built from the same TSVs once the audio is extracted.
+        self.extracted()
+        manifest = quiet(n1.build_manifest, self.sources, split="calibration", output=self.tmp / "m" / "n1.json",
+                         root=self.root)
+        self.assertEqual(manifest["counts"]["byLanguage"]["english"]["eligible"], calibration["eligibleRecordings"])
+
 
 class ManifestTests(CorpusFixture):
     def build(self, output: Path, split: str = "calibration", **options) -> dict:

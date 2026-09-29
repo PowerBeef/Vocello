@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 import time
@@ -56,6 +57,32 @@ def read_wav16k(path: Path) -> Any:
             raise WorkerError("worker single-file input must be 16 kHz mono PCM16")
         frames = stream.readframes(stream.getnframes())
     return np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+
+
+def finite_or_none(value: Any) -> float | None:
+    """A finite float, or None for a statistic Whisper could not compute."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def segment_record(item: dict[str, Any]) -> dict[str, Any]:
+    """One decoded segment's times and confidence statistics, each finite or None.
+
+    Whisper can return NaN, for example as the mean log-probability of a
+    segment without tokens. The protocol's strict JSON refused it, and the
+    worker exited on the row every time: on 2026-09-29 one FLEURS Chinese
+    recording crashed Whisper large-v3 in three panel runs. An uncomputable
+    statistic is recorded as unknown (None) instead.
+    """
+    return {
+        "start": finite_or_none(item.get("start", 0.0)),
+        "end": finite_or_none(item.get("end", 0.0)),
+        "noSpeechProb": finite_or_none(item.get("no_speech_prob", 0.0)),
+        "avgLogprob": finite_or_none(item.get("avg_logprob", 0.0)),
+    }
 
 
 class Recognizer:
@@ -114,15 +141,7 @@ class Recognizer:
         _tokens, probabilities = self.model.detect_language(self._segment(audio))
         detected = max(probabilities, key=probabilities.get)
         result = mlx_whisper.transcribe(audio, **self._options(language))
-        segments = [
-            {
-                "start": float(item.get("start", 0.0)),
-                "end": float(item.get("end", 0.0)),
-                "noSpeechProb": float(item.get("no_speech_prob", 0.0)),
-                "avgLogprob": float(item.get("avg_logprob", 0.0)),
-            }
-            for item in result.get("segments", [])
-        ]
+        segments = [segment_record(item) for item in result.get("segments", [])]
         return {
             "transcript": str(result.get("text", "")).strip(),
             "language": result.get("language"),

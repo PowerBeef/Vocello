@@ -371,8 +371,10 @@ def _recognition(row: dict[str, Any], result: dict[str, Any], *, provenance: dic
         samples / rate
         if type(samples) is int and samples > 0 and type(rate) is int and rate > 0 else None
     )
-    no_speech = [float(segment["noSpeechProb"]) for segment in segments if "noSpeechProb" in segment]
-    log_probabilities = [float(segment["avgLogprob"]) for segment in segments if "avgLogprob" in segment]
+    # A statistic Whisper could not compute arrives as None (independent_asr_worker.segment_record).
+    no_speech = [float(segment["noSpeechProb"]) for segment in segments if segment.get("noSpeechProb") is not None]
+    log_probabilities = [float(segment["avgLogprob"]) for segment in segments
+                         if segment.get("avgLogprob") is not None]
     return {
         "schemaVersion": INDEPENDENT_RECOGNITION_SCHEMA,
         "algorithmVersion": INDEPENDENT_ASR_ALGORITHM,

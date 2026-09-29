@@ -47,6 +47,17 @@ def envelope(**overrides) -> dict:
 
 
 class IndependentASRTests(unittest.TestCase):
+    def test_a_segment_statistic_whisper_cannot_compute_is_recorded_as_unknown(self) -> None:
+        # One FLEURS recording made Whisper return NaN; strict JSON refused it and the worker exited each time.
+        import independent_asr_worker as worker
+
+        record = worker.segment_record({"start": 0.0, "end": 2.5, "no_speech_prob": float("nan"),
+                                        "avg_logprob": float("-inf")})
+        self.assertEqual(record, {"start": 0.0, "end": 2.5, "noSpeechProb": None, "avgLogprob": None})
+        json.dumps(record, allow_nan=False)  # the protocol's JSON accepts it
+        self.assertEqual(worker.segment_record({"no_speech_prob": 0.25, "avg_logprob": -0.5}),
+                         {"start": 0.0, "end": 0.0, "noSpeechProb": 0.25, "avgLogprob": -0.5})
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

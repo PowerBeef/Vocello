@@ -55,6 +55,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import numpy as np  # noqa: E402
 
 from audio_resampling import INPUT_BLOCK_FRAMES, RESAMPLER_VERSION, RationalFIR  # noqa: E402
+import audio_qc_n1_corpus  # noqa: E402
 from lib import jsonio  # noqa: E402
 from lib.language_metrics import is_sha256, text_sha256  # noqa: E402
 
@@ -198,6 +199,9 @@ def eligible_recordings(manifest: Any) -> tuple[list[dict[str, Any]], int]:
     """The N1 cohort's eligible takes, checked, and its take count."""
     if not isinstance(manifest, dict) or manifest.get("schemaVersion") != 1 or manifest.get("kind") != N1_KIND:
         raise N2Error(f"the N1 manifest is not {N1_KIND} schema 1")
+    # The N1 builder's own integrity check: an edited eligibility mark or text is refused.
+    if issues := audio_qc_n1_corpus.manifest_digest_issues(manifest):
+        raise N2Error(issues[0])
     takes = manifest.get("takes")
     if not isinstance(takes, list) or not takes:
         raise N2Error("the N1 manifest has no takes")
@@ -375,6 +379,15 @@ def build_manifest(*, plan_path: Path, result_path: Path, output: Path) -> dict[
     manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
     jsonio.atomic_json(output, manifest, ascii=False, allow_nan=False)
     return manifest
+
+
+def manifest_digest_issues(manifest: Any) -> list[str]:
+    """The manifest's own kind and self digest, without its plan or audio (what a consumer checks first)."""
+    if not isinstance(manifest, dict) or manifest.get("schemaVersion") != 1 or manifest.get("kind") != MANIFEST_KIND:
+        return [f"the manifest is not {MANIFEST_KIND} schema 1"]
+    if manifest.get("manifestDigest") != self_digest(manifest, "manifestDigest"):
+        return ["the manifest digest does not match its content"]
+    return []
 
 
 def validate_manifest(manifest: Any, *, manifest_dir: Path, plan: Any = None) -> dict[str, Any]:

@@ -24,6 +24,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import audio_qc_n2_resynthesis as n2  # noqa: E402
+from audio_qc_calibration_takes import self_digest  # noqa: E402
+import audio_qc_orchestrator as orchestrator  # noqa: E402
 from audio_qc_n2_resynthesis import N2Error  # noqa: E402
 
 TOKENIZER = "836b7b357f5e" + "0" * 52
@@ -111,8 +113,10 @@ class N2Fixture(unittest.TestCase):
         }
 
     def n1_manifest(self, takes: list[dict], **overrides) -> Path:
-        manifest = {"schemaVersion": 1, "kind": "audio-qc-n1-cohort", "runID": "n1-fixture", "takes": takes}
+        manifest = {"schemaVersion": 1, "kind": "audio-qc-n1-cohort", "population": "N1", "runID": "n1-fixture",
+                    "takes": takes}
         manifest.update(overrides)
+        manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")  # as the N1 builder signs it
         path = self.n1_dir / "n1-manifest.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -248,6 +252,29 @@ class ManifestTests(N2Fixture):
         tampered["takes"][0]["family"] = "other"
         self.assertEqual(n2.validate_manifest(tampered, manifest_dir=self.run)["errors"],
                          ["the manifest digest does not match its content"])
+
+    def test_the_orchestrator_takes_the_n2_cohort_and_refuses_a_tampered_one(self) -> None:
+        plan = self.planned()
+        output = self.run / "n2-manifest.json"
+        manifest = n2.build_manifest(plan_path=self.run / "n2-plan.json", result_path=self.fake_result(plan),
+                                     output=output)
+        value = orchestrator.manifest_from_calibration_takes(manifest, source_sha256="f" * 64, base_dir=self.run)
+        orchestrator.validate_manifest(value)
+        self.assertEqual([take["id"] for take in value["takes"]], ["en-001--n2", "en-003--n2"])
+        self.assertEqual(value["source"], {"kind": "audio-qc-n2-cohort", "sha256": "f" * 64, "skippedTakes": 0})
+        self.assertEqual(value["takes"][0]["referenceText"], "Recording en-001.")
+        tampered = copy.deepcopy(manifest)
+        tampered["takes"][0]["text"] = "Another text."
+        with self.assertRaisesRegex(orchestrator.OrchestratorError, "digest"):
+            orchestrator.manifest_from_calibration_takes(tampered, source_sha256="f" * 64, base_dir=self.run)
+
+    def test_plan_refuses_an_n1_manifest_edited_after_it_was_signed(self) -> None:
+        path = self.n1_manifest([self.n1_take("en-001"), self.n1_take("en-002", eligible=False)])
+        edited = json.loads(path.read_text())
+        edited["takes"][1]["eligible"] = True
+        path.write_text(json.dumps(edited), encoding="utf-8")
+        with self.assertRaisesRegex(N2Error, "N1 manifest digest"):
+            n2.build_plan(n1_manifest=path, out_dir=self.run, run_id="mac-qc-n2-fixture", label="L1")
 
     def test_manifest_refuses_an_incomplete_or_unbound_round_trip(self) -> None:
         plan = self.planned()

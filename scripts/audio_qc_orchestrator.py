@@ -92,6 +92,7 @@ import numpy as np  # noqa: E402
 import audio_qc_calibration_takes  # noqa: E402
 from audio_qc_judges import JudgeRegistryError, load_registry  # noqa: E402
 import audio_qc_n1_corpus  # noqa: E402
+import audio_qc_n2_resynthesis  # noqa: E402
 from delivery_analysis_cache import (  # noqa: E402
     NO_MODEL_DIGEST,
     SUPPORTED_RESAMPLERS,
@@ -250,18 +251,23 @@ def manifest_from_independent_asr(source: dict[str, Any], *, source_sha256: str)
     }
 
 
-CALIBRATION_TAKE_KINDS = ("audio-qc-calibration-takes", "audio-qc-injection-set", audio_qc_n1_corpus.MANIFEST_KIND)
+CALIBRATION_TAKE_KINDS = ("audio-qc-calibration-takes", "audio-qc-injection-set", audio_qc_n1_corpus.MANIFEST_KIND,
+                          audio_qc_n2_resynthesis.MANIFEST_KIND)
+# The cohorts whose entries carry an eligibility mark: only eligible recordings go in.
+ELIGIBILITY_KINDS = (audio_qc_n1_corpus.MANIFEST_KIND, audio_qc_n2_resynthesis.MANIFEST_KIND)
 
 
 def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: str, base_dir: Path) -> dict[str, Any]:
-    """The language lane over natural calibration takes (AQ-07, population N3), an injection set or an N1 cohort.
+    """The language lane over natural calibration takes (AQ-07, population N3), an injection set, or an N1 or
+    N2 cohort.
 
     Each generated take becomes one language-lane take: its planned text is the
     reference text and its language the expected language, so the content and
     language metrics of every judge apply. A WAV path is relative to the source
     manifest (`base_dir`). A planned take without output is skipped and counted,
-    and so is an N1 recording (`scripts/audio_qc_n1_corpus.py`) its manifest
-    marks ineligible: only eligible human recordings go in.
+    and so is an N1 recording (`scripts/audio_qc_n1_corpus.py`) or its N2
+    resynthesis (`scripts/audio_qc_n2_resynthesis.py`) that its manifest marks
+    ineligible: only eligible recordings go in.
     """
     kind = source.get("kind")
     if kind not in CALIBRATION_TAKE_KINDS:
@@ -272,6 +278,9 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
     if kind == audio_qc_n1_corpus.MANIFEST_KIND:
         if issues := audio_qc_n1_corpus.manifest_digest_issues(source):
             raise OrchestratorError(issues[0])
+    if kind == audio_qc_n2_resynthesis.MANIFEST_KIND:
+        if issues := audio_qc_n2_resynthesis.manifest_digest_issues(source):
+            raise OrchestratorError(issues[0])
     entries = source.get("takes")
     if not isinstance(entries, list) or not entries:
         raise OrchestratorError("the calibration-takes manifest has no takes")
@@ -280,7 +289,7 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
         if not isinstance(entry, dict) or not isinstance(entry.get("takeID"), str):
             raise OrchestratorError("every calibration take names its takeID")
         if entry.get("status") == "missing" or entry.get("wavPath") is None or entry.get("wavSHA256") is None \
-                or (kind == audio_qc_n1_corpus.MANIFEST_KIND and entry.get("eligible") is not True):
+                or (kind in ELIGIBILITY_KINDS and entry.get("eligible") is not True):
             skipped += 1
             continue
         take_id, text = entry["takeID"], entry.get("text")

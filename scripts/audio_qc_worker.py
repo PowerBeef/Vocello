@@ -19,6 +19,14 @@ A crash leaves the rows already emitted intact; the runner
 (`lib.qc_pipeline.workers`) keeps them and retries the remainder once in a
 fresh worker. Nothing here prints paths or transcripts anywhere but stdout.
 
+A worker process ends without interpreter finalization (`worker_exit`): its
+Python exit handlers run, then it leaves with `os._exit`. Native runtimes can
+abort in their static destructors after every row was emitted (onnxruntime on
+macOS: `recursive_mutex lock failed`, once in 26 DNSMOS launches of the
+2026-09-27 recalibration session), which turned a finished job into a
+nonzero exit and its crash report into the next launch's failed swap
+recovery.
+
 The protocol owns stdout alone. Before the job is read, the worker keeps a
 private duplicate of its stdout descriptor for the protocol and points
 descriptor 1 (and `sys.stdout`) at stderr, so whatever a library prints, from
@@ -67,6 +75,7 @@ keeps beside the result, never in what it caches.
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 from pathlib import Path
@@ -315,5 +324,22 @@ def main(argv: list[str] | None = None, *,
     return 0
 
 
+def worker_exit(status: int) -> None:
+    """End the worker process with `status`, skipping interpreter finalization.
+
+    The protocol stream is flushed after every line; the Python exit handlers
+    (the per-run empty model-cache directory) still run here. What is skipped is
+    module teardown and native static destructors, where a runtime may abort
+    after the job is complete.
+    """
+    atexit._run_exitfuncs()
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+    os._exit(status)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    worker_exit(main())

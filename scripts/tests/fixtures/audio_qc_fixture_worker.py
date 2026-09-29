@@ -84,4 +84,4 @@ def fixture_engine(job, emit) -> None:
 
 
 if __name__ == "__main__":
-    raise SystemExit(audio_qc_worker.main(engines={**audio_qc_worker.ENGINES, "fixture": fixture_engine}))
+    audio_qc_worker.worker_exit(audio_qc_worker.main(engines={**audio_qc_worker.ENGINES, "fixture": fixture_engine}))

@@ -100,6 +100,30 @@ class WorkerStreamTests(unittest.TestCase):
         self.assertEqual(emitted[2]["result"]["decodedSampleCount"], 101)
 
 
+class WorkerExitTests(unittest.TestCase):
+    def test_a_worker_exits_past_a_native_teardown_abort_after_its_exit_handlers(self) -> None:
+        # A finalizer that aborts during module teardown stands in for a native
+        # runtime's static destructor (onnxruntime on macOS, 2026-09-27).
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "exit-handler-ran"
+            script = (
+                "import atexit, os, sys\n"
+                f"sys.path.insert(0, {str(Path(__file__).resolve().parents[1])!r})\n"
+                "import audio_qc_worker\n"
+                "class TeardownAbort:\n"
+                "    def __del__(self):\n"
+                "        os.abort()\n"
+                "BOMB = TeardownAbort()\n"
+                f"atexit.register(lambda: open({str(marker)!r}, 'w').close())\n"
+                "sys.stdout.write('unflushed line')\n"
+                "audio_qc_worker.worker_exit(3)\n"
+            )
+            result = subprocess.run([sys.executable, "-c", script], capture_output=True, timeout=60, check=False)
+            self.assertEqual(result.returncode, 3, result.stderr.decode("utf-8", "replace"))
+            self.assertTrue(marker.exists(), "the Python exit handlers still run")
+            self.assertEqual(result.stdout.decode("utf-8"), "unflushed line")
+
+
 class PersistentWorkerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

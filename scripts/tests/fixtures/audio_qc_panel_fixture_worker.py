@@ -72,5 +72,5 @@ def table_engine(job, emit) -> None:
 PANEL = (*audio_qc_worker.PANEL_ENGINES, "whisper-mlx", "fixture")
 
 if __name__ == "__main__":
-    raise SystemExit(audio_qc_worker.main(engines={**audio_qc_worker.ENGINES,
-                                                   **{name: table_engine for name in PANEL}}))
+    audio_qc_worker.worker_exit(audio_qc_worker.main(engines={**audio_qc_worker.ENGINES,
+                                                              **{name: table_engine for name in PANEL}}))

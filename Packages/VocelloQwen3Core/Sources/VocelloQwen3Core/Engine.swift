@@ -178,6 +178,49 @@ public struct VocelloQwen3CodecReplayResult: Sendable {
     }
 }
 
+/// A diagnostic codec round trip (audio QC population N2): the encoder's codes,
+/// frames x codebooks, and their production non-streaming decode trimmed to
+/// the input's sample count.
+public struct VocelloQwen3CodecRoundTripResult: Sendable {
+    /// One minute of mono PCM at the codec's 24 kHz.
+    static let maximumInputSampleCount = 24_000 * 60
+
+    public let codes: [[Int32]]
+    public let audio: [Float]
+    public let sampleRate: Int
+
+    public init(codes: [[Int32]], audio: [Float], sampleRate: Int) {
+        self.codes = codes
+        self.audio = audio
+        self.sampleRate = sampleRate
+    }
+
+    /// Bounded, finite, non-empty PCM; anything else fails before the lease.
+    static func validateInput(_ samples: [Float]) throws {
+        guard !samples.isEmpty, samples.count <= maximumInputSampleCount,
+              samples.allSatisfy(\.isFinite) else {
+            throw VocelloQwen3EngineError.invalidCodecRoundTripInput
+        }
+    }
+
+    /// The decoded audio covers the input plus the encoder's trailing silence;
+    /// keep exactly the input's span. Rectangular, non-empty codes and a decode
+    /// at least as long as the input are required.
+    static func trimmed(
+        codes: [[Int32]],
+        decodedAudio: [Float],
+        inputSampleCount: Int,
+        sampleRate: Int
+    ) throws -> Self {
+        guard inputSampleCount > 0, decodedAudio.count >= inputSampleCount, sampleRate > 0,
+              let width = codes.first?.count, width > 0,
+              codes.allSatisfy({ $0.count == width }) else {
+            throw VocelloQwen3EngineError.invalidCodecRoundTripOutput
+        }
+        return Self(codes: codes, audio: Array(decodedAudio.prefix(inputSampleCount)), sampleRate: sampleRate)
+    }
+}
+
 public enum VocelloQwen3EngineError: Error, Equatable, Sendable {
     case operationInProgress(VocelloQwen3RuntimeOperationKind)
     case noLoadedModel
@@ -191,6 +234,10 @@ public enum VocelloQwen3EngineError: Error, Equatable, Sendable {
     case invalidCloneHandle
     case invalidConditioningDigest
     case cloneConditioningIdentityMismatch
+    /// The loaded model has no speech-tokenizer encoder (only Base loads one).
+    case speechTokenizerEncoderUnavailable
+    case invalidCodecRoundTripInput
+    case invalidCodecRoundTripOutput
 }
 
 public enum VocelloQwen3CloneHandleCapability: String, Codable, Hashable, Sendable {
@@ -854,6 +901,43 @@ public actor VocelloQwen3Engine {
             phase = .ready
             return result
         } catch {
+            failOperationIfCurrent(lease)
+            throw error
+        }
+    }
+
+    /// Round-trips bounded mono PCM at the model's 24 kHz through the loaded
+    /// model's speech tokenizer (audio QC population N2) while the actor
+    /// exclusively owns the model and its mutable encoder and decoder state:
+    /// the clone path's encoder input (trailing silence included) at every
+    /// codebook, then the production non-streaming decode the replay's
+    /// `fullAudio` uses, trimmed to the input's sample count. Only a model
+    /// with a speech-tokenizer encoder (Base) can serve it.
+    public func codecRoundTrip(
+        samples: [Float],
+        memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault
+    ) throws -> VocelloQwen3CodecRoundTripResult {
+        guard let model = loadedModel else {
+            throw VocelloQwen3EngineError.noLoadedModel
+        }
+        guard model.hasSpeechTokenizerEncoder else {
+            throw VocelloQwen3EngineError.speechTokenizerEncoderUnavailable
+        }
+        try VocelloQwen3CodecRoundTripResult.validateInput(samples)
+        let lease = try beginOperation(kind: .prewarm, generationID: nil, phase: .prewarming)
+        let mlxErrors = VocelloQwen3MLXErrorScope()
+        do {
+            try Task.checkCancellation()
+            let result = try mlxErrors.capture {
+                try model.codecRoundTrip(samples: samples, memory: memory)
+            }
+            try revalidate(lease)
+            try Task.checkCancellation()
+            activeOperation = nil
+            phase = .ready
+            return result
+        } catch {
+            recordRuntimeFailure(error, in: mlxErrors, lease: lease)
             failOperationIfCurrent(lease)
             throw error
         }

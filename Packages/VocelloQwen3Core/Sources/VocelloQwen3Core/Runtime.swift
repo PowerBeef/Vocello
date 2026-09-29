@@ -141,8 +141,9 @@ public enum VocelloQwen3Runtime {
 /// MLX reports C++ errors through one process-wide callback that carries only a
 /// message, and mlx-swift answers an error raised outside a scoped handler with
 /// `fatalError`. The facade scopes a handler around model load, prewarm,
-/// priming, clone conditioning (`makeCloneHandle`), audio marking and
-/// generation, classifies the message once at this boundary and surfaces only
+/// priming, clone conditioning (`makeCloneHandle`), the diagnostic codec round
+/// trip, audio marking and generation, classifies the message once at this
+/// boundary and surfaces only
 /// this typed value; the raw message never crosses the facade.
 ///
 /// Real coverage is narrower than "every MLX error":

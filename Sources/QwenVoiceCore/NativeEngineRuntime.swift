@@ -553,6 +553,36 @@ actor NativeEngineRuntime {
         )
     }
 
+    /// Diagnostic codec round trip (audio QC population N2) on `modelID`,
+    /// loaded with the clone capability profile so a Base model brings its
+    /// speech-tokenizer encoder. A loaded model that can serve it is reused.
+    func codecRoundTrip(
+        modelID: String,
+        samples: [Float]
+    ) async throws -> DiagnosticCodecRoundTripResult {
+        guard RuntimeDebugGate.isEnabled() else {
+            throw NativeRuntimeError(
+                stage: .requestValidation,
+                message: "The codec round trip requires the internal diagnostics gate."
+            )
+        }
+        // Like the cold replay: the host allocator policy applies before loading.
+        let policy = NativeMemoryPolicyResolver.policy(mode: .clone, isBatch: false)
+        NativeMemoryPolicyResolver.apply(policy)
+        try Task.checkCancellation()
+        let loadResult = try await loadModel(
+            id: modelID,
+            capabilityProfile: .cloneOnly,
+            preserveActiveClonePrimeToken: false
+        )
+        try Task.checkCancellation()
+        return try await loadResult.model.codecRoundTrip(
+            samples: samples,
+            memory: NativeMemoryPolicyResolver.memoryConfiguration(for: policy),
+            didLoadModel: loadResult.didLoad
+        )
+    }
+
     private func recordCodecReplayLoadMemory(stage: String) throws {
         let snapshot = Memory.snapshot()
         let data = try JSONSerialization.data(withJSONObject: [

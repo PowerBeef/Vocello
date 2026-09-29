@@ -189,6 +189,20 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
+    func codecRoundTrip(
+        samples: [Float],
+        memory: VocelloQwen3MemoryConfiguration,
+        didLoadModel: Bool
+    ) async throws -> DiagnosticCodecRoundTripResult {
+        let result = try await engine.codecRoundTrip(samples: samples, memory: memory)
+        return DiagnosticCodecRoundTripResult(
+            codes: result.codes,
+            audio: result.audio,
+            sampleRate: result.sampleRate,
+            didLoadModel: didLoadModel
+        )
+    }
+
     var supportsDedicatedCustomVoice: Bool { facts.capabilities.contains(.customVoice) }
     var supportsOptimizedCustomVoice: Bool { facts.capabilities.contains(.customVoice) }
     var supportsOptimizedVoiceDesign: Bool { facts.capabilities.contains(.voiceDesign) }

@@ -390,6 +390,15 @@ names it `productionNonStreaming` and records this distinction. `replay_complete
 diagnostic finished; the separately recorded audio QC may still fail. No replay result alone
 establishes a sampled-model pathology or authorizes a product/model/QC change.
 
+### Codec round trip (internal diagnostics only)
+
+`bench --codec-roundtrip <job.json> --output-dir <new-untracked-directory>` resynthesizes the job's
+digest-bound mono PCM16 24 kHz WAVs through the installed Voice Cloning Speed model's speech
+tokenizer (audio QC population N2), on one model load. Like the replay, it needs an
+internal-diagnostics binary and `QWENVOICE_DEBUG=1`, binds the model to the pinned catalog bytes and
+refuses an existing output directory. `scripts/macos_test.sh qc-n2` writes the job and binds the
+result; see [`audio-qc-engineering.md`](audio-qc-engineering.md) (Codec resynthesis).
+
 ## Examples
 
 ```sh

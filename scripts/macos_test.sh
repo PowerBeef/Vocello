@@ -14,6 +14,8 @@
 #                                                 # headless macOS language-hint matrix (vocello CLI)
 #   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b] [--label L]
 #                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
+#   scripts/macos_test.sh qc-n2 --n1-manifest <path> [--label L]
+#                                                 # audio QC N2: N1 codec resynthesis (vocello bench --codec-roundtrip)
 #   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
@@ -1284,6 +1286,80 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
   note "qc-takes PASS · $planned_count takes · no benchmark record (calibration data) · $artifacts"
 }
 
+# qc-n2: audio QC population N2 (audit P9). The eligible recordings of an N1
+# cohort manifest, resampled to 24 kHz, go through the installed Voice Cloning
+# Speed model's speech tokenizer in one gated `vocello bench --codec-roundtrip`
+# (one model load); the result is bound into an N2 cohort manifest. Calibration
+# data, not a benchmark: nothing is published and no history record is written.
+cmd_qc_n2() {
+  local n1_manifest="" label=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --n1-manifest) n1_manifest="${2:-}"; shift 2 ;;
+      --n1-manifest=*) n1_manifest="${1#*=}"; shift ;;
+      --label) label="${2:-}"; shift 2 ;;
+      --label=*) label="${1#*=}"; shift ;;
+      *) die "unknown qc-n2 arg '$1' (try --n1-manifest <path> --label L)" ;;
+    esac
+  done
+  validate_benchmark_label "$label"
+  [[ -n "$n1_manifest" ]] || die "qc-n2 needs --n1-manifest <path> (an audio-qc-n1-cohort manifest)"
+  [[ -f "$n1_manifest" ]] || die "qc-n2: the N1 manifest does not exist"
+
+  local tool="$SCRIPT_DIR/audio_qc_n2_resynthesis.py"
+  # Both CLI variants carry VOCELLO_INTERNAL_DIAGNOSTICS; the optimized one is the shipping build.
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
+  # Read-only: downloads stay an explicit `models ensure` repair action.
+  require_mac_benchmark_models pro_clone_speed
+
+  local run_id
+  run_id="mac-qc-n2-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local artifacts="$QVOICE_ARTIFACTS_MACOS/audio-qc/qc-n2-$run_id"
+  mkdir -p "$artifacts/logs"
+  capture_benchmark_source "$artifacts"
+
+  local -a plan_command=(python3 "$tool" plan --n1-manifest "$n1_manifest" --out-dir "$artifacts"
+    --run-id "$run_id")
+  [[ -z "$label" ]] || plan_command+=(--label "$label")
+  "${plan_command[@]}" >"$artifacts/plan-summary.json" \
+    || die "qc-n2: the plan could not be written; artifacts are preserved in $artifacts"
+  local planned_count
+  planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["counts"]["planned"])' \
+    "$artifacts/n2-plan.json")"
+  note "qc-n2: runID=$run_id recordings=$planned_count${label:+ label=$label}"
+
+  # The debug data context holds the model `require_mac_benchmark_models` checked;
+  # QWENVOICE_DEBUG=1 is the round trip's runtime gate.
+  local st=0
+  QWENVOICE_DEBUG=1 "$QVOICE_BUILD_ROOT/vocello" bench --codec-roundtrip "$artifacts/n2-job.json" \
+    --output-dir "$artifacts/roundtrip" >"$artifacts/roundtrip-summary.json" \
+    2>"$artifacts/logs/roundtrip.log" </dev/null || st=$?
+
+  local manifest="$artifacts/n2-manifest.json" manifest_st=1 validate_st=1
+  if (( st == 0 )); then
+    manifest_st=0
+    python3 "$tool" manifest --plan "$artifacts/n2-plan.json" \
+      --result "$artifacts/roundtrip/codec-roundtrip-result.json" --output "$manifest" \
+      >"$artifacts/manifest-counts.json" || manifest_st=$?
+  fi
+  if (( manifest_st == 0 )); then
+    validate_st=0
+    python3 "$tool" validate-manifest --manifest "$manifest" --plan "$artifacts/n2-plan.json" \
+      >"$artifacts/manifest-validation.json" || validate_st=$?
+  fi
+  {
+    echo "qc-n2 runID=$run_id recordings=$planned_count${label:+ label=$label}"
+    echo "roundtrip=$([[ $st -eq 0 ]] && echo PASS || echo "FAIL (exit $st)")"
+    echo "manifest=$([[ $st -eq 0 && $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "manifest_validation=$([[ $st -eq 0 && $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"
+  } | tee "$artifacts/verdict.txt"
+
+  (( st == 0 )) || die "qc-n2 FAIL: the codec round trip exited $st; artifacts are preserved in $artifacts"
+  (( manifest_st == 0 && validate_st == 0 )) \
+    || die "qc-n2 FAIL: the N2 manifest could not be bound or validated; artifacts are preserved in $artifacts"
+  note "qc-n2 PASS · $planned_count resynthesized recordings · no benchmark record (calibration data) · $artifacts"
+}
+
 # test: deterministic Core and owned Qwen3 runtime tests. No UI process is
 # launched and no frontend action is synthesized.
 cmd_test() {
@@ -1868,6 +1944,11 @@ main() {
       require_quiet_host macos-qc-takes || die "calibration takes need a quiet host"
       cmd_qc_takes "$@"
       ;;
+    qc-n2)
+      require_build_free_space language-benchmark || die "N2 resynthesis storage preflight failed"
+      require_quiet_host macos-qc-n2 || die "N2 resynthesis needs a quiet host"
+      cmd_qc_n2 "$@"
+      ;;
     test)
       require_build_free_space runtime-tests || die "macOS test storage preflight failed"
       cmd_test "$@"
@@ -1891,7 +1972,7 @@ main() {
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2
       ;;
-    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|qc-takes|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
+    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|qc-takes|qc-n2|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
   esac
 }
 

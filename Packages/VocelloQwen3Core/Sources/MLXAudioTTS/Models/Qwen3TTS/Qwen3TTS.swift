@@ -1358,7 +1358,7 @@ struct Qwen3StreamChunkSchedule: Sendable {
 
 // MARK: - Qwen3TTS Model
 
-public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedSpeechGenerationModel, Qwen3PreparedQualityGenerationModel, Qwen3SuspendingSpeechGenerationModel, Qwen3CodecTraceReplayModel, Qwen3CustomVoicePrewarmDepthControlling, SpeechGenerationModelDiagnosticsProvider, @unchecked Sendable {
+public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedSpeechGenerationModel, Qwen3PreparedQualityGenerationModel, Qwen3SuspendingSpeechGenerationModel, Qwen3CodecTraceReplayModel, Qwen3CodecRoundTripModel, Qwen3CustomVoicePrewarmDepthControlling, SpeechGenerationModelDiagnosticsProvider, @unchecked Sendable {
     private static let productionMinimumGeneratedCodeTokensBeforeEOS = 2
     private static let productionFullResultMemoryClearCadence = 0
 
@@ -3086,6 +3086,64 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             fullAudio: fullAudio,
             sampleRate: sampleRate
         )
+    }
+
+    public var hasSpeechTokenizerEncoder: Bool {
+        speechTokenizer?.hasEncoder ?? false
+    }
+
+    /// Diagnostic codec round trip (audio QC population N2). The encoder sees
+    /// exactly the clone path's reference input (`encoderInputWithTrailingSilence`)
+    /// and keeps every codebook it produces; the codes then decode through
+    /// `replayDecoderArm` on the production non-streaming 25-frame schedule and
+    /// sample window, the schedule the replay's `fullAudio` uses. The codes are
+    /// materialized first and decoded from that CPU copy, so the audio is the
+    /// replay decode of the returned codes. The caller trims the audio.
+    public func codecRoundTrip(
+        samples: [Float],
+        memoryPolicy: Qwen3RequestMemoryPolicy = .compatibilityDefault
+    ) throws -> Qwen3CodecRoundTripResult {
+        guard let speechTokenizer, speechTokenizer.hasEncoder else {
+            throw AudioGenerationError.modelNotInitialized("Speech tokenizer encoder not loaded")
+        }
+        guard !samples.isEmpty else {
+            throw AudioGenerationError.invalidInput("Empty codec round-trip input")
+        }
+        try Task.checkCancellation()
+        let (flatCodes, frameCount, groupCount): ([Int32], Int, Int) = try autoreleasepool {
+            let encoderInput = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(MLXArray(samples))
+            // [1, codebooks, frames] -> [1, frames, codebooks], the codec trace layout.
+            let encoded = try speechTokenizer.encode(encoderInput).transposed(0, 2, 1)
+            eval(encoded)
+            return (encoded.asArray(Int32.self), encoded.dim(1), encoded.dim(2))
+        }
+        if memoryPolicy.clearCacheOnStreamChunkEmit { Memory.clearCache() }
+        guard frameCount > 0, frameCount <= 8_192, groupCount > 0, groupCount <= 64,
+              flatCodes.count == frameCount * groupCount else {
+            throw AudioGenerationError.invalidInput("Codec round-trip codes are out of bounds")
+        }
+        try Task.checkCancellation()
+        let codes = MLXArray(flatCodes).reshaped([1, frameCount, groupCount])
+        let ranges = stride(from: 0, to: frameCount, by: Self.qualityFirstDecoderChunkFrames).map {
+            Qwen3CodecFrameRange(start: $0, endExclusive: min(frameCount, $0 + Self.qualityFirstDecoderChunkFrames))
+        }
+        var audio = try Self.replayDecoderArm(
+            speechTokenizer.decoder, codes: codes, ranges: ranges,
+            arm: .full, memoryPolicy: memoryPolicy, observe: { _ in }
+        )
+        let window = Self.qualityFirstSampleRange(
+            referenceFrameCount: 0,
+            generatedFrameCount: frameCount,
+            decodedSampleCount: audio.count,
+            upsampleRate: speechTokenizer.decodeUpsampleRate
+        )
+        if window != audio.indices {
+            audio = Array(audio[window])
+        }
+        let frames = stride(from: 0, to: flatCodes.count, by: groupCount).map {
+            Array(flatCodes[$0 ..< $0 + groupCount])
+        }
+        return Qwen3CodecRoundTripResult(codes: frames, audio: audio, sampleRate: sampleRate)
     }
 
     /// Diagnostic replay keeps only CPU samples after each materialization;

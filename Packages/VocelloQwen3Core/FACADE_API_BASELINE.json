@@ -192,6 +192,11 @@
     "Sources/VocelloQwen3Core/Engine.swift::public let fullAudio: [Float]",
     "Sources/VocelloQwen3Core/Engine.swift::public let sampleRate: Int",
     "Sources/VocelloQwen3Core/Engine.swift::public init(incrementalAudio: [Float], fullAudio: [Float], sampleRate: Int)",
+    "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CodecRoundTripResult: Sendable",
+    "Sources/VocelloQwen3Core/Engine.swift::public let codes: [[Int32]]",
+    "Sources/VocelloQwen3Core/Engine.swift::public let audio: [Float]",
+    "Sources/VocelloQwen3Core/Engine.swift::public let sampleRate: Int",
+    "Sources/VocelloQwen3Core/Engine.swift::public init(codes: [[Int32]], audio: [Float], sampleRate: Int)",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3EngineError: Error, Equatable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3CloneHandleCapability: String, Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CloneHandle: Hashable, Sendable",
@@ -222,6 +227,7 @@
     "Sources/VocelloQwen3Core/Engine.swift::public func prewarm( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, customDepth: String? = nil ) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func prime( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil ) async throws -> VocelloQwen3PrimeResult",
     "Sources/VocelloQwen3Core/Engine.swift::public func replayCodecTrace( frames: [[Int32]], incrementalRanges: [VocelloQwen3CodecFrameRange], memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault ) throws -> VocelloQwen3CodecReplayResult",
+    "Sources/VocelloQwen3Core/Engine.swift::public func codecRoundTrip( samples: [Float], memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault ) throws -> VocelloQwen3CodecRoundTripResult",
     "Sources/VocelloQwen3Core/Engine.swift::public func reserveGeneration( request: VocelloQwen3SynthesisRequest, cloneHandle: VocelloQwen3CloneHandle? = nil, audioCapacityFrames: Int, diagnosticCapacity: Int = 128 ) async throws -> VocelloQwen3GenerationReservation",
     "Sources/VocelloQwen3Core/Engine.swift::public func open(_ reservationID: UUID) async throws",
     "Sources/VocelloQwen3Core/Engine.swift::public func abortReservation( _ reservationID: UUID, reason: VocelloQwen3CancellationReason = .shutdown ) async throws",
@@ -443,7 +449,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "d7186c846dfbd3ee563366c15db5f219d126bfa1c4c026736cf0b10347c1fe42"
+      "sha256": "d69c4eb870e6864d8bb2fdc8cad430e6c97f340f6977878cb248e608da075c9c"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
@@ -451,7 +457,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "b742b672ade6278c8de743cc8be6ca44d96ac55216787b92be584a4981c92a52"
+      "sha256": "f8895f13725d68894cb1b465a217b9605ecea5d8af7354e4326fa01972fc0692"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",
@@ -459,7 +465,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "99657f4594f1cae0b5985049c2130c6a58ab78d432b30bfe699e65febc65a1a0"
+      "sha256": "9a7021a654378674d83152954154619503b1f47bccdb37cc02474ff07bcf8cc8"
     }
   ],
   "sourceRoot": "Sources/VocelloQwen3Core"

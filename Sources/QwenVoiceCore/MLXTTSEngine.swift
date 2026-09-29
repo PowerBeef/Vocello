@@ -509,13 +509,14 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         case proactivePrewarm
         case clonePriming
         case diagnosticCodecReplay
+        case diagnosticCodecRoundTrip
 
         var isGeneration: Bool {
             switch self {
             case .generation:
                 return true
             case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming,
-                 .diagnosticCodecReplay:
+                 .diagnosticCodecReplay, .diagnosticCodecRoundTrip:
                 return false
             }
         }
@@ -1276,6 +1277,41 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         loadState = .loaded(modelID: request.modelID)
         scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
         return replay
+    }
+
+    /// Diagnostics-only codec round trip (audio QC population N2): mono 24 kHz
+    /// PCM through `modelID`'s speech tokenizer, encoded as the clone path
+    /// encodes a reference and decoded on the production non-streaming
+    /// schedule. Only internal-diagnostics builds with `QWENVOICE_DEBUG` serve
+    /// it, and only a model with a speech-tokenizer encoder (Base).
+    public func codecRoundTrip(
+        modelID: String,
+        samples: [Float]
+    ) async throws -> DiagnosticCodecRoundTripResult {
+        try ensureInitialized()
+        guard RuntimeDebugGate.isEnabled() else {
+            throw MLXTTSEngineError.unsupportedRequest(
+                "The codec round trip is available only to gated internal diagnostics."
+            )
+        }
+        let operationID = try await beginUserModelOperation(.diagnosticCodecRoundTrip)
+        defer { finishModelOperation(id: operationID) }
+        cancelIdleUnload()
+        do {
+            let result = try await runtime.codecRoundTrip(modelID: modelID, samples: samples)
+            loadState = .loaded(modelID: modelID)
+            scheduleIdleUnloadIfNeeded(modelID: modelID, mode: .clone, isBatch: false)
+            return result
+        } catch {
+            // A diagnostic publishes no visible error. A captured MLX failure
+            // unloads the model it may have left half-evaluated; otherwise the
+            // model stays resident and gets back the idle unload this
+            // operation cancelled, as a cancelled warm or prime does (AUD-10).
+            await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+            await settleCancelledModelOperation()
+            if Self.isModelOperationCancellation(error) { throw CancellationError() }
+            throw error
+        }
     }
 
     public func startupReliabilityRuntimeOwnershipSnapshot()

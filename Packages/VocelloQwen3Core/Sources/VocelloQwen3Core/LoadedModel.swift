@@ -432,6 +432,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         let quality: any Qwen3PreparedQualityGenerationModel
         let suspending: any Qwen3SuspendingSpeechGenerationModel
         let replay: (any Qwen3CodecTraceReplayModel)?
+        let roundTrip: (any Qwen3CodecRoundTripModel)?
 
         init(_ base: any SpeechGenerationModel) throws {
             guard let optimized = base as? any Qwen3OptimizedSpeechGenerationModel,
@@ -444,6 +445,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             self.quality = quality
             self.suspending = suspending
             replay = base as? any Qwen3CodecTraceReplayModel
+            roundTrip = base as? any Qwen3CodecRoundTripModel
         }
     }
 
@@ -512,6 +514,29 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         return VocelloQwen3CodecReplayResult(
             incrementalAudio: result.incrementalAudio,
             fullAudio: result.fullAudio,
+            sampleRate: result.sampleRate
+        )
+    }
+
+    var hasSpeechTokenizerEncoder: Bool {
+        box.roundTrip?.hasSpeechTokenizerEncoder ?? false
+    }
+
+    func codecRoundTrip(
+        samples: [Float],
+        memory: VocelloQwen3MemoryConfiguration
+    ) throws -> VocelloQwen3CodecRoundTripResult {
+        guard let roundTrip = box.roundTrip, roundTrip.hasSpeechTokenizerEncoder else {
+            throw VocelloQwen3EngineError.speechTokenizerEncoderUnavailable
+        }
+        let result = try roundTrip.codecRoundTrip(
+            samples: samples,
+            memoryPolicy: try requestMemoryPolicy(memory)
+        )
+        return try VocelloQwen3CodecRoundTripResult.trimmed(
+            codes: result.codes,
+            decodedAudio: result.audio,
+            inputSampleCount: samples.count,
             sampleRate: result.sampleRate
         )
     }

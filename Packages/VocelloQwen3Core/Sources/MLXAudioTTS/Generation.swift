@@ -270,6 +270,34 @@ public protocol Qwen3CodecTraceReplayModel: AnyObject {
     ) throws -> Qwen3CodecReplayResult
 }
 
+/// Materialized result of a diagnostic codec round trip: the speech-tokenizer
+/// encoder's codes (frames x codebooks) and their decode, before any trim.
+public struct Qwen3CodecRoundTripResult: Sendable {
+    public let codes: [[Int32]]
+    public let audio: [Float]
+    public let sampleRate: Int
+
+    public init(codes: [[Int32]], audio: [Float], sampleRate: Int) {
+        self.codes = codes
+        self.audio = audio
+        self.sampleRate = sampleRate
+    }
+}
+
+/// Diagnostics-only codec round trip (audio QC population N2). Implementations
+/// encode with the clone path's encoder input, decode on the production
+/// non-streaming schedule, reset mutable codec state before and after, and
+/// remain inside the loaded-model isolation domain.
+public protocol Qwen3CodecRoundTripModel: AnyObject {
+    /// Whether the speech-tokenizer encoder is loaded (Base models only).
+    var hasSpeechTokenizerEncoder: Bool { get }
+
+    func codecRoundTrip(
+        samples: [Float],
+        memoryPolicy: Qwen3RequestMemoryPolicy
+    ) throws -> Qwen3CodecRoundTripResult
+}
+
 /// Async, backpressure-capable Qwen3 production surface.
 ///
 /// The legacy stream protocol remains source-compatible for shipping callers

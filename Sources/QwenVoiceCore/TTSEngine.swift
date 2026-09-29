@@ -189,6 +189,24 @@ public struct StartupReliabilityCodecReplayResult: Sendable {
     }
 }
 
+/// A diagnostic codec round trip (audio QC population N2): the speech-tokenizer
+/// codes, frames x codebooks, and their production non-streaming decode trimmed
+/// to the input's sample count. `didLoadModel` records whether this call loaded
+/// the model, so a job can prove it ran on one load.
+public struct DiagnosticCodecRoundTripResult: Sendable {
+    public let codes: [[Int32]]
+    public let audio: [Float]
+    public let sampleRate: Int
+    public let didLoadModel: Bool
+
+    public init(codes: [[Int32]], audio: [Float], sampleRate: Int, didLoadModel: Bool) {
+        self.codes = codes
+        self.audio = audio
+        self.sampleRate = sampleRate
+        self.didLoadModel = didLoadModel
+    }
+}
+
 public struct StartupReliabilityRuntimeOwnershipSnapshot: Hashable, Codable, Sendable {
     public let modelOperationInFlight: Bool
     public let generationReservationInFlight: Bool

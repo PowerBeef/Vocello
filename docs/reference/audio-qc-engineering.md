@@ -1560,6 +1560,61 @@ take fails the lane. The lane publishes nothing and writes no benchmark history.
 takes manifest, an injection-set manifest or an N1 cohort manifest into a language-lane manifest for
 the panel judges; it skips and counts missing takes and ineligible N1 recordings.
 
+### Codec resynthesis (N2, audit P9)
+
+Population N2 is N1 resynthesized through the Qwen3-TTS speech tokenizer at all 16 codebooks. A2
+confirms a fail bound's false-alarm rate on it: the recordings stay human, and the audio now carries
+the codec every take is decoded through. Every production artifact shares one tokenizer (catalog
+`speech_tokenizer/model.safetensors`), but only the Base (Voice Cloning) model loads its encoder, so
+the round trip runs on the installed Voice Cloning Speed model.
+
+The facade's `VocelloQwen3Engine.codecRoundTrip(samples:memory:)` runs under an operation lease. It
+takes mono 24 kHz Float PCM of at most 60 s. It builds the clone path's encoder input, with the
+0.5 s trailing silence (`encoderInputWithTrailingSilence`), and keeps every codebook. It decodes the
+codes on the production non-streaming 25-frame schedule and sample window of the replay's
+`fullAudio`. A model without an encoder fails with `speechTokenizerEncoderUnavailable`.
+
+- **Trim.** The decode covers the input plus the silence, so it is cut to the input's sample count.
+  An N2 file is exactly as long as its 24 kHz input.
+- **Output.** Each file is plain PCM16 (x 32767, clamped to ±1, with the clamps counted), without
+  the production output limiter. QC's limiter pass measures clicks and the ceiling on an engine's
+  raw output, so N2 must stand where that output stands, as N1 does. A pre-limited file would hide
+  the very events whose FAR N2 bounds. The replay's WAVs, by contrast, do pass the limiter.
+
+`scripts/audio_qc_n2_resynthesis.py` works in three steps:
+
+- `plan` reads an `audio-qc-n1-cohort` manifest and keeps its eligible takes. It resamples each
+  from 16 kHz to 24 kHz with the `polyphase-kaiser5-v2` design of `scripts/audio_resampling.py`
+  (Kaiser-5, ten zero crossings, SciPy's `resample_poly`, here up 3/down 2), quantized like L0
+  (round half to even, clip). A subclass only changes the output rate, so the L0 cache identity
+  (that file's digest) does not move. It writes `inputs/`, the text-free CLI job `n2-job.json` and
+  the immutable `n2-plan.json`.
+- `manifest` binds the CLI result into `n2-manifest.json` (kind `audio-qc-n2-cohort`). Each take
+  keeps its N1 `family`, `scriptID`, language and text, and adds `population: "N2"`, its
+  `n1TakeID` and the resynthesis `wavPath`/`wavSHA256`. It also binds the codec identity: the
+  tokenizer SHA-256, the model id and revision, and the codes SHA-256.
+- `validate-manifest` recomputes every digest and checks the plan binding.
+
+The CLI branch is `vocello bench --codec-roundtrip <n2-job.json> --output-dir <new directory>`.
+It needs an internal-diagnostics build (`build.sh cli` and `cli-optimized` both define
+`VOCELLO_INTERNAL_DIAGNOSTICS`; the lane builds `cli-optimized`) and `QWENVOICE_DEBUG=1`.
+
+1. It verifies every input's digest and format before loading anything, then binds the model to
+   the pinned catalog bytes, as the codec replay does.
+2. It creates the output directory exclusively, then runs the whole job on one model load.
+3. It writes `<id>.wav` and `<id>.codes.bin` (the codec-trace v1 binary the replay reads) for each
+   item, plus `codec-roundtrip-result.json` (per-item status and digests, no text).
+4. It unloads the model.
+
+The consent-bound lane runs the three steps around one CLI run on a quiet host:
+
+```sh
+scripts/macos_test.sh qc-n2 --n1-manifest <n1-cohort-manifest.json> [--label L]
+```
+
+Its artifacts go to `build/artifacts/macos/audio-qc/qc-n2-<run>/` and stay untracked. It publishes
+nothing and writes no benchmark history.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

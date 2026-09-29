@@ -2071,6 +2071,98 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         XCTAssertNil(snapshot.activeOperation)
     }
 
+    func testCodecRoundTripRefusesAModelWithoutAnEncoderBeforeItsLease() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(compatibilityModel: FacadeCompatibilityModel())
+        )
+        do {
+            _ = try await engine.codecRoundTrip(samples: [0.1, 0.2])
+            XCTFail("a model without a speech-tokenizer encoder must refuse the round trip")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3EngineError, .speechTokenizerEncoderUnavailable)
+        }
+        let snapshot = await engine.snapshot()
+        XCTAssertEqual(snapshot.phase, .ready)
+        XCTAssertNil(snapshot.activeOperation)
+
+        do {
+            _ = try await VocelloQwen3Engine().codecRoundTrip(samples: [0.1])
+            XCTFail("an unloaded engine must refuse the round trip")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3EngineError, .noLoadedModel)
+        }
+    }
+
+    func testCodecRoundTripTrimsTheDecodeToTheInputAndKeepsEveryCodebook() async throws {
+        let codes: [[Int32]] = [
+            Array(repeating: 7, count: 16),
+            (0 ..< 16).map { Int32($0) },
+        ]
+        let engine = VocelloQwen3Engine(loadedModel: try makeLoadedFixture(
+            compatibilityModel: FacadeCompatibilityModel(
+                roundTrip: (codes: codes, audio: [0.1, 0.2, 0.3, 0.4, 0.5])
+            )
+        ))
+        let result = try await engine.codecRoundTrip(samples: [0.5, -0.5, 0.25])
+        XCTAssertEqual(result.audio, [0.1, 0.2, 0.3])
+        XCTAssertEqual(result.codes, codes)
+        XCTAssertEqual(result.sampleRate, 24_000)
+        let snapshot = await engine.snapshot()
+        XCTAssertEqual(snapshot.phase, .ready)
+        XCTAssertNil(snapshot.activeOperation)
+    }
+
+    func testCodecRoundTripBoundsItsInputAndRefusesAShortOrRaggedDecode() async throws {
+        let maximum = VocelloQwen3CodecRoundTripResult.maximumInputSampleCount
+        let invalidInputs: [[Float]] = [[], [.nan], [0.1, .infinity], [Float](repeating: 0, count: maximum + 1)]
+        for samples in invalidInputs {
+            XCTAssertThrowsError(try VocelloQwen3CodecRoundTripResult.validateInput(samples)) {
+                XCTAssertEqual($0 as? VocelloQwen3EngineError, .invalidCodecRoundTripInput)
+            }
+        }
+        XCTAssertNoThrow(try VocelloQwen3CodecRoundTripResult.validateInput([Float](repeating: 0.5, count: maximum)))
+
+        let frame = [Int32](repeating: 1, count: 16)
+        let exact = try VocelloQwen3CodecRoundTripResult.trimmed(
+            codes: [frame], decodedAudio: [0.1, 0.2], inputSampleCount: 2, sampleRate: 24_000
+        )
+        XCTAssertEqual(exact.audio, [0.1, 0.2])
+        let refused: [([[Int32]], [Float], Int)] = [
+            ([frame], [0.1], 2),
+            ([], [0.1, 0.2], 2),
+            ([[]], [0.1, 0.2], 2),
+            ([frame, [1]], [0.1, 0.2], 2),
+            ([frame], [0.1, 0.2], 0),
+        ]
+        for (codes, audio, inputCount) in refused {
+            XCTAssertThrowsError(try VocelloQwen3CodecRoundTripResult.trimmed(
+                codes: codes, decodedAudio: audio, inputSampleCount: inputCount, sampleRate: 24_000
+            )) {
+                XCTAssertEqual($0 as? VocelloQwen3EngineError, .invalidCodecRoundTripOutput)
+            }
+        }
+
+        let engine = VocelloQwen3Engine(loadedModel: try makeLoadedFixture(
+            compatibilityModel: FacadeCompatibilityModel(roundTrip: (codes: [frame], audio: [0.1]))
+        ))
+        do {
+            _ = try await engine.codecRoundTrip(samples: [.nan])
+            XCTFail("non-finite input must be refused")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3EngineError, .invalidCodecRoundTripInput)
+        }
+        let refusedSnapshot = await engine.snapshot()
+        XCTAssertEqual(refusedSnapshot.phase, .ready)
+        do {
+            _ = try await engine.codecRoundTrip(samples: [0.1, 0.2])
+            XCTFail("a decode shorter than its input must fail")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3EngineError, .invalidCodecRoundTripOutput)
+        }
+        let failedSnapshot = await engine.snapshot()
+        XCTAssertNil(failedSnapshot.activeOperation)
+    }
+
     private func makeLoadedFixture(
         compatibilityModel: FacadeCompatibilityModel,
         capabilities: VocelloQwen3CapabilitySet = VocelloQwen3CapabilitySet([
@@ -2280,6 +2372,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
     private let producerError: (any Error & Sendable)?
     private let prewarmRaisesMLXError: Bool
     private let producerRaisesMLXError: Bool
+    /// A codec round trip's codes and untrimmed decode; nil models a loaded
+    /// model without a speech-tokenizer encoder (every non-Base model).
+    fileprivate let roundTripFixture: (codes: [[Int32]], audio: [Float])?
     private let captureLock = NSLock()
     private var _capturedGenerationParameters: GenerateParameters?
     private var _capturedSamplingPolicy: Qwen3RequestSamplingPolicy?
@@ -2300,7 +2395,8 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         primeError: (any Error & Sendable)? = nil,
         producerError: (any Error & Sendable)? = nil,
         prewarmRaisesMLXError: Bool = false,
-        producerRaisesMLXError: Bool = false
+        producerRaisesMLXError: Bool = false,
+        roundTrip: (codes: [[Int32]], audio: [Float])? = nil
     ) {
         self.eventCount = eventCount
         self.generationEndReason = generationEndReason
@@ -2316,6 +2412,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         self.producerError = producerError
         self.prewarmRaisesMLXError = prewarmRaisesMLXError
         self.producerRaisesMLXError = producerRaisesMLXError
+        self.roundTripFixture = roundTrip
     }
 
     /// Raises a real MLX error (incompatible shapes) through MLX's error
@@ -2834,5 +2931,21 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             _capturedStreamingIntervals.append(streamingInterval)
         }
         captureLock.unlock()
+    }
+}
+
+extension FacadeCompatibilityModel: Qwen3CodecRoundTripModel {
+    var hasSpeechTokenizerEncoder: Bool { roundTripFixture != nil }
+
+    func codecRoundTrip(
+        samples _: [Float],
+        memoryPolicy _: Qwen3RequestMemoryPolicy
+    ) throws -> Qwen3CodecRoundTripResult {
+        guard let roundTripFixture else { throw FacadeCompatibilityFixtureError.unsupported }
+        return Qwen3CodecRoundTripResult(
+            codes: roundTripFixture.codes,
+            audio: roundTripFixture.audio,
+            sampleRate: sampleRate
+        )
     }
 }

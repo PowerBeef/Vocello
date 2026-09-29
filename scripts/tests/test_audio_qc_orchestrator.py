@@ -749,6 +749,18 @@ class CommittedRecordReplayTests(unittest.TestCase):
 
 
 class CommandLineTests(unittest.TestCase):
+    def test_a_run_admits_its_judges_for_as_long_as_its_queue_can_take(self) -> None:
+        # A run's judges queue behind each other; the last must not time out behind the others' work.
+        self.assertGreaterEqual(orchestrator_module.DEFAULT_RUN_ADMISSION_WAIT_SECONDS, 6 * 3600)
+        with tempfile.TemporaryDirectory() as cache:
+            base = dict(judge_config=[], judge=[], panel=False, model_root=None, resampler=None,
+                        timeout_seconds=900.0, cache_root=Path(cache))
+            chosen = orchestrator_module._orchestrator(argparse.Namespace(**base, admission_wait_seconds=123.0),
+                                                       offline=True)
+            default = orchestrator_module._orchestrator(argparse.Namespace(**base), offline=True)
+        self.assertEqual(chosen.host.wait_seconds, 123.0)
+        self.assertEqual(default.host.wait_seconds, orchestrator_module.DEFAULT_RUN_ADMISSION_WAIT_SECONDS)
+
     def test_replay_records_command_reports_identical(self) -> None:
         with mock.patch("sys.stdout") as stdout:
             self.assertEqual(orchestrator_module.main(["replay-records"]), 0)

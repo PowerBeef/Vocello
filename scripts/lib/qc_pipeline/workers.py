@@ -20,10 +20,14 @@ had not emitted:
   breaks the protocol) has no row in flight: its rows are retried once
   together, and a second such failure makes every row it still held
   unavailable.
-- A run whose envelope failed a host condition (pressure, swap, post-exit
-  recovery or a probe) accepts nothing: its rows and every row still queued are
-  `unavailable` (`envelope-breach`) and nothing is retried, since a retry would
-  not change the host.
+- A launch whose envelope failed a host condition (pressure, swap, post-exit
+  recovery or a probe) accepts nothing. Its rows run again once, together, in a
+  fresh launch after the host settles (`HOST_SETTLE_SECONDS`): with chunked
+  launches one transient condition (on 2026-09-29 a post-exit recovery check
+  that read file cache as the exited worker's memory) must not cost a judge
+  every chunk still queued. A second consecutive host condition makes the rows
+  it held and every row still queued `unavailable` (`envelope-breach`), since
+  the host has not recovered.
 - A row the engine reports it could not analyze is `unavailable`
   (`analysis-failed`, or the reason the engine gave) and is not retried.
 
@@ -54,6 +58,7 @@ import json
 import math
 import os
 from pathlib import Path
+import time
 from typing import Any, Callable, Mapping, Sequence
 
 from audio_qc_worker import JOB_KIND, PROTOCOL, thread_environment
@@ -86,6 +91,9 @@ STDERR_TAIL_BYTES = 8192
 # output identity: the launcher is envelope provenance, and a row's result
 # does not depend on which process analyzed it.
 ROWS_PER_LAUNCH = 64
+# After a launch fails a host condition, its rows wait this long before their
+# one fresh launch, so the host (file cache, swap, pressure) can settle.
+HOST_SETTLE_SECONDS = 30.0
 
 
 class WorkerProtocolError(ValueError):
@@ -237,6 +245,8 @@ def run_persistent_worker(
     supervisor_options: Mapping[str, Any] | None = None,
     adopt: Callable[[Sequence[Mapping[str, Any]]], Mapping[str, dict[str, Any]]] | None = None,
     rows_per_launch: int = ROWS_PER_LAUNCH,
+    host_settle_seconds: float = HOST_SETTLE_SECONDS,
+    settle: Callable[[float], None] = time.sleep,
 ) -> WorkerOutcome:
     """Run one judge's rows through its workers, isolating a row that crashes one.
 
@@ -260,6 +270,7 @@ def run_persistent_worker(
         (planned[start:start + rows_per_launch], "job") for start in range(0, len(planned), rows_per_launch))
     crashes: dict[str, int] = {}
     unready_failures = 0
+    host_failures = 0  # consecutive launches that failed a host condition
 
     def queued_rows() -> list[dict[str, Any]]:
         return [row for batch, _kind in queue for row in batch]
@@ -362,10 +373,18 @@ def run_persistent_worker(
             "resourceEnvelope": envelope,
         })
         if host_condition:
-            for row in remaining + queued_rows():
-                outcome.unavailable[str(row["id"])] = "envelope-breach"
-            queue.clear()
-            break
+            host_failures += 1
+            if host_failures > 1:
+                for row in remaining + queued_rows():
+                    outcome.unavailable[str(row["id"])] = "envelope-breach"
+                queue.clear()
+                break
+            # One host condition costs this launch's measurements, not the
+            # judge's run: its rows run again once, after the host settles.
+            settle(host_settle_seconds)
+            queue.appendleft((remaining, "host-retry"))
+            continue
+        host_failures = 0
         if not remaining:
             continue
         if parsed.ready is None:

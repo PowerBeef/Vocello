@@ -1305,6 +1305,14 @@ def build_stage2_judges(registry: Mapping[str, Any], *, judge_configs: Mapping[s
     return judges, chosen_resampler or select_resampler(resampler)
 
 
+# One run's judges queue behind each other: a single worker is admitted at a
+# time, and a judge that has just finished a chunk re-admits its next one first,
+# so judges effectively run in turn. The last judge waits for the others' whole
+# work; on 2026-09-29 Audiobox timed out at 3,600 s behind a 2-hour N2 panel.
+# A run's wait covers that, as the panel qualification's does.
+DEFAULT_RUN_ADMISSION_WAIT_SECONDS = 6 * 3600.0
+
+
 def _orchestrator(args: argparse.Namespace, *, offline: bool) -> Orchestrator:
     registry = load_registry()
     judges, resampler = build_stage2_judges(
@@ -1316,7 +1324,9 @@ def _orchestrator(args: argparse.Namespace, *, offline: bool) -> Orchestrator:
     )
     cache = DeliveryAnalysisCache(args.cache_root, resampler_version=resampler)
     # The lock and the ledger are the host's, never the cache root's.
-    return Orchestrator(registry=registry, cache=cache, stage2=judges, offline=offline)
+    host = HostAdmission(None, AdmissionPolicy.from_registry(registry),
+                         wait_seconds=getattr(args, "admission_wait_seconds", DEFAULT_RUN_ADMISSION_WAIT_SECONDS))
+    return Orchestrator(registry=registry, cache=cache, stage2=judges, offline=offline, host_admission=host)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1346,6 +1356,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                                   f"start-up allowance ({DEFAULT_STARTUP_SECONDS:g} s)")
         if name == "run":
             command.add_argument("--bundle", type=Path, help="a new, untracked bundle directory")
+            command.add_argument("--admission-wait-seconds", type=float, default=DEFAULT_RUN_ADMISSION_WAIT_SECONDS,
+                                 help="how long each judge may wait to be admitted; a run's judges queue behind "
+                                      "each other, so this covers the run (default: 6 h)")
         else:
             command.add_argument("--bundle", type=Path, required=True)
     validate = commands.add_parser("validate-bundle", help="re-hash and re-validate a private bundle")

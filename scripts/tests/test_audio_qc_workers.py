@@ -265,21 +265,45 @@ class PersistentWorkerTests(unittest.TestCase):
         self.assertEqual(outcome.unavailable, {"row-3": "analysis-failed"})
         self.assertEqual(len(outcome.results), 3)
 
-    def test_a_failed_host_condition_accepts_nothing_and_never_retries(self) -> None:
+    def test_a_persistent_host_condition_accepts_nothing_after_one_settled_retry(self) -> None:
         def recovery_failed(command, **kwargs):
             result = quiet_supervisor(command, **kwargs)
             report = dict(result.report, qualified=False,
                           qualificationFailures=["post-exit-memory-recovery-unqualified"])
             return SupervisedResult(report, result.stdout, result.stderr)
 
-        outcome = self._run(self._spec(), supervisor=recovery_failed)
-        self.assertEqual(len(outcome.launches), 1)
+        pauses: list[float] = []
+        outcome = self._run(self._spec(), supervisor=recovery_failed, settle=pauses.append)
+        # The rows run once more after the host settles; a second host condition ends the judge.
+        self.assertEqual([(launch["kind"], launch["retry"]) for launch in outcome.launches],
+                         [("job", False), ("host-retry", True)])
+        self.assertEqual(pauses, [workers.HOST_SETTLE_SECONDS])
         self.assertEqual(outcome.results, {})
         self.assertEqual(set(outcome.unavailable.values()), {"envelope-breach"})
-        # The launch names why its emitted rows were lost.
-        launch = outcome.launches[0]
-        self.assertEqual((launch["hostCondition"], launch["rowsDiscarded"], launch["unavailableReason"]),
-                         (True, 4, "envelope-breach"))
+        # Each launch names why its emitted rows were lost.
+        for launch in outcome.launches:
+            self.assertEqual((launch["hostCondition"], launch["rowsDiscarded"], launch["unavailableReason"]),
+                             (True, 4, "envelope-breach"))
+
+    def test_a_transient_host_condition_costs_one_chunk_not_the_run(self) -> None:
+        calls = []
+
+        def first_recovery_fails(command, **kwargs):
+            result = quiet_supervisor(command, **kwargs)
+            calls.append(1)
+            if len(calls) > 1:
+                return result
+            report = dict(result.report, qualified=False,
+                          qualificationFailures=["post-exit-memory-recovery-unqualified"])
+            return SupervisedResult(report, result.stdout, result.stderr)
+
+        rows = self._clips(7)
+        outcome = self._run(self._spec(), rows=rows, supervisor=first_recovery_fails, rows_per_launch=3,
+                            settle=lambda _seconds: None)
+        self.assertEqual([(launch["kind"], launch["rows"], launch["hostCondition"]) for launch in outcome.launches],
+                         [("job", 3, True), ("host-retry", 3, False), ("job", 3, False), ("job", 1, False)])
+        self.assertEqual(sorted(outcome.results), sorted(row["id"] for row in rows))
+        self.assertEqual(outcome.unavailable, {})
 
     def test_a_worker_without_its_thread_environment_never_emits(self) -> None:
         def stripped(command, **kwargs):

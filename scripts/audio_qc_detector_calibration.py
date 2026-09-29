@@ -298,7 +298,7 @@ def load_measurements(path: Path) -> dict:
     return {"clips": data["clips"], "identity": json_digest(data.get("subject") or {}),
             "fileSHA256": file_sha256(path), "clipsSHA256": data["clipsSHA256"],
             "takesManifestSHA256": data.get("takesManifestSHA256"), "entriesSHA256": data.get("entriesSHA256"),
-            "name": name}
+            "startedAt": data.get("startedAt"), "name": name}
 
 
 def construction_value(key: str, value: Any) -> str:
@@ -604,7 +604,8 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         "sources": {
             "bundle": bundle.identity() if bundle and needs_panel else None,
             "measurements": {key: measurements[key] for key in ("fileSHA256", "clipsSHA256", "identity",
-                                                                "takesManifestSHA256", "entriesSHA256")}
+                                                                "takesManifestSHA256", "entriesSHA256",
+                                                                "startedAt")}
             if measurements else None,
             "injectionSet": {key: injection_set[key] for key in ("fileSHA256", "entriesSHA256",
                                                                  "sourceManifestSHA256", "construction")}
@@ -612,7 +613,7 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
             "positiveBundle": positive_bundle.identity() if positive_bundle and needs_panel else None,
             "positiveMeasurements": {key: positive_measurements[key]
                                      for key in ("fileSHA256", "clipsSHA256", "identity", "takesManifestSHA256",
-                                                 "entriesSHA256")}
+                                                 "entriesSHA256", "startedAt")}
             if positive_measurements else None,
         },
         "judgeIdentities": {judge: sorted(values) for judge, values in sorted(identities.items())},
@@ -1201,7 +1202,26 @@ def confirmation_evidence_problems(repository: Repository, plan: thresholds.PreR
     for key, what in (("bundle", "the confirmation cohort's panel bundle"),
                       ("positiveBundle", "the positives' panel bundle")):
         problems.extend(panel_freshness_problems(sources.get(key), planned_at, what))
+    for key, what in (("measurements", "the confirmation cohort's measurements"),
+                      ("positiveMeasurements", "the positives' measurements")):
+        problems.extend(measurement_freshness_problems(sources.get(key), planned_at, what))
     return problems
+
+
+def measurement_freshness_problems(source: Mapping[str, Any] | None, planned_at: int, what: str) -> list[str]:
+    """Confirmation measurements (Fast QC, Stage 0) computed after the plan's commit (A5).
+
+    `audio_qc_calibration_set.py score` stamps `startedAt` in its header, outside
+    `clipsSHA256`, before any clip is measured.
+    """
+    if source is None:
+        return []
+    started = started_at_seconds(source.get("startedAt"))
+    if started is None:
+        return [f"{what} record no start time; measure them with the current audio_qc_calibration_set.py score"]
+    if started <= planned_at:
+        return [f"{what} started before its plan was committed (A5)"]
+    return []
 
 
 def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], derived: Mapping[str, Any],

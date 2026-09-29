@@ -1761,8 +1761,11 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
             records.append(_reduced(measurement))
             yield measurement
 
+    # When measuring started (UTC), outside clipsSHA256: a confirmation's measurements must postdate its
+    # committed plan (A5), as its panel bundles must (audio_qc_detector_calibration.py).
+    started_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) + f".{int((time.time() % 1) * 1e6):06d}Z"
     head = {"schemaVersion": 1, "kind": MEASUREMENTS_KIND, "generator": GENERATOR,
-            "privacy": "ids and digests only: no text, transcript or path",
+            "privacy": "ids and digests only: no text, transcript or path", "startedAt": started_at,
             "takesManifestSHA256": manifest_sha256, "entriesSHA256": injection_set["entriesSHA256"],
             "subject": {"detector": m1.SUBJECT, "mirror": audio_qc.FASTQC_V8_MIRROR,
                         "observations": audio_qc_observations.OBSERVATIONS_MIRROR}}

@@ -286,7 +286,8 @@ class Fixture:
         return self.bundle(self.root / name, rows, **header)
 
     # -- measurements (class A) --------------------------------------------------
-    def measurements(self, cohort: Path, name: str, *, injection_set: Path | None = None) -> Path:
+    def measurements(self, cohort: Path, name: str, *, injection_set: Path | None = None,
+                     started_at: str | None = FRESH) -> Path:
         clips = []
         # Confirmation levels are spread half as wide, so no clean take reaches the calibration tail.
         spread = 10.0 if cohort == self.calibration else 20.0
@@ -307,7 +308,7 @@ class Fixture:
                           "fastQC": {"rmsDBFS": -70.0 if injection["population"] == "P1" else -20.0},
                           "observations": {}})
         return write_json(self.root / f"{name}.json", {
-            "kind": calibration.MEASUREMENTS_KIND, "schemaVersion": 1,
+            "kind": calibration.MEASUREMENTS_KIND, "schemaVersion": 1, "startedAt": started_at,
             "subject": {"detector": "fastqc@8", "mirror": "fastqc-v8-numpy/1"},
             "takesManifestSHA256": calibration.file_sha256(cohort),
             "entriesSHA256": json_digest(entries) if injection_set is not None else None,
@@ -815,6 +816,24 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(record["phiAudit"], [])
         self.assertEqual(record["judges"][0]["judge"], "fastqc@8")
         self.assertEqual(record["evidence"]["confirmationPanels"], [])
+
+    def test_confirmation_measurements_postdate_the_plan(self) -> None:
+        # Fast QC and Stage 0 measurements stamp startedAt (outside clipsSHA256); like a panel, a confirmation's
+        # measurements must start after its plan's commit (A5).
+        fixture = self.fixture
+        scores = self.calibration_scores("test.level@1",
+                                         measurements=fixture.measurements(fixture.calibration, "cal-measurements"))
+        self.plan("test.level@1", scores)
+        fixture.commit_plans()
+        injection = fixture.injection_set(("SIG-LEVEL",))
+        for name, started_at, expected in (("stale", STALE, "started before its plan was committed"),
+                                           ("unstamped", None, "record no start time")):
+            measured = fixture.measurements(fixture.confirmation, f"{name}/measurements", injection_set=injection,
+                                            started_at=started_at)
+            self.assertIn(expected, self.confirmation_scores("test.level@1", measurements=measured,
+                                                             injection_set=injection, positive_measurements=measured,
+                                                             expect=2), name)
+        self.no_ledger()
 
     def test_truncation_scores_come_from_private_transcripts(self) -> None:
         fixture = self.fixture

@@ -19,6 +19,18 @@ rules below (`RULES_VERSION`), so the pool rebuilds byte for byte:
   letter (Spanish may open with an inverted mark), a capital in a cased
   script, ends with a full stop, question or exclamation mark, and holds no
   ellipsis.
+- **No proper names** (rules v2). Recognizers spell names their own way, so a
+  name makes a correct take read as a content error (in the first cohort,
+  French "ajouta Robin Poussepain"). In the languages whose case marks names
+  (English, French, Spanish, Italian, Portuguese, Russian), a word that opens
+  no sentence may not start with a capital (English "I" excepted), no word
+  may hold a capital after its first letter ("Jean-Pierre", "L'Oréal"), and a
+  sentence may not open with a word its own source file writes capitalized
+  inside sentences and never in lower case (a name lexicon derived from the
+  pinned file). Case cannot mark names in German (every noun is capitalized)
+  or in Chinese, Japanese and Korean: their names are not detected, a declared
+  limitation. The per-text part is checked by `validate`; the lexicon part
+  needs the source file, so `validate --rebuild` checks it.
 - **Script.** Every letter is in the language's script: Latin for the six
   Latin-script languages, Cyrillic for Russian, Han for Chinese (Simplified
   only: no character the committed Hant-Hans fold table would change), Han
@@ -86,8 +98,8 @@ CACHE_SUBDIRECTORY = "common-voice-sentences"
 POOL_KIND = "audio-qc-script-pool"
 SOURCES_KIND = "audio-qc-script-pool-sources"
 SCHEMA_VERSION = 1
-POOL_VERSION = 1
-RULES_VERSION = "audio-qc-script-pool-rules-v1"
+POOL_VERSION = 2
+RULES_VERSION = "audio-qc-script-pool-rules-v2"
 SEED = "vocello-aq02-common-voice-script-pool-v1"
 DOWNLOAD_HOST = "raw.githubusercontent.com"
 DOWNLOAD_TIMEOUT_SECONDS = 120
@@ -151,11 +163,23 @@ LEADING_MARKS = {"spanish": frozenset("¿¡")}
 ELLIPSES = ("...", "…")
 URL_OR_EMAIL = re.compile(r"(?i)(?:https?:|www\.|\b[\w.+-]+@[\w-]+\.[\w.-]+|\b[\w-]+\.(?:com|org|net|de|fr|ru|io)\b)")
 FILTERS = (
-    "wellFormed", "noUrlOrEmail", "notAllCaps", "corpusLint", "scriptMatch", "sentenceForm", "lengthWindow",
-    "noLegacyOverlap", "uniqueInLanguage", "uniqueAcrossLanguages",
+    "wellFormed", "noUrlOrEmail", "notAllCaps", "corpusLint", "scriptMatch", "sentenceForm", "noProperNames",
+    "lengthWindow", "noLegacyOverlap", "uniqueInLanguage", "uniqueAcrossLanguages",
 )
+# Languages whose letter case marks proper names; the others' names are not detected (a declared limitation).
+NAME_CASE_LANGUAGES = ("english", "french", "spanish", "italian", "portuguese", "russian")
+NAMES_UNDETECTED = {
+    "german": "every German noun is capitalized, so case does not mark a name",
+    "chinese": "the script has no letter case",
+    "japanese": "the script has no letter case",
+    "korean": "the script has no letter case",
+}
+# A word: letters, joined by an apostrophe or a hyphen ("l'homme", "Jean-Pierre").
+NAME_WORD = re.compile(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*")
+ENGLISH_I = frozenset({"i", "i'm", "i've", "i'd", "i'll", "i’m", "i’ve", "i’d", "i’ll"})
 POOL_DESCRIPTION = (
-    "AQ-02 script pool: CC0 Common Voice Sentence Collector sentences in the product's ten languages, 120 per "
+    "AQ-02 script pool (rules v2, which refuse proper names where letter case marks them): CC0 Common Voice "
+    "Sentence Collector sentences in the product's ten languages, 120 per "
     "language (60 calibration, 60 confirmation, disjoint by script), selected deterministically from one "
     "pinned commit (config/audio-qc-script-pool-sources.json) by scripts/audio_qc_script_pool.py. It is the "
     "script source for natural Vocello calibration takes (N3) in detector qualification (AQ-07) and for the "
@@ -201,6 +225,15 @@ def selection_block(rules: Mapping[str, Any] | None = None) -> dict[str, Any]:
         "normalizedText": ("language_metrics.normalized_tokens joined by one space for word languages and "
                            "with no separator for character languages"),
         "legacyCorpus": "config/language-bench-corpus.json",
+        "properNames": {
+            "languages": list(NAME_CASE_LANGUAGES),
+            "notDetected": dict(NAMES_UNDETECTED),
+            "word": "letters joined by an apostrophe or a hyphen; a word opens a sentence when it is the first or "
+                    "follows . ! ? since the previous word",
+            "lexicon": "per language, the words of the pinned source file written capitalized where they open no "
+                       "sentence and never in lower case anywhere (English I excluded); checked by build and "
+                       "validate --rebuild, since validate reads no source file",
+        },
         "rules": [
             "well formed: no leading or trailing whitespace and no control or format characters",
             "no URL or email address",
@@ -212,6 +245,9 @@ def selection_block(rules: Mapping[str, Any] | None = None) -> dict[str, Any]:
             "with at least one kana; Hangul syllables for Korean)",
             "sentence form: starts with a letter (Spanish may open with an inverted mark), a capital in a cased "
             "script, ends with . ! ? or the ideographic full stop, and holds no ellipsis",
+            "no proper names, where case marks them (properNames): no capitalized word that opens no sentence "
+            "(English I excepted), no capital after a word's first letter, and no sentence-opening word the "
+            "language's source file capitalizes inside sentences and never writes in lower case",
             "length: the normalized unit count lies inside the language's window",
             "no overlap with a legacy corpus script: neither normalized text contains the other",
             "unique within the language (the first source line is kept) and across languages (every copy is dropped)",
@@ -290,8 +326,54 @@ def _sentence_form(text: str, language: str) -> bool:
     return not any(ellipsis in folded for ellipsis in ELLIPSES)
 
 
-def text_rejection(text: str, language: str) -> str | None:
-    """The first per-text filter a text fails (a `FILTERS` name), or None when it passes them all."""
+def name_words(text: str) -> list[tuple[str, bool]]:
+    """(word, opens a sentence) for each word: the first word, or the first after . ! ? opens one."""
+    words: list[tuple[str, bool]] = []
+    end = 0
+    for match in NAME_WORD.finditer(text):
+        opens = not words or any(mark in text[end:match.start()] for mark in ".!?")
+        words.append((match.group(), opens))
+        end = match.end()
+    return words
+
+
+def name_lexicon(lines: Sequence[str], language: str) -> frozenset[str]:
+    """The words a language's source file capitalizes inside sentences and never writes in lower case."""
+    if language not in NAME_CASE_LANGUAGES:
+        return frozenset()
+    capitalized: set[str] = set()
+    lower: set[str] = set()
+    for line in lines:
+        for word, opens in name_words(line):
+            if language == "english" and word.casefold() in ENGLISH_I:
+                continue
+            if not opens and word[0].isupper():
+                capitalized.add(word)
+            if word[0].islower():
+                lower.add(word.casefold())
+    return frozenset(word for word in capitalized if word.casefold() not in lower)
+
+
+def names_proper_noun(text: str, language: str, names: frozenset[str] | None = None) -> bool:
+    """True when case marks a proper name in `text` (`names`: the source file's lexicon, when known)."""
+    if language not in NAME_CASE_LANGUAGES:
+        return False
+    for word, opens in name_words(text):
+        if language == "english" and word.casefold() in ENGLISH_I:
+            continue
+        if any(character.isupper() for character in word[1:]):
+            return True
+        if word[0].isupper() and (not opens or (names is not None and word in names)):
+            return True
+    return False
+
+
+def text_rejection(text: str, language: str, names: frozenset[str] | None = None) -> str | None:
+    """The first per-text filter a text fails (a `FILTERS` name), or None when it passes them all.
+
+    `names` is the language's name lexicon (`name_lexicon`); without it only the
+    per-text part of the proper-name rule applies.
+    """
     if (not text or text != text.strip()
             or any(unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp") for character in text)):
         return "wellFormed"
@@ -305,6 +387,8 @@ def text_rejection(text: str, language: str) -> str | None:
         return "scriptMatch"
     if not _sentence_form(text, language):
         return "sentenceForm"
+    if names_proper_noun(text, language, names):
+        return "noProperNames"
     low, high = LENGTH_WINDOWS[language]
     if not low <= len(normalized_units(text, language)) <= high:
         return "lengthWindow"
@@ -537,11 +621,12 @@ def build(sources: Mapping[str, Any], directory: Path, legacy_corpus: Mapping[st
         language = entry["language"]
         lines = read_source_lines(directory / entry["path"], entry)
         numbered = [(number, line) for number, line in enumerate(lines, start=1) if line.strip()]
+        names = name_lexicon([line for _number, line in numbered], language)
         funnel = {"nonBlankLines": len(numbered)}
         survivors = []
         rejected: dict[str, int] = {name: 0 for name in FILTERS}
         for number, line in numbered:
-            reason = text_rejection(line, language)
+            reason = text_rejection(line, language, names)
             if reason is None and overlaps_legacy(line, language, legacy):
                 reason = "noLegacyOverlap"
             if reason is None:

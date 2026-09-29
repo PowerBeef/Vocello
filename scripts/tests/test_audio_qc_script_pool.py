@@ -46,6 +46,7 @@ SOURCES_TEXT = {
         "Visit www.example.com to read the rest of this long story.",
         " A leading space makes this line unusable for the pool.",
         "The cafe served борщ to every guest who came in from the cold.",
+        "Yesterday we met Robin at the old market down by the river.",  # a proper name
     ],
     "french": [
         "Le petit chat dort tranquillement sur le rebord de la fenêtre.",
@@ -128,6 +129,10 @@ class FilterTests(unittest.TestCase):
         ("english", "The letter arrived late on a cold and rainy winter morning", "sentenceForm"),
         ("english", "The letter arrived late on a cold... and rainy winter morning.", "sentenceForm"),
         ("english", "- The letter arrived late on a cold and rainy winter morning.", "sentenceForm"),
+        ("russian", "Наследие Гагарина мы сохраним и в будущем.", "noProperNames"),
+        ("french", "Et il a un œil de trop, ajouta Robin Poussepain.", "noProperNames"),
+        ("french", "Jean-Pierre est parti très tôt ce matin pour la gare du nord.", "noProperNames"),
+        ("spanish", "Fuimos al Museo del Prado para ver la exposición nueva.", "noProperNames"),
         ("english", "The letter arrived late.", "lengthWindow"),
         ("english", " ".join(["The long letter"] + ["arrived"] * 20) + ".", "lengthWindow"),
         ("chinese", "小猫在睡觉。", "lengthWindow"),
@@ -142,13 +147,31 @@ class FilterTests(unittest.TestCase):
         for language, text in [
             ("english", "The old dog slept by the warm fire all through the night."),
             ("spanish", "¿Dónde está la estación de tren más cercana a este hotel?"),
-            ("russian", "Наследие Гагарина мы сохраним и в будущем."),
+            ("russian", "Наследие нашей страны мы сохраним и в будущем."),
+            ("english", "I think we should leave before the heavy rain starts tonight."),
+            # Case cannot mark a name in German, where every noun is capitalized (a declared limitation).
+            ("german", "Der alte Hund schlief die ganze Nacht am warmen Feuer."),
             ("chinese", "我们今天早上在公园里散步，看到了很多美丽的花。"),
             ("japanese", "全ての人が他人で関わりがなかった。"),
             ("korean", "그 순간 신철이는 선비를 멀리 바라보았다."),
         ]:
             with self.subTest(text=text):
                 self.assertIsNone(pool_cli.text_rejection(text, language))
+
+    def test_a_sentence_may_not_open_with_a_name_its_source_file_uses(self) -> None:
+        lines = ["Il parla longtemps avec Poussepain hier soir au village.",
+                 "Poussepain est parti très tôt ce matin pour la gare du nord.",
+                 "Hier encore, Marie disait que marie était un joli prénom."]
+        self.assertEqual(pool_cli.name_lexicon(lines, "french"), frozenset({"Poussepain"}),
+                         "a word also written in lower case is no name; a sentence opener alone says nothing")
+        opener = lines[1]
+        self.assertIsNone(pool_cli.text_rejection(opener, "french"), "validate, without the source file")
+        self.assertEqual(pool_cli.text_rejection(opener, "french", pool_cli.name_lexicon(lines, "french")),
+                         "noProperNames")
+        # English "I" is never a name, and German and the CJK languages have no case-marked names.
+        self.assertEqual(pool_cli.name_lexicon(["Yesterday I went home early.", "I went home."], "english"),
+                         frozenset())
+        self.assertEqual(pool_cli.name_lexicon(["Gestern sah ich den Hund im Garten."], "german"), frozenset())
 
     def test_units_follow_the_scoring_normalization(self) -> None:
         self.assertEqual(pool_cli.unit_for("english"), "word")
@@ -194,8 +217,8 @@ class SelectionTests(unittest.TestCase):
 
     def test_funnel_counts_each_filter(self) -> None:
         self.assertEqual(funnel(self.pool, "english"), {
-            "nonBlankLines": 16, "wellFormed": 15, "noUrlOrEmail": 14, "notAllCaps": 13, "corpusLint": 12,
-            "scriptMatch": 11, "sentenceForm": 10, "lengthWindow": 9, "noLegacyOverlap": 8,
+            "nonBlankLines": 17, "wellFormed": 16, "noUrlOrEmail": 15, "notAllCaps": 14, "corpusLint": 13,
+            "scriptMatch": 12, "sentenceForm": 11, "noProperNames": 10, "lengthWindow": 9, "noLegacyOverlap": 8,
             "uniqueInLanguage": 7, "uniqueAcrossLanguages": 6, "selected": 4,
         })
         self.assertEqual(funnel(self.pool, "french")["uniqueAcrossLanguages"], 6)

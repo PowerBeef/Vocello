@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-27
+reviewed: 2026-09-29
 summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
 sourceOfTruth:
   - scripts/check_language_hints.py
@@ -60,17 +60,33 @@ human recordings (N1) and their codec resyntheses (N2).
   (`server/data/<locale>/sentence-collector.txt`, human-reviewed submissions) at one pinned commit of
   `common-voice/common-voice`, whose `server/data/LICENSE` is CC0 1.0 Universal. The sources file
   pins the commit, the license and every file's size and SHA-256. Only these texts are committed.
-- **Selection** (rules `audio-qc-script-pool-rules-v1`, recorded in the pool's `selection` block):
+- **Selection** (rules `audio-qc-script-pool-rules-v2`, recorded in the pool's `selection` block):
   every text passes the corpus lint below; it is well formed, has no URL or email, is not all
   capitals, and reads as one sentence (a capital or inverted mark first, `.`, `!`, `?` or `。` last,
-  no ellipsis); every letter is in the language's script (Simplified Chinese only under the
-  committed Hant-Hans fold table, Japanese with kana, Korean in Hangul, no Latin in CJK and no CJK
-  in alphabetic text); its length in the scoring unit (`normalized_tokens` words, or characters
-  for Chinese and Japanese and syllables for Korean) lies in a window sized for takes of about
-  3-8 s; it is unique after normalization within and across languages and overlaps no legacy corpus
-  script. Candidates are ordered by a seeded SHA-256 of the normalized text, the first 120 are kept
-  (ids `en-0001` onward), and a second seeded hash assigns the splits. Each language records its
-  candidate count after every filter, and `poolDigest` covers the entries.
+  no ellipsis); it names no one where letter case marks names (below); every letter is in the
+  language's script (Simplified Chinese only under the committed Hant-Hans fold table, Japanese with
+  kana, Korean in Hangul, no Latin in CJK and no CJK in alphabetic text); its length in the scoring
+  unit (`normalized_tokens` words, or characters for Chinese and Japanese and syllables for Korean)
+  lies in a window sized for takes of about 3-8 s; it is unique after normalization within and
+  across languages and overlaps no legacy corpus script. Candidates are ordered by a seeded SHA-256
+  of the normalized text, the first 120 are kept (ids `en-0001` onward), and a second seeded hash
+  assigns the splits. Each language records its candidate count after every filter, and `poolDigest`
+  covers the entries.
+- **No proper names (v2).** Recognizers spell names their own way, so a name turns a correct take
+  into a content error (the first cohort's French "ajouta Robin Poussepain"). In English, French,
+  Spanish, Italian, Portuguese and Russian a text is refused when a word that opens no sentence is
+  capitalized (English "I" excepted), when a word holds a capital after its first letter
+  ("Jean-Pierre"), or when its opening word is one the language's source file capitalizes inside
+  sentences and never writes in lower case. Case cannot mark names in German (every noun is
+  capitalized) or in Chinese, Japanese and Korean, so their names are not detected; the pool records
+  this limitation. `validate` checks the per-text part; the lexicon part needs the source file and is
+  checked by `validate --rebuild`.
+- **Versions and cohorts.** Ids are ranks within a version, so a cohort binds to its pool version by
+  `poolDigest` and to texts by `textSHA256`. Of the first calibration cohort's 800 takes (pool v1,
+  `mac-qc-takes-20260927-182513-872126ac`), 683 read texts that pool v2 keeps, 672 of them in the
+  calibration split. Splits are ranks among the selected texts, so 11 texts moved split: calibration
+  data taken from the v1 cohort uses only texts in v2's calibration split, which keeps calibration
+  and confirmation disjoint by script.
 - **Commands.** `python3 scripts/audio_qc_script_pool.py fetch` downloads the pinned files into
   `build/cache/audio-qc-corpora/` (verified, re-fetchable); `build` rewrites the pool from them;
   `validate` checks the committed pool without network and runs in the contract gate, and

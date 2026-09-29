@@ -17,6 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 29 — AQ-07 gets human speech: N1 from FLEURS and N2 through the codec
+
+The four resume items of the September 27 pause are done. Judge workers now exit without interpreter
+finalization (the DNSMOS onnxruntime teardown abort), and pool rules v2 refuse proper names where
+letter case marks them. The maintainer fetched the pinned FLEURS corpus (40 files, 6.7 GB). Extraction
+converts its float32 WAVs to PCM16 (none clipped), and the N1 cohorts hold 1,888 eligible calibration
+and 3,718 confirmation recordings. The N2 codec round trip is a new gated `vocello bench` branch
+through the shared speech tokenizer, with the consent-bound `qc-n2` lane. It resynthesized the 1,888
+calibration recordings with one model load. Full panels ran over N1 and N2. Three envelope fixes came
+out of them: `run --admission-wait-seconds` (6 h), one settled retry after a host condition, and a
+120 s post-exit recovery wait (MLX memory comes back slowly). The codec barely moves strong ASR but
+hurts SenseVoice. About 3% of human recordings already exceed 0.15 error on the best single
+recognizer, so a content fail needs cross-family consensus to reach the 1% bar. Next: pre-registered
+class A-D calibration on N2 with N3 flag-rate bounds, then the confirmation-split N2 run. Artifacts
+(untracked): `build/artifacts/macos/audio-qc/{n1-calibration,n1-confirmation,qc-n2-*}`.
+
 ### Paused September 27, night — resume AQ-07 at pool rules v2 and the DNSMOS teardown crash
 
 Paused by the maintainer with `main` clean and pushed (CI green on the last push); no agent,

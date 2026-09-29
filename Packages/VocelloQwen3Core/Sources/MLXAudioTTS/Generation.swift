@@ -285,9 +285,10 @@ public struct Qwen3CodecRoundTripResult: Sendable {
 }
 
 /// Diagnostics-only codec round trip (audio QC population N2). Implementations
-/// encode with the clone path's encoder input, decode on the production
-/// non-streaming schedule, reset mutable codec state before and after, and
-/// remain inside the loaded-model isolation domain.
+/// encode with the clone path's encoder input (whose state the encoder resets
+/// on entry, as on the clone path), decode on the production non-streaming
+/// schedule with the decoder state reset before and after, and remain inside
+/// the loaded-model isolation domain.
 public protocol Qwen3CodecRoundTripModel: AnyObject {
     /// Whether the speech-tokenizer encoder is loaded (Base models only).
     var hasSpeechTokenizerEncoder: Bool { get }

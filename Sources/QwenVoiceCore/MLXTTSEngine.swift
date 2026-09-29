@@ -1269,12 +1269,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         cancelIdleUnload()
         let operationID = try await beginUserModelOperation(.diagnosticCodecReplay)
         defer { finishModelOperation(id: operationID) }
+        let wasLoaded = loadState == .loaded(modelID: request.modelID)
         let replay = try await runtime.replayStartupReliabilityCodecTrace(
             request: request,
             frames: frames,
             incrementalRanges: incrementalRanges
         )
         loadState = .loaded(modelID: request.modelID)
+        // A replay that loaded its model dropped any primed clone reference,
+        // as loadModel does; a stale state would keep idle unload refused.
+        if !wasLoaded { clonePreparationState = .idle }
         scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
         return replay
     }
@@ -1300,6 +1304,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         do {
             let result = try await runtime.codecRoundTrip(modelID: modelID, samples: samples)
             loadState = .loaded(modelID: modelID)
+            // Loading the model dropped any primed clone reference, as loadModel
+            // does; a stale state would keep idle unload refused.
+            if result.didLoadModel { clonePreparationState = .idle }
             scheduleIdleUnloadIfNeeded(modelID: modelID, mode: .clone, isBatch: false)
             return result
         } catch {

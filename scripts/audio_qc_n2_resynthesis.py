@@ -67,7 +67,7 @@ MANIFEST_KIND = "audio-qc-n2-cohort"
 CODEC_RATE = 24_000
 CODEBOOKS = 16
 # The CLI's bounds (Sources/QwenVoiceCore/CodecRoundTripEvidence.swift).
-MAX_ITEMS = 2_048
+MAX_ITEMS = 4_096  # CodecRoundTripEvidence.maximumItems: one job, one model load, per cohort
 MAX_INPUT_SAMPLES = CODEC_RATE * 60
 DECODE_SEMANTICS = "production_nonstreaming_25_frame_schedule"
 OUTPUT_FORMAT = "pcm16_mono_24000hz_without_output_limiter"

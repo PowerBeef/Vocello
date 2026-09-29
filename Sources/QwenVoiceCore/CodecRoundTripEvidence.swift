@@ -15,7 +15,10 @@ public enum CodecRoundTripEvidence {
     public static let jobKind = "audio-qc-n2-roundtrip-job"
     public static let sampleRate = 24_000
     public static let codebookCount = 16
-    public static let maximumItems = 2_048
+    /// A cohort per job, so one model load serves it: the largest FLEURS split
+    /// holds 3,718 eligible recordings, and 4,096 items stay well inside
+    /// `maximumJobBytes` (about 150 bytes each).
+    public static let maximumItems = 4_096
     public static let maximumJobBytes = 1_048_576
     /// One minute at 24 kHz, the facade's own input bound.
     public static let maximumInputSamples = 24_000 * 60

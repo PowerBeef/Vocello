@@ -2,11 +2,33 @@
 """AQ-07 warn-level qualification of the registered detectors (audit sections 5.4-5.9).
 
 Each detector in `config/audio-qc-detectors.json` is qualified at the policy's
-`warn` operating point on two FLEURS-derived N2 cohorts: the calibration
-cohort (FLEURS dev) fits the threshold from clean clips only, and the
-untouched confirmation cohort (FLEURS test), with the P1 positives and S shams
-injected over it, confirms it once. No model runs here; the panel and the
-Stage 0 scorer produce the inputs.
+`warn` operating point on two cohorts its role set names: the calibration
+cohort fits the threshold from clean clips only, and the untouched
+confirmation cohort, with the positives and shams built over it, confirms it
+once. No model runs here; the panel and the Stage 0 scorer produce the inputs.
+
+Cohorts per role set (`COHORT_RULES`), each with the disjointness it proves on
+the ids at plan and confirm time:
+
+- `fleurs-n2`: FLEURS dev and test N2 (or N1), disjoint by family and script;
+  FLEURS publishes no speaker ids, so each unit's speaker is
+  `<language>:fleurs-unidentified`, a lower bound (a declared limitation).
+- `speaker-labeled-n2`: N2 (or N1) of a speaker-labelled corpus, the N1
+  manifest naming its `split` (calibration or confirmation), its `corpus` and
+  each recording's `speaker`; disjoint by family, speaker and script.
+- `n3-takes`, `n3-codec-trace`, `n3-controlled-generation`: the two splits of
+  the N3 take plan (`audio_qc_calibration_takes.py`), disjoint by family (script
+  x voice x seed), speaker (a Built-in speaker or a Voice Design brief, never
+  shared across splits) and script (the pool's split).
+- `n3-long-form`: long-form N3 takes, each carrying a `longForm` block with at
+  least one seam; disjoint as N3.
+
+A role whose corpus is still `pending-...` in the registry is not plannable.
+Positives are the role set's population: P1 (a T1 PCM injection), P2 (a T2
+codec-trace mutation, `injection.provenance` naming the trace, recipe and
+decoder digests) or P3 (a T3 knob take, naming the knob and recipe), each
+beside its S shams; this driver reads them from an injection set and builds
+none.
 
 Every input is bound to what it claims to measure: a cohort manifest to its own
 `manifestDigest`; a panel bundle to its `bundleDigest`, and each evidence
@@ -23,30 +45,36 @@ Commands:
            injector, severity, score or abstention with its reason, and each
            component), ids and digests only, with the scoring code's digest and
            the evidence identity (orchestrator source, metric versions). An N2
-           cohort names its FLEURS split through the N1 manifest it pins
-           (--n1-manifest). Positives are the injection set's entries. A
-           confirmation role needs the detector's committed plan naming that
-           cohort, the planned injection construction and panels computed from
-           scratch after the plan (see confirm); calibration and informational
-           roles refuse a FLEURS test cohort and any cohort a plan names as
-           confirmation (A5).
+           cohort names its split (and a labelled corpus its speakers) through
+           the N1 manifest it pins (--n1-manifest); an N3 takes manifest names
+           its take-plan split. Positives are the injection set's entries, of
+           the role set's positive population. A confirmation role needs the
+           detector's committed plan naming that cohort, the planned injection
+           construction and panels computed from scratch after the plan (see
+           confirm); calibration and informational roles refuse the role set's
+           confirmation split (FLEURS test, the confirmation take split) and
+           any cohort a plan names as confirmation (A5).
   plan     --detector ID --calibration-cohort MANIFEST --confirmation-cohort MANIFEST
-           [--confirmation-n1-manifest FILE] --calibration-scores FILE --alpha A
-           --injection-catalog-seed N --injection-sample-seed N
-           --injection-sample-per-cell N --injection-classes A,B,... [--operating-point warn]
+           [--confirmation-n1-manifest FILE] [--calibration-n1-manifest FILE]
+           --calibration-scores FILE --alpha A --injection-catalog-seed N
+           --injection-sample-seed N --injection-sample-per-cell N --injection-classes A,B,...
+           [--injection-catalog-version N] [--operating-point warn]
            Write config/audio-qc-preregistrations/<id>.json: the split-conformal
            rule, alpha (below the warn FAR bound), the declared cohort split
-           (both manifests by kind and digest, disjoint by family and script,
-           the FLEURS speaker limitation) and the bindings (definition,
-           calibration scores, policy, scoring code, evidence identity, and the
-           confirmation-side injection construction with the injector catalog
-           version). Refuses calibration scores below the calibration floor per
-           stratum, with missing evidence, or from a panel whose orchestrator,
-           metric reduction or metric versions are not the current code's (the
+           (both manifests by kind and digest, what the role set's cohorts are
+           disjoint by, the speaker unit and claim, the limitations) and the
+           bindings (definition, calibration scores, policy, scoring code,
+           evidence identity, and the confirmation-side injection construction
+           with its catalog version: this repository's injector catalog for P1,
+           the declared one for P2 or P3). Refuses a role set whose corpus is
+           pending, calibration scores below the calibration floor per stratum,
+           with missing evidence, or from a panel whose orchestrator, metric
+           reduction or metric versions are not the current code's (the
            confirmation panels will run it), a confirmation cohort that is not
-           FLEURS test, a cohort another plan uses in the other role, and a
-           confirmation cohort that already holds scores, a panel bundle or
-           measurements. The lead reviews and commits it.
+           the role set's confirmation split, cohorts that share a family,
+           script or (where identified) speaker, a cohort another plan uses in
+           the other role, and a confirmation cohort that already holds scores,
+           a panel bundle or measurements. The lead reviews and commits it.
   derive   --detector ID --calibration-scores FILE [--output FILE]
            The split-conformal threshold from the calibration cohort's clean
            N2 scores, one per family, per declared stratum (language) or
@@ -61,8 +89,8 @@ Commands:
            unit present with evidence and no failed judge row (an unavailable
            row is the run's failure, not an abstention), and the warn minimums
            counted on scored units (negatives, positives per severe cell, a
-           sham cell per injector). Then the confirmation N2 negatives, the P1 positives and
-           the S shams against the warn operating point (evaluate_confirmation),
+           sham cell per injector). Then the confirmation negatives, the
+           positives and the S shams against the warn operating point (evaluate_confirmation),
            with the phi audit of consensus families; writes the ledger entry
            beside the plan and the tracked record
            benchmarks/audio-qc-calibration/<id>/record-<plan digest 16>.json
@@ -81,6 +109,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -93,6 +122,7 @@ from typing import Any, Iterable, Mapping, Sequence
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
+from audio_qc_calibration_takes import long_form_issues, seam_seconds, voice_key  # noqa: E402
 from lib.jsonio import sha256_json  # noqa: E402
 from lib.language_metrics import ACCURACY_METRIC_VERSION, TEXT_NORMALIZATION, text_sha256  # noqa: E402
 from lib.qc_pipeline.evidence import privacy_errors  # noqa: E402
@@ -115,10 +145,44 @@ N1_KIND, N2_KIND, N3_KIND = "audio-qc-n1-cohort", "audio-qc-n2-cohort", "audio-q
 COHORT_KINDS = {N2_KIND: "N2", N1_KIND: "N1", N3_KIND: "N3"}
 FLEURS_KINDS = frozenset({N2_KIND, N1_KIND})
 FLEURS_SPLITS = ("dev", "test")
+# The split a non-FLEURS cohort declares (the N3 take plan's, a speaker-labelled N1 manifest's).
+DECLARED_SPLITS = ("calibration", "confirmation")
 ROLES = ("calibration", "confirmation", "informational")
 SUPPORTED_OPERATING_POINTS = ("warn",)
 FLEURS_SPEAKER_UNIT = "language:fleurs-unidentified"
 FLEURS_DISJOINT_BY = ("family", "script")
+# A role set whose corpus the registry still names `pending-...` has no data decision yet.
+PENDING_CORPUS_PREFIX = "pending-"
+# P2 and P3 positives are declared with their provenance (audit 5.1, T2 and T3); P1's is its T1 recipe.
+POSITIVE_PROVENANCE = {"P2": ("T2", ("traceSHA256", "recipeSHA256", "decoderSHA256")),
+                       "P3": ("T3", ("knob", "recipeSHA256"))}
+
+
+@dataclass(frozen=True)
+class CohortRule:
+    """What a role set's cohorts are and what their split proves."""
+    name: str
+    kinds: frozenset[str]
+    fleurs: bool
+    disjoint_by: tuple[str, ...]
+    speaker_unit: str
+    speaker_claim: str
+    long_form: bool = False
+
+
+FLEURS_RULE = CohortRule("fleurs", FLEURS_KINDS, True, FLEURS_DISJOINT_BY, FLEURS_SPEAKER_UNIT, "lower-bound")
+SPEAKER_LABELED_RULE = CohortRule("speaker-labeled", FLEURS_KINDS, False, ("family", "speaker", "script"),
+                                  "corpus-speaker", "identified")
+TAKES_RULE = CohortRule("vocello-takes", frozenset({N3_KIND}), False, ("family", "speaker", "script"),
+                        "vocello-voice", "identified")
+COHORT_RULES = {
+    "fleurs-n2": FLEURS_RULE,
+    "speaker-labeled-n2": SPEAKER_LABELED_RULE,
+    "n3-takes": TAKES_RULE,
+    "n3-codec-trace": TAKES_RULE,
+    "n3-controlled-generation": TAKES_RULE,
+    "n3-long-form": replace(TAKES_RULE, name="vocello-long-form", long_form=True),
+}
 MAX_RECORD_BYTES = 64 * 1024
 PI_MAX = (0.05, 0.10, 0.20)
 SKIPPED_DIRECTORIES = frozenset({"roundtrip", "inputs", "logs", "wav", "evidence", "private", "batches",
@@ -240,32 +304,64 @@ def load_cohort(path: Path) -> dict:
         text = take.get("textSHA256")
         if not is_sha256(text):
             text = text_sha256(take["text"]) if isinstance(take.get("text"), str) else None
-        if kind in FLEURS_KINDS:
-            speaker = f"{language}:fleurs-unidentified"
-        else:
-            speaker = f"voice:{(take.get('voice') or {}).get('id')}"
+        # FLEURS-derived until `resolve_cohort` reads a speaker-labelled corpus's labels.
+        speaker = _voice_speaker(take.get("voice")) if kind == N3_KIND else f"{language}:fleurs-unidentified"
+        label = take.get("speaker")
         takes[take_id] = {"takeID": take_id, "family": take["family"], "language": language,
                           "scriptID": str(take.get("scriptID")), "speaker": speaker,
-                          "wavSHA256": take["wavSHA256"], "textSHA256": text}
+                          "wavSHA256": take["wavSHA256"], "textSHA256": text,
+                          "speakerLabel": label if isinstance(label, str) and label else None,
+                          "n1TakeID": take.get("n1TakeID"), "seams": _seams(take.get("longForm"), f"{name}: {take_id}")}
     if not takes:
         raise CalibrationError(f"{name} has no eligible takes")
     return {"kind": kind, "population": population, "manifestDigest": digest, "fileSHA256": file_sha256(path),
             "runID": manifest.get("runID"), "takes": takes, "directory": Path(path).resolve().parent, "name": name,
             "fleursSplit": manifest.get("fleursSplit") if kind == N1_KIND else None,
-            "n1ManifestSHA256": manifest.get("n1ManifestSHA256") if kind == N2_KIND else None}
+            "n1ManifestSHA256": manifest.get("n1ManifestSHA256") if kind == N2_KIND else None,
+            # What names the split and the speakers: the manifest itself (N1, N3) or the N1 an N2 pins.
+            "source": {key: manifest.get(key) for key in ("split", "fleursSplit", "corpus", "dataset")}
+            if kind != N2_KIND else None}
 
 
-def cohort_split(cohort: Mapping[str, Any], n1_manifest: Path | None) -> str | None:
-    """The FLEURS split (dev or test) a FLEURS-derived cohort was drawn from; None for another corpus.
+def _voice_speaker(voice: Any) -> str:
+    """An N3 take's speaker: its Built-in speaker or its Voice Design brief (the take plan's voice key); a
+    voice of another kind (a clone) by a digest of its identity."""
+    voice = voice if isinstance(voice, Mapping) else {}
+    try:
+        return f"voice:{voice_key(dict(voice))}"
+    except (KeyError, TypeError):
+        return f"voice:{voice.get('kind')}-{json_digest(dict(voice))[:16]}"
 
-    An N1 manifest names its own split; an N2 manifest pins its N1 manifest by
-    file digest (`n1ManifestSHA256`), which must then be given.
+
+def _seams(block: Any, where: str) -> list[float] | None:
+    """A long-form take's seam times in seconds, or None for a take without a `longForm` block."""
+    if block is None:
+        return None
+    issues = long_form_issues(block)
+    if issues:
+        raise CalibrationError(f"{where}: {issues[0]}")
+    return seam_seconds(block)
+
+
+def resolve_cohort(cohort: dict, n1_manifest: Path | None) -> str | None:
+    """The split a cohort was drawn from, finalizing each take's speaker where the corpus labels it.
+
+    FLEURS (an N1 manifest naming its `fleursSplit`): dev or test, and speakers
+    stay `<language>:fleurs-unidentified`. A speaker-labelled corpus: the N1
+    manifest's `split` (calibration or confirmation), and each take's speaker is
+    its corpus label (the take's own `speaker`, else its N1 recording's through
+    `n1TakeID`), digested with the corpus name. An N3 takes manifest: its take
+    plan's split. An N2 manifest pins its N1 manifest by file digest
+    (`n1ManifestSHA256`), which must then be given.
     """
     if cohort["kind"] != N2_KIND and n1_manifest is not None:
         raise CalibrationError("an N1 manifest is given only for an N2 cohort, which pins it by n1ManifestSHA256")
-    if cohort["kind"] not in FLEURS_KINDS:
-        return None
-    split = cohort["fleursSplit"]
+    source, labels = cohort["source"], {}
+    if cohort["kind"] == N3_KIND:
+        split = source.get("split")
+        if split not in DECLARED_SPLITS:
+            raise CalibrationError(f"{cohort['name']} names no take-plan split ({' or '.join(DECLARED_SPLITS)})")
+        return split
     if cohort["kind"] == N2_KIND:
         if n1_manifest is None:
             raise CalibrationError(f"{cohort['name']} is an N2 cohort: pass the N1 manifest it was resynthesized "
@@ -273,19 +369,74 @@ def cohort_split(cohort: Mapping[str, Any], n1_manifest: Path | None) -> str | N
         if file_sha256(n1_manifest) != cohort["n1ManifestSHA256"]:
             raise CalibrationError(f"{Path(n1_manifest).name} is not the N1 manifest {cohort['name']} pins "
                                    "(n1ManifestSHA256)")
-        source = load_json(n1_manifest, "the N1 manifest")
-        if not isinstance(source, dict) or source.get("kind") != N1_KIND:
+        document = load_json(n1_manifest, "the N1 manifest")
+        if not isinstance(document, dict) or document.get("kind") != N1_KIND:
             raise CalibrationError(f"{Path(n1_manifest).name} is not an {N1_KIND} manifest")
+        source = {key: document.get(key) for key in ("split", "fleursSplit", "corpus", "dataset")}
+        labels = {take.get("takeID"): take.get("speaker") for take in document.get("takes") or ()
+                  if isinstance(take, Mapping)}
+    if source.get("fleursSplit") is not None or source.get("split") not in DECLARED_SPLITS:
         split = source.get("fleursSplit")
-    if split not in FLEURS_SPLITS:
-        raise CalibrationError(f"{cohort['name']} names no FLEURS split ({' or '.join(FLEURS_SPLITS)})")
-    return split
+        if split not in FLEURS_SPLITS:
+            raise CalibrationError(f"{cohort['name']} names no FLEURS split ({' or '.join(FLEURS_SPLITS)})")
+        return split
+    corpus = str(source.get("corpus") or source.get("dataset") or "")
+    for take_id, take in cohort["takes"].items():
+        label = take["speakerLabel"] or labels.get(take["n1TakeID"])
+        if not isinstance(label, str) or not label or not corpus:
+            raise CalibrationError(f"{cohort['name']}: {take_id} names no speaker or corpus; a corpus other than "
+                                   "FLEURS labels each recording's speaker")
+        take["speaker"] = "speaker:" + hashlib.sha256(f"{corpus}|{label}".encode("utf-8")).hexdigest()[:16]
+    return source["split"]
+
+
+def cohort_rule(entry: Mapping[str, Any]) -> CohortRule:
+    rule = COHORT_RULES.get(entry.get("populations"))
+    if rule is None:
+        raise CalibrationError(f"{entry.get('id')}: this driver has no cohort rule for role set "
+                               f"{entry.get('populations')!r}")
+    return rule
 
 
 def corpus_split(roles: Mapping[str, Any], role: str) -> str | None:
     """The FLEURS split a role set declares for a role (`fleurs-dev` -> dev), or None for another corpus."""
     corpus = str((roles.get(role) or {}).get("corpus") or "")
     return corpus.removeprefix("fleurs-") if corpus.startswith("fleurs-") else None
+
+
+def expected_split(rule: CohortRule, roles: Mapping[str, Any], role: str) -> str | None:
+    """The split a role's cohort must come from: FLEURS dev or test, or the declared calibration or
+    confirmation split (the role's own cohort)."""
+    return corpus_split(roles, role) if rule.fleurs else (roles.get(role) or {}).get("cohort")
+
+
+def split_name(split: str | None) -> str:
+    return f"FLEURS {split}" if split in FLEURS_SPLITS else f"the {split} split"
+
+
+def scores_split(scores: Mapping[str, Any]) -> str | None:
+    """The split a scores document's cohort came from."""
+    cohort = scores.get("cohort") or {}
+    return cohort.get("fleursSplit") or cohort.get("split")
+
+
+def cohort_rule_problems(cohort: Mapping[str, Any], rule: CohortRule, roles: Mapping[str, Any]) -> list[str]:
+    """Why a cohort is not one of its role set's (kind, long-form seams, a pending corpus)."""
+    problems = []
+    if cohort["kind"] not in rule.kinds:
+        problems.append(f"{cohort['name']} is an {cohort['kind']} manifest; the {rule.name} cohorts are "
+                        f"{' or '.join(sorted(rule.kinds))}")
+    if rule.long_form:
+        flat = sorted(take_id for take_id, take in cohort["takes"].items() if not take.get("seams"))
+        if flat:
+            problems.append(f"{len(flat)} takes of {cohort['name']} carry no long-form seam (e.g. {flat[0]}); a "
+                            "long-form cohort holds assembled projects with at least one seam")
+    return problems
+
+
+def pending_corpora(roles: Mapping[str, Any]) -> list[str]:
+    return [f"{role} ({roles[role]['corpus']})" for role in ("fit", "confirmNegatives")
+            if str((roles.get(role) or {}).get("corpus") or "").startswith(PENDING_CORPUS_PREFIX)]
 
 
 def load_measurements(path: Path) -> dict:
@@ -456,11 +607,32 @@ def _check_private(private: Mapping[str, Any] | None, text_digest: str | None, w
         raise CalibrationError(f"{where}: its private reference text is not the manifest's text")
 
 
+def provenance_problems(population: str, injection: Mapping[str, Any], mechanism: str | None) -> list[str]:
+    """Why a declared P2 or P3 positive does not name its construction (T2 trace, recipe and decoder; T3 knob
+    and recipe) or its tier's mechanism; empty for P1 and S, whose recipe is their T1 injection."""
+    if population not in POSITIVE_PROVENANCE:
+        return []
+    tier, keys = POSITIVE_PROVENANCE[population]
+    provenance = injection.get("provenance") if isinstance(injection.get("provenance"), Mapping) else {}
+    problems = []
+    if provenance.get("tier") != tier or not str(mechanism or "").startswith(f"{tier}-"):
+        problems.append(f"a {population} positive is a {tier} construction")
+    for key in keys:
+        value = provenance.get(key)
+        if not (is_sha256(value) if key.endswith("SHA256") else isinstance(value, str) and value.strip()):
+            problems.append(f"a {population} positive names its {key}")
+    return problems
+
+
 def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: str, split: str | None = None,
                  bundle: Bundle | None = None, measurements: Mapping[str, Any] | None = None,
                  injection_set: Mapping[str, Any] | None = None, positive_bundle: Bundle | None = None,
-                 positive_measurements: Mapping[str, Any] | None = None) -> dict:
-    """Every cohort take's score, then every positive and sham of the detector's injectors."""
+                 positive_measurements: Mapping[str, Any] | None = None, positives_population: str = "P1") -> dict:
+    """Every cohort take's score, then every positive and sham of the detector's injectors.
+
+    Positives are the role set's population (`positives_population`: P1, or a
+    declared P2 or P3 construction with its provenance); shams are S.
+    """
     detector = entry["id"]
     needs_panel, needs_measurements = registry_lib.needs_panel(entry), registry_lib.needs_measurements(entry)
     needs_private = registry_lib.needs_private(entry)
@@ -554,13 +726,18 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
             skipped[f"mechanism-mismatch:{injector_id}"] += 1
             continue
         population = injection.get("population")
-        if population not in ("P1", "S"):
-            raise CalibrationError(f"{item.get('takeID')}: an injection is P1 or S, not {population!r}")
+        if population not in (positives_population, "S"):
+            raise CalibrationError(f"{item.get('takeID')}: an injection is {positives_population} or S, not "
+                                   f"{population!r}")
+        problems = provenance_problems(population, injection, mechanism)
+        if problems:
+            raise CalibrationError(f"{item.get('takeID')}: " + "; ".join(problems))
         language = item.get("language") or source["language"]
         text = item.get("textSHA256") if is_sha256(item.get("textSHA256")) else None
         where = f"{injection_set['name']}: {item['takeID']}"
         meta = {"takeID": item["takeID"], "family": item.get("family") or source["family"], "language": language,
-                "speaker": f"{language}:fleurs-unidentified" if cohort["kind"] in FLEURS_KINDS else source["speaker"],
+                "speaker": f"{language}:fleurs-unidentified" if cohort["kind"] in FLEURS_KINDS
+                and source["speaker"].endswith(":fleurs-unidentified") else source["speaker"],
                 "scriptID": source["scriptID"], "population": population}
         evidence = positive_bundle.measurements(item["takeID"], audio_sha256=wav, text_sha256=text,
                                                 language=language) \
@@ -577,8 +754,13 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
             if clip.get("wavSHA256") != wav:
                 raise CalibrationError(f"{where}: measurements.json measured other audio than the set's")
         severity = injection.get("severity")
-        cell = registry_lib.target_cell(entry, injector_id, severity, mechanism) if population == "P1" else None
+        cell = registry_lib.target_cell(entry, injector_id, severity, mechanism) \
+            if population == positives_population else None
         sham = population == "S" and registry_lib.sham_of(entry, injector_id, mechanism)
+        # A declared construction (P2, P3) keeps its provenance in its unit: digests and the knob's id only.
+        extra = {"provenance": {key: (injection.get("provenance") or {}).get(key) for key in
+                                ("tier", *POSITIVE_PROVENANCE[population][1])}} \
+            if population in POSITIVE_PROVENANCE else {}
         # Clean cohort audio: a byte copy of a cohort take (a language swap's donor) or an identity construction.
         clean = wav in cohort_audio or (injection.get("outputPCMSHA256") is not None
                                         and injection.get("outputPCMSHA256") == injection.get("sourcePCMSHA256"))
@@ -588,9 +770,16 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         elif needs_panel:
             scored = _run_failed(entry, language, scored, evidence)
         units.append(_unit(meta, scored, injectorID=injector_id, variant=injection.get("variant"),
-                           severity=severity, mechanism=mechanism, cell=cell, sham=bool(sham), cleanAudio=clean))
+                           severity=severity, mechanism=mechanism, cell=cell, sham=bool(sham), cleanAudio=clean,
+                           **extra))
     by_population = Counter(unit["population"] for unit in units)
     abstained = Counter(unit["abstain"] for unit in units if unit["abstain"])
+    cohort_block = {"kind": cohort["kind"], "population": cohort["population"],
+                    "manifestDigest": cohort["manifestDigest"], "fileSHA256": cohort["fileSHA256"],
+                    "runID": cohort.get("runID"), "takes": len(cohort["takes"]),
+                    "fleursSplit": split if split in FLEURS_SPLITS else None}
+    if split in DECLARED_SPLITS:
+        cohort_block["split"] = split
     document = {
         "schema": SCORES_SCHEMA, "kind": SCORES_KIND,
         "privacy": "ids and digests only: no text, transcript or path",
@@ -598,9 +787,7 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         "scoringCodeSHA256": registry_lib.scoring_code_sha256(),
         "class": entry["class"], "direction": entry["direction"], "combination": entry["score"]["combination"],
         "role": role,
-        "cohort": {"kind": cohort["kind"], "population": cohort["population"],
-                   "manifestDigest": cohort["manifestDigest"], "fileSHA256": cohort["fileSHA256"],
-                   "runID": cohort.get("runID"), "takes": len(cohort["takes"]), "fleursSplit": split},
+        "cohort": cohort_block,
         "sources": {
             "bundle": bundle.identity() if bundle and needs_panel else None,
             "measurements": {key: measurements[key] for key in ("fileSHA256", "clipsSHA256", "identity",
@@ -669,34 +856,43 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
 def command_scores(args: argparse.Namespace, repository: Repository) -> int:
     registry, entry = repository.entry(args.detector)
     roles = registry_lib.role_set(registry, entry)
+    rule = cohort_rule(entry)
     cohort = load_cohort(args.cohort)
-    split = cohort_split(cohort, args.n1_manifest)
+    split = resolve_cohort(cohort, args.n1_manifest)
     plan = repository.store.load(entry["id"])
     digest = cohort["manifestDigest"]
-    confirmation_split = corpus_split(roles, "confirmNegatives")
+    confirmation_split = expected_split(rule, roles, "confirmNegatives")
     if args.role == "confirmation":
         if plan is None or plan.cohorts is None or plan.cohorts.confirmation.manifest_digest != digest:
             raise CalibrationError("a confirmation cohort is scored only under a plan that names it (A5): "
                                    f"run plan for {entry['id']} first and commit it")
         repository.store.require(plan)
         if confirmation_split is not None and split != confirmation_split:
-            raise CalibrationError(f"the confirmation cohort is FLEURS {split}, not {confirmation_split}")
+            raise CalibrationError(f"the confirmation cohort is FLEURS {split}, not {confirmation_split}"
+                                   if rule.fleurs else
+                                   f"the confirmation cohort is {split_name(split)}, not the {confirmation_split} "
+                                   "split")
     else:
         named = declared_cohorts(repository)["confirmation"].get(digest)
         if named:
             raise CalibrationError(f"the plan of {', '.join(sorted(named))} names this cohort as its confirmation "
                                    "cohort; it is scored only under --role confirmation (A5)")
-        if confirmation_split is not None and split == confirmation_split:
-            raise CalibrationError(f"FLEURS {split} is the confirmation corpus: it is scored only under "
+        if confirmation_split is not None and split == confirmation_split and cohort["kind"] in rule.kinds:
+            raise CalibrationError(f"{split_name(split)} is the confirmation corpus: it is scored only under "
                                    "--role confirmation, never for calibration or information (A5)")
     if args.role == "calibration":
         if plan is not None and plan.cohorts and plan.cohorts.calibration.manifest_digest != digest:
             raise CalibrationError(f"{entry['id']}'s plan pins another calibration cohort")
         if cohort["population"] != roles["fit"]["population"]:
             raise CalibrationError(f"{entry['id']} fits on {roles['fit']['population']}, not {cohort['population']}")
-        fit_split = corpus_split(roles, "fit")
+        fit_split = expected_split(rule, roles, "fit")
         if fit_split is not None and split != fit_split:
-            raise CalibrationError(f"{entry['id']} fits on FLEURS {fit_split}, not {split}")
+            raise CalibrationError(f"{entry['id']} fits on FLEURS {fit_split}, not {split}" if rule.fleurs else
+                                   f"{entry['id']} fits on the {fit_split} split, not {split_name(split)}")
+    if args.role in ("calibration", "confirmation"):
+        problems = cohort_rule_problems(cohort, rule, roles)
+        if problems:
+            raise CalibrationError("; ".join(problems))
     output = repository.check_output(args.output)
     document = build_scores(
         entry, cohort, role=args.role, split=split,
@@ -705,6 +901,7 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         injection_set=load_injection_set(args.injection_set) if args.injection_set else None,
         positive_bundle=Bundle(args.positive_bundle) if args.positive_bundle else None,
         positive_measurements=load_measurements(args.positive_measurements) if args.positive_measurements else None,
+        positives_population=roles["positives"]["population"],
     )
     if args.role == "confirmation":
         problems = confirmation_evidence_problems(repository, plan, document)
@@ -831,7 +1028,7 @@ def current_evidence_problems(entry: Mapping[str, Any], identity: Mapping[str, A
 def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mapping[str, Any], *,
                calibration: Mapping[str, Any], confirmation: Mapping[str, Any], calibration_scores: Mapping[str, Any],
                alpha: float, operating_point: str, injection: Mapping[str, Any],
-               confirmation_split: str | None = None) -> thresholds.PreRegistration:
+               confirmation_split: str | None = None, calibration_split: str | None = None) -> thresholds.PreRegistration:
     policy = repository.policy()
     if operating_point not in SUPPORTED_OPERATING_POINTS:
         raise CalibrationError(f"this driver pre-registers {SUPPORTED_OPERATING_POINTS} only")
@@ -840,15 +1037,30 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         raise CalibrationError(f"alpha must lie below the {operating_point} FAR bound {point['farPooledMax']} "
                                "to leave margin for the confirmation")
     roles = registry_lib.role_set(registry, entry)
+    rule = cohort_rule(entry)
+    pending = pending_corpora(roles)
+    if pending:
+        raise CalibrationError(f"role set {entry['populations']} names no corpus yet for {', '.join(pending)}: the "
+                               "maintainer's data decision names it in config/audio-qc-detectors.json roleSets first")
     for cohort, role in ((calibration, "fit"), (confirmation, "confirmNegatives")):
-        if cohort["kind"] not in FLEURS_KINDS:
-            raise CalibrationError("a declared split pre-registers FLEURS-derived cohorts (N1 or N2) only")
+        if cohort["kind"] not in rule.kinds:
+            raise CalibrationError("a declared split pre-registers FLEURS-derived cohorts (N1 or N2) only"
+                                   if rule is FLEURS_RULE else "; ".join(cohort_rule_problems(cohort, rule, roles)))
         if cohort["population"] != roles[role]["population"]:
             raise CalibrationError(f"the {role} role is {roles[role]['population']}, not {cohort['population']}")
-    expected = corpus_split(roles, "confirmNegatives")
+        problems = cohort_rule_problems(cohort, rule, roles)
+        if problems:
+            raise CalibrationError("; ".join(problems))
+    expected = expected_split(rule, roles, "confirmNegatives")
     if expected is not None and confirmation_split != expected:
         raise CalibrationError(f"the confirmation cohort is FLEURS {confirmation_split}; the role set confirms on "
-                               f"FLEURS {expected}")
+                               f"FLEURS {expected}" if rule.fleurs else
+                               f"the confirmation cohort is {split_name(confirmation_split)}; the role set confirms "
+                               f"on the {expected} split")
+    fit_split = expected_split(rule, roles, "fit")
+    if calibration_split is not None and fit_split is not None and calibration_split != fit_split:
+        raise CalibrationError(f"the calibration cohort is {split_name(calibration_split)}; the role set fits on "
+                               f"{split_name(fit_split)}")
     if calibration_scores.get("detector") != entry["id"] or calibration_scores.get("role") != "calibration":
         raise CalibrationError("the calibration scores belong to another detector or role")
     if calibration_scores.get("detectorDefinitionSHA256") != registry_lib.definition_digest(entry):
@@ -856,9 +1068,8 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
     if calibration_scores["cohort"]["manifestDigest"] != calibration["manifestDigest"] \
             or calibration_scores["cohort"]["fileSHA256"] != calibration["fileSHA256"]:
         raise CalibrationError("the calibration scores are not of the calibration cohort")
-    fit_split = corpus_split(roles, "fit")
-    if fit_split is not None and calibration_scores["cohort"].get("fleursSplit") != fit_split:
-        raise CalibrationError(f"the calibration scores are not of FLEURS {fit_split}")
+    if fit_split is not None and scores_split(calibration_scores) != fit_split:
+        raise CalibrationError(f"the calibration scores are not of {split_name(fit_split)}")
     scoring_code = registry_lib.scoring_code_sha256()
     if calibration_scores.get("scoringCodeSHA256") != scoring_code:
         raise CalibrationError("the calibration scores were computed by other scoring code; score them again (A7)")
@@ -884,7 +1095,7 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                                                roles["fit"].get("corpus", "")),
         confirmation=thresholds.CohortReference(confirmation["kind"], confirmation["manifestDigest"],
                                                 roles["confirmNegatives"].get("corpus", "")),
-        disjoint_by=FLEURS_DISJOINT_BY, speaker_unit=FLEURS_SPEAKER_UNIT, speaker_claim="lower-bound",
+        disjoint_by=rule.disjoint_by, speaker_unit=rule.speaker_unit, speaker_claim=rule.speaker_claim,
         limitations=limitations)
     bindings = (
         ("calibrationScoresSHA256", calibration_scores["scoresSHA256"]),
@@ -915,13 +1126,33 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
     from lib.qc_qualification import injectors  # deferred: NumPy-backed, only its catalog version is read
 
     registry, entry = repository.entry(args.detector)
+    rule = cohort_rule(entry)
+    positives = registry_lib.role_set(registry, entry)["positives"]["population"]
+    # P1 positives come from this repository's T1 catalog; a declared P2 or P3 construction names its own.
+    if positives == "P1":
+        catalog_version = injectors.CATALOG_VERSION
+        if args.injection_catalog_version not in (None, catalog_version):
+            raise CalibrationError(f"P1 positives are built with injector catalog {catalog_version}")
+    elif args.injection_catalog_version is None:
+        raise CalibrationError(f"{positives} positives are a declared construction: pass --injection-catalog-version "
+                               "(the version of the catalog the confirmation set will be built with)")
+    else:
+        catalog_version = args.injection_catalog_version
     confirmation = load_cohort(args.confirmation_cohort)
-    injection = {"catalogVersion": injectors.CATALOG_VERSION, "catalogSeed": args.injection_catalog_seed,
+    calibration = load_cohort(args.calibration_cohort)
+    calibration_split = None
+    if args.calibration_n1_manifest is not None or calibration["kind"] != N2_KIND:
+        calibration_split = resolve_cohort(calibration, args.calibration_n1_manifest)
+    elif not rule.fleurs:
+        raise CalibrationError(f"{calibration['name']} is an N2 cohort: pass --calibration-n1-manifest (the N1 "
+                               "manifest it pins) so its split and speakers are known")
+    injection = {"catalogVersion": catalog_version, "catalogSeed": args.injection_catalog_seed,
                  "sampleSeed": args.injection_sample_seed, "samplePerCell": args.injection_sample_per_cell,
                  "classes": args.injection_classes}
-    plan = build_plan(repository, registry, entry, calibration=load_cohort(args.calibration_cohort),
+    plan = build_plan(repository, registry, entry, calibration=calibration,
                       confirmation=confirmation,
-                      confirmation_split=cohort_split(confirmation, args.confirmation_n1_manifest),
+                      confirmation_split=resolve_cohort(confirmation, args.confirmation_n1_manifest),
+                      calibration_split=calibration_split,
                       calibration_scores=load_scores(args.calibration_scores), alpha=args.alpha,
                       operating_point=args.operating_point, injection=injection)
     if repository.ledger.outcome(plan.digest()) is not None:
@@ -1055,14 +1286,15 @@ def sham_cells(entry: Mapping[str, Any]) -> list[str]:
     return sorted({sham["injectorID"] for sham in entry.get("shams") or ()})
 
 
-def confirmation_inputs(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], population: str) -> dict:
+def confirmation_inputs(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], population: str,
+                        positives_population: str = "P1") -> dict:
     negatives = _in_scope(units, population)
     positives: dict[str, dict[str, list[dict]]] = {}
     shams: dict[str, list[dict]] = {}
     for unit in units:
         if not unit["inScope"]:
             continue
-        if unit["population"] == "P1" and unit["cell"]:
+        if unit["population"] == positives_population and unit["cell"]:
             positives.setdefault(unit["mechanism"], {}).setdefault(unit["cell"], []).append(dict(unit))
         elif unit["population"] == "S" and unit.get("sham"):
             shams.setdefault(unit["injectorID"], []).append(dict(unit))
@@ -1102,8 +1334,9 @@ def preconditions(entry: Mapping[str, Any], inputs: Mapping[str, Any], point: Ma
                         "timeout, a crash or an envelope breach); run that panel again on a new cache root")
     negatives = [unit for unit in inputs["negatives"] if unit["score"] is not None]
     families = _scored_families(negatives)
+    population = next((unit["population"] for unit in inputs["negatives"]), "N2")
     if len(families) < floors["good"]:
-        problems.append(f"{len(families)} scored N2 negative families, the floor is {floors['good']}")
+        problems.append(f"{len(families)} scored {population} negative families, the floor is {floors['good']}")
     for key, floor in (("language", floors["languages"]), ("speaker", floors["speakers"]),
                        ("scriptID", floors["scripts"])):
         count = len({unit[key] for unit in negatives})
@@ -1225,7 +1458,7 @@ def measurement_freshness_problems(source: Mapping[str, Any] | None, planned_at:
 
 
 def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], derived: Mapping[str, Any],
-               population: str) -> list[dict]:
+               population: str, positives_population: str = "P1") -> list[dict]:
     """Per consensus group: the two families' failure correlation, each voting at the unit's threshold.
 
     A family fails a clean negative when its own score alarms, and a target
@@ -1246,7 +1479,7 @@ def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], der
             if unit["population"] == population and unit["injectorID"] is None:
                 expected = False
                 negatives += 1
-            elif unit["population"] == "P1" and unit["cell"]:
+            elif unit["population"] == positives_population and unit["cell"]:
                 expected = True
                 positives += 1
             else:
@@ -1326,7 +1559,7 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
                  derived: Mapping[str, Any], outcome: Mapping[str, Any], calibration: Mapping[str, Any],
                  confirmation: Mapping[str, Any], inputs: Mapping[str, Any], disjointness: Mapping[str, Any],
                  phi: Sequence[Mapping[str, Any]], informational: Mapping[str, Any] | None,
-                 informative: Mapping[str, bool], planned_at: int) -> dict:
+                 informative: Mapping[str, bool], planned_at: int, positives_population: str = "P1") -> dict:
     qualified = outcome["status"] == "qualified"
 
     def counts(units: Iterable[Mapping[str, Any]]) -> dict:
@@ -1340,7 +1573,8 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
     sources = confirmation["sources"]
     injection = sources["injectionSet"]
     panels = [{"cohort": role, "bundleDigest": sources[key]["bundleDigest"], "startedAt": sources[key]["startedAt"]}
-              for key, role in (("bundle", "N2"), ("positiveBundle", "P1+S")) if sources.get(key)]
+              for key, role in (("bundle", plan.population), ("positiveBundle", f"{positives_population}+S"))
+              if sources.get(key)]
     record = {
         "schema": RECORD_SCHEMA, "kind": RECORD_KIND,
         "detector": entry["id"], "class": entry["class"], "stage": entry["stage"],
@@ -1374,14 +1608,15 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
         "split": {"method": "declared-cohorts", "disjointBy": list(disjointness["disjointBy"]),
                   "counts": {f"{key}s" if key != "family" else "families": value
                              for key, value in disjointness["counts"].items()}},
-        "speakers": {"unit": FLEURS_SPEAKER_UNIT, "claim": plan.cohorts.speaker_claim,
+        "speakers": {"unit": plan.cohorts.speaker_unit, "claim": plan.cohorts.speaker_claim,
                      "count": len({unit["speaker"] for unit in inputs["negatives"]})},
         "threshold": {"strata": derived["strata"], "values": dict(derived["thresholds"]),
                       "ranks": {key: item["rank"] for key, item in derived["byStratum"].items()},
                       "calibrationUnits": {key: item["calibrationUnits"] for key, item in derived["byStratum"].items()},
                       "alpha": plan.alpha, "rule": plan.rule, "unit": "source-family"},
         "counts": {"calibration": counts(calibration_negatives),
-                   "confirmation": {"N2": counts(inputs["negatives"]), "P1": counts(positives), "S": counts(shams)}},
+                   "confirmation": {plan.population: counts(inputs["negatives"]),
+                                    positives_population: counts(positives), "S": counts(shams)}},
         "rates": {key: outcome[key] for key in ("farPooled", "farPerLanguage", "cleanAbstention", "mechanisms",
                                                 "mechanismsMeeting", "mechanismsMin", "shams")},
         # A4 per injector; a cell whose shams are clean cohort audio is recorded but cannot fail.
@@ -1419,20 +1654,25 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
         raise CalibrationError(f"no threshold for {short} (calibration families per stratum); "
                                f"{next(iter(derived['byStratum'].values()))['minimumNegatives']} needed")
     _check_pair(plan, calibration, confirmation)
-    expected_split = corpus_split(registry_lib.role_set(registry, entry), "confirmNegatives")
-    if expected_split is not None and confirmation["cohort"].get("fleursSplit") != expected_split:
-        raise CalibrationError(f"the confirmation scores are not of FLEURS {expected_split}")
+    roles = registry_lib.role_set(registry, entry)
+    positives_population = roles["positives"]["population"]
+    split = expected_split(cohort_rule(entry), roles, "confirmNegatives")
+    if split is not None and scores_split(confirmation) != split:
+        raise CalibrationError(f"the confirmation scores are not of {split_name(split)}")
     problems = confirmation_evidence_problems(repository, plan, confirmation)
     if problems:
         raise CalibrationError("the confirmation cannot start, nothing was recorded: " + "; ".join(problems))
     n3 = None
     if args.n3_scores:
+        if "N3" not in roles["informational"]:
+            raise CalibrationError(f"role set {entry['populations']} reports no N3 informational rate (it reports "
+                                   f"{roles['informational'] or 'none'}); nothing was recorded")
         n3 = load_scores(args.n3_scores)
         check_n3(n3, calibration, entry)
     disjointness = thresholds.check_cohort_disjointness(
         plan, [(unit["family"], unit["speaker"], unit["scriptID"]) for unit in calibration["units"]],
         [(unit["family"], unit["speaker"], unit["scriptID"]) for unit in confirmation["units"]])
-    inputs = confirmation_inputs(entry, confirmation["units"], plan.population)
+    inputs = confirmation_inputs(entry, confirmation["units"], plan.population, positives_population)
     problems = preconditions(entry, inputs, point, confirmation)
     if problems:
         raise CalibrationError("the confirmation cannot start, nothing was recorded: " + "; ".join(problems))
@@ -1446,12 +1686,12 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
         shams={injector: [_scored(unit, derived) for unit in scored] for injector, scored in inputs["shams"].items()},
         sham_cells=sham_cells(entry), sham_minimum=int(floors["bad"]), sham_informative=informative)
     preview = thresholds.evaluate_confirmation(plan, threshold, **arguments)
-    phi = phi_audits(entry, confirmation["units"], derived, plan.population)
+    phi = phi_audits(entry, confirmation["units"], derived, plan.population, positives_population)
     informational = informational_n3(n3["units"], derived) if n3 is not None else None
     record = build_record(repository, entry, plan, derived=derived, outcome=preview, calibration=calibration,
                           confirmation=confirmation, inputs=inputs, disjointness=disjointness, phi=phi,
                           informational=informational, informative=informative,
-                          planned_at=repository.store.commit_time(plan))
+                          planned_at=repository.store.commit_time(plan), positives_population=positives_population)
     problems = record_errors(record)
     if problems:
         raise CalibrationError("the record would not validate, nothing was recorded: " + "; ".join(problems[:3]))
@@ -1754,7 +1994,13 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--calibration-cohort", required=True, type=Path)
     plan.add_argument("--confirmation-cohort", required=True, type=Path)
     plan.add_argument("--confirmation-n1-manifest", type=Path,
-                      help="for an N2 confirmation cohort: the N1 manifest it pins, naming its FLEURS split")
+                      help="for an N2 confirmation cohort: the N1 manifest it pins, naming its split (and speakers)")
+    plan.add_argument("--calibration-n1-manifest", type=Path,
+                      help="for an N2 calibration cohort of a speaker-labelled corpus: the N1 manifest it pins "
+                           "(optional for FLEURS)")
+    plan.add_argument("--injection-catalog-version", type=int,
+                      help="for declared P2 or P3 positives: the construction catalog version the confirmation set "
+                           "will carry (P1 uses this repository's injector catalog)")
     plan.add_argument("--calibration-scores", required=True, type=Path)
     plan.add_argument("--alpha", required=True, type=float)
     plan.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS)

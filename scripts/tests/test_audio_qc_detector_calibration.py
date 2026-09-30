@@ -109,18 +109,39 @@ def level_entry() -> dict:
     }
 
 
+def token_loop_entry(detector: str = "test.token-loop@1", populations: str = "n3-codec-trace") -> dict:
+    """A Stage 0 introspection detector fitted and confirmed on N3 takes, with declared T2 positives."""
+    return {
+        "id": detector, "class": "I", "stage": 0, "measures": "The looped codec span.",
+        "score": {"combination": "single", "unit": "codec-frames", "groups": [
+            {"languages": list(LANGUAGES), "components": [{"source": "introspection",
+                                                            "field": "tokenCycleSpanFrames"}]}]},
+        "direction": "above", "strata": None, "scope": scope(),
+        "targets": [{"injectorID": "COD-LOOP", "severities": ["severe"], "mechanism": "T2-codec-construction"}],
+        "shams": [{"injectorID": "COD-LOOP", "mechanism": "T2-codec-construction"}],
+        "populations": populations, "limitations": ["n3-no-labels"], "risks": [],
+    }
+
+
 def fixture_registry() -> dict:
     real = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+    roles = copy.deepcopy(real["roleSets"])
+    # The fixture's speaker-labelled corpus has data; the long-form one stays pending.
+    roles["speaker-labeled-n2"]["fit"]["corpus"] = "test-speakers-calibration"
+    roles["speaker-labeled-n2"]["confirmNegatives"]["corpus"] = "test-speakers-confirmation"
     return {
         "schemaVersion": 1, "kind": detectors.REGISTRY_KIND, "authority": "test", "note": "test",
-        "operatingPoint": "warn", "roleSets": real["roleSets"],
-        "limitations": {"fleurs-no-speaker-ids": real["limitations"]["fleurs-no-speaker-ids"]},
+        "operatingPoint": "warn", "roleSets": roles,
+        "limitations": {"fleurs-no-speaker-ids": real["limitations"]["fleurs-no-speaker-ids"],
+                        "n3-no-labels": real["limitations"]["n3-no-labels"]},
         "exclusionReasons": {"not-in-fixture": "The fixture covers three languages."},
         "risks": {"test-risk": "A declared risk."},
         "detectors": [consensus_entry(), level_entry(),
                       consensus_entry("test.truncation@1", source="transcript-tail",
                                       what="trailingUnmatchedFraction", injectors_=("BND-TRUNC",), klass="C"),
-                      consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS"))],
+                      consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
+                      token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
+                      {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"}],
     }
 
 
@@ -1141,6 +1162,17 @@ class FlowTests(unittest.TestCase):
         self.plan("test.consensus-error@1", scores)
         plan_file = fixture.repo / "config/audio-qc-preregistrations/test.consensus-error@1.json"
         bindings = json.loads(plan_file.read_text(encoding="utf-8"))["bindings"]
+        # A FLEURS plan keeps the shape every committed warn plan has.
+        split = json.loads(plan_file.read_text(encoding="utf-8"))["split"]
+        self.assertEqual((split["disjointBy"], split["speakers"], sorted(bindings)),
+                         (["family", "script"], {"unit": "language:fleurs-unidentified", "claim": "lower-bound"},
+                          ["calibrationScoresSHA256", "detectorDefinitionSHA256", "evidenceIdentitySHA256",
+                           "injectionCatalogSeed", "injectionClasses", "injectionSamplePerCell", "injectionSampleSeed",
+                           "injectorCatalogVersion", "operatingPoint", "policySHA256", "scoringCodeSHA256"]))
+        committed = json.loads((REPO / "config/audio-qc-preregistrations/signal.clicks@1.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual((committed["split"]["disjointBy"], committed["split"]["speakers"], sorted(committed["bindings"])),
+                         (split["disjointBy"], split["speakers"], sorted(bindings)))
         self.assertEqual({key: bindings[key] for key in calibration.INJECTION_BINDINGS.values()},
                          {"injectorCatalogVersion": str(injectors.CATALOG_VERSION), "injectionCatalogSeed": "7",
                           "injectionSampleSeed": "1", "injectionSamplePerCell": "150",
@@ -1561,6 +1593,286 @@ class FlowTests(unittest.TestCase):
         short = calibration.derivation(repository, entry, plan, document, 61)
         self.assertEqual((short["status"], short["thresholds"]["english"],
                           short["byStratum"]["english"]["minimumNegatives"]), ("insufficient-negatives", None, 61))
+
+
+T2_FLAGS = ("--injection-catalog-seed", "7", "--injection-sample-seed", "1", "--injection-sample-per-cell", "150",
+            "--injection-classes", "I", "--injection-catalog-version", "1")
+CALIBRATION_VOICES = ("aiden", "serena", "design-calm")
+CONFIRMATION_VOICES = ("ryan", "vivian", "design-warm")
+
+
+class TakesFixture:
+    """Two N3 take-plan splits over the three fixture languages (25 families each), their Stage 0 measurements
+    with engine introspection, and a declared T2 (P2) injection set over the confirmation split."""
+
+    def __init__(self, fixture: Fixture, *, per_language: int = 25) -> None:
+        self.fixture = fixture
+        self.root = fixture.root / "n3"
+        self.per_language = per_language
+        self.calibration = self.manifest("calibration", "c", CALIBRATION_VOICES)
+        self.confirmation = self.manifest("confirmation", "t", CONFIRMATION_VOICES)
+
+    def manifest(self, split: str, tag: str, voices: tuple[str, ...], *, long_form: bool = False,
+                 name: str | None = None) -> Path:
+        takes = []
+        for language in LANGUAGES:
+            for index in range(self.per_language):
+                voice = voices[index % len(voices)]
+                block = {"kind": "design", "briefID": voice.removeprefix("design-"), "brief": "A calm voice."} \
+                    if voice.startswith("design-") else {"kind": "builtin", "id": voice}
+                script = f"{tag}{language[:2]}{index:03d}"
+                take_id = f"{script}--{voice}"
+                take = {"takeID": take_id, "family": f"{script}:{voice}:7", "scriptID": script,
+                        "language": language, "voice": block, "seed": 7, "status": "generated",
+                        "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)}
+                if long_form:
+                    take["longForm"] = {"schemaVersion": 1, "algorithmVersion": 4, "sampleRate": 24_000,
+                                        "segmentCount": 2, "outputFrameCount": 96_000,
+                                        "maximumSegmentBoundaryJump": 12, "seamFrames": [48_000]}
+                takes.append(take)
+        manifest = signed({"schemaVersion": 1, "kind": calibration.N3_KIND, "runID": f"run-{split}",
+                           "split": split, "takes": takes})
+        return write_json(self.root / (name or split) / "takes-manifest.json", manifest)
+
+    @staticmethod
+    def span(take_id: str) -> int:
+        return int(take_id.split("--")[0][-3:]) % 10
+
+    def injection_set(self, *, population: str = "P2", provenance: bool = True, name: str = "t2-set") -> Path:
+        entries = []
+        for take in self.fixture.takes(self.confirmation):
+            for severity, kind in (("severe", population), ("sham", "S")):
+                clip = f"{take['takeID']}__COD-LOOP__{severity}"
+                injection = {"injectorID": "COD-LOOP", "injector": "COD-LOOP@1", "variant": severity,
+                             "severity": severity, "catalogVersion": 1, "classes": ["I"],
+                             "mechanism": "T2-codec-construction", "population": kind,
+                             "sourcePCMSHA256": sha(f"pcm:{take['takeID']}"), "outputPCMSHA256": sha(f"pcm:{clip}")}
+                if provenance:
+                    injection["provenance"] = {"tier": "T2", "traceSHA256": sha(f"trace:{take['takeID']}"),
+                                               "recipeSHA256": sha(f"recipe:{clip}"), "decoderSHA256": sha("decoder")}
+                entries.append({"takeID": clip, "sourceTakeID": take["takeID"], "family": take["family"],
+                                "language": take["language"], "textSHA256": take["textSHA256"],
+                                "wavSHA256": sha(f"wav:{clip}"), "injection": injection})
+        return write_json(self.root / name / "injection-set.json", {
+            "kind": calibration.INJECTION_SET_KIND, "schemaVersion": 1,
+            "sourceManifest": {"sha256": calibration.file_sha256(self.confirmation), "kind": calibration.N3_KIND},
+            "catalogVersion": 1, "catalogSeed": 7, "classes": ["I"], "sampling": {"perCell": 150, "seed": 1},
+            "entries": entries, "entriesSHA256": json_digest(entries)})
+
+    def measurements(self, cohort: Path, name: str, *, injection_set: Path | None = None) -> Path:
+        clips = []
+        for take in self.fixture.takes(cohort):
+            # Clean confirmation takes loop half as long, so none reaches the calibration tail.
+            span = self.span(take["takeID"]) // (2 if cohort == self.confirmation else 1)
+            clips.append({"clipID": take["takeID"], "population": "N3", "family": take["family"],
+                          "sourceTakeID": take["takeID"], "language": take["language"], "injection": None,
+                          "wavSHA256": take["wavSHA256"], "fastQC": {}, "observations": {},
+                          "introspection": {"codecFrameCount": 90, "tokenCycleSpanFrames": span or None}})
+        entries = self.fixture.entries(injection_set) if injection_set is not None else []
+        for entry in entries:
+            injection = entry["injection"]
+            looped = injection["severity"] == "severe"
+            clips.append({"clipID": entry["takeID"], "population": injection["population"], "family": entry["family"],
+                          "sourceTakeID": entry["sourceTakeID"], "language": entry["language"],
+                          "wavSHA256": entry["wavSHA256"],
+                          "injection": {key: injection[key] for key in ("injector", "injectorID", "variant", "severity",
+                                                                         "classes", "outputPCMSHA256")},
+                          "fastQC": {}, "observations": {},
+                          "introspection": {"codecFrameCount": 90, "tokenCycleSpanFrames": 64 if looped else None}})
+        return write_json(self.root / f"{name}.json", {
+            "kind": calibration.MEASUREMENTS_KIND, "schemaVersion": 1, "startedAt": FRESH,
+            "subject": {"detector": "fastqc@8", "mirror": "fastqc-v8-numpy/1"},
+            "takesManifestSHA256": calibration.file_sha256(cohort),
+            "entriesSHA256": json_digest(entries) if injection_set is not None else None,
+            "clipsSHA256": json_digest(clips), "clips": clips})
+
+
+def labelled_cohort(fixture: Fixture, name: str, tag: str, split: str, speakers: tuple[str, ...]) -> tuple[Path, Path]:
+    """A speaker-labelled N2 cohort and the N1 manifest it pins (its split, corpus and speaker labels)."""
+    n1_takes, n2_takes = [], []
+    for language in LANGUAGES:
+        for index in range(fixture.per_language):
+            n1_id, take_id = f"n1-{tag}-{language[:2]}-{index:03d}", f"{tag}-{language[:2]}-{index:03d}--n2"
+            family, script = f"{tag}-{language}-{index}", f"corpus-{tag}{index % 12}"
+            n1_takes.append({"takeID": n1_id, "family": family, "scriptID": script, "language": language,
+                             "speaker": f"{language[:2]}-{speakers[index % len(speakers)]}", "eligible": True,
+                             "wavSHA256": sha(f"n1:{n1_id}"), "textSHA256": sha(REFERENCE)})
+            n2_takes.append({"takeID": take_id, "n1TakeID": n1_id, "family": family, "scriptID": script,
+                             "language": language, "eligible": True, "population": "N2",
+                             "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)})
+    n1 = write_json(fixture.root / f"{name}-n1.json", signed({
+        "kind": calibration.N1_KIND, "schemaVersion": 1, "population": "N1", "split": split,
+        "corpus": "test-speakers", "takes": n1_takes}))
+    n2 = write_json(fixture.root / name / "n2-manifest.json", signed({
+        "kind": calibration.N2_KIND, "schemaVersion": 1, "runID": f"run-{name}",
+        "n1ManifestSHA256": calibration.file_sha256(n1), "takes": n2_takes}))
+    return n2, n1
+
+
+class RoleSetCohortTests(unittest.TestCase):
+    """Plans, scores and confirmations over the role sets beyond FLEURS: N3 take splits with declared P2
+    positives, speaker-labelled N2 and pending long-form corpora."""
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.fixture = Fixture(Path(self.directory.name))
+        self.takes = TakesFixture(self.fixture)
+        self.out = self.fixture.root / "out"
+
+    def tearDown(self) -> None:
+        self.directory.cleanup()
+
+    def cli(self, *argv: str, expect: int = 0) -> str:
+        code, out, err = run("--repo-root", str(self.fixture.repo), *argv)
+        self.assertEqual(code, expect, f"{argv[0]}: {err}")
+        return out + err
+
+    def scores(self, detector: str, role: str, cohort: Path, name: str, *extra: str, expect: int = 0) -> Path | str:
+        output = self.out / f"{name}.json"
+        text = self.cli("scores", "--detector", detector, "--role", role, "--cohort", str(cohort),
+                        "--output", str(output), *extra, expect=expect)
+        return output if expect == 0 else text
+
+    def plan(self, detector: str, calibration_cohort: Path, confirmation_cohort: Path, scores: Path, *extra: str,
+             flags: tuple[str, ...] = T2_FLAGS, expect: int = 0) -> str:
+        return self.cli("plan", "--detector", detector, "--calibration-cohort", str(calibration_cohort),
+                        "--confirmation-cohort", str(confirmation_cohort), "--calibration-scores", str(scores),
+                        "--alpha", "0.05", *flags, *extra, expect=expect)
+
+    def calibrated(self) -> Path:
+        takes = self.takes
+        return self.scores("test.token-loop@1", "calibration", takes.calibration, "loop-calibration",
+                           "--measurements", str(takes.measurements(takes.calibration, "cal-measurements")))
+
+    def test_n3_take_splits_plan_score_and_confirm_with_declared_p2_positives(self) -> None:
+        takes = self.takes
+        scores = self.calibrated()
+        document = json.loads(scores.read_text(encoding="utf-8"))
+        self.assertEqual((document["cohort"]["split"], document["cohort"]["fleursSplit"]), ("calibration", None))
+        self.assertEqual({unit["speaker"] for unit in document["units"]},
+                         {"voice:aiden", "voice:serena", "voice:design-calm"})
+        # The confirmation split is never scored for calibration or information (A5), plan or no plan.
+        confirmation_measurements = takes.measurements(takes.confirmation, "early-measurements")
+        for role in ("calibration", "informational"):
+            self.assertIn("the confirmation split is the confirmation corpus", self.scores(
+                "test.token-loop@1", role, takes.confirmation, f"early-{role}", "--measurements",
+                str(confirmation_measurements), expect=2))
+        # A P2 construction names its catalog version: this repository has no T2 catalog.
+        self.assertIn("--injection-catalog-version", self.plan(
+            "test.token-loop@1", takes.calibration, takes.confirmation, scores, flags=INJECTION_FLAGS, expect=2))
+        self.plan("test.token-loop@1", takes.calibration, takes.confirmation, scores)
+        plan_file = self.fixture.repo / "config/audio-qc-preregistrations/test.token-loop@1.json"
+        plan = json.loads(plan_file.read_text(encoding="utf-8"))
+        self.assertEqual(plan["split"]["disjointBy"], ["family", "script", "speaker"])
+        self.assertEqual(plan["split"]["speakers"], {"unit": "vocello-voice", "claim": "identified"})
+        self.assertEqual((plan["split"]["calibration"]["source"], plan["split"]["confirmation"]["kind"]),
+                         ("vocello-takes-calibration", calibration.N3_KIND))
+        self.assertEqual((plan["population"], plan["bindings"]["injectorCatalogVersion"],
+                          plan["bindings"]["injectionClasses"]), ("N3", "1", "I"))
+        self.fixture.commit_plans()
+        injection = takes.injection_set()
+        measured = takes.measurements(takes.confirmation, "t2-measurements", injection_set=injection)
+        # An injection set of P1 is not this role set's, and a P2 names its provenance.
+        p1 = takes.injection_set(population="P1", name="p1-set")
+        self.assertIn("an injection is P2 or S, not 'P1'", self.scores(
+            "test.token-loop@1", "confirmation", takes.confirmation, "p1", "--injection-set", str(p1),
+            "--measurements", str(takes.measurements(takes.confirmation, "p1-measurements", injection_set=p1)),
+            "--positive-measurements", str(takes.measurements(takes.confirmation, "p1-positive", injection_set=p1)),
+            expect=2))
+        bare = takes.injection_set(provenance=False, name="bare-set")
+        bare_measured = takes.measurements(takes.confirmation, "bare-measurements", injection_set=bare)
+        self.assertIn("names its traceSHA256", self.scores(
+            "test.token-loop@1", "confirmation", takes.confirmation, "bare", "--injection-set", str(bare),
+            "--measurements", str(bare_measured), "--positive-measurements", str(bare_measured), expect=2))
+        confirmation = self.scores("test.token-loop@1", "confirmation", takes.confirmation, "loop-confirmation",
+                                   "--injection-set", str(injection), "--measurements", str(measured),
+                                   "--positive-measurements", str(measured))
+        units = json.loads(confirmation.read_text(encoding="utf-8"))["units"]
+        positive = next(unit for unit in units if unit["population"] == "P2")
+        self.assertEqual((positive["cell"], positive["provenance"]["tier"], positive["score"]),
+                         ("COD-LOOP/severe", "T2", 64.0))
+        self.assertIn("reports no N3 informational rate", self.cli(
+            "confirm", "--detector", "test.token-loop@1", "--calibration-scores", str(scores),
+            "--confirmation-scores", str(confirmation), "--n3-scores", str(scores), expect=2))
+        result = json.loads(self.cli("confirm", "--detector", "test.token-loop@1", "--calibration-scores",
+                                     str(scores), "--confirmation-scores", str(confirmation)))
+        self.assertEqual((result["verdict"], result["reasons"]), ("qualified", []))
+        record = json.loads((self.fixture.repo / result["record"]).read_text(encoding="utf-8"))
+        self.assertEqual(calibration.record_errors(record), [])
+        self.assertEqual(sorted(record["counts"]["confirmation"]), ["N3", "P2", "S"])
+        self.assertEqual(record["counts"]["confirmation"]["P2"]["families"], 75)
+        self.assertEqual(record["speakers"], {"unit": "vocello-voice", "claim": "identified", "count": 3})
+        self.assertEqual(record["split"]["counts"]["speakers"], {"calibration": 3, "confirmation": 3})
+        self.assertEqual(list(record["rates"]["mechanisms"]), ["T2-codec-construction"])
+        self.cli("validate")
+
+    def test_n3_splits_must_be_disjoint_by_speaker(self) -> None:
+        takes = self.takes
+        scores = self.calibrated()
+        shared = takes.manifest("confirmation", "u", ("aiden", "vivian", "design-warm"), name="shared-voice")
+        self.assertIn("share 1 speaker value", self.plan("test.token-loop@1", takes.calibration, shared, scores,
+                                                        expect=2))
+        swapped = takes.manifest("calibration", "v", CONFIRMATION_VOICES, name="calibration-as-confirmation")
+        self.assertIn("the calibration split; the role set confirms on the confirmation split",
+                      self.plan("test.token-loop@1", takes.calibration, swapped, scores, expect=2))
+        self.assertFalse((self.fixture.repo / "config/audio-qc-preregistrations").exists())
+
+    def test_a_pending_corpus_or_a_flat_long_form_cohort_is_not_plannable(self) -> None:
+        takes = self.takes
+        long_calibration = takes.manifest("calibration", "lc", CALIBRATION_VOICES, long_form=True, name="lf-cal")
+        long_confirmation = takes.manifest("confirmation", "lt", CONFIRMATION_VOICES, long_form=True, name="lf-conf")
+        scores = self.scores("test.long-loop@1", "calibration", long_calibration, "long-calibration",
+                             "--measurements", str(takes.measurements(long_calibration, "lf-measurements")))
+        seams = {unit["unitID"]: unit for unit in json.loads(scores.read_text(encoding="utf-8"))["units"]}
+        self.assertEqual(len(seams), 75)
+        self.assertIn("names no corpus yet for fit (pending-vocello-long-form-calibration)",
+                      self.plan("test.long-loop@1", long_calibration, long_confirmation, scores,
+                                flags=INJECTION_FLAGS, expect=2))
+        # A long-form role set's cohorts are assembled projects with seams.
+        registry = calibration.Repository(self.fixture.repo).registry()
+        entry = detectors.detector_entry(registry, "test.long-loop@1")
+        rule = calibration.cohort_rule(entry)
+        roles = detectors.role_set(registry, entry)
+        self.assertEqual(calibration.cohort_rule_problems(calibration.load_cohort(long_confirmation), rule, roles), [])
+        flat = calibration.cohort_rule_problems(calibration.load_cohort(takes.confirmation), rule, roles)
+        self.assertIn("75 takes of takes-manifest.json carry no long-form seam", flat[0])
+        self.assertEqual(calibration.load_cohort(long_confirmation)["takes"]["lten000--ryan"]["seams"], [2.0])
+
+    def test_a_speaker_labelled_corpus_names_its_speakers_and_proves_speaker_disjointness(self) -> None:
+        fixture = self.fixture
+        cal, cal_n1 = labelled_cohort(fixture, "lab-cal", "lc", "calibration", ("s1", "s2", "s3"))
+        conf, conf_n1 = labelled_cohort(fixture, "lab-conf", "lt", "confirmation", ("s4", "s5", "s6"))
+        self.assertIn("pass the N1 manifest", self.scores("test.labeled-level@1", "calibration", cal, "no-n1",
+                                                          expect=2))
+        scores = self.scores("test.labeled-level@1", "calibration", cal, "labelled", "--n1-manifest", str(cal_n1),
+                             "--measurements", str(fixture.measurements(cal, "lab-measurements")))
+        units = json.loads(scores.read_text(encoding="utf-8"))["units"]
+        self.assertEqual(len({unit["speaker"] for unit in units}), 9)
+        self.assertTrue(all(unit["speaker"].startswith("speaker:") and "s1" not in unit["speaker"] for unit in units))
+        self.assertIn("--calibration-n1-manifest", self.plan("test.labeled-level@1", cal, conf, scores,
+                                                             "--confirmation-n1-manifest", str(conf_n1),
+                                                             flags=INJECTION_FLAGS, expect=2))
+        # One confirmation speaker label is a calibration speaker's.
+        shared, shared_n1 = labelled_cohort(fixture, "lab-shared", "ls", "confirmation", ("s1", "s5", "s6"))
+        self.assertIn("share 3 speaker value", self.plan(
+            "test.labeled-level@1", cal, shared, scores, "--confirmation-n1-manifest", str(shared_n1),
+            "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS, expect=2))
+        self.plan("test.labeled-level@1", cal, conf, scores, "--confirmation-n1-manifest", str(conf_n1),
+                  "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS)
+        plan = json.loads((fixture.repo / "config/audio-qc-preregistrations/test.labeled-level@1.json")
+                          .read_text(encoding="utf-8"))
+        self.assertEqual((plan["split"]["disjointBy"], plan["split"]["speakers"]),
+                         (["family", "script", "speaker"], {"unit": "corpus-speaker", "claim": "identified"}))
+        self.assertEqual(plan["split"]["calibration"]["source"], "test-speakers-calibration")
+        # A take without a label is refused.
+        document = json.loads(cal_n1.read_text(encoding="utf-8"))
+        document["takes"][0].pop("speaker")
+        unlabelled_n1 = write_json(fixture.root / "unlabelled-n1.json", signed(
+            {key: value for key, value in document.items() if key != "manifestDigest"}))
+        cohort = calibration.load_cohort(cal)
+        cohort["n1ManifestSHA256"] = calibration.file_sha256(unlabelled_n1)
+        with self.assertRaisesRegex(calibration.CalibrationError, "names no speaker"):
+            calibration.resolve_cohort(cohort, unlabelled_n1)
 
 
 def evidence_record(take: dict) -> dict:

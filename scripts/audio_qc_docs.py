@@ -205,8 +205,9 @@ class Qualification:
     plan_problem: str | None
     ledger: dict | None
     records: list[Record] = field(default_factory=list)
-    # Plans at a fail point beside the warn plan: (point, plan, its ledger entry).
+    # Plans at a fail point beside the warn plan: (point, plan, its ledger entry), and any that is unreadable.
     fail_plans: list[tuple[str, thresholds.PreRegistration, dict | None]] = field(default_factory=list)
+    fail_problems: list[str] = field(default_factory=list)
 
     def best(self) -> Record | None:
         """The usable qualified record at the strictest level, if any."""
@@ -232,6 +233,8 @@ class Qualification:
             state = f"confirmed ({self.ledger.get('status', '-')})"
         for point, _, ledger in self.fail_plans:
             state += f"; {point} " + ("planned" if ledger is None else f"confirmed ({ledger.get('status', '-')})")
+        for problem in self.fail_problems:
+            state += f"; unreadable {problem.split(':', 1)[0]} plan"
         return state
 
 
@@ -288,13 +291,13 @@ class Sources:
                 ledger = thresholds.ConfirmationLedger(directory).outcome(plan.digest())
             except (OSError, json.JSONDecodeError):
                 ledger = {"status": "unreadable"}
-        fail_plans = []
+        fail_plans, fail_problems = [], []
         for point in calibration.SUPPORTED_OPERATING_POINTS[1:]:
             try:
                 other = thresholds.PreRegistrationStore(directory, naming="detector").load(entry["id"], point)
                 outcome = thresholds.ConfirmationLedger(directory).outcome(other.digest()) if other else None
             except (thresholds.PreRegistrationError, ValueError, KeyError, TypeError, OSError) as error:
-                problem = problem or f"{point}: {error}"
+                fail_problems.append(f"{point}: {error}")
                 continue
             if other is not None:
                 fail_plans.append((point, other, outcome))
@@ -314,7 +317,7 @@ class Sources:
             if not problems and data["detectorDefinitionSHA256"] != current:
                 problems.append("it confirmed an earlier definition (A7)")
             records.append(Record(relative, data if isinstance(data, dict) else None, problems))
-        return Qualification(plan, problem, ledger, records, fail_plans)
+        return Qualification(plan, problem, ledger, records, fail_plans, fail_problems)
 
     def consumers(self, judge: str) -> list[tuple[dict, list[str], list[str]]]:
         """The detectors that read a judge, each with the languages and what it reads there."""

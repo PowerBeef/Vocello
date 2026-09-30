@@ -750,8 +750,10 @@ def export_raw_outputs(takes_path: Path, bundle: Path, output: Path, *, judge_id
     Only the fields the detectors' reducers read are kept (`RAW_OUTPUT_FIELDS`:
     pYIN's hop, F0 and voicing track; a speaker judge's 2 s window embeddings).
     `takes_path` is the manifest the panel ran over: a cohort or an injection
-    set (whose entries are the positives and shams). The export holds speaker
-    embeddings: an untracked build artifact, never committed.
+    set (whose entries are the positives and shams). `cache_root` is the panel's
+    own (a confirmation panel's new, empty root), so every exported output is the
+    one that panel computed after its plan. The export holds speaker embeddings:
+    an untracked build artifact, never written inside the repository outside build/.
     """
     from dataclasses import replace as replace_identity
     from types import SimpleNamespace
@@ -762,8 +764,13 @@ def export_raw_outputs(takes_path: Path, bundle: Path, output: Path, *, judge_id
     from lib.qc_pipeline.layered_cache import L1_LAYER, l1_identity
     from lib.qc_pipeline.panel_jobs import PanelJobError, judge_scope, panel_identity, panel_request, profile
 
+    repository = Path(__file__).resolve().parents[1]
+    resolved = Path(output).resolve()
+    if resolved.is_relative_to(repository) and not resolved.is_relative_to(repository / "build"):
+        raise CalibrationError(f"{output} is inside the repository: raw outputs (speaker embeddings among them) are "
+                               "untracked build artifacts; write them under build/")
     manifest, manifest_sha256, takes = _raw_output_takes(takes_path)
-    registry_path = registry_path or Path(__file__).resolve().parents[1] / "config" / "audio-qc-judges.json"
+    registry_path = registry_path or repository / "config" / "audio-qc-judges.json"
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     judge = (registry.get("judges") or {}).get(judge_id)
     engine = ((judge or {}).get("execution") or {}).get("engine") if isinstance(judge, dict) else None
@@ -1786,6 +1793,10 @@ def generation_evidence(source: dict, *, own_generation: bool) -> dict:
     if own_generation and introspection is not None:
         if issues := takes_tool.introspection_issues(introspection):
             raise CalibrationError(f"{source.get('takeID')}: {issues[0]}")
+        if introspection.get("wavSHA256") != source.get("wavSHA256"):
+            # A summary binds the WAV its generation wrote; an entry that copied its source's fields does not.
+            raise CalibrationError(f"{source.get('takeID')}: its introspection summary describes other audio than "
+                                   "its WAV (a T2 or T3 entry records its own generation's summary)")
         evidence["introspection"] = introspection
     block = source.get("longForm")
     if block is not None:
@@ -2465,8 +2476,9 @@ def main(argv: list[str] | None = None) -> int:
     raw_outputs.add_argument("--bundle", type=Path, required=True, help="the panel's private bundle directory")
     raw_outputs.add_argument("--judge", required=True, help="pitch.pyin@1 or speaker.campplus-voxceleb@1")
     raw_outputs.add_argument("--output", type=Path, required=True)
-    raw_outputs.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT,
-                             help="the orchestrator's analysis cache the panel ran on")
+    raw_outputs.add_argument("--cache-root", type=Path, required=True,
+                             help="the panel's own cache root (a confirmation panel's new, empty one), never a "
+                                  "shared cache that may hold entries from before its plan")
     for command in (inject, verify, score):
         command.add_argument("--jobs", type=int, default=default_jobs(),
                              help="worker processes (default: half the cores)")

@@ -81,8 +81,8 @@ Commands:
            [--confirmation-n1-manifest FILE] [--calibration-n1-manifest FILE]
            --calibration-scores FILE --alpha A --injection-catalog-seed N
            --injection-sample-seed N --injection-sample-per-cell N --injection-classes A,B,...
-           [--injection-catalog-version N] [--operating-point warn|fail|evidenceLaneFail]
-           [--n3-cohort MANIFEST]
+           [--injection-catalog-version N] [--tier-catalog-version T2=N ...]
+           [--operating-point warn|fail|evidenceLaneFail] [--n3-cohort MANIFEST]
            Write config/audio-qc-preregistrations/<id>.json (<id>.<point>.json
            at a fail point, with its N3 cohort): the split-conformal rule,
            alpha (below the point's FAR bound), the declared cohort split
@@ -142,6 +142,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -175,6 +176,8 @@ FLEURS_KINDS = frozenset({N2_KIND, N1_KIND})
 FLEURS_SPLITS = ("dev", "test")
 # The split a non-FLEURS cohort declares (the N3 take plan's, a speaker-labelled N1 manifest's).
 DECLARED_SPLITS = ("calibration", "confirmation")
+# The splits a confirmation (or a fail plan's N3 bound) draws from, whatever the role set.
+CONFIRMATION_SPLITS = ("test", "confirmation")
 # `bound`: the N3 cohort a fail plan bounds the flag rate on (A2), scored after the plan like a confirmation.
 ROLES = ("calibration", "confirmation", "informational", "bound")
 SUPPORTED_OPERATING_POINTS = ("warn", "fail", "evidenceLaneFail")
@@ -192,6 +195,9 @@ POSITIVE_PROVENANCE = {"P2": ("T2", ("traceSHA256", "recipeSHA256", "decoderSHA2
                        "P3": ("T3", ("knob", "recipeSHA256"))}
 # The positive population each construction tier builds (audit 5.1: P1 PCM, P2 codec, P3 knob).
 TIER_POPULATIONS = {"T1": "P1", "T2": "P2", "T3": "P3"}
+POPULATION_TIERS = {population: tier for tier, population in TIER_POPULATIONS.items()}
+# A registered generation knob's id (config/runtime-debug-knobs.json style): an identifier, never free text.
+KNOB_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
 
 
 @dataclass(frozen=True)
@@ -239,6 +245,8 @@ STARTED_AT_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 # Why a sham cell's A4 test cannot fail: every sham clip's audio is a clean cohort take's.
 UNINFORMATIVE_SHAM = "sham-audio-is-clean-cohort-audio"
 # The injection set's recorded construction -> the plan binding that pre-registers it (A5).
+# A second construction tier's catalog version (a fail point's T2 beside T1): `injectorCatalogVersionT2`.
+TIER_CATALOG_BINDING = "injectorCatalogVersion"
 INJECTION_BINDINGS = {"catalogVersion": "injectorCatalogVersion", "catalogSeed": "injectionCatalogSeed",
                       "sampleSeed": "injectionSampleSeed", "samplePerCell": "injectionSamplePerCell",
                       "classes": "injectionClasses"}
@@ -440,6 +448,7 @@ def resolve_cohort(cohort: dict, n1_manifest: Path | None) -> str | None:
             raise CalibrationError(f"{cohort['name']}: {take_id} names no speaker or corpus; a corpus other than "
                                    "FLEURS labels each recording's speaker")
         take["speaker"] = "speaker:" + hashlib.sha256(f"{corpus}|{label}".encode("utf-8")).hexdigest()[:16]
+    cohort["corpus"] = corpus
     return source["split"]
 
 
@@ -535,6 +544,16 @@ def load_injection_set(path: Path) -> dict:
                                         if isinstance(entry, dict) and isinstance(entry.get("injection"), dict)
                                         and isinstance(entry["injection"].get("catalogVersion"), int)}),
     }
+    tiers: dict[str, set[int]] = {}
+    for entry in data["entries"]:
+        injection = entry.get("injection") if isinstance(entry, dict) else None
+        if isinstance(injection, dict) and isinstance(injection.get("catalogVersion"), int) \
+                and not isinstance(injection.get("catalogVersion"), bool):
+            tier = str(injection.get("mechanism") or "T1-").split("-", 1)[0]
+            tiers.setdefault(tier, set()).add(injection["catalogVersion"])
+    if set(tiers) - {"T1"}:
+        # A declared T2 or T3 construction: each tier's catalog versions, bound per tier by the plan.
+        construction["tierCatalogVersions"] = {tier: sorted(versions) for tier, versions in sorted(tiers.items())}
     return {"entries": data["entries"], "sourceManifestSHA256": source["sha256"], "fileSHA256": file_sha256(path),
             "entriesSHA256": data["entriesSHA256"], "construction": construction, "name": name}
 
@@ -780,8 +799,11 @@ def provenance_problems(population: str, injection: Mapping[str, Any], mechanism
         problems.append(f"a {population} positive is a {tier} construction")
     for key in keys:
         value = provenance.get(key)
-        if not (is_sha256(value) if key.endswith("SHA256") else isinstance(value, str) and value.strip()):
+        if not (is_sha256(value) if key.endswith("SHA256") else isinstance(value, str) and KNOB_ID.fullmatch(value)):
             problems.append(f"a {population} positive names its {key}")
+    # Its construction catalog is bound by the plan per tier (see injection_construction_problems).
+    if isinstance(injection.get("catalogVersion"), bool) or not isinstance(injection.get("catalogVersion"), int):
+        problems.append(f"a {population} positive names its construction catalogVersion")
     return problems
 
 
@@ -939,7 +961,8 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         _identities(identities, versions, evidence, panel_judges)
         raw = raw_for(item["takeID"], wav, evidence, positive_exports, where) if positive_exports else None
         # A construction that moved the seams records its own long-form block; otherwise its source's hold.
-        seams = (_seams(item.get("longForm"), where) or source.get("seams")) if needs_seams else None
+        own = _seams(item.get("longForm"), where) if needs_seams else None
+        seams = (own if own is not None else source.get("seams")) if needs_seams else None
         clip = injected_clips.get(item["takeID"]) if needs_measurements else None
         if clip is not None:
             recorded = clip.get("injection") or {}
@@ -1036,9 +1059,20 @@ def load_scores(path: Path) -> dict:
 
 
 def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
-    """Every plan file's cohorts by role: {calibration|confirmation|bound: {manifest digest: [detectors]}},
-    `bound` being a fail plan's N3 cohort."""
-    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}}
+    """Every plan file's cohorts by role: {calibration|confirmation|bound|spent: {manifest digest: [detectors]}},
+    `bound` being a fail plan's N3 cohort and `spent` a cohort already scored as confirmation evidence: the
+    confirmation or N3 cohort of a plan with a ledger entry, or a record's informational N3 cohort."""
+    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}, "spent": {}}
+    if repository.records.is_dir():
+        for path in sorted(repository.records.glob("*/*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            digest = ((record.get("informational") or {}).get("manifestDigest")
+                      if isinstance(record, Mapping) and isinstance(record.get("informational"), Mapping) else None)
+            if is_sha256(digest):
+                found["spent"].setdefault(digest, []).append(str(record.get("detector")))
     directory = repository.store.directory
     if not directory.is_dir():
         return found
@@ -1055,6 +1089,10 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
         found["confirmation"].setdefault(plan.cohorts.confirmation.manifest_digest, []).append(plan.detector)
         if plan.binding("n3CohortDigest"):
             found["bound"].setdefault(plan.binding("n3CohortDigest"), []).append(plan.detector)
+        if repository.ledger.outcome(plan.digest()) is not None:
+            for digest in (plan.cohorts.confirmation.manifest_digest, plan.binding("n3CohortDigest")):
+                if digest:
+                    found["spent"].setdefault(digest, []).append(plan.detector)
     return found
 
 
@@ -1068,6 +1106,9 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
     digest = cohort["manifestDigest"]
     confirmation_split = expected_split(rule, roles, "confirmNegatives")
     if args.role == "bound":
+        if args.operating_point == "warn":
+            raise CalibrationError("the N3 bound belongs to a fail plan: pass --operating-point fail (or "
+                                   "evidenceLaneFail)")
         if plan is None or plan.binding("n3CohortDigest") != digest:
             raise CalibrationError("an N3 bound cohort is scored only under the fail plan that names it (A5): run "
                                    f"plan for {entry['id']} at a fail operating point first and commit it")
@@ -1098,6 +1139,11 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         if confirmation_split is not None and split == confirmation_split and cohort["kind"] in rule.kinds:
             raise CalibrationError(f"{split_name(split)} is the confirmation corpus: it is scored only under "
                                    "--role confirmation, never for calibration or information (A5)")
+        if args.role in ("calibration", "informational") and split in CONFIRMATION_SPLITS:
+            # Another role set's confirmation corpus (the N3 confirmation split for a FLEURS detector, FLEURS
+            # test for an N3 one) stays untouched too, planned or not.
+            raise CalibrationError(f"{split_name(split)} is a confirmation split: it is scored only under --role "
+                                   "confirmation or bound, never for calibration or information (A5)")
     if args.role == "calibration":
         if plan is not None and plan.cohorts and plan.cohorts.calibration.manifest_digest != digest:
             raise CalibrationError(f"{entry['id']}'s plan pins another calibration cohort")
@@ -1196,8 +1242,9 @@ def fail_like(point: Mapping[str, Any]) -> bool:
 def calibration_floor_of(point: Mapping[str, Any], by: str | None) -> int:
     """Scored calibration families each stratum needs. Warn states it (`minimumUnits.calibration`); a fail
     point states none, so the calibration cohort is held to the confirmation's negative floor for the same
-    stratum (`n2NegativesPerLanguage` per language, `n2Negatives` pooled), which also exceeds the
-    split-conformal minimum ceil(1 / alpha) - 1 at any alpha below its FAR bound."""
+    stratum (`n2NegativesPerLanguage` per language, `n2Negatives` pooled). The split-conformal rule needs
+    ceil(1 / alpha) - 1 families on top (a smaller alpha needs more: 199 at 0.005), which `plan` and
+    `derive` apply as well."""
     units = point["minimumUnits"]
     if "calibration" in units:
         return int(units["calibration"])
@@ -1332,6 +1379,17 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                                f"FLEURS {expected}" if rule.fleurs else
                                f"the confirmation cohort is {split_name(confirmation_split)}; the role set confirms "
                                f"on the {expected} split")
+    if rule is SPEAKER_LABELED_RULE:
+        # Speakers are digests of (corpus, label): both cohorts name one corpus, or disjointness is vacuous.
+        corpora = {calibration.get("corpus"), confirmation.get("corpus")}
+        if len(corpora) != 1 or None in corpora:
+            raise CalibrationError("the two cohorts of a speaker-labelled split name one corpus (their N1 manifests' "
+                                   "corpus), so their speakers compare")
+        (corpus,) = corpora
+        for role in ("fit", "confirmNegatives"):
+            if roles[role].get("corpus") != f"{corpus}-{roles[role]['cohort']}":
+                raise CalibrationError(f"role set {entry['populations']} names corpus {roles[role].get('corpus')} "
+                                       f"for {role}, not {corpus}-{roles[role]['cohort']}")
     fit_split = expected_split(rule, roles, "fit")
     if calibration_split is not None and fit_split is not None and calibration_split != fit_split:
         raise CalibrationError(f"the calibration cohort is {split_name(calibration_split)}; the role set fits on "
@@ -1350,7 +1408,8 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         raise CalibrationError("the calibration scores were computed by other scoring code; score them again (A7)")
     problems = current_evidence_problems(entry, calibration_scores["evidenceIdentity"])
     problems += calibration_problems(entry, calibration_scores, roles["fit"]["population"],
-                                     calibration_floor_of(point, registry_lib.strata_by(entry)))
+                                     max(calibration_floor_of(point, registry_lib.strata_by(entry)),
+                                         math.ceil(1.0 / alpha) - 1))
     if problems:
         raise CalibrationError("the calibration scores cannot fit a threshold: " + "; ".join(problems))
     declared = declared_cohorts(repository)
@@ -1367,6 +1426,11 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         raise CalibrationError(f"the plan of {', '.join(declared['calibration'][n3['manifestDigest']])} fits on "
                                "the N3 bound cohort (A5)")
     for cohort, what in ((confirmation, "confirmation cohort"), (n3, "N3 bound cohort")):
+        spent = declared["spent"].get(cohort["manifestDigest"]) if cohort is not None else None
+        if spent:
+            raise CalibrationError(f"the {what} was already scored as confirmation evidence (for "
+                                   f"{', '.join(sorted(set(spent)))}: a confirmed plan or a record's informational "
+                                   "N3); A5 needs a cohort no confirmation has scored")
         artifacts = scoring_artifacts(cohort["directory"]) if cohort is not None else []
         if artifacts:
             raise CalibrationError(f"the {what} already holds scores, a panel bundle or measurements "
@@ -1387,6 +1451,8 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         ("scoringCodeSHA256", scoring_code),
         ("evidenceIdentitySHA256", json_digest(calibration_scores["evidenceIdentity"])),
         *((binding, construction_value(key, injection[key])) for key, binding in INJECTION_BINDINGS.items()),
+        *((f"{TIER_CATALOG_BINDING}{tier}", str(version))
+          for tier, version in sorted((injection.get("tierCatalogVersions") or {}).items())),
         # A fail point's N3 flag-rate bound is confirmation evidence too: its cohort is pre-registered (A2, A5).
         *((("n3CohortDigest", n3["manifestDigest"]),) if n3 is not None else ()),
     )
@@ -1397,6 +1463,13 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         strata=strata, cohorts=split, bindings=bindings)
     thresholds.check_cohort_disjointness(plan, _triples(calibration), _triples(confirmation))
     return plan
+
+
+def tier_catalog_version(value: str) -> tuple[str, int]:
+    tier, _, version = value.partition("=")
+    if tier not in ("T2", "T3") or not version.isdigit():
+        raise argparse.ArgumentTypeError("TIER=N, with TIER T2 or T3")
+    return tier, int(version)
 
 
 def injection_classes(value: str) -> list[str]:
@@ -1430,12 +1503,21 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
     elif not rule.fleurs:
         raise CalibrationError(f"{calibration['name']} is an N2 cohort: pass --calibration-n1-manifest (the N1 "
                                "manifest it pins) so its split and speakers are known")
+    # A second tier's positives (a fail point's T2 beside T1) are built from that tier's catalog, bound too.
+    tiers = [POPULATION_TIERS[population] for population in positive_populations(
+        registry_lib.role_set(registry, entry), entry)[1:]]
+    declared_tiers = dict(args.tier_catalog_version or ())
+    if sorted(declared_tiers) != sorted(tiers):
+        raise CalibrationError(f"{entry['id']} reads {', '.join(tiers) or 'no'} second-tier constructions: pass "
+                               "--tier-catalog-version TIER=N for each, and only those")
     injection = {"catalogVersion": catalog_version, "catalogSeed": args.injection_catalog_seed,
                  "sampleSeed": args.injection_sample_seed, "samplePerCell": args.injection_sample_per_cell,
-                 "classes": args.injection_classes}
+                 "classes": args.injection_classes, "tierCatalogVersions": declared_tiers}
     n3 = None
     if args.n3_cohort is not None:
         n3 = load_cohort(args.n3_cohort)
+        if n3["kind"] != N3_KIND:
+            raise CalibrationError(f"the N3 bound cohort is an {N3_KIND} manifest, not {n3['kind']}")
         resolve_cohort(n3, None)
     plan = build_plan(repository, registry, entry, calibration=calibration,
                       confirmation=confirmation,
@@ -1764,10 +1846,25 @@ def injection_construction_problems(plan: thresholds.PreRegistration, scores: Ma
         if actual != expected:
             problems.append(f"the injection set's {key} is {actual}, the plan declares {expected} (A5)")
     planned = plan.binding(INJECTION_BINDINGS["catalogVersion"])
-    entry_versions = [str(value) for value in recorded.get("entryCatalogVersions") or ()]
-    if planned is not None and any(value != planned for value in entry_versions):
-        problems.append(f"the injection set's entries carry catalog versions {entry_versions}, the plan declares "
-                        f"{planned} (A5)")
+    tier_versions = recorded.get("tierCatalogVersions")
+    extra = {key.removeprefix(TIER_CATALOG_BINDING): value for key, value in plan.bindings
+             if key.startswith(TIER_CATALOG_BINDING) and key != TIER_CATALOG_BINDING}
+    if tier_versions is None:
+        entry_versions = [str(value) for value in recorded.get("entryCatalogVersions") or ()]
+        if planned is not None and any(value != planned for value in entry_versions):
+            problems.append(f"the injection set's entries carry catalog versions {entry_versions}, the plan declares "
+                            f"{planned} (A5)")
+        if extra:
+            problems.append(f"the plan declares {', '.join(sorted(extra))} constructions the injection set lacks")
+        return problems
+    for tier, versions in sorted(tier_versions.items()):
+        expected = extra.get(tier, planned)
+        if [str(value) for value in versions] != [expected]:
+            problems.append(f"the injection set's {tier} entries carry catalog versions {versions}, the plan "
+                            f"declares {expected} (A5)")
+    missing = sorted(set(extra) - set(tier_versions))
+    if missing:
+        problems.append(f"the plan declares {', '.join(missing)} constructions the injection set lacks")
     return problems
 
 
@@ -1849,11 +1946,13 @@ def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], der
     return audits
 
 
-def informational_n3(units: Sequence[Mapping[str, Any]], derived: Mapping[str, Any]) -> dict:
-    """Report-only (N3 is unlabeled): the flag rate and the FAR bound f / (1 - pi_max) it implies."""
+def informational_n3(units: Sequence[Mapping[str, Any]], derived: Mapping[str, Any],
+                     manifest_digest: str | None = None) -> dict:
+    """Report-only (N3 is unlabeled): the flag rate and the FAR bound f / (1 - pi_max) it implies, and the N3
+    cohort it was measured on (so no later fail plan bounds its flag rate on that scored cohort, A5)."""
     n3 = [unit for unit in units if unit["population"] == "N3" and unit["inScope"] and unit["injectorID"] is None]
     flags = family_rate((unit["family"], _alarm(unit, derived)) for unit in n3 if unit["score"] is not None)
-    return {"population": "N3", "flagRate": flags.as_dict(),
+    return {"population": "N3", "manifestDigest": manifest_digest, "flagRate": flags.as_dict(),
             "farBound": {str(pi): (None if flags.rate is None else round(flags.rate / (1.0 - pi), 6))
                          for pi in PI_MAX},
             "note": "report-only"}
@@ -2091,7 +2190,8 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
         arguments["n3_negatives"] = [_scored(unit, derived) for unit in _in_scope(n3["units"], "N3")]
     preview = thresholds.evaluate_confirmation(plan, threshold, **arguments)
     phi = phi_audits(entry, confirmation["units"], derived, plan.population, positives_population)
-    informational = informational_n3(n3["units"], derived) if n3 is not None and not fail else None
+    informational = informational_n3(n3["units"], derived, (n3.get("cohort") or {}).get("manifestDigest")) \
+        if n3 is not None and not fail else None
     record = build_record(repository, entry, plan, derived=derived, outcome=preview, calibration=calibration,
                           confirmation=confirmation, inputs=inputs, disjointness=disjointness, phi=phi,
                           informational=informational, informative=informative,
@@ -2438,6 +2538,8 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--calibration-scores", required=True, type=Path)
     plan.add_argument("--alpha", required=True, type=float)
     plan.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS)
+    plan.add_argument("--tier-catalog-version", type=tier_catalog_version, action="append",
+                      help="TIER=N for each second construction tier the detector declares (e.g. T2=1)")
     plan.add_argument("--n3-cohort", type=Path,
                       help="for a fail point: the N3 takes manifest its flag rate is bounded on (A2)")
     plan.add_argument("--injection-catalog-seed", required=True, type=int,

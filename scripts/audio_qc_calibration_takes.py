@@ -749,9 +749,11 @@ def introspection_issues(block: Any) -> list[str]:
     if not isinstance(block, dict):
         return ["the introspection summary is an object"]
     issues = []
-    unknown = set(block) - set(INTROSPECTION_NUMBERS) - {"seamCodecFrames"}
+    unknown = set(block) - set(INTROSPECTION_NUMBERS) - {"seamCodecFrames", "wavSHA256"}
     if unknown:
         issues.append(f"the introspection summary has unknown fields {sorted(unknown)}")
+    if "wavSHA256" in block and not is_sha256(block["wavSHA256"]):
+        issues.append("introspection wavSHA256 names the generation's WAV digest")
     for key in INTROSPECTION_NUMBERS:
         value = block.get(key)
         if value is None and key not in INTROSPECTION_REQUIRED:
@@ -824,7 +826,8 @@ def engine_introspections(diagnostics: Path | None, wav_digests: set[str]) -> di
     """Each WAV digest's engine introspection summaries, from the engine rows whose `samplingWAVDigest` is it.
 
     Rows without a summary, or with one that is not the engine's shape, are
-    ignored. A digest can have several rows (a resumed item re-generates it,
+    ignored. Each summary keeps the digest it was bound by (`wavSHA256`), so a
+    clip that is not that WAV never carries it. A digest can have several rows (a resumed item re-generates it,
     the diagnostics root outlives runs); the caller binds only an agreed one.
     """
     found: dict[str, list[dict[str, Any]]] = {}
@@ -837,6 +840,8 @@ def engine_introspections(diagnostics: Path | None, wav_digests: set[str]) -> di
         if digest in wav_digests and not introspection_issues(block):
             summary = {key: block.get(key) for key in INTROSPECTION_NUMBERS}
             summary["seamCodecFrames"] = list(block.get("seamCodecFrames", []))
+            # The WAV the generation wrote: a summary describes that audio only (a copied entry must not inherit it).
+            summary["wavSHA256"] = digest
             if summary not in found.setdefault(digest, []):
                 found[digest].append(summary)
     return found

@@ -1712,7 +1712,8 @@ class TakesFixture:
             "clipsSHA256": json_digest(clips), "clips": clips})
 
 
-def labelled_cohort(fixture: Fixture, name: str, tag: str, split: str, speakers: tuple[str, ...]) -> tuple[Path, Path]:
+def labelled_cohort(fixture: Fixture, name: str, tag: str, split: str, speakers: tuple[str, ...], *,
+                    corpus: str = "test-speakers") -> tuple[Path, Path]:
     """A speaker-labelled N2 cohort and the N1 manifest it pins (its split, corpus and speaker labels)."""
     n1_takes, n2_takes = [], []
     for language in LANGUAGES:
@@ -1727,7 +1728,7 @@ def labelled_cohort(fixture: Fixture, name: str, tag: str, split: str, speakers:
                              "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)})
     n1 = write_json(fixture.root / f"{name}-n1.json", signed({
         "kind": calibration.N1_KIND, "schemaVersion": 1, "population": "N1", "split": split,
-        "corpus": "test-speakers", "takes": n1_takes}))
+        "corpus": corpus, "takes": n1_takes}))
     n2 = write_json(fixture.root / name / "n2-manifest.json", signed({
         "kind": calibration.N2_KIND, "schemaVersion": 1, "runID": f"run-{name}",
         "n1ManifestSHA256": calibration.file_sha256(n1), "takes": n2_takes}))
@@ -1831,6 +1832,20 @@ class RoleSetCohortTests(unittest.TestCase):
         self.assertEqual(list(record["rates"]["mechanisms"]), ["T2-codec-construction"])
         self.cli("validate")
 
+    def test_any_confirmation_split_stays_untouched_by_other_role_sets(self) -> None:
+        takes = self.takes
+        measured = takes.measurements(takes.confirmation, "n3-confirmation-measurements")
+        self.assertIn("the confirmation split is a confirmation split", self.scores(
+            "test.level@1", "informational", takes.confirmation, "fleurs-on-n3", "--measurements", str(measured),
+            expect=2))
+        self.scores("test.level@1", "informational", takes.calibration, "fleurs-on-n3-calibration",
+                    "--measurements", str(takes.measurements(takes.calibration, "n3-calibration-measurements")))
+        fixture = self.fixture
+        self.assertIn("FLEURS test is a confirmation split", self.scores(
+            "test.token-loop@1", "informational", fixture.confirmation, "n3-on-fleurs", "--n1-manifest",
+            str(fixture.n1["confirmation"]), "--measurements",
+            str(fixture.measurements(fixture.confirmation, "fleurs-test-measurements")), expect=2))
+
     def test_n3_splits_must_be_disjoint_by_speaker(self) -> None:
         takes = self.takes
         scores = self.calibrated()
@@ -1852,7 +1867,10 @@ class RoleSetCohortTests(unittest.TestCase):
         self.assertEqual(len(seams), 75)
         self.assertIn("names no corpus yet for fit (pending-vocello-long-form-calibration)",
                       self.plan("test.long-loop@1", long_calibration, long_confirmation, scores,
-                                flags=INJECTION_FLAGS, expect=2))
+                                flags=(*INJECTION_FLAGS, "--tier-catalog-version", "T2=1"), expect=2))
+        # Its T2 target is a second construction tier: the plan binds that tier's catalog too.
+        self.assertIn("reads T2 second-tier constructions", self.plan(
+            "test.long-loop@1", long_calibration, long_confirmation, scores, flags=INJECTION_FLAGS, expect=2))
         # A long-form role set's cohorts are assembled projects with seams.
         registry = calibration.Repository(self.fixture.repo).registry()
         entry = detectors.detector_entry(registry, "test.long-loop@1")
@@ -1881,6 +1899,12 @@ class RoleSetCohortTests(unittest.TestCase):
         shared, shared_n1 = labelled_cohort(fixture, "lab-shared", "ls", "confirmation", ("s1", "s5", "s6"))
         self.assertIn("share 3 speaker value", self.plan(
             "test.labeled-level@1", cal, shared, scores, "--confirmation-n1-manifest", str(shared_n1),
+            "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS, expect=2))
+        # Speakers are digests of (corpus, label): cohorts of two corpora would compare nothing.
+        other, other_n1 = labelled_cohort(fixture, "lab-other", "lo", "confirmation", ("s4", "s5", "s6"),
+                                          corpus="another-corpus")
+        self.assertIn("name one corpus", self.plan(
+            "test.labeled-level@1", cal, other, scores, "--confirmation-n1-manifest", str(other_n1),
             "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS, expect=2))
         self.plan("test.labeled-level@1", cal, conf, scores, "--confirmation-n1-manifest", str(conf_n1),
                   "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS)
@@ -1943,7 +1967,7 @@ class FailFixture(Fixture):
                            "n1ManifestSHA256": calibration.file_sha256(self.n1[name]), "takes": takes})
         return write_json(self.root / name / "n2-manifest.json", manifest)
 
-    def n3_cohort(self, per_language: int = 60) -> Path:
+    def n3_cohort(self, per_language: int = 60, *, split: str = "confirmation", name: str = "n3-bound") -> Path:
         takes = []
         for language in ALL_LANGUAGES:
             for index in range(per_language):
@@ -1953,8 +1977,8 @@ class FailFixture(Fixture):
                               "scriptID": f"b{language[:2]}{index:03d}", "language": language,
                               "voice": {"kind": "builtin", "id": voice}, "status": "generated",
                               "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)})
-        return write_json(self.root / "n3-bound" / "takes-manifest.json", signed(
-            {"schemaVersion": 1, "kind": calibration.N3_KIND, "runID": "run-bound", "split": "confirmation",
+        return write_json(self.root / name / "takes-manifest.json", signed(
+            {"schemaVersion": 1, "kind": calibration.N3_KIND, "runID": f"run-{name}", "split": split,
              "takes": takes}))
 
     def fail_injection_set(self) -> Path:
@@ -1967,8 +1991,9 @@ class FailFixture(Fixture):
                 for severity in ("moderate", "severe", "sham"):
                     clip = f"{take['takeID']}__{injector}__{severity}"
                     kind = "S" if severity == "sham" else population
+                    version = injectors.CATALOG_VERSION if mechanism.startswith("T1") else 1
                     injection = {"injectorID": injector, "injector": f"{injector}@1", "variant": severity,
-                                 "catalogVersion": injectors.CATALOG_VERSION, "severity": severity, "classes": ["A"],
+                                 "catalogVersion": version, "severity": severity, "classes": ["A"],
                                  "mechanism": mechanism, "population": kind,
                                  "sourcePCMSHA256": sha(f"pcm:{take['takeID']}"), "outputPCMSHA256": sha(f"pcm:{clip}")}
                     if mechanism.startswith("T2"):
@@ -2049,10 +2074,12 @@ class FailLevelTests(unittest.TestCase):
 
     def plan(self, scores: Path, *extra: str, detector: str = FAIL_DETECTOR, expect: int = 0) -> str:
         fixture = self.fixture
+        # The fail detector's COD-GAIN target is a second (T2) construction tier, bound by its own catalog version.
+        tier = ("--tier-catalog-version", "T2=1") if detector == FAIL_DETECTOR else ()
         return self.cli("plan", "--detector", detector, "--calibration-cohort", str(fixture.calibration),
                         "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
-                        str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), *FAIL_FLAGS, *extra,
-                        expect=expect)
+                        str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), *FAIL_FLAGS, *tier,
+                        *extra, expect=expect)
 
     def calibrated(self, detector: str = FAIL_DETECTOR) -> Path:
         fixture = self.fixture
@@ -2103,6 +2130,8 @@ class FailLevelTests(unittest.TestCase):
                          ("warn", "fail"))
         self.assertNotIn("n3CohortDigest", warn_plan["bindings"])
         self.assertEqual(fail_plan["bindings"]["n3CohortDigest"], calibration.load_cohort(n3)["manifestDigest"])
+        self.assertEqual((warn_plan["bindings"]["injectorCatalogVersionT2"],
+                          fail_plan["bindings"]["injectorCatalogVersion"]), ("1", str(injectors.CATALOG_VERSION)))
         self.assertIn("another fail plan", self.plan(scores, "--alpha", "0.004", "--operating-point", "fail",
                                                      "--n3-cohort", str(n3), expect=2))
         fixture.commit_plans()
@@ -2115,8 +2144,11 @@ class FailLevelTests(unittest.TestCase):
         n3_measured = fixture.n3_measurements(n3, "n3-bound/measurements")
         self.assertIn("scored only under --role bound", self.scores(
             "informational", n3, "n3-info", "--measurements", str(n3_measured), expect=2))
-        self.assertIn("scored only under the fail plan", self.scores(
+        self.assertIn("pass --operating-point fail", self.scores(
             "bound", n3, "n3-warn", "--measurements", str(n3_measured), expect=2))
+        self.assertIn("scored only under the fail plan", self.scores(
+            "bound", n3, "n3-lane", "--measurements", str(n3_measured), "--operating-point", "evidenceLaneFail",
+            expect=2))
         bound = self.scores("bound", n3, "n3-bound", "--measurements", str(n3_measured), "--operating-point", "fail")
         injection = fixture.fail_injection_set()
         measured = fixture.measurements(fixture.confirmation, "confirmation/measurements", injection_set=injection)
@@ -2147,6 +2179,9 @@ class FailLevelTests(unittest.TestCase):
         self.assertEqual((warn_record["level"], "n3" in warn_record["rates"]), ("warn", False))
         self.assertNotEqual(warn["record"], result["record"])
         self.cli("validate")
+        # Both plans confirmed: their confirmation and N3 cohorts are spent for any later plan (A5).
+        self.assertIn("already scored as confirmation evidence", self.plan(
+            scores, "--alpha", "0.004", "--operating-point", "evidenceLaneFail", "--n3-cohort", str(n3), expect=2))
         self.assertIn(f"{FAIL_DETECTOR} (fail)", self.cli("report"))
         # A fail record without its N3 bound, or a warn record with one, is refused.
         for mutation, fragment in ((lambda value: value["rates"].pop("n3"), "carries its N3 bound"),
@@ -2157,6 +2192,29 @@ class FailLevelTests(unittest.TestCase):
         broken = copy.deepcopy(warn_record)
         broken["rates"]["n3"] = record["rates"]["n3"]
         self.assertIn("a warn record carries no N3 bound", calibration.record_errors(broken))
+
+    def test_a_warn_record_pins_its_informational_n3_cohort(self) -> None:
+        fixture = self.fixture
+        informational = fixture.n3_cohort(split="calibration", name="n3-informational")
+        scores = self.calibrated()
+        self.plan(scores, "--alpha", "0.05")
+        fixture.commit_plans()
+        n3_scores = self.scores("informational", informational, "n3-informational", "--measurements",
+                                str(fixture.n3_measurements(informational, "n3-informational/measurements")))
+        injection = fixture.fail_injection_set()
+        measured = fixture.measurements(fixture.confirmation, "confirmation/measurements", injection_set=injection)
+        confirmation = self.scores("confirmation", fixture.confirmation, "warn-confirmation", "--measurements",
+                                   str(measured), "--injection-set", str(injection), "--positive-measurements",
+                                   str(measured), n1=fixture.n1["confirmation"])
+        result = json.loads(self.cli("confirm", "--detector", FAIL_DETECTOR, "--calibration-scores", str(scores),
+                                     "--confirmation-scores", str(confirmation), "--n3-scores", str(n3_scores)))
+        record = json.loads((fixture.repo / result["record"]).read_text(encoding="utf-8"))
+        digest = calibration.load_cohort(informational)["manifestDigest"]
+        self.assertEqual(record["informational"]["manifestDigest"], digest)
+        self.assertEqual(calibration.record_errors(record), [])
+        spent = calibration.declared_cohorts(calibration.Repository(fixture.repo))["spent"]
+        self.assertEqual((spent[digest], spent[calibration.load_cohort(fixture.confirmation)["manifestDigest"]]),
+                         ([FAIL_DETECTOR], [FAIL_DETECTOR]))
 
     def test_the_fail_floors_hold_before_the_confirmation_starts(self) -> None:
         fixture = self.fixture

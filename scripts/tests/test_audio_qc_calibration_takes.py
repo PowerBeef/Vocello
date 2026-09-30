@@ -491,8 +491,8 @@ class ManifestTests(Fixture):
         manifest = self._manifest(self.root / "diagnostics")
         by_id = {take["takeID"]: take for take in manifest["takes"]}
         bound = by_id[first["takeID"]]["engineIntrospection"]
-        self.assertEqual((bound["tokenCycleSpanFrames"], bound["codecFrameCount"], bound["eosFirstLikelyStep"]),
-                         (32, 60, None))
+        self.assertEqual((bound["tokenCycleSpanFrames"], bound["codecFrameCount"], bound["eosFirstLikelyStep"],
+                          bound["wavSHA256"]), (32, 60, None, digests[first["takeID"]]))
         self.assertIsNone(by_id[second["takeID"]]["engineIntrospection"])
         self.assertIsNone(by_id[third["takeID"]]["engineIntrospection"])
         self.assertEqual(manifest["introspection"], {"bound": 1, "unbound": 15})

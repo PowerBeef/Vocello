@@ -101,7 +101,9 @@ class GenerationEvidenceTests(unittest.TestCase):
         return {clip["clipID"]: clip for clip in data["clips"]}
 
     def test_clips_carry_the_introspection_summary_and_the_long_form_block(self) -> None:
-        looped = self.take("s1--aiden", self.single, engineIntrospection=SUMMARY)
+        looped = self.take("s1--aiden", self.single)
+        # The takes manifest binds each summary to the WAV its generation wrote.
+        looped["engineIntrospection"] = {**SUMMARY, "wavSHA256": looped["wavSHA256"]}
         joined = self.take("s2--aiden", self.joined, longForm=self.block)
         plain = self.take("s3--aiden", self.single[: self.single.size // 2])
         takes_path = self.manifest([looped, joined, plain])
@@ -109,16 +111,18 @@ class GenerationEvidenceTests(unittest.TestCase):
         # moves them has no block; a T3 knob take carries its own generation's summary.
         clicked = self.joined.copy()
         clicked[self.seam] = 0.9
-        knob_summary = {**SUMMARY, "eosLikelyStepsWithoutStop": 7}
+        knob = self.entry(looped, "s1--knob", self.single * 0.5, population="P3",
+                          mechanism="T3-controlled-generation")
+        knob_summary = {**SUMMARY, "eosLikelyStepsWithoutStop": 7, "wavSHA256": knob["wavSHA256"]}
+        knob["engineIntrospection"] = knob_summary
         entries = [
             self.entry(joined, "s2--click", clicked, population="P1", mechanism=injectors.MECHANISM),
             self.entry(joined, "s2--cut", self.joined[: -2_400], population="P1", mechanism=injectors.MECHANISM),
-            self.entry(looped, "s1--knob", self.single, population="P3", mechanism="T3-controlled-generation",
-                       engineIntrospection=knob_summary),
-            self.entry(looped, "s1--pcm", self.single, population="S", mechanism=injectors.MECHANISM),
+            knob,
+            self.entry(looped, "s1--pcm", self.single * 0.9, population="S", mechanism=injectors.MECHANISM),
         ]
         clips = self.clips(takes_path, self.injection_set(takes_path, entries))
-        self.assertEqual(clips["s1--aiden"]["introspection"], SUMMARY)
+        self.assertEqual(clips["s1--aiden"]["introspection"], looped["engineIntrospection"])
         self.assertNotIn("longForm", clips["s1--aiden"])
         self.assertEqual(clips["s2--aiden"]["longForm"], self.block)
         self.assertIsNotNone(clips["s2--aiden"]["observations"]["seamDiscontinuityMaxZ"])
@@ -150,6 +154,15 @@ class GenerationEvidenceTests(unittest.TestCase):
         broken["codecFrameCount"] = None
         with self.assertRaisesRegex(m2.CalibrationError, "codecFrameCount"):
             self.clips(self.manifest([self.take("s1--aiden", self.single, engineIntrospection=broken)]))
+        # A summary describes the WAV it was bound to: a T3 entry that copied its source's fields (as an entry
+        # builder copies a take's) must not pass the clean take's summary off as its own.
+        looped = self.take("s1--aiden", self.single)
+        looped["engineIntrospection"] = {**SUMMARY, "wavSHA256": looped["wavSHA256"]}
+        takes_path = self.manifest([looped])
+        inherited = self.entry(looped, "s1--knob", self.single * 0.5, population="P3",
+                               mechanism="T3-controlled-generation")
+        with self.assertRaisesRegex(m2.CalibrationError, "describes other audio"):
+            self.clips(takes_path, self.injection_set(takes_path, [inherited]))
 
     def test_the_boundary_jump_mirrors_the_assembler(self) -> None:
         self.assertEqual(m2.boundary_jump(self.joined, [self.seam]), self.jump)
@@ -247,6 +260,10 @@ class RawOutputExportTests(unittest.TestCase):
         output.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(calibration.CalibrationError, "takesSHA256"):
             calibration.load_raw_outputs(output)
+        inside = Path(__file__).resolve().parents[1] / "raw-outputs-here.json"
+        with self.assertRaisesRegex(m2.CalibrationError, "inside the repository"):
+            m2.export_raw_outputs(self.manifest, self.bundle, inside, judge_id=PYIN, cache_root=self.cache_root)
+        self.assertFalse(inside.exists())
         with self.assertRaisesRegex(m2.CalibrationError, "raw output a detector reduces"):
             m2.export_raw_outputs(self.manifest, self.bundle, output, judge_id="asr.whisper-large-v3@1",
                                   cache_root=self.cache_root)

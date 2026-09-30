@@ -34,7 +34,7 @@ Rendered from [config/audio-qc-corpora.json](../../../config/audio-qc-corpora.js
 | Group | Class | Title | Sources | Files | Download | Extracted (estimate) |
 |---|---|---|---|---|---|---|
 | `fleurs-train` | N1 | FLEURS train reserve | fleurs-train | 20 | 15.58 GB | 5.38 GB |
-| `speaker` | E | Speaker-labelled speech | aishell3-subset, crema-d, emozionalmente, libritts-r, mls, zeroth-korean | 8999 | 9.66 GB | 26.53 GB |
+| `speaker` | E | Speaker-labelled speech | aishell3-subset, crema-d, emozionalmente, libritts-r, mls, zeroth-korean | 8999 | 9.66 GB | 5.85 GB |
 | `emotion` | H | Acted emotion | emodb, emouerj, jvnv, resd, thorsten-emotional, crema-d (shared), emozionalmente (shared) | 10 | 3.09 GB | 1.71 GB |
 | `accent` | D | Accented English | speechocean762 | 2 | 0.64 GB | 0.64 GB |
 
@@ -43,7 +43,7 @@ Rendered from [config/audio-qc-corpora.json](../../../config/audio-qc-corpora.js
 - `emotion`: Class H delivery: actor-labelled emotion; CREMA-D and Emozionalmente come from the speaker group.
 - `accent`: Class D language: non-native English with expert pronunciation scores, as accented negatives.
 
-**Totals.** 9031 files, 28.96 GB to download; about 34.25 GB of mono PCM16 WAV once extracted (estimates; each extraction checks its own need first).
+**Totals.** 9031 files, 28.96 GB to download; about 13.58 GB of mono PCM16 WAV once extracted (estimates; each extraction checks its own need first).
 Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 29 GB to download.
 
 **Hosts.** https only, on `huggingface.co`, `*.hf.co`, `*.huggingface.co`, `media.githubusercontent.com`, `zenodo.org`.
@@ -122,7 +122,7 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - License: CC-BY-4.0 ([text](https://creativecommons.org/licenses/by/4.0/); official source <https://www.openslr.org/141/>).
 - Attribution: LibriTTS-R (Koizumi et al., 2023, arXiv:2305.18802), the sound-quality-restored LibriTTS corpus (Zen et al., 2019) derived from LibriSpeech and LibriVox, OpenSLR 141, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset mythicinfinity/libritts_r. No audio or transcript is redistributed or committed.
 - Labels: speaker (speaker_id column), text (text_original column); absent: accent, emotion, gender, pronunciationScores.
-- Extraction: `parquet`; written at 24000 Hz; about 3.02 GB (62,877 s (datasets-server duration statistics of dev.clean and test.clean) of 24 kHz PCM16).
+- Extraction: `parquet`; written at 24000 Hz; about 0.45 GB (per-speaker cap: 79 speakers x 20 utterances x 5.95 s mean (62,877 s over 10,573 utterances of dev.clean and test.clean, datasets-server duration statistics) of 24 kHz PCM16).
 - Caveat: The audio is restored by a speech restoration model (Miipher), not a raw recording: unsuitable as a class A or G signal-quality negative.
 - Caveat: This mirror carries no speaker gender (LibriTTS's SPEAKERS.txt is not in it).
 - Caveat: dev.clean holds 40 speakers and test.clean 39; audio is 24 kHz.
@@ -133,7 +133,7 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - License: CC-BY-4.0 ([text](https://creativecommons.org/licenses/by/4.0/); official source <https://www.openslr.org/94/>).
 - Attribution: Multilingual LibriSpeech (Pratap et al., 2020, arXiv:2012.03411), derived from LibriVox audiobooks, OpenSLR 94, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset facebook/multilingual_librispeech. No audio or transcript is redistributed or committed.
 - Labels: speaker (speaker_id column), text (transcript column); absent: accent, emotion, gender, pronunciationScores.
-- Extraction: `parquet`; written at 16000 Hz; about 15.73 GB (491,408 s (datasets-server duration statistics of the 20 splits) of 16 kHz PCM16).
+- Extraction: `parquet`; written at 16000 Hz; about 3.09 GB (per-speaker cap: 322 speakers (union of dev, test, 9_hours and 1_hours) x 20 utterances x about 15 s (MLS segments run 10-20 s) of 16 kHz PCM16; uncapped 491,408 s (datasets-server duration statistics of the 20 splits)).
 - Caveat: Maintainer decision: anonymous same/different-speaker trials only, never speaker identification.
 - Caveat: Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.
 - Caveat: The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.
@@ -146,7 +146,7 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - License: CC-BY-4.0 ([text](https://creativecommons.org/licenses/by/4.0/); official source <https://www.openslr.org/40/>).
 - Attribution: Zeroth-Korean, the Korean speech corpus of the Zeroth project (Lucas Jo, Wonkyum Lee and Atlas Guide), OpenSLR 40, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face mirror kresnik/zeroth_korean. No audio or transcript is redistributed or committed.
 - Labels: speaker (speaker_id column), text (text column); absent: accent, emotion, gender, pronunciationScores.
-- Extraction: `parquet`; written at 16000 Hz; about 6.09 GB (190,334 s (datasets-server duration statistics) of 16 kHz PCM16).
+- Extraction: `parquet`; written at 16000 Hz; about 0.62 GB (per-speaker cap: 115 speakers x 20 utterances x 8.38 s mean (190,334 s over 22,720 utterances, datasets-server duration statistics) of 16 kHz PCM16).
 - Caveat: An unofficial Hugging Face mirror, pinned by revision and LFS SHA-256 (maintainer decision).
 - Caveat: test holds 10 speakers and train 105; this mirror carries no speaker gender.
 

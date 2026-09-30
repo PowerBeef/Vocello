@@ -724,15 +724,17 @@
       ],
       "extract": {
         "audioColumn": "audio",
+        "capSeed": "aq-speaker-cap-2026-09-30",
         "columns": {
           "id": "id",
           "speaker": "speaker_id",
           "text": "text_original"
         },
-        "estimateBasis": "62,877 s (datasets-server duration statistics of dev.clean and test.clean) of 24 kHz PCM16",
-        "estimatedBytes": 3018096000,
+        "estimateBasis": "per-speaker cap: 79 speakers x 20 utterances x 5.95 s mean (62,877 s over 10,573 utterances of dev.clean and test.clean, datasets-server duration statistics) of 24 kHz PCM16",
+        "estimatedBytes": 451020480,
         "format": "parquet",
-        "outputRate": 24000
+        "outputRate": 24000,
+        "perSpeaker": 20
       },
       "files": [
         {
@@ -816,15 +818,17 @@
       ],
       "extract": {
         "audioColumn": "audio",
+        "capSeed": "aq-speaker-cap-2026-09-30",
         "columns": {
           "id": "id",
           "speaker": "speaker_id",
           "text": "transcript"
         },
-        "estimateBasis": "491,408 s (datasets-server duration statistics of the 20 splits) of 16 kHz PCM16",
-        "estimatedBytes": 15725056000,
+        "estimateBasis": "per-speaker cap: 322 speakers (union of dev, test, 9_hours and 1_hours) x 20 utterances x about 15 s (MLS segments run 10-20 s) of 16 kHz PCM16; uncapped 491,408 s (datasets-server duration statistics of the 20 splits)",
+        "estimatedBytes": 3091200000,
         "format": "parquet",
-        "outputRate": 16000
+        "outputRate": 16000,
+        "perSpeaker": 20
       },
       "files": [
         {
@@ -1232,15 +1236,17 @@
       ],
       "extract": {
         "audioColumn": "audio",
+        "capSeed": "aq-speaker-cap-2026-09-30",
         "columns": {
           "id": "id",
           "speaker": "speaker_id",
           "text": "text"
         },
-        "estimateBasis": "190,334 s (datasets-server duration statistics) of 16 kHz PCM16",
-        "estimatedBytes": 6090688000,
+        "estimateBasis": "per-speaker cap: 115 speakers x 20 utterances x 8.38 s mean (190,334 s over 22,720 utterances, datasets-server duration statistics) of 16 kHz PCM16",
+        "estimatedBytes": 616768000,
         "format": "parquet",
-        "outputRate": 16000
+        "outputRate": 16000,
+        "perSpeaker": 20
       },
       "files": [
         {

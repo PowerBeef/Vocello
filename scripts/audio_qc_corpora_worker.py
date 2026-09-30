@@ -114,14 +114,16 @@ def row_identity(row: Mapping[str, Any], spec: Mapping[str, Any], shard: str, in
 
 def process_rows(rows: Iterable[Mapping[str, Any]], *, job: Mapping[str, Any], file: Mapping[str, Any],
                  sink: clips.ClipSink, decode: Callable[[bytes], tuple[Any, int, dict[str, Any]]] = decode_other,
-                 ) -> int:
-    """Write every row of one shard through the sink; returns the rows read."""
+                 keep: set[tuple[str, int]] | None = None) -> int:
+    """Write every row of one shard (or only the `keep` rows) through the sink; returns the rows read."""
     spec = job["extract"]
     columns = spec.get("columns") or {}
     audio_column = spec["audioColumn"]
     count = 0
     for index, row in enumerate(rows):
         count += 1
+        if keep is not None and (file["shard"], index) not in keep:
+            continue
         origin = f"{file['shard']}#{index}"
         data, audio_path = _audio_cell(row.get(audio_column))
         if data is None:
@@ -159,6 +161,38 @@ def parquet_rows(path: Path, needed: Iterable[str]) -> Iterable[dict[str, Any]]:
         yield from batch.to_pylist()
 
 
+def speaker_cap(job: Mapping[str, Any],
+                reader: Callable[[Path, Iterable[str]], Iterable[Mapping[str, Any]]]) -> set[tuple[str, int]] | None:
+    """The rows a per-speaker cap keeps, or None without one.
+
+    A first pass reads only the id and speaker columns of every shard (no
+    audio). Per language and speaker it keeps the `perSpeaker` distinct ids of
+    lowest SHA-256(capSeed NUL language NUL id), across shards, so a speaker
+    split over several shards is capped once and the choice is reproducible. A
+    row without a speaker or an id is not kept: the cap serves speaker trials.
+    """
+    spec = job["extract"]
+    cap = spec.get("perSpeaker")
+    if not cap:
+        return None
+    columns = spec["columns"]
+    ranks: dict[tuple[str, str], dict[str, str]] = {}
+    rows: dict[tuple[str, str], list[tuple[str, int]]] = {}
+    for file in job["files"]:
+        for index, row in enumerate(reader(Path(file["path"]), sorted({columns["id"], columns["speaker"]}))):
+            speaker, identity = clips.label_text(row.get(columns["speaker"])), clips.label_text(row.get(columns["id"]))
+            if speaker is None or identity is None:
+                continue
+            key = f"{spec['capSeed']}\0{file['language']}\0{identity}".encode("utf-8")
+            ranks.setdefault((file["language"], speaker), {})[identity] = hashlib.sha256(key).hexdigest()
+            rows.setdefault((file["language"], identity), []).append((file["shard"], index))
+    keep: set[tuple[str, int]] = set()
+    for (language, _speaker), ranked in ranks.items():
+        for identity in sorted(ranked, key=lambda item: (ranked[item], item))[:cap]:
+            keep.update(rows[(language, identity)])
+    return keep
+
+
 def needed_columns(spec: Mapping[str, Any]) -> list[str]:
     columns = [spec["audioColumn"]]
     columns += [name for name in (spec.get("columns") or {}).values() if name and not name.startswith("@")]
@@ -172,15 +206,18 @@ def run_job(job: Mapping[str, Any], *,
     if not isinstance(job, Mapping) or job.get("kind") != JOB_KIND or job.get("schemaVersion") != SCHEMA_VERSION:
         raise WorkerError(f"the job is not an {JOB_KIND} schema {SCHEMA_VERSION} file")
     sink = clips.ClipSink(Path(job["wavDirectory"]))
+    keep = speaker_cap(job, reader)
+    if keep is not None:
+        _log(f"{job['source']}: the per-speaker cap keeps {len(keep)} rows")
     shards = []
     for file in job["files"]:
         _log(f"{job['source']}: reading {file['shard']}")
         rows = process_rows(reader(Path(file["path"]), needed_columns(job["extract"])), job=job, file=file,
-                            sink=sink, decode=decode)
+                            sink=sink, decode=decode, keep=keep)
         shards.append({"shard": file["shard"], "rows": rows})
         _log(f"{job['source']}: {file['shard']}: {rows} rows; {len(sink.clips)} clips so far")
     return {"schemaVersion": SCHEMA_VERSION, "kind": RESULT_KIND, "source": job["source"], "shards": shards,
-            **sink.result()}
+            **({"capKept": len(keep)} if keep is not None else {}), **sink.result()}
 
 
 def main(argv: list[str] | None = None) -> int:

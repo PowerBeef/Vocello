@@ -309,7 +309,9 @@ class CommittedRegistryTests(unittest.TestCase):
         self.assertEqual(value["downloadBytes"], 28_962_323_872)
         self.assertEqual(value["missingBytes"], 28_962_323_872 + value["n1TSVBytes"])
         self.assertEqual(set(value["groups"]), set(corpora.GROUPS))
-        self.assertGreater(value["extractTotalBytes"], 30e9)
+        # The per-speaker caps of MLS, Zeroth-Korean and LibriTTS-R keep the extraction near 13.6 GB (34 GB uncapped).
+        self.assertGreater(value["extractTotalBytes"], 10e9)
+        self.assertLess(value["extractTotalBytes"], 20e9)
         self.assertTrue(value["runtime"]["needed"])
         self.assertFalse(value["runtime"]["built"])
 
@@ -757,6 +759,28 @@ class ParquetTests(Fixture):
                          ["soundfile cannot decode it (LibsndfileError)", "the row has no audio bytes"])
         self.assertEqual(manifest["members"], {"rows": 5})
         self.assertFalse((directory / corpora.JOB_NAME).exists() or (directory / corpora.RESULTS_NAME).exists())
+
+    def test_a_per_speaker_cap_keeps_each_speakers_lowest_ranked_ids_across_shards(self) -> None:
+        def row(identity: str, speaker: str | None) -> dict:
+            return {"id": identity, "speaker_id": speaker, "transcript": "Hallo.", "total": 5,
+                    "audio": {"bytes": pcm16(1600, 16000), "path": None}}
+
+        rows = {"german/dev-0.parquet": [row("a1", "1"), row("a2", "1"), row("b1", "2"), row("x", None)],
+                "french/dev-0.parquet": [row("a3", "1"), row("c1", "3")]}
+        job = {"extract": {"columns": {"id": "id", "speaker": "speaker_id"}, "perSpeaker": 1, "capSeed": "seed"},
+               "files": [{"path": path, "shard": path, "language": path.split("/")[0]} for path in rows]}
+
+        def reader(path, needed):
+            self.assertEqual(sorted(needed), ["id", "speaker_id"])
+            return [{name: item[name] for name in needed} for item in rows[str(path)]]
+
+        keep = worker.speaker_cap(job, reader)
+        rank = {identity: hashlib.sha256(f"seed\0german\0{identity}".encode()).hexdigest() for identity in ("a1", "a2")}
+        german_one = ("german/dev-0.parquet", 0 if rank["a1"] < rank["a2"] else 1)
+        # One id per (language, speaker): speaker 1 once in German and once in French; no speaker, no row.
+        self.assertEqual(keep, {german_one, ("german/dev-0.parquet", 2), ("french/dev-0.parquet", 0),
+                                ("french/dev-0.parquet", 1)})
+        self.assertIsNone(worker.speaker_cap({"extract": {}, "files": []}, reader))
 
     def test_a_worker_that_writes_no_result_leaves_nothing(self) -> None:
         with self.assertRaisesRegex(corpora.CorporaError, "wrote no readable result"):

@@ -376,6 +376,12 @@ def _extract_issues(source: str, entry: Mapping[str, Any], pins: Sequence[Pin]) 
         scores = spec.get("scores")
         if scores is not None and (not isinstance(scores, list) or not all(isinstance(name, str) for name in scores)):
             issues.append(f"{source}: extract.scores lists column names")
+        if ("perSpeaker" in spec or "capSeed" in spec) and (
+                not _positive_int(spec.get("perSpeaker")) or not isinstance(spec.get("capSeed"), str)
+                or not spec["capSeed"] or not isinstance(columns, dict)
+                or any(str(columns.get(name) or "@").startswith("@") for name in ("id", "speaker"))):
+            issues.append(f"{source}: a per-speaker cap names perSpeaker and capSeed and reads id and speaker "
+                          "columns")
         if any(pin.role != "audio" for pin in pins) or not all(pin.path.endswith(".parquet") for pin in pins):
             issues.append(f"{source}: a Parquet source pins only its .parquet shards")
         return issues
@@ -1465,8 +1471,10 @@ def _extract_parquet(source: str, entry: Mapping[str, Any], pins: Sequence[Pin],
             raise CorporaError(f"{source}: the Parquet worker's clip {record.get('clipID')} is not on disk as it "
                                "says")
     shards = {item.get("shard"): item.get("rows") for item in result.get("shards") or ()}
-    return result["clips"], result["skipped"], {"rows": sum(value for value in shards.values()
-                                                            if isinstance(value, int))}
+    counts = {"rows": sum(value for value in shards.values() if isinstance(value, int))}
+    if isinstance(result.get("capKept"), int):
+        counts["capKept"] = result["capKept"]
+    return result["clips"], result["skipped"], counts
 
 
 # --------------------------------------------------------------------------- #

@@ -134,9 +134,11 @@ class RecordingAdapterTests(unittest.TestCase):
             for variant in injector.recording_variants:
                 if "donor" in variant.parameters:
                     # A donor splice (catalog version 3) needs the words of a speaker-labelled recording and
-                    # its donor, which a natural take never has.
-                    self.assertTrue({"words", "donor"} <= set(injectors.needs(injector.injector_id,
-                                                                             variant.parameters)))
+                    # its donor, which a natural take never has; a voice-donor splice (take-voice-*) needs long-form
+                    # seams and another long-form take as its donor, which this single-segment take lacks.
+                    needs = set(injectors.needs(injector.injector_id, variant.parameters))
+                    self.assertTrue({"words", "donor"} <= needs or {"seams", "voice-donor"} <= needs,
+                                    f"{injector.key} {variant.name}")
                     with self.assertRaises(injectors.InjectorNotApplicable, msg=f"{injector.key} {variant.name}"):
                         injectors.inject(injector.injector_id, variant.name, self.source, 7)
                     continue

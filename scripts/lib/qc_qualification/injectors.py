@@ -43,6 +43,17 @@ chooses it, `speaker_donors`). The donor's words replace the source's at aligned
 word boundaries, level-matched, so the positive and its sham differ only in who
 speaks. Every version 2 variant's output is unchanged.
 
+A generated long-form take (N3) has no word interval and no corpus speaker, but
+the voice it was generated with is its speaker label (a Built-in speaker, a
+Voice Design brief, a clone reference speaker). SEAM-VOICE's `take-voice-*`
+recording variants splice from such a *voice donor*, another long-form take of
+another voice (`other-voice`) for a positive and of the source's voice
+(`same-voice`) for the sham: the segment after the seeded seam (or its first 1
+or 2 s) is replaced by the donor's own audio from the start of one of its
+segments, level-matched and crossfaded inside the replaced span, so the label
+covers exactly the replaced samples and the seams after it move by the length
+change (`_voice_splice`). They leave every other variant's output unchanged.
+
 NumPy only. The catalog version and each injector's version are part of every
 recipe; changing an injector's output needs a new version and a new golden.
 """
@@ -91,6 +102,8 @@ SEAM_DISC_MAXIMUM_MS = 20.0
 SEAM_VOICE_MINIMUM_MS = 500.0
 # A donor variant's `donor` parameter: another speaker for a positive, the source speaker for its sham.
 DONOR_RELATIONS = ("other-speaker", "same-speaker")
+# A voice donor's relation (SEAM-VOICE take-voice-*): another voice for a positive, the source's voice for its sham.
+VOICE_DONOR_RELATIONS = ("other-voice", "same-voice")
 # What a variant may need of its source (`needs`), and how a refusal names it.
 NEED_DESCRIPTIONS = {
     "words": "word intervals (from the aligner, on N1 and N2 only)",
@@ -100,7 +113,10 @@ NEED_DESCRIPTIONS = {
     "seams": "long-form seam offsets",
     "donor": "a speaker-labelled donor recording (another speaker of the same language and gender, or another "
              "utterance of the source speaker for a sham)",
+    "voice-donor": "a voice donor (another long-form take of another voice of the same language, or of the source's "
+                   "voice for a sham)",
 }
+DONOR_NEEDS = frozenset({"donor", "voice-donor"})
 
 
 class InjectorNotApplicable(ValueError):
@@ -943,10 +959,85 @@ def _seam_disc(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np
     return output, labels, _shift_seams(source.seams, seam, seam + removed, -removed)
 
 
+def replace_resized(base: np.ndarray, piece: np.ndarray, start: int, end: int, fade: int) -> np.ndarray:
+    """base[start:end] replaced by `piece` of any length, crossfaded inside the replaced span.
+
+    The piece's first and last `overlap` samples are mixed with the replaced
+    span's own first and last samples (as `replace_span` does), so every output
+    sample outside [start, start + piece.size) is the source's, the ones after
+    it moved by the length change. With a piece of the span's length it is
+    `replace_span`.
+    """
+    base = np.asarray(base, dtype=np.float64)
+    mixed = np.array(piece, dtype=np.float64)
+    overlap = min(fade, mixed.size // 2, (end - start) // 2)
+    if overlap:
+        ramp = (np.arange(overlap) + 0.5) / overlap
+        mixed[:overlap] = base[start:start + overlap] * (1.0 - ramp) + mixed[:overlap] * ramp
+        mixed[mixed.size - overlap:] = mixed[mixed.size - overlap:] * (1.0 - ramp) + base[end - overlap:end] * ramp
+    return np.concatenate([base[:start], mixed, base[end:]])
+
+
+def _active_rms(samples: np.ndarray) -> float:
+    """The RMS over non-zero samples: a long-form assembler's inserted pauses are exact zeros."""
+    return _rms(samples[samples != 0.0])
+
+
+def _voice_splice(source: Fixture, donor: Fixture | None, parameters: dict, *,
+                  seam: tuple[int, int]) -> tuple[np.ndarray, list[dict], tuple[int, ...]]:
+    """SEAM-VOICE on a long-form take from a voice donor: the donor's own audio from the start of a segment.
+
+    The source span is the segment after the seeded seam (to the next seam or
+    the take's end) or its first `durationMS`. The donor gives the segment
+    after one of its own seams: the whole segment for a whole-segment span,
+    else its first samples of the span's length, among its segments at least
+    that long (at least SEAM_VOICE_MINIMUM_MS for a whole segment), the one
+    closest in length to the source's segment (the earliest on a tie). It is
+    scaled to the replaced span's RMS over non-zero samples and crossfaded over
+    5 ms inside the span (`replace_resized`), so its first sample lands on the
+    seam, the label covers exactly the replaced samples, and the seams after
+    the span move by the length change (a mild or moderate span keeps it).
+    """
+    if donor is None:
+        raise ValueError("a voice-donor variant needs its donor")
+    if donor.sample_rate != source.sample_rate:
+        raise ValueError("the donor and the source must share a sample rate")
+    relation = parameters["donor"]
+    if relation not in VOICE_DONOR_RELATIONS:
+        raise ValueError(f"unknown voice donor relation {relation!r}")
+    rate = source.sample_rate
+    start, segment_end = seam
+    duration = parameters["durationMS"]
+    end = segment_end if duration is None else min(start + _samples(duration, rate), segment_end)
+    room = _samples(SEAM_VOICE_MINIMUM_MS, rate) if duration is None else end - start
+    bounds = sorted({offset for offset in donor.seams if 0 < offset < donor.samples.size})
+    ends = [*bounds[1:], donor.samples.size]
+    usable = [(offset, until) for offset, until in zip(bounds, ends) if until - offset >= room]
+    if not usable:
+        raise InjectorNotApplicable(f"{source.fixture_id}: its donor has no seam followed by {room} samples of "
+                                    "its segment")
+    wanted = segment_end - start
+    donor_seam, donor_end = min(usable, key=lambda span: (abs(span[1] - span[0] - wanted), span[0]))
+    piece = np.asarray(donor.samples[donor_seam:donor_end if duration is None else donor_seam + end - start],
+                       dtype=np.float64)
+    level = _active_rms(piece)
+    piece = piece * (_active_rms(source.samples[start:end]) / level if level > 0 else 1.0)
+    output = replace_resized(source.samples, piece, start, end, _fade(rate))
+    seams = _shift_seams(source.seams, start, end, int(piece.size) - (end - start))
+    if relation != "other-voice":
+        return output, [], seams
+    return output, [{"kind": "seam-voice", "startSample": int(start), "endSample": int(start + piece.size),
+                     "seamSample": int(start), "position": "seam", "donorRelation": relation,
+                     "replacedSamples": int(end - start), "donorSamples": int(piece.size),
+                     "donorSeamSample": int(donor_seam)}], seams
+
+
 def _seam_voice(source: Fixture, parameters: dict, rng: SeededStream,
                 donor: Fixture | None = None) -> tuple[np.ndarray, list[dict], tuple]:
     rate = source.sample_rate
     seam, segment_end = _pick_seam(source, rng, _samples(SEAM_VOICE_MINIMUM_MS, rate))
+    if parameters.get("donor") in VOICE_DONOR_RELATIONS:
+        return _voice_splice(source, donor, parameters, seam=(seam, segment_end))
     if "donor" in parameters:
         return _donor_splice(source, donor, parameters, kind="seam-voice", seam=(seam, segment_end))
     duration = parameters["durationMS"]
@@ -967,10 +1058,10 @@ def _variants(sham: dict, sweep: dict[str, dict], *, controls: dict[str, dict] |
     return tuple(variants)
 
 
-def _take_variants(sham: dict | None, sweep: dict[str, dict]) -> tuple[Variant, ...]:
-    """Recording variants `take-<severity>`: a sham (when the catalog's needs a word) and the sweep."""
-    variants = [Variant("take-sham", "sham", sham)] if sham is not None else []
-    return tuple(variants + [Variant(f"take-{name}", name, parameters) for name, parameters in sweep.items()])
+def _take_variants(sham: dict | None, sweep: dict[str, dict], *, prefix: str = "take") -> tuple[Variant, ...]:
+    """Recording variants `<prefix>-<severity>`: a sham (when the catalog's needs a word) and the sweep."""
+    variants = [Variant(f"{prefix}-sham", "sham", sham)] if sham is not None else []
+    return tuple(variants + [Variant(f"{prefix}-{name}", name, parameters) for name, parameters in sweep.items()])
 
 
 def _catalog() -> dict[str, Injector]:
@@ -1205,7 +1296,9 @@ def _catalog() -> dict[str, Injector]:
                  "The segment after a seeded long-form seam re-rendered by a close voice, time-aligned, for "
                  "1 s, 2 s or the whole segment; sham: the source's own render (zero magnitude); control: a "
                  "same-speaker re-render. On a speaker-labelled recording (take-*), another speaker's words "
-                 "from the seam; sham: another utterance of the source speaker the same way.",
+                 "from the seam; sham: another utterance of the source speaker the same way. On a generated "
+                 "long-form take (take-voice-*), another voice's long-form take from the start of one of its "
+                 "segments; sham: another take of the source's voice the same way.",
                  _variants({**seam_voice, "relation": "self", "durationMS": None},
                            {"mild": {**seam_voice, "relation": "close", "durationMS": 1000.0},
                             "moderate": {**seam_voice, "relation": "close", "durationMS": 2000.0},
@@ -1217,7 +1310,13 @@ def _catalog() -> dict[str, Injector]:
                      {**take_seam, "donor": "same-speaker", "durationMS": None},
                      {"mild": {**take_seam, "donor": "other-speaker", "durationMS": 1000.0},
                       "moderate": {**take_seam, "donor": "other-speaker", "durationMS": 2000.0},
-                      "severe": {**take_seam, "donor": "other-speaker", "durationMS": None}})),
+                      "severe": {**take_seam, "donor": "other-speaker", "durationMS": None}})
+                 # Generated long-form takes: the voice each was generated with is its speaker label.
+                 + _take_variants(
+                     {**take_seam, "donor": "same-voice", "durationMS": None},
+                     {"mild": {**take_seam, "donor": "other-voice", "durationMS": 1000.0},
+                      "moderate": {**take_seam, "donor": "other-voice", "durationMS": 2000.0},
+                      "severe": {**take_seam, "donor": "other-voice", "durationMS": None}}, prefix="take-voice")),
     ]
     return {injector.injector_id: injector for injector in injectors}
 
@@ -1246,6 +1345,8 @@ def needs(injector_id: str, parameters: Mapping[str, Any]) -> tuple[str, ...]:
     if injector_id in ("IDN-SWAP", "IDN-ONSET"):
         return ("words", "donor") if "donor" in parameters else ("script", "voice", "words")
     if injector_id == "SEAM-VOICE":
+        if parameters.get("donor") in VOICE_DONOR_RELATIONS:
+            return ("voice-donor", "seams")
         return ("words", "donor", "seams") if "donor" in parameters else ("script", "voice", "seams")
     if injector_id == "SEAM-DISC":
         return ("seams",)
@@ -1262,16 +1363,17 @@ def inject(injector_id: str, variant: str, source: Fixture, seed: int, *,
            donor: Fixture | None = None) -> Injection:
     """Apply one catalog (or recording) variant to a source under a seed.
 
-    `donor`: the donor recording of a variant that splices one (its `donor`
-    parameter names the relation); any other variant refuses a donor.
+    `donor`: the donor recording (or voice donor) of a variant that splices one
+    (its `donor` parameter names the relation); any other variant refuses a donor.
     """
     injector = CATALOG[injector_id]
     chosen = injector.variant(variant)
     parameters = dict(chosen.parameters)
     required = needs(injector_id, parameters)
-    if donor is not None and "donor" not in required:
+    if donor is not None and not DONOR_NEEDS & set(required):
         raise ValueError(f"{injector.key} {chosen.name} takes no donor")
-    missing = [need for need in required if not (donor is not None if need == "donor" else _has(source, need))]
+    missing = [need for need in required
+               if not (donor is not None if need in DONOR_NEEDS else _has(source, need))]
     if missing:
         raise InjectorNotApplicable(f"{source.fixture_id}: {injector.key} {chosen.name} needs "
                                     + "; ".join(NEED_DESCRIPTIONS[need] for need in missing))

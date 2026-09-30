@@ -123,7 +123,25 @@ the take plan's long-form cell carries them as its `longForm` block's
 `seamFrames`, which serve the same way (`take_seams`). SEAM-DISC
 and SEAM-VOICE act at one of them; every entry carries the seams of its own
 output (`seamSamples`) where the edit keeps them, and `score` passes them to the
-Stage 0 seam z-score.
+Stage 0 seam z-score. An entry whose output keeps one seam per seam of its
+take's `longForm` block (where they were, or moved by the construction)
+records the block of its own output (its length, its seams and the boundary
+jump its PCM16 steps at them, `output_long_form`), which `verify` checks, so
+the detectors read the seams and the jump the clip has.
+
+Voice donors (class J, `speaker_donors.VoicePool`). A generated long-form take
+names no corpus speaker, but the voice it was generated with is its speaker
+label (lead decision 2026-09-30): a Built-in speaker, a Voice Design brief, a
+clone reference speaker, with the gender the committed take policy records
+(`speakerGenders`, a brief's declared `gender`) or a clone reference's corpus
+label. On an N3 manifest with long-form takes the plan schedules SEAM-VOICE's
+`take-voice-*` variants: the segment after the seeded seam is replaced by
+another long-form take of the same manifest (so the same split) and language,
+of another voice whose gender is not known to differ, from the start of one of
+its segments, or for the sham by another take of the same voice. The choice is
+the speaker donors' seeded rule; each entry records its donor (take, family,
+voice label, relation, WAV and PCM digests, seams), and `verify` re-derives and
+replays it.
 
 Catalog version. A set records the injector catalog version it was built with,
 and `verify` replays only a set of the current version (3). A set of another
@@ -163,7 +181,7 @@ from lib.playback_capture import resample as polyphase_resample
 from lib.qc_qualification import (
     injectors, language_swap, pcm_measures, policy as policy_module, recordings, resampling, speaker_donors,
 )
-from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
+from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest, to_pcm16
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
 
 TAKES_KIND = "audio-qc-calibration-takes"
@@ -269,6 +287,12 @@ IMPOSTOR_ISSUES = {
     N2_KIND: None,
 }
 NO_LABELLED_TAKES = "no take of this manifest names its speaker and gender"
+# The take policy whose speakerGenders (and any brief's declared gender) give a generated take's voice its gender.
+TAKE_POLICY = Path(__file__).resolve().parent.parent / "config" / "audio-qc-calibration-takes.json"
+# How an entry's longForm block describes its output (a set that records this rule has verify check each block).
+LONG_FORM_ENTRY_RULE = ("an entry whose output keeps one seam per seam of its source take's longForm block (where "
+                        "they were, or moved by the construction) records the block of its output: its frame count, "
+                        "its seams and the largest PCM16 step at them; any other entry keeps its source's block")
 
 
 class CalibrationError(ValueError):
@@ -476,20 +500,47 @@ def voice_label(take: dict) -> dict:
     return {"kind": kind, "idSHA256": hashlib.sha256(identity.encode("utf-8")).hexdigest()}
 
 
+def voice_genders(path: Path | None = None) -> dict[str, dict[str, str]]:
+    """The genders the take policy (`TAKE_POLICY` by default) records: each Built-in speaker's (`speakerGenders`)
+    and each Voice Design brief's that declares one (`designBriefs.<id>.gender`; none does in policy version 2)."""
+    policy = json.loads((path or TAKE_POLICY).read_text(encoding="utf-8"))
+    speakers = policy.get("speakerGenders") if isinstance(policy.get("speakerGenders"), dict) else {}
+    briefs = policy.get("designBriefs") if isinstance(policy.get("designBriefs"), dict) else {}
+    return {"speakers": {str(speaker): gender for speaker, gender in sorted(speakers.items())
+                         if gender in speaker_donors.VOICE_GENDERS},
+            "briefs": {str(brief_id): brief["gender"] for brief_id, brief in sorted(briefs.items())
+                       if isinstance(brief, dict) and brief.get("gender") in speaker_donors.VOICE_GENDERS}}
+
+
+def voice_labels(takes: Iterable[dict], genders: dict[str, dict[str, str]]) -> dict[str, dict | None]:
+    """takeID -> the take's voice as its speaker label (`speaker_donors.voice_label`), or None."""
+    return {take["takeID"]: speaker_donors.voice_label(take, speaker_genders=genders["speakers"],
+                                                       brief_genders=genders["briefs"]) for take in takes}
+
+
+def voice_table(labels: dict[str, dict | None]) -> list[dict]:
+    """The distinct voices a manifest's takes were labelled with, each with the gender it was drawn with."""
+    distinct = {canonical_json(label["label"]): label["label"] for label in labels.values() if label is not None}
+    return [distinct[key] for key in sorted(distinct)]
+
+
 # --------------------------------------------------------------------------- #
 # The plan
 # --------------------------------------------------------------------------- #
 
 def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_issue: str | None = None,
                language_swap_rows: bool = False, seams: bool = False, impostor_issue: str | None = None,
-               impostor_rows: bool = False) -> list[dict]:
+               impostor_rows: bool = False, voice_donors: bool = False) -> list[dict]:
     """Every catalog injector at sham, mild, moderate and severe, then its `SCHEDULE_EXTRAS` variants (rows
     marked `extra`): scheduled, replaced, not applicable or out of scope.
 
     `words`: the sources carry the aligner's word intervals, so a catalog
     variant that needs only words (and pauses) is scheduled, and the injectors
     of `WORD_CATALOG_INJECTORS` run their catalog variants instead of their
-    take-* ones. `seams`: some sources declare long-form seams. `language_swap_rows`
+    take-* ones. `seams`: some sources declare long-form seams. `voice_donors`:
+    the sources are generated long-form takes whose voice is their speaker
+    label, so an injector with `take-voice-*` variants (SEAM-VOICE) runs those
+    instead of its take-* ones. `language_swap_rows`
     adds the LNG-SWAP rows (class D), refused with `language_swap_issue` when
     the manifest cannot build them; `impostor_rows` adds the IDN-IMPOSTOR rows
     (class E) the same way.
@@ -503,7 +554,8 @@ def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_iss
         for severity in SEVERITY_SWEEP:
             catalog = injector.variant(severity)
             catalog_needs = list(injectors.needs(injector.injector_id, catalog.parameters))
-            chosen = recording.get(f"take-{severity}")
+            chosen = (recording.get(f"take-voice-{severity}") if voice_donors else None) \
+                or recording.get(f"take-{severity}")
             row = {"injector": injector.key, "injectorID": injector.injector_id, "classes": list(injector.classes),
                    "severity": severity, "catalogVariant": catalog.name, "catalogNeeds": catalog_needs}
             word_catalog = words and injector.injector_id in WORD_CATALOG_INJECTORS
@@ -581,10 +633,31 @@ def impostors_scheduled(plan: list[dict]) -> list[str]:
 
 
 def donor_relations(plan: list[dict], injector_id: str) -> tuple[str, ...]:
-    """The donor relations the scheduled variants of a T1 splice injector need (none: it splices no donor)."""
+    """The donor relations the scheduled variants of a T1 splice injector need (none: it splices no donor):
+    speaker relations (`speaker_donors.RELATIONS`) or voice relations (`VOICE_RELATIONS`), never both."""
     wanted = {injectors.CATALOG[injector_id].variant(variant).parameters.get("donor")
               for row_id, variant in schedule(plan) if row_id == injector_id}
-    return tuple(relation for relation in speaker_donors.RELATIONS if relation in wanted)
+    relations = tuple(relation for relation in (*speaker_donors.RELATIONS, *speaker_donors.VOICE_RELATIONS)
+                      if relation in wanted)
+    if set(relations) & set(speaker_donors.RELATIONS) and set(relations) & set(speaker_donors.VOICE_RELATIONS):
+        raise CalibrationError(f"{injector_id}: a plan draws speaker donors or voice donors for an injector, not both")
+    return relations
+
+
+def voice_relations(relations: Iterable[str]) -> bool:
+    """The relations are a voice donor's (`speaker_donors.VoicePool`), not a speaker donor's."""
+    return bool(set(relations) & set(speaker_donors.VOICE_RELATIONS))
+
+
+def splice_pool(takes: list[dict], relations: tuple[str, ...], usable_words: set[str] | None,
+                labels: dict[str, dict | None] | None) -> Any:
+    """The donors of a splice injector's relations: speaker-labelled takes with usable words (`usable_words`,
+    None when the set has no alignments), or for voice relations the long-form takes labelled by their voice."""
+    if voice_relations(relations):
+        if labels is None:
+            raise CalibrationError("voice donors need the takes' voice labels")
+        return speaker_donors.VoicePool(takes, labels, eligible={take["takeID"] for take in takes if take_seams(take)})
+    return speaker_donors.DonorPool(takes, eligible=usable_words)
 
 
 def injector_classes(injector_id: str) -> tuple[str, ...]:
@@ -1022,14 +1095,15 @@ def stratified_sample(pool: dict[str, str], count: int, *, seed: int, key: str) 
 
 
 def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: int,
-                   usable_words: set[str] | None) -> dict:
+                   usable_words: set[str] | None, voice_labels: dict[str, dict | None] | None = None) -> dict:
     """One seeded, language-stratified family sample per injector, shared by its sham and every severity.
 
     `usable_words`: the takes whose alignment is usable, when the set has word
     intervals; a word-level injector draws only from their families. A donor
-    splice draws only from sources with a donor of every relation it needs, a
-    seam injector only from sources that declare seams, and IDN-IMPOSTOR only
-    from sources with both of its donors.
+    splice draws only from sources with a donor of every relation it needs (a
+    voice donor's among the takes' `voice_labels`), a seam injector only from
+    sources that declare seams, and IDN-IMPOSTOR only from sources with both of
+    its donors.
     """
     languages: dict[str, str] = {}
     for take in takes:
@@ -1060,9 +1134,10 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
                 pool = {family: language for family, language in pool.items() if family in worded}
             if "seams" in needs:
                 pool = {family: language for family, language in pool.items() if family in seamed}
-            if "donor" in needs:
-                donors = speaker_donors.DonorPool(takes, eligible=usable_words if "words" in needs else None)
-                served = {take["family"] for take in donors.sources(donor_relations(plan, row["injectorID"]))}
+            if injectors.DONOR_NEEDS & set(needs):
+                relations = donor_relations(plan, row["injectorID"])
+                donors = splice_pool(takes, relations, usable_words if "words" in needs else None, voice_labels)
+                served = {take["family"] for take in donors.sources(relations)}
                 pool = {family: language for family, language in pool.items() if family in served}
         families = stratified_sample(pool, per_cell, seed=seed, key=row["injector"])
         chosen[row["injector"]] = {
@@ -1127,6 +1202,30 @@ def parallel(function: Callable[[Any], Any], tasks: list[Any], jobs: int, label:
 # inject
 # --------------------------------------------------------------------------- #
 
+def output_long_form(take: dict, samples: np.ndarray, seams: Iterable[int]) -> dict | None:
+    """The `longForm` block an entry built from `take` records for its output (`LONG_FORM_ENTRY_RULE`).
+
+    When the output keeps one seam per seam of the take's block (moved by
+    SEAM-DISC or a whole-segment SEAM-VOICE splice, or where they were), the
+    block of the output: its frame count, its seams and the largest step its
+    PCM16 takes at them, as `score` measures it on the clip. Otherwise the
+    take's block as it is (no seam mapping follows the edit, and `score`
+    describes no block for it); None without a block, and the take's block
+    when its seams are its own `seamSamples`, not its block's.
+    """
+    block = take.get("longForm")
+    if not isinstance(block, dict) or take.get("seamSamples") is not None:
+        return block
+    seams = [int(seam) for seam in seams]
+    recorded = block.get("seamFrames")
+    if block.get("sampleRate") != recordings.ENGINE_SAMPLE_RATE or not isinstance(recorded, list) \
+            or not seams or len(seams) != len(recorded):
+        return block
+    pcm = to_pcm16(samples).astype(np.float64) / recordings.PCM16_FULL_SCALE
+    return {**block, "outputFrameCount": int(samples.size), "seamFrames": seams,
+            "maximumSegmentBoundaryJump": boundary_jump(pcm, seams)}
+
+
 def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: str, wav_sha256: str,
            source_wav_sha256: str, rate: int, source_resampling: dict | None = None, *, embed_text: bool = False,
            source_alignment: dict | None = None, donor: dict | None = None,
@@ -1134,6 +1233,9 @@ def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: s
     injector = injectors.CATALOG[injection.injector.split("@")[0]]
     # The source's seams stay behind: the entry carries its own output's (none where the edit moved them).
     entry = {key: value for key, value in take.items() if key not in ("text", "seamSamples")}
+    block = output_long_form(take, injection.samples, injection.seams)
+    if block is not None:
+        entry["longForm"] = block
     entry.update(
         takeID=clip_id, sourceTakeID=take["takeID"], family=take["family"], status="generated",
         wavPath=wav_path, wavSHA256=wav_sha256, durationSeconds=round(injection.samples.size / rate, 6),
@@ -1233,6 +1335,17 @@ def _needs_words(injector_id: str, variant: str) -> bool:
     return "words" in injectors.needs(injector_id, injectors.CATALOG[injector_id].variant(variant).parameters)
 
 
+def donor_block(item: dict, relation: str, fixture: Any, digest: str, alignment: dict | None) -> dict:
+    """The donor a splice entry records: a speaker donor's speaker and alignment, or a voice donor's voice
+    label and the seams its audio was drawn at."""
+    take = item["take"]
+    if relation in speaker_donors.VOICE_RELATIONS:
+        return {"takeID": take["takeID"], "family": take["family"], "voice": item.get("voice"), "relation": relation,
+                "wavSHA256": digest, "pcmSHA256": fixture.digest, "seamSamples": list(fixture.seams)}
+    return {"takeID": take["takeID"], "family": take["family"], "speaker": take.get("speaker"),
+            "relation": relation, "wavSHA256": digest, "pcmSHA256": fixture.digest, "alignment": alignment}
+
+
 class _Donors:
     """A task's chosen splice donors, each loaded once (with its usable word intervals)."""
 
@@ -1250,9 +1363,7 @@ class _Donors:
         if take["takeID"] not in self.loaded:
             self.loaded[take["takeID"]] = _source_fixture(item)
         fixture, digest, alignment, _status = self.loaded[take["takeID"]]
-        return fixture, {"takeID": take["takeID"], "family": take["family"], "speaker": take.get("speaker"),
-                         "relation": relation, "wavSHA256": digest, "pcmSHA256": fixture.digest,
-                         "alignment": alignment}, None
+        return fixture, donor_block(item, relation, fixture, digest, alignment), None
 
 
 def _inject_take(task: dict) -> dict:
@@ -1387,9 +1498,10 @@ def impostor_issue(manifest: dict) -> str | None:
 def plan_for(manifest: dict, classes: Iterable[str], *, words: bool) -> list[dict]:
     cohort = manifest["kind"] in COHORT_KINDS
     seams = any(take_seams(take) for take in generated_takes(manifest))
+    # Natural takes with long-form seams: the voice each was generated with is its speaker label.
     return build_plan(classes, words=words, language_swap_issue=LANGUAGE_SWAP_ISSUES[manifest["kind"]],
                       language_swap_rows=cohort, seams=seams, impostor_issue=impostor_issue(manifest),
-                      impostor_rows=cohort)
+                      impostor_rows=cohort, voice_donors=manifest["kind"] == TAKES_KIND and seams)
 
 
 def identity_swap_status(manifest: dict) -> dict:
@@ -1407,19 +1519,20 @@ def _sampled(sources: list[dict], sampling: dict | None, key: str) -> list[dict]
 
 
 def splice_donors(generated: list[dict], plan: list[dict], sampling: dict | None, usable_words: set[str] | None, *,
-                  seed: int) -> dict[str, dict[str, dict[str, str]]]:
+                  seed: int, voice_labels: dict[str, dict | None] | None = None) -> dict[str, dict[str, dict[str, str]]]:
     """Per donor-splice injector: source takeID -> {relation: donor takeID}, re-derivable by `verify`.
 
     The sources are the takes with a donor of every relation the injector's
     scheduled variants need (within its sampled families), in manifest order;
-    donors must carry a usable alignment when the set has alignments.
+    a speaker donor must carry a usable alignment when the set has alignments,
+    a voice donor (`voice_labels`) must declare seams.
     """
     chosen: dict[str, dict[str, dict[str, str]]] = {}
     for injector_id in dict.fromkeys(row_id for row_id, _ in schedule(plan)):
         relations = donor_relations(plan, injector_id)
         if not relations:
             continue
-        pool = speaker_donors.DonorPool(generated, eligible=usable_words)
+        pool = splice_pool(generated, relations, usable_words, voice_labels)
         sources = _sampled(pool.sources(relations), sampling, injectors.CATALOG[injector_id].key)
         chosen[injector_id] = pool.choose([take["takeID"] for take in sources], seed=seed,
                                           key=injectors.CATALOG[injector_id].key, relations=relations)
@@ -1444,11 +1557,28 @@ def impostor_donors(generated: list[dict], plan: list[dict], sampling: dict | No
                        relations=relations)
 
 
-def _donor_item(take: dict, takes_path: Path, alignments: dict | None) -> dict:
+def _donor_item(take: dict, takes_path: Path, alignments: dict | None, voice: dict | None = None) -> dict:
     item = {"take": take, "wav": str(take_wav(takes_path, take))}
     if alignments is not None:
         item["alignment"] = alignment_context(alignments["takes"].get(take["takeID"]))
+    if voice is not None:
+        # A voice donor's recorded voice label (`speaker_donors.voice_label`).
+        item["voice"] = voice["label"]
     return item
+
+
+def needs_voice_labels(plan: list[dict]) -> bool:
+    """Some scheduled splice draws voice donors."""
+    return any(voice_relations(donor_relations(plan, injector_id))
+               for injector_id in dict.fromkeys(row_id for row_id, _ in schedule(plan)))
+
+
+def splice_items(by_id: dict[str, dict], picks: dict[str, str], takes_path: Path, alignments: dict | None,
+                 labels: dict[str, dict | None] | None) -> dict[str, dict]:
+    """A source's chosen donors, relation -> the item `_Donors` loads (a voice donor's with its voice label)."""
+    return {relation: _donor_item(by_id[donor_id], takes_path, alignments,
+                                  (labels or {}).get(donor_id) if relation in speaker_donors.VOICE_RELATIONS else None)
+            for relation, donor_id in picks.items()}
 
 
 def usable_word_takes(generated: list[dict], alignments: dict | None) -> set[str] | None:
@@ -1488,14 +1618,16 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
     scheduled = schedule(plan)
     generated = generated_takes(manifest)
     usable = usable_word_takes(generated, alignments)
-    sampling = build_sampling(generated, plan, per_cell=per_cell, seed=sample_seed, usable_words=usable) \
-        if per_cell else None
+    labels = voice_labels(generated, voice_genders()) if needs_voice_labels(plan) else None
+    sampling = build_sampling(generated, plan, per_cell=per_cell, seed=sample_seed, usable_words=usable,
+                              voice_labels=labels) if per_cell else None
     by_id = {take["takeID"]: take for take in generated}
     sources = swap_sources(generated, plan, sampling)
     donors = language_swap.choose_donors(generated, sources, seed=sample_seed)
     swap_variants = swaps_scheduled(plan)
-    splices = splice_donors(generated, plan, sampling, usable, seed=sample_seed)
-    splice_pool = speaker_donors.DonorPool(generated, eligible=usable)
+    splices = splice_donors(generated, plan, sampling, usable, seed=sample_seed, voice_labels=labels)
+    pools = {injector_id: splice_pool(generated, donor_relations(plan, injector_id), usable, labels)
+             for injector_id in splices}
     impostor_variants = impostors_scheduled(plan)
     impostors = impostor_donors(generated, plan, sampling, seed=sample_seed)
     chosen = {key: set(value["families"]) for key, value in (sampling or {}).get("injectors", {}).items()}
@@ -1521,11 +1653,10 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
                 continue
             picks = by_source.get(take["takeID"])
             if picks is None:
-                task.setdefault("donorIssues", {})[injector_id] = splice_pool.issue(
+                task.setdefault("donorIssues", {})[injector_id] = pools[injector_id].issue(
                     take, donor_relations(plan, injector_id)) or "no donor was chosen for this take"
                 continue
-            task.setdefault("donors", {})[injector_id] = {
-                relation: _donor_item(by_id[donor_id], takes_path, alignments) for relation, donor_id in picks.items()}
+            task.setdefault("donors", {})[injector_id] = splice_items(by_id, picks, takes_path, alignments, labels)
         if take["takeID"] in impostors:
             task["sampleSeed"] = sample_seed
             picks = impostors[take["takeID"]]
@@ -1570,7 +1701,13 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
     }
     if manifest["kind"] in COHORT_KINDS:
         head["sourceManifest"]["population"] = population
-    if splices or impostor_variants:
+    if any(isinstance(take.get("longForm"), dict) for take in generated):
+        head["longForm"] = LONG_FORM_ENTRY_RULE
+    speaker_splices = {injector_id: by_source for injector_id, by_source in splices.items()
+                       if not voice_relations(donor_relations(plan, injector_id))}
+    voice_splices = {injector_id: by_source for injector_id, by_source in splices.items()
+                     if voice_relations(donor_relations(plan, injector_id))}
+    if speaker_splices or impostor_variants:
         head["speakerDonors"] = {
             "schema": speaker_donors.CHOICE_SCHEMA, "seed": sample_seed, "choice": speaker_donors.CHOICE_RULE,
             "pool": "this cohort manifest (one split): takes of the source's language and gender that name their "
@@ -1579,7 +1716,19 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
             "labelledTakes": sum(1 for take in generated if speaker_donors.labelled(take)),
             "splices": {injectors.CATALOG[injector_id].key: {"relations": list(donor_relations(plan, injector_id)),
                                                              "sources": len(by_source)}
-                        for injector_id, by_source in splices.items()},
+                        for injector_id, by_source in speaker_splices.items()},
+        }
+    if voice_splices:
+        head["voiceDonors"] = {
+            "schema": speaker_donors.CHOICE_SCHEMA, "seed": sample_seed, "choice": speaker_donors.CHOICE_RULE,
+            "label": speaker_donors.VOICE_LABEL_RULE, "pool": speaker_donors.VOICE_POOL_RULE,
+            "genders": "config/audio-qc-calibration-takes.json (speakerGenders; a Voice Design brief's gender where "
+                       "it declares one)",
+            "voices": voice_table(labels or {}),
+            "labelledTakes": sum(1 for label in (labels or {}).values() if label is not None),
+            "splices": {injectors.CATALOG[injector_id].key: {"relations": list(donor_relations(plan, injector_id)),
+                                                             "sources": len(by_source)}
+                        for injector_id, by_source in voice_splices.items()},
         }
     if impostor_variants:
         head["impostor"] = {**speaker_donors.describe_impostor(), "seed": sample_seed,
@@ -1709,11 +1858,8 @@ def _verify_donor(recipe: dict, task: dict, injector_id: str, relation: str) -> 
         fixture, digest, alignment, _status = _source_fixture(item)
     except recordings.RecordingError as error:
         return None, f"donor: {error}"
-    donor = item["take"]
-    expected = {"takeID": donor["takeID"], "family": donor["family"], "speaker": donor.get("speaker"),
-                "relation": relation, "wavSHA256": digest, "pcmSHA256": fixture.digest, "alignment": alignment}
-    if recipe.get("donor") != _plain(expected):
-        return None, "the donor differs from the re-derived choice (take, digests or alignment)"
+    if recipe.get("donor") != _plain(donor_block(item, relation, fixture, digest, alignment)):
+        return None, "the donor differs from the re-derived choice (take, digests, alignment, voice or seams)"
     return fixture, None
 
 
@@ -1780,6 +1926,10 @@ def _verify_take(task: dict) -> list[list[str]]:
         if entry.get("seamSamples", []) != list(replay.seams):
             failures.append([clip, "its seams differ from the replay's"])
             continue
+        if task.get("longFormRule") \
+                and entry.get("longForm") != _plain(output_long_form(take, replay.samples, replay.seams)):
+            failures.append([clip, "its longForm block does not describe the replay's output"])
+            continue
         output = Path(task["setDir"]) / entry["wavPath"]
         if not output.is_file() or file_sha256(output) != entry.get("wavSHA256"):
             failures.append([clip, "output WAV is missing or its file digest differs"])
@@ -1819,10 +1969,15 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
                 alignments = None
     sampling = injection_set.get("sampling")
     plan = injection_set.get("plan") or []
+    # The voice labels a voice-donor splice drew from, from the committed take policy's genders.
+    labels = voice_labels(generated, voice_genders()) if needs_voice_labels(plan) else None
+    voices = injection_set.get("voiceDonors")
+    if voices is not None and voices.get("voices") != _plain(voice_table(labels or {})):
+        failures.append(["<set>", "the voices or their genders differ from the take policy's (voiceDonors.voices)"])
     if sampling is not None and (declared is None or alignments is not None):
         redrawn = build_sampling(generated, plan, per_cell=int(sampling.get("perCell") or 0),
                                  seed=int(sampling.get("seed") or 0),
-                                 usable_words=usable_word_takes(generated, alignments))
+                                 usable_words=usable_word_takes(generated, alignments), voice_labels=labels)
         if _plain(redrawn) != sampling:
             failures.append(["<set>", "the sampled families differ from a redraw with the set's seed"])
     swap = injection_set.get("languageSwap")
@@ -1830,12 +1985,12 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
     if swap is not None:
         donors = language_swap.choose_donors(generated, swap_sources(generated, plan, sampling),
                                              seed=int(swap.get("seed") or 0))
-    # The speaker donors, re-derived as `inject` chose them (a splice's pool depends on the alignments).
-    speakers = injection_set.get("speakerDonors")
+    # The speaker and voice donors, re-derived as `inject` chose them (a splice's pool depends on the alignments).
+    chooser = injection_set.get("speakerDonors") or voices
     splices: dict[str, dict[str, dict[str, str]]] = {}
-    if speakers is not None and (declared is None or alignments is not None):
+    if chooser is not None and (declared is None or alignments is not None):
         splices = splice_donors(generated, plan, sampling, usable_word_takes(generated, alignments),
-                                seed=int(speakers.get("seed") or 0))
+                                seed=int(chooser.get("seed") or 0), voice_labels=labels)
     impostor = injection_set.get("impostor")
     impostors = {} if impostor is None else impostor_donors(generated, plan, sampling,
                                                             seed=int(impostor.get("seed") or 0))
@@ -1850,6 +2005,9 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
     for source, entries in grouped.items():
         task = {"take": takes[source], "wav": str(take_wav(takes_path, takes[source])), "entries": entries,
                 "setDir": str(set_path.parent), "catalogSeed": injection_set.get("catalogSeed")}
+        if injection_set.get("longForm") is not None:
+            # The set records each entry's longForm block for its own output (LONG_FORM_ENTRY_RULE).
+            task["longFormRule"] = True
         if alignments is not None:
             task["alignment"] = alignment_context(alignments["takes"].get(source))
         if source in donors:
@@ -1858,9 +2016,8 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
                              for variant, donor in donors[source].items()}
         for injector_id, by_source in splices.items():
             if source in by_source:
-                task.setdefault("donors", {})[injector_id] = {
-                    relation: _donor_item(takes[donor], takes_path, alignments)
-                    for relation, donor in by_source[source].items()}
+                task.setdefault("donors", {})[injector_id] = splice_items(takes, by_source[source], takes_path,
+                                                                          alignments, labels)
         if source in impostors:
             task["impostorSeed"] = int(impostor["seed"])
             task["impostors"] = {

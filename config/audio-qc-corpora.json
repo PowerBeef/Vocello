@@ -1,7 +1,7 @@
 {
   "decisions": [
     "2026-09-29, maintainer: the lean set (about 29 GB to download).",
-    "Multilingual LibriSpeech is used for anonymous same/different-speaker trials only, never speaker identification.",
+    "Multilingual LibriSpeech is used for anonymous same/different-speaker trials and, by maintainer decision of 2026-09-30, as internal-only Voice Clone references; never speaker identification.",
     "A Zenodo source is pinned by the publisher's MD5 and exact size; its SHA-256 is recorded in the fetch receipt on the first verified fetch and binds every later run.",
     "An unofficial Hugging Face mirror is accepted pinned by revision and LFS SHA-256; its license is cited from the corpus's official source.",
     "Scope gaps: class E has no acceptable source for Japanese or Russian; class H has none for French, Chinese or Korean, and Spanish is weak and not pinned."
@@ -835,7 +835,7 @@
       "alsoIn": [],
       "attribution": "Multilingual LibriSpeech (Pratap et al., 2020, arXiv:2012.03411), derived from LibriVox audiobooks, OpenSLR 94, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset facebook/multilingual_librispeech. No audio or transcript is redistributed or committed.",
       "caveats": [
-        "Maintainer decision: anonymous same/different-speaker trials only, never speaker identification.",
+        "Maintainer decisions: anonymous same/different-speaker trials, and (2026-09-30) internal-only Voice Clone references whose outputs are never published; never speaker identification.",
         "Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.",
         "The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.",
         "1_hours is a limited-supervision set overlapping 9_hours speakers; identical clips are written once and listed as duplicates.",

@@ -24,7 +24,7 @@ Rendered from [config/audio-qc-corpora.json](../../../config/audio-qc-corpora.js
 **Decisions.**
 
 - 2026-09-29, maintainer: the lean set (about 29 GB to download).
-- Multilingual LibriSpeech is used for anonymous same/different-speaker trials only, never speaker identification.
+- Multilingual LibriSpeech is used for anonymous same/different-speaker trials and, by maintainer decision of 2026-09-30, as internal-only Voice Clone references; never speaker identification.
 - A Zenodo source is pinned by the publisher's MD5 and exact size; its SHA-256 is recorded in the fetch receipt on the first verified fetch and binds every later run.
 - An unofficial Hugging Face mirror is accepted pinned by revision and LFS SHA-256; its license is cited from the corpus's official source.
 - Scope gaps: class E has no acceptable source for Japanese or Russian; class H has none for French, Chinese or Korean, and Spanish is weak and not pinned.
@@ -134,7 +134,7 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - Attribution: Multilingual LibriSpeech (Pratap et al., 2020, arXiv:2012.03411), derived from LibriVox audiobooks, OpenSLR 94, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset facebook/multilingual_librispeech. No audio or transcript is redistributed or committed.
 - Labels: gender (data/mls_<language>/metainfo.txt GENDER column, joined by speaker id within its language), speaker (speaker_id column), text (transcript column); absent: accent, emotion, pronunciationScores.
 - Extraction: `parquet`; written at 16000 Hz; about 3.09 GB (per-speaker cap: 322 speakers (union of dev, test, 9_hours and 1_hours) x 20 utterances x about 15 s (MLS segments run 10-20 s) of 16 kHz PCM16; uncapped 491,408 s (datasets-server duration statistics of the 20 splits)).
-- Caveat: Maintainer decision: anonymous same/different-speaker trials only, never speaker identification.
+- Caveat: Maintainer decisions: anonymous same/different-speaker trials, and (2026-09-30) internal-only Voice Clone references whose outputs are never published; never speaker identification.
 - Caveat: Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.
 - Caveat: The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.
 - Caveat: 1_hours is a limited-supervision set overlapping 9_hours speakers; identical clips are written once and listed as duplicates.

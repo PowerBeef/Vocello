@@ -205,6 +205,8 @@ class Qualification:
     plan_problem: str | None
     ledger: dict | None
     records: list[Record] = field(default_factory=list)
+    # Plans at a fail point beside the warn plan: (point, plan, its ledger entry).
+    fail_plans: list[tuple[str, thresholds.PreRegistration, dict | None]] = field(default_factory=list)
 
     def best(self) -> Record | None:
         """The usable qualified record at the strictest level, if any."""
@@ -223,10 +225,14 @@ class Qualification:
 
     def plan_state(self) -> str:
         if self.plan is None:
-            return "unreadable plan" if self.plan_problem else "no plan"
-        if self.ledger is None:
-            return "planned, not confirmed"
-        return f"confirmed ({self.ledger.get('status', '-')})"
+            state = "unreadable plan" if self.plan_problem else "no plan"
+        elif self.ledger is None:
+            state = "planned, not confirmed"
+        else:
+            state = f"confirmed ({self.ledger.get('status', '-')})"
+        for point, _, ledger in self.fail_plans:
+            state += f"; {point} " + ("planned" if ledger is None else f"confirmed ({ledger.get('status', '-')})")
+        return state
 
 
 @dataclass
@@ -282,6 +288,16 @@ class Sources:
                 ledger = thresholds.ConfirmationLedger(directory).outcome(plan.digest())
             except (OSError, json.JSONDecodeError):
                 ledger = {"status": "unreadable"}
+        fail_plans = []
+        for point in calibration.SUPPORTED_OPERATING_POINTS[1:]:
+            try:
+                other = thresholds.PreRegistrationStore(directory, naming="detector").load(entry["id"], point)
+                outcome = thresholds.ConfirmationLedger(directory).outcome(other.digest()) if other else None
+            except (thresholds.PreRegistrationError, ValueError, KeyError, TypeError, OSError) as error:
+                problem = problem or f"{point}: {error}"
+                continue
+            if other is not None:
+                fail_plans.append((point, other, outcome))
         records = []
         record_directory = self.root / calibration.RECORDS / entry["id"]
         current = registry_lib.definition_digest(entry)
@@ -298,7 +314,7 @@ class Sources:
             if not problems and data["detectorDefinitionSHA256"] != current:
                 problems.append("it confirmed an earlier definition (A7)")
             records.append(Record(relative, data if isinstance(data, dict) else None, problems))
-        return Qualification(plan, problem, ledger, records)
+        return Qualification(plan, problem, ledger, records, fail_plans)
 
     def consumers(self, judge: str) -> list[tuple[dict, list[str], list[str]]]:
         """The detectors that read a judge, each with the languages and what it reads there."""
@@ -646,6 +662,19 @@ def plan_lines(page: PurePosixPath, entry: Mapping[str, Any], qualification: Qua
     else:
         reasons = f" ({names(ledger.get('reasons') or ())})" if ledger.get("reasons") else ""
         lines += ["", f"**Confirmation.** Ledger entry {ledger.get('status', '-')}{reasons}."]
+    for point, other, outcome in qualification.fail_plans:
+        other_path = f"{PREREGISTRATIONS}/{entry['id']}.{point}.json"
+        split = other.split_dict()
+        n3 = other.binding("n3CohortDigest")
+        lines += ["", f"**Plan ({point}).** {link(page, other_path, other_path)}: digest {short(other.digest())}, "
+                      f"alpha {number(other.alpha)}; calibration manifest "
+                      f"{short((split.get('calibration') or {}).get('manifestDigest'))}, confirmation manifest "
+                      f"{short((split.get('confirmation') or {}).get('manifestDigest'))}, N3 bound manifest "
+                      f"{short(n3)}; injector catalog {other.binding('injectorCatalogVersion') or '-'}, classes "
+                      f"{other.binding('injectionClasses') or '-'}. "
+                      + ("Not confirmed: no ledger entry." if outcome is None else
+                         f"Ledger entry {outcome.get('status', '-')}"
+                         + (f" ({names(outcome.get('reasons') or ())})" if outcome.get("reasons") else "") + ".")]
     return lines
 
 
@@ -674,7 +703,9 @@ def record_lines(page: PurePosixPath, record: Record, heading: str) -> list[str]
     pooled = rates.get("farPooled") or {}
     rows.append([registry_lib.POOLED, number(values.get(registry_lib.POOLED)), fraction(pooled),
                  number(pooled.get("limit")), number(pooled.get("meets"))])
-    lines += table(["Stratum", "Threshold", "FAR on confirmation N2", "Limit", "Meets"], rows)
+    population = calibration.COHORT_KINDS.get(((data.get("cohorts") or {}).get("confirmation") or {}).get("kind"),
+                                              "N2")
+    lines += table(["Stratum", "Threshold", f"FAR on confirmation {population}", "Limit", "Meets"], rows)
     abstention = rates.get("cleanAbstention") or {}
     lines += ["", f"Per-language bounds at confidence {number(far_per_language.get('confidence'))} (Bonferroni "
                   f"over the languages), pooled at {number(pooled.get('confidence'))}. Clean abstention: "
@@ -701,10 +732,15 @@ def record_lines(page: PurePosixPath, record: Record, heading: str) -> list[str]
 
     confirmation = counts.get("confirmation") or {}
     speakers = data.get("speakers") or {}
-    lines += ["", f"Counts: calibration {counted(counts.get('calibration'))}; confirmation N2 "
-                  f"{counted(confirmation.get('N2'))}; P1 {counted(confirmation.get('P1'))}; S "
-                  f"{counted(confirmation.get('S'))}. Speakers: {number(speakers.get('count'))} "
+    populations = "; ".join(f"{name} {counted(value)}" for name, value in confirmation.items()) or "-"
+    lines += ["", f"Counts: calibration {counted(counts.get('calibration'))}; confirmation {populations}. "
+                  f"Speakers: {number(speakers.get('count'))} "
                   f"({speakers.get('claim', '-')}, unit `{speakers.get('unit', '-')}`)."]
+    bound = rates.get("n3")
+    if isinstance(bound, Mapping):
+        lines += ["", f"N3 bound (A2): flag rate {fraction(bound)} (limit {number(bound.get('limit'))}, meets "
+                      f"{number(bound.get('meets'))}) on N3 manifest "
+                      f"{short(((data.get('cohorts') or {}).get('n3') or {}).get('manifestDigest'))}."]
     if data.get("phiAudit"):
         lines += [""] + table(["Consensus languages", "Judges", "Units", "Phi", "Joint failure"],
                               [[names(audit.get("languages") or ()), names(audit.get("judges") or ()),

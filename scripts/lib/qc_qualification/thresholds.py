@@ -61,8 +61,11 @@ SPLIT_METHODS = ("component-hash", "declared-cohorts")
 DISJOINT_KEYS = ("family", "speaker", "script")
 SPEAKER_CLAIMS = ("identified", "lower-bound")
 STORE_NAMINGS = ("digest", "detector")
+# The operating point a plan without an `operatingPoint` binding, or bound to it, is filed under by detector.
+DEFAULT_OPERATING_POINT = "warn"
 _SHA256_TEXT = re.compile(r"^[0-9a-f]{64}$")
 _BINDING_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+_OPERATING_POINT = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,31}$")
 
 
 class PreRegistrationError(ValueError):
@@ -287,7 +290,11 @@ class PreRegistrationStore:
 
     `naming` picks the file name: `digest` (`plan-<digest>.json`) or
     `detector` (`<id@version>.json`), which allows one plan per detector
-    version, so no second plan for the same detector can be confirmed. The
+    version and operating point, so no second plan for the same detector and
+    point can be confirmed. A plan bound to another operating point than warn
+    (its `operatingPoint` binding) is filed beside it as
+    `<id@version>.<point>.json`, so a fail plan is pre-registered alongside
+    the warn plan of the same version; a warn plan keeps its name. The
     repository store names by detector.
     """
 
@@ -307,18 +314,24 @@ class PreRegistrationStore:
         return self.directory / f"plan-{digest}.json"
 
     def plan_path(self, plan: PreRegistration) -> Path:
-        return self.detector_path(plan.detector) if self.naming == "detector" else self.path(plan.digest())
+        if self.naming != "detector":
+            return self.path(plan.digest())
+        return self.detector_path(plan.detector, plan.binding("operatingPoint"))
 
-    def detector_path(self, detector: str) -> Path:
+    def detector_path(self, detector: str, operating_point: str | None = None) -> Path:
         if not detector or "/" in detector or detector.startswith("."):
             raise PreRegistrationError(f"{detector!r} cannot name a plan file")
-        return self.directory / f"{detector}.json"
+        if operating_point in (None, DEFAULT_OPERATING_POINT):
+            return self.directory / f"{detector}.json"
+        if not _OPERATING_POINT.fullmatch(operating_point):
+            raise PreRegistrationError(f"{operating_point!r} cannot name a plan file")
+        return self.directory / f"{detector}.{operating_point}.json"
 
-    def load(self, detector: str) -> PreRegistration | None:
-        """The plan filed for a detector (detector naming only), or None when there is none."""
+    def load(self, detector: str, operating_point: str = DEFAULT_OPERATING_POINT) -> PreRegistration | None:
+        """The plan filed for a detector at an operating point (detector naming only), or None."""
         if self.naming != "detector":
             raise PreRegistrationError("only a store named by detector can look a plan up by detector")
-        path = self.detector_path(detector)
+        path = self.detector_path(detector, operating_point)
         if not path.is_file():
             return None
         try:
@@ -327,6 +340,8 @@ class PreRegistrationStore:
             raise PreRegistrationError(f"{path.name} is unreadable: {error}") from error
         if plan.detector != detector:
             raise PreRegistrationError(f"{path.name} holds the plan of {plan.detector}")
+        if (plan.binding("operatingPoint") or DEFAULT_OPERATING_POINT) != operating_point:
+            raise PreRegistrationError(f"{path.name} holds a plan at operating point {plan.binding('operatingPoint')}")
         return plan
 
     def commit(self, plan: PreRegistration) -> Path:

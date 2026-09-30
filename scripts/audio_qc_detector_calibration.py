@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
-"""AQ-07 warn-level qualification of the registered detectors (audit sections 5.4-5.9).
+"""AQ-07 qualification of the registered detectors at warn and fail (audit sections 5.4-5.9).
 
-Each detector in `config/audio-qc-detectors.json` is qualified at the policy's
-`warn` operating point on two cohorts its role set names: the calibration
+Each detector in `config/audio-qc-detectors.json` is qualified at one of the
+policy's operating points on two cohorts its role set names: the calibration
 cohort fits the threshold from clean clips only, and the untouched
 confirmation cohort, with the positives and shams built over it, confirms it
 once. No model runs here; the panel and the Stage 0 scorer produce the inputs.
+
+Operating points. `warn` (the default) is what AQ-07 confirms first. A `fail`
+point (`fail`, or `evidenceLaneFail`, whose policy `appliesTo` keeps it off
+product lanes; decision 5) is pre-registered as its own plan beside the warn
+plan of the same detector version (`<id>.fail.json`) and confirmed once on its
+own: FAR on N2 at <= 1% pooled and <= 5% per language over all ten languages
+(1,240 families, 124 per language; the calibration cohort is held to the same
+floor per stratum), the N3 flag rate on an N3 cohort the plan names
+(`n3CohortDigest`, scored after the plan under `--role bound`, 60 families
+per language; A2), detection >= 0.90 on severe and >= 0.70 on moderate cells
+of two construction mechanisms (A3), shams per injector, and clean abstention
+<= 5%. A detector whose definition cannot meet that (confirmed on N3, fewer
+than ten languages, fewer than two mechanisms with severe and moderate cells)
+is refused at plan time. A qualified record's `level` is `fail` and carries the
+N3 bound, which the lane gates accept for fail and warn gates.
 
 Cohorts per role set (`COHORT_RULES`), each with the disjointness it proves on
 the ids at plan and confirm time:
@@ -38,10 +53,10 @@ and injection set it names, and each clip's audio digest; an injection set to
 its `entriesSHA256` and to the cohort manifest it was built on (always checked).
 
 Commands:
-  scores   --detector ID --role calibration|confirmation|informational --cohort MANIFEST
+  scores   --detector ID --role calibration|confirmation|informational|bound --cohort MANIFEST
            [--n1-manifest FILE] [--bundle DIR] [--measurements FILE] [--injection-set FILE]
            [--positive-bundle DIR] [--positive-measurements FILE] [--raw-outputs FILE ...]
-           [--positive-raw-outputs FILE ...] --output FILE
+           [--positive-raw-outputs FILE ...] [--operating-point warn|fail|evidenceLaneFail] --output FILE
            Per-unit scores (family, language, speaker, script, population,
            injector, severity, score or abstention with its reason, and each
            component), ids and digests only, with the scoring code's digest and
@@ -59,14 +74,18 @@ Commands:
            construction and panels computed from scratch after the plan (see
            confirm); calibration and informational roles refuse the role set's
            confirmation split (FLEURS test, the confirmation take split) and
-           any cohort a plan names as confirmation (A5).
+           any cohort a plan names as confirmation or as its N3 bound (A5). The
+           bound role scores a fail plan's N3 cohort (--operating-point names
+           the plan), fresh after the plan like a confirmation panel.
   plan     --detector ID --calibration-cohort MANIFEST --confirmation-cohort MANIFEST
            [--confirmation-n1-manifest FILE] [--calibration-n1-manifest FILE]
            --calibration-scores FILE --alpha A --injection-catalog-seed N
            --injection-sample-seed N --injection-sample-per-cell N --injection-classes A,B,...
-           [--injection-catalog-version N] [--operating-point warn]
-           Write config/audio-qc-preregistrations/<id>.json: the split-conformal
-           rule, alpha (below the warn FAR bound), the declared cohort split
+           [--injection-catalog-version N] [--operating-point warn|fail|evidenceLaneFail]
+           [--n3-cohort MANIFEST]
+           Write config/audio-qc-preregistrations/<id>.json (<id>.<point>.json
+           at a fail point, with its N3 cohort): the split-conformal rule,
+           alpha (below the point's FAR bound), the declared cohort split
            (both manifests by kind and digest, what the role set's cohorts are
            disjoint by, the speaker unit and claim, the limitations) and the
            bindings (definition, calibration scores, policy, scoring code,
@@ -81,22 +100,25 @@ Commands:
            script or (where identified) speaker, a cohort another plan uses in
            the other role, and a confirmation cohort that already holds scores,
            a panel bundle or measurements. The lead reviews and commits it.
-  derive   --detector ID --calibration-scores FILE [--output FILE]
+  derive   --detector ID --calibration-scores FILE [--output FILE] [--operating-point P]
            The split-conformal threshold from the calibration cohort's clean
            N2 scores, one per family, per declared stratum (language) or
            pooled, each stratum at least the calibration floor; refuses a plan
            not committed at HEAD.
   confirm  --detector ID --calibration-scores FILE --confirmation-scores FILE [--n3-scores FILE]
+           [--operating-point P]
            Once per plan digest. Before anything is recorded: the bindings and
            output, evidence and scoring-code identities across both cohorts
            (A7), the planned injection construction, confirmation panels
            computed from scratch after the plan's commit (a start time after
            it, an empty cache root, no L1 hit, no adoption), every expected
            unit present with evidence and no failed judge row (an unavailable
-           row is the run's failure, not an abstention), and the warn minimums
-           counted on scored units (negatives, positives per severe cell, a
-           sham cell per injector). Then the confirmation negatives, the
-           positives and the S shams against the warn operating point (evaluate_confirmation),
+           row is the run's failure, not an abstention), and the point's
+           minimums counted on scored units (warn: negatives, positives per
+           severe cell, a sham cell per injector; fail: see above, with its N3
+           bound scores). Then the confirmation negatives, the positives and
+           the S shams (and at fail the N3 bound) against the plan's operating
+           point (evaluate_confirmation),
            with the phi audit of consensus families; writes the ledger entry
            beside the plan and the tracked record
            benchmarks/audio-qc-calibration/<id>/record-<plan digest 16>.json
@@ -153,8 +175,14 @@ FLEURS_KINDS = frozenset({N2_KIND, N1_KIND})
 FLEURS_SPLITS = ("dev", "test")
 # The split a non-FLEURS cohort declares (the N3 take plan's, a speaker-labelled N1 manifest's).
 DECLARED_SPLITS = ("calibration", "confirmation")
-ROLES = ("calibration", "confirmation", "informational")
-SUPPORTED_OPERATING_POINTS = ("warn",)
+# `bound`: the N3 cohort a fail plan bounds the flag rate on (A2), scored after the plan like a confirmation.
+ROLES = ("calibration", "confirmation", "informational", "bound")
+SUPPORTED_OPERATING_POINTS = ("warn", "fail", "evidenceLaneFail")
+# The level a qualified record at each operating point gates at (audit 3.3; decision 5): the evidence-lane
+# fail point is a fail level whose policy `appliesTo` keeps it off product lanes.
+POINT_LEVELS = {"warn": "warn", "fail": "fail", "evidenceLaneFail": "fail"}
+# The severities a fail point measures detection on, per mechanism (tprSevereMin, tprModerateMin).
+FAIL_SEVERITIES = frozenset(thresholds.SEVERITY_FLOORS)
 FLEURS_SPEAKER_UNIT = "language:fleurs-unidentified"
 FLEURS_DISJOINT_BY = ("family", "script")
 # A role set whose corpus the registry still names `pending-...` has no data decision yet.
@@ -162,6 +190,8 @@ PENDING_CORPUS_PREFIX = "pending-"
 # P2 and P3 positives are declared with their provenance (audit 5.1, T2 and T3); P1's is its T1 recipe.
 POSITIVE_PROVENANCE = {"P2": ("T2", ("traceSHA256", "recipeSHA256", "decoderSHA256")),
                        "P3": ("T3", ("knob", "recipeSHA256"))}
+# The positive population each construction tier builds (audit 5.1: P1 PCM, P2 codec, P3 knob).
+TIER_POPULATIONS = {"T1": "P1", "T2": "P2", "T3": "P3"}
 
 
 @dataclass(frozen=True)
@@ -726,6 +756,18 @@ def _check_private(private: Mapping[str, Any] | None, text_digest: str | None, w
         raise CalibrationError(f"{where}: its private reference text is not the manifest's text")
 
 
+def positive_populations(roles: Mapping[str, Any], entry: Mapping[str, Any]) -> tuple[str, ...]:
+    """The positive populations a detector's confirmation reads: its role set's, then the population of each
+    other construction tier its targets declare (a fail point's second mechanism, A3: T1 P1 beside T2 P2)."""
+    primary = roles["positives"]["population"]
+    tiers = {TIER_POPULATIONS.get(str(target["mechanism"]).split("-", 1)[0]) for target in entry.get("targets") or ()}
+    return (primary, *sorted(population for population in tiers if population and population != primary))
+
+
+def _populations(value: str | Sequence[str]) -> tuple[str, ...]:
+    return (value,) if isinstance(value, str) else tuple(value)
+
+
 def provenance_problems(population: str, injection: Mapping[str, Any], mechanism: str | None) -> list[str]:
     """Why a declared P2 or P3 positive does not name its construction (T2 trace, recipe and decoder; T3 knob
     and recipe) or its tier's mechanism; empty for P1 and S, whose recipe is their T1 injection."""
@@ -746,13 +788,15 @@ def provenance_problems(population: str, injection: Mapping[str, Any], mechanism
 def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: str, split: str | None = None,
                  bundle: Bundle | None = None, measurements: Mapping[str, Any] | None = None,
                  injection_set: Mapping[str, Any] | None = None, positive_bundle: Bundle | None = None,
-                 positive_measurements: Mapping[str, Any] | None = None, positives_population: str = "P1",
+                 positive_measurements: Mapping[str, Any] | None = None,
+                 positives_population: str | Sequence[str] = "P1",
                  raw_outputs: Sequence[Mapping[str, Any]] = (),
                  positive_raw_outputs: Sequence[Mapping[str, Any]] = ()) -> dict:
     """Every cohort take's score, then every positive and sham of the detector's injectors.
 
-    Positives are the role set's population (`positives_population`: P1, or a
-    declared P2 or P3 construction with its provenance); shams are S. A
+    Positives are the role set's populations (`positives_population`, see
+    `positive_populations`: P1, or a declared P2 or P3 construction with its
+    provenance), each of its construction tier; shams are S. A
     `raw-output` detector reads its judge's raw output from the exports
     (`raw_outputs` for the cohort's panel, `positive_raw_outputs` for the
     injection set's), and a seam measure reads each take's long-form seams (a
@@ -761,6 +805,7 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
     clip each take declares.
     """
     detector = entry["id"]
+    populations = (positives_population,) if isinstance(positives_population, str) else tuple(positives_population)
     needs_panel, needs_measurements = registry_lib.needs_panel(entry), registry_lib.needs_measurements(entry)
     needs_private = registry_lib.needs_private(entry)
     needs_seams, referenced = registry_lib.needs_seams(entry), reference_judges(entry)
@@ -866,9 +911,13 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
             skipped[f"mechanism-mismatch:{injector_id}"] += 1
             continue
         population = injection.get("population")
-        if population not in (positives_population, "S"):
-            raise CalibrationError(f"{item.get('takeID')}: an injection is {positives_population} or S, not "
+        if population not in (*populations, "S"):
+            raise CalibrationError(f"{item.get('takeID')}: an injection is {' or '.join(populations)} or S, not "
                                    f"{population!r}")
+        tier = str(mechanism or "").split("-", 1)[0]
+        if population != "S" and TIER_POPULATIONS.get(tier) != population:
+            raise CalibrationError(f"{item.get('takeID')}: a {population} positive is not a {tier} construction "
+                                   f"({mechanism})")
         problems = provenance_problems(population, injection, mechanism)
         if problems:
             raise CalibrationError(f"{item.get('takeID')}: " + "; ".join(problems))
@@ -901,7 +950,7 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
                 raise CalibrationError(f"{where}: measurements.json measured other audio than the set's")
         severity = injection.get("severity")
         cell = registry_lib.target_cell(entry, injector_id, severity, mechanism) \
-            if population == positives_population else None
+            if population in populations else None
         sham = population == "S" and registry_lib.sham_of(entry, injector_id, mechanism)
         # A declared construction (P2, P3) keeps its provenance in its unit: digests and the knob's id only.
         extra = {"provenance": {key: (injection.get("provenance") or {}).get(key) for key in
@@ -987,8 +1036,9 @@ def load_scores(path: Path) -> dict:
 
 
 def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
-    """Every plan file's cohorts by role: {calibration|confirmation: {manifest digest: [detectors]}}."""
-    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}}
+    """Every plan file's cohorts by role: {calibration|confirmation|bound: {manifest digest: [detectors]}},
+    `bound` being a fail plan's N3 cohort."""
+    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}}
     directory = repository.store.directory
     if not directory.is_dir():
         return found
@@ -1003,6 +1053,8 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
             continue
         found["calibration"].setdefault(plan.cohorts.calibration.manifest_digest, []).append(plan.detector)
         found["confirmation"].setdefault(plan.cohorts.confirmation.manifest_digest, []).append(plan.detector)
+        if plan.binding("n3CohortDigest"):
+            found["bound"].setdefault(plan.binding("n3CohortDigest"), []).append(plan.detector)
     return found
 
 
@@ -1012,10 +1064,19 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
     rule = cohort_rule(entry)
     cohort = load_cohort(args.cohort)
     split = resolve_cohort(cohort, args.n1_manifest)
-    plan = repository.store.load(entry["id"])
+    plan = repository.store.load(entry["id"], args.operating_point)
     digest = cohort["manifestDigest"]
     confirmation_split = expected_split(rule, roles, "confirmNegatives")
-    if args.role == "confirmation":
+    if args.role == "bound":
+        if plan is None or plan.binding("n3CohortDigest") != digest:
+            raise CalibrationError("an N3 bound cohort is scored only under the fail plan that names it (A5): run "
+                                   f"plan for {entry['id']} at a fail operating point first and commit it")
+        repository.store.require(plan)
+        if cohort["population"] != "N3":
+            raise CalibrationError(f"the N3 bound is scored on N3 takes, not {cohort['population']}")
+        if args.injection_set or args.positive_bundle or args.positive_measurements:
+            raise CalibrationError("the N3 bound has no positives: pass no injection set")
+    elif args.role == "confirmation":
         if plan is None or plan.cohorts is None or plan.cohorts.confirmation.manifest_digest != digest:
             raise CalibrationError("a confirmation cohort is scored only under a plan that names it (A5): "
                                    f"run plan for {entry['id']} first and commit it")
@@ -1026,10 +1087,14 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
                                    f"the confirmation cohort is {split_name(split)}, not the {confirmation_split} "
                                    "split")
     else:
-        named = declared_cohorts(repository)["confirmation"].get(digest)
+        declared = declared_cohorts(repository)
+        named = declared["confirmation"].get(digest)
         if named:
             raise CalibrationError(f"the plan of {', '.join(sorted(named))} names this cohort as its confirmation "
                                    "cohort; it is scored only under --role confirmation (A5)")
+        if declared["bound"].get(digest):
+            raise CalibrationError(f"the fail plan of {', '.join(sorted(declared['bound'][digest]))} bounds its N3 "
+                                   "flag rate on this cohort; it is scored only under --role bound (A5)")
         if confirmation_split is not None and split == confirmation_split and cohort["kind"] in rule.kinds:
             raise CalibrationError(f"{split_name(split)} is the confirmation corpus: it is scored only under "
                                    "--role confirmation, never for calibration or information (A5)")
@@ -1054,7 +1119,7 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         injection_set=load_injection_set(args.injection_set) if args.injection_set else None,
         positive_bundle=Bundle(args.positive_bundle) if args.positive_bundle else None,
         positive_measurements=load_measurements(args.positive_measurements) if args.positive_measurements else None,
-        positives_population=roles["positives"]["population"],
+        positives_population=positive_populations(roles, entry),
         raw_outputs=[load_raw_outputs(path) for path in args.raw_outputs or ()],
         positive_raw_outputs=[load_raw_outputs(path) for path in args.positive_raw_outputs or ()],
     )
@@ -1062,6 +1127,10 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         problems = confirmation_evidence_problems(repository, plan, document)
         if problems:
             raise CalibrationError("the confirmation evidence does not meet its plan: " + "; ".join(problems))
+    if args.role == "bound":
+        problems = freshness_problems(repository, plan, document, bound=True)
+        if problems:
+            raise CalibrationError("the N3 bound evidence does not meet its plan: " + "; ".join(problems))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(document, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     log(f"scores: {entry['id']} {args.role}: {document['counts']['units']} units "
@@ -1117,6 +1186,43 @@ def _triples(cohort: Mapping[str, Any]) -> list[tuple[str, str, str]]:
 def _strata_keys(entry: Mapping[str, Any]) -> tuple[str | None, list[str]]:
     by = registry_lib.strata_by(entry)
     return by, [registry_lib.POOLED] if by is None else list(entry["scope"]["languages"])
+
+
+def fail_like(point: Mapping[str, Any]) -> bool:
+    """A fail operating point (`fail`, `evidenceLaneFail`): it names the population its FAR is confirmed on."""
+    return "farPopulation" in point
+
+
+def calibration_floor_of(point: Mapping[str, Any], by: str | None) -> int:
+    """Scored calibration families each stratum needs. Warn states it (`minimumUnits.calibration`); a fail
+    point states none, so the calibration cohort is held to the confirmation's negative floor for the same
+    stratum (`n2NegativesPerLanguage` per language, `n2Negatives` pooled), which also exceeds the
+    split-conformal minimum ceil(1 / alpha) - 1 at any alpha below its FAR bound."""
+    units = point["minimumUnits"]
+    if "calibration" in units:
+        return int(units["calibration"])
+    return int(units["n2NegativesPerLanguage"] if by == "language" else units["n2Negatives"])
+
+
+def fail_plan_problems(entry: Mapping[str, Any], roles: Mapping[str, Any], point: Mapping[str, Any]) -> list[str]:
+    """Why a detector's definition cannot qualify at a fail point, whatever its confirmation shows: FAR is
+    confirmed on the point's population (A2), a per-language bound over the point's languages, and detection
+    on severe and moderate cells of at least `mechanismsMin` construction mechanisms (A3)."""
+    problems = []
+    population = roles["confirmNegatives"]["population"]
+    if population != point["farPopulation"]:
+        problems.append(f"the fail FAR is confirmed on {point['farPopulation']} (A2); role set {entry['populations']} "
+                        f"confirms on {population}")
+    languages = len(entry["scope"]["languages"])
+    if languages < point["minimumUnits"]["languages"]:
+        problems.append(f"its scope holds {languages} languages; a fail bound covers {point['minimumUnits']['languages']}")
+    complete = sorted(mechanism for mechanism, cells in registry_lib.declared_cells(entry).items()
+                      if FAIL_SEVERITIES <= {cell.rsplit("/", 1)[-1] for cell in cells})
+    required = int(point.get("mechanismsMin", 1))
+    if len(complete) < required:
+        problems.append(f"{len(complete)} construction mechanisms declare severe and moderate cells "
+                        f"({', '.join(complete) or 'none'}); fail measures detection on {required} (A3)")
+    return problems
 
 
 def evidence_gaps(units: Iterable[Mapping[str, Any]]) -> Counter:
@@ -1183,7 +1289,8 @@ def current_evidence_problems(entry: Mapping[str, Any], identity: Mapping[str, A
 def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mapping[str, Any], *,
                calibration: Mapping[str, Any], confirmation: Mapping[str, Any], calibration_scores: Mapping[str, Any],
                alpha: float, operating_point: str, injection: Mapping[str, Any],
-               confirmation_split: str | None = None, calibration_split: str | None = None) -> thresholds.PreRegistration:
+               confirmation_split: str | None = None, calibration_split: str | None = None,
+               n3: Mapping[str, Any] | None = None) -> thresholds.PreRegistration:
     policy = repository.policy()
     if operating_point not in SUPPORTED_OPERATING_POINTS:
         raise CalibrationError(f"this driver pre-registers {SUPPORTED_OPERATING_POINTS} only")
@@ -1193,6 +1300,19 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                                "to leave margin for the confirmation")
     roles = registry_lib.role_set(registry, entry)
     rule = cohort_rule(entry)
+    if fail_like(point):
+        problems = fail_plan_problems(entry, roles, point)
+        if problems:
+            raise CalibrationError(f"{entry['id']} cannot qualify at {operating_point}: " + "; ".join(problems))
+        if n3 is None:
+            raise CalibrationError(f"a {operating_point} plan names the N3 cohort its flag rate is bounded on "
+                                   "(--n3-cohort, A2)")
+        if n3["kind"] != N3_KIND:
+            raise CalibrationError(f"the N3 bound cohort is an {N3_KIND} manifest, not {n3['kind']}")
+        if n3["manifestDigest"] in (calibration["manifestDigest"], confirmation["manifestDigest"]):
+            raise CalibrationError("the N3 bound cohort is neither the calibration nor the confirmation cohort")
+    elif n3 is not None:
+        raise CalibrationError(f"the {operating_point} point bounds no N3 flag rate: pass no --n3-cohort")
     pending = pending_corpora(roles)
     if pending:
         raise CalibrationError(f"role set {entry['populations']} names no corpus yet for {', '.join(pending)}: the "
@@ -1230,7 +1350,7 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         raise CalibrationError("the calibration scores were computed by other scoring code; score them again (A7)")
     problems = current_evidence_problems(entry, calibration_scores["evidenceIdentity"])
     problems += calibration_problems(entry, calibration_scores, roles["fit"]["population"],
-                                     point["minimumUnits"]["calibration"])
+                                     calibration_floor_of(point, registry_lib.strata_by(entry)))
     if problems:
         raise CalibrationError("the calibration scores cannot fit a threshold: " + "; ".join(problems))
     declared = declared_cohorts(repository)
@@ -1240,10 +1360,17 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
     if declared["calibration"].get(confirmation["manifestDigest"]):
         raise CalibrationError(f"the plan of {', '.join(declared['calibration'][confirmation['manifestDigest']])} "
                                "fits on the confirmation cohort (A5)")
-    artifacts = scoring_artifacts(confirmation["directory"])
-    if artifacts:
-        raise CalibrationError("the confirmation cohort already holds scores, a panel bundle or measurements "
-                               f"({', '.join(artifacts[:3])}); A5 needs the plan committed before any of them")
+    if declared["bound"].get(calibration["manifestDigest"]):
+        raise CalibrationError(f"the fail plan of {', '.join(declared['bound'][calibration['manifestDigest']])} "
+                               "bounds its N3 flag rate on the calibration cohort (A5)")
+    if n3 is not None and declared["calibration"].get(n3["manifestDigest"]):
+        raise CalibrationError(f"the plan of {', '.join(declared['calibration'][n3['manifestDigest']])} fits on "
+                               "the N3 bound cohort (A5)")
+    for cohort, what in ((confirmation, "confirmation cohort"), (n3, "N3 bound cohort")):
+        artifacts = scoring_artifacts(cohort["directory"]) if cohort is not None else []
+        if artifacts:
+            raise CalibrationError(f"the {what} already holds scores, a panel bundle or measurements "
+                                   f"({', '.join(artifacts[:3])}); A5 needs the plan committed before any of them")
     limitations = tuple((code, registry["limitations"][code]) for code in entry["limitations"])
     split = thresholds.CohortSplit(
         calibration=thresholds.CohortReference(calibration["kind"], calibration["manifestDigest"],
@@ -1260,6 +1387,8 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         ("scoringCodeSHA256", scoring_code),
         ("evidenceIdentitySHA256", json_digest(calibration_scores["evidenceIdentity"])),
         *((binding, construction_value(key, injection[key])) for key, binding in INJECTION_BINDINGS.items()),
+        # A fail point's N3 flag-rate bound is confirmation evidence too: its cohort is pre-registered (A2, A5).
+        *((("n3CohortDigest", n3["manifestDigest"]),) if n3 is not None else ()),
     )
     strata = () if entry["strata"] is None else ((entry["strata"]["by"], entry["strata"]["reason"]),)
     plan = thresholds.PreRegistration(
@@ -1304,17 +1433,22 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
     injection = {"catalogVersion": catalog_version, "catalogSeed": args.injection_catalog_seed,
                  "sampleSeed": args.injection_sample_seed, "samplePerCell": args.injection_sample_per_cell,
                  "classes": args.injection_classes}
+    n3 = None
+    if args.n3_cohort is not None:
+        n3 = load_cohort(args.n3_cohort)
+        resolve_cohort(n3, None)
     plan = build_plan(repository, registry, entry, calibration=calibration,
                       confirmation=confirmation,
                       confirmation_split=resolve_cohort(confirmation, args.confirmation_n1_manifest),
                       calibration_split=calibration_split,
                       calibration_scores=load_scores(args.calibration_scores), alpha=args.alpha,
-                      operating_point=args.operating_point, injection=injection)
+                      operating_point=args.operating_point, injection=injection, n3=n3)
     if repository.ledger.outcome(plan.digest()) is not None:
         raise CalibrationError("this plan was already confirmed")
-    existing = repository.store.load(entry["id"])
+    existing = repository.store.load(entry["id"], args.operating_point)
     if existing is not None and existing != plan:
-        raise CalibrationError(f"{entry['id']} already has another plan; a changed plan needs a new detector version")
+        raise CalibrationError(f"{entry['id']} already has another {args.operating_point} plan; a changed plan "
+                               "needs a new detector version")
     path = repository.store.commit(plan)
     print(json.dumps({"plan": str(path.relative_to(repository.root)), "digest": plan.digest(),
                       "next": "review and commit the plan file; derive and confirm refuse it until then"}, indent=2))
@@ -1325,10 +1459,12 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
 # derive
 # --------------------------------------------------------------------------- #
 
-def committed_plan(repository: Repository, entry: Mapping[str, Any]) -> thresholds.PreRegistration:
-    plan = repository.store.load(entry["id"])
+def committed_plan(repository: Repository, entry: Mapping[str, Any],
+                   operating_point: str = "warn") -> thresholds.PreRegistration:
+    plan = repository.store.load(entry["id"], operating_point)
     if plan is None:
-        raise CalibrationError(f"{entry['id']} has no plan in {thresholds.PREREGISTRATION_DIRECTORY.name}/ (A5)")
+        raise CalibrationError(f"{entry['id']} has no {operating_point} plan in "
+                               f"{thresholds.PREREGISTRATION_DIRECTORY.name}/ (A5)")
     repository.store.require(plan)
     if plan.cohorts is None:
         raise CalibrationError("this driver reads plans with declared cohorts")
@@ -1356,7 +1492,8 @@ def plan_strata(plan: thresholds.PreRegistration) -> str | None:
 
 
 def calibration_floor(repository: Repository, plan: thresholds.PreRegistration) -> int:
-    return int(repository.policy()["operatingPoints"][plan.binding("operatingPoint")]["minimumUnits"]["calibration"])
+    return calibration_floor_of(repository.policy()["operatingPoints"][plan.binding("operatingPoint")],
+                                plan_strata(plan))
 
 
 def derivation(repository: Repository, entry: Mapping[str, Any], plan: thresholds.PreRegistration,
@@ -1407,7 +1544,7 @@ def unit_threshold(derived: Mapping[str, Any], language: str) -> float:
 
 def command_derive(args: argparse.Namespace, repository: Repository) -> int:
     _, entry = repository.entry(args.detector)
-    plan = committed_plan(repository, entry)
+    plan = committed_plan(repository, entry, args.operating_point)
     result = derivation(repository, entry, plan, load_scores(args.calibration_scores),
                         calibration_floor(repository, plan))
     text = json.dumps(result, indent=2, allow_nan=False)
@@ -1442,14 +1579,14 @@ def sham_cells(entry: Mapping[str, Any]) -> list[str]:
 
 
 def confirmation_inputs(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], population: str,
-                        positives_population: str = "P1") -> dict:
+                        positives_population: str | Sequence[str] = "P1") -> dict:
     negatives = _in_scope(units, population)
     positives: dict[str, dict[str, list[dict]]] = {}
     shams: dict[str, list[dict]] = {}
     for unit in units:
         if not unit["inScope"]:
             continue
-        if unit["population"] == positives_population and unit["cell"]:
+        if unit["population"] in _populations(positives_population) and unit["cell"]:
             positives.setdefault(unit["mechanism"], {}).setdefault(unit["cell"], []).append(dict(unit))
         elif unit["population"] == "S" and unit.get("sham"):
             shams.setdefault(unit["injectorID"], []).append(dict(unit))
@@ -1460,33 +1597,85 @@ def _scored_families(units: Iterable[Mapping[str, Any]]) -> set[str]:
     return {unit["family"] for unit in units if unit["score"] is not None}
 
 
-def preconditions(entry: Mapping[str, Any], inputs: Mapping[str, Any], point: Mapping[str, Any],
-                  scores: Mapping[str, Any]) -> list[str]:
-    """What must hold before the one confirmation starts, counted on scored units (never on alarms).
-
-    Every expected unit is present and has its evidence, and the warn minimums
-    hold on the units that did not abstain: a detector that (nearly) always
-    abstains is refused here, never recorded as refused.
-    """
+def evidence_problems(scores: Mapping[str, Any], what: str = "") -> list[str]:
+    """Every expected unit of a scores document is present, has its evidence and no failed judge row."""
     problems: list[str] = []
-    floors = point["minimumUnits"]
     counts = scores["counts"]
     if counts.get("skipped"):
-        problems.append(f"units were skipped ({counts['skipped']}); every expected unit is scored")
+        problems.append(f"{what}units were skipped ({counts['skipped']}); every expected unit is scored")
     expected = counts.get("expected") or {}
     cohort_units = sum(1 for unit in scores["units"] if unit["injectorID"] is None)
     injected_units = sum(1 for unit in scores["units"] if unit["injectorID"] is not None)
     if (cohort_units, injected_units) != (expected.get("cohortTakes"), expected.get("injections")):
-        problems.append(f"{cohort_units} cohort and {injected_units} injected units, where the manifests list "
-                        f"{expected.get('cohortTakes')} and {expected.get('injections')}")
+        problems.append(f"{what}{cohort_units} cohort and {injected_units} injected units, where the manifests "
+                        f"list {expected.get('cohortTakes')} and {expected.get('injections')}")
     gaps = evidence_gaps(scores["units"])
     if gaps:
-        problems.append(f"{sum(gaps.values())} in-scope units have no evidence ({dict(sorted(gaps.items()))}); "
-                        "every expected unit needs its evidence")
+        problems.append(f"{what}{sum(gaps.values())} in-scope units have no evidence "
+                        f"({dict(sorted(gaps.items()))}); every expected unit needs its evidence")
     failed = sum(1 for unit in scores["units"] if unit["inScope"] and unit["abstain"] in RUN_FAILURES)
     if failed:
-        problems.append(f"{failed} in-scope units have a failed judge row (unavailable: an admission or row "
+        problems.append(f"{what}{failed} in-scope units have a failed judge row (unavailable: an admission or row "
                         "timeout, a crash or an envelope breach); run that panel again on a new cache root")
+    return problems
+
+
+def fail_minimum_problems(entry: Mapping[str, Any], inputs: Mapping[str, Any], point: Mapping[str, Any],
+                          n3_units: Sequence[Mapping[str, Any]]) -> list[str]:
+    """The fail point's minimum units, counted on scored families: N2 negatives pooled and per language over
+    its language count, positives per declared severe and moderate cell, a sham cell per injector, and N3
+    negatives per language of the N2 negatives."""
+    floors = point["minimumUnits"]
+    problems = []
+    negatives = [unit for unit in inputs["negatives"] if unit["score"] is not None]
+    population = next((unit["population"] for unit in inputs["negatives"]), point["farPopulation"])
+    families = _scored_families(negatives)
+    if len(families) < floors["n2Negatives"]:
+        problems.append(f"{len(families)} scored {population} negative families, the fail floor is "
+                        f"{floors['n2Negatives']}")
+    languages = sorted({unit["language"] for unit in negatives})
+    if len(languages) < floors["languages"]:
+        problems.append(f"{len(languages)} languages among the scored negatives, the fail floor is "
+                        f"{floors['languages']}")
+    for language in languages:
+        count = len(_scored_families(unit for unit in negatives if unit["language"] == language))
+        if count < floors["n2NegativesPerLanguage"]:
+            problems.append(f"{language}: {count} scored {population} negative families, the fail floor is "
+                            f"{floors['n2NegativesPerLanguage']}")
+    cell_floor = floors["positivesPerCell"]
+    for mechanism, cells in sorted(registry_lib.declared_cells(entry).items()):
+        for cell in sorted(cells):
+            if cell.rsplit("/", 1)[-1] not in FAIL_SEVERITIES:
+                continue
+            count = len(_scored_families(inputs["positives"].get(mechanism, {}).get(cell, [])))
+            if count < cell_floor:
+                problems.append(f"{mechanism} {cell}: {count} scored positive families, the fail floor is {cell_floor}")
+    for injector in sham_cells(entry):
+        count = len(_scored_families(inputs["shams"].get(injector, [])))
+        if count < cell_floor:
+            problems.append(f"{injector}: {count} scored sham families, the fail floor is {cell_floor} (A4)")
+    n3_floor = floors["n3NegativesPerLanguage"]
+    for language in languages:
+        count = len(_scored_families(unit for unit in n3_units if unit["language"] == language))
+        if count < n3_floor:
+            problems.append(f"{language}: {count} scored N3 families, the fail floor is {n3_floor} (A2)")
+    return problems
+
+
+def preconditions(entry: Mapping[str, Any], inputs: Mapping[str, Any], point: Mapping[str, Any],
+                  scores: Mapping[str, Any], n3: Mapping[str, Any] | None = None) -> list[str]:
+    """What must hold before the one confirmation starts, counted on scored units (never on alarms).
+
+    Every expected unit is present and has its evidence, and the operating
+    point's minimums hold on the units that did not abstain: a detector that
+    (nearly) always abstains is refused here, never recorded as refused. A fail
+    point also needs its N3 bound scores (`n3`) complete.
+    """
+    problems = evidence_problems(scores)
+    floors = point["minimumUnits"]
+    if fail_like(point):
+        problems += evidence_problems(n3, "N3 bound: ") if n3 is not None else ["no N3 bound scores"]
+        return problems + fail_minimum_problems(entry, inputs, point, _in_scope((n3 or {}).get("units") or (), "N3"))
     negatives = [unit for unit in inputs["negatives"] if unit["score"] is not None]
     families = _scored_families(negatives)
     population = next((unit["population"] for unit in inputs["negatives"]), "N2")
@@ -1584,13 +1773,19 @@ def injection_construction_problems(plan: thresholds.PreRegistration, scores: Ma
 
 def confirmation_evidence_problems(repository: Repository, plan: thresholds.PreRegistration,
                                    scores: Mapping[str, Any]) -> list[str]:
-    problems = injection_construction_problems(plan, scores)
+    return injection_construction_problems(plan, scores) + freshness_problems(repository, plan, scores)
+
+
+def freshness_problems(repository: Repository, plan: thresholds.PreRegistration, scores: Mapping[str, Any], *,
+                       bound: bool = False) -> list[str]:
+    """Every panel and measurement behind confirmation-side scores computed from scratch after the plan (A5)."""
+    problems = []
     planned_at = repository.store.commit_time(plan)
     sources = scores.get("sources") or {}
-    for key, what in (("bundle", "the confirmation cohort's panel bundle"),
-                      ("positiveBundle", "the positives' panel bundle")):
+    cohort = "the N3 bound cohort's" if bound else "the confirmation cohort's"
+    for key, what in (("bundle", f"{cohort} panel bundle"), ("positiveBundle", "the positives' panel bundle")):
         problems.extend(panel_freshness_problems(sources.get(key), planned_at, what))
-    for key, what in (("measurements", "the confirmation cohort's measurements"),
+    for key, what in (("measurements", f"{cohort} measurements"),
                       ("positiveMeasurements", "the positives' measurements")):
         problems.extend(measurement_freshness_problems(sources.get(key), planned_at, what))
     return problems
@@ -1613,7 +1808,7 @@ def measurement_freshness_problems(source: Mapping[str, Any] | None, planned_at:
 
 
 def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], derived: Mapping[str, Any],
-               population: str, positives_population: str = "P1") -> list[dict]:
+               population: str, positives_population: str | Sequence[str] = "P1") -> list[dict]:
     """Per consensus group: the two families' failure correlation, each voting at the unit's threshold.
 
     A family fails a clean negative when its own score alarms, and a target
@@ -1634,7 +1829,7 @@ def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], der
             if unit["population"] == population and unit["injectorID"] is None:
                 expected = False
                 negatives += 1
-            elif unit["population"] == positives_population and unit["cell"]:
+            elif unit["population"] in _populations(positives_population) and unit["cell"]:
                 expected = True
                 positives += 1
             else:
@@ -1706,6 +1901,26 @@ def check_n3(n3: Mapping[str, Any], calibration: Mapping[str, Any], entry: Mappi
         raise CalibrationError("the --n3-scores cannot be reported, nothing was recorded: " + "; ".join(problems))
 
 
+def check_bound(n3: Mapping[str, Any], plan: thresholds.PreRegistration, calibration: Mapping[str, Any]) -> None:
+    """A fail plan's N3 bound scores: its cohort, scored under --role bound like the calibration (A7)."""
+    problems = []
+    if n3.get("detector") != plan.detector or n3.get("role") != "bound":
+        problems.append("they are not this detector's N3 bound scores (--role bound)")
+    if (n3.get("cohort") or {}).get("manifestDigest") != plan.binding("n3CohortDigest"):
+        problems.append("their cohort is not the one the plan names (n3CohortDigest)")
+    if n3.get("detectorDefinitionSHA256") != calibration.get("detectorDefinitionSHA256"):
+        problems.append("they were scored under another definition")
+    if n3.get("scoringCodeSHA256") != calibration.get("scoringCodeSHA256"):
+        problems.append("they were scored by other scoring code (A7)")
+    if n3.get("judgeIdentities") != calibration.get("judgeIdentities"):
+        problems.append("a consumed judge's output identity differs from the calibration's (A7)")
+    if n3.get("evidenceIdentity") != calibration.get("evidenceIdentity"):
+        problems.append("the orchestrator source or a metric version differs from the calibration's (A7)")
+    if problems:
+        raise CalibrationError("the --n3-scores cannot bound the flag rate, nothing was recorded: "
+                               + "; ".join(problems))
+
+
 def _timestamp(seconds: int) -> str:
     return datetime.fromtimestamp(seconds, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -1714,8 +1929,13 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
                  derived: Mapping[str, Any], outcome: Mapping[str, Any], calibration: Mapping[str, Any],
                  confirmation: Mapping[str, Any], inputs: Mapping[str, Any], disjointness: Mapping[str, Any],
                  phi: Sequence[Mapping[str, Any]], informational: Mapping[str, Any] | None,
-                 informative: Mapping[str, bool], planned_at: int, positives_population: str = "P1") -> dict:
+                 informative: Mapping[str, bool], planned_at: int,
+                 positives_population: str | Sequence[str] = "P1",
+                 bound: Mapping[str, Any] | None = None) -> dict:
+    """The tracked record of one confirmation. A fail point's record also names its N3 bound (`bound`: the N3
+    scores): its cohort, its panel, its N3 counts and the flag-rate bound the ledger outcome holds."""
     qualified = outcome["status"] == "qualified"
+    point = plan.binding("operatingPoint")
 
     def counts(units: Iterable[Mapping[str, Any]]) -> dict:
         units = list(units)
@@ -1728,16 +1948,22 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
     sources = confirmation["sources"]
     injection = sources["injectionSet"]
     panels = [{"cohort": role, "bundleDigest": sources[key]["bundleDigest"], "startedAt": sources[key]["startedAt"]}
-              for key, role in (("bundle", plan.population), ("positiveBundle", f"{positives_population}+S"))
+              for key, role in (("bundle", plan.population),
+                                ("positiveBundle", "+".join((*_populations(positives_population), "S"))))
               if sources.get(key)]
+    bound_panel = ((bound or {}).get("sources") or {}).get("bundle")
+    if bound_panel:
+        panels.append({"cohort": "N3", "bundleDigest": bound_panel["bundleDigest"],
+                       "startedAt": bound_panel["startedAt"]})
     record = {
         "schema": RECORD_SCHEMA, "kind": RECORD_KIND,
         "detector": entry["id"], "class": entry["class"], "stage": entry["stage"],
         "direction": entry["direction"], "combination": entry["score"]["combination"],
         "judges": [{"judge": judge, "outputIdentities": values}
                    for judge, values in sorted(confirmation["judgeIdentities"].items())],
-        "operatingPoint": plan.binding("operatingPoint"),
-        "verdict": outcome["status"], "level": "warn" if qualified else None, "reasons": list(outcome["reasons"]),
+        "operatingPoint": point,
+        "verdict": outcome["status"], "level": POINT_LEVELS.get(point) if qualified else None,
+        "reasons": list(outcome["reasons"]),
         "planSHA256": plan.digest(),
         "detectorDefinitionSHA256": registry_lib.definition_digest(entry),
         "registries": {"detectorsSHA256": file_sha256(repository.registry_path),
@@ -1771,7 +1997,10 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
                       "alpha": plan.alpha, "rule": plan.rule, "unit": "source-family"},
         "counts": {"calibration": counts(calibration_negatives),
                    "confirmation": {plan.population: counts(inputs["negatives"]),
-                                    positives_population: counts(positives), "S": counts(shams)}},
+                                    **{population: counts(unit for unit in positives
+                                                          if unit["population"] == population)
+                                       for population in _populations(positives_population)},
+                                    "S": counts(shams)}},
         "rates": {key: outcome[key] for key in ("farPooled", "farPerLanguage", "cleanAbstention", "mechanisms",
                                                 "mechanismsMeeting", "mechanismsMin", "shams")},
         # A4 per injector; a cell whose shams are clean cohort audio is recorded but cannot fail.
@@ -1785,6 +2014,12 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
         "informational": dict(informational) if informational else None,
         "ledgerOutcomeSHA256": json_digest(dict(outcome)),
     }
+    if bound is not None:
+        # The N3 flag-rate bound (A2): what the fail point confirms beside N2, pinned like the cohorts.
+        record["cohorts"]["n3"] = {"kind": bound["cohort"]["kind"], "manifestDigest": bound["cohort"]["manifestDigest"],
+                                   "scoresSHA256": bound["scoresSHA256"]}
+        record["counts"]["confirmation"]["N3"] = counts(_in_scope(bound["units"], "N3"))
+        record["rates"]["n3"] = outcome["n3"]
     return record
 
 
@@ -1794,7 +2029,7 @@ def record_path(repository: Repository, detector: str, plan_digest: str) -> Path
 
 def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
     registry, entry = repository.entry(args.detector)
-    plan = committed_plan(repository, entry)
+    plan = committed_plan(repository, entry, args.operating_point)
     if repository.ledger.outcome(plan.digest()) is not None:
         raise CalibrationError("this plan was already confirmed; confirmation runs once (A5)")
     calibration = load_scores(args.calibration_scores)
@@ -1802,7 +2037,8 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
     policy = repository.policy()
     point = policy["operatingPoints"][plan.binding("operatingPoint")]
     floors = point["minimumUnits"]
-    derived = derivation(repository, entry, plan, calibration, int(floors["calibration"]))
+    fail = fail_like(point)
+    derived = derivation(repository, entry, plan, calibration, calibration_floor(repository, plan))
     if derived["status"] != "derived":
         short = {key: item["calibrationUnits"] for key, item in derived["byStratum"].items()
                  if item["status"] != "derived"}
@@ -1810,7 +2046,7 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
                                f"{next(iter(derived['byStratum'].values()))['minimumNegatives']} needed")
     _check_pair(plan, calibration, confirmation)
     roles = registry_lib.role_set(registry, entry)
-    positives_population = roles["positives"]["population"]
+    positives_population = positive_populations(roles, entry)
     split = expected_split(cohort_rule(entry), roles, "confirmNegatives")
     if split is not None and scores_split(confirmation) != split:
         raise CalibrationError(f"the confirmation scores are not of {split_name(split)}")
@@ -1818,7 +2054,17 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
     if problems:
         raise CalibrationError("the confirmation cannot start, nothing was recorded: " + "; ".join(problems))
     n3 = None
-    if args.n3_scores:
+    if fail:
+        # The fail point bounds the N3 flag rate on the cohort its plan names, scored after the plan (A2, A5).
+        if not args.n3_scores:
+            raise CalibrationError(f"a {plan.binding('operatingPoint')} confirmation bounds the N3 flag rate: pass "
+                                   "--n3-scores (the plan's N3 cohort scored under --role bound)")
+        n3 = load_scores(args.n3_scores)
+        check_bound(n3, plan, calibration)
+        problems = freshness_problems(repository, plan, n3, bound=True)
+        if problems:
+            raise CalibrationError("the confirmation cannot start, nothing was recorded: " + "; ".join(problems))
+    elif args.n3_scores:
         if "N3" not in roles["informational"]:
             raise CalibrationError(f"role set {entry['populations']} reports no N3 informational rate (it reports "
                                    f"{roles['informational'] or 'none'}); nothing was recorded")
@@ -1828,7 +2074,7 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
         plan, [(unit["family"], unit["speaker"], unit["scriptID"]) for unit in calibration["units"]],
         [(unit["family"], unit["speaker"], unit["scriptID"]) for unit in confirmation["units"]])
     inputs = confirmation_inputs(entry, confirmation["units"], plan.population, positives_population)
-    problems = preconditions(entry, inputs, point, confirmation)
+    problems = preconditions(entry, inputs, point, confirmation, n3 if fail else None)
     if problems:
         raise CalibrationError("the confirmation cannot start, nothing was recorded: " + "; ".join(problems))
     threshold = dict(derived["thresholds"])
@@ -1839,14 +2085,18 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
         positives={mechanism: {cell: [_scored(unit, derived) for unit in scored] for cell, scored in cells.items()}
                    for mechanism, cells in inputs["positives"].items()},
         shams={injector: [_scored(unit, derived) for unit in scored] for injector, scored in inputs["shams"].items()},
-        sham_cells=sham_cells(entry), sham_minimum=int(floors["bad"]), sham_informative=informative)
+        sham_cells=sham_cells(entry), sham_minimum=int(floors["positivesPerCell" if fail else "bad"]),
+        sham_informative=informative)
+    if fail:
+        arguments["n3_negatives"] = [_scored(unit, derived) for unit in _in_scope(n3["units"], "N3")]
     preview = thresholds.evaluate_confirmation(plan, threshold, **arguments)
     phi = phi_audits(entry, confirmation["units"], derived, plan.population, positives_population)
-    informational = informational_n3(n3["units"], derived) if n3 is not None else None
+    informational = informational_n3(n3["units"], derived) if n3 is not None and not fail else None
     record = build_record(repository, entry, plan, derived=derived, outcome=preview, calibration=calibration,
                           confirmation=confirmation, inputs=inputs, disjointness=disjointness, phi=phi,
                           informational=informational, informative=informative,
-                          planned_at=repository.store.commit_time(plan), positives_population=positives_population)
+                          planned_at=repository.store.commit_time(plan), positives_population=positives_population,
+                          bound=n3 if fail else None)
     problems = record_errors(record)
     if problems:
         raise CalibrationError("the record would not validate, nothing was recorded: " + "; ".join(problems[:3]))
@@ -1889,10 +2139,21 @@ def record_errors(record: Any) -> list[str]:
         errors.append("verdict is qualified or refused")
     if (record["verdict"] == "qualified") != (not record["reasons"]):
         errors.append("a qualified record has no reasons and a refused one has at least one")
-    if record["level"] != ("warn" if record["verdict"] == "qualified" else None):
-        errors.append("level is warn for a qualified warn record and null otherwise")
-    if record["operatingPoint"] not in SUPPORTED_OPERATING_POINTS:
+    point = record["operatingPoint"]
+    if point not in SUPPORTED_OPERATING_POINTS:
         errors.append(f"operatingPoint is one of {SUPPORTED_OPERATING_POINTS}")
+    level = POINT_LEVELS.get(point, "warn")
+    if record["level"] != (level if record["verdict"] == "qualified" else None):
+        errors.append(f"level is {level} for a qualified {point} record and null otherwise")
+    # A fail record carries its N3 flag-rate bound (A2) and the N3 cohort it was measured on; a warn one neither.
+    bounded = level == "fail"
+    rates_n3 = (record["rates"] or {}).get("n3") if isinstance(record["rates"], Mapping) else None
+    n3_cohort = (record["cohorts"] or {}).get("n3") if isinstance(record["cohorts"], Mapping) else None
+    if bounded and (not isinstance(rates_n3, Mapping) or not isinstance(n3_cohort, Mapping)
+                    or not is_sha256(n3_cohort.get("manifestDigest")) or not is_sha256(n3_cohort.get("scoresSHA256"))):
+        errors.append("a fail record carries its N3 bound (rates.n3) and pins its N3 cohort and scores by SHA-256")
+    if not bounded and (rates_n3 is not None or n3_cohort is not None):
+        errors.append("a warn record carries no N3 bound")
     for key in ("planSHA256", "detectorDefinitionSHA256", "ledgerOutcomeSHA256"):
         if not is_sha256(record[key]):
             errors.append(f"{key} must be a SHA-256")
@@ -1992,7 +2253,12 @@ def repository_errors(repository: Repository) -> list[str]:
             except thresholds.PreRegistrationError as error:
                 errors.append(f"{where}: {error}")
                 continue
-            expected = f"{plan.detector}.json" if not path.name.startswith("plan-") else f"plan-{plan.digest()}.json"
+            try:
+                named = repository.store.detector_path(plan.detector, plan.binding("operatingPoint")).name
+            except thresholds.PreRegistrationError as error:
+                errors.append(f"{where}: {error}")
+                continue
+            expected = named if not path.name.startswith("plan-") else f"plan-{plan.digest()}.json"
             if path.name != expected:
                 errors.append(f"{where}: the file is named {expected}")
             if path.read_text(encoding="utf-8") != json.dumps(plan.as_dict(), indent=2, sort_keys=True) + "\n":
@@ -2070,19 +2336,25 @@ def _describe_score(entry: Mapping[str, Any]) -> str:
 
 def build_report(repository: Repository, scores: Sequence[Mapping[str, Any]] = ()) -> str:
     registry = repository.registry()
-    lines = ["# Audio-QC detector qualification (warn)", "",
+    lines = ["# Audio-QC detector qualification", "", "Warn plans, and each fail-point plan as its own row.", "",
              "| Detector | Class | Direction | Strata | Score | Plan | Verdict | N2 FAR (upper) "
-             "| Worst language (upper) | Clean abstention | Severe detection (lower) | Shams overlap |",
+             "| Worst language (upper) | Clean abstention | Detection per cell (lower) | Shams overlap |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    rows = []
     for entry in registry["detectors"]:
-        plan = repository.store.load(entry["id"])
+        # The warn plan (or its absence), then any plan at a fail point beside it.
+        rows.append((entry, "warn", repository.store.load(entry["id"])))
+        rows.extend((entry, point, plan) for point in SUPPORTED_OPERATING_POINTS[1:]
+                    if (plan := repository.store.load(entry["id"], point)) is not None)
+    for entry, point, plan in rows:
         record = None
         if plan is not None:
             path = record_path(repository, entry["id"], plan.digest())
             record = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
         status = "none" if plan is None else plan.digest()[:12]
         strata = registry_lib.strata_by(entry) or registry_lib.POOLED
-        head = f"| {entry['id']} | {entry['class']} | {entry['direction']} | {strata} | {_describe_score(entry)} "
+        name = entry["id"] if point == "warn" else f"{entry['id']} ({point})"
+        head = f"| {name} | {entry['class']} | {entry['direction']} | {strata} | {_describe_score(entry)} "
         if record is None:
             lines.append(f"{head}| {status} | {'planned' if plan else '-'} | - | - | - | - | - |")
             continue
@@ -2148,6 +2420,8 @@ def parser() -> argparse.ArgumentParser:
                              "one per judge the detector reduces")
     scores.add_argument("--positive-raw-outputs", type=Path, action="append",
                         help="the same for the injection set's panel")
+    scores.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS,
+                        help="the plan that names the cohort (confirmation and bound roles)")
     scores.add_argument("--output", required=True, type=Path)
     plan = commands.add_parser("plan", help="write the detector's pre-registration")
     plan.add_argument("--detector", required=True)
@@ -2164,6 +2438,8 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--calibration-scores", required=True, type=Path)
     plan.add_argument("--alpha", required=True, type=float)
     plan.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS)
+    plan.add_argument("--n3-cohort", type=Path,
+                      help="for a fail point: the N3 takes manifest its flag rate is bounded on (A2)")
     plan.add_argument("--injection-catalog-seed", required=True, type=int,
                       help="the catalog seed the confirmation injection set will be built with")
     plan.add_argument("--injection-sample-seed", required=True, type=int)
@@ -2174,11 +2450,14 @@ def parser() -> argparse.ArgumentParser:
     derive.add_argument("--detector", required=True)
     derive.add_argument("--calibration-scores", required=True, type=Path)
     derive.add_argument("--output", type=Path)
+    derive.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS)
     confirm = commands.add_parser("confirm", help="the one confirmation of the committed plan")
     confirm.add_argument("--detector", required=True)
     confirm.add_argument("--calibration-scores", required=True, type=Path)
     confirm.add_argument("--confirmation-scores", required=True, type=Path)
-    confirm.add_argument("--n3-scores", type=Path)
+    confirm.add_argument("--n3-scores", type=Path,
+                         help="warn: informational N3 scores; a fail point: its N3 bound scores (--role bound)")
+    confirm.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS)
     report = commands.add_parser("report", help="markdown summary across detectors")
     report.add_argument("--scores", type=Path, nargs="*")
     report.add_argument("--output", type=Path)

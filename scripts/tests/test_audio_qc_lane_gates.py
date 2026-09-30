@@ -85,6 +85,37 @@ class LaneGateTests(unittest.TestCase):
         self.lane()(lambda lane: lane["gates"][0].update(level="fail"))
         self.assert_refused("qualified at warn, not fail")
 
+    def fail_record(self, point: str = "fail") -> None:
+        """Turn the fixture's warn record into a qualified record at a fail point, with its N3 bound."""
+        def change(record: dict) -> None:
+            record.update(operatingPoint=point, level="fail")
+            record["cohorts"]["n3"] = {"kind": "audio-qc-calibration-takes", "manifestDigest": "7" * 64,
+                                       "scoresSHA256": "8" * 64}
+            record["rates"]["n3"] = {"events": 0, "units": 180, "rate": 0.0, "lower": 0.0, "upper": 0.0165,
+                                     "confidence": 0.95, "method": "clopper-pearson-one-sided", "limit": 0.05,
+                                     "minimumUnits": None, "meets": True}
+        self.edit(self.record, change)
+
+    def test_a_fail_record_backs_a_fail_gate_and_the_evidence_lane_bar_no_product_lane(self) -> None:
+        self.fail_record()
+        self.lane()(lambda lane: lane["gates"][0].update(level="fail"))
+        self.assertEqual(self.errors(), [])
+        # A fail record also covers a warn gate.
+        self.lane()(lambda lane: lane["gates"][0].update(level="warn"))
+        self.assertEqual(self.errors(), [])
+        self.reset()
+        self.fail_record("evidenceLaneFail")
+        self.lane()(lambda lane: lane["gates"][0].update(level="fail"))
+        self.assertEqual(self.errors(), [])
+        self.lane()(lambda lane: lane.update(kind="product"))
+        self.assert_refused("operating point evidenceLaneFail does not apply to the lane's kind (product)")
+        self.reset()
+        # A fail record without its N3 bound is no valid record.
+        self.fail_record()
+        self.edit(self.record, lambda record: record["rates"].pop("n3"))
+        self.lane()(lambda lane: lane["gates"][0].update(level="fail"))
+        self.assert_refused("not a valid record (a fail record carries its N3 bound")
+
     def test_a_record_of_an_earlier_definition_does_not_back_a_gate(self) -> None:
         def reword(registry: dict) -> None:
             next(entry for entry in registry["detectors"] if entry["id"] == CONTENT)["measures"] += " Reworded."

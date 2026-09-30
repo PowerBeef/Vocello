@@ -109,6 +109,36 @@ class GoldenTests(FixtureCase):
         self.assertIn("| B (content) | confirmed (qualified) | qualified (warn) | 7/359 (0.019), upper 0.036 |", report)
 
 
+class FailPlanTests(FixtureCase):
+    def test_a_fail_plan_and_a_fail_record_are_rendered_beside_the_warn_ones(self) -> None:
+        from lib.qc_qualification import thresholds
+
+        directory = self.root / "config/audio-qc-preregistrations"
+        warn = json.loads((directory / f"{CONTENT}.json").read_text(encoding="utf-8"))
+        warn["bindings"].update(operatingPoint="fail", n3CohortDigest="7" * 64)
+        warn["alpha"] = 0.005
+        plan = thresholds.PreRegistration.from_dict(warn)
+        thresholds.PreRegistrationStore(directory, naming="detector").commit(plan)
+        self.assertTrue((directory / f"{CONTENT}.fail.json").is_file())
+        record = next((self.root / RECORD_DIRECTORY).glob("record-*.json")).relative_to(self.root).as_posix()
+
+        def fail(value: dict) -> None:
+            value.update(operatingPoint="fail", level="fail")
+            value["cohorts"]["n3"] = {"kind": "audio-qc-calibration-takes", "manifestDigest": "7" * 64,
+                                      "scoresSHA256": "8" * 64}
+            value["rates"]["n3"] = {"events": 1, "units": 600, "rate": 0.001667, "lower": 0.0, "upper": 0.0079,
+                                    "confidence": 0.95, "method": "clopper-pearson-one-sided", "limit": 0.05,
+                                    "minimumUnits": None, "meets": True}
+        self.edit_json(record, fail)
+        self.regen()
+        page = self.read("detectors/content.consensus-error-v1.md")
+        self.assertIn(f"**Plan (fail).** [{docs.PREREGISTRATIONS}/{CONTENT}.fail.json]", page)
+        self.assertIn("N3 bound manifest `7777777777777777`", page)
+        self.assertIn("**Status.** Qualified (fail); confirmed (qualified); fail planned.", page)
+        self.assertIn("N3 bound (A2): flag rate 1/600 (0.002), upper 0.008 (limit 0.05, meets yes)", page)
+        self.assertIn("confirmed (qualified); fail planned", self.read("README.md"))
+
+
 class NoRecordTests(FixtureCase):
     def test_without_a_record_every_page_says_not_qualified(self) -> None:
         shutil.rmtree(self.root / RECORD_DIRECTORY)

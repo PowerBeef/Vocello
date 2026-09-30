@@ -1047,6 +1047,15 @@ class CohortPlanTests(unittest.TestCase):
             with self.assertRaises(thresholds.PreRegistrationError):
                 store.commit(self.plan(alpha=0.04))
             self.assertIsNone(store.load("test.other@1"))
+            # A plan at another operating point is filed beside the warn plan of the same version.
+            fail = self.plan(alpha=0.005, bindings=(("operatingPoint", "fail"), ("detectorDefinitionSHA256", "3" * 64)))
+            self.assertEqual(store.commit(fail).name, "test.consensus-error@1.fail.json")
+            self.assertEqual((store.load(plan.detector), store.load(plan.detector, "fail")), (plan, fail))
+            self.assertIsNone(store.load(plan.detector, "evidenceLaneFail"))
+            (Path(directory) / "test.consensus-error@1.evidenceLaneFail.json").write_text(
+                (Path(directory) / "test.consensus-error@1.fail.json").read_text(encoding="utf-8"), encoding="utf-8")
+            with self.assertRaisesRegex(thresholds.PreRegistrationError, "at operating point fail"):
+                store.load(plan.detector, "evidenceLaneFail")
 
     def test_each_sham_cell_is_tested_alone_with_a_minimum(self) -> None:
         plan = self.plan()
@@ -1889,6 +1898,288 @@ class RoleSetCohortTests(unittest.TestCase):
         cohort["n1ManifestSHA256"] = calibration.file_sha256(unlabelled_n1)
         with self.assertRaisesRegex(calibration.CalibrationError, "names no speaker"):
             calibration.resolve_cohort(cohort, unlabelled_n1)
+
+
+FAIL_DETECTOR = "test.fail-level@1"
+FAIL_FLAGS = ("--injection-catalog-seed", "7", "--injection-sample-seed", "1", "--injection-sample-per-cell", "150",
+              "--injection-classes", "A,B,C,D,F")
+
+
+def fail_level_entry() -> dict:
+    """A pooled Stage 0 detector over every product language whose targets span two construction tiers with
+    severe and moderate cells: what a fail point measures (A3)."""
+    return {**level_entry(), "id": FAIL_DETECTOR, "scope": scope(ALL_LANGUAGES),
+            "score": {"combination": "single", "unit": "dbfs", "groups": [
+                {"languages": list(ALL_LANGUAGES), "components": [{"source": "fastqc", "field": "rmsDBFS"}]}]},
+            "targets": [{"injectorID": "SIG-LEVEL", "severities": ["moderate", "severe"],
+                         "mechanism": "T1-pcm-construction"},
+                        {"injectorID": "COD-GAIN", "severities": ["moderate", "severe"],
+                         "mechanism": "T2-codec-construction"}],
+            "shams": [{"injectorID": "SIG-LEVEL", "mechanism": "T1-pcm-construction"},
+                      {"injectorID": "COD-GAIN", "mechanism": "T2-codec-construction"}]}
+
+
+class FailFixture(Fixture):
+    """FLEURS-like N2 dev and test cohorts over the ten product languages at the fail floors (124 families
+    each), an N3 bound cohort (60 per language), and a two-tier injection set (60 families per cell)."""
+
+    def __init__(self, root: Path) -> None:
+        super().__init__(root, per_language=124, positives_per_language=6)
+        registry = json.loads((self.repo / calibration.REGISTRY).read_text(encoding="utf-8"))
+        registry["detectors"].append(fail_level_entry())
+        (self.repo / calibration.REGISTRY).write_text(json.dumps(registry, indent=2), encoding="utf-8")
+        git(self.repo, "add", "config")
+        git(self.repo, "commit", "-q", "--no-verify", "-m", "fail detector")
+
+    def cohort(self, name: str, tag: str) -> Path:
+        takes = []
+        for language in ALL_LANGUAGES:
+            for index in range(self.per_language):
+                take_id = f"{tag}-{language[:2]}-{index:03d}--n2"
+                takes.append({"takeID": take_id, "family": f"{tag}-{language}-{index}", "language": language,
+                              "scriptID": f"flores-{tag}{index % 12}", "eligible": True, "population": "N2",
+                              "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)})
+        manifest = signed({"kind": "audio-qc-n2-cohort", "schemaVersion": 1, "runID": f"run-{name}",
+                           "n1ManifestSHA256": calibration.file_sha256(self.n1[name]), "takes": takes})
+        return write_json(self.root / name / "n2-manifest.json", manifest)
+
+    def n3_cohort(self, per_language: int = 60) -> Path:
+        takes = []
+        for language in ALL_LANGUAGES:
+            for index in range(per_language):
+                voice = ("ryan", "vivian", "eric")[index % 3]
+                take_id = f"b{language[:2]}{index:03d}--{voice}"
+                takes.append({"takeID": take_id, "family": f"b{language[:2]}{index:03d}:{voice}:7",
+                              "scriptID": f"b{language[:2]}{index:03d}", "language": language,
+                              "voice": {"kind": "builtin", "id": voice}, "status": "generated",
+                              "wavSHA256": sha(f"wav:{take_id}"), "textSHA256": sha(REFERENCE)})
+        return write_json(self.root / "n3-bound" / "takes-manifest.json", signed(
+            {"schemaVersion": 1, "kind": calibration.N3_KIND, "runID": "run-bound", "split": "confirmation",
+             "takes": takes}))
+
+    def fail_injection_set(self) -> Path:
+        entries = []
+        for take in self.takes(self.confirmation):
+            if self.index(take["takeID"]) >= self.positives_per_language:
+                continue
+            for injector, mechanism, population in (("SIG-LEVEL", "T1-pcm-construction", "P1"),
+                                                    ("COD-GAIN", "T2-codec-construction", "P2")):
+                for severity in ("moderate", "severe", "sham"):
+                    clip = f"{take['takeID']}__{injector}__{severity}"
+                    kind = "S" if severity == "sham" else population
+                    injection = {"injectorID": injector, "injector": f"{injector}@1", "variant": severity,
+                                 "catalogVersion": injectors.CATALOG_VERSION, "severity": severity, "classes": ["A"],
+                                 "mechanism": mechanism, "population": kind,
+                                 "sourcePCMSHA256": sha(f"pcm:{take['takeID']}"), "outputPCMSHA256": sha(f"pcm:{clip}")}
+                    if mechanism.startswith("T2"):
+                        injection["provenance"] = {"tier": "T2", "traceSHA256": sha(f"trace:{clip}"),
+                                                   "recipeSHA256": sha(f"recipe:{clip}"),
+                                                   "decoderSHA256": sha("decoder")}
+                    entries.append({"takeID": clip, "sourceTakeID": take["takeID"], "family": take["family"],
+                                    "language": take["language"], "textSHA256": take["textSHA256"],
+                                    "wavSHA256": sha(f"wav:{clip}"), "injection": injection})
+        return write_json(self.root / "fail-set" / "injection-set.json", {
+            "kind": calibration.INJECTION_SET_KIND, "schemaVersion": 1,
+            "sourceManifest": {"sha256": calibration.file_sha256(self.confirmation), "kind": "audio-qc-n2-cohort"},
+            "catalogVersion": injectors.CATALOG_VERSION, "catalogSeed": 7, "classes": ["A", "B", "C", "D", "F"],
+            "sampling": {"perCell": 150, "seed": 1}, "entries": entries, "entriesSHA256": json_digest(entries)})
+
+    def measurements(self, cohort: Path, name: str, *, injection_set: Path | None = None,
+                     started_at: str | None = FRESH) -> Path:
+        path = super().measurements(cohort, name, injection_set=injection_set, started_at=started_at)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for clip in data["clips"]:
+            if clip["population"] in ("P1", "P2"):
+                clip["fastQC"]["rmsDBFS"] = -70.0
+            elif clip["population"] == "N3":
+                clip["fastQC"]["rmsDBFS"] = -20.0
+        data["clipsSHA256"] = json_digest(data["clips"])
+        return write_json(path, data)
+
+    def n3_measurements(self, cohort: Path, name: str) -> Path:
+        clips = [{"clipID": take["takeID"], "population": "N3", "family": take["family"],
+                  "sourceTakeID": take["takeID"], "language": take["language"], "injection": None,
+                  "wavSHA256": take["wavSHA256"], "fastQC": {"rmsDBFS": -20.0}, "observations": {}}
+                 for take in self.takes(cohort)]
+        return write_json(self.root / f"{name}.json", {
+            "kind": calibration.MEASUREMENTS_KIND, "schemaVersion": 1, "startedAt": FRESH,
+            "subject": {"detector": "fastqc@8", "mirror": "fastqc-v8-numpy/1"},
+            "takesManifestSHA256": calibration.file_sha256(cohort), "entriesSHA256": None,
+            "clipsSHA256": json_digest(clips), "clips": clips})
+
+
+class FailLevelTests(unittest.TestCase):
+    """The fail operating point (decision 5): a fail plan beside the warn plan of one detector version, its N3
+    bound, its floors and a fail record the lane gates accept."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.template = FailFixture(Path(cls.directory.name) / "template")
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.directory.cleanup()
+
+    def setUp(self) -> None:
+        self.work = tempfile.TemporaryDirectory()
+        root = Path(self.work.name) / "fixture"
+        shutil.copytree(self.template.root, root)
+        self.fixture = copy.copy(self.template)
+        self.fixture.root, self.fixture.repo = root, root / "repo"
+        self.fixture.n1 = {key: root / path.name for key, path in self.template.n1.items()}
+        self.fixture.calibration = root / "calibration" / "n2-manifest.json"
+        self.fixture.confirmation = root / "confirmation" / "n2-manifest.json"
+        self.out = root / "out"
+
+    def tearDown(self) -> None:
+        self.work.cleanup()
+
+    def cli(self, *argv: str, expect: int = 0) -> str:
+        code, out, err = run("--repo-root", str(self.fixture.repo), *argv)
+        self.assertEqual(code, expect, f"{argv[0]}: {err}")
+        return out + err
+
+    def scores(self, role: str, cohort: Path, name: str, *extra: str, n1: Path | None = None,
+               detector: str = FAIL_DETECTOR, expect: int = 0) -> Path | str:
+        output = self.out / f"{name}.json"
+        text = self.cli("scores", "--detector", detector, "--role", role, "--cohort", str(cohort),
+                        *(("--n1-manifest", str(n1)) if n1 else ()), "--output", str(output), *extra, expect=expect)
+        return output if expect == 0 else text
+
+    def plan(self, scores: Path, *extra: str, detector: str = FAIL_DETECTOR, expect: int = 0) -> str:
+        fixture = self.fixture
+        return self.cli("plan", "--detector", detector, "--calibration-cohort", str(fixture.calibration),
+                        "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
+                        str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), *FAIL_FLAGS, *extra,
+                        expect=expect)
+
+    def calibrated(self, detector: str = FAIL_DETECTOR) -> Path:
+        fixture = self.fixture
+        return self.scores("calibration", fixture.calibration, f"{detector}-calibration", "--measurements",
+                           str(fixture.measurements(fixture.calibration, f"cal-{detector}")),
+                           n1=fixture.n1["calibration"], detector=detector)
+
+    def test_a_fail_plan_needs_n2_two_mechanisms_every_language_and_its_n3_cohort(self) -> None:
+        fixture = self.fixture
+        n3 = fixture.n3_cohort()
+        level = self.calibrated("test.level@1")
+        refused = self.plan(level, "--alpha", "0.005", "--operating-point", "fail", "--n3-cohort", str(n3),
+                            detector="test.level@1", expect=2)
+        self.assertIn("its scope holds 3 languages; a fail bound covers 10", refused)
+        self.assertIn("0 construction mechanisms declare severe and moderate cells (none); fail measures detection "
+                      "on 2 (A3)", refused)
+        scores = self.calibrated()
+        self.assertIn("alpha must lie below the fail FAR bound 0.01",
+                      self.plan(scores, "--alpha", "0.05", "--operating-point", "fail", "--n3-cohort", str(n3),
+                                expect=2))
+        self.assertIn("names the N3 cohort its flag rate is bounded on",
+                      self.plan(scores, "--alpha", "0.005", "--operating-point", "fail", expect=2))
+        self.assertIn("bounds no N3 flag rate", self.plan(scores, "--alpha", "0.05", "--n3-cohort", str(n3),
+                                                           expect=2))
+        # The calibration floor at fail is the confirmation's N2 negative floor (1240 pooled families).
+        registry = calibration.Repository(fixture.repo).registry()
+        policy = json.loads((REPO / calibration.POLICY).read_text(encoding="utf-8"))
+        self.assertEqual(calibration.calibration_floor_of(policy["operatingPoints"]["fail"], None), 1240)
+        self.assertEqual(calibration.calibration_floor_of(policy["operatingPoints"]["fail"], "language"), 124)
+        self.assertEqual(calibration.calibration_floor_of(policy["operatingPoints"]["evidenceLaneFail"], None), 510)
+        self.assertEqual(calibration.calibration_floor_of(policy["operatingPoints"]["warn"], "language"), 60)
+        # A detector confirmed on N3 cannot qualify at fail: its FAR is not confirmed on N2 (A2).
+        loop = detectors.detector_entry(registry, "test.token-loop@1")
+        problems = calibration.fail_plan_problems(loop, detectors.role_set(registry, loop),
+                                                  policy["operatingPoints"]["fail"])
+        self.assertIn("the fail FAR is confirmed on N2 (A2); role set n3-codec-trace confirms on N3", problems)
+
+    def test_fail_and_warn_plans_of_one_version_confirm_separately(self) -> None:
+        fixture = self.fixture
+        n3 = fixture.n3_cohort()
+        scores = self.calibrated()
+        self.plan(scores, "--alpha", "0.05")
+        self.plan(scores, "--alpha", "0.005", "--operating-point", "fail", "--n3-cohort", str(n3))
+        directory = fixture.repo / "config/audio-qc-preregistrations"
+        warn_plan = json.loads((directory / f"{FAIL_DETECTOR}.json").read_text(encoding="utf-8"))
+        fail_plan = json.loads((directory / f"{FAIL_DETECTOR}.fail.json").read_text(encoding="utf-8"))
+        self.assertEqual((warn_plan["bindings"]["operatingPoint"], fail_plan["bindings"]["operatingPoint"]),
+                         ("warn", "fail"))
+        self.assertNotIn("n3CohortDigest", warn_plan["bindings"])
+        self.assertEqual(fail_plan["bindings"]["n3CohortDigest"], calibration.load_cohort(n3)["manifestDigest"])
+        self.assertIn("another fail plan", self.plan(scores, "--alpha", "0.004", "--operating-point", "fail",
+                                                     "--n3-cohort", str(n3), expect=2))
+        fixture.commit_plans()
+        self.cli("validate")
+        derived = json.loads(self.cli("derive", "--detector", FAIL_DETECTOR, "--calibration-scores", str(scores),
+                                      "--operating-point", "fail"))
+        self.assertEqual((derived["status"], derived["calibrationFloor"], derived["byStratum"]["pooled"]["rank"]),
+                         ("derived", 1240, 1235))
+        # The N3 bound is scored only under the fail plan, after it, and never for information.
+        n3_measured = fixture.n3_measurements(n3, "n3-bound/measurements")
+        self.assertIn("scored only under --role bound", self.scores(
+            "informational", n3, "n3-info", "--measurements", str(n3_measured), expect=2))
+        self.assertIn("scored only under the fail plan", self.scores(
+            "bound", n3, "n3-warn", "--measurements", str(n3_measured), expect=2))
+        bound = self.scores("bound", n3, "n3-bound", "--measurements", str(n3_measured), "--operating-point", "fail")
+        injection = fixture.fail_injection_set()
+        measured = fixture.measurements(fixture.confirmation, "confirmation/measurements", injection_set=injection)
+        confirmation = self.scores("confirmation", fixture.confirmation, "fail-confirmation", "--measurements",
+                                   str(measured), "--injection-set", str(injection), "--positive-measurements",
+                                   str(measured), "--operating-point", "fail", n1=fixture.n1["confirmation"])
+        document = json.loads(confirmation.read_text(encoding="utf-8"))
+        self.assertEqual(document["counts"]["byPopulation"], {"N2": 1240, "P1": 120, "P2": 120, "S": 120})
+        arguments = ("confirm", "--detector", FAIL_DETECTOR, "--calibration-scores", str(scores),
+                     "--confirmation-scores", str(confirmation), "--operating-point", "fail")
+        self.assertIn("pass --n3-scores", self.cli(*arguments, expect=2))
+        self.assertIn("not this detector's N3 bound scores", self.cli(*arguments, "--n3-scores", str(scores), expect=2))
+        result = json.loads(self.cli(*arguments, "--n3-scores", str(bound)))
+        self.assertEqual((result["verdict"], result["reasons"]), ("qualified", []))
+        record = json.loads((fixture.repo / result["record"]).read_text(encoding="utf-8"))
+        self.assertEqual(calibration.record_errors(record), [])
+        self.assertEqual((record["operatingPoint"], record["level"]), ("fail", "fail"))
+        self.assertEqual((record["rates"]["n3"]["units"], record["rates"]["n3"]["meets"]), (600, True))
+        self.assertEqual(record["cohorts"]["n3"]["scoresSHA256"], json.loads(bound.read_text())["scoresSHA256"])
+        self.assertEqual(sorted(record["counts"]["confirmation"]), ["N2", "N3", "P1", "P2", "S"])
+        self.assertEqual(record["rates"]["mechanismsMeeting"], ["T1-pcm-construction", "T2-codec-construction"])
+        self.assertEqual([panel["cohort"] for panel in record["evidence"]["confirmationPanels"]], [])
+        self.assertIn("once", self.cli(*arguments, "--n3-scores", str(bound), expect=2))
+        # The warn plan confirms on its own, once, into its own record.
+        warn = json.loads(self.cli("confirm", "--detector", FAIL_DETECTOR, "--calibration-scores", str(scores),
+                                   "--confirmation-scores", str(confirmation)))
+        warn_record = json.loads((fixture.repo / warn["record"]).read_text(encoding="utf-8"))
+        self.assertEqual((warn_record["level"], "n3" in warn_record["rates"]), ("warn", False))
+        self.assertNotEqual(warn["record"], result["record"])
+        self.cli("validate")
+        self.assertIn(f"{FAIL_DETECTOR} (fail)", self.cli("report"))
+        # A fail record without its N3 bound, or a warn record with one, is refused.
+        for mutation, fragment in ((lambda value: value["rates"].pop("n3"), "carries its N3 bound"),
+                                   (lambda value: value.update(level="warn"), "level is fail")):
+            broken = copy.deepcopy(record)
+            mutation(broken)
+            self.assertTrue(any(fragment in error for error in calibration.record_errors(broken)), fragment)
+        broken = copy.deepcopy(warn_record)
+        broken["rates"]["n3"] = record["rates"]["n3"]
+        self.assertIn("a warn record carries no N3 bound", calibration.record_errors(broken))
+
+    def test_the_fail_floors_hold_before_the_confirmation_starts(self) -> None:
+        fixture = self.fixture
+        n3 = fixture.n3_cohort(per_language=59)
+        scores = self.calibrated()
+        self.plan(scores, "--alpha", "0.005", "--operating-point", "fail", "--n3-cohort", str(n3))
+        fixture.commit_plans()
+        bound = self.scores("bound", n3, "n3-bound", "--measurements",
+                            str(fixture.n3_measurements(n3, "n3-bound/measurements")), "--operating-point", "fail")
+        fixture.positives_per_language = 5
+        injection = fixture.fail_injection_set()
+        measured = fixture.measurements(fixture.confirmation, "confirmation/measurements", injection_set=injection)
+        confirmation = self.scores("confirmation", fixture.confirmation, "short", "--measurements", str(measured),
+                                   "--injection-set", str(injection), "--positive-measurements", str(measured),
+                                   "--operating-point", "fail", n1=fixture.n1["confirmation"])
+        message = self.cli("confirm", "--detector", FAIL_DETECTOR, "--calibration-scores", str(scores),
+                           "--confirmation-scores", str(confirmation), "--operating-point", "fail", "--n3-scores",
+                           str(bound), expect=2)
+        self.assertIn("T1-pcm-construction SIG-LEVEL/moderate: 50 scored positive families, the fail floor is 60",
+                      message)
+        self.assertIn("COD-GAIN: 50 scored sham families, the fail floor is 60 (A4)", message)
+        self.assertIn("english: 59 scored N3 families, the fail floor is 60 (A2)", message)
+        self.assertFalse(list((fixture.repo / "config/audio-qc-preregistrations").glob("confirmation-*")))
 
 
 class RawOutputAndReferenceTests(unittest.TestCase):

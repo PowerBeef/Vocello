@@ -110,6 +110,7 @@
       "Bash(scripts/macos_test.sh lang-bench*)",
       "Bash(scripts/macos_test.sh qc-takes*)",
       "Bash(scripts/macos_test.sh qc-n2*)",
+      "Bash(scripts/macos_test.sh qc-introspection*)",
       "Bash(scripts/macos_test.sh gate*)",
       "Bash(scripts/macos_test.sh profile*)",
       "Bash(scripts/macos_test.sh telemetry-overhead*)",

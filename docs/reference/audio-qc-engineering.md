@@ -1815,9 +1815,9 @@ and the qc-takes lane keeps its diagnostics rows. The last column is the state o
 
 | Detector | Class | Score | Direction | Still needs |
 |---|---|---|---|---|
-| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labelled N2 corpus (a maintainer decision: role set `speaker-labeled-n2` is pending) and reference clips in the panel manifest |
-| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus |
-| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; the pYIN register and envelope parts of the joint onset rule |
+| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | Both speaker cohorts resynthesized to N2, CAM++ over them with their reference clips (the speaker cohort below; plannable this round) |
+| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | As clone-similarity, and the aligner on the confirmation cohort for the IDN-SWAP splices |
+| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | As window-drift (IDN-ONSET); the pYIN register and envelope parts of the joint onset rule |
 | `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on both FLEURS reserve panels, its frame track exported per take; pYIN's oracle ladder recorded |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
 | `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on both N3 splits of take plan version 2 (standard, clone and cross-lingual cells) |
@@ -1831,20 +1831,74 @@ and the qc-takes lane keeps its diagnostics rows. The last column is the state o
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
 (the speaker families, pYIN) runs on every take, so the validator counts it as covering every
-language. Its role set `speaker-labeled-n2` names pending corpora: FLEURS has no speaker ids, so
-the fit and confirmation cohorts wait for a maintainer decision on a speaker-labeled corpus whose
-terms allow speaker verification (not Common Voice), with two or more utterances per speaker,
-resynthesized to N2. Each language stratum needs 60 scored calibration families and 60
-confirmation negative families from at least 3 speakers, disjoint by family, speaker and script,
-plus 60 families per severe cell and per sham. Once the role set names the corpus instead of
-`pending-...`, `plan` reads its split, corpus name and speaker labels from the N1 manifest each N2
-cohort pins (`--calibration-n1-manifest`, `--confirmation-n1-manifest`) and checks speaker
+language. FLEURS has no speaker ids, so class E fits and confirms on the speaker cohort (the
+maintainer's decision of 2026-09-30 admits the speaker group for anonymous same- and
+different-speaker trials, outputs never published). Role set `speaker-labeled-n2` names it:
+`speaker-corpora-v1-calibration`, then `speaker-corpora-v1-confirmation` (`speaker-corpora-v1`).
+Each language stratum needs 60 scored calibration families and 60 confirmation negative families
+from at least 3 speakers, disjoint by family, speaker and script, plus 60 families per severe cell
+and per sham. `plan` reads the split, the corpus name and the speaker labels from the N1 manifest
+each N2 cohort pins (`--calibration-n1-manifest`, `--confirmation-n1-manifest`) and checks speaker
 disjointness beside family and script. Both cohorts name one corpus (speakers are digests of corpus
-and label, so two corpora would compare nothing), and the role set names it `<corpus>-calibration`
-and `<corpus>-confirmation`. A take (or an impostor positive) names its reference clip
-(`reference`: WAV path and digest); `audio_qc_orchestrator.py manifest --from-calibration-takes`
-passes it to the speaker judges, the take's private record names its digest, and `scores` refuses
-evidence measured against another clip than the declared one.
+and label, so two corpora would compare nothing), and a confirmed plan spends the corpus's
+confirmation split, whichever resynthesis of it a later plan names (A5). A take (or an impostor
+positive) names its reference clip (`reference`: WAV path and digest);
+`audio_qc_orchestrator.py manifest --from-calibration-takes` passes it to the speaker judges, the
+take's private record names its digest, and `scores` refuses evidence measured against another clip
+than the declared one.
+
+*The speaker cohort.* `audio_qc_corpora.py cohort --source speaker --split calibration|confirmation`
+builds both splits from the extracted speaker group, one corpus per language:
+
+| Language | Corpus | Gender | Families | Speakers | Audio (min) |
+|---|---|---|---|---|---|
+| English | LibriTTS-R dev.clean and test.clean | none | 324 / 339 | 36 / 38 | 52 / 51 |
+| German | Multilingual LibriSpeech | yes | 450 / 441 | 45 / 45 | 111 / 108 |
+| French | Multilingual LibriSpeech | yes | 322 / 325 | 33 / 33 | 79 / 81 |
+| Spanish | Multilingual LibriSpeech | yes | 347 / 340 | 36 / 34 | 87 / 87 |
+| Italian | Multilingual LibriSpeech | yes | 231 / 242 | 25 / 25 | 58 / 59 |
+| Portuguese | Multilingual LibriSpeech | yes | 219 / 219 | 23 / 22 | 55 / 56 |
+| Chinese | AISHELL-3 test subset | yes | 218 / 167 | 34 / 32 | 18 / 14 |
+| Korean | Zeroth-Korean | none | 563 / 580 | 57 / 58 | 82 / 81 |
+| **All eight** | | | **2,674 / 2,653** | **289 / 287** | **542 / 537 (9.0 h / 8.9 h)** |
+
+Each pair is calibration / confirmation, counted on the extraction of 2026-09-30.
+
+- **Takes.** A take is 4-30 s of transcribed speech: at least two of CAM++'s 2 s windows, and within
+  the codec round trip's bound. A neutral emotion is required where the corpus labels one, and each
+  speaker keeps at most 10 takes (a seeded choice).
+- **Splits.** Speakers are split by a seeded SHA-256 within each corpus, grouped by the language
+  they read most. A reader of two MLS languages is one speaker. A script read in both splits
+  (Zeroth-Korean repeats sentences across speakers) stays in one.
+- **Speaker labels.** Each take names its speaker, anonymized as `corpus:SHA-256[:16]`, and its
+  gender where the corpus labels one, never a guess.
+- **Reference clip.** Each take names its `reference`: another take of its speaker in the same split,
+  with another script. A speaker's takes are chained in a seeded cycle, so no two takes are each
+  other's reference while a third can serve. The qc-n2 lane keeps the labels, and each N2 take's
+  reference names the other take's resynthesis. Both sides of a trial therefore carry the codec, as
+  an impostor is scored against its N2 source take (`speaker-reference-n2`).
+
+**What is out of scope, and why.**
+
+- **Japanese and Russian** leave the scope (`no-speaker-corpus`). The speaker group has no corpus in
+  either: JVNV, of the emotion group, has four Japanese actors and no transcript, and RESD labels no
+  speaker.
+- **CREMA-D** serves no cohort. It has no transcript, and the N2 plan, the panel manifest and the
+  aligner read every take's text. Its clips are also 1-5 s and acted.
+- **Emozionalmente** serves no cohort either: Italian reads Multilingual LibriSpeech. With one corpus
+  per language, a donor never differs from its source by recording channel.
+
+**Where the identity positives come from** (`speaker-gender-unlabelled`). IDN-IMPOSTOR and the
+recorded IDN-SWAP and IDN-ONSET draw same-gender donors. LibriTTS-R and Zeroth-Korean publish no
+gender, and Korean has no word intervals for a splice. English and Korean therefore keep FAR bounds
+but receive only IDN-SHIFT. The other identity cells come from German, French, Spanish, Italian,
+Portuguese and Chinese.
+
+The confirmation cohort's panel also runs the aligner, whose word intervals the splices need
+(`audio_qc_calibration_set.py alignments`). Every injection-set entry keeps the reference clip of the
+take its audio came from, the path rebased onto the set. An impostor's reference is its source take.
+A sham counts as clean cohort audio for A4 only when its reference is also the one its audio's take
+is scored against, so the impostor's sham, a cohort take scored against another take, is informative.
 
 Class F reads a new source, `raw-output`: `detectors.py` reduces a panel judge's raw (L1) output,
 which the bundle does not keep, and `score_take(..., raw={judge: output})` takes it once the judge's
@@ -2476,6 +2530,11 @@ python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of d
   `spk-info.txt` and Emozionalmente from its `users.csv`. A speaker whose rows disagree keeps no
   gender, never a guess. LibriTTS-R and Zeroth-Korean carry none: their mirrors have no speaker
   table and no pinnable source was found on the allowed hosts.
+- **Speaker cohort.** `cohort --source speaker` turns the speaker group into class E's two N1
+  splits. It reads one corpus per language (English, German, French, Spanish, Italian, Portuguese,
+  Chinese, Korean) and names every take's reference clip. The class E paragraph under "Detector
+  qualification at warn" gives its rule and counts. CREMA-D stays emotion data (class H), and
+  Emozionalmente emotion data and a clone reference source.
 - **AISHELL-3 subset.** A seeded rule over the pinned test listing: the 76 speakers with at least
   100 WAVs, 20 WAVs each (lowest SHA-256 of seed and path), resolved to explicit per-WAV pins in
   `config/audio-qc-corpora/aishell3-test-subset.tsv` by `audio_qc_corpora.py resolve-subset`.
@@ -2559,14 +2618,15 @@ executes.
 | `language.nativeness@1` | FLEURS reserve-1, then reserve-2, with the speechocean762 confirmation split as positives | 0.05 | the warn default |
 | `prosody.pitch-instability@1` | the take plan's calibration split, then its confirmation split (standard, clone and cross-lingual cells) | 0.05 | the warn default |
 | `long-form.seam-discontinuity@1`, `long-form.seam-jump@1` | the long-form cell's calibration split, then its confirmation split | 0.05 | the warn default |
+| `identity.clone-similarity@1`, `identity.window-drift@1`, `identity.onset-drift@1` | the speaker cohort's calibration split, then its confirmation split (N2, eight languages) | 0.05 | the warn default |
 
 **No plan this round.**
 
-- Class E waits for the maintainer's speaker-labelled corpus decision (`speaker-labeled-n2` is pending).
 - Class I has no producer of its positives (COD-LOOP's replay mode, GEN-NOEOS's knob).
 - `long-form.seam-identity@1` has no positives on natural long-form takes (`seam-constructions`).
-- No fail plan is admissible. Every planned detector declares one construction mechanism, where the
-  fail point needs two (A3), and the fail points refuse the two-family mean (`mean-consensus-warn-only`).
+- No fail plan is admissible. No planned detector declares two construction mechanisms with severe
+  and moderate cells, as the fail point needs (A3), and the fail points refuse the two-family mean
+  (`mean-consensus-warn-only`). Class E also covers eight languages, where a fail point needs ten.
   Reserve-3 stays untouched for a later fail point.
 
 Estimates are for the M6. They scale two measured runs:
@@ -2583,12 +2643,16 @@ Every other step loads no model.
 A=build/artifacts/macos/audio-qc; C=build/cache/audio-qc-corpora; K=build/cache/delivery-analysis
 Q="python3 scripts/audio_qc_detector_calibration.py"; S="python3 scripts/audio_qc_calibration_set.py"
 O="python3 scripts/audio_qc_orchestrator.py"
-# The FLEURS reserve sampling of this registry (extract prints the paths) and speechocean762's cohorts.
+# The FLEURS reserve sampling of this registry (extract prints the paths), speechocean762's cohorts and the
+# speaker cohort (its cohort command prints the path; the digest names the extractions and the rule).
 RES=$C/fleurs/70bb2e84b976b7e960aa89f1c648e09c59f894dd/reserve/407a1df60f7c
 SOC=$C/speechocean762/06385584fad212b26134c656fdd3ccf9f093f33e/cohorts/share-0.5
+SPK=$C/speaker-cohorts/81599e2d4b2b/share-0.5
 J6="--judge asr.whisper-large-v3@1 --judge asr.parakeet-tdt-0.6b-v3@1 --judge asr.paraformer-zh@1 \
   --judge asr.sensevoice-small-f16@1 --judge align.qwen3-forcedaligner-0.6b@1 --judge pitch.pyin@1"
 J7="$J6 --judge lid.voxlingua107-ecapa@1"
+JE="--judge speaker.campplus-voxceleb@1"
+IDN="identity.clone-similarity@1 identity.window-drift@1 identity.onset-drift@1"
 
 # 1. [maintainer] Corpora: FLEURS train reserve, speaker, emotion and accent groups (28.96 GB).
 #    About 1-2 h, depending on the link; the extraction writes about 13.6 GB of WAVs.
@@ -2600,13 +2664,24 @@ python3 scripts/audio_qc_corpora.py verify --set lean
 #    confirmation split holds fewer than 60 severe utterances; rebuild it with a larger
 #    --confirmation-share before step 3, and point SOC at the share-<S> directory it prints.
 python3 scripts/audio_qc_corpora.py cohort --source speechocean762 --split confirmation
-# 3. [model] N2 resynthesis: reserve-1 and reserve-2, about 4,000 recordings each, est. 45 min each;
-#    speechocean762's confirmation split, about 2,500 utterances of about 4 s, est. 15 min. Reserve-3
-#    stays held back.
+#    The speaker cohort's two splits for class E (about 1 min each). Read the summary: every language
+#    needs 60 families and 3 speakers per split (on the extraction of 2026-09-30: 167 to 580 families
+#    and 22 to 58 speakers). A warning names a language below them, and that language leaves the
+#    identity scope (a registry change) rather than weakening the floor.
+python3 scripts/audio_qc_corpora.py cohort --source speaker --split calibration
+python3 scripts/audio_qc_corpora.py cohort --source speaker --split confirmation
+# 3. [model] N2 resynthesis:
+#    - reserve-1 and reserve-2, about 4,000 recordings each, est. 45 min each (reserve-3 stays held back);
+#    - speechocean762's confirmation split, about 2,500 utterances of about 4 s, est. 15 min;
+#    - both speaker splits, about 2,660 utterances and 9 h of audio each, est. 40-50 min each.
+#    The speaker runs keep each take's speaker, gender and reference clip.
 scripts/macos_test.sh qc-n2 --n1-manifest $RES/cohort-1/manifest.json --label aq07-reserve-1
 scripts/macos_test.sh qc-n2 --n1-manifest $RES/cohort-2/manifest.json --label aq07-reserve-2
 scripts/macos_test.sh qc-n2 --n1-manifest $SOC/confirmation/manifest.json --label aq07-speechocean762
+scripts/macos_test.sh qc-n2 --n1-manifest $SPK/calibration/manifest.json --label aq07-speaker-calibration
+scripts/macos_test.sh qc-n2 --n1-manifest $SPK/confirmation/manifest.json --label aq07-speaker-confirmation
 R1=$A/qc-n2-<reserve-1 run>; R2=$A/qc-n2-<reserve-2 run>; SO=$A/qc-n2-<speechocean762 run>
+E1=$A/qc-n2-<speaker calibration run>; E2=$A/qc-n2-<speaker confirmation run>
 # 4. [model] Take plan version 2: both splits, all four cells (about 3.5 h in all, estimated in the
 #    take plan section above).
 scripts/macos_test.sh qc-takes --split calibration --cells standard,clone,cross-lingual --label aq07-calibration-v2
@@ -2620,15 +2695,24 @@ python3 scripts/audio_qc_oracle_ladders.py build --ladder pyin
 $O run --manifest build/artifacts/diagnostics/audio-qc-oracle-ladders/pyin/manifest.json \
   --judge pitch.pyin@1 --bundle $A/oracle-ladder-pyin-<date>
 python3 scripts/audio_qc_oracle_ladders.py evaluate --ladder pyin --bundle $A/oracle-ladder-pyin-<date>
-# 6. [model] Calibration panels, on the shared cache: reserve-1 with seven judges (est. 1.5-2 h) and
-#    the N3 calibration takes with pYIN (est. 15 min).
+# 6. [model] Calibration panels, on the shared cache:
+#    - reserve-1 with seven judges, est. 1.5-2 h;
+#    - the N3 calibration takes with pYIN, est. 15 min;
+#    - the speaker calibration split with CAM++, est. 15-30 min. The panel manifest hands each take
+#      its reference clip, the resynthesis of another take of its speaker.
 $O manifest --from-calibration-takes $R1/n2-manifest.json --output $R1/panel-manifest.json
 $O run --manifest $R1/panel-manifest.json $J7 --cache-root $K --bundle $R1/panel-bundle
 $O manifest --from-calibration-takes $T1/takes-manifest.json --output $T1/panel-manifest.json
 $O run --manifest $T1/panel-manifest.json --judge pitch.pyin@1 --cache-root $K --bundle $T1/panel-bundle
-#    Optional, informational only (no plan reads them this round): CAM++ over the clone cell's takes and
-#    their reference clips, the design data class E and seam-identity will need.
-#    $O run --manifest $T1/panel-manifest.json --judge speaker.campplus-voxceleb@1 --bundle $T1/speaker-bundle
+$O manifest --from-calibration-takes $E1/n2-manifest.json --output $E1/panel-manifest.json
+$O run --manifest $E1/panel-manifest.json $JE --cache-root $K --bundle $E1/panel-bundle
+#    Optional, informational only (no plan reads them this round):
+#    - ResNet293 over the speaker calibration split, est. 2-4 h: the data its correlated-failure audit
+#      against CAM++ needs before a two-family identity version (resnet293-not-voting);
+#    - CAM++ over the clone cell's takes and their reference clips: how the clone lane's own similarity
+#      sits against the speaker cohort's thresholds (speaker-reference-n2), and seam-identity's design data.
+#    $O run --manifest $E1/panel-manifest.json --judge speaker.resnet293-voxceleb@1 --cache-root $K --bundle $E1/resnet-bundle
+#    $O run --manifest $T1/panel-manifest.json $JE --bundle $T1/speaker-bundle
 # 7. Calibration evidence, no model (about 30 min): Stage 0 and PCM measures, pYIN frame tracks, scores.
 $S score --takes $R1/n2-manifest.json --output $R1/stage0
 $S score --takes $L1/takes-manifest.json --output $L1/stage0
@@ -2653,10 +2737,15 @@ $Q scores --detector prosody.pitch-instability@1 --role calibration --cohort $T1
 for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
   $Q scores --detector $d --role calibration --cohort $L1/takes-manifest.json \
     --measurements $L1/stage0/measurements.json --output $D/calibration/$d.json; done
-# 8. The 13 plans (a few minutes), each checked with derive, then committed on main by the lead
+for d in $IDN; do
+  $Q scores --detector $d --role calibration --cohort $E1/n2-manifest.json --n1-manifest $SPK/calibration/manifest.json \
+    --bundle $E1/panel-bundle --output $D/calibration/$d.json; done
+# 8. The 16 plans (a few minutes), each checked with derive, then committed on main by the lead
 #    before anything touches a confirmation cohort.
 FL="--calibration-cohort $R1/n2-manifest.json --calibration-n1-manifest $N1R1 \
   --confirmation-cohort $R2/n2-manifest.json --confirmation-n1-manifest $N1R2"
+FE="--calibration-cohort $E1/n2-manifest.json --calibration-n1-manifest $SPK/calibration/manifest.json \
+  --confirmation-cohort $E2/n2-manifest.json --confirmation-n1-manifest $SPK/confirmation/manifest.json"
 INJ="--injection-catalog-seed 7 --injection-sample-seed 1 --injection-sample-per-cell 150"
 for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2; do
   $Q plan --detector $d $FL --calibration-scores $D/calibration/$d.json --alpha 0.01 $INJ --injection-classes A,B,C,F; done
@@ -2674,8 +2763,10 @@ $Q plan --detector prosody.pitch-instability@1 --calibration-cohort $T1/takes-ma
 for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
   $Q plan --detector $d --calibration-cohort $L1/takes-manifest.json --confirmation-cohort $L2/takes-manifest.json \
     --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes J; done
+for d in $IDN; do
+  $Q plan --detector $d $FE --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes E; done
 $Q derive --detector signal.dropout@2 --calibration-scores $D/calibration/signal.dropout@2.json   # each detector
-git add config/audio-qc-preregistrations/<the 13 plan files> && git commit -F -   # on main
+git add config/audio-qc-preregistrations/<the 16 plan files> && git commit -F -   # on main
 ```
 
 The N3 and long-form plans take a nonzero `--injection-sample-per-cell` because a set built with the
@@ -2683,7 +2774,7 @@ N3 default of 0 records no sample seed for the plan to bind. Their sets hold eve
 the pool is smaller than 150.
 
 Step 9 is the confirmation chain. Every panel gets a new, empty cache root under `$K/confirmation/`.
-The chain takes an estimated 7 hours, most of it the reserve-2 positives panel.
+The chain takes an estimated 8-8.5 hours, most of it the reserve-2 positives panel.
 
 ```sh
 # 9a. [model] The reserve-2 cohort panel, seven judges (est. 1.5-2 h), then its exports and the
@@ -2727,7 +2818,25 @@ $S inject --takes $L2/takes-manifest.json --output $L2/injection-set --catalog-s
   --sample-per-cell 150 --classes J
 $S verify --set $L2/injection-set/injection-set.json --takes $L2/takes-manifest.json
 $S score --takes $L2/takes-manifest.json --set $L2/injection-set/injection-set.json --output $L2/stage0
-# 9e. Confirmation scores and one confirm per plan (no model, about 15 min).
+# 9e. [model] The speaker confirmation split, in three steps (about 1-1.5 h in all):
+#     - its panel, CAM++ and the aligner, on its own new cache root (est. 30-45 min);
+#     - its word intervals and the class E injection set, no model (est. 10 min): IDN-IMPOSTOR, the
+#       recorded IDN-SWAP and IDN-ONSET splices (same-language, same-gender donors of this split, so
+#       German, French, Spanish, Italian, Portuguese and Chinese) and IDN-SHIFT (every language), about
+#       2,100 clips, each naming its reference clip (an impostor's is its source take);
+#     - the positives' CAM++ panel on another new cache root (est. 15-25 min).
+$O manifest --from-calibration-takes $E2/n2-manifest.json --output $E2/panel-manifest.json
+$O run --manifest $E2/panel-manifest.json $JE --judge align.qwen3-forcedaligner-0.6b@1 \
+  --cache-root $K/confirmation/speaker --bundle $E2/panel-bundle
+$S alignments --takes $E2/n2-manifest.json --bundle $E2/panel-bundle --cache-root $K/confirmation/speaker \
+  --output $E2/alignments.json
+$S inject --takes $E2/n2-manifest.json --alignments $E2/alignments.json --output $E2/injection-set \
+  --catalog-seed 7 --sample-seed 1 --sample-per-cell 150 --classes E
+$S verify --set $E2/injection-set/injection-set.json --takes $E2/n2-manifest.json --alignments $E2/alignments.json
+$O manifest --from-calibration-takes $E2/injection-set/injection-set.json --output $E2/injection-panel-manifest.json
+$O run --manifest $E2/injection-panel-manifest.json $JE --cache-root $K/confirmation/speaker-positives \
+  --bundle $E2/injection-panel-bundle
+# 9f. Confirmation scores and one confirm per plan (no model, about 15 min).
 SET="--injection-set $R2/injection-set/injection-set.json"
 for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2 signal.clipping@2 signal.band-limit@1; do
   $Q scores --detector $d --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 $SET \
@@ -2756,7 +2865,12 @@ for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
   $Q scores --detector $d --role confirmation --cohort $L2/takes-manifest.json \
     --injection-set $L2/injection-set/injection-set.json --measurements $L2/stage0/measurements.json \
     --positive-measurements $L2/stage0/measurements.json --output $D/confirmation/$d.json; done
-for d in <each of the 13 detectors>; do
+for d in $IDN; do
+  $Q scores --detector $d --role confirmation --cohort $E2/n2-manifest.json \
+    --n1-manifest $SPK/confirmation/manifest.json --bundle $E2/panel-bundle \
+    --injection-set $E2/injection-set/injection-set.json --positive-bundle $E2/injection-panel-bundle \
+    --output $D/confirmation/$d.json; done
+for d in <each of the 16 detectors>; do
   $Q confirm --detector $d --calibration-scores $D/calibration/$d.json --confirmation-scores $D/confirmation/$d.json
 done
 # 10. Commit every ledger entry and record, regenerate the reference tree, then prune the confirmation
@@ -2768,16 +2882,28 @@ scripts/clean_build_caches.sh --prune-confirmation-caches --dry-run
 | Phase | Kind | Estimate |
 |---|---|---|
 | 1. Corpora fetch and extraction | maintainer, network | 1-2 h |
-| 2. speechocean762 cohort | offline | 1 min |
-| 3. qc-n2 of reserve-1, reserve-2 and speechocean762 | model | 1 h 45 min |
+| 2. speechocean762 and speaker cohorts | offline | 3 min |
+| 3. qc-n2 of reserve-1, reserve-2, speechocean762 and both speaker splits | model | 3-3.5 h |
 | 4. qc-takes version 2, both splits, four cells | model | 3 h 30 min |
 | 5. pYIN oracle ladder | model | 2 min |
-| 6. Calibration panels | model | 2 h |
-| 7. Calibration evidence and scores | offline | 30 min |
-| 8. Plans, derive, commit | offline, lead | 15 min |
-| 9. Confirmation chain | model and offline | 7 h |
+| 6. Calibration panels (without the optional ResNet293 run, 2-4 h more) | model | 2.5 h |
+| 7. Calibration evidence and scores | offline | 35 min |
+| 8. Plans, derive, commit | offline, lead | 20 min |
+| 9. Confirmation chain | model and offline | 8-8.5 h |
 | 10. Records, docs, prune | offline, lead | 15 min |
-| **Total** | | **about 16-17 h, of which about 14 h is model time** |
+| **Total** | | **about 19-21 h, of which about 17 h is model time** |
+
+Class E adds about 3-3.5 h:
+
+- two qc-n2 runs of about 9 h of speech each (about 32,000 s per split). Scaled from the reserve
+  estimate, that is 40-50 min each;
+- CAM++ over the calibration split;
+- in the confirmation chain: the confirmation split's CAM++ and aligner panel, its injection set, and
+  the CAM++ panel of the positives.
+
+No CAM++ run over the speaker cohort has been timed yet. The panel estimates scale the canary's
+CAM++ and aligner walls of 2026-09-27: about 800 short takes in 60-65 s each, and ResNet293 at
+about 9 times CAM++.
 
 `confirm --n3-scores` is optional for the FLEURS detectors. It needs the same detector scored
 `--role informational` on an N3 cohort, with the judges that detector reads run over that cohort:

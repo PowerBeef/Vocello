@@ -24,6 +24,13 @@ vote: it may stand alone in a `single` group when it is not from the
 generator's lab and is at least shadow. Any other judge still decides a take
 only if the registry says it votes (A6).
 
+`introspection` components read the engine's introspection summary
+(codebook-0 token cycles, the talker's per-step entropy and EOS probability;
+`audio_qc_observations.introspection_summary` mirrors it) from a clip's
+`introspection` block in `measurements.json`, a Stage 0 measurement like Fast
+QC's (class I). The summary reports no exact cycle as null, which scores a
+cycle of 0 frames; a clip without a summary abstains.
+
 Combinations:
 
 - `single`: one component.
@@ -71,8 +78,10 @@ from .pcm import json_digest
 REGISTRY_KIND = "audio-qc-detector-registry"
 REGISTRY_SCHEMA_VERSION = 1
 COMBINATIONS = ("single", "consensus-min", "consensus-max", "difference")
-SOURCES = ("fastqc", "observations", "panel", "transcript-tail", "raw-output")
-MEASUREMENT_SOURCES = frozenset({"fastqc", "observations"})
+SOURCES = ("fastqc", "observations", "introspection", "panel", "transcript-tail", "raw-output")
+MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection"})
+# Where a measurements.json clip keeps each measurement source's fields.
+MEASUREMENT_BLOCKS = {"fastqc": "fastQC", "observations": "observations", "introspection": "introspection"}
 PANEL_SOURCES = frozenset({"panel", "transcript-tail", "raw-output"})
 TRANSFORMS = ("absolute",)
 TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDeletions")
@@ -97,8 +106,19 @@ STRATA = ("language",)
 POOLED = "pooled"
 ROLE_KEYS = ("fit", "confirmNegatives", "positives", "shams", "informational")
 QUALIFYING_JUDGE_STATUSES = frozenset({"shadow", "warn", "gating"})
-# The Stage 0 judge measurements.json speaks for (Fast QC v8 and its observations).
+# The Stage 0 judge measurements.json speaks for (Fast QC v8, its observations and the engine's
+# introspection summary, all measured inside the engine).
 STAGE0_JUDGE = "fastqc@8"
+# The engine introspection summary's numeric fields (audio_qc_observations.introspection_summary, algorithm 1),
+# which a clip carries as its `introspection` block.
+INTROSPECTION_SCORE_FIELDS = frozenset({
+    "codecFrameCount", "longestRepeatedTokenRunFrames", "tokenCyclePeriod", "tokenCycleSpanFrames",
+    "tokenCycleRepeats", "tokenCycleStartFrame", "observedStepCount", "entropyMeanNats", "entropyP95Nats",
+    "longestHighEntropyRunSteps", "eosProbabilityFinal", "eosProbabilityMax", "eosProbabilityMaxStep",
+    "eosFirstLikelyStep", "eosLikelyStepsWithoutStop",
+})
+# The summary leaves these null when no exact cycle of period 2-32 occurred: a cycle of 0, not a missing value.
+INTROSPECTION_ABSENT_AS_ZERO = frozenset({"tokenCycleSpanFrames", "tokenCycleRepeats"})
 # The Fast QC v8 numeric fields measurements.json keeps (scripts/audio_qc_calibration_set.py FASTQC_FIELDS).
 FASTQC_SCORE_FIELDS = frozenset({
     "rmsDBFS", "dcOffset", "peak", "clippedSamples", "hotSamples", "nonFiniteSamples", "clickEvents",
@@ -249,6 +269,8 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
             errors.append(f"{where}.field must be a Fast QC v8 field measurements.json keeps")
         if source == "observations" and field not in {name for name, _ in _observation_measures()}:
             errors.append(f"{where}.field must be a Stage 0 observation measurements.json keeps")
+        if source == "introspection" and field not in INTROSPECTION_SCORE_FIELDS:
+            errors.append(f"{where}.field must be a numeric field of the engine introspection summary")
     elif source in PANEL_SOURCES:
         allowed.update({"judge", "metric"} if source == "panel" else {"judge", "measure"})
         judge = component.get("judge")
@@ -769,8 +791,12 @@ def component_value(component: Mapping[str, Any], *, language: str, clip: Mappin
     if source in MEASUREMENT_SOURCES:
         if clip is None:
             return None, "not-measured"
-        container = clip.get("fastQC" if source == "fastqc" else "observations") or {}
+        container = clip.get(MEASUREMENT_BLOCKS[source]) or {}
         value = _finite(container.get(component["field"]))
+        if value is None and source == "introspection" and component["field"] in INTROSPECTION_ABSENT_AS_ZERO \
+                and _finite(container.get("codecFrameCount")) is not None:
+            # A summary without an exact cycle reports none: the take looped for 0 frames.
+            value = 0.0
         if value is None:
             return None, "no-value"
     else:

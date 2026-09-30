@@ -1681,6 +1681,9 @@ which. An entry can still change in place until a plan binds its digest.
 | `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; IDN-ONSET (not in catalog v2); the pYIN register and envelope parts of the joint onset rule |
 | `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on the panels with its frame track exported per take; a confirmation N2 cohort no plan has scored; pYIN's oracle ladder |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
+| `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | Introspection carried into measurements.json; COD-LOOP (T2) with summaries recomputed from the mutated trace |
+| `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | Introspection carried; GEN-NOEOS (T3), a registered EOS-suppression knob |
+| `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1705,6 +1708,17 @@ frame track like `alignments`, and a confirmation cohort no plan has scored: the
 cohort already holds bundles, so `plan` refuses it (A5). Creak is not registered: catalog v2 has no
 creak construction (the audit builds one with WORLD, which the catalog lacks), and no voice-quality
 measure has passed its oracle ladder.
+
+Class I reads a third new source, `introspection`: a clip's `introspection` block in
+measurements.json, the engine's Stage 0 summary (the same fields as
+`audio_qc_observations.introspection_summary`). A summary without an exact cycle scores a loop of 0
+frames, not an abstention. The talker runs only in natural takes (a codec round trip samples no
+token), so class I fits and confirms on the N3 splits of the take plan: at least 60 scored families
+per language in each (the calibration split plans 80). Its role sets `n3-codec-trace` (P2) and
+`n3-controlled-generation` (P3) name positives the driver cannot read yet, since `scores` takes P1
+and S injections only and `plan` takes FLEURS-derived cohorts only. The summary also has no
+producer here: it lands in the telemetry row's `engineIntrospection`, and neither the N3 takes
+manifest nor `score` carries it, so every clip abstains until they do.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A

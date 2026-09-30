@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import audio_qc_calibration_set  # noqa: E402
 import audio_qc_detector_calibration as calibration  # noqa: E402
-from lib import language_metrics  # noqa: E402
+from lib import audio_qc_observations, language_metrics  # noqa: E402
 from lib.jsonio import sha256_json  # noqa: E402
 from lib.qc_pipeline import panel_metrics  # noqa: E402
 from lib.qc_pipeline.evidence import PRIVATE_SCHEMA, TAKE_EVIDENCE_SCHEMA, write_private_bundle  # noqa: E402
@@ -333,7 +333,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.errors(fixture_registry()), [])
         ids = [entry["id"] for entry in self.registry["detectors"]]
         self.assertEqual(sorted({detectors.detector_entry(self.registry, detector)["class"] for detector in ids}),
-                         ["A", "B", "C", "D", "E", "F"])
+                         ["A", "B", "C", "D", "E", "F", "I"])
 
     def test_fastqc_fields_match_the_measurement_writer(self) -> None:
         self.assertLessEqual(detectors.FASTQC_SCORE_FIELDS, set(audio_qc_calibration_set.FASTQC_FIELDS))
@@ -557,6 +557,44 @@ class NewClassRegistryTests(unittest.TestCase):
         judges["judges"][PYIN]["kind"] = "neural"
         self.assertTrue(any("does not vote" in error for error in detectors.registry_errors(self.registry, judges)))
 
+    def test_introspection_fields_are_the_summarys_and_the_role_sets_name_n3(self) -> None:
+        summary = audio_qc_observations.introspection_summary([1, 2, 1, 2, 1, 2], entropies=[1.0] * 6,
+                                                              eos_probabilities=[0.1] * 6)
+        self.assertLessEqual(detectors.INTROSPECTION_SCORE_FIELDS, set(summary))
+        self.assertLessEqual(detectors.INTROSPECTION_ABSENT_AS_ZERO, detectors.INTROSPECTION_SCORE_FIELDS)
+        expected = {"introspection.token-loop@1": ("n3-codec-trace", "P2", "COD-LOOP", "T2-codec-construction"),
+                    "introspection.high-entropy@1": ("n3-controlled-generation", "P3", "GEN-NOEOS",
+                                                     "T3-controlled-generation"),
+                    "introspection.eos-overrun@1": ("n3-controlled-generation", "P3", "GEN-NOEOS",
+                                                    "T3-controlled-generation")}
+        for detector, (role_set, positives, injector, mechanism) in expected.items():
+            entry = self.entry(detector)
+            self.assertEqual((entry["class"], entry["stage"], entry["populations"]), ("I", 0, role_set))
+            roles = detectors.role_set(self.registry, entry)
+            self.assertEqual((roles["fit"]["population"], roles["confirmNegatives"]["population"],
+                              roles["positives"]["population"], roles["informational"]), ("N3", "N3", positives, []))
+            self.assertEqual(detectors.judges_of(entry), [detectors.STAGE0_JUDGE])
+            self.assertTrue(detectors.needs_measurements(entry))
+            self.assertFalse(detectors.needs_panel(entry) or detectors.needs_raw(entry))
+            self.assertEqual(detectors.target_injectors(entry), {injector})
+            self.assertEqual(detectors.target_mechanism(entry, injector), mechanism)
+            self.assertEqual(detectors.declared_cells(entry), {mechanism: {f"{injector}/severe"}})
+
+        def unknown_field(entry, _):
+            entry["score"]["groups"][0]["components"][0]["field"] = "entropyMaxNats"
+        self.assertTrue(any("introspection summary" in error
+                            for error in self.mutate("introspection.high-entropy@1", unknown_field)))
+
+        def fastqc_field(entry, _):
+            entry["score"]["groups"][0]["components"][0] = {"source": "fastqc", "field": "tokenCycleSpanFrames"}
+        self.assertTrue(any("Fast QC v8 field" in error
+                            for error in self.mutate("introspection.token-loop@1", fastqc_field)))
+
+        def panel_at_stage_zero(entry, _):
+            entry["score"]["groups"][0]["components"][0] = {"source": "panel", "judge": CAMPPLUS, "metric": "cosine"}
+        self.assertTrue(any("Stage 0 detector" in error
+                            for error in self.mutate("introspection.eos-overrun@1", panel_at_stage_zero)))
+
 
 class NewClassScoringTests(unittest.TestCase):
     """score_take on fixture evidence for classes E, F, I and J, and their abstentions."""
@@ -646,6 +684,41 @@ class NewClassScoringTests(unittest.TestCase):
         self.assertEqual(detectors.longest_octave_displacement(self.track((200.0, 1))), 0.0)
         with self.assertRaises(detectors.DetectorError):
             detectors.raw_measure("jitter", steady)
+
+    def test_introspection_scores_and_abstentions(self) -> None:
+        loop, entropy, eos = (self.entry(detector) for detector in (
+            "introspection.token-loop@1", "introspection.high-entropy@1", "introspection.eos-overrun@1"))
+        # An 8-token phrase looped four times, a 7-step high-entropy run and 3 likely-EOS steps that did not stop.
+        tokens = list(range(100, 120)) + list(range(8)) * 4 + list(range(200, 210))
+        steps = len(tokens) + 1
+        entropies = [1.0] * 20 + [4.5] * 7 + [2.0] * (steps - 27)
+        eos_probabilities = [0.01] * (steps - 5) + [0.6, 0.7, 0.2, 0.55, 0.9]
+        summary = audio_qc_observations.introspection_summary(
+            tokens, entropies=entropies, eos_probabilities=eos_probabilities, stopped_at_eos=True)
+        self.assertEqual((summary["tokenCyclePeriod"], summary["tokenCycleSpanFrames"]), (8, 32))
+        clip = {"fastQC": {}, "observations": {}, "introspection": summary}
+        self.assertEqual(detectors.score_take(loop, "japanese", clip=clip)["score"], 32.0)
+        self.assertEqual(detectors.score_take(entropy, "japanese", clip=clip)["score"], 7.0)
+        self.assertEqual(detectors.score_take(eos, "japanese", clip=clip)["score"], 3.0)
+        component = f"{detectors.STAGE0_JUDGE}:introspection:tokenCycleSpanFrames"
+        self.assertEqual(detectors.score_take(loop, "japanese", clip=clip)["components"], {component: 32.0})
+        # No exact cycle: the summary reports none, which scores 0 rather than abstaining.
+        plain = audio_qc_observations.introspection_summary(list(range(60)), entropies=[1.0] * 60,
+                                                            eos_probabilities=[0.0] * 60)
+        self.assertIsNone(plain["tokenCycleSpanFrames"])
+        scored = detectors.score_take(loop, "english", clip={"introspection": plain})
+        self.assertEqual((scored["score"], scored["abstain"]), (0.0, None))
+        # A clip without a summary (the scorer does not carry one yet), no clip, or a language out of scope.
+        for entry in (loop, entropy, eos):
+            self.assertEqual(detectors.score_take(entry, "english", clip={"fastQC": {}})["abstain"], "no-value")
+            self.assertEqual(detectors.score_take(entry, "english", clip={"introspection": {}})["abstain"],
+                             "no-value")
+            self.assertEqual(detectors.score_take(entry, "english")["abstain"], "not-measured")
+            self.assertEqual(detectors.score_take(entry, "dutch", clip=clip)["abstain"], "out-of-scope")
+        # An empty generation has a summary but no observed step: its entropy has no p95 to read.
+        empty = audio_qc_observations.introspection_summary([])
+        self.assertEqual(detectors.score_take(loop, "english", clip={"introspection": empty})["score"], 0.0)
+        self.assertIsNone(empty["entropyP95Nats"])
 
 
 def brute_force_tail(reference: list, hypothesis: list) -> tuple[int, int]:

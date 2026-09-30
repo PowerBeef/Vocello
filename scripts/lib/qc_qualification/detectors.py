@@ -520,6 +520,14 @@ def registry_errors(registry: Any, judges_registry: Mapping[str, Any]) -> list[s
             errors.append(f"roleSets.{name}: fit is on the calibration cohort, confirmation on the other")
         if roles["positives"].get("cohort") != "confirmation" or roles["shams"].get("cohort") != "confirmation":
             errors.append(f"roleSets.{name}: positives and shams are built on the confirmation cohort")
+        # A corpus held back for a fail point's confirmation (a third reserve cohort): only the confirmation role
+        # names one, and it is neither the fit's nor the warn confirmation's corpus.
+        held = roles["confirmNegatives"].get("failCorpus")
+        if any("failCorpus" in roles[key] for key in ROLE_KEYS[:-1] if key != "confirmNegatives") \
+                or held is not None and (not isinstance(held, str) or not held.strip()
+                                         or held in (roles["fit"].get("corpus"), roles["confirmNegatives"].get("corpus"))):
+            errors.append(f"roleSets.{name}: only confirmNegatives names a failCorpus, a third corpus beside the fit's "
+                          "and the warn confirmation's")
         if not isinstance(roles["informational"], list) or not set(roles["informational"]) <= set(POPULATIONS):
             errors.append(f"roleSets.{name}.informational lists populations")
         if isinstance(roles["positives"], Mapping) and "labels" in roles["positives"]:

@@ -2449,6 +2449,29 @@ python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of d
   the N2 plan and the calibration set take as they take the dev and test cohorts. A language that
   cannot fill every cohort is reported, not padded.
 
+**Which reserve cohort does what.** FLEURS test is spent: the v1 warn plans confirmed on it. Role set
+`fleurs-reserve-n2` of `config/audio-qc-detectors.json` fixes the rule: reserve-1 fits, reserve-2
+confirms at warn, and reserve-3 (`failCorpus`) is held back for a fail point. A later requalification
+at warn needs a registry change that names reserve-3, or new reserve cohorts. `accent-natural-n2`
+takes its negatives from the same cohorts. Every unplanned FLEURS detector names this role set: the
+six v2 detectors, `signal.band-limit@1`, `prosody.pitch-break@1` and `prosody.octave-jump@1`. The
+eleven planned v1 detectors keep `fleurs-n2`, and their plans, ledger entries and records are
+unchanged. `audio_qc_detector_calibration.py` enforces the rule:
+
+- It reads a reserve cohort's split from its N1 manifest: `split` `reserve-<k>`, which the `reserve`
+  block must confirm, with FLEURS split train.
+- It never scores a reserve cohort past the first for calibration or information.
+- It refuses, as any new plan's confirmation, a FLEURS corpus that a confirmed plan scored
+  (`spentSources`), whichever N2 resynthesis of it the plan names.
+
+The reserve cohorts are grouped by sentence, not by speaker, so the calibration and confirmation cohorts
+likely share speakers (`fleurs-reserve-no-speaker-ids`).
+
+**Long-form cohorts.** Role set `n3-long-form` names the take plan's long-form cell
+(`vocello-long-form-calibration` and `-confirmation`). A long-form take records its seams in its
+`longForm` block, not as `seamSamples`, and the calibration set now reads them there (`take_seams`),
+so SEAM-DISC and SEAM-VOICE draw from those takes.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

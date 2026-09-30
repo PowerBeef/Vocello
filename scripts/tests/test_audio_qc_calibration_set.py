@@ -413,6 +413,49 @@ class CalibrationSetTests(unittest.TestCase):
         shutil.rmtree(output)
 
 
+class LongFormSeamTests(unittest.TestCase):
+    """A take of the take plan's long-form cell records its seams in its `longForm` block, not as `seamSamples`:
+    the seam injectors read them there."""
+
+    def test_the_long_form_block_gives_the_seams(self) -> None:
+        block = {"schemaVersion": 1, "algorithmVersion": 1, "sampleRate": recordings.ENGINE_SAMPLE_RATE,
+                 "segmentCount": 2, "outputFrameCount": 48_000, "maximumSegmentBoundaryJump": 0, "seamFrames": [24_000]}
+        self.assertEqual(m2.take_seams({"longForm": block}), [24_000])
+        self.assertEqual(m2.take_seams({"longForm": block, "seamSamples": [12_000]}), [12_000])
+        self.assertEqual(m2.take_seams({"longForm": {**block, "sampleRate": 16_000}}), [])
+        self.assertEqual(m2.take_seams({}), [])
+
+    def test_seam_injectors_run_on_a_long_form_take(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = fixtures.make_script(700, word_count=10)
+            samples = fixtures.render(script, fixtures.VOICES["low"])
+            digest = recordings.write_pcm16_wav(root / "wav" / "lf.wav", samples)
+            pcm16 = recordings.read_pcm16_wav(root / "wav" / "lf.wav")
+            seam = script.words[5][0]
+            block = {"schemaVersion": 1, "algorithmVersion": 1, "sampleRate": recordings.ENGINE_SAMPLE_RATE,
+                     "segmentCount": 2, "outputFrameCount": int(pcm16.size),
+                     "maximumSegmentBoundaryJump": m2.boundary_jump(pcm16, [seam]), "seamFrames": [seam]}
+            take = {"takeID": "lf__custom-aiden__s1", "family": "lf__custom-aiden__s1", "scriptID": "lf",
+                    "language": "english", "mode": "custom", "variant": "speed", "cell": "long-form",
+                    "voice": {"kind": "builtin", "id": "aiden"}, "seed": 1, "text": script.text,
+                    "wavPath": "wav/lf.wav", "wavSHA256": digest, "durationSeconds": round(samples.size / 24_000, 3),
+                    "finishReason": "eos", "status": "generated", "longForm": block}
+            manifest = {"schemaVersion": 1, "kind": "audio-qc-calibration-takes", "runID": "long-form",
+                        "planDigest": "0" * 64, "poolDigest": "1" * 64, "split": "calibration", "takes": [take]}
+            takes_path = root / "takes.json"
+            takes_path.write_text(json.dumps(manifest), encoding="utf-8")
+            summary = quiet(m2.run_inject, takes_path, root / "set", catalog_seed=7, classes=("J",), jobs=1)
+            plan = {(row["injectorID"], row["severity"]): row["status"] for row in summary["plan"]}
+            self.assertEqual(plan[("SEAM-DISC", "severe")], "scheduled")
+            entries = [entry for entry in summary["entries"] if entry["injection"]["injectorID"] == "SEAM-DISC"]
+            self.assertEqual(sorted(entry["injection"]["severity"] for entry in entries),
+                             ["mild", "moderate", "severe", "sham"])
+            self.assertTrue(all(entry["injection"]["sourceSeams"] == [seam] for entry in entries))
+            verified = quiet(m2.run_verify, root / "set" / "injection-set.json", takes_path, jobs=1)
+            self.assertTrue(verified["verified"], verified["failures"])
+
+
 class FamilyClusteringTests(unittest.TestCase):
     """Rates count source families (policy thresholdDerivation.unitOfRates), never clips."""
 

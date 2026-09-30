@@ -23,7 +23,7 @@ Registry entry `long-form.seam-jump@1` in [config/audio-qc-detectors.json](../..
 |---|---|---|---|
 | `SEAM-DISC` | severe | T1-pcm-construction | yes |
 
-**Populations** (role set `n3-long-form`): fit N3 (calibration, pending-vocello-long-form-calibration); confirmNegatives N3 (confirmation, pending-vocello-long-form-confirmation); positives P1 (confirmation); shams S (confirmation).
+**Populations** (role set `n3-long-form`): fit N3 (calibration, vocello-long-form-calibration); confirmNegatives N3 (confirmation, vocello-long-form-confirmation); positives P1 (confirmation); shams S (confirmation).
 
 **Limitations.**
 

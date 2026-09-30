@@ -12,6 +12,13 @@
       "shams": {"population": "S", "cohort": "confirmation"},
       "informational": ["N3", "N1"]
     },
+    "fleurs-reserve-n2": {
+      "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-reserve-1"},
+      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-reserve-2", "failCorpus": "fleurs-reserve-3"},
+      "positives": {"population": "P1", "cohort": "confirmation"},
+      "shams": {"population": "S", "cohort": "confirmation"},
+      "informational": ["N3", "N1"]
+    },
     "speaker-labeled-n2": {
       "fit": {"population": "N2", "cohort": "calibration", "corpus": "pending-speaker-labeled-calibration"},
       "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "pending-speaker-labeled-confirmation"},
@@ -41,15 +48,15 @@
       "informational": ["N2"]
     },
     "n3-long-form": {
-      "fit": {"population": "N3", "cohort": "calibration", "corpus": "pending-vocello-long-form-calibration"},
-      "confirmNegatives": {"population": "N3", "cohort": "confirmation", "corpus": "pending-vocello-long-form-confirmation"},
+      "fit": {"population": "N3", "cohort": "calibration", "corpus": "vocello-long-form-calibration"},
+      "confirmNegatives": {"population": "N3", "cohort": "confirmation", "corpus": "vocello-long-form-confirmation"},
       "positives": {"population": "P1", "cohort": "confirmation"},
       "shams": {"population": "S", "cohort": "confirmation"},
       "informational": []
     },
     "accent-natural-n2": {
-      "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-dev"},
-      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-test"},
+      "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-reserve-1"},
+      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-reserve-2", "failCorpus": "fleurs-reserve-3"},
       "positives": {"population": "P4", "cohort": "confirmation", "corpus": "pending-speechocean762-n2-confirmation",
                     "labels": {"tier": "T4", "source": "speechocean762 sentence-level accuracy, the experts' 0-10 pronunciation score published with the corpus (config/audio-qc-corpora.json, group accent)", "field": "scores.accuracy",
                                "rules": [{"severity": "severe", "atMost": 4}, {"severity": "moderate", "atMost": 6}]}},
@@ -59,6 +66,7 @@
   },
   "limitations": {
     "fleurs-no-speaker-ids": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.",
+    "fleurs-reserve-no-speaker-ids": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured.",
     "fleurs-speaker-lower-bound": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.",
     "n2-one-codec": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).",
     "speaker-corpus-pending": "FLEURS publishes no speaker ids, so class E has no fit or confirmation corpus yet (role set speaker-labeled-n2, corpora pending a maintainer data decision): it needs a speaker-labeled corpus whose terms allow speaker verification (Common Voice's forbid speaker identification) with at least two utterances per speaker, resynthesized to N2 like FLEURS. Each language stratum needs at least 60 scored calibration families and 60 scored confirmation negative families (the policy's warn minimums; audit section 5.4 sizes a per-language bound on its own families), from at least 3 speakers per language, the two cohorts disjoint by family, speaker and script; the positives need 60 families per severe cell and each injector's sham 60 more. A language without such a corpus becomes a scope exclusion (audit section 5.5 step 5), which changes the definition: a new version once a plan binds it.",
@@ -174,8 +182,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "SIG-DROP", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "SIG-DROP", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "digital-silence-only", "pcm-measures-python-only"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "digital-silence-only", "pcm-measures-python-only"],
       "risks": ["fleurs-digital-silence", "pooled-fleurs-locale-concentration"]
     },
     {
@@ -210,8 +218,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "SIG-SIL", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "SIG-SIL", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "digital-silence-only", "pcm-measures-python-only"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "digital-silence-only", "pcm-measures-python-only"],
       "risks": ["fleurs-digital-silence", "pooled-fleurs-locale-concentration"]
     },
     {
@@ -246,8 +254,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "SIG-DC", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "SIG-DC", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
       "risks": ["pooled-fleurs-locale-concentration"]
     },
     {
@@ -300,8 +308,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "SIG-CLIP", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "SIG-CLIP", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only", "clip-variants-not-sampled"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only", "clip-variants-not-sampled"],
       "risks": ["n2-full-scale-clamps", "soft-knee-saturation"]
     },
     {
@@ -336,8 +344,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "SIG-BAND", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "SIG-BAND", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
       "risks": ["no-band-limit-injector", "fleurs-bandwidth"]
     },
     {
@@ -401,8 +409,8 @@
         {"injectorID": "CNT-INS", "mechanism": "T1-pcm-construction"},
         {"injectorID": "CNT-REP", "mechanism": "T1-pcm-construction"}
       ],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "substitutions-not-scored"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "substitutions-not-scored"],
       "risks": ["parakeet-whisper-label-lineage", "one-family-alarm", "splice-sham-content-errors"]
     },
     {
@@ -484,8 +492,8 @@
                 "exclusions": [{"language": "korean", "reason": "aligner-excludes-korean"}]},
       "targets": [{"injectorID": "BND-RUNON", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "BND-RUNON", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only"],
       "risks": ["aligner-anchoring", "runon-quiet-span", "noisy-tail-activity"]
     },
     {
@@ -523,7 +531,7 @@
       "targets": [{"injectorID": "NAT-ACCENT", "severities": ["severe"], "mechanism": "T4-natural-labelled"}],
       "shams": [],
       "populations": "accent-natural-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "accent-positives-english-only", "accent-labels-policy", "accent-corpus-pending"],
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "accent-positives-english-only", "accent-labels-policy", "accent-corpus-pending"],
       "risks": ["voxlingua-weak-native-de-ru", "one-classifier-alarm", "accent-by-voice"]
     },
     {
@@ -602,8 +610,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "PRS-BRK", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "PRS-BRK", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
       "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "pyin-transition-limit", "korean-no-word-positives"]
     },
     {
@@ -620,8 +628,8 @@
       "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
       "targets": [{"injectorID": "PRS-OCT", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "PRS-OCT", "mechanism": "T1-pcm-construction"}],
-      "populations": "fleurs-n2",
-      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
+      "populations": "fleurs-reserve-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
       "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "korean-no-word-positives"]
     },
     {

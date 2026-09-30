@@ -28,6 +28,14 @@ the ids at plan and confirm time:
 - `fleurs-n2`: FLEURS dev and test N2 (or N1), disjoint by family and script;
   FLEURS publishes no speaker ids, so each unit's speaker is
   `<language>:fleurs-unidentified`, a lower bound (a declared limitation).
+  Dev and test are spent: the v1 warn plans confirmed on test.
+- `fleurs-reserve-n2` (and `accent-natural-n2`'s negatives): FLEURS train's
+  reserve cohorts N2 (or N1), by a fixed rule the role set states: reserve-1
+  fits, reserve-2 confirms at warn, reserve-3 (`failCorpus`) is held back for
+  a fail point. Every reserve cohort past the first is a confirmation split,
+  never scored for calibration or information, and a FLEURS corpus a
+  confirmed plan scored is refused as any new plan's confirmation, whichever
+  resynthesis of it the plan names (A5).
 - `speaker-labeled-n2`: N2 (or N1) of a speaker-labelled corpus, the N1
   manifest naming its `split` (calibration or confirmation), its `corpus` and
   each recording's `speaker`; disjoint by family, speaker and script.
@@ -35,8 +43,8 @@ the ids at plan and confirm time:
   the N3 take plan (`audio_qc_calibration_takes.py`), disjoint by family (script
   x voice x seed), speaker (a Built-in speaker or a Voice Design brief, never
   shared across splits) and script (the pool's split).
-- `n3-long-form`: long-form N3 takes, each carrying a `longForm` block with at
-  least one seam; disjoint as N3.
+- `n3-long-form`: long-form N3 takes (the take plan's `long-form` cell), each
+  carrying a `longForm` block with at least one seam; disjoint as N3.
 
 A role whose corpus is still `pending-...` in the registry is not plannable.
 Positives are the role set's population: P1 (a T1 PCM injection), P2 (a T2
@@ -111,10 +119,13 @@ Commands:
            with missing evidence, or from a panel whose orchestrator, metric
            reduction or metric versions are not the current code's (the
            confirmation panels will run it), a confirmation cohort that is not
-           the role set's confirmation split, cohorts that share a family,
+           the role set's confirmation split (at a fail point its held-back
+           `failCorpus`, when it names one), cohorts that share a family,
            script or (where identified) speaker, a cohort another plan uses in
-           the other role, and a confirmation cohort that already holds scores,
-           a panel bundle or measurements. The lead reviews and commits it.
+           the other role, a confirmation cohort that already holds scores,
+           a panel bundle or measurements, and a FLEURS or labelled corpus a
+           confirmed plan already scored, whichever resynthesis of it the
+           cohort is. The lead reviews and commits it.
   derive   --detector ID --calibration-scores FILE [--output FILE] [--operating-point P]
            The split-conformal threshold from the calibration cohort's clean
            N2 scores, one per family, per declared stratum (language) or
@@ -189,16 +200,29 @@ N1_KIND, N2_KIND, N3_KIND = "audio-qc-n1-cohort", "audio-qc-n2-cohort", "audio-q
 COHORT_KINDS = {N2_KIND: "N2", N1_KIND: "N1", N3_KIND: "N3"}
 FLEURS_KINDS = frozenset({N2_KIND, N1_KIND})
 FLEURS_SPLITS = ("dev", "test")
+# FLEURS train's reserve cohorts (`audio_qc_corpora.py extract`: an N1 manifest of split `reserve-<k>`, FLEURS
+# split train, with its `reserve` block), disjoint by FLoRes sentence from dev, test and each other. Their role
+# sets follow one fixed rule, which the registry states: reserve-1 fits, reserve-2 confirms at warn and reserve-3
+# (`failCorpus`) is held back for a fail point; no reserve cohort past the first is ever scored for calibration or
+# information (A5).
+RESERVE_SPLIT = re.compile(r"reserve-([1-9][0-9]*)")
 # The split a non-FLEURS cohort declares (the N3 take plan's, a speaker-labelled N1 manifest's).
 DECLARED_SPLITS = ("calibration", "confirmation")
-# The splits a confirmation (or a fail plan's N3 bound) draws from, whatever the role set.
+# The splits a confirmation (or a fail plan's N3 bound) draws from, whatever the role set (and every reserve
+# cohort past the first, `is_confirmation_split`).
 CONFIRMATION_SPLITS = ("test", "confirmation")
+# A FLEURS-derived corpus names fixed recordings (dev, test, a reserve cohort of the pinned sampling): once a
+# confirmation scored it, no new plan confirms on it, whichever N2 resynthesis of it the plan names (A5).
+FLEURS_CORPUS_PREFIX = "fleurs-"
+# What an N1 (or N3) manifest names of its split, corpus and speakers.
+SOURCE_KEYS = ("split", "fleursSplit", "corpus", "dataset", "reserve")
 # `bound`: the N3 cohort a fail plan bounds the flag rate on (A2), scored after the plan like a confirmation.
 ROLES = ("calibration", "confirmation", "informational", "bound")
 SUPPORTED_OPERATING_POINTS = ("warn", "fail", "evidenceLaneFail")
 # The level a qualified record at each operating point gates at (audit 3.3; decision 5): the evidence-lane
 # fail point is a fail level whose policy `appliesTo` keeps it off product lanes.
 POINT_LEVELS = {"warn": "warn", "fail": "fail", "evidenceLaneFail": "fail"}
+FAIL_POINTS = tuple(point for point, level in POINT_LEVELS.items() if level == "fail")
 # The severities a fail point measures detection on, per mechanism (tprSevereMin, tprModerateMin).
 FAIL_SEVERITIES = frozenset(thresholds.SEVERITY_FLOORS)
 FLEURS_SPEAKER_UNIT = "language:fleurs-unidentified"
@@ -235,6 +259,7 @@ TAKES_RULE = CohortRule("vocello-takes", frozenset({N3_KIND}), False, ("family",
                         "vocello-voice", "identified")
 COHORT_RULES = {
     "fleurs-n2": FLEURS_RULE,
+    "fleurs-reserve-n2": FLEURS_RULE,
     "accent-natural-n2": FLEURS_RULE,
     "speaker-labeled-n2": SPEAKER_LABELED_RULE,
     "n3-takes": TAKES_RULE,
@@ -383,8 +408,7 @@ def load_cohort(path: Path) -> dict:
             "fleursSplit": manifest.get("fleursSplit") if kind == N1_KIND else None,
             "n1ManifestSHA256": manifest.get("n1ManifestSHA256") if kind == N2_KIND else None,
             # What names the split and the speakers: the manifest itself (N1, N3) or the N1 an N2 pins.
-            "source": {key: manifest.get(key) for key in ("split", "fleursSplit", "corpus", "dataset")}
-            if kind != N2_KIND else None}
+            "source": {key: manifest.get(key) for key in SOURCE_KEYS} if kind != N2_KIND else None}
 
 
 def _voice_speaker(voice: Any) -> str:
@@ -424,8 +448,10 @@ def _seams(block: Any, where: str) -> list[float] | None:
 def resolve_cohort(cohort: dict, n1_manifest: Path | None) -> str | None:
     """The split a cohort was drawn from, finalizing each take's speaker where the corpus labels it.
 
-    FLEURS (an N1 manifest naming its `fleursSplit`): dev or test, and speakers
-    stay `<language>:fleurs-unidentified`. A speaker-labelled corpus: the N1
+    FLEURS (an N1 manifest naming its `fleursSplit`): dev or test, or a train
+    reserve cohort by its `split` (`reserve-<k>`, which its `reserve` block
+    confirms), and speakers stay `<language>:fleurs-unidentified`. A
+    speaker-labelled corpus: the N1
     manifest's `split` (calibration or confirmation), and each take's speaker is
     its corpus label (the take's own `speaker`, else its N1 recording's through
     `n1TakeID`), digested with the corpus name. An N3 takes manifest: its take
@@ -450,13 +476,16 @@ def resolve_cohort(cohort: dict, n1_manifest: Path | None) -> str | None:
         document = load_json(n1_manifest, "the N1 manifest")
         if not isinstance(document, dict) or document.get("kind") != N1_KIND:
             raise CalibrationError(f"{Path(n1_manifest).name} is not an {N1_KIND} manifest")
-        source = {key: document.get(key) for key in ("split", "fleursSplit", "corpus", "dataset")}
+        source = {key: document.get(key) for key in SOURCE_KEYS}
         labels = {take.get("takeID"): take.get("speaker") for take in document.get("takes") or ()
                   if isinstance(take, Mapping)}
     if source.get("fleursSplit") is not None or source.get("split") not in DECLARED_SPLITS:
         split = source.get("fleursSplit")
-        if split not in FLEURS_SPLITS:
-            raise CalibrationError(f"{cohort['name']} names no FLEURS split ({' or '.join(FLEURS_SPLITS)})")
+        if split == "train":
+            split = reserve_split(cohort, source)
+        if not is_fleurs_split(split):
+            raise CalibrationError(f"{cohort['name']} names no FLEURS split ({' or '.join(FLEURS_SPLITS)} or a "
+                                   "train reserve cohort)")
         return split
     corpus = str(source.get("corpus") or source.get("dataset") or "")
     for take_id, take in cohort["takes"].items():
@@ -469,6 +498,33 @@ def resolve_cohort(cohort: dict, n1_manifest: Path | None) -> str | None:
     return source["split"]
 
 
+def reserve_index(split: Any) -> int | None:
+    """k of a FLEURS train reserve cohort's split `reserve-<k>`, else None."""
+    match = RESERVE_SPLIT.fullmatch(split) if isinstance(split, str) else None
+    return int(match.group(1)) if match else None
+
+
+def is_fleurs_split(split: Any) -> bool:
+    """FLEURS dev, test or a train reserve cohort."""
+    return split in FLEURS_SPLITS or reserve_index(split) is not None
+
+
+def is_confirmation_split(split: Any) -> bool:
+    """A split never scored for calibration or information: FLEURS test, a declared confirmation split, or a
+    reserve cohort past the first (the second confirms at warn, the later ones are held back)."""
+    return split in CONFIRMATION_SPLITS or (reserve_index(split) or 0) > 1
+
+
+def reserve_split(cohort: Mapping[str, Any], source: Mapping[str, Any]) -> str:
+    """A FLEURS train cohort's split: a reserve cohort, named by its manifest's `split` and its `reserve` block."""
+    split = source.get("split")
+    block = source.get("reserve")
+    if reserve_index(split) is None or not isinstance(block, Mapping) or block.get("cohort") != reserve_index(split):
+        raise CalibrationError(f"{cohort['name']}: a FLEURS train cohort is a reserve cohort, split reserve-<k> with "
+                               "its reserve block (audio_qc_corpora.py extract)")
+    return split
+
+
 def cohort_rule(entry: Mapping[str, Any]) -> CohortRule:
     rule = COHORT_RULES.get(entry.get("populations"))
     if rule is None:
@@ -477,20 +533,30 @@ def cohort_rule(entry: Mapping[str, Any]) -> CohortRule:
     return rule
 
 
-def corpus_split(roles: Mapping[str, Any], role: str) -> str | None:
-    """The FLEURS split a role set declares for a role (`fleurs-dev` -> dev), or None for another corpus."""
-    corpus = str((roles.get(role) or {}).get("corpus") or "")
-    return corpus.removeprefix("fleurs-") if corpus.startswith("fleurs-") else None
+def role_corpus(roles: Mapping[str, Any], role: str, operating_point: str = "warn") -> str:
+    """The corpus a role's cohort comes from: at a fail point the confirmation's held-back corpus, when the role
+    set names one (`failCorpus`), else the role's `corpus`."""
+    value = roles.get(role) or {}
+    if role == "confirmNegatives" and operating_point in FAIL_POINTS and value.get("failCorpus"):
+        return str(value["failCorpus"])
+    return str(value.get("corpus") or "")
 
 
-def expected_split(rule: CohortRule, roles: Mapping[str, Any], role: str) -> str | None:
-    """The split a role's cohort must come from: FLEURS dev or test, or the declared calibration or
-    confirmation split (the role's own cohort)."""
-    return corpus_split(roles, role) if rule.fleurs else (roles.get(role) or {}).get("cohort")
+def corpus_split(roles: Mapping[str, Any], role: str, operating_point: str = "warn") -> str | None:
+    """The FLEURS split a role set declares for a role (`fleurs-dev` -> dev, `fleurs-reserve-2` -> reserve-2), or
+    None for another corpus."""
+    corpus = role_corpus(roles, role, operating_point)
+    return corpus.removeprefix(FLEURS_CORPUS_PREFIX) if corpus.startswith(FLEURS_CORPUS_PREFIX) else None
+
+
+def expected_split(rule: CohortRule, roles: Mapping[str, Any], role: str, operating_point: str = "warn") -> str | None:
+    """The split a role's cohort must come from: a FLEURS split (dev, test or a reserve cohort; a fail point's
+    confirmation its held-back one), or the declared calibration or confirmation split (the role's own cohort)."""
+    return corpus_split(roles, role, operating_point) if rule.fleurs else (roles.get(role) or {}).get("cohort")
 
 
 def split_name(split: str | None) -> str:
-    return f"FLEURS {split}" if split in FLEURS_SPLITS else f"the {split} split"
+    return f"FLEURS {split}" if is_fleurs_split(split) else f"the {split} split"
 
 
 def scores_split(scores: Mapping[str, Any]) -> str | None:
@@ -1126,7 +1192,7 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
                     "manifestDigest": cohort["manifestDigest"], "fileSHA256": cohort["fileSHA256"],
                     "runID": cohort.get("runID"), "takes": len(cohort["takes"]),
                     "fleursSplit": split if split in FLEURS_SPLITS else None}
-    if split in DECLARED_SPLITS:
+    if split in DECLARED_SPLITS or reserve_index(split) is not None:
         cohort_block["split"] = split
     document = {
         "schema": SCORES_SCHEMA, "kind": SCORES_KIND,
@@ -1200,8 +1266,11 @@ def load_scores(path: Path) -> dict:
 def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
     """Every plan file's cohorts by role: {calibration|confirmation|bound|spent: {manifest digest: [detectors]}},
     `bound` being a fail plan's N3 cohort and `spent` a cohort already scored as confirmation evidence: the
-    confirmation or N3 cohort of a plan with a ledger entry, or a record's informational N3 cohort."""
-    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}, "spent": {}}
+    confirmation or N3 cohort of a plan with a ledger entry, or a record's informational N3 cohort. `spentSources`
+    names, by corpus, the fixed recordings such a plan confirmed on: a FLEURS corpus (its confirmation cohort's
+    source) and a labelled corpus's natural positives, so a new resynthesis of them is spent too."""
+    found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}, "spent": {},
+                                              "spentSources": {}}
     if repository.records.is_dir():
         for path in sorted(repository.records.glob("*/*.json")):
             try:
@@ -1236,6 +1305,11 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
                            plan.binding("naturalPositivesDigest")):
                 if digest:
                     found["spent"].setdefault(digest, []).append(plan.detector)
+            source = plan.cohorts.confirmation.source
+            for corpus in (source if source.startswith(FLEURS_CORPUS_PREFIX) else None,
+                           plan.binding("naturalPositivesSource")):
+                if corpus:
+                    found["spentSources"].setdefault(corpus, []).append(plan.detector)
     return found
 
 
@@ -1247,7 +1321,7 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
     split = resolve_cohort(cohort, args.n1_manifest)
     plan = repository.store.load(entry["id"], args.operating_point)
     digest = cohort["manifestDigest"]
-    confirmation_split = expected_split(rule, roles, "confirmNegatives")
+    confirmation_split = expected_split(rule, roles, "confirmNegatives", args.operating_point)
     if args.role == "bound":
         if args.operating_point == "warn":
             raise CalibrationError("the N3 bound belongs to a fail plan: pass --operating-point fail (or "
@@ -1282,9 +1356,9 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         if confirmation_split is not None and split == confirmation_split and cohort["kind"] in rule.kinds:
             raise CalibrationError(f"{split_name(split)} is the confirmation corpus: it is scored only under "
                                    "--role confirmation, never for calibration or information (A5)")
-        if args.role in ("calibration", "informational") and split in CONFIRMATION_SPLITS:
+        if args.role in ("calibration", "informational") and is_confirmation_split(split):
             # Another role set's confirmation corpus (the N3 confirmation split for a FLEURS detector, FLEURS
-            # test for an N3 one) stays untouched too, planned or not.
+            # test for an N3 one, a held-back reserve cohort) stays untouched too, planned or not.
             raise CalibrationError(f"{split_name(split)} is a confirmation split: it is scored only under --role "
                                    "confirmation or bound, never for calibration or information (A5)")
     if args.role == "calibration":
@@ -1532,7 +1606,7 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         problems = cohort_rule_problems(cohort, rule, roles)
         if problems:
             raise CalibrationError("; ".join(problems))
-    expected = expected_split(rule, roles, "confirmNegatives")
+    expected = expected_split(rule, roles, "confirmNegatives", operating_point)
     if expected is not None and confirmation_split != expected:
         raise CalibrationError(f"the confirmation cohort is FLEURS {confirmation_split}; the role set confirms on "
                                f"FLEURS {expected}" if rule.fleurs else
@@ -1592,6 +1666,15 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                 if {take[key] for take in natural_cohort["takes"].values()} & \
                         {take[key] for take in cohort["takes"].values()}:
                     raise CalibrationError(f"the natural positives share a {key} with the {what} cohort")
+    confirmation_source = role_corpus(roles, "confirmNegatives", operating_point)
+    natural_source = (roles.get("positives") or {}).get("corpus") if natural is not None else None
+    for corpus, what in ((confirmation_source if rule.fleurs else None, "confirmation corpus"),
+                         (natural_source, "natural positives' corpus")):
+        spent = declared["spentSources"].get(corpus) if corpus else None
+        if spent:
+            raise CalibrationError(f"the {what} {corpus} was already scored as confirmation evidence (for "
+                                   f"{', '.join(sorted(set(spent)))}: a confirmed plan); A5 needs recordings no "
+                                   "confirmation has scored, whichever resynthesis of them the plan names")
     for cohort, what in ((confirmation, "confirmation cohort"), (n3, "N3 bound cohort"),
                          (natural_cohort, "natural positives cohort")):
         spent = declared["spent"].get(cohort["manifestDigest"]) if cohort is not None else None
@@ -1608,7 +1691,7 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         calibration=thresholds.CohortReference(calibration["kind"], calibration["manifestDigest"],
                                                roles["fit"].get("corpus", "")),
         confirmation=thresholds.CohortReference(confirmation["kind"], confirmation["manifestDigest"],
-                                                roles["confirmNegatives"].get("corpus", "")),
+                                                confirmation_source),
         disjoint_by=rule.disjoint_by, speaker_unit=rule.speaker_unit, speaker_claim=rule.speaker_claim,
         limitations=limitations)
     bindings = (
@@ -2379,7 +2462,7 @@ def command_confirm(args: argparse.Namespace, repository: Repository) -> int:
     _check_pair(plan, calibration, confirmation)
     roles = registry_lib.role_set(registry, entry)
     positives_population = positive_populations(roles, entry)
-    split = expected_split(cohort_rule(entry), roles, "confirmNegatives")
+    split = expected_split(cohort_rule(entry), roles, "confirmNegatives", plan.binding("operatingPoint") or "warn")
     if split is not None and scores_split(confirmation) != split:
         raise CalibrationError(f"the confirmation scores are not of {split_name(split)}")
     problems = confirmation_evidence_problems(repository, plan, confirmation)

@@ -185,8 +185,13 @@ def fixture_registry() -> dict:
     # The fixture's speaker-labelled corpus has data; the long-form one stays pending.
     roles["speaker-labeled-n2"]["fit"]["corpus"] = "test-speakers-calibration"
     roles["speaker-labeled-n2"]["confirmNegatives"]["corpus"] = "test-speakers-confirmation"
-    # The fixture's labelled accent corpus has data too.
+    roles["n3-long-form"]["fit"]["corpus"] = "pending-vocello-long-form-calibration"
+    roles["n3-long-form"]["confirmNegatives"]["corpus"] = "pending-vocello-long-form-confirmation"
+    # The fixture's labelled accent corpus has data too, and its negatives are the fixture's dev and test cohorts.
     roles["accent-natural-n2"]["positives"]["corpus"] = "test-accent-confirmation"
+    roles["accent-natural-n2"]["fit"]["corpus"] = "fleurs-dev"
+    roles["accent-natural-n2"]["confirmNegatives"] = {"population": "N2", "cohort": "confirmation",
+                                                      "corpus": "fleurs-test"}
     return {
         "schemaVersion": 1, "kind": detectors.REGISTRY_KIND, "authority": "test", "note": "test",
         "operatingPoint": "warn", "roleSets": roles,
@@ -200,7 +205,9 @@ def fixture_registry() -> dict:
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
                       {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
-                      pitch_entry(), mean_entry(), run_on_entry(), accent_entry()],
+                      pitch_entry(), mean_entry(), run_on_entry(), accent_entry(),
+                      {**level_entry(), "id": "test.reserve-level@1", "populations": "fleurs-reserve-n2"},
+                      {**level_entry(), "id": "test.reserve-level@2", "populations": "fleurs-reserve-n2"}],
     }
 
 
@@ -803,7 +810,8 @@ class NewClassRegistryTests(unittest.TestCase):
     def test_prosody_detectors_reduce_the_pitch_track(self) -> None:
         for detector, injector in (("prosody.pitch-break@1", "PRS-BRK"), ("prosody.octave-jump@1", "PRS-OCT")):
             entry = self.entry(detector)
-            self.assertEqual((entry["class"], entry["stage"], entry["populations"]), ("F", 1, "fleurs-n2"))
+            # FLEURS test is spent: the unplanned class F detectors plan on the reserve cohorts.
+            self.assertEqual((entry["class"], entry["stage"], entry["populations"]), ("F", 1, "fleurs-reserve-n2"))
             self.assertEqual(detectors.judges_of(entry), [PYIN])
             self.assertTrue(detectors.needs_panel(entry) and detectors.needs_raw(entry))
             self.assertFalse(detectors.needs_private(entry) or detectors.needs_measurements(entry))
@@ -1991,6 +1999,144 @@ class FlowTests(unittest.TestCase):
         short = calibration.derivation(repository, entry, plan, document, 61)
         self.assertEqual((short["status"], short["thresholds"]["english"],
                           short["byStratum"]["english"]["minimumNegatives"]), ("insufficient-negatives", None, 61))
+
+
+class ReserveFixture(Fixture):
+    """The synthetic cohorts drawn from FLEURS train's reserve cohorts (`audio_qc_corpora.py extract`): the
+    calibration cohort from reserve-1 and the confirmation cohort from reserve-2, as the reserve role set rules."""
+
+    RESERVE = {"dev": 1, "test": 2}
+
+    def n1_manifest(self, name: str, split: str, *, block: bool = True) -> Path:
+        index = self.RESERVE.get(split) or int(split.removeprefix("reserve-"))
+        manifest = {"kind": "audio-qc-n1-cohort", "schemaVersion": 1, "population": "N1", "split": f"reserve-{index}",
+                    "fleursSplit": "train", "dataset": "google/fleurs", "takes": []}
+        if block:
+            manifest["reserve"] = {"cohort": index, "cohorts": 3, "perLanguage": 400}
+        return write_json(self.root / f"n1-{name}.json", signed(manifest))
+
+    def resynthesized(self, name: str, tag: str, split: str, *, block: bool = True) -> tuple[Path, Path]:
+        """Another N2 cohort of a reserve cohort (its own N1 manifest and run)."""
+        self.n1[name] = self.n1_manifest(name, split, block=block)
+        return self.cohort(name, tag), self.n1[name]
+
+
+class ReserveCohortTests(unittest.TestCase):
+    """The FLEURS reserve role set: reserve-1 fits, reserve-2 confirms at warn, reserve-3 is held back for a fail
+    point, and a FLEURS corpus a confirmed plan scored stays spent whichever resynthesis a later plan names."""
+
+    DETECTOR = "test.reserve-level@1"
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.fixture = ReserveFixture(Path(self.directory.name))
+        self.out = self.fixture.root / "out"
+
+    def tearDown(self) -> None:
+        self.directory.cleanup()
+
+    def cli(self, *argv: str, expect: int = 0) -> str:
+        code, out, err = run("--repo-root", str(self.fixture.repo), *argv)
+        self.assertEqual(code, expect, f"{argv[0]}: {err}")
+        return out + err
+
+    def scores(self, role: str, cohort: Path, n1: Path, name: str, *, detector: str = DETECTOR, expect: int = 0,
+               **sources: Path) -> Path | str:
+        output = self.out / f"{name}.json"
+        arguments = ["scores", "--detector", detector, "--role", role, "--cohort", str(cohort), "--n1-manifest",
+                     str(n1), "--output", str(output)]
+        for key, value in sources.items():
+            arguments += [f"--{key.replace('_', '-')}", str(value)]
+        text = self.cli(*arguments, expect=expect)
+        return output if expect == 0 else text
+
+    def plan(self, scores: Path, confirmation: Path, n1: Path, *, detector: str = DETECTOR, expect: int = 0) -> str:
+        return self.cli("plan", "--detector", detector, "--calibration-cohort", str(self.fixture.calibration),
+                        "--confirmation-cohort", str(confirmation), "--confirmation-n1-manifest", str(n1),
+                        "--calibration-scores", str(scores), "--alpha", "0.05", *INJECTION_FLAGS, expect=expect)
+
+    def calibrated(self, detector: str = DETECTOR) -> Path:
+        fixture = self.fixture
+        return self.scores("calibration", fixture.calibration, fixture.n1["calibration"], f"{detector}-calibration",
+                           detector=detector,
+                           measurements=fixture.measurements(fixture.calibration, f"cal-measurements-{detector}"))
+
+    def test_the_registry_states_the_rule(self) -> None:
+        registry = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+        rule = calibration.COHORT_RULES["fleurs-reserve-n2"]
+        for name in ("fleurs-reserve-n2", "accent-natural-n2"):
+            roles = registry["roleSets"][name]
+            self.assertEqual([calibration.expected_split(rule, roles, role, point) for role, point in
+                              (("fit", "warn"), ("confirmNegatives", "warn"), ("confirmNegatives", "fail"),
+                               ("confirmNegatives", "evidenceLaneFail"))],
+                             ["reserve-1", "reserve-2", "reserve-3", "reserve-3"], name)
+        # FLEURS dev and test keep their role set, whose plans are all confirmed; every other FLEURS detector plans
+        # on the reserve cohorts.
+        planned = {path.stem.split(".fail")[0] for path in (REPO / "config/audio-qc-preregistrations").glob("*.json")
+                   if not path.name.startswith("confirmation-")}
+        for entry in registry["detectors"]:
+            fleurs = entry["populations"] in ("fleurs-n2", "fleurs-reserve-n2")
+            if fleurs:
+                self.assertEqual(entry["populations"] == "fleurs-n2", entry["id"] in planned, entry["id"])
+        self.assertEqual(registry["roleSets"]["fleurs-n2"]["confirmNegatives"],
+                         {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-test"})
+        self.assertEqual([calibration.is_confirmation_split(split) for split in
+                          ("dev", "test", "reserve-1", "reserve-2", "reserve-3", "reserve-4", "calibration")],
+                         [False, True, False, True, True, True, False])
+        judges = json.loads((REPO / calibration.JUDGES).read_text(encoding="utf-8"))
+        for mutate in (lambda roles: roles["fit"].update(failCorpus="fleurs-reserve-3"),
+                       lambda roles: roles["confirmNegatives"].update(failCorpus="fleurs-reserve-2"),
+                       lambda roles: roles["confirmNegatives"].update(failCorpus="")):
+            broken = copy.deepcopy(registry)
+            mutate(broken["roleSets"]["fleurs-reserve-n2"])
+            self.assertTrue(any("failCorpus" in error for error in detectors.registry_errors(broken, judges)))
+
+    def test_reserve_one_fits_reserve_two_confirms_and_later_cohorts_stay_untouched(self) -> None:
+        fixture = self.fixture
+        scores = self.calibrated()
+        document = json.loads(scores.read_text(encoding="utf-8"))
+        self.assertEqual((document["cohort"]["fleursSplit"], document["cohort"]["split"]), (None, "reserve-1"))
+        measured = fixture.measurements(fixture.confirmation, "reserve-2-measurements")
+        held, held_n1 = fixture.resynthesized("held", "h", "reserve-3")
+        held_measured = fixture.measurements(held, "reserve-3-measurements")
+        for role in ("calibration", "informational"):
+            self.assertIn("FLEURS reserve-2 is the confirmation corpus", self.scores(
+                role, fixture.confirmation, fixture.n1["confirmation"], f"r2-{role}", measurements=measured,
+                expect=2))
+            self.assertIn("FLEURS reserve-3 is a confirmation split", self.scores(
+                role, held, held_n1, f"r3-{role}", measurements=held_measured, expect=2))
+        # A FLEURS train cohort names its reserve cohort; without the reserve block it is no split at all.
+        bare, bare_n1 = fixture.resynthesized("bare", "b", "reserve-1", block=False)
+        self.assertIn("a FLEURS train cohort is a reserve cohort", self.scores(
+            "calibration", bare, bare_n1, "bare", measurements=fixture.measurements(bare, "bare-measurements"),
+            expect=2))
+        # The warn plan confirms on reserve-2, never on the held-back reserve-3.
+        self.assertIn("the role set confirms on FLEURS reserve-2", self.plan(scores, held, held_n1, expect=2))
+        self.plan(scores, fixture.confirmation, fixture.n1["confirmation"])
+        plan = json.loads((fixture.repo / f"config/audio-qc-preregistrations/{self.DETECTOR}.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual((plan["split"]["calibration"]["source"], plan["split"]["confirmation"]["source"]),
+                         ("fleurs-reserve-1", "fleurs-reserve-2"))
+        self.assertIn("fleurs-reserve-no-speaker-ids", json.loads((REPO / calibration.REGISTRY).read_text(
+            encoding="utf-8"))["limitations"])
+        fixture.commit_plans()
+        injection = fixture.injection_set(("SIG-LEVEL",))
+        confirmed = fixture.measurements(fixture.confirmation, "confirmation/measurements", injection_set=injection)
+        confirmation = self.scores("confirmation", fixture.confirmation, fixture.n1["confirmation"], "confirmation",
+                                   measurements=confirmed, injection_set=injection, positive_measurements=confirmed)
+        self.assertIn("scored only under a plan that names it", self.scores(
+            "confirmation", held, held_n1, "held-confirmation", measurements=held_measured, expect=2))
+        result = json.loads(self.cli("confirm", "--detector", self.DETECTOR, "--calibration-scores", str(scores),
+                                     "--confirmation-scores", str(confirmation)))
+        self.assertEqual(result["verdict"], "qualified")
+        self.cli("validate")
+        spent = calibration.declared_cohorts(calibration.Repository(fixture.repo))["spentSources"]
+        self.assertEqual(spent, {"fleurs-reserve-2": [self.DETECTOR]})
+        # A later plan may not confirm on reserve-2 again, even on a new resynthesis of its recordings (A5).
+        again, again_n1 = fixture.resynthesized("again", "t2", "reserve-2")
+        other = self.calibrated("test.reserve-level@2")
+        self.assertIn("confirmation corpus fleurs-reserve-2 was already scored as confirmation evidence",
+                      self.plan(other, again, again_n1, detector="test.reserve-level@2", expect=2))
 
 
 T2_FLAGS = ("--injection-catalog-seed", "7", "--injection-sample-seed", "1", "--injection-sample-per-cell", "150",

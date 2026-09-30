@@ -1,7 +1,7 @@
 # `language.nativeness@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `c025dad49bf43c1c` (a plan binds it, so any change is a new version, A7).
+Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `f191c9f440104a1d` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Whether the take sounds like a native speaker of the expected language: the mean of Whisper large-v3's expected-language probability and VoxLingua107's expected-language posterior, fitted on native read speech (N2 FLEURS), direction below. An accent pulls both classifiers' confidence down while they still identify the language; language.consensus-lid@1 takes the larger of the two, so both must be low (another language), and counts accented speech as a negative (audit section 4.2). Native FLEURS French scores a VoxLingua posterior of 0.999 at the median; the app's French from Serena 0.39.
 
@@ -25,11 +25,11 @@ Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../..
 |---|---|---|---|
 | `NAT-ACCENT` | severe | T4-natural-labelled | no |
 
-**Populations** (role set `accent-natural-n2`): fit N2 (calibration, fleurs-dev); confirmNegatives N2 (confirmation, fleurs-test); positives P4 (confirmation, pending-speechocean762-n2-confirmation); shams S (confirmation); informational N3, N1.
+**Populations** (role set `accent-natural-n2`): fit N2 (calibration, fleurs-reserve-1); confirmNegatives N2 (confirmation, fleurs-reserve-2; at a fail point fleurs-reserve-3); positives P4 (confirmation, pending-speechocean762-n2-confirmation); shams S (confirmation); informational N3, N1.
 
 **Limitations.**
 
-- `fleurs-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.
+- `fleurs-reserve-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured.
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 - `accent-positives-english-only`: Natural non-native positives exist for English only (speechocean762: Mandarin-L1 speakers reading English), so the detection rate is English's: the other nine languages' thresholds bound their FAR on native N2 speech, but their sensitivity to an accent is unmeasured. A lane should read them as report-only until a labelled non-native corpus of that language exists; the lane gates declare each lane's languages.

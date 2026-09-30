@@ -105,7 +105,9 @@ entry and re-derived by `verify`. A take without a speaker label, or without a
 donor of both relations, is not applicable, with that reason.
 
 Seams (class J). A long-form take may declare its segment boundaries as
-`seamSamples` (sample offsets at the engine rate on its own timeline). SEAM-DISC
+`seamSamples` (sample offsets at the engine rate on its own timeline); a take of
+the take plan's long-form cell carries them as its `longForm` block's
+`seamFrames`, which serve the same way (`take_seams`). SEAM-DISC
 and SEAM-VOICE act at one of them; every entry carries the seams of its own
 output (`seamSamples`) where the edit keeps them, and `score` passes them to the
 Stage 0 seam z-score.
@@ -320,11 +322,12 @@ def load_takes(path: Path) -> tuple[dict, str]:
         if not isinstance(take.get("language"), str) or not isinstance(take.get("text"), str):
             raise CalibrationError(f"{take_id}: a generated take names its language and text")
         _relative_path(path.parent, take.get("wavPath"), f"{take_id}: wavPath")
-        seams = take.get("seamSamples")
-        if seams is not None and (not isinstance(seams, list) or not all(type(seam) is int and seam > 0
-                                                                         for seam in seams)
-                                  or any(later <= earlier for earlier, later in zip(seams, seams[1:]))):
-            raise CalibrationError(f"{take_id}: seamSamples are increasing positive sample offsets")
+        for seams in (take.get("seamSamples"), take_seams(take)):
+            if seams is not None and (not isinstance(seams, list) or not all(type(seam) is int and seam > 0
+                                                                             for seam in seams)
+                                      or any(later <= earlier for earlier, later in zip(seams, seams[1:]))):
+                raise CalibrationError(f"{take_id}: seamSamples (or a longForm block's seamFrames) are increasing "
+                                       "positive sample offsets")
         if n1:
             recording = take.get("recording")
             if take.get("population") != "N1" or not isinstance(take.get("eligible"), bool) \
@@ -333,6 +336,18 @@ def load_takes(path: Path) -> tuple[dict, str]:
                 raise CalibrationError(f"{take_id}: an N1 recording names its population, eligibility and "
                                        "source sample rate")
     return manifest, hashlib.sha256(raw).hexdigest()
+
+
+def take_seams(take: dict) -> list:
+    """A long-form take's seam offsets (samples at the engine rate on its own timeline): the `seamSamples` it
+    declares, else the `seamFrames` of its `longForm` block, where the take plan's long-form cell records the
+    assembly (`audio_qc_calibration_takes.long_form_block`); none for a single-segment take."""
+    if take.get("seamSamples") is not None:
+        return take["seamSamples"]
+    block = take.get("longForm")
+    if isinstance(block, dict) and block.get("sampleRate") == recordings.ENGINE_SAMPLE_RATE:
+        return block.get("seamFrames") or []
+    return []
 
 
 def source_rate(take: dict) -> int:
@@ -972,7 +987,7 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
         languages.setdefault(take["family"], str(take.get("language")))
     swap_families = {take["family"] for take in language_swap.eligible_sources(takes)}
     impostor_families = {take["family"] for take in speaker_donors.DonorPool(takes).sources()}
-    seamed = {take["family"] for take in takes if take.get("seamSamples")}
+    seamed = {take["family"] for take in takes if take_seams(take)}
     worded = None if usable_words is None else {take["family"] for take in takes if take["takeID"] in usable_words}
     chosen: dict[str, dict] = {}
     for row in plan:
@@ -1149,7 +1164,7 @@ def _source_fixture(task: dict) -> tuple[Any, str, dict | None, str | None]:
     fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"], family=take["family"],
                                                 stratum=stratum(take), text=take["text"],
                                                 expected_sha256=take["wavSHA256"], source_rate=source_rate(take),
-                                                seams=take.get("seamSamples") or ())
+                                                seams=take_seams(take))
     context = task.get("alignment")
     if context is None:
         return fixture, digest, None, None
@@ -1302,7 +1317,7 @@ def impostor_issue(manifest: dict) -> str | None:
 
 def plan_for(manifest: dict, classes: Iterable[str], *, words: bool) -> list[dict]:
     cohort = manifest["kind"] in COHORT_KINDS
-    seams = any(take.get("seamSamples") for take in generated_takes(manifest))
+    seams = any(take_seams(take) for take in generated_takes(manifest))
     return build_plan(classes, words=words, language_swap_issue=LANGUAGE_SWAP_ISSUES[manifest["kind"]],
                       language_swap_rows=cohort, seams=seams, impostor_issue=impostor_issue(manifest),
                       impostor_rows=cohort)
@@ -2425,8 +2440,8 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
                 **generation_evidence(take, own_generation=True)}
         if source_rate(take) != recordings.ENGINE_SAMPLE_RATE:
             task["sourceRate"] = source_rate(take)
-        if take.get("seamSamples"):
-            task["seams"] = list(take["seamSamples"])
+        if take_seams(take):
+            task["seams"] = list(take_seams(take))
         tasks.append(task)
     for entry in injection_set["entries"]:
         take = takes.get(entry.get("sourceTakeID"))

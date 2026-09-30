@@ -621,6 +621,7 @@ def detector_definition(sources: Sources, entry: Mapping[str, Any]) -> str:
             value = roles.get(role)
             if isinstance(value, Mapping):
                 corpus = f", {value['corpus']}" if value.get("corpus") else ""
+                corpus += f"; at a fail point {value['failCorpus']}" if value.get("failCorpus") else ""
                 described.append(f"{role} {value.get('population')} ({value.get('cohort')}{corpus})")
             elif value:
                 described.append(f"{role} {names(value)}")

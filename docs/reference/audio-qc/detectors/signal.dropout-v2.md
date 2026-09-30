@@ -1,7 +1,7 @@
 # `signal.dropout@2`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `signal.dropout@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `5d5f7e40085c9a61` (a plan binds it, so any change is a new version, A7).
+Registry entry `signal.dropout@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `457bbae2605a75d2` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** The longest run of exact digital silence (PCM16 zeros) strictly between the take's first and last nonzero samples, in milliseconds (pcmMeasures longestInteriorDigitalSilenceMS), against one threshold pooled over the languages. Room tone and codec output are never exactly zero for long, whatever the recording's noise floor, so the score does not follow the recording conditions that set v1's per-language thresholds (Fast QC's 0.001 floor counted a quiet room as silence: 16 ms in pt against 2.4 s in ko, so 95% of pt app takes flagged).
 
@@ -23,11 +23,11 @@ Registry entry `signal.dropout@2` in [config/audio-qc-detectors.json](../../../.
 |---|---|---|---|
 | `SIG-DROP` | moderate, severe | T1-pcm-construction | yes |
 
-**Populations** (role set `fleurs-n2`): fit N2 (calibration, fleurs-dev); confirmNegatives N2 (confirmation, fleurs-test); positives P1 (confirmation); shams S (confirmation); informational N3, N1.
+**Populations** (role set `fleurs-reserve-n2`): fit N2 (calibration, fleurs-reserve-1); confirmNegatives N2 (confirmation, fleurs-reserve-2; at a fail point fleurs-reserve-3); positives P1 (confirmation); shams S (confirmation); informational N3, N1.
 
 **Limitations.**
 
-- `fleurs-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.
+- `fleurs-reserve-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured.
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 - `digital-silence-only`: The score counts exact digital silence (PCM16 zeros) only: a quiet but nonzero gap or tail (room tone, codec silence tokens, an attenuated span) is not scored, so a generated pause or tail that merely runs long is outside this detector. The legacy Fast QC v8 silence flags keep reporting those (A10), and SIG-DROP's attenuated variant is no target.

@@ -1,7 +1,7 @@
 # `signal.band-limit@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `51cac201234a1150` (a plan binds it, so any change is a new version, A7).
+Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `e82a77c5ce9ce623` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** The effective bandwidth in Hz (Stage 0 observation effectiveBandwidthHz); a narrow band alarms.
 
@@ -25,11 +25,11 @@ Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../.
 |---|---|---|---|
 | `SIG-BAND` | severe | T1-pcm-construction | yes |
 
-**Populations** (role set `fleurs-n2`): fit N2 (calibration, fleurs-dev); confirmNegatives N2 (confirmation, fleurs-test); positives P1 (confirmation); shams S (confirmation); informational N3, N1.
+**Populations** (role set `fleurs-reserve-n2`): fit N2 (calibration, fleurs-reserve-1); confirmNegatives N2 (confirmation, fleurs-reserve-2; at a fail point fleurs-reserve-3); positives P1 (confirmation); shams S (confirmation); informational N3, N1.
 
 **Limitations.**
 
-- `fleurs-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.
+- `fleurs-reserve-no-speaker-ids`: FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured.
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 

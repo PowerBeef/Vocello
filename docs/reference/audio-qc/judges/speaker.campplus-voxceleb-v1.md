@@ -55,7 +55,16 @@ Registry entry `speaker.campplus-voxceleb@1` in [config/audio-qc-judges.json](..
 - Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.campplus-voxceleb-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.campplus-voxceleb-v1.json) (2026-09-27), output identity `567113ff49594c84`.
 - Canary qualification passed: yes; determinism D0 over 31 rows (31 bit-exact, 0 discrete mismatches); peak 0.27 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
 
-**UNQUALIFIED.** No registered detector consumes this judge, so no accuracy is claimed for it.
+Its accuracy is claimed only through the detectors that consume it:
+
+| Detector | Class | Languages | Reads | Qualification |
+|---|---|---|---|---|
+| [`identity.clone-similarity@1`](../detectors/identity.clone-similarity-v1.md) | E (identity) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `cosine` | not qualified |
+| [`identity.window-drift@1`](../detectors/identity.window-drift-v1.md) | E (identity) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `cosine`, panel `windowCosineMinimum` | not qualified |
+| [`identity.onset-drift@1`](../detectors/identity.onset-drift-v1.md) | E (identity) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `cosine`, panel `onsetWindowCosine` | not qualified |
+| [`long-form.seam-identity@1`](../detectors/long-form.seam-identity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `seamWindowCosineMinimum` | not qualified |
+
+**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

@@ -46,7 +46,15 @@ Registry entry `pitch.pyin@1` in [config/audio-qc-judges.json](../../../../confi
 - Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json) (2026-09-27), output identity `772bcaf2018a0b50`.
 - Canary qualification passed: yes; determinism D0 over 28 rows (28 bit-exact, 0 discrete mismatches); peak 0.49 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
 
-**UNQUALIFIED.** No registered detector consumes this judge, so no accuracy is claimed for it.
+Its accuracy is claimed only through the detectors that consume it:
+
+| Detector | Class | Languages | Reads | Qualification |
+|---|---|---|---|---|
+| [`prosody.pitch-break@1`](../detectors/prosody.pitch-break-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `maxPitchStepSemitones` | not qualified |
+| [`prosody.octave-jump@1`](../detectors/prosody.octave-jump-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `longestOctaveDisplacementSeconds` | not qualified |
+| [`prosody.pitch-instability@1`](../detectors/prosody.pitch-instability-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `pitchJumpsPerVoicedSecond` | not qualified |
+
+**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

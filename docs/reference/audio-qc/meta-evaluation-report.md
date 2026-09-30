@@ -20,6 +20,18 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | confirmed (qualified) | qualified (warn) | 83/3718 (0.022), upper 0.027 | french 16/286 (0.056), upper 0.101 | 142/150 (0.947), lower 0.906 | 0/3718 (0.000), upper 0.001 | 3718 / 150 / 150 | [record-68b22b3caabe3742.json](../../../benchmarks/audio-qc-calibration/boundary.truncation@1/record-68b22b3caabe3742.json) |
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | confirmed (refused) | refused | 206/3473 (0.059), upper 0.066 | french 20/286 (0.070), upper 0.117 | 43/135 (0.319), lower 0.252 | 0/3473 (0.000), upper 0.001 | 3473 / 135 / 135 | [record-40cbfdf9b37db8a2.json](../../../benchmarks/audio-qc-calibration/boundary.run-on@1/record-40cbfdf9b37db8a2.json) |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | confirmed (qualified) | qualified (warn) | 200/3718 (0.054), upper 0.060 | english 19/236 (0.081), upper 0.137 | 150/150 (1.000), lower 0.980 | 0/3718 (0.000), upper 0.001 | 3718 / 150 / 150 | [record-67b4358cc9d3e121.json](../../../benchmarks/audio-qc-calibration/language.consensus-lid@1/record-67b4358cc9d3e121.json) |
+| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
+| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
+| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
+| [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
+| [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
+| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
+| [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
+| [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
+| [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
 
 ## Lane gates
 

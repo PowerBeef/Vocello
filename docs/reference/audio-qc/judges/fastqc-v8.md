@@ -51,6 +51,11 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`signal.clipping@1`](../detectors/signal.clipping-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `hotSamples` | refused |
 | [`signal.noise@1`](../detectors/signal.noise-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `wadaSNRDB` | qualified (warn) |
 | [`signal.band-limit@1`](../detectors/signal.band-limit-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `effectiveBandwidthHz` | not qualified |
+| [`introspection.token-loop@1`](../detectors/introspection.token-loop-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `tokenCycleSpanFrames` | not qualified |
+| [`introspection.high-entropy@1`](../detectors/introspection.high-entropy-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `longestHighEntropyRunSteps` | not qualified |
+| [`introspection.eos-overrun@1`](../detectors/introspection.eos-overrun-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `eosLikelyStepsWithoutStop` | not qualified |
+| [`long-form.seam-discontinuity@1`](../detectors/long-form.seam-discontinuity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `seamDiscontinuityMaxZ` | not qualified |
+| [`long-form.seam-jump@1`](../detectors/long-form.seam-jump-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | longform `maximumSegmentBoundaryJump` | not qualified |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

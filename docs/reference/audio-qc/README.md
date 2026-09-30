@@ -137,6 +137,18 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | - |
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |
+| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | 2 | single | no plan | not qualified | - |
+| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | 2 | difference | no plan | not qualified | - |
+| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | 2 | difference | no plan | not qualified | - |
+| [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | 1 | single | no plan | not qualified | - |
+| [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | 1 | single | no plan | not qualified | - |
+| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | 1 | single | no plan | not qualified | - |
+| [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | 0 | single | no plan | not qualified | - |
+| [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | 0 | single | no plan | not qualified | - |
+| [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | 0 | single | no plan | not qualified | - |
+| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | 0 | single | no plan | not qualified | - |
+| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | 0 | single | no plan | not qualified | - |
+| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | 2 | single | no plan | not qualified | - |
 <!-- END GENERATED audio-qc-docs:detectors -->
 
 ## Adding a judge or a detector

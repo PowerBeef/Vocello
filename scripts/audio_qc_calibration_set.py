@@ -1942,8 +1942,11 @@ def _long_form(task: dict, samples: np.ndarray) -> dict | None:
 
     A clean take's recorded block must describe its WAV (length, rate, the
     assembler's jump); a T1 construction that kept the length keeps the seams,
-    and its jump is measured on the constructed PCM. One that moved them has
-    no block, so a seam detector abstains on it.
+    and its jump is measured on the constructed PCM. One that moved them
+    (SEAM-DISC removes samples after a seam) is described at the seams its
+    entry records, one per seam of its source; one that recorded none (an edit
+    whose timeline no seam mapping follows) has no block, so a seam detector
+    abstains on it.
     """
     block = task.get("longForm")
     if block is None:
@@ -1952,7 +1955,11 @@ def _long_form(task: dict, samples: np.ndarray) -> dict | None:
     if not fits:
         if task["longFormRecorded"]:
             raise CalibrationError(f"{task['clipID']}: its longForm block does not describe its WAV (length or rate)")
-        return None
+        seams = [int(seam) for seam in task.get("seams") or ()]
+        if block["sampleRate"] != recordings.ENGINE_SAMPLE_RATE or len(seams) != len(block["seamFrames"]) \
+                or not seams or seams[-1] >= samples.size:
+            return None
+        block = {**block, "outputFrameCount": int(samples.size), "seamFrames": seams}
     jump = boundary_jump(samples, block["seamFrames"])
     if task["longFormRecorded"] and jump != block["maximumSegmentBoundaryJump"]:
         raise CalibrationError(f"{task['clipID']}: its PCM steps {jump} at the recorded seams, the assembler "

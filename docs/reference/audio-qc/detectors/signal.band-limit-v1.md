@@ -1,7 +1,7 @@
 # `signal.band-limit@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `e82a77c5ce9ce623` (a plan binds it, so any change is a new version, A7).
+Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `c3f5fb00981f07b9` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** The effective bandwidth in Hz (Stage 0 observation effectiveBandwidthHz); a narrow band alarms.
 
@@ -35,7 +35,6 @@ Registry entry `signal.band-limit@1` in [config/audio-qc-detectors.json](../../.
 
 **Risks.**
 
-- `no-band-limit-injector`: Injector catalog version 2 has no band-limit family (SIG-BAND); until one exists the detector has no positives and its confirmation cannot start.
 - `fleurs-bandwidth`: N2 inherits FLEURS's 16 kHz sampling, so clean N2 effective bandwidth sits near 8 kHz and a threshold fitted there flags only band-limits below it; natural 24 kHz takes (N3) reach about 11.5 kHz.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.

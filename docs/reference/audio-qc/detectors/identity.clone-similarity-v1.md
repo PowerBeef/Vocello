@@ -1,7 +1,7 @@
 # `identity.clone-similarity@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `identity.clone-similarity@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `773534a9136b65c6` (a plan binds it, so any change is a new version, A7).
+Registry entry `identity.clone-similarity@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `3c943332b37f7352` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Whole-take speaker similarity (SIM): the cosine between CAM++'s embedding of the take and of its reference clip (another utterance of the same speaker; the clone's reference in the clone lane). A low similarity alarms: a clone mismatch or another voice for the whole take.
 
@@ -36,7 +36,6 @@ Registry entry `identity.clone-similarity@1` in [config/audio-qc-detectors.json]
 **Risks.**
 
 - `resnet293-not-voting`: The audit fails an identity only when both speaker families fall below their thresholds and abstains when they disagree (section 4.3), but ResNet293 votes only after its correlated-failure audit against CAM++ (the same VoxCeleb training data) passes. These detectors read CAM++ alone; the two-family rule (consensus-max of the two families' scores) is a new version once ResNet293 votes.
-- `no-impostor-injector`: Injector catalog version 2 has no impostor construction: a recording of another speaker of the same language and gender presented against the source speaker's reference clip (T1-parallel-corpus, built from published speaker labels as LNG-SWAP is from parallel sentences), with another utterance of the source speaker as its sham. Until IDN-IMPOSTOR exists the whole-take detector has no impostor positives and its confirmation cannot start.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

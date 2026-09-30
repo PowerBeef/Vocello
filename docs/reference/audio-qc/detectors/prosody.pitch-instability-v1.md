@@ -1,7 +1,7 @@
 # `prosody.pitch-instability@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `prosody.pitch-instability@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `48761aa606877abc` (a plan binds it, so any change is a new version, A7).
+Registry entry `prosody.pitch-instability@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `fa45cd07127daf3d` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Pitch jumps per voiced second, reduced from pYIN's frame track: F0 changes between consecutive voiced frames at most 50 ms apart faster than 150 semitones per second (about twice the fastest change a speaker makes), a cluster within 50 ms counted once, over the take's voiced seconds. A pitch that jumps from syllable to syllable scores high, while expressive intonation, however wide, glides below the rate; semitone rates do not depend on the voice's register. A take with less than 1 s of voiced speech abstains.
 
@@ -30,13 +30,12 @@ Registry entry `prosody.pitch-instability@1` in [config/audio-qc-detectors.json]
 **Limitations.**
 
 - `n3-expressive-negatives`: The negatives are natural Vocello takes (N3: the product's expressive variation, Built-in and Voice Design voices), so natural expressive speech is a negative, as the maintainer's report of erratic pitch in Voice Clone takes needs; a threshold fitted on FLEURS read speech (N2, informational here) would flag expressive intonation. N3 carries no labels, so the flag rate bounds the false-alarm rate only as f / (1 - pi_max) (audit section 5.1), and a fail bound still needs an expressive N2 corpus (the audit's expressive N1, section 5.7). Each language stratum needs at least 60 scored families in each split of the take plan (the calibration split plans 80 per language).
-- `n3-no-clone-takes`: The maintainer hears erratic pitch in Voice Clone takes, but the N3 take plan (config/audio-qc-calibration-takes.json) covers Built-in and Voice Design voices only, so no clone take is a negative or informational yet; a clone split needs reference clips that may be cloned (the class E speaker corpus would serve) and the same families per stratum.
+- `n3-clone-takes`: Version 2 of the take plan (config/audio-qc-calibration-takes.json) adds a clone cell to both N3 splits: Voice Clone takes on human reference clips of the pinned speaker corpora, 80 per language per split, each reference speaker in one split only. The maintainer hears erratic pitch in exactly those takes, and N3 carries no labels, so the fit counts every clone take as clean: an erratic clone take raises the threshold instead of alarming, and the confirmation split's flag rate bounds the false-alarm rate only as f / (1 - pi_max).
 
 **Risks.**
 
 - `pyin-tracker-unvalidated`: The audit qualifies class F only after the pitch tracker is validated (section 5.7), and pYIN's oracle ladder is not recorded yet. pYIN's own octave errors (a halved or doubled F0 on creak, breath or low energy) read as jumps, so its error rate on clean N2 sets these detectors' false-alarm floor.
 - `pyin-raw-track-export`: The panel bundle keeps pYIN's whole-take L2 statistics only; its frame track (f0Hz, voiced, hopSeconds) stays in the orchestrator's L1 cache. audio_qc_calibration_set.py raw-outputs --judge pitch.pyin@1 exports it per take from the panel's cache root, and scores --raw-outputs binds each track to the take's audio and pYIN's output identity and passes it to score_take as raw; a take whose entry the cache no longer holds is an evidence gap. pYIN is not among the six judges the v1 confirmation panels run, so a class F panel adds it and keeps its cache root until the export.
-- `no-erratic-pitch-injector`: Injector catalog version 2 has no erratic-pitch construction: PRS-BRK and PRS-OCT change one span each, which a take-level rate barely registers. PRS-ERRATIC would cut the take into seeded 150-300 ms spans and shift each by a seeded sign and magnitude (2, 4 and 7 semitones for mild, moderate and severe) through the PRS-BRK shifter, with 0 semitones through the same path as its sham; it needs no word interval, so it runs on N3 recordings. Until it exists the detector has no positives.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

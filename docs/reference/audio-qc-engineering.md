@@ -1692,9 +1692,17 @@ conservative token estimates at that run's seconds per unit: standard and cross-
 prefill unmeasured: 30 to 40 minutes), long-form about 5,650 s of streaming segments (unmeasured:
 25 to 35 minutes). About 1 hour 45 minutes per split, 3.5 hours for both.
 
-The detector registry's `n3-no-clone-takes` and `long-form-takes-pending` limitations and its
-`introspection-not-carried` and `long-form-evidence-not-carried` risks describe the gaps this plan
-closes; their owner updates them once the cohorts exist.
+The detector registry now describes these cells as they are (2026-09-30):
+
+- `n3-clone-takes`: the clone cell's takes are negatives, erratic ones included, since N3 carries no
+  labels.
+- `n3-long-form-cell`: class J's cohorts are the long-form cell, and role set `n3-long-form` names
+  them.
+- `introspection-rows-kept`: the lane keeps its diagnostics rows, and a take without its row abstains.
+- `long-form-block`: the manifest records each long-form take's assembly as its `longForm` block.
+
+These entries replace `n3-no-clone-takes`, `long-form-takes-pending`, `introspection-not-carried` and
+`long-form-evidence-not-carried`.
 
 ### Codec resynthesis (N2, audit P9)
 
@@ -1799,24 +1807,26 @@ where warn allows 20% per language. The registry records the declared risks (Sen
 degradation in ja and ko, VoxLingua's weakness in de and ru, Parakeet's Whisper label lineage).
 
 **Classes E, F, I and J (registered @1, not yet planned).** The next classes of audit section 5.7
-are registered at warn with the data each still needs. None has a plan: each lacks a cohort, a
-positive construction or a producer of its inputs, and the entries' `limitations` and `risks` say
-which. An entry can still change in place until a plan binds its digest.
+are registered at warn. None has a plan yet, and the entries' `limitations` and `risks` say what each
+still lacks. An entry can still change in place until a plan binds its digest. Catalog version 3
+builds every T1 construction these detectors name (IDN-IMPOSTOR, the recorded IDN-SWAP splice,
+IDN-ONSET, PRS-ERRATIC, SEAM-DISC, SEAM-VOICE). Take plan version 2 adds the clone and long-form cells,
+and the qc-takes lane keeps its diagnostics rows. The last column is the state on 2026-09-30.
 
 | Detector | Class | Score | Direction | Still needs |
 |---|---|---|---|---|
-| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labeled N2 corpus; reference clips in the panel manifest (IDN-IMPOSTOR since catalog v3) |
-| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus (the recorded IDN-SWAP splice since catalog v3) |
-| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus (IDN-ONSET since catalog v3); the pYIN register and envelope parts of the joint onset rule |
-| `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on the panels with its frame track exported per take; a confirmation N2 cohort no plan has scored; pYIN's oracle ladder |
+| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labelled N2 corpus (a maintainer decision: role set `speaker-labeled-n2` is pending) and reference clips in the panel manifest |
+| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus |
+| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; the pYIN register and envelope parts of the joint onset rule |
+| `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on both FLEURS reserve panels, its frame track exported per take; pYIN's oracle ladder recorded |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
-| `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on the N3 splits; a Voice Clone split (PRS-ERRATIC since catalog v3) |
-| `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | Introspection carried into measurements.json; COD-LOOP (T2) with summaries recomputed from the mutated trace |
-| `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | Introspection carried; GEN-NOEOS (T3), a registered EOS-suppression knob |
+| `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on both N3 splits of take plan version 2 (standard, clone and cross-lingual cells) |
+| `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | COD-LOOP (T2): a mutation-recipe replay mode for the codec trace |
+| `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | GEN-NOEOS (T3), a registered EOS-suppression knob |
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
-| `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | Long-form N3 takes with their `seamSamples` (then `score` passes them; SEAM-DISC since catalog v3) |
-| `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | Long-form N3 takes; a `longForm` block in measurements.json with a Python mirror for positives |
-| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | Long-form N3 takes; CAM++ windows exported with the seam times; SEAM-VOICE positives there (catalog v3 splices donors only on speaker-labelled cohorts) |
+| `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | The long-form cell's takes of both splits (the calibration set reads their seams from the `longForm` block) |
+| `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | As seam-discontinuity; a SEAM-DISC clip is measured at the seams its entry records |
+| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | SEAM-VOICE positives, which natural long-form takes cannot build (no procedural script, no speaker label); CAM++ windows exported with the seam times |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1842,18 +1852,19 @@ measurement completed. pYIN's HMM caps a transition at 4.3 semitones per 10 ms f
 measure compares voiced frames up to 50 ms apart. pYIN does not vote, but as a DSP instrument with
 no learned weights its raw output may score a `single` detector alone if it is not from the
 generator's lab and is at least shadow; its L2 metrics through a `panel` component still may not.
-Class F fits on the FLEURS N2 calibration cohort, and PRS-BRK and PRS-OCT already run on N2 with
-the aligner's intervals (not in Korean). A plan still needs pYIN on both panels, its frame track
-exported per take (`audio_qc_calibration_set.py raw-outputs --judge pitch.pyin@1`, rebuilt from the
-panel's own cache root, `--cache-root` required, like `alignments`, and passed to `scores
---raw-outputs`; a take whose entry the cache no longer holds is an evidence gap), and a confirmation
-cohort no plan has scored: the v1 confirmation
-cohort already holds bundles, so `plan` refuses it (A5). The pitch-instability detector answers
+Class F fits on an N2 calibration cohort, now the FLEURS reserve's (`fleurs-reserve-n2`: the v1
+confirmation cohort already holds bundles, so `plan` refuses it, A5), and PRS-BRK and PRS-OCT
+already run on N2 with the aligner's intervals (not in Korean). A plan still needs pYIN on both
+panels and its frame track exported per take (`audio_qc_calibration_set.py raw-outputs --judge
+pitch.pyin@1`, rebuilt from the panel's own cache root, `--cache-root` required, like `alignments`,
+and passed to `scores --raw-outputs`; a take whose entry the cache no longer holds is an evidence
+gap). The pitch-instability detector answers
 the maintainer's report of Voice Clone takes whose pitch is all over the place: a take-level rate
 of jumps no voice makes (about twice the fastest F0 change a speaker produces), so expressive
 intonation that glides stays a negative. It therefore fits and confirms on natural takes (role set
-`n3-takes`, FLEURS read speech informational) and needs a construction that shifts many short spans
-(PRS-ERRATIC); the take plan has no Voice Clone split yet. Window drift is the identity half of the
+`n3-takes`, FLEURS read speech informational) and a construction that shifts many short spans
+(PRS-ERRATIC, catalog version 3); take plan version 2's clone cell brings Voice Clone takes into both
+splits, as negatives (`n3-clone-takes`). Window drift is the identity half of the
 same complaint. Creak is not registered: catalog v2 has no
 creak construction (the audit builds one with WORLD, which the catalog lacks), and no voice-quality
 measure has passed its oracle ladder.
@@ -1873,23 +1884,24 @@ T2=N`, checked against each tier's entries).
 `audio_qc_calibration_takes.py manifest --diagnostics` binds each take to the engine row whose
 `samplingWAVDigest` is its WAV digest and carries that row's `engineIntrospection`, and `score`
 copies it into each clip (a T2 or T3 entry carries its own; a T1 construction none), refusing a
-summary bound to another WAV than the clip's. The engine's
-diagnostics log is capped (8 MB), so the early rows of a long qc-takes run are gone when the lane
-builds its manifest and those takes abstain: the lane has to keep its rows before class I is scored.
+summary bound to another WAV than the clip's. The engine front-trims its diagnostics log at its cap,
+so the qc-takes lane keeps its rows: it raises the cap to 64 MB, copies each batch's new rows and
+binds the manifest against its copy (`introspection-rows-kept`). A take without its row abstains.
 
 Class J reads the Stage 0 seam z-score, a fourth new source, `longform` (a clip's `longForm` block:
 the long-form assembly evidence), and the `raw-output` seam measure, which also takes the take's
 seam times (`score_take(..., seams=[...])`, abstaining `no-seams` without one). Its role set
-`n3-long-form` names pending corpora: the take plan has single-segment takes only, so class J
-waits for a long-form take plan with at least 60 scored families per split (one pooled threshold
-over at least 3 languages, speakers and scripts), each a project with at least one seam. A
+`n3-long-form` names the take plan's long-form cell: 80 projects per split (one pooled threshold,
+the warn floor 60, over at least 3 languages, speakers and scripts), each with at least one seam. A
 long-form take carries a `longForm` block (`audio_qc_calibration_takes.long_form_block`: the
 assembled frame count, the assembler's boundary jump and each seam's output frame); `score` passes
 its seams to the Stage 0 seam z-score and measures each clip's jump on its own PCM (a clean take's
-must equal the assembler's; a T1 construction that keeps the length keeps the seams), and `scores`
-passes the seams to the seam-identity measure with the exported CAM++ windows. Until a long-form
-take plan exists, every `seamDiscontinuityMaxZ` in measurements.json stays null.
-Seam-identity uses `raw-output` from class F, so its commit comes after F's.
+must equal the assembler's; a T1 construction that keeps the length keeps the seams; a SEAM-DISC
+clip, which removed samples after a seam, is described at the seams its entry records), and `scores`
+passes the seams to the seam-identity measure with the exported CAM++ windows. A single-segment
+take's `seamDiscontinuityMaxZ` stays null. SEAM-VOICE needs a procedural script or a speaker label,
+which natural long-form takes lack, so seam-identity has no positives on the long-form cell
+(`seam-constructions`). Seam-identity uses `raw-output` from class F, so its commit comes after F's.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A

@@ -1,7 +1,7 @@
 # `identity.window-drift@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `identity.window-drift@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `801e5f419ac4dd47` (a plan binds it, so any change is a new version, A7).
+Registry entry `identity.window-drift@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `38976afe77eb66a2` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Window drift: CAM++'s whole-take cosine to the reference clip minus its lowest 2 s window cosine (0.5 s hop) to the same reference, so a span of another voice inside the take alarms against the take's own similarity while a whole-take mismatch (the clone-similarity detector's) does not.
 
@@ -36,7 +36,6 @@ Registry entry `identity.window-drift@1` in [config/audio-qc-detectors.json](../
 
 - `resnet293-not-voting`: The audit fails an identity only when both speaker families fall below their thresholds and abstains when they disagree (section 4.3), but ResNet293 votes only after its correlated-failure audit against CAM++ (the same VoxCeleb training data) passes. These detectors read CAM++ alone; the two-family rule (consensus-max of the two families' scores) is a new version once ResNet293 votes.
 - `short-window-embeddings`: Speaker embeddings degrade on short windows (audit section 4.3): a 2 s window scores lower against the reference than the whole take even on clean speech. The drift and onset scores subtract the window's cosine from the take's own whole-take cosine, so each take is its own baseline; a take shorter than one window has none and abstains (no-value).
-- `no-recorded-identity-swap`: IDN-SWAP@1 splices a time-aligned re-render by a second procedural voice, so it runs on procedural sources only: a human recording has no script to re-render and no render voice (audio_qc_calibration_set.py COHORT_SWAP_STATUS). On the speaker corpus it needs a recorded variant, a span of another same-language speaker's recording spliced at aligned word boundaries with a same-speaker splice as its sham (audit section 5.7); until then the window-drift detector has no positives.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

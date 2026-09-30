@@ -1,7 +1,7 @@
 # `introspection.eos-overrun@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `746c5a516924e7d8` (a plan binds it, so any change is a new version, A7).
+Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `1a872d278f12de67` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Generation steps at which the talker gave EOS a probability of at least 0.5 and generation went on (eosLikelyStepsWithoutStop): the take ran on past points where the talker would likely have stopped.
 
@@ -33,7 +33,7 @@ Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json]
 
 **Risks.**
 
-- `introspection-not-carried`: The engine's introspection summary lands in the telemetry row's engineIntrospection. audio_qc_calibration_takes.py manifest --diagnostics binds each take to the engine row whose samplingWAVDigest is its WAV digest and carries the summary, and audio_qc_calibration_set.py score copies it into each clip; but the engine's diagnostics log is capped (8 MB), so the early rows of a long qc-takes run are gone when the lane builds its manifest and those takes abstain (no-value) until the lane keeps its rows.
+- `introspection-rows-kept`: The engine's introspection summary reaches a take through its diagnostics row, which the engine front-trims at its log cap. The qc-takes lane marks the rows present before it starts, raises the cap (QWENVOICE_DIAGNOSTICS_MAX_MB=64), copies each vocello batch's new rows (generation id, WAV digest, Fast QC flag names, failure code and introspection numbers) into its diagnostics/ directory, and audio_qc_calibration_takes.py manifest --diagnostics binds each take to the row whose samplingWAVDigest is its WAV digest; verdict.txt reports the bound count. A take still without its row abstains (no-value); the 2026-09-27 cohort, generated before the lane kept its rows, bound 251 of its 791 takes.
 - `no-generation-knob`: GEN-NOEOS (T3, audit section 5.2) suppresses EOS for 6-50 frames through a registered knob, with no suppression (N = 0) as its sham; config/runtime-debug-knobs.json lists no such knob, so the entropy and EOS detectors have no positives until one is registered under the release-only rules.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.

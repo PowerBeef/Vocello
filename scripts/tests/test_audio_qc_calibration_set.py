@@ -499,6 +499,19 @@ class LongFormSeamTests(unittest.TestCase):
             self.assertTrue(all(entry["injection"]["sourceSeams"] == [seam] for entry in entries))
             verified = quiet(m2.run_verify, root / "set" / "injection-set.json", takes_path, jobs=1)
             self.assertTrue(verified["verified"], verified["failures"])
+            # Every SEAM-DISC clip carries a long-form block describing its own PCM, so the boundary-jump detector
+            # scores the positives that removed samples (their length moved) as well as the sham.
+            quiet(m2.run_score, takes_path, root / "set" / "injection-set.json", root / "score", jobs=1)
+            clips = json.loads((root / "score" / "measurements.json").read_text(encoding="utf-8"))["clips"]
+            blocks = {(clip["injection"] or {}).get("severity", "clean"): clip.get("longForm") for clip in clips
+                      if clip["injection"] is None or clip["injection"]["injectorID"] == "SEAM-DISC"}
+            self.assertEqual(set(blocks), {"clean", "sham", "mild", "moderate", "severe"})
+            self.assertEqual(blocks["clean"]["maximumSegmentBoundaryJump"], block["maximumSegmentBoundaryJump"])
+            removed = {"mild": 24, "moderate": 120, "severe": 480}
+            for severity, samples in removed.items():
+                self.assertEqual(blocks[severity]["outputFrameCount"], pcm16.size - samples, severity)
+                self.assertEqual(blocks[severity]["seamFrames"], [seam], severity)
+            self.assertGreater(blocks["severe"]["maximumSegmentBoundaryJump"], blocks["sham"]["maximumSegmentBoundaryJump"])
 
 
 class FamilyClusteringTests(unittest.TestCase):

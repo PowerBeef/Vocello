@@ -1,7 +1,7 @@
 # `identity.onset-drift@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `identity.onset-drift@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `f63b51b60fa62ec5` (a plan binds it, so any change is a new version, A7).
+Registry entry `identity.onset-drift@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `eedf3e2f96bfc067` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Onset identity delta: CAM++'s whole-take cosine to the reference clip minus the cosine of the take's first 2 s window, so another voice at the start alarms against the take's own similarity. The CAM++ part of the audit's joint onset rule only.
 
@@ -36,7 +36,6 @@ Registry entry `identity.onset-drift@1` in [config/audio-qc-detectors.json](../.
 
 - `resnet293-not-voting`: The audit fails an identity only when both speaker families fall below their thresholds and abstains when they disagree (section 4.3), but ResNet293 votes only after its correlated-failure audit against CAM++ (the same VoxCeleb training data) passes. These detectors read CAM++ alone; the two-family rule (consensus-max of the two families' scores) is a new version once ResNet293 votes.
 - `short-window-embeddings`: Speaker embeddings degrade on short windows (audit section 4.3): a 2 s window scores lower against the reference than the whole take even on clean speech. The drift and onset scores subtract the window's cosine from the take's own whole-take cosine, so each take is its own baseline; a take shorter than one window has none and abstains (no-value).
-- `no-onset-swap-injector`: The onset detector's severe defect is another voice over the first 1.5 s of the take, which IDN-SWAP@1 never builds (its severe span sits in the middle; only its moderate one starts at the onset). It names IDN-ONSET, which catalog version 2 lacks: another voice over the first 0.3 s (mild), 1.0 s (moderate) and 1.5 s (severe), with a same-speaker splice as its sham.
 - `onset-joint-rule-pending`: The audit judges the onset jointly on the CAM++ cosine, the pYIN register delta in semitones and a spectral-envelope Mahalanobis distance, since embeddings alone cannot judge the first 1.5 s (section 4.3). Nothing reduces the last two yet and the registry has no joint combination, so this version reads the CAM++ part alone; it stays warn until natural onset breaks are harvested.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.

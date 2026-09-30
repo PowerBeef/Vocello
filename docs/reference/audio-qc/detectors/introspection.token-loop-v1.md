@@ -1,7 +1,7 @@
 # `introspection.token-loop@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `introspection.token-loop@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `472174ae5de8f393` (a plan binds it, so any change is a new version, A7).
+Registry entry `introspection.token-loop@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `0794b60e5319d04b` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** The span, in codec frames (12.5 per second), of the longest exact codebook-0 token cycle of period 2 to 32 in the engine's introspection summary (tokenCycleSpanFrames); a take without one scores 0. A stuck single token (period 1, longestRepeatedTokenRunFrames) is not scored: a pause repeats one token.
 
@@ -33,7 +33,7 @@ Registry entry `introspection.token-loop@1` in [config/audio-qc-detectors.json](
 
 **Risks.**
 
-- `introspection-not-carried`: The engine's introspection summary lands in the telemetry row's engineIntrospection. audio_qc_calibration_takes.py manifest --diagnostics binds each take to the engine row whose samplingWAVDigest is its WAV digest and carries the summary, and audio_qc_calibration_set.py score copies it into each clip; but the engine's diagnostics log is capped (8 MB), so the early rows of a long qc-takes run are gone when the lane builds its manifest and those takes abstain (no-value) until the lane keeps its rows.
+- `introspection-rows-kept`: The engine's introspection summary reaches a take through its diagnostics row, which the engine front-trims at its log cap. The qc-takes lane marks the rows present before it starts, raises the cap (QWENVOICE_DIAGNOSTICS_MAX_MB=64), copies each vocello batch's new rows (generation id, WAV digest, Fast QC flag names, failure code and introspection numbers) into its diagnostics/ directory, and audio_qc_calibration_takes.py manifest --diagnostics binds each take to the row whose samplingWAVDigest is its WAV digest; verdict.txt reports the bound count. A take still without its row abstains (no-value); the 2026-09-27 cohort, generated before the lane kept its rows, bound 251 of its 791 takes.
 - `no-codec-trace-injector`: Injector catalog version 2 is T1 only. COD-LOOP (T2, audit section 5.2) repeats 4-32 codec frames (0.32-2.56 s) of a take's code trace, decoded by the production decoder, with the untouched trace as its sham; it needs a mutation-recipe replay mode, since BenchCodecReplay replays only an unmodified, digest-verified trace. Until it exists the loop detector has no positives.
 - `introspection-from-trace`: A T2 positive never runs the talker, so its summary comes from the Python mirror over the mutated codebook-0 trace (audio_qc_observations.introspection_summary): the cycle fields are exact, but entropy and EOS need the talker's logits, so only the loop detector can use T2 positives. The negatives' summaries come from the engine; the two sides agree exactly on integers (config/audio-qc-stage0-observations.json).
 

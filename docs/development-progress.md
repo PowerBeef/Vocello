@@ -17,6 +17,42 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 30 — AQ-07 warn level confirmed: 8 qualified, 3 refused; the harness comes first
+
+The maintainer made the audio-QC plan primary: finish the whole harness before release work. They
+heard three defects in the app: Voice Clone pitch "all over the place", cut-offs, and a French Design
+voice that sounded like an English speaker. The confirmation chain ran on N2 FLEURS test (3,718 takes,
+9,299 injections, fresh cache roots). One injector fix came out of it: SIG-CLIP skips a source already
+flat at its peak (1a9e6b38).
+
+- **Qualified at warn:** truncation, consensus LID, clicks, DC offset, dropout, terminal silence,
+  noise and level.
+- **Refused by the A3 cross-mechanism rule:** consensus error (insertions 0.67, repetitions 0.51),
+  run-on (0.32) and clipping (blind below 0.965).
+- **On the app's own N3 takes:** clicks flag 31%, DC offset 30%, content 16% and language 15%.
+  English and Chinese built-in voices speaking French leave the native LID band: Serena's median
+  VoxLingua French posterior is 0.39, against 0.999 for native speakers.
+
+Records, ledgers and the regenerated `docs/reference/audio-qc/` report are committed. Also landed:
+AQ-08's oracle ladders (the `prosody@3` HNR proxy fails; the window-corrected HNR is
+pass-provisional) and AQ-09's generated reference tree with the lane-gating contract.
+
+Registered but not yet on `main`: classes E, F, I and J, on agent branch
+`worktree-agent-ad5c88a76da51d062`, which changes the scoring digest.
+
+Still in flight on agent branches:
+- the lean corpora registry and fetcher (~29 GB: FLEURS train reserve cohorts, speaker, emotion,
+  accent), with its own Parquet runtime;
+- injector catalog v3;
+- the driver work: new role sets, P2/P3 positives, fail level, raw/seam producers.
+
+Next:
+1. Integrate those branches.
+2. Add a nativeness detector.
+3. The maintainer runs the corpora fetch; then N2 resynthesis and panels.
+4. One batched confirmation.
+5. Lane gating.
+
 ### September 29, evening — AQ-07 warn plans committed; the confirmation chain runs
 
 Whisper large-v3 returned a NaN segment statistic on one FLEURS Chinese round trip, and the strict

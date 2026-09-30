@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "release-first-3-0-2026-09",
+  "primaryPlan": "audio-qc-audit-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
     {
@@ -1535,7 +1535,7 @@
         "scripts/audio_qc_calibration_takes.py",
         "scripts/audio_qc_calibration_set.py"
       ],
-      "notes": "Audit P9-P10; takes over BT-05 bounds and AV-07. Decision 5: warn 60/60/60; fail FAR <= 1% pooled, <= 5% per language on N2. N3 (qc-takes, 2026-09-27): 800 takes over the CC0 pool (pool rules v2 refuse proper names); v8 is blind to sub-full-scale clipping, truncation and noise. N1: pinned FLEURS, cohorts of 1,888 calibration and 3,718 confirmation recordings. N2: codec round trip (qc-n2 lane) of both cohorts; it barely moves strong ASR but hurts SenseVoice, and ~3% of human recordings exceed 0.15 on the best single recognizer, so content needs cross-family consensus. Warn level (2026-09-29): 11 split-conformal plans committed (alpha 0.05, per-language: seven signal detectors, consensus error, truncation, run-on, consensus LID; band-limit waits for an injector); calibration and N3 scored under the whisper NaN fix. Next: the confirmation chain over N2 confirmation (fresh-cache panels, injection set at 150 per cell), one confirm per plan, commit the records; then the fail level and class E.",
+      "notes": "Audit P9-P10; takes over BT-05 bounds and AV-07. Decision 5: warn 60/60/60; fail FAR <= 1% pooled, <= 5% per language on N2. Maintainer decision 2026-09-29: finish the whole harness before release work (heard: clone pitch instability, cut-offs, English-accented French from Design). Warn level A-D confirmed 2026-09-30 on N2 FLEURS test (3,718 takes, 9,299 injections): qualified truncation, consensus LID, clicks, DC offset, dropout, terminal silence, noise, level; refused (A3 cross-mechanism) consensus error (insertions 0.67, repetitions 0.51), run-on (0.32) and clipping (blind below 0.965). N3 app takes flag clicks 31%, DC offset 30%, content 16%, language 15%. Next: classes E/F/I/J (registered), injector catalog v3, driver P2/P3 and fail level, a nativeness detector, the lean corpora fetch (FLEURS train reserve cohorts, speaker, emotion, accent), then one batched confirmation; lane gating from the gates contract.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-29",
       "blockedBy": [

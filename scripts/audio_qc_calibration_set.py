@@ -18,7 +18,11 @@ Commands:
           Stage 0 observations over every clean take (N3, or N1/N2 for a cohort),
           sham (S) and positive (P1); write measurements.json (ids and digests
           only), report.json and report.md. Without --set it scores the clean
-          takes alone.
+          takes alone. A clip also carries its generation's Stage 0 evidence
+          (`generation_evidence`): the engine introspection summary a take (or
+          a T2/T3 entry, or a byte-copied donor) records, and a long-form
+          take's `longForm` block, whose seams reach the Stage 0 seam z-score
+          and whose boundary jump is measured on the clip's own PCM.
   alignments --takes <cohort manifest> --bundle <panel bundle> --output <alignments.json>
           [--cache-root <dir>]
           Export the forced aligner's word intervals for the cohort's takes from
@@ -1607,6 +1611,64 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
 # score
 # --------------------------------------------------------------------------- #
 
+def generation_evidence(source: dict, *, own_generation: bool) -> dict:
+    """What a clip carries of the generation beside Fast QC, from its take or entry.
+
+    `own_generation` says the clip's audio is the generation's own output (a
+    clean take, a byte-copied donor, a T2 replay or a T3 knob take), so its
+    engine introspection summary describes it; a T1 PCM construction changed
+    the audio after generation and carries none. A `longForm` block
+    (`audio_qc_calibration_takes.long_form_block`) gives the seams: the clean
+    take's must describe its WAV exactly, while a T1 construction keeps them
+    only if it kept the output's length (see `_long_form`).
+    """
+    import audio_qc_calibration_takes as takes_tool  # deferred: only long-form and introspection takes need it
+
+    evidence: dict[str, Any] = {}
+    introspection = source.get("engineIntrospection")
+    if own_generation and introspection is not None:
+        if issues := takes_tool.introspection_issues(introspection):
+            raise CalibrationError(f"{source.get('takeID')}: {issues[0]}")
+        evidence["introspection"] = introspection
+    block = source.get("longForm")
+    if block is not None:
+        if issues := takes_tool.long_form_issues(block):
+            raise CalibrationError(f"{source.get('takeID')}: {issues[0]}")
+        evidence.update(longForm=block, longFormRecorded=own_generation)
+    return evidence
+
+
+def boundary_jump(samples: np.ndarray, seams: Iterable[int]) -> int:
+    """The assembler's maximum segment-boundary jump, read back from the joined PCM16: the largest step
+    between each seam's first frame and the frame before it (the previous content's last frame or the pause's
+    last zero), in PCM16 units (LongFormAssembly.swift `write`)."""
+    pcm = np.rint(np.asarray(samples, dtype=np.float64) * recordings.PCM16_FULL_SCALE).astype(np.int64)
+    return max((int(abs(pcm[seam] - pcm[seam - 1])) for seam in seams), default=0)
+
+
+def _long_form(task: dict, samples: np.ndarray) -> dict | None:
+    """The clip's long-form block with its boundary jump measured on its own PCM, or None.
+
+    A clean take's recorded block must describe its WAV (length, rate, the
+    assembler's jump); a T1 construction that kept the length keeps the seams,
+    and its jump is measured on the constructed PCM. One that moved them has
+    no block, so a seam detector abstains on it.
+    """
+    block = task.get("longForm")
+    if block is None:
+        return None
+    fits = block["sampleRate"] == recordings.ENGINE_SAMPLE_RATE and block["outputFrameCount"] == samples.size
+    if not fits:
+        if task["longFormRecorded"]:
+            raise CalibrationError(f"{task['clipID']}: its longForm block does not describe its WAV (length or rate)")
+        return None
+    jump = boundary_jump(samples, block["seamFrames"])
+    if task["longFormRecorded"] and jump != block["maximumSegmentBoundaryJump"]:
+        raise CalibrationError(f"{task['clipID']}: its PCM steps {jump} at the recorded seams, the assembler "
+                               f"recorded {block['maximumSegmentBoundaryJump']}")
+    return {**block, "maximumSegmentBoundaryJump": jump}
+
+
 def _score_clip(task: dict) -> dict:
     path = Path(task["wav"])
     if not path.is_file() or file_sha256(path) != task["wavSHA256"]:
@@ -1616,15 +1678,25 @@ def _score_clip(task: dict) -> dict:
     if recordings.resampling_recipe(rate) is not None:
         # An N1 recording reaches the engine rate as it does before any injector (recordings.load_recording).
         samples = polyphase_resample(samples, rate, recordings.ENGINE_SAMPLE_RATE)
-    # A long-form clip's seams feed the Stage 0 seam z-score (no v8 flag or verdict reads them).
+    long_form = _long_form(task, samples)
+    # A long-form clip's seams feed the Stage 0 seam z-score (no v8 flag or verdict reads them): its longForm
+    # block when the block still describes the PCM, else the seams an injection entry records (SEAM-DISC
+    # shortens the audio and records its shifted seams).
+    seams = long_form["seamFrames"] if long_form else (task.get("seams") or ())
     report = audio_qc.fast_qc_v8(samples, sample_rate=recordings.ENGINE_SAMPLE_RATE, text=task["text"], signal=True,
-                                 seam_offsets=task.get("seams") or ())
+                                 seam_offsets=seams)
     fast = {"verdict": report["verdict"], "instabilityVerdict": report["instabilityVerdict"],
             "writtenOutputVerdict": report["writtenOutputVerdict"], "flags": list(report["flags"]),
             "flagLevels": dict(report["flagLevels"])}
     fast.update({field: report.get(field) for field in FASTQC_FIELDS})
-    return _plain({**task["meta"], "wavSHA256": task["wavSHA256"], "pcmSHA256": pcm_digest(samples),
-                   "fastQC": fast, "observations": report["signal"]})
+    clip = {**task["meta"], "wavSHA256": task["wavSHA256"], "pcmSHA256": pcm_digest(samples),
+            "fastQC": fast, "observations": report["signal"]}
+    # The Stage 0 blocks the `introspection` and `longform` detector sources read (absent otherwise).
+    if task.get("introspection") is not None:
+        clip["introspection"] = task["introspection"]
+    if long_form is not None:
+        clip["longForm"] = long_form
+    return _plain(clip)
 
 
 def _meta(take: dict, clip_id: str, population: str, injection: dict | None, *, family: str | None = None) -> dict:
@@ -2121,7 +2193,8 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
     tasks = []
     for take_id, take in takes.items():
         task = {"clipID": take_id, "wav": str(take_wav(takes_path, take)), "wavSHA256": take["wavSHA256"],
-                "text": take["text"], "meta": _meta(take, take_id, population, None)}
+                "text": take["text"], "meta": _meta(take, take_id, population, None),
+                **generation_evidence(take, own_generation=True)}
         if source_rate(take) != recordings.ENGINE_SAMPLE_RATE:
             task["sourceRate"] = source_rate(take)
         if take.get("seamSamples"):
@@ -2132,10 +2205,14 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
         if take is None:
             raise CalibrationError(f"{entry.get('takeID')}: its source take is not a generated take")
         injection = entry["injection"]
+        # A T1 PCM construction changed the audio after generation; a byte-copied donor, a T2 replay or a T3
+        # knob take is a generation's own output (an entry copies its source's or donor's fields).
+        own = injection.get("mechanism") not in (None, injectors.MECHANISM)
         task = {"clipID": entry["takeID"], "wav": str(_relative_path(set_path.parent, entry["wavPath"],
                                                                       f"{entry['takeID']}: wavPath")),
                 "wavSHA256": entry["wavSHA256"], "text": presented_text(entry, takes),
-                "meta": _meta(take, entry["takeID"], injection["population"], injection, family=entry.get("family"))}
+                "meta": _meta(take, entry["takeID"], injection["population"], injection, family=entry.get("family")),
+                **generation_evidence(entry, own_generation=own)}
         if entry.get("seamSamples"):
             task["seams"] = list(entry["seamSamples"])
         tasks.append(task)

@@ -451,6 +451,95 @@ class ManifestTests(Fixture):
         report = validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)
         self.assertTrue(any("do not match their digest" in error for error in report["errors"]))
 
+    @staticmethod
+    def _summary(frames: int, span: int | None = None) -> dict:
+        """An engine introspection block as the telemetry row encodes it (nil fields omitted)."""
+        block = {"algorithmVersion": 1, "codecFrameCount": frames, "longestRepeatedTokenRunFrames": 2,
+                 "observedStepCount": frames + 1, "entropyMeanNats": 0.8, "entropyP95Nats": 1.9,
+                 "longestHighEntropyRunSteps": 0, "eosProbabilityFinal": 0.6, "eosProbabilityMax": 0.6,
+                 "eosProbabilityMaxStep": frames, "eosLikelyStepsWithoutStop": 0, "seamCodecFrames": []}
+        if span is not None:
+            block.update(tokenCyclePeriod=8, tokenCycleSpanFrames=span, tokenCycleRepeats=span // 8,
+                         tokenCycleStartFrame=4)
+        return block
+
+    def test_generated_takes_carry_the_engine_introspection_bound_by_their_wav_digest(self) -> None:
+        for batch in self.plan_value["batches"]:
+            self._emit(batch, self._batch_json(batch))
+        first, second, third, *_ = self.plan_value["takes"]
+        digests = {take["takeID"]: hashlib.sha256(b"RIFF" + take["takeID"].encode("utf-8")).hexdigest()
+                   for take in (first, second, third)}
+        engine = self.root / "diagnostics" / "engine"
+        engine.mkdir(parents=True)
+        rows = [
+            # The first take's row, twice (a resumed item regenerates it identically) beside an unrelated row.
+            {"generationID": "A", "notes": {"samplingWAVDigest": digests[first["takeID"]]},
+             "engineIntrospection": self._summary(60, span=32)},
+            {"generationID": "B", "notes": {"samplingWAVDigest": digests[first["takeID"]]},
+             "engineIntrospection": self._summary(60, span=32)},
+            {"generationID": "C", "notes": {"samplingWAVDigest": "f" * 64}, "engineIntrospection": self._summary(9)},
+            # The second take's rows disagree: no summary is bound.
+            {"generationID": "D", "notes": {"samplingWAVDigest": digests[second["takeID"]]},
+             "engineIntrospection": self._summary(40)},
+            {"generationID": "E", "notes": {"samplingWAVDigest": digests[second["takeID"]]},
+             "engineIntrospection": self._summary(41)},
+            # The third take's row is not the engine's shape.
+            {"generationID": "F", "notes": {"samplingWAVDigest": digests[third["takeID"]]},
+             "engineIntrospection": {"codecFrameCount": -1}},
+        ]
+        (engine / "generations.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+        manifest = self._manifest(self.root / "diagnostics")
+        by_id = {take["takeID"]: take for take in manifest["takes"]}
+        bound = by_id[first["takeID"]]["engineIntrospection"]
+        self.assertEqual((bound["tokenCycleSpanFrames"], bound["codecFrameCount"], bound["eosFirstLikelyStep"]),
+                         (32, 60, None))
+        self.assertIsNone(by_id[second["takeID"]]["engineIntrospection"])
+        self.assertIsNone(by_id[third["takeID"]]["engineIntrospection"])
+        self.assertEqual(manifest["introspection"], {"bound": 1, "unbound": 15})
+        self.assertTrue(all(take["longForm"] is None for take in manifest["takes"]))
+        report = validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)
+        self.assertEqual(report["status"], "PASS", report)
+        # The block is checked, and so are the counts.
+        edited = copy.deepcopy(manifest)
+        edited["takes"][0]["engineIntrospection"]["entropyMeanNats"] = -1.0
+        edited["manifestDigest"] = takes_module.self_digest(edited, "manifestDigest")
+        self.assertTrue(any("entropyMeanNats" in error for error in validate_manifest(
+            edited, self.plan_value, manifest_dir=self.run_dir)["errors"]))
+        edited = copy.deepcopy(manifest)
+        edited["takes"][0]["engineIntrospection"] = None
+        edited["manifestDigest"] = takes_module.self_digest(edited, "manifestDigest")
+        self.assertIn("the manifest's introspection counts do not match its takes",
+                      validate_manifest(edited, self.plan_value, manifest_dir=self.run_dir)["errors"])
+        # Without diagnostics, no summary and no counts.
+        plain = self._manifest()
+        self.assertNotIn("introspection", plain)
+        self.assertTrue(all(take["engineIntrospection"] is None for take in plain["takes"]))
+
+    def test_a_long_form_block_reduces_the_assembly_evidence(self) -> None:
+        def segment(start: int, end: int, pause: int) -> dict:
+            return {"segmentID": f"s{start}", "contentOutputRange": {"lowerBound": start, "upperBound": end},
+                    "insertedPauseOutputRange": {"lowerBound": end, "upperBound": end + pause}}
+        evidence = {"schemaVersion": 1, "algorithmVersion": 4, "sampleRate": 24_000, "blockFrames": 4096,
+                    "segmentCount": 3, "outputFrameCount": 90_000, "maximumSegmentBoundaryJump": 812,
+                    "outputDigest": "0" * 64, "outputReadable": True,
+                    "segments": [segment(0, 24_000, 7_200), segment(31_200, 60_000, 0), segment(60_000, 90_000, 0)]}
+        block = takes_module.long_form_block(evidence)
+        self.assertEqual(block, {"schemaVersion": 1, "algorithmVersion": 4, "sampleRate": 24_000, "segmentCount": 3,
+                                 "outputFrameCount": 90_000, "maximumSegmentBoundaryJump": 812,
+                                 "seamFrames": [31_200, 60_000]})
+        self.assertEqual(takes_module.seam_seconds(block), [1.3, 2.5])
+        self.assertEqual(takes_module.long_form_issues(block), [])
+        for change, fragment in ((lambda value: value.update(seamFrames=[60_000, 31_200]), "increase strictly"),
+                                 (lambda value: value.update(seamFrames=[31_200]), "one seam per join"),
+                                 (lambda value: value.update(seamFrames=[31_200, 90_000]), "inside the output"),
+                                 (lambda value: value.update(maximumSegmentBoundaryJump=-3), "non-negative"),
+                                 (lambda value: value.update(extra=1), "declares exactly")):
+            broken = copy.deepcopy(block)
+            change(broken)
+            self.assertTrue(any(fragment in issue for issue in takes_module.long_form_issues(broken)), fragment)
+        with self.assertRaisesRegex(TakeError, "lists no segments"):
+            takes_module.long_form_block({"sampleRate": 24_000})
+
     def test_the_command_line_round_trip(self) -> None:
         for batch in self.plan_value["batches"]:
             self._emit(batch, self._batch_json(batch))

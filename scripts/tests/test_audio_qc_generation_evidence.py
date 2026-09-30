@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Stage 0 generation evidence in measurements.json (AQ-07 classes I and J).
+
+`audio_qc_calibration_set.py score` copies a take's engine introspection
+summary and long-form block into its clip, passes the long-form seams to the
+Stage 0 seam z-score, and measures each clip's boundary jump on its own PCM.
+Takes are procedural renders written at run time; no WAV is committed.
+"""
+
+from __future__ import annotations
+
+from contextlib import redirect_stderr, redirect_stdout
+import copy
+from io import StringIO
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import audio_qc_calibration_set as m2  # noqa: E402
+from lib.qc_qualification import fixtures, injectors, recordings  # noqa: E402
+from lib.qc_qualification.pcm import json_digest, pcm_digest  # noqa: E402
+
+SUMMARY = {"algorithmVersion": 1, "codecFrameCount": 60, "longestRepeatedTokenRunFrames": 2,
+           "tokenCyclePeriod": 8, "tokenCycleSpanFrames": 32, "tokenCycleRepeats": 4, "tokenCycleStartFrame": 4,
+           "observedStepCount": 61, "entropyMeanNats": 0.8, "entropyP95Nats": 1.9, "longestHighEntropyRunSteps": 0,
+           "eosProbabilityFinal": 0.6, "eosProbabilityMax": 0.6, "eosProbabilityMaxStep": 60,
+           "eosFirstLikelyStep": None, "eosLikelyStepsWithoutStop": 0, "seamCodecFrames": []}
+
+
+def quiet(function, *args, **kwargs):
+    with redirect_stderr(StringIO()), redirect_stdout(StringIO()):
+        return function(*args, **kwargs)
+
+
+class GenerationEvidenceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        first = fixtures.render(fixtures.make_script(601, word_count=6), fixtures.VOICES["low"])
+        second = fixtures.render(fixtures.make_script(602, word_count=6), fixtures.VOICES["low"])
+        # A two-segment project: the second segment's content starts after a 300 ms pause.
+        pause = np.zeros(7_200)
+        self.joined = np.concatenate([first, pause, second])
+        self.seam = first.size + pause.size
+        stored = np.rint(self.joined * recordings.PCM16_FULL_SCALE).astype(np.int64)
+        self.jump = int(abs(stored[self.seam] - stored[self.seam - 1]))
+        self.block = {"schemaVersion": 1, "algorithmVersion": 4, "sampleRate": 24_000, "segmentCount": 2,
+                      "outputFrameCount": int(self.joined.size), "maximumSegmentBoundaryJump": self.jump,
+                      "seamFrames": [int(self.seam)]}
+        self.single = first
+
+    def tearDown(self) -> None:
+        self.directory.cleanup()
+
+    def take(self, take_id: str, samples: np.ndarray, **extra) -> dict:
+        wav = recordings.write_pcm16_wav(self.root / "wav" / f"{take_id}.wav", samples)
+        return {"takeID": take_id, "family": take_id, "scriptID": take_id.split("--")[0], "language": "english",
+                "mode": "custom", "variant": "speed", "voice": {"kind": "builtin", "id": "aiden"}, "seed": 7,
+                "text": "one two three four five six", "wavPath": f"wav/{take_id}.wav", "wavSHA256": wav,
+                "durationSeconds": round(samples.size / 24_000, 3), "finishReason": "eos", "status": "generated",
+                "engineIntrospection": None, "longForm": None, **extra}
+
+    def manifest(self, takes: list[dict]) -> Path:
+        path = self.root / "takes.json"
+        path.write_text(json.dumps({"schemaVersion": 1, "kind": "audio-qc-calibration-takes", "runID": "run",
+                                    "planDigest": "0" * 64, "poolDigest": "1" * 64, "split": "calibration",
+                                    "takes": takes}), encoding="utf-8")
+        return path
+
+    def entry(self, source: dict, clip_id: str, samples: np.ndarray, *, population: str, mechanism: str,
+              **extra) -> dict:
+        wav = recordings.write_pcm16_wav(self.root / "set" / "wav" / f"{clip_id}.wav", samples)
+        entry = {key: value for key, value in source.items() if key != "text"}
+        entry.update(takeID=clip_id, sourceTakeID=source["takeID"], wavPath=f"wav/{clip_id}.wav", wavSHA256=wav,
+                     injection={"injector": "X@1", "injectorID": "SIG-CLICK", "variant": "take-severe",
+                                "severity": "severe", "classes": ["A"], "population": population,
+                                "mechanism": mechanism, "outputPCMSHA256": pcm_digest(samples)}, **extra)
+        return entry
+
+    def injection_set(self, takes_path: Path, entries: list[dict]) -> Path:
+        path = self.root / "set" / "injection-set.json"
+        path.write_text(json.dumps({"schemaVersion": 1, "kind": m2.SET_KIND,
+                                    "sourceManifest": {"sha256": m2.file_sha256(takes_path)},
+                                    "entries": entries, "entriesSHA256": json_digest(entries)}), encoding="utf-8")
+        return path
+
+    def clips(self, takes_path: Path, set_path: Path | None = None) -> dict[str, dict]:
+        quiet(m2.run_score, takes_path, set_path, self.root / "score", jobs=1)
+        data = json.loads((self.root / "score" / "measurements.json").read_text(encoding="utf-8"))
+        return {clip["clipID"]: clip for clip in data["clips"]}
+
+    def test_clips_carry_the_introspection_summary_and_the_long_form_block(self) -> None:
+        looped = self.take("s1--aiden", self.single, engineIntrospection=SUMMARY)
+        joined = self.take("s2--aiden", self.joined, longForm=self.block)
+        plain = self.take("s3--aiden", self.single[: self.single.size // 2])
+        takes_path = self.manifest([looped, joined, plain])
+        # A T1 click that keeps the length keeps the seams, and its jump is measured on its PCM; a T1 cut that
+        # moves them has no block; a T3 knob take carries its own generation's summary.
+        clicked = self.joined.copy()
+        clicked[self.seam] = 0.9
+        knob_summary = {**SUMMARY, "eosLikelyStepsWithoutStop": 7}
+        entries = [
+            self.entry(joined, "s2--click", clicked, population="P1", mechanism=injectors.MECHANISM),
+            self.entry(joined, "s2--cut", self.joined[: -2_400], population="P1", mechanism=injectors.MECHANISM),
+            self.entry(looped, "s1--knob", self.single, population="P3", mechanism="T3-controlled-generation",
+                       engineIntrospection=knob_summary),
+            self.entry(looped, "s1--pcm", self.single, population="S", mechanism=injectors.MECHANISM),
+        ]
+        clips = self.clips(takes_path, self.injection_set(takes_path, entries))
+        self.assertEqual(clips["s1--aiden"]["introspection"], SUMMARY)
+        self.assertNotIn("longForm", clips["s1--aiden"])
+        self.assertEqual(clips["s2--aiden"]["longForm"], self.block)
+        self.assertIsNotNone(clips["s2--aiden"]["observations"]["seamDiscontinuityMaxZ"])
+        self.assertEqual(clips["s2--aiden"]["observations"]["seamCount"], 1)
+        for clip_id in ("s3--aiden", "s1--aiden"):
+            self.assertNotIn("introspection" if clip_id == "s3--aiden" else "longForm", clips[clip_id])
+            self.assertIsNone(clips[clip_id]["observations"]["seamDiscontinuityMaxZ"])
+        click = clips["s2--click"]
+        self.assertEqual(click["longForm"]["maximumSegmentBoundaryJump"],
+                         int(abs(round(0.9 * recordings.PCM16_FULL_SCALE)
+                                 - round(self.joined[self.seam - 1] * recordings.PCM16_FULL_SCALE))))
+        self.assertEqual(click["longForm"]["seamFrames"], self.block["seamFrames"])
+        self.assertNotIn("introspection", click)
+        self.assertNotIn("longForm", clips["s2--cut"])
+        self.assertEqual(clips["s2--cut"]["observations"]["seamCount"], 0)
+        self.assertEqual(clips["s1--knob"]["introspection"], knob_summary)
+        self.assertNotIn("introspection", clips["s1--pcm"], "a T1 construction carries no generation summary")
+
+    def test_a_recorded_block_must_describe_its_wav(self) -> None:
+        wrong = self.take("s2--aiden", self.joined, longForm={**self.block,
+                                                             "maximumSegmentBoundaryJump": self.jump + 1})
+        with self.assertRaisesRegex(m2.CalibrationError, "the assembler recorded"):
+            self.clips(self.manifest([wrong]))
+        short = self.take("s2--aiden", self.joined, longForm={**self.block,
+                                                             "outputFrameCount": self.joined.size + 1})
+        with self.assertRaisesRegex(m2.CalibrationError, "does not describe its WAV"):
+            self.clips(self.manifest([short]))
+        broken = copy.deepcopy(SUMMARY)
+        broken["codecFrameCount"] = None
+        with self.assertRaisesRegex(m2.CalibrationError, "codecFrameCount"):
+            self.clips(self.manifest([self.take("s1--aiden", self.single, engineIntrospection=broken)]))
+
+    def test_the_boundary_jump_mirrors_the_assembler(self) -> None:
+        self.assertEqual(m2.boundary_jump(self.joined, [self.seam]), self.jump)
+        self.assertEqual(m2.boundary_jump(self.joined, []), 0)
+        # 0.5 and -0.5 at 1/32767 store as 16384 and -16384: the step between them is the largest.
+        steps = np.array([0.0, 0.5, -0.5, 0.25])
+        self.assertEqual(m2.boundary_jump(steps, [1, 2, 3]), 32_768)
+
+
+if __name__ == "__main__":
+    unittest.main()

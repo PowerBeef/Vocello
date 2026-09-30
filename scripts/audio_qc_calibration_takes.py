@@ -30,6 +30,22 @@ script x voice x seed.
 Everything this module writes (plans, line files, WAVs, manifests) is an
 untracked build artifact. A manifest records WAV paths relative to itself,
 never an absolute local path.
+
+Engine-time evidence. With `--diagnostics`, each generated take also carries
+`engineIntrospection`, the talker's introspection summary (codebook-0 token
+cycles, per-step entropy, the EOS trajectory; the telemetry row's
+`engineIntrospection`, which `audio_qc_observations.introspection_summary`
+mirrors), from the engine row whose `samplingWAVDigest` is the take's WAV
+digest: the WAV's exact bytes bind the row, so no generation id is needed. A
+take whose row the capped diagnostics log no longer holds, or whose rows
+disagree, carries null, and the manifest counts it (`introspection`). A
+long-form take carries `longForm` (`long_form_block`): the assembled output's
+frame count, the assembler's maximum segment-boundary jump and each seam's
+output frame, from its `LongFormAssemblyEvidence`. The take plan holds
+single-segment takes only, so `longForm` stays null until a long-form take plan
+writes it. `audio_qc_calibration_set.py score` copies both into
+measurements.json, the Stage 0 evidence the `introspection` and `longform`
+detector sources read.
 """
 
 from __future__ import annotations
@@ -90,7 +106,20 @@ PLANNED_FIELDS = (
     "batchID", "text", "textSHA256",
 )
 OUTPUT_FIELDS = ("wavPath", "wavSHA256", "durationSeconds", "finishReason", "status", "missingReason", "textBinding",
-                 "rejection", "failure")
+                 "rejection", "failure", "engineIntrospection", "longForm")
+# The telemetry row's engineIntrospection (GenerationEngineIntrospection; algorithm 1): its numbers, the ones the
+# summary leaves null when the take has none (no exact cycle, no observed step, no likely EOS), and its seams.
+INTROSPECTION_NUMBERS = (
+    "algorithmVersion", "codecFrameCount", "longestRepeatedTokenRunFrames", "tokenCyclePeriod",
+    "tokenCycleSpanFrames", "tokenCycleRepeats", "tokenCycleStartFrame", "observedStepCount", "entropyMeanNats",
+    "entropyP95Nats", "longestHighEntropyRunSteps", "eosProbabilityFinal", "eosProbabilityMax",
+    "eosProbabilityMaxStep", "eosFirstLikelyStep", "eosLikelyStepsWithoutStop",
+)
+INTROSPECTION_REQUIRED = ("algorithmVersion", "codecFrameCount", "observedStepCount")
+# A take's long-form block: the assembled output (LongFormAssemblyEvidence) reduced to what the detectors read.
+LONG_FORM_SCHEMA_VERSION = 1
+LONG_FORM_KEYS = ("schemaVersion", "algorithmVersion", "sampleRate", "segmentCount", "outputFrameCount",
+                  "maximumSegmentBoundaryJump", "seamFrames")
 TAKE_STATUSES = ("generated", "rejected", "failed", "missing")
 # A resumed batch segment's stdout: `<batchID>@<offset>.json` (offset 0 is `<batchID>.json`).
 GENERATION_ID = re.compile(r"^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$")
@@ -711,6 +740,108 @@ def engine_failures(diagnostics: Path | None, generation_ids: set[str]) -> dict[
     return found
 
 
+def _count(value: Any, *, positive: bool = False) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and (value > 0 if positive else value >= 0)
+
+
+def introspection_issues(block: Any) -> list[str]:
+    """Why a take's engineIntrospection block is not the engine's summary; empty when it is."""
+    if not isinstance(block, dict):
+        return ["the introspection summary is an object"]
+    issues = []
+    unknown = set(block) - set(INTROSPECTION_NUMBERS) - {"seamCodecFrames"}
+    if unknown:
+        issues.append(f"the introspection summary has unknown fields {sorted(unknown)}")
+    for key in INTROSPECTION_NUMBERS:
+        value = block.get(key)
+        if value is None and key not in INTROSPECTION_REQUIRED:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            issues.append(f"introspection {key} is a non-negative number")
+    if not _count(block.get("algorithmVersion"), positive=True):
+        issues.append("introspection algorithmVersion is a positive integer")
+    seams = block.get("seamCodecFrames", [])
+    if not isinstance(seams, list) or not all(_count(frame) for frame in seams):
+        issues.append("introspection seamCodecFrames lists codec frames")
+    return issues
+
+
+def long_form_block(evidence: Any) -> dict[str, Any]:
+    """A long-form take's `longForm` block from its assembler's LongFormAssemblyEvidence (the JSON it encodes).
+
+    A seam is the output frame where a segment's content starts after the first
+    (`segments[k].contentOutputRange.lowerBound`, k >= 1): the assembler measures
+    its boundary jump there, between that frame and the one before it (the
+    previous segment's last frame, or the inserted pause's last zero).
+    """
+    if not isinstance(evidence, dict) or not isinstance(evidence.get("segments"), list):
+        raise TakeError("the long-form assembly evidence lists no segments")
+    seams = []
+    for segment in evidence["segments"][1:]:
+        bounds = segment.get("contentOutputRange") if isinstance(segment, dict) else None
+        if not isinstance(bounds, dict):
+            raise TakeError("a long-form segment names no content output range")
+        seams.append(bounds.get("lowerBound"))
+    block = {"schemaVersion": LONG_FORM_SCHEMA_VERSION, "algorithmVersion": evidence.get("algorithmVersion"),
+             "sampleRate": evidence.get("sampleRate"), "segmentCount": evidence.get("segmentCount"),
+             "outputFrameCount": evidence.get("outputFrameCount"),
+             "maximumSegmentBoundaryJump": evidence.get("maximumSegmentBoundaryJump"), "seamFrames": seams}
+    if issues := long_form_issues(block):
+        raise TakeError("the long-form assembly evidence is unusable: " + "; ".join(issues))
+    return block
+
+
+def long_form_issues(block: Any) -> list[str]:
+    """Why a `longForm` block is not a long-form take's; empty when it is."""
+    if not isinstance(block, dict) or set(block) != set(LONG_FORM_KEYS):
+        return [f"a longForm block declares exactly {', '.join(LONG_FORM_KEYS)}"]
+    issues = []
+    if block["schemaVersion"] != LONG_FORM_SCHEMA_VERSION:
+        issues.append(f"a longForm block is schema {LONG_FORM_SCHEMA_VERSION}")
+    for key in ("algorithmVersion", "sampleRate", "segmentCount", "outputFrameCount"):
+        if not _count(block[key], positive=True):
+            issues.append(f"longForm {key} is a positive integer")
+    if not _count(block["maximumSegmentBoundaryJump"]):
+        issues.append("longForm maximumSegmentBoundaryJump is a non-negative integer")
+    seams = block["seamFrames"]
+    if not isinstance(seams, list) or not all(_count(frame, positive=True) for frame in seams):
+        return issues + ["longForm seamFrames lists output frames"]
+    if seams != sorted(set(seams)):
+        issues.append("longForm seamFrames increase strictly")
+    if _count(block["outputFrameCount"], positive=True) and any(frame >= block["outputFrameCount"] for frame in seams):
+        issues.append("a longForm seam lies inside the output")
+    if _count(block["segmentCount"], positive=True) and len(seams) != block["segmentCount"] - 1:
+        issues.append("a longForm block names one seam per join (segmentCount - 1)")
+    return issues
+
+
+def seam_seconds(block: dict[str, Any]) -> list[float]:
+    """A valid `longForm` block's seams, in seconds on the take's own timeline."""
+    return [frame / block["sampleRate"] for frame in block["seamFrames"]]
+
+
+def engine_introspections(diagnostics: Path | None, wav_digests: set[str]) -> dict[str, list[dict[str, Any]]]:
+    """Each WAV digest's engine introspection summaries, from the engine rows whose `samplingWAVDigest` is it.
+
+    Rows without a summary, or with one that is not the engine's shape, are
+    ignored. A digest can have several rows (a resumed item re-generates it,
+    the diagnostics root outlives runs); the caller binds only an agreed one.
+    """
+    found: dict[str, list[dict[str, Any]]] = {}
+    if diagnostics is None or not wav_digests:
+        return found
+    for record in _jsonl(diagnostics / "engine" / "generations.jsonl"):
+        notes = record.get("notes")
+        digest = notes.get("samplingWAVDigest") if isinstance(notes, dict) else None
+        block = record.get("engineIntrospection")
+        if digest in wav_digests and not introspection_issues(block):
+            summary = {key: block.get(key) for key in INTROSPECTION_NUMBERS}
+            summary["seamCodecFrames"] = list(block.get("seamCodecFrames", []))
+            if summary not in found.setdefault(digest, []):
+                found[digest].append(summary)
+    return found
+
+
 def _inside(path: Path, root: Path) -> bool:
     try:
         path.relative_to(root)
@@ -771,12 +902,21 @@ def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, outp
             record.update(status="missing", missingReason=outcome["missingReason"])
         records[take["takeID"]] = record
     takes = [records[take["takeID"]] for take in plan["takes"]]
+    if diagnostics is not None:
+        summaries = engine_introspections(diagnostics, {take["wavSHA256"] for take in takes
+                                                        if take["status"] == "generated"})
+        for take in takes:
+            found = summaries.get(take["wavSHA256"]) if take["status"] == "generated" else None
+            # One summary, or several identical rows (a resumed item): bound. Rows that disagree: none.
+            take["engineIntrospection"] = found[0] if found and len(found) == 1 else None
     manifest: dict[str, Any] = {
         "schemaVersion": 1, "kind": MANIFEST_KIND, "runID": plan["runID"], "planDigest": plan["planDigest"],
         "poolDigest": plan["poolDigest"], "policyDigest": plan["policyDigest"], "split": plan["split"],
         "counts": status_counts(takes),
         "takes": takes,
     }
+    if diagnostics is not None:
+        manifest["introspection"] = introspection_counts(takes)
     manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
     jsonio.atomic_json(output, manifest, ascii=False, allow_nan=False)
     return manifest
@@ -791,6 +931,13 @@ def status_counts(takes: Sequence[dict[str, Any]]) -> dict[str, int]:
     for status in TAKE_STATUSES:
         counts[status] = sum(1 for take in takes if isinstance(take, dict) and take.get("status") == status)
     return counts
+
+
+def introspection_counts(takes: Sequence[dict[str, Any]]) -> dict[str, int]:
+    """Generated takes with and without a bound engine introspection summary."""
+    generated = [take for take in takes if isinstance(take, dict) and take.get("status") == "generated"]
+    bound = sum(1 for take in generated if take.get("engineIntrospection") is not None)
+    return {"bound": bound, "unbound": len(generated) - bound}
 
 
 def manifest_digest_issues(manifest: Any) -> list[str]:
@@ -841,8 +988,13 @@ def validate_manifest(manifest: Any, plan: Any, *, manifest_dir: Path) -> dict[s
                 digests.append(take["wavSHA256"])
             if _number(take.get("durationSeconds")) is None or take.get("textBinding") not in ("text", "index"):
                 errors.append(f"{take_id}: invalid duration or text binding")
+            if take.get("engineIntrospection") is not None:
+                errors.extend(f"{take_id}: {issue}" for issue in introspection_issues(take["engineIntrospection"]))
+            if take.get("longForm") is not None:
+                errors.extend(f"{take_id}: {issue}" for issue in long_form_issues(take["longForm"]))
         elif take.get("status") in ("missing", "rejected", "failed"):
-            if any(take.get(field) is not None for field in ("wavPath", "wavSHA256", "durationSeconds")):
+            if any(take.get(field) is not None for field in ("wavPath", "wavSHA256", "durationSeconds",
+                                                              "engineIntrospection", "longForm")):
                 errors.append(f"{take_id}: a take without output names no output")
             status = take["status"]
             if status == "missing" and not isinstance(take.get("missingReason"), str):
@@ -863,6 +1015,8 @@ def validate_manifest(manifest: Any, plan: Any, *, manifest_dir: Path) -> dict[s
     counts = status_counts(takes)
     if manifest.get("counts") != counts:
         errors.append("the manifest's counts do not match its takes")
+    if "introspection" in manifest and manifest["introspection"] != introspection_counts(takes):
+        errors.append("the manifest's introspection counts do not match its takes")
     duplicates = len(digests) - len(set(digests))
     return {"status": "PASS" if not errors else "FAIL", "errors": errors, "counts": counts,
             "duplicateWavDigests": duplicates}

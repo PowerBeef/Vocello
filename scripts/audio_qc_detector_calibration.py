@@ -1911,7 +1911,7 @@ def phi_audits(entry: Mapping[str, Any], units: Sequence[Mapping[str, Any]], der
     A family fails a clean negative when its own score alarms, and a target
     positive when it does not; units where either family abstained are left out.
     """
-    if entry["score"]["combination"] not in ("consensus-min", "consensus-max"):
+    if entry["score"]["combination"] not in registry_lib.CONSENSUS_COMBINATIONS:
         return []
     direction = entry["direction"]
     audits = []
@@ -2285,7 +2285,7 @@ def record_errors(record: Any) -> list[str]:
         errors.append("a per-language threshold covers exactly the scope's languages")
     if not isinstance(record["phiAudit"], list):
         errors.append("phiAudit must be a list")
-    elif record["combination"] in ("consensus-min", "consensus-max") and not record["phiAudit"]:
+    elif record["combination"] in registry_lib.CONSENSUS_COMBINATIONS and not record["phiAudit"]:
         errors.append("a consensus rule records its phi audit (section 5.7)")
     rates = record["rates"] or {}
     if not isinstance(rates.get("farPooled"), Mapping) or not isinstance(rates.get("mechanisms"), Mapping):

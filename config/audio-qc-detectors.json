@@ -61,10 +61,12 @@
     "long-form-takes-pending": "Class J's negatives are natural long-form takes (N3 long form, audit section 5.7): multi-segment projects assembled by the product's long-form path, with their segment boundaries. The N3 take plan holds single-segment takes only, so the fit and confirmation cohorts (role set n3-long-form, corpora pending) wait for a long-form take plan: at least 60 scored families in each (one pooled threshold, over at least 3 languages, speakers and scripts), every family a script x voice x seed project with at least one seam, the two disjoint by family, speaker and script.",
     "digital-silence-only": "The score counts exact digital silence (PCM16 zeros) only: a quiet but nonzero gap or tail (room tone, codec silence tokens, an attenuated span) is not scored, so a generated pause or tail that merely runs long is outside this detector. The legacy Fast QC v8 silence flags keep reporting those (A10), and SIG-DROP's attenuated variant is no target.",
     "pcm-measures-python-only": "The pcmMeasures block is measured by the calibration scorer (scripts/lib/qc_qualification/pcm_measures.py, audio_qc_calibration_set.py score) over the persisted PCM16, not inside the engine: until a Swift mirror joins the Stage 0 observations the app's own takes carry no such field, so the detector serves the evidence lanes that run the scorer. An N1 recording is measured after its resampling, which smooths flat tops and zero runs.",
-    "clip-variants-not-sampled": "The N2 injection schedule (audio_qc_calibration_set.py build_plan) draws each injector's sham, mild, moderate and severe catalog variants only, so SIG-CLIP's soft-knee and over-range variants never reach a confirmation set and the moderate cell holds hard clipping alone. Their design-data detection comes from building them in memory on the spent confirmation sources; qualifying them needs the schedule to draw the extra variants."
+    "clip-variants-not-sampled": "The N2 injection schedule (audio_qc_calibration_set.py build_plan) draws each injector's sham, mild, moderate and severe catalog variants only, so SIG-CLIP's soft-knee and over-range variants never reach a confirmation set and the moderate cell holds hard clipping alone. Their design-data detection comes from building them in memory on the spent confirmation sources; qualifying them needs the schedule to draw the extra variants.",
+    "substitutions-not-scored": "A substitution (a unit heard as another) does not count, so a mispronounced or wrong word leaves the score unchanged unless it changes the number of units heard: substitution defects stay outside this detector, which the audit keeps warn-only anyway (section 5.7)."
   },
   "exclusionReasons": {
-    "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
+    "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean.",
+    "sensevoice-codec-failures": "The ja and ko content pair is Whisper and SenseVoice, and SenseVoice fails outright on codec audio (error rate above 0.5 on 5.6% of ja and 18.5% of ko N2): under the two-family mean each failure scores about 0.5 on a clean take, so on the spent AQ-07 data the Japanese threshold sat at 0.5 and 6 of 49 Japanese severe content positives alarmed. Japanese and Korean stay outside until a second family survives the codec (Korean also has no word-level positives)."
   },
   "risks": {
     "parakeet-whisper-label-lineage": "Parakeet's training labels include Whisper pseudo-labels (Granary), so the pair may fail together; the phi audit in the record measures it before the pair gates.",
@@ -100,7 +102,9 @@
     "pooled-fleurs-locale-concentration": "One threshold pooled over the languages puts FLEURS's false alarms in the locales whose recording chain sits furthest out, while the confirmation still bounds every language's FAR (0.20 at warn, upper bound at the Bonferroni confidence). On the spent AQ-07 cohorts (design data, fitted on FLEURS dev N2 and counted on test N2), a pooled plan at alpha 0.05 put the worst language's bound at 0.354 (German DC), 0.283 (Spanish digital dropout) and 0.265 (English digital tail), and at alpha 0.01 at 0.066, 0.075 and 0.071: plan these detectors at alpha 0.01.",
     "fleurs-digital-silence": "FLEURS N2 holds exact-zero spans that generated takes never show (spent AQ-07 cohorts: clean dev N2 interior runs up to 0.88 s, 99th percentile 0.40 s, from zh, es and ru recordings, and trailing runs up to 17 ms in zh and en; the 791 N3 takes of 2026-09-27: at most 1 ms), so the pooled thresholds sit near 0.4 s inside the take and 12 ms at its end, and a shorter digital dropout (SIG-DROP mild, 150 ms) is missed.",
     "n2-full-scale-clamps": "The N2 round trip clamps some loud FLEURS recordings at full scale (the N2 manifest's clampedSampleCount), leaving genuine two-sided flat tops on clean negatives: on the spent AQ-07 cohorts 16 of 3,718 test N2 families carry any (15 of them Japanese, upper bound 0.077 at 0.995), so the pooled threshold sits at 0 whatever the alpha and the Japanese stratum holds the FAR.",
-    "soft-knee-saturation": "A soft knee leaves a flat top only where it saturates: SIG-CLIP's knee squashes toward an asymptote 12% above its level, so samples far above the knee (speech's crest factor puts the loudest 1% well above the level that 1% exceeds) round to the asymptote on both polarities, while a waveform that barely crosses the knee is compressed without one. On the spent confirmation sources 149 of 150 soft-knee constructions scored; on the smooth procedural fixtures none does."
+    "soft-knee-saturation": "A soft knee leaves a flat top only where it saturates: SIG-CLIP's knee squashes toward an asymptote 12% above its level, so samples far above the knee (speech's crest factor puts the loudest 1% well above the level that 1% exceeds) round to the asymptote on both polarities, while a waveform that barely crosses the knee is compressed without one. On the spent confirmation sources 149 of 150 soft-knee constructions scored; on the smooth procedural fixtures none does.",
+    "one-family-alarm": "Under the two-family mean one family's evidence alarms alone once it reaches twice the threshold, so a passage one recognizer hallucinates or drops (Whisper hallucinates on non-speech) can alarm without the other. The per-language conformal threshold still bounds the N2 FAR, and the phi audit records how the two families fail together; a strict consensus (both high) cannot see what one family never transcribes, which is why v1 missed repetitions.",
+    "splice-sham-content-errors": "CNT-REP's sham, a splice at the same boundary with nothing repeated, raises the two families' insertion-deletion rate: on the spent AQ-07 data 14 of 133 sham families alarmed at alpha 0.05 against 164 of 3,116 clean ones, intervals that do not overlap (A4 would refuse), and 9 of 133 against 104 of 3,116 at alpha 0.03, which overlap narrowly. Plan at alpha 0.03, where the severe cells still met A3 (lower bounds 0.868, 0.816 and 0.913)."
   },
   "detectors": [
     {
@@ -351,6 +355,38 @@
       "populations": "fleurs-n2",
       "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
       "risks": ["parakeet-whisper-label-lineage", "sensevoice-codec-degradation"]
+    },
+    {
+      "id": "content.consensus-error@2",
+      "class": "B",
+      "stage": 2,
+      "measures": "The mean of two independent recognizer families' insertion-deletion rates against the script: the units (words, or characters in zh) a family heard beyond the script plus the script's units it did not hear, over the script's length, from the minimum-cost alignment of its private transcript that has the fewest of them (a pair read either way counts as a substitution, a recognizer's own error; substitutions do not count). The mean lets the literal family's hearing count where Whisper large-v3 smooths a repetition away: on the spent AQ-07 data Whisper transcribed none of the repeated units in 73 of 133 CNT-REP severe positives, where the second family heard at least three in 125, so v1's minimum could not reach 0.70. One family alarms alone only with twice the threshold's evidence. Qwen3-ASR is same-lab and never votes (A6).",
+      "score": {"combination": "consensus-mean", "unit": "reference-fraction", "groups": [
+        {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+         "components": [{"source": "transcript-edit", "judge": "asr.whisper-large-v3@1", "measure": "insertionDeletionRate"},
+                        {"source": "transcript-edit", "judge": "asr.parakeet-tdt-0.6b-v3@1", "measure": "insertionDeletionRate"}]},
+        {"languages": ["chinese"],
+         "components": [{"source": "transcript-edit", "judge": "asr.whisper-large-v3@1", "measure": "insertionDeletionRate"},
+                        {"source": "transcript-edit", "judge": "asr.paraformer-zh@1", "measure": "insertionDeletionRate"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Word against character units and each recognizer's hearing per language (spent AQ-07 dev N2, 95th percentile of the two families' mean: 0.021 in it to 0.059 in de)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+                "exclusions": [{"language": "japanese", "reason": "sensevoice-codec-failures"},
+                               {"language": "korean", "reason": "sensevoice-codec-failures"}]},
+      "targets": [
+        {"injectorID": "CNT-DEL", "severities": ["severe"], "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-INS", "severities": ["severe"], "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-REP", "severities": ["severe"], "mechanism": "T1-pcm-construction"}
+      ],
+      "shams": [
+        {"injectorID": "CNT-DEL", "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-INS", "mechanism": "T1-pcm-construction"},
+        {"injectorID": "CNT-REP", "mechanism": "T1-pcm-construction"}
+      ],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "substitutions-not-scored"],
+      "risks": ["parakeet-whisper-label-lineage", "one-family-alarm", "splice-sham-content-errors"]
     },
     {
       "id": "boundary.truncation@1",

@@ -70,6 +70,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
 | [`content.consensus-error@1`](../detectors/content.consensus-error-v1.md) | B (content) | chinese | panel `errorRate` | refused |
+| [`content.consensus-error@2`](../detectors/content.consensus-error-v2.md) | B (content) | chinese | transcript-edit `insertionDeletionRate` | not qualified |
 | [`boundary.truncation@1`](../detectors/boundary.truncation-v1.md) | C (boundary) | chinese | transcript-tail `trailingUnmatchedFraction` | qualified (warn) |
 | [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | chinese | must complete | refused |
 <!-- END GENERATED audio-qc-docs:accuracy -->

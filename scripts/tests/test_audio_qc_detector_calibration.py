@@ -101,6 +101,14 @@ def consensus_entry(detector: str = "test.consensus-error@1", *, source: str = "
     }
 
 
+def mean_entry() -> dict:
+    """Two families' error rates averaged (consensus-mean): each family's evidence counts at half weight."""
+    entry = consensus_entry("test.consensus-mean@1")
+    entry["score"]["combination"] = "consensus-mean"
+    entry["measures"] = "The mean of two families' scores."
+    return entry
+
+
 def level_entry() -> dict:
     return {
         "id": "test.level@1", "class": "A", "stage": 0, "measures": "RMS level.",
@@ -160,7 +168,7 @@ def fixture_registry() -> dict:
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
                       {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
-                      pitch_entry()],
+                      pitch_entry(), mean_entry()],
     }
 
 
@@ -483,6 +491,122 @@ class ScoringTests(unittest.TestCase):
         names = {path.name for path in detectors.scoring_sources()}
         self.assertLessEqual({"detectors.py", "language_metrics.py"}, names)
         self.assertEqual(detectors.scoring_code_sha256(), detectors.scoring_code_sha256())
+
+
+def _fewest_indels(reference: list, hypothesis: list) -> tuple[int, int]:
+    """Brute force: (minimum edit cost, fewest insertions plus deletions among the minimum-cost alignments)."""
+    best: dict[tuple[int, int], tuple[int, int]] = {}
+
+    def walk(row: int, column: int) -> tuple[int, int]:
+        if (row, column) in best:
+            return best[(row, column)]
+        if row == len(reference) or column == len(hypothesis):
+            rest = (len(reference) - row) + (len(hypothesis) - column)
+            best[(row, column)] = (rest, rest)
+            return best[(row, column)]
+        cost, indels = walk(row + 1, column + 1)
+        options = [(cost + (reference[row] != hypothesis[column]), indels)]
+        for step in (walk(row + 1, column), walk(row, column + 1)):
+            options.append((step[0] + 1, step[1] + 1))
+        best[(row, column)] = min(options)
+        return best[(row, column)]
+    return walk(0, 0)
+
+
+class InsertionDeletionTests(unittest.TestCase):
+    """content.consensus-error@2's reduction and the two-family mean."""
+
+    def test_repeats_and_insertions_count_and_a_misheard_word_does_not(self) -> None:
+        repeated = detectors.insertion_deletion("a b c d".split(), "a b c b c d".split())
+        self.assertEqual((repeated["insertions"], repeated["deletions"], repeated["insertionDeletionRate"]),
+                         (2, 0, 0.5))
+        dropped = detectors.insertion_deletion("a b c d".split(), "a d".split())
+        self.assertEqual((dropped["insertions"], dropped["deletions"]), (0, 2))
+        # [a, b] heard as [b, c]: two substitutions or a deletion and an insertion cost the same; the reading
+        # with the fewest insertions and deletions wins, so a recognizer's misreading is no content defect.
+        shifted = detectors.insertion_deletion(["a", "b"], ["b", "c"])
+        self.assertEqual((shifted["editCost"], shifted["insertionDeletions"]), (2, 0))
+        self.assertEqual(detectors.insertion_deletion(["a", "b"], [])["insertionDeletionRate"], 1.0)
+        self.assertIsNone(detectors.insertion_deletion([], ["a"])["insertionDeletionRate"])
+
+    def test_the_counts_are_the_fewest_over_every_minimum_cost_alignment(self) -> None:
+        stream = SeededStream(11, "insertion-deletion")
+        for _ in range(300):
+            lengths = [int(value) for value in stream.integers(7, 2)]
+            reference = [int(value) for value in stream.integers(3, lengths[0])] if lengths[0] else []
+            hypothesis = [int(value) for value in stream.integers(3, lengths[1])] if lengths[1] else []
+            result = detectors.insertion_deletion(reference, hypothesis)
+            cost, indels = _fewest_indels(reference, hypothesis)
+            self.assertEqual((result["editCost"], result["insertionDeletions"]), (cost, indels))
+            self.assertEqual(result["insertions"] - result["deletions"], len(hypothesis) - len(reference))
+            self.assertEqual(result["editCost"],
+                             language_metrics.edit_metrics(reference, hypothesis)["substitutions"]
+                             + language_metrics.edit_metrics(reference, hypothesis)["insertions"]
+                             + language_metrics.edit_metrics(reference, hypothesis)["deletions"])
+
+    def test_the_transcript_edit_source_reads_private_transcripts(self) -> None:
+        component = {"source": "transcript-edit", "judge": PARAKEET, "measure": "insertionDeletionRate"}
+        complete = {PARAKEET: {"status": "complete", "metrics": {"transcriptEmpty": False}}}
+        private = {"referenceText": "one two three four", "transcripts": {PARAKEET: "one two three two three four"}}
+        self.assertEqual(detectors.component_value(component, language="english", measurements=complete,
+                                                   private=private), (0.5, None))
+        empty = {PARAKEET: {"status": "complete", "metrics": {"transcriptEmpty": True}}}
+        self.assertEqual(detectors.component_value(component, language="english", measurements=empty,
+                                                   private={"referenceText": "one two", "transcripts": {}}),
+                         (1.0, None))
+        self.assertEqual(detectors.component_value(component, language="english", measurements=complete,
+                                                   private={"referenceText": "one two", "transcripts": {}}),
+                         (None, "no-transcript"))
+
+    def test_consensus_mean_averages_two_families(self) -> None:
+        entry = mean_entry()
+        measurements = {WHISPER: {"status": "complete", "metrics": {"errorRate": 0.0}},
+                        PARAKEET: {"status": "complete", "metrics": {"errorRate": 0.3}}}
+        self.assertAlmostEqual(detectors.score_take(entry, "german", measurements=measurements)["score"], 0.15)
+        self.assertEqual(detectors.combine("consensus-mean", [0.2, 0.9]), 0.55)
+        self.assertIn("consensus-mean", detectors.CONSENSUS_COMBINATIONS)
+
+
+class ContentV2RegistryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.judges = json.loads((REPO / calibration.JUDGES).read_text(encoding="utf-8"))
+        self.registry = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+        self.entry = detectors.detector_entry(self.registry, "content.consensus-error@2")
+
+    def mutate(self, change) -> list[str]:
+        registry = copy.deepcopy(self.registry)
+        change(next(entry for entry in registry["detectors"] if entry["id"] == "content.consensus-error@2"))
+        return detectors.registry_errors(registry, self.judges)
+
+    def test_definition(self) -> None:
+        self.assertEqual(self.entry["score"]["combination"], "consensus-mean")
+        self.assertTrue(detectors.needs_private(self.entry) and detectors.needs_panel(self.entry))
+        self.assertEqual(sorted(detectors.judges_of(self.entry)),
+                         sorted([WHISPER, PARAKEET, "asr.paraformer-zh@1"]))
+        self.assertEqual({item["language"] for item in self.entry["scope"]["exclusions"]}, {"japanese", "korean"})
+        self.assertEqual(detectors.target_injectors(self.entry), {"CNT-DEL", "CNT-INS", "CNT-REP"})
+        self.assertEqual(detectors.strata_by(self.entry), "language")
+        # v1 keeps its minimum of error rates.
+        self.assertEqual(detectors.detector_entry(self.registry, "content.consensus-error@1")["score"]["combination"],
+                         "consensus-min")
+
+    def test_the_mean_keeps_the_two_family_rules(self) -> None:
+        def same_family(entry):
+            entry["score"]["groups"][0]["components"][1]["judge"] = "asr.whisper-small@1"
+        self.assertTrue(any("two recognizer families" in error for error in self.mutate(same_family)))
+
+        def same_lab(entry):
+            entry["score"]["groups"][0]["components"][1]["judge"] = "asr.qwen3-asr-1.7b@1"
+        self.assertTrue(any("A6" in error for error in self.mutate(same_lab)))
+
+        def unknown_measure(entry):
+            entry["score"]["groups"][0]["components"][0]["measure"] = "insertionRate"
+        self.assertTrue(any("insertionDeletionRate" in error for error in self.mutate(unknown_measure)))
+
+        def below(entry):
+            entry["direction"] = "below"
+        # The mean has no direction of its own: either is valid.
+        self.assertEqual(self.mutate(below), [])
 
 
 ALL_LANGUAGES = tuple(language_metrics.PRODUCT_LANGUAGES)
@@ -1254,6 +1378,28 @@ class FlowTests(unittest.TestCase):
         edited = self.cli("validate", expect=1)
         self.assertIn("changed after it was confirmed", edited)
         self.assertIn("changed after its plan", edited)
+
+    def test_a_consensus_mean_detector_confirms_with_its_phi_audit(self) -> None:
+        fixture = self.fixture
+        detector = "test.consensus-mean@1"
+        scores = self.calibration_scores(detector, bundle=fixture.negative_bundle(fixture.calibration, "mean-cal"))
+        self.plan(detector, scores)
+        fixture.commit_plans()
+        injection = fixture.injection_set()
+        confirmation = self.confirmation_scores(
+            detector, bundle=fixture.negative_bundle(fixture.confirmation, "confirmation/panel-bundle-v2", scale=200.0),
+            injection_set=injection, positive_bundle=fixture.positive_bundle(injection))
+        units = json.loads(confirmation.read_text(encoding="utf-8"))["units"]
+        clean = next(unit for unit in units if unit["injectorID"] is None)
+        self.assertAlmostEqual(clean["score"], sum(clean["components"].values()) / 2.0, places=9)
+        result = json.loads(self.confirm(detector, scores, confirmation))
+        self.assertEqual((result["verdict"], result["reasons"]), ("qualified", []))
+        record = json.loads((fixture.repo / result["record"]).read_text(encoding="utf-8"))
+        self.assertEqual(record["combination"], "consensus-mean")
+        self.assertEqual([audit["judges"] for audit in record["phiAudit"]], [[WHISPER, PARAKEET]])
+        self.assertEqual(calibration.record_errors(record), [])
+        # A consensus-mean record without its phi audit is refused like any consensus rule's.
+        self.assertIn("phi audit", " ".join(calibration.record_errors({**record, "phiAudit": []})))
 
     def test_a_pooled_signal_detector_reads_measurements(self) -> None:
         fixture = self.fixture

@@ -48,6 +48,11 @@ Combinations:
 - `consensus-min` (direction `above`): the smaller of two independent families'
   scores, so the take alarms only when both do.
 - `consensus-max` (direction `below`): the larger of two, so both must be low.
+- `consensus-mean` (either direction): the mean of two independent families'
+  scores. Each family's evidence counts at half weight, so a take alarms on the
+  two families' joint evidence, which one family reaches alone only with twice
+  the threshold's worth: the literal family's hearing counts where the other
+  smooths a defect away (Whisper large-v3 transcribes a repeated phrase once).
 - `difference`: the first component minus the second. The second may be a
   non-voting timing instrument (the same-lab aligner) only where the group
   requires both content voters of the language to have completed, which is
@@ -61,6 +66,11 @@ entry lists no languages (the speaker families, pYIN) runs on every take, so
 it covers every product language. A `difference` may subtract two metrics of
 one voting judge (class E: CAM++'s whole-take cosine minus a window's), so each
 take is its own baseline.
+
+`transcript-edit` components read a family's private transcript like
+`transcript-tail` ones and score `insertion_deletion`: the units heard beyond
+the script plus the script's units not heard, from the minimum-cost alignment
+that has the fewest of them, over the script's length.
 
 `trailing_unmatched` compares a transcript with its reference on the primary
 units of `lib/language_metrics.py` (words, or characters in zh, ja and ko) and
@@ -89,8 +99,11 @@ from .pcm import json_digest
 
 REGISTRY_KIND = "audio-qc-detector-registry"
 REGISTRY_SCHEMA_VERSION = 1
-COMBINATIONS = ("single", "consensus-min", "consensus-max", "difference")
-SOURCES = ("fastqc", "observations", "introspection", "longform", "pcm", "panel", "transcript-tail", "raw-output")
+COMBINATIONS = ("single", "consensus-min", "consensus-max", "consensus-mean", "difference")
+# The combinations of two independent voting families (A6), whose partners a confirmation phi-audits.
+CONSENSUS_COMBINATIONS = ("consensus-min", "consensus-max", "consensus-mean")
+SOURCES = ("fastqc", "observations", "introspection", "longform", "pcm", "panel", "transcript-tail",
+           "transcript-edit", "raw-output")
 MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection", "longform", "pcm"})
 # Where a measurements.json clip keeps each measurement source's fields.
 MEASUREMENT_BLOCKS = {"fastqc": "fastQC", "observations": "observations", "introspection": "introspection",
@@ -104,9 +117,12 @@ PCM_SCORE_FIELDS = frozenset({
     "longestInteriorDigitalSilenceMS", "trailingDigitalSilenceMS", "leadingDigitalSilenceMS", "lastActiveSeconds",
 })
 PCM_MEASURES_SOURCE = Path(__file__).resolve().with_name("pcm_measures.py")
-PANEL_SOURCES = frozenset({"panel", "transcript-tail", "raw-output"})
+PANEL_SOURCES = frozenset({"panel", "transcript-tail", "transcript-edit", "raw-output"})
+# The sources that align a family's private transcript against the script.
+TRANSCRIPT_SOURCES = frozenset({"transcript-tail", "transcript-edit"})
 TRANSFORMS = ("absolute",)
 TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDeletions")
+EDIT_MEASURES = ("insertionDeletionRate", "insertionDeletions")
 # What this module reduces from a panel judge's raw (L1) output -> the engine whose output it reads
 # (the judge registry's execution.engine).
 RAW_MEASURES = {
@@ -247,7 +263,7 @@ def needs_panel(entry: Mapping[str, Any]) -> bool:
 
 
 def needs_private(entry: Mapping[str, Any]) -> bool:
-    return any(component.get("source") == "transcript-tail" for component in components_of(entry))
+    return any(component.get("source") in TRANSCRIPT_SOURCES for component in components_of(entry))
 
 
 def needs_raw(entry: Mapping[str, Any]) -> bool:
@@ -329,6 +345,8 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
             errors.append(f"{where}.metric must name a panel metric")
         if source == "transcript-tail" and component.get("measure") not in TAIL_MEASURES:
             errors.append(f"{where}.measure must be one of {TAIL_MEASURES}")
+        if source == "transcript-edit" and component.get("measure") not in EDIT_MEASURES:
+            errors.append(f"{where}.measure must be one of {EDIT_MEASURES}")
         if source == "raw-output":
             measure = component.get("measure")
             if measure not in RAW_MEASURES:
@@ -422,7 +440,7 @@ def _group_errors(entry: Mapping[str, Any], group: Any, where: str, judges: Mapp
         required = []
     if set(group) - {"languages", "components", "requiresComplete"}:
         errors.append(f"{where} has unknown keys")
-    if combination in ("consensus-min", "consensus-max"):
+    if combination in CONSENSUS_COMBINATIONS:
         first, second = (component_judge(component) for component in components)
         if first == second:
             errors.append(f"{where}: consensus needs two judges")
@@ -730,6 +748,38 @@ def trailing_unmatched(reference: Sequence[Any], hypothesis: Sequence[Any]) -> d
     }
 
 
+def insertion_deletion(reference: Sequence[Any], hypothesis: Sequence[Any]) -> dict:
+    """The units heard beyond the script and the script's units not heard, over the script's length.
+
+    Among the alignments of minimum edit cost (unit costs, as
+    `language_metrics.edit_metrics`), take the one with the fewest insertions
+    plus deletions: a pair that reads either as one substitution or as a unit
+    missing and another added counts as the substitution, a recognizer's own
+    kind of error. Insertions minus deletions is the length difference on every
+    alignment, so the two counts are unique whatever the tie order. A repeated
+    phrase, an inserted word or a missing one moves them; a misheard word does
+    not. `insertionDeletionRate` is their sum over the reference length (None for
+    an empty reference).
+    """
+    rows, columns = len(reference), len(hypothesis)
+    # Each cell: (edit cost, insertions + deletions), compared in that order.
+    previous = [(column, column) for column in range(columns + 1)]
+    for row in range(1, rows + 1):
+        current = [(row, row)]
+        unit = reference[row - 1]
+        for column in range(1, columns + 1):
+            diagonal = previous[column - 1]
+            best = (diagonal[0] + (unit != hypothesis[column - 1]), diagonal[1])
+            for cost, indels in (previous[column], current[column - 1]):
+                best = min(best, (cost + 1, indels + 1))
+            current.append(best)
+        previous = current
+    cost, indels = previous[columns]
+    insertions = (indels + columns - rows) // 2
+    return {"referenceUnits": rows, "editCost": cost, "insertions": insertions, "deletions": indels - insertions,
+            "insertionDeletions": indels, "insertionDeletionRate": (indels / rows) if rows else None}
+
+
 def primary_units(text: str, language: str) -> list[str]:
     """The units language_metrics scores a language on: characters in zh, ja and ko, words elsewhere."""
     words, characters = language_metrics.scoring_units(text, language)
@@ -738,6 +788,10 @@ def primary_units(text: str, language: str) -> list[str]:
 
 def transcript_tail(reference: str, hypothesis: str, language: str) -> dict:
     return trailing_unmatched(primary_units(reference, language), primary_units(hypothesis, language))
+
+
+def transcript_edit(reference: str, hypothesis: str, language: str) -> dict:
+    return insertion_deletion(primary_units(reference, language), primary_units(hypothesis, language))
 
 
 # --------------------------------------------------------------------------- #
@@ -962,7 +1016,8 @@ def component_value(component: Mapping[str, Any], *, language: str, clip: Mappin
                 hypothesis = ""
             if not isinstance(hypothesis, str) or not isinstance(reference, str):
                 return None, "no-transcript"
-            value = transcript_tail(reference, hypothesis, language)[component["measure"]]
+            align = transcript_tail if source == "transcript-tail" else transcript_edit
+            value = align(reference, hypothesis, language)[component["measure"]]
             if value is None:
                 return None, "no-value"
             value = float(value)
@@ -978,6 +1033,8 @@ def combine(combination: str, values: Sequence[float]) -> float:
         return min(values)
     if combination == "consensus-max":
         return max(values)
+    if combination == "consensus-mean":
+        return (values[0] + values[1]) / 2.0
     if combination == "difference":
         return values[0] - values[1]
     raise DetectorError(f"unknown combination {combination!r}")

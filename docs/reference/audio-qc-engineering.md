@@ -1757,7 +1757,8 @@ nothing and writes no benchmark history.
 stage; its score, read from a Fast QC v8 or Stage 0 field of `measurements.json`, from panel judge
 metrics, or from a judge's private transcript aligned against the reference; the combination
 (`single`; `consensus-min`, direction above, and `consensus-max`, direction below, over two
-independent voting families per language, so both must alarm; or `difference`); its strata; its
+independent voting families per language, so both must alarm; `consensus-mean` over the same pairs,
+since 2026-09-30, so their joint evidence alarms; or `difference`); its strata; its
 language scope with a declared reason per exclusion; the injectors and severities its detection
 rate is measured on with their matched shams; and its population roles. The contract gate's
 `audio_qc_detector_calibration.py validate` checks it against `config/audio-qc-judges.json`: a
@@ -2204,6 +2205,42 @@ soft-knee or over-range clip until the schedule draws the extra variants
 (`clip-variants-not-sampled`). A soft knee leaves a flat top only where it saturates, as speech's crest
 factor makes it do; a smooth procedural waveform barely above the knee is compressed without one
 (`soft-knee-saturation`).
+
+**Content: insertions and repetitions (`content.consensus-error@2`).** v1 took the smaller of the
+two families' error rates, so a take alarmed only when both families heard the defect, and Whisper
+large-v3 smooths repetitions away. On the spent CNT-REP severe positives in scope, Whisper
+transcribed none of the repeated units on 73 of 133 while the literal family (Parakeet; Paraformer
+in zh) heard at least three on 125. No per-family measure can lift a minimum above the weaker
+family's hearing. v2 changes the score and the combination:
+
+- **Score per family: the insertion-deletion rate.** It counts the units heard beyond the script
+  plus the script's units not heard, over the script's length (`transcript-edit`, measure
+  `insertionDeletionRate`). The counts come from the minimum-cost alignment that has the fewest of
+  them, so a pair read either way counts as a substitution, a recognizer's own kind of error.
+  Insertions minus deletions is the length difference, so the counts do not depend on tie order.
+- **`consensus-mean`: the two families' mean.** It still needs two independent voting families
+  (A6) and records their phi audit. Each family's evidence counts at half weight, so one family
+  alarms alone only with twice the threshold's evidence (`one-family-alarm`).
+
+Japanese and Korean leave the scope (`sensevoice-codec-failures`): SenseVoice's outright failures on
+codec audio put the Japanese threshold of the mean at 0.5. Substitutions no longer count
+(`substitutions-not-scored`). Per-language thresholds on the eight languages in scope:
+
+| Rule (alpha 0.05 unless noted) | N2 FAR pooled; worst language | DEL / INS / REP severe | Shams DEL / INS / REP | N3 flag rate |
+|---|---|---|---|---|
+| v1: min of error rates | 180/3116 (upper 0.065); fr 32/286 (upper 0.166) | 114/134 (lower 0.791), 91/134 (0.606), 66/133 (0.422) | 7, 8, 9 of 134, 134, 133 | 90/633 |
+| min of insertion-deletion rates | 156/3116 (0.057); en 26/236 (0.171) | 131/134 (0.943), 91/134 (0.606), 67/133 (0.429) | 7, 8, 10 | 54/633 |
+| mean of error rates | 186/3116 (0.067); fr 39/286 (0.195) | 107/134 (0.733), 103/134 (0.701), 126/133 (0.903) | 8, 7, 12 | 116/633 |
+| v2: mean of insertion-deletion rates | 164/3116 (0.060); it 31/351 (0.133) | 132/134 (0.954), 120/134 (0.841), 127/133 (0.913) | 7, 8, 14 | 98/633 |
+| v2 at alpha 0.03 | 104/3116 (0.039); it 29/351 (0.126) | 123/134 (0.868), 117/134 (0.816), 127/133 (0.913) | 4, 4, 9 | 84/633 |
+
+CNT-REP's sham, a splice at the same boundary with nothing repeated, raises both families'
+insertion-deletion rate. At alpha 0.05 its 14 of 133 alarms do not overlap the clean N2 interval, and
+A4 would refuse the detector; at alpha 0.03 the two overlap narrowly (`splice-sham-content-errors`).
+Plan v2 at alpha 0.03. CNT-INS stays the hardest cell: on 11 of 134 severe positives neither family
+heard an inserted unit. The app takes at alpha 0.03 flag 29 of 80 in French and 13 to 14 of about
+80 in Italian and Spanish (Serena 31 of 107), much as v1 flags them. French recognition of the
+app's French is itself poor (see the nativeness detector below).
 
 ### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
 

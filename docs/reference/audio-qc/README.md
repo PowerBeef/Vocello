@@ -138,6 +138,7 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | confirmed (refused) | refused | - |
+| [`content.consensus-error@2`](detectors/content.consensus-error-v2.md) | B (content) | 2 | consensus-mean | no plan | not qualified | - |
 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | - |
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |

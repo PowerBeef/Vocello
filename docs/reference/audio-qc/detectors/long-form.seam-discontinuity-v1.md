@@ -33,7 +33,7 @@ Registry entry `long-form.seam-discontinuity@1` in [config/audio-qc-detectors.js
 **Risks.**
 
 - `no-seam-injector`: Injector catalog version 2 has no seam family. The audit's SEAM-* constructions (section 5.2) act at a long-form seam and need the take's seam offsets: SEAM-DISC removes 1, 5 and 20 ms of samples at the seam (mild, moderate, severe; no removal as its sham), and SEAM-VOICE replaces the segment after the seam with the same text rendered by another voice (a same-voice re-render as its sham). COD-SEAM (T2, a 1-3 frame seam misalignment) is the second mechanism. Until they exist the class J detectors have no positives.
-- `seam-offsets-not-passed`: The Stage 0 seam z-score reads the take's seams. The engine passes its streaming seams, but the offline scorer (audio_qc_calibration_set.py score) passes none, so every clip's seamDiscontinuityMaxZ is null there and abstains (no-value) until the long-form segment boundaries (the assembly's segment output ranges) reach it.
+- `seam-offsets-not-passed`: The Stage 0 seam z-score reads the take's seams. audio_qc_calibration_set.py score passes a long-form take's seams (its longForm block's seamFrames) to it, but the N3 take plan holds single-segment takes only, so every clip's seamDiscontinuityMaxZ stays null (no-value) until a long-form take plan records each project's assembly.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

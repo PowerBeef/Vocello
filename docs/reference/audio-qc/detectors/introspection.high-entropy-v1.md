@@ -33,7 +33,7 @@ Registry entry `introspection.high-entropy@1` in [config/audio-qc-detectors.json
 
 **Risks.**
 
-- `introspection-not-carried`: The engine's introspection summary lands in the telemetry row's engineIntrospection. Neither the N3 takes manifest (audio_qc_calibration_takes.py manifest) nor measurements.json (audio_qc_calibration_set.py score) carries it yet, so every clip lacks its introspection block and abstains (no-value) until the takes lane records the summary per take and the scorer copies it into each clip.
+- `introspection-not-carried`: The engine's introspection summary lands in the telemetry row's engineIntrospection. audio_qc_calibration_takes.py manifest --diagnostics binds each take to the engine row whose samplingWAVDigest is its WAV digest and carries the summary, and audio_qc_calibration_set.py score copies it into each clip; but the engine's diagnostics log is capped (8 MB), so the early rows of a long qc-takes run are gone when the lane builds its manifest and those takes abstain (no-value) until the lane keeps its rows.
 - `no-generation-knob`: GEN-NOEOS (T3, audit section 5.2) suppresses EOS for 6-50 frames through a registered knob, with no suppression (N = 0) as its sham; config/runtime-debug-knobs.json lists no such knob, so the entropy and EOS detectors have no positives until one is registered under the release-only rules.
 - `entropy-target-uncertain`: EOS suppression is the only construction the audit names for the entropy detector (T3). Whether the talker's entropy stays at 4 nats or more after a suppressed stop, rather than filling the overrun with silence or a loop, is what the confirmation measures; harvested babble (P4) is the other source of positives.
 

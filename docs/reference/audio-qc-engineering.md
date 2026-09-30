@@ -1734,8 +1734,13 @@ the fit and confirmation cohorts wait for a maintainer decision on a speaker-lab
 terms allow speaker verification (not Common Voice), with two or more utterances per speaker,
 resynthesized to N2. Each language stratum needs 60 scored calibration families and 60
 confirmation negative families from at least 3 speakers, disjoint by family, speaker and script,
-plus 60 families per severe cell and per sham. `plan` pre-registers FLEURS-derived cohorts only,
-so it also needs a declared split for another corpus.
+plus 60 families per severe cell and per sham. Once the role set names the corpus instead of
+`pending-...`, `plan` reads its split, corpus name and speaker labels from the N1 manifest each N2
+cohort pins (`--calibration-n1-manifest`, `--confirmation-n1-manifest`) and checks speaker
+disjointness beside family and script. A take (or an impostor positive) names its reference clip
+(`reference`: WAV path and digest); `audio_qc_orchestrator.py manifest --from-calibration-takes`
+passes it to the speaker judges, the take's private record names its digest, and `scores` refuses
+evidence measured against another clip than the declared one.
 
 Class F reads a new source, `raw-output`: `detectors.py` reduces a panel judge's raw (L1) output,
 which the bundle does not keep, and `score_take(..., raw={judge: output})` takes it once the judge's
@@ -1744,8 +1749,10 @@ measure compares voiced frames up to 50 ms apart. pYIN does not vote, but as a D
 no learned weights its raw output may score a `single` detector alone if it is not from the
 generator's lab and is at least shadow; its L2 metrics through a `panel` component still may not.
 Class F fits on the FLEURS N2 calibration cohort, and PRS-BRK and PRS-OCT already run on N2 with
-the aligner's intervals (not in Korean). A plan still needs pYIN on both panels, an export of its
-frame track like `alignments`, and a confirmation cohort no plan has scored: the v1 confirmation
+the aligner's intervals (not in Korean). A plan still needs pYIN on both panels, its frame track
+exported per take (`audio_qc_calibration_set.py raw-outputs --judge pitch.pyin@1`, rebuilt from the
+panel's L1 cache like `alignments` and passed to `scores --raw-outputs`; a take whose entry the
+cache no longer holds is an evidence gap), and a confirmation cohort no plan has scored: the v1 confirmation
 cohort already holds bundles, so `plan` refuses it (A5). The pitch-instability detector answers
 the maintainer's report of Voice Clone takes whose pitch is all over the place: a take-level rate
 of jumps no voice makes (about twice the fastest F0 change a speaker produces), so expressive
@@ -1761,19 +1768,29 @@ measurements.json, the engine's Stage 0 summary (the same fields as
 `audio_qc_observations.introspection_summary`). A summary without an exact cycle scores a loop of 0
 frames, not an abstention. The talker runs only in natural takes (a codec round trip samples no
 token), so class I fits and confirms on the N3 splits of the take plan: at least 60 scored families
-per language in each (the calibration split plans 80). Its role sets `n3-codec-trace` (P2) and
-`n3-controlled-generation` (P3) name positives the driver cannot read yet, since `scores` takes P1
-and S injections only and `plan` takes FLEURS-derived cohorts only. The summary also has no
-producer here: it lands in the telemetry row's `engineIntrospection`, and neither the N3 takes
-manifest nor `score` carries it, so every clip abstains until they do.
+per language in each (the calibration split plans 80), which `plan` checks disjoint by family,
+speaker (a Built-in speaker or a Voice Design brief) and script. Its role sets `n3-codec-trace` (P2)
+and `n3-controlled-generation` (P3) name declared constructions: `scores` reads P2 and P3 entries
+with their provenance (T2 trace, recipe and decoder digests; T3 knob and recipe) and builds none,
+and `plan` binds the construction catalog version the lead declares (`--injection-catalog-version`).
+`audio_qc_calibration_takes.py manifest --diagnostics` binds each take to the engine row whose
+`samplingWAVDigest` is its WAV digest and carries that row's `engineIntrospection`, and `score`
+copies it into each clip (a T2 or T3 entry carries its own; a T1 construction none). The engine's
+diagnostics log is capped (8 MB), so the early rows of a long qc-takes run are gone when the lane
+builds its manifest and those takes abstain: the lane has to keep its rows before class I is scored.
 
 Class J reads the Stage 0 seam z-score, a fourth new source, `longform` (a clip's `longForm` block:
 the long-form assembly evidence), and the `raw-output` seam measure, which also takes the take's
 seam times (`score_take(..., seams=[...])`, abstaining `no-seams` without one). Its role set
 `n3-long-form` names pending corpora: the take plan has single-segment takes only, so class J
 waits for a long-form take plan with at least 60 scored families per split (one pooled threshold
-over at least 3 languages, speakers and scripts), each a project with at least one seam. The
-offline scorer passes no seam, so today every `seamDiscontinuityMaxZ` in measurements.json is null.
+over at least 3 languages, speakers and scripts), each a project with at least one seam. A
+long-form take carries a `longForm` block (`audio_qc_calibration_takes.long_form_block`: the
+assembled frame count, the assembler's boundary jump and each seam's output frame); `score` passes
+its seams to the Stage 0 seam z-score and measures each clip's jump on its own PCM (a clean take's
+must equal the assembler's; a T1 construction that keeps the length keeps the seams), and `scores`
+passes the seams to the seam-identity measure with the exported CAM++ windows. Until a long-form
+take plan exists, every `seamDiscontinuityMaxZ` in measurements.json stays null.
 Seam-identity uses `raw-output` from class F, so its commit comes after F's.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
@@ -1803,10 +1820,11 @@ detector's. The driver checks each T1 entry's own catalog version, but not that 
 (every sampled family and scheduled variant present): run `audio_qc_calibration_set.py verify` on
 the confirmation set before scoring it.
 
-*A5 is enforced, not a convention.* An N2 cohort names its FLEURS split through the N1 manifest it
-pins by `n1ManifestSHA256` (`scores --n1-manifest`, `plan --confirmation-n1-manifest`). The
-calibration and informational roles refuse a FLEURS test cohort and any cohort a plan in the store
-names as confirmation; a plan refuses a confirmation cohort that is not FLEURS test, a calibration
+*A5 is enforced, not a convention.* An N2 cohort names its split through the N1 manifest it
+pins by `n1ManifestSHA256` (`scores --n1-manifest`, `plan --confirmation-n1-manifest`); an N3 takes
+manifest names its take-plan split. The calibration and informational roles refuse the role set's
+confirmation split (FLEURS test, the confirmation take split) and any cohort a plan in the store
+names as confirmation; a plan refuses a confirmation cohort that is not that split, a calibration
 cohort another plan confirms on and a confirmation cohort another plan fits on. The plan also binds
 the confirmation-side construction: the injection set's catalog seed, sample seed, sample per cell
 and classes (`--injection-catalog-seed`, `--injection-sample-seed`, `--injection-sample-per-cell`,
@@ -1820,7 +1838,7 @@ confirmation panel runs with its own new, empty `--cache-root`. L2 hits inside s
 own: identical audio under one request (an identity sham of two injectors, a language swap's donor)
 shares one L1 row and is reduced once. The orchestrator stamps both fields in the bundle header
 only, outside any judge's identity. The directory scan at `plan` stays as a convenience. Stage 0
-`measurements.json` carries no start time, so a class A confirmation still rests on that scan.
+`measurements.json` stamps its own `startedAt` (outside `clipsSHA256`), held to the same rule.
 
 *A7 covers what shapes a score.* The plan binds the scoring-code digest and the digest of the
 calibration evidence identity; `confirm` requires both cohorts' judge output identities, scoring
@@ -1842,7 +1860,7 @@ returns one split-conformal threshold per stratum from clean calibration familie
 stratum below that floor, and refuses a plan not committed at HEAD. `confirm` runs once per plan
 digest. Before anything is recorded it checks the bindings, the identities above, the construction,
 the panels' freshness, the declared split, and that every expected unit is present with its
-evidence and no failed judge row (rerun that panel on a new cache root). The minimum units are
+evidence and no failed judge row (rerun that panel on a new cache root). The warn minimum units are
 counted on scored units only: 60 negative families, 3 languages,
 speakers and scripts, 60 families per severe cell, and a sham cell per injector with 60 families.
 So a detector that (nearly) always abstains refuses to start instead of recording a refusal. Its
@@ -1859,6 +1877,28 @@ fails a plan or record whose registry entry changed in place without a version b
 entry without its record, and any plan, ledger entry or record that a later commit deleted,
 modified or renamed: they are written once, so an unconfirmed plan cannot be dropped to plan the
 same confirmation cohort again.
+
+*Fail* (decision 5, operating point `fail` or the evidence-lane-only `evidenceLaneFail`). A fail
+plan is its own plan beside the warn plan of the same version (`<id>.fail.json`; warn plans keep
+their names) and is confirmed once on its own. `plan --operating-point fail --alpha A --n3-cohort
+MANIFEST` refuses a definition that cannot qualify: FAR confirmed on another population than N2
+(the N3 role sets of classes I and J, A2), fewer than ten languages in scope, or fewer than two
+construction mechanisms declaring severe and moderate cells (A3), which no v1 detector declares
+yet, so a fail plan needs a new detector version first. Alpha lies below 0.01, the calibration
+cohort meets the confirmation's N2 floor per stratum (1,240 pooled, 124 per language), and the plan
+binds the N3 cohort its flag rate is bounded on (`n3CohortDigest`), which must hold no scores,
+bundle or measurements yet. That cohort is scored after the plan under `scores --role bound
+--operating-point fail` (fresh panels and measurements, like a confirmation); `confirm
+--operating-point fail --n3-scores` requires it complete, then 1,240 N2 families (124 in each of ten
+languages), 60 families per severe and moderate cell of each mechanism and per sham, and 60 N3
+families per language, and evaluates the fail point: FAR <= 1% pooled and <= 5% per language, the
+N3 flag rate <= 5%, detection >= 0.90 severe and >= 0.70 moderate on two mechanisms, clean
+abstention <= 5% and the shams. Positives of a second tier (T2 P2 beside T1 P1) are read when the
+detector declares that mechanism. The record's `level` is `fail`, it pins the N3 cohort and
+scores (`cohorts.n3`) and carries the bound (`rates.n3`), and the lane gates accept it for fail and
+warn gates (an `evidenceLaneFail` record never backs a product lane). The policy's
+`physicalEventsT1Only` exception (clipping, DC, digital silence and non-finite samples may qualify on
+T1 alone) is not wired: it needs the registry to mark those detectors, a new version of each.
 
 The lead's sequence (all 11 plans before any confirmation panel or score, since a plan refuses a
 scored confirmation cohort). `signal.band-limit@1` gets no plan: without an injector its

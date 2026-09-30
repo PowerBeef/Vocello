@@ -33,7 +33,7 @@ Registry entry `long-form.seam-jump@1` in [config/audio-qc-detectors.json](../..
 **Risks.**
 
 - `no-seam-injector`: Injector catalog version 2 has no seam family. The audit's SEAM-* constructions (section 5.2) act at a long-form seam and need the take's seam offsets: SEAM-DISC removes 1, 5 and 20 ms of samples at the seam (mild, moderate, severe; no removal as its sham), and SEAM-VOICE replaces the segment after the seam with the same text rendered by another voice (a same-voice re-render as its sham). COD-SEAM (T2, a 1-3 frame seam misalignment) is the second mechanism. Until they exist the class J detectors have no positives.
-- `long-form-evidence-not-carried`: maximumSegmentBoundaryJump comes from the assembled project's long-form assembly evidence (LongFormAssemblyEvidence, advisory above 4,096). measurements.json carries no longForm block yet, and a T1 positive injected after assembly needs a Python mirror of the assembler's boundary jump at the recorded segment boundaries.
+- `long-form-evidence-not-carried`: maximumSegmentBoundaryJump comes from the assembled project's long-form assembly evidence (LongFormAssemblyEvidence, advisory above 4,096). A take's longForm block (audio_qc_calibration_takes.long_form_block) carries it, and audio_qc_calibration_set.py score measures each clip's jump on its own PCM at the recorded seams: a clean take's must equal the assembler's, a T1 positive that keeps the length is measured the same way, and one that moves the seams (SEAM-DISC) must record its own block. No long-form take plan writes the block yet.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

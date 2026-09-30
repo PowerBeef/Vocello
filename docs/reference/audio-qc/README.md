@@ -8,7 +8,6 @@ sourceOfTruth:
   - config/audio-qc-detectors.json
   - config/audio-qc-qualification-policy.json
   - config/audio-qc-lane-gates.json
-  - config/audio-qc-corpora.json
   - config/audio-qc-preregistrations/
   - benchmarks/audio-qc-calibration/
   - scripts/audio_qc_docs.py
@@ -30,8 +29,6 @@ commands are in [audio-qc-engineering.md](../audio-qc-engineering.md).
   config.
 - [Meta-evaluation report](meta-evaluation-report.md): generated only; the measured accuracy of
   every detector, the lane gates and the judges' canaries.
-- [Corpora](corpora.md): the pinned corpora of the next qualification round (FLEURS train reserve,
-  speaker, emotion and accent groups), with their licenses, labels and caveats.
 - `judges/` and `detectors/`: one page per registry entry, named by its id with `@N` spelled `-vN`.
 
 ## Pipeline

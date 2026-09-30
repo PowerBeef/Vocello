@@ -1077,6 +1077,19 @@ have their own):
   recording as it is, with its own text, as the source speaker against the source take as the
   reference clip; its sham is another utterance of the source speaker. Donors come from the same
   cohort manifest, never from another split.
+- **Voice donors** (J, 2026-09-30). A generated long-form take names no corpus speaker, but the voice
+  it was generated with is its speaker label: a Built-in speaker, a Voice Design brief or a clone
+  reference speaker (the lead's decision). SEAM-VOICE's `take-voice-*` variants splice another
+  long-form take of the same manifest and language (`speaker_donors.VoicePool`): another voice for
+  the positives, another take of the same voice for the sham. The replaced span is the segment after
+  the seeded seam (severe) or its first 1 or 2 s. The donor gives the segment after one of its own
+  seams, the one closest in length to the source's, or that segment's first 1 or 2 s. It is scaled to
+  the replaced span's RMS over non-zero samples (the assembler's pauses are exact zeros) and
+  crossfaded over 5 ms inside the span, so its first sample lands on the seam. The label is exactly
+  the replaced span, and the seams after it move by the length change. A donor's gender must not
+  differ from the source's where the take policy records both (`speakerGenders`; policy version 2
+  declares no brief gender). The variants leave every other output unchanged, so the catalog stays
+  at version 3.
 
 A set records its catalog version, and `verify` refuses a set of any other version whole, naming it.
 The 11 AQ-07 warn plans bind injector catalog version 2, so their confirmation set stays the one
@@ -1826,7 +1839,7 @@ and the qc-takes lane keeps its diagnostics rows. The last column is the state o
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
 | `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | The long-form cell's takes of both splits (the calibration set reads their seams from the `longForm` block) |
 | `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | As seam-discontinuity; a SEAM-DISC clip is measured at the seams its entry records |
-| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | SEAM-VOICE positives, which natural long-form takes cannot build (no procedural script, no speaker label); CAM++ windows exported with the seam times |
+| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | As seam-discontinuity, with CAM++ over both long-form splits and the confirmation set, its windows exported with the seam times; SEAM-VOICE positives come from voice donors (the take's generation voice is its speaker label) |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1953,9 +1966,11 @@ its seams to the Stage 0 seam z-score and measures each clip's jump on its own P
 must equal the assembler's; a T1 construction that keeps the length keeps the seams; a SEAM-DISC
 clip, which removed samples after a seam, is described at the seams its entry records), and `scores`
 passes the seams to the seam-identity measure with the exported CAM++ windows. A single-segment
-take's `seamDiscontinuityMaxZ` stays null. SEAM-VOICE needs a procedural script or a speaker label,
-which natural long-form takes lack, so seam-identity has no positives on the long-form cell
-(`seam-constructions`). Seam-identity uses `raw-output` from class F, so its commit comes after F's.
+take's `seamDiscontinuityMaxZ` stays null. On the long-form cell SEAM-VOICE splices voice donors:
+the take's generation voice is its speaker label, so another long-form take of another voice gives
+the positives and another take of the same voice the sham (`seam-constructions`). Each such entry
+records the `longForm` block of its own output, whose seams `scores` reads. Seam-identity uses
+`raw-output` from class F, so its commit comes after F's.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A
@@ -2174,7 +2189,11 @@ recording. Four additions serve warn-level qualification:
   A take without a speaker label, or without both donors, is not applicable with that reason, and so
   is every identity positive on FLEURS, which has no speaker ids. Long-form takes may declare
   `seamSamples`; the seam injectors draw only from them, each entry carries its output's seams, and
-  `score` passes them to the Stage 0 seam z-score.
+  `score` passes them to the Stage 0 seam z-score. On an N3 manifest with long-form takes,
+  `inject --classes J` draws SEAM-VOICE's voice donors the same way, labelled by each take's
+  generation voice with the take policy's genders (`voiceDonors` in the set's head). Each entry
+  records its donor (take, family, voice label, relation, WAV and PCM digests, seams) and the
+  `longForm` block of its own output, and `verify` re-derives both.
 - **Text.** N1 and N2 sets carry each entry's text (for a swap, the expected text) bound by
   `textSHA256`. N3 sets carry it only with `--embed-text`, so their bytes stay as before.
   `audio_qc_orchestrator.py manifest --from-calibration-takes` reads a set's `entries`, checks
@@ -2617,13 +2636,17 @@ executes.
 | `boundary.run-on@2` | FLEURS reserve-1, then reserve-2 | 0.02 | `noisy-tail-activity` |
 | `language.nativeness@1` | FLEURS reserve-1, then reserve-2, with the speechocean762 confirmation split as positives | 0.05 | the warn default |
 | `prosody.pitch-instability@1` | the take plan's calibration split, then its confirmation split (standard, clone and cross-lingual cells) | 0.05 | the warn default |
-| `long-form.seam-discontinuity@1`, `long-form.seam-jump@1` | the long-form cell's calibration split, then its confirmation split | 0.05 | the warn default |
+| `long-form.seam-discontinuity@1`, `long-form.seam-jump@1`, `long-form.seam-identity@1` | the long-form cell's calibration split, then its confirmation split | 0.05 | the warn default |
 | `identity.clone-similarity@1`, `identity.window-drift@1`, `identity.onset-drift@1` | the speaker cohort's calibration split, then its confirmation split (N2, eight languages) | 0.05 | the warn default |
+
+Seam-identity's positives are SEAM-VOICE splices from voice donors: each long-form take's generation
+voice is its speaker label, so the confirmation split's 80 takes each get another voice's segment
+(severe) and a same-voice sham (`seam-constructions`). Its scores read CAM++'s window embeddings,
+exported per take (`raw-outputs --judge speaker.campplus-voxceleb@1`), with each clip's own seams.
 
 **No plan this round.**
 
 - Class I has no producer of its positives (COD-LOOP's replay mode, GEN-NOEOS's knob).
-- `long-form.seam-identity@1` has no positives on natural long-form takes (`seam-constructions`).
 - No fail plan is admissible. No planned detector declares two construction mechanisms with severe
   and moderate cells, as the fail point needs (A3), and the fail points refuse the two-family mean
   (`mean-consensus-warn-only`). Class E also covers eight languages, where a fail point needs ten.
@@ -2698,28 +2721,34 @@ python3 scripts/audio_qc_oracle_ladders.py evaluate --ladder pyin --bundle $A/or
 # 6. [model] Calibration panels, on the shared cache:
 #    - reserve-1 with seven judges, est. 1.5-2 h;
 #    - the N3 calibration takes with pYIN, est. 15 min;
+#    - the long-form calibration takes with CAM++, est. 5 min;
 #    - the speaker calibration split with CAM++, est. 15-30 min. The panel manifest hands each take
 #      its reference clip, the resynthesis of another take of its speaker.
 $O manifest --from-calibration-takes $R1/n2-manifest.json --output $R1/panel-manifest.json
 $O run --manifest $R1/panel-manifest.json $J7 --cache-root $K --bundle $R1/panel-bundle
 $O manifest --from-calibration-takes $T1/takes-manifest.json --output $T1/panel-manifest.json
 $O run --manifest $T1/panel-manifest.json --judge pitch.pyin@1 --cache-root $K --bundle $T1/panel-bundle
+$O manifest --from-calibration-takes $L1/takes-manifest.json --output $L1/panel-manifest.json
+$O run --manifest $L1/panel-manifest.json --judge speaker.campplus-voxceleb@1 --cache-root $K --bundle $L1/panel-bundle
 $O manifest --from-calibration-takes $E1/n2-manifest.json --output $E1/panel-manifest.json
 $O run --manifest $E1/panel-manifest.json $JE --cache-root $K --bundle $E1/panel-bundle
 #    Optional, informational only (no plan reads them this round):
 #    - ResNet293 over the speaker calibration split, est. 2-4 h: the data its correlated-failure audit
 #      against CAM++ needs before a two-family identity version (resnet293-not-voting);
 #    - CAM++ over the clone cell's takes and their reference clips: how the clone lane's own similarity
-#      sits against the speaker cohort's thresholds (speaker-reference-n2), and seam-identity's design data.
+#      sits against the speaker cohort's thresholds (speaker-reference-n2).
 #    $O run --manifest $E1/panel-manifest.json --judge speaker.resnet293-voxceleb@1 --cache-root $K --bundle $E1/resnet-bundle
 #    $O run --manifest $T1/panel-manifest.json $JE --bundle $T1/speaker-bundle
-# 7. Calibration evidence, no model (about 30 min): Stage 0 and PCM measures, pYIN frame tracks, scores.
+# 7. Calibration evidence, no model (about 35 min): Stage 0 and PCM measures, pYIN frame tracks, CAM++
+#    windows, scores.
 $S score --takes $R1/n2-manifest.json --output $R1/stage0
 $S score --takes $L1/takes-manifest.json --output $L1/stage0
 $S raw-outputs --takes $R1/n2-manifest.json --bundle $R1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
   --output $R1/pyin-raw.json
 $S raw-outputs --takes $T1/takes-manifest.json --bundle $T1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
   --output $T1/pyin-raw.json
+$S raw-outputs --takes $L1/takes-manifest.json --bundle $L1/panel-bundle --judge speaker.campplus-voxceleb@1 \
+  --cache-root $K --output $L1/campplus-raw.json
 D=$A/detector-scores-round2; N1R1=$RES/cohort-1/manifest.json; N1R2=$RES/cohort-2/manifest.json
 for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2 signal.clipping@2 signal.band-limit@1; do
   $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
@@ -2740,7 +2769,10 @@ for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
 for d in $IDN; do
   $Q scores --detector $d --role calibration --cohort $E1/n2-manifest.json --n1-manifest $SPK/calibration/manifest.json \
     --bundle $E1/panel-bundle --output $D/calibration/$d.json; done
-# 8. The 16 plans (a few minutes), each checked with derive, then committed on main by the lead
+$Q scores --detector long-form.seam-identity@1 --role calibration --cohort $L1/takes-manifest.json \
+  --bundle $L1/panel-bundle --raw-outputs $L1/campplus-raw.json \
+  --output $D/calibration/long-form.seam-identity@1.json
+# 8. The 17 plans (a few minutes), each checked with derive, then committed on main by the lead
 #    before anything touches a confirmation cohort.
 FL="--calibration-cohort $R1/n2-manifest.json --calibration-n1-manifest $N1R1 \
   --confirmation-cohort $R2/n2-manifest.json --confirmation-n1-manifest $N1R2"
@@ -2760,13 +2792,13 @@ $Q plan --detector language.nativeness@1 $FL --calibration-scores $D/calibration
 $Q plan --detector prosody.pitch-instability@1 --calibration-cohort $T1/takes-manifest.json \
   --confirmation-cohort $T2/takes-manifest.json --calibration-scores $D/calibration/prosody.pitch-instability@1.json \
   --alpha 0.05 $INJ --injection-classes F
-for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
+for d in long-form.seam-discontinuity@1 long-form.seam-jump@1 long-form.seam-identity@1; do
   $Q plan --detector $d --calibration-cohort $L1/takes-manifest.json --confirmation-cohort $L2/takes-manifest.json \
     --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes J; done
 for d in $IDN; do
   $Q plan --detector $d $FE --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes E; done
 $Q derive --detector signal.dropout@2 --calibration-scores $D/calibration/signal.dropout@2.json   # each detector
-git add config/audio-qc-preregistrations/<the 16 plan files> && git commit -F -   # on main
+git add config/audio-qc-preregistrations/<the 17 plan files> && git commit -F -   # on main
 ```
 
 The N3 and long-form plans take a nonzero `--injection-sample-per-cell` because a set built with the
@@ -2774,7 +2806,7 @@ N3 default of 0 records no sample seed for the plan to bind. Their sets hold eve
 the pool is smaller than 150.
 
 Step 9 is the confirmation chain. Every panel gets a new, empty cache root under `$K/confirmation/`.
-The chain takes an estimated 8-8.5 hours, most of it the reserve-2 positives panel.
+The chain takes an estimated 9 hours, most of it the reserve-2 positives panel.
 
 ```sh
 # 9a. [model] The reserve-2 cohort panel, seven judges (est. 1.5-2 h), then its exports and the
@@ -2800,8 +2832,9 @@ $O manifest --from-calibration-takes $SO/n2-manifest.json --output $SO/panel-man
 $O run --manifest $SO/panel-manifest.json --judge asr.whisper-large-v3@1 --judge lid.voxlingua107-ecapa@1 \
   --cache-root $K/confirmation/speechocean762 --bundle $SO/panel-bundle
 # 9d. [model] The N3 confirmation split: its pYIN panel, PRS-ERRATIC and PRS-RATE injections, their
-#     pYIN panel (est. 30 min in all). Then the long-form cell's SEAM-DISC set and Stage 0 (no model,
-#     est. 5 min).
+#     pYIN panel (est. 30 min in all). Then the long-form cell's class J set (SEAM-DISC, and SEAM-VOICE
+#     from voice donors) and Stage 0 (no model, est. 10 min), CAM++ over the long-form cohort (est.
+#     5 min) and over the set's 640 clips (est. 30 min), and both window exports.
 $O manifest --from-calibration-takes $T2/takes-manifest.json --output $T2/panel-manifest.json
 $O run --manifest $T2/panel-manifest.json --judge pitch.pyin@1 --cache-root $K/confirmation/n3 --bundle $T2/panel-bundle
 $S raw-outputs --takes $T2/takes-manifest.json --bundle $T2/panel-bundle --judge pitch.pyin@1 \
@@ -2818,6 +2851,17 @@ $S inject --takes $L2/takes-manifest.json --output $L2/injection-set --catalog-s
   --sample-per-cell 150 --classes J
 $S verify --set $L2/injection-set/injection-set.json --takes $L2/takes-manifest.json
 $S score --takes $L2/takes-manifest.json --set $L2/injection-set/injection-set.json --output $L2/stage0
+$O manifest --from-calibration-takes $L2/takes-manifest.json --output $L2/panel-manifest.json
+$O run --manifest $L2/panel-manifest.json --judge speaker.campplus-voxceleb@1 \
+  --cache-root $K/confirmation/long-form --bundle $L2/panel-bundle
+$S raw-outputs --takes $L2/takes-manifest.json --bundle $L2/panel-bundle --judge speaker.campplus-voxceleb@1 \
+  --cache-root $K/confirmation/long-form --output $L2/campplus-raw.json
+$O manifest --from-calibration-takes $L2/injection-set/injection-set.json --output $L2/injection-panel-manifest.json
+$O run --manifest $L2/injection-panel-manifest.json --judge speaker.campplus-voxceleb@1 \
+  --cache-root $K/confirmation/long-form-positives --bundle $L2/injection-panel-bundle
+$S raw-outputs --takes $L2/injection-set/injection-set.json --bundle $L2/injection-panel-bundle \
+  --judge speaker.campplus-voxceleb@1 --cache-root $K/confirmation/long-form-positives \
+  --output $L2/injection-campplus-raw.json
 # 9e. [model] The speaker confirmation split, in three steps (about 1-1.5 h in all):
 #     - its panel, CAM++ and the aligner, on its own new cache root (est. 30-45 min);
 #     - its word intervals and the class E injection set, no model (est. 10 min): IDN-IMPOSTOR, the
@@ -2870,7 +2914,11 @@ for d in $IDN; do
     --n1-manifest $SPK/confirmation/manifest.json --bundle $E2/panel-bundle \
     --injection-set $E2/injection-set/injection-set.json --positive-bundle $E2/injection-panel-bundle \
     --output $D/confirmation/$d.json; done
-for d in <each of the 16 detectors>; do
+$Q scores --detector long-form.seam-identity@1 --role confirmation --cohort $L2/takes-manifest.json \
+  --injection-set $L2/injection-set/injection-set.json --bundle $L2/panel-bundle \
+  --positive-bundle $L2/injection-panel-bundle --raw-outputs $L2/campplus-raw.json \
+  --positive-raw-outputs $L2/injection-campplus-raw.json --output $D/confirmation/long-form.seam-identity@1.json
+for d in <each of the 17 detectors>; do
   $Q confirm --detector $d --calibration-scores $D/calibration/$d.json --confirmation-scores $D/confirmation/$d.json
 done
 # 10. Commit every ledger entry and record, regenerate the reference tree, then prune the confirmation
@@ -2886,12 +2934,12 @@ scripts/clean_build_caches.sh --prune-confirmation-caches --dry-run
 | 3. qc-n2 of reserve-1, reserve-2, speechocean762 and both speaker splits | model | 3-3.5 h |
 | 4. qc-takes version 2, both splits, four cells | model | 3 h 30 min |
 | 5. pYIN oracle ladder | model | 2 min |
-| 6. Calibration panels (without the optional ResNet293 run, 2-4 h more) | model | 2.5 h |
+| 6. Calibration panels (without the optional ResNet293 run, 2-4 h more) | model | 2 h 35 min |
 | 7. Calibration evidence and scores | offline | 35 min |
 | 8. Plans, derive, commit | offline, lead | 20 min |
-| 9. Confirmation chain | model and offline | 8-8.5 h |
+| 9. Confirmation chain | model and offline | about 9 h |
 | 10. Records, docs, prune | offline, lead | 15 min |
-| **Total** | | **about 19-21 h, of which about 17 h is model time** |
+| **Total** | | **about 20-22 h, of which about 18 h is model time** |
 
 Class E adds about 3-3.5 h:
 
@@ -2904,6 +2952,9 @@ Class E adds about 3-3.5 h:
 No CAM++ run over the speaker cohort has been timed yet. The panel estimates scale the canary's
 CAM++ and aligner walls of 2026-09-27: about 800 short takes in 60-65 s each, and ResNet293 at
 about 9 times CAM++.
+
+Seam-identity adds about 45 min: CAM++ over both long-form splits and the set's 640 clips, and their
+window exports.
 
 `confirm --n3-scores` is optional for the FLEURS detectors. It needs the same detector scored
 `--role informational` on an N3 cohort, with the judges that detector reads run over that cohort:

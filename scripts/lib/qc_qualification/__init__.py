@@ -28,6 +28,9 @@ evidence.
 - `recordings`: natural takes (N3) and FLEURS human recordings (N1) as
   injector sources: PCM16 at the engine rate (N1 resampled from 16 kHz), with
   no word intervals, pauses, script or render voice.
+- `language_swap` and `speaker_donors`: second recordings of the same cohort
+  as donors: FLoRes parallel sentences for wrong-language swaps, and
+  speaker-labelled takes for impostors and the identity and seam-voice splices.
 - `composer`: the pure Stage 3 verdict composer.
 - `policy`: the loader and validator of
   `config/audio-qc-qualification-policy.json`.

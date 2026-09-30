@@ -1032,8 +1032,8 @@ Fixture version 2 band-limits the fricative and aspiration noise around 6 kHz, w
 Nyquist; version 1's first difference put the noise energy, and the largest sample-to-sample steps,
 at Nyquist.
 
-The T1 catalog has 17 families: clicks, dropouts, clipping, DC, level, additive noise and hum,
-leading or terminal silence, truncation, run-on, repetition, word deletion and insertion by
+The version 2 T1 catalog has 17 families: clicks, dropouts, clipping, DC, level, additive noise
+and hum, leading or terminal silence, truncation, run-on, repetition, word deletion and insertion by
 splicing, octave jumps, pitch breaks, tempo change, pitch-and-formant shift and an identity swap that
 splices a second voice rendering the same script. Each is a pure function of source, parameters and
 seed with a golden PCM16 digest per variant (`scripts/tests/test_qc_qualification_injectors.py`),
@@ -1046,6 +1046,41 @@ nothing. Clipping (v2) flattens or soft-knee squashes the loudest fraction of sa
 so its label is exactly the changed samples; its over-range variant is the gain that drives that
 fraction beyond full scale, labeled as the whole take. Pitch and tempo use a windowed-sinc resampler
 and plain overlap-add, so they are signal-level constructions, not natural prosody.
+
+**Catalog version 3 (2026-09-29)** adds the positives classes A, E, F and J were waiting for, and
+leaves every version 2 output byte-identical (the version 2 goldens are unchanged; the new variants
+have their own):
+
+- **SIG-BAND** (A): a zero-phase 511-tap Blackman-windowed-sinc low-pass at 0.7, 0.5 or 0.3 of the
+  source's measured effective bandwidth (Stage 0's definition, at the injector's own constants), so
+  it cuts content the source has whether it is FLEURS-derived N2 (about 8 kHz) or a natural take
+  (about 11.5 kHz). It refuses a source with no active frame, a cutoff below 1 kHz, and a low-pass
+  that leaves the measured bandwidth unchanged. Sham: the same low-pass at 1.1 of the bandwidth
+  (at most 0.99 of Nyquist), which keeps the measured band. The label is the whole take.
+- **PRS-ERRATIC** (F): the take cut into seeded 150-300 ms spans, each shifted by a seeded sign of
+  2, 4 or 7 semitones through PRS-OCT's shifter, length kept and neighbours crossfaded over 5 ms. It
+  needs no word interval, so it runs on N3. Sham: 0 st through the same path.
+- **IDN-ONSET** (E): another voice over the first 0.3, 1.0 or 1.5 s of speech from the first word.
+- **SEAM-DISC** (J): 1, 5 or 20 ms removed right after a seeded long-form seam, with no crossfade;
+  sham: nothing removed. **SEAM-VOICE** (J): the segment after a seeded seam in another voice, for
+  1 s, 2 s or the whole segment. Both act at the seams a source declares (`Fixture.seams`; a
+  long-form take's `seamSamples`) and refuse a source without one; every output carries its own
+  seams, moved by the edit.
+- **Speaker donors.** On procedural sources, IDN-ONSET and SEAM-VOICE splice a time-aligned
+  re-render by a close voice, as IDN-SWAP does (sham: the source's own render; control: a same-speaker
+  re-render). On a speaker-labelled recording, IDN-SWAP, IDN-ONSET and SEAM-VOICE gain `take-*`
+  variants that splice a *donor* recording's opening words over the source's words at aligned word
+  boundaries (or from the seam), level-matched: another speaker of the source's language and gender
+  for the positives, another utterance of the source speaker for the sham, so the two differ only
+  in who speaks. **IDN-IMPOSTOR** (E, `T1-parallel-corpus`,
+  `lib/qc_qualification/speaker_donors.py`) presents another same-language, same-gender speaker's
+  recording as it is, with its own text, as the source speaker against the source take as the
+  reference clip; its sham is another utterance of the source speaker. Donors come from the same
+  cohort manifest, never from another split.
+
+A set records its catalog version, and `verify` refuses a set of any other version whole, naming it.
+The 11 AQ-07 warn plans bind injector catalog version 2, so their confirmation set stays the one
+built with version 2, verified by the code of that version.
 
 The composer is pure and never cached. It emits `pass`, `warn`, `fail`, `inconclusive` (a gating
 abstention), `uncalibrated` or `unavailable`, in that corrected precedence: fail, unavailable,
@@ -1649,7 +1684,7 @@ entry's digest, so any change needs a new version (A7). The v1 set:
 | `signal.level@1` | A | Fast QC `rmsDBFS` | below |
 | `signal.clipping@1` | A | Fast QC `hotSamples` (above 0.965; blind below it) | above |
 | `signal.noise@1` | A | Stage 0 `wadaSNRDB` | below |
-| `signal.band-limit@1` | A | Stage 0 `effectiveBandwidthHz` (no injector yet) | below |
+| `signal.band-limit@1` | A | Stage 0 `effectiveBandwidthHz` (SIG-BAND since catalog v3) | below |
 | `content.consensus-error@1` | B | min of Whisper large-v3 and Parakeet (zh Paraformer, ja/ko SenseVoice) `errorRate` | above |
 | `boundary.truncation@1` | C | min of the same pairs' trailing unmatched fraction | above |
 | `boundary.run-on@1` | C | Whisper last segment end minus the aligner's script end (not ko) | above |
@@ -1678,18 +1713,18 @@ which. An entry can still change in place until a plan binds its digest.
 
 | Detector | Class | Score | Direction | Still needs |
 |---|---|---|---|---|
-| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labeled N2 corpus; reference clips in the panel manifest; IDN-IMPOSTOR (not in catalog v2) |
-| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus; a recorded IDN-SWAP (v1 swaps procedural sources only) |
-| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; IDN-ONSET (not in catalog v2); the pYIN register and envelope parts of the joint onset rule |
+| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labeled N2 corpus; reference clips in the panel manifest (IDN-IMPOSTOR since catalog v3) |
+| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus (the recorded IDN-SWAP splice since catalog v3) |
+| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus (IDN-ONSET since catalog v3); the pYIN register and envelope parts of the joint onset rule |
 | `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on the panels with its frame track exported per take; a confirmation N2 cohort no plan has scored; pYIN's oracle ladder |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
-| `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on the N3 splits; PRS-ERRATIC (not in catalog v2); a Voice Clone split |
+| `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on the N3 splits; a Voice Clone split (PRS-ERRATIC since catalog v3) |
 | `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | Introspection carried into measurements.json; COD-LOOP (T2) with summaries recomputed from the mutated trace |
 | `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | Introspection carried; GEN-NOEOS (T3), a registered EOS-suppression knob |
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
-| `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | Long-form N3 takes; segment boundaries passed to the scorer; SEAM-DISC (not in catalog v2) |
-| `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | Long-form N3 takes; a `longForm` block in measurements.json with a Python mirror for positives; SEAM-DISC |
-| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | Long-form N3 takes; CAM++ windows exported with the seam times; SEAM-VOICE (not in catalog v2) |
+| `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | Long-form N3 takes with their `seamSamples` (then `score` passes them; SEAM-DISC since catalog v3) |
+| `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | Long-form N3 takes; a `longForm` block in measurements.json with a Python mirror for positives |
+| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | Long-form N3 takes; CAM++ windows exported with the seam times; SEAM-VOICE positives there (catalog v3 splices donors only on speaker-labelled cohorts) |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1828,7 +1863,7 @@ same confirmation cohort again.
 The lead's sequence (all 11 plans before any confirmation panel or score, since a plan refuses a
 scored confirmation cohort). `signal.band-limit@1` gets no plan: without an injector its
 confirmation cannot start, and a write-once plan would bind this cohort for good. It waits for a
-catalog with a band-limit injector and a new confirmation cohort. The confirmation panels run the
+new confirmation cohort (catalog version 3 adds SIG-BAND). The confirmation panels run the
 six judges the detectors read (Whisper large-v3, Parakeet, Paraformer, SenseVoice, VoxLingua and
 the aligner) rather than the whole panel:
 
@@ -1910,6 +1945,17 @@ recording. Four additions serve warn-level qualification:
   byte copy of the donor's file (never a hard link, which would share the cohort's own audio), and
   its family is the donor recording's. Donors come from the same cohort
   manifest, so from the same split. `lib/qc_qualification/language_swap.py` holds the construction.
+- **Speaker donors and seams (classes E and J, catalog version 3).** On a cohort whose takes name
+  their `speaker` and `gender`, `inject --classes E,J` chooses donors from the same manifest as
+  LNG-SWAP does (lowest seeded SHA-256 rank per injector and relation among donors not yet drawn,
+  `--sample-seed`): another speaker of the source's language and gender for a positive, another
+  utterance of the source speaker for a sham, a splice's donors only among takes with a usable
+  alignment. Each entry records its donor (take, family, speaker, relation, WAV and PCM digests,
+  alignment) and `verify` re-derives and replays it; the sample draws only sources with both donors.
+  A take without a speaker label, or without both donors, is not applicable with that reason, and so
+  is every identity positive on FLEURS, which has no speaker ids. Long-form takes may declare
+  `seamSamples`; the seam injectors draw only from them, each entry carries its output's seams, and
+  `score` passes them to the Stage 0 seam z-score.
 - **Text.** N1 and N2 sets carry each entry's text (for a swap, the expected text) bound by
   `textSHA256`. N3 sets carry it only with `--embed-text`, so their bytes stay as before.
   `audio_qc_orchestrator.py manifest --from-calibration-takes` reads a set's `entries`, checks

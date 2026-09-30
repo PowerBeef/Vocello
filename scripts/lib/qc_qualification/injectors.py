@@ -31,6 +31,18 @@ windowed-sinc resampler and plain overlap-add (no correlation search, whose
 arg-max could differ between hosts), so they are signal-level constructions,
 not natural prosody.
 
+Catalog version 3 adds a band-limit ladder relative to the source's measured
+effective bandwidth (SIG-BAND), erratic pitch over seeded spans (PRS-ERRATIC),
+an onset identity swap (IDN-ONSET) and the long-form seam families (SEAM-DISC,
+SEAM-VOICE), which act at the seam offsets a long-form source declares
+(`Fixture.seams`). On a speaker-labelled recording the identity and seam-voice
+families splice a *donor*: another recording of the same cohort, of another
+speaker of the same language and gender for a positive and another utterance of
+the source speaker for the sham (`inject(..., donor=)`; the calibration set
+chooses it, `speaker_donors`). The donor's words replace the source's at aligned
+word boundaries, level-matched, so the positive and its sham differ only in who
+speaks. Every version 2 variant's output is unchanged.
+
 NumPy only. The catalog version and each injector's version are part of every
 recipe; changing an injector's output needs a new version and a new golden.
 """
@@ -46,7 +58,7 @@ import numpy as np
 from .fixtures import ROOM_TONE_RMS, Fixture, donor_voice, rerender
 from .pcm import SeededStream, pcm_digest
 
-CATALOG_VERSION = 2
+CATALOG_VERSION = 3
 MECHANISM = "T1-pcm-construction"
 SEVERITIES = ("sham", "control", "mild", "moderate", "severe")
 NON_DEFECT_SEVERITIES = frozenset({"sham", "control"})
@@ -59,12 +71,35 @@ SINC_HALF_WIDTH = 16
 SOFT_KNEE_HEADROOM = 0.12
 # A dropout centred on a recorded take keeps at least this much of it on each side.
 CENTRE_MARGIN_MS = 250.0
+# SIG-BAND@1 measures the source's effective bandwidth as Stage 0 does (`audio_qc_observations`,
+# `effectiveBandwidthHz`), at these constants of its own, so a change to the observation never moves
+# the injector's output: 512-point Hann frames every 10 ms, a frame of mean square 1e-6 or more is
+# active, and the bandwidth is the highest long-term-average bin within 50 dB of the peak bin.
+BAND_FFT_SIZE = 512
+BAND_FRAMES_PER_SECOND = 100
+BAND_ACTIVE_MEAN_SQUARE = 1e-6
+BAND_THRESHOLD_DB = 50.0
+# The low-pass: a Blackman-windowed sinc (about 74 dB of stopband, a 260 Hz transition at 24 kHz).
+BAND_TAPS = 511
+# A cutoff below this leaves no band-limit to measure, only muffled speech.
+BAND_MINIMUM_CUTOFF_HZ = 1_000.0
+# No cutoff above this fraction of Nyquist (11.88 kHz at 24 kHz, the audit's 11.9 kHz sham).
+BAND_CEILING_FRACTION = 0.99
+# SEAM-DISC's largest removal: every variant draws its seam among those with room for it.
+SEAM_DISC_MAXIMUM_MS = 20.0
+# SEAM-VOICE draws its seam among those whose following segment lasts at least this long.
+SEAM_VOICE_MINIMUM_MS = 500.0
+# A donor variant's `donor` parameter: another speaker for a positive, the source speaker for its sham.
+DONOR_RELATIONS = ("other-speaker", "same-speaker")
 # What a variant may need of its source (`needs`), and how a refusal names it.
 NEED_DESCRIPTIONS = {
     "words": "word intervals (from the aligner, on N1 and N2 only)",
     "pauses": "declared pause intervals",
     "script": "a procedural script to re-render",
     "voice": "a procedural render voice",
+    "seams": "long-form seam offsets",
+    "donor": "a speaker-labelled donor recording (another speaker of the same language and gender, or another "
+             "utterance of the source speaker for a sham)",
 }
 
 
@@ -87,7 +122,9 @@ class Injector:
     classes: tuple[str, ...]
     description: str
     variants: tuple[Variant, ...]
-    apply: Callable[[Fixture, dict, SeededStream], tuple[np.ndarray, list[dict]]] = field(repr=False)
+    # (source, parameters, rng[, donor]) -> (samples, labels[, output seams]); the donor is passed only to
+    # a variant that needs one, and without output seams the source's stand when the length is kept.
+    apply: Callable[..., tuple] = field(repr=False)
     # Word-free variants for recorded takes (N3). They stay out of `variants`
     # and `describe`, so the catalog, M1 and the procedural goldens are as before.
     recording_variants: tuple[Variant, ...] = ()
@@ -121,17 +158,25 @@ class Injection:
     samples: np.ndarray
     labels: tuple[dict, ...]
     digest: str
+    # The donor recording's PCM digest, for a variant that splices one.
+    donor_digest: str | None = None
+    # The output's long-form seam offsets: the source's, moved by the edit; () when the edit moves the
+    # timeline in a way no seam mapping follows (a tempo change, a word-level splice).
+    seams: tuple[int, ...] = ()
 
     @property
     def positive(self) -> bool:
         return self.severity not in NON_DEFECT_SEVERITIES
 
     def recipe(self) -> dict:
-        return {"schema": "vocello.audioqc.injection-recipe/1", "catalogVersion": CATALOG_VERSION,
-                "mechanism": MECHANISM, "injector": self.injector, "variant": self.variant,
-                "severity": self.severity, "parameters": self.parameters, "seed": self.seed,
-                "sourceFamily": self.source_family, "sourcePCMSHA256": self.source_digest,
-                "outputPCMSHA256": self.digest, "labels": list(self.labels)}
+        recipe = {"schema": "vocello.audioqc.injection-recipe/1", "catalogVersion": CATALOG_VERSION,
+                  "mechanism": MECHANISM, "injector": self.injector, "variant": self.variant,
+                  "severity": self.severity, "parameters": self.parameters, "seed": self.seed,
+                  "sourceFamily": self.source_family, "sourcePCMSHA256": self.source_digest,
+                  "outputPCMSHA256": self.digest, "labels": list(self.labels)}
+        if self.donor_digest is not None:
+            recipe["donorPCMSHA256"] = self.donor_digest
+        return recipe
 
 
 # --------------------------------------------------------------------------- #
@@ -649,7 +694,11 @@ def _shift(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.nda
     return output, labels
 
 
-def _swap(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+def _swap(source: Fixture, parameters: dict, rng: SeededStream,
+          donor: Fixture | None = None) -> tuple[np.ndarray, list[dict]] | tuple[np.ndarray, list[dict], tuple]:
+    if "donor" in parameters:
+        # A speaker-labelled recording (catalog version 3): a donor recording's words spliced in.
+        return _donor_splice(source, donor, parameters, kind="identity-swap")
     if source.voice is None or source.script is None:
         raise ValueError("an identity swap needs a procedural source with a script and a voice")
     relation = parameters["relation"]
@@ -662,6 +711,251 @@ def _swap(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndar
     labels = [{"kind": "identity-swap", "startSample": start, "endSample": start + length,
                "relation": relation}] if relation != "self" else []
     return output, labels
+
+
+# --------------------------------------------------------------------------- #
+# Catalog version 3
+# --------------------------------------------------------------------------- #
+
+def effective_bandwidth(samples: np.ndarray, rate: int) -> float | None:
+    """The source's effective bandwidth in Hz (Stage 0's definition at SIG-BAND@1's constants).
+
+    The highest bin of the long-term average spectrum of active frames within
+    BAND_THRESHOLD_DB of its peak bin (DC excluded), as a frequency; None when
+    no frame is active.
+    """
+    size = BAND_FFT_SIZE
+    hop = rate // BAND_FRAMES_PER_SECOND
+    count = (samples.size - size) // hop + 1 if hop > 0 and samples.size >= size else 0
+    if count <= 0:
+        return None
+    window = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(size) / size)
+    energy = float((window * window).sum())
+    frames = samples[np.arange(size)[None, :] + hop * np.arange(count)[:, None]] * window[None, :]
+    active = (frames * frames).sum(axis=1) / energy >= BAND_ACTIVE_MEAN_SQUARE
+    if not active.any():
+        return None
+    spectrum = (np.abs(np.fft.rfft(frames[active], axis=1)) ** 2).sum(axis=0) / (energy * int(active.sum()))
+    levels = 10.0 * np.log10(np.maximum(spectrum[1:], 1e-20))
+    highest = int(np.flatnonzero(levels >= float(levels.max()) - BAND_THRESHOLD_DB).max()) + 1
+    return highest * rate / size
+
+
+def lowpass(samples: np.ndarray, cutoff_hz: float, rate: int, taps: int = BAND_TAPS) -> np.ndarray:
+    """Zero-phase low-pass: a Blackman-windowed sinc of `taps` (odd) taps, unit DC gain, applied centred."""
+    if taps < 3 or taps % 2 == 0:
+        raise ValueError("taps must be odd and at least 3")
+    half = taps // 2
+    offsets = np.arange(-half, half + 1)
+    normalized = cutoff_hz / rate
+    kernel = 2.0 * normalized * np.sinc(2.0 * normalized * offsets)
+    kernel = kernel * (0.42 + 0.5 * np.cos(np.pi * offsets / half) + 0.08 * np.cos(2.0 * np.pi * offsets / half))
+    kernel /= kernel.sum()
+    return np.convolve(samples, kernel)[half:half + samples.size]
+
+
+def _band_limit(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    rate = source.sample_rate
+    bandwidth = effective_bandwidth(source.samples, rate)
+    if bandwidth is None:
+        raise InjectorNotApplicable(f"{source.fixture_id} has no active frame, so no measured band to cut")
+    fraction = parameters["bandwidthFraction"]
+    cutoff = min(fraction * bandwidth, BAND_CEILING_FRACTION * rate / 2.0)
+    positive = fraction < 1.0
+    if positive and cutoff < BAND_MINIMUM_CUTOFF_HZ:
+        raise InjectorNotApplicable(f"{source.fixture_id}'s effective bandwidth of {bandwidth:.0f} Hz puts the cutoff "
+                                    f"below {BAND_MINIMUM_CUTOFF_HZ:.0f} Hz")
+    output = lowpass(source.samples, cutoff, rate, parameters["taps"])
+    if not positive:
+        return output, []
+    after = effective_bandwidth(output, rate)
+    if after is None or after >= bandwidth:
+        # The source had no content the measure sees above the cutoff: nothing was cut.
+        raise InjectorNotApplicable(f"{source.fixture_id}: a low-pass at {cutoff:.0f} Hz leaves its measured "
+                                    "bandwidth unchanged")
+    return output, [{"kind": "band-limit", "startSample": 0, "endSample": int(output.size),
+                     "cutoffHz": round(cutoff, 3), "sourceBandwidthHz": round(bandwidth, 3),
+                     "outputBandwidthHz": round(after, 3)}]
+
+
+def _erratic(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
+    """Seeded 150-300 ms spans over the whole take, each shifted up or down, crossfaded into each other."""
+    rate = source.sample_rate
+    size = source.samples.size
+    shortest = _samples(parameters["minimumSpanMS"], rate)
+    longest = _samples(parameters["maximumSpanMS"], rate)
+    starts = [0]
+    while True:
+        following = starts[-1] + shortest + rng.integer(longest - shortest + 1)
+        if following >= size:
+            break
+        starts.append(following)
+    if len(starts) > 1 and size - starts[-1] < shortest:
+        starts.pop()  # a remainder shorter than a span joins the span before it
+    if len(starts) < 2:
+        raise InjectorNotApplicable(f"{source.fixture_id} is shorter than two spans")
+    ends = [*starts[1:], size]
+    signs = np.where(rng.uniform(len(starts)) < 0.5, -1.0, 1.0)
+    magnitude = parameters["semitones"]
+    fade = _fade(rate)
+    lead, lag = fade // 2, fade - fade // 2
+    rise = (np.arange(fade) + 0.5) / fade
+    output = np.zeros(size)
+    last = len(starts) - 1
+    spans = []
+    for index, (start, end, sign) in enumerate(zip(starts, ends, signs)):
+        semitones = float(sign * magnitude)
+        # Each span reaches half a fade into its neighbours; the two ramps there sum to one.
+        first = start - lead if index else 0
+        final = end + lag if index < last else size
+        low, high = max(0, first - OLA_WINDOW), min(size, final + OLA_WINDOW)
+        shifted = pitch_shift(source.samples[low:high], semitones)
+        weights = np.ones(final - first)
+        if index:
+            weights[:fade] = rise
+        if index < last:
+            weights[weights.size - fade:] = 1.0 - rise
+        output[first:final] += shifted[first - low:final - low] * weights
+        spans.append([int(start), int(end), semitones])
+    labels = [{"kind": "erratic-pitch", "startSample": 0, "endSample": size, "semitones": magnitude,
+               "spans": spans}] if magnitude else []
+    return output, labels
+
+
+def _shift_seams(seams: tuple[int, ...], start: int, end: int, delta: int) -> tuple[int, ...]:
+    """Seams after an edit that replaced [start, end) and moved what follows by `delta` (inside ones go)."""
+    return tuple(sorted({seam for seam in seams if seam <= start} | {seam + delta for seam in seams if seam >= end}))
+
+
+def _pick_seam(source: Fixture, rng: SeededStream, room: int) -> tuple[int, int]:
+    """A seeded seam whose following segment holds at least `room` samples: (seam, segment end)."""
+    bounds = sorted({seam for seam in source.seams if 0 < seam < source.samples.size})
+    ends = [*bounds[1:], source.samples.size]
+    usable = [(seam, end) for seam, end in zip(bounds, ends) if end - seam >= room]
+    if not usable:
+        raise InjectorNotApplicable(f"{source.fixture_id} has no seam followed by {room} samples of its segment")
+    return usable[rng.integer(len(usable))]
+
+
+def _aligned_splice(source: Fixture, relation: str, render_seed: int, start: int, length: int) -> np.ndarray:
+    """IDN-SWAP's construction: [start, start + length) from the script re-rendered by a second voice."""
+    if source.voice is None or source.script is None:
+        raise ValueError("an aligned splice needs a procedural source with a script and a voice")
+    donor = rerender(source, donor_voice(source.voice, relation), render_seed=render_seed)
+    return replace_span(source.samples, donor[start:start + length], start, _fade(source.sample_rate))
+
+
+def _closest(cuts: list[int], first: int, target: int) -> int:
+    """The last cut index after `first` whose span from cuts[first] is closest to `target` (fewest words on a tie)."""
+    return min(range(first + 1, len(cuts)), key=lambda last: (abs(cuts[last] - cuts[first] - target), last))
+
+
+def _source_span(source: Fixture, position: str, target: int | None,
+                 seam: tuple[int, int] | None) -> tuple[int, int]:
+    """[start, end) the donor replaces: whole words closest to `target` at a position, or from a seam."""
+    cuts = boundaries(source)
+    if position == "seam":
+        start, segment_end = seam
+        if target is None:
+            return start, segment_end
+        ends = [cut for cut in cuts if start < cut < segment_end] + [segment_end]
+        return start, min(ends, key=lambda cut: (abs(cut - start - target), cut))
+    words = len(cuts) - 1
+    best: tuple[int, int, int] | None = None
+    for count in range(1, words + 1):
+        first = {"onset": 0, "middle": (words - count) // 2, "end": words - count}[position]
+        error = abs(cuts[first + count] - cuts[first] - target)
+        if best is None or error < best[0]:
+            best = (error, cuts[first], cuts[first + count])
+    return best[1], best[2]
+
+
+def _rms(samples: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(samples ** 2))) if samples.size else 0.0
+
+
+def _donor_splice(source: Fixture, donor: Fixture, parameters: dict, *, kind: str,
+                  seam: tuple[int, int] | None = None) -> tuple[np.ndarray, list[dict], tuple[int, ...]]:
+    """A recording's words replaced by a donor recording's opening words, at aligned word boundaries.
+
+    The source span is the whole words closest to `durationMS` at the position
+    (or from a seam to the word cut closest to it, or to the segment's end);
+    the donor gives its words from its first, closest in length, scaled to the
+    replaced span's RMS and spliced with the catalog's 5 ms crossfades. The
+    label covers every output sample the donor reaches; outside it the output
+    is the source, moved by the length change after it.
+    """
+    if donor is None:
+        raise ValueError("a donor variant needs its donor")
+    if donor.sample_rate != source.sample_rate:
+        raise ValueError("the donor and the source must share a sample rate")
+    if not donor.words:
+        raise InjectorNotApplicable(f"{source.fixture_id}: its donor has no word intervals")
+    rate = source.sample_rate
+    duration = parameters["durationMS"]
+    target = None if duration is None else _samples(duration, rate)
+    start, end = _source_span(source, parameters["position"], target, seam)
+    donor_cuts = boundaries(donor)
+    last = _closest(donor_cuts, 0, end - start)
+    piece = np.asarray(donor.samples[donor_cuts[0]:donor_cuts[last]], dtype=np.float64)
+    level = _rms(piece)
+    piece = piece * (_rms(source.samples[start:end]) / level if level > 0 else 1.0)
+    head, tail = source.samples[:start], source.samples[end:]
+    fade = _fade(rate)
+    output, starts = join([head, piece, tail], fade)
+    first_overlap = min(fade, head.size, piece.size)
+    second_overlap = min(fade, head.size + piece.size - first_overlap, tail.size)
+    delta = int(output.size) - int(source.samples.size)
+    seams = _shift_seams(source.seams, start, end, delta)
+    relation = parameters["donor"]
+    if relation not in DONOR_RELATIONS:
+        raise ValueError(f"unknown donor relation {relation!r}")
+    if relation != "other-speaker":
+        return output, [], seams
+    label = {"kind": kind, "startSample": int(starts[0]), "endSample": int(starts[-1] + second_overlap),
+             "position": parameters["position"], "donorRelation": relation, "replacedSamples": int(end - start),
+             "donorSamples": int(piece.size)}
+    if seam is not None:
+        label["seamSample"] = int(start)
+    return output, [label], seams
+
+
+def _onset(source: Fixture, parameters: dict, rng: SeededStream,
+           donor: Fixture | None = None) -> tuple[np.ndarray, list[dict]] | tuple[np.ndarray, list[dict], tuple]:
+    if "donor" in parameters:
+        return _donor_splice(source, donor, parameters, kind="identity-swap")
+    first, last = source.words[0][0], source.words[-1][1]
+    length = min(_samples(parameters["durationMS"], source.sample_rate), last - first)
+    relation = parameters["relation"]
+    output = _aligned_splice(source, relation, parameters["renderSeed"], first, length)
+    labels = [{"kind": "identity-swap", "startSample": first, "endSample": first + length, "relation": relation,
+               "position": "onset"}] if relation != "self" else []
+    return output, labels
+
+
+def _seam_disc(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict], tuple]:
+    rate = source.sample_rate
+    seam, _end = _pick_seam(source, rng, _samples(SEAM_DISC_MAXIMUM_MS, rate) + 1)
+    removed = _samples(parameters["removeMS"], rate)
+    output = np.concatenate([source.samples[:seam], source.samples[seam + removed:]])
+    labels = [{"kind": "seam-discontinuity", "startSample": seam, "endSample": seam, "seamSample": seam,
+               "removedSamples": removed}] if removed else []
+    return output, labels, _shift_seams(source.seams, seam, seam + removed, -removed)
+
+
+def _seam_voice(source: Fixture, parameters: dict, rng: SeededStream,
+                donor: Fixture | None = None) -> tuple[np.ndarray, list[dict], tuple]:
+    rate = source.sample_rate
+    seam, segment_end = _pick_seam(source, rng, _samples(SEAM_VOICE_MINIMUM_MS, rate))
+    if "donor" in parameters:
+        return _donor_splice(source, donor, parameters, kind="seam-voice", seam=(seam, segment_end))
+    duration = parameters["durationMS"]
+    length = segment_end - seam if duration is None else min(_samples(duration, rate), segment_end - seam)
+    relation = parameters["relation"]
+    output = _aligned_splice(source, relation, parameters["renderSeed"], seam, length)
+    labels = [{"kind": "seam-voice", "startSample": seam, "endSample": seam + length, "seamSample": seam,
+               "relation": relation}] if relation != "self" else []
+    return output, labels, source.seams
 
 
 def _variants(sham: dict, sweep: dict[str, dict], *, controls: dict[str, dict] | None = None,
@@ -687,6 +981,12 @@ def _catalog() -> dict[str, Injector]:
     take_drop = {**drop, "placement": "centre"}
     take_noise = {"kind": "white", "snrReference": "take"}
     take_run_on = {"anchor": "take-end", "spanSeconds": 0.5}
+    band = {"taps": BAND_TAPS}
+    erratic = {"minimumSpanMS": 150.0, "maximumSpanMS": 300.0}
+    onset = {"renderSeed": 0}
+    take_onset = {"position": "onset"}
+    seam_voice = {"renderSeed": 0}
+    take_seam = {"position": "seam"}
     injectors = [
         Injector("SIG-CLICK", 1, "clicks", ("A",),
                  "Impulses of 1-3 samples at a rate per second, voiced, quiet or anywhere; "
@@ -850,7 +1150,74 @@ def _catalog() -> dict[str, Injector]:
                             "severe": {**swap, "relation": "cross-gender", "durationMS": 3000.0}},
                            controls={"control-same-speaker": {**swap, "relation": "self", "durationMS": 1000.0,
                                                               "renderSeed": 1}}),
-                 _swap),
+                 _swap,
+                 # Speaker-labelled recordings: another speaker's words over 0.3 s (middle), 1 s (onset) or
+                 # 3 s (middle); the sham splices another utterance of the source speaker over the severe span.
+                 recording_variants=_take_variants(
+                     {"donor": "same-speaker", "position": "middle", "durationMS": 3000.0},
+                     {"mild": {"donor": "other-speaker", "position": "middle", "durationMS": 300.0},
+                      "moderate": {"donor": "other-speaker", "position": "onset", "durationMS": 1000.0},
+                      "severe": {"donor": "other-speaker", "position": "middle", "durationMS": 3000.0}})),
+        Injector("SIG-BAND", 1, "band-limit", ("A", "G"),
+                 "A zero-phase low-pass (a 511-tap Blackman-windowed sinc) at 0.7, 0.5 or 0.3 of the source's "
+                 "measured effective bandwidth (Stage 0's definition), so it cuts content the source has "
+                 "whatever its sampling history (FLEURS-derived N2 near 8 kHz, natural takes near 11.5 kHz); "
+                 "refused without an active frame, below a 1 kHz cutoff, or when the measured bandwidth does "
+                 "not drop; sham: the same low-pass at 1.1 of the bandwidth, at most 0.99 of Nyquist.",
+                 _variants({**band, "bandwidthFraction": 1.1},
+                           {"mild": {**band, "bandwidthFraction": 0.7},
+                            "moderate": {**band, "bandwidthFraction": 0.5},
+                            "severe": {**band, "bandwidthFraction": 0.3}}),
+                 _band_limit),
+        Injector("PRS-ERRATIC", 1, "erratic pitch", ("F",),
+                 "The take cut into seeded 150-300 ms spans, each shifted by a seeded sign of 2, 4 or 7 "
+                 "semitones through the shifter of PRS-OCT, length kept and neighbours crossfaded over 5 ms; "
+                 "needs no word interval; sham: 0 st through the same path.",
+                 _variants({**erratic, "semitones": 0.0},
+                           {"mild": {**erratic, "semitones": 2.0}, "moderate": {**erratic, "semitones": 4.0},
+                            "severe": {**erratic, "semitones": 7.0}}),
+                 _erratic),
+        Injector("IDN-ONSET", 1, "onset identity swap", ("E",),
+                 "Another voice over the first 0.3, 1.0 or 1.5 s of speech from the first word: a time-aligned "
+                 "re-render of the script by a close voice; sham: the source's own render (zero magnitude); "
+                 "control: a same-speaker re-render. On a speaker-labelled recording (take-*), another "
+                 "speaker's opening words over the source's first words; sham: another utterance of the source "
+                 "speaker the same way.",
+                 _variants({**onset, "relation": "self", "durationMS": 1500.0},
+                           {"mild": {**onset, "relation": "close", "durationMS": 300.0},
+                            "moderate": {**onset, "relation": "close", "durationMS": 1000.0},
+                            "severe": {**onset, "relation": "close", "durationMS": 1500.0}},
+                           controls={"control-same-speaker": {**onset, "relation": "self", "durationMS": 1500.0,
+                                                              "renderSeed": 1}}),
+                 _onset,
+                 recording_variants=_take_variants(
+                     {**take_onset, "donor": "same-speaker", "durationMS": 1500.0},
+                     {"mild": {**take_onset, "donor": "other-speaker", "durationMS": 300.0},
+                      "moderate": {**take_onset, "donor": "other-speaker", "durationMS": 1000.0},
+                      "severe": {**take_onset, "donor": "other-speaker", "durationMS": 1500.0}})),
+        Injector("SEAM-DISC", 1, "seam discontinuity", ("J",),
+                 "1, 5 or 20 ms of samples removed right after a seeded long-form seam, with no crossfade; "
+                 "needs the source's seam offsets; sham: nothing removed at the same seam.",
+                 _variants({"removeMS": 0.0}, {"mild": {"removeMS": 1.0}, "moderate": {"removeMS": 5.0},
+                                               "severe": {"removeMS": 20.0}}),
+                 _seam_disc),
+        Injector("SEAM-VOICE", 1, "voice change at a seam", ("J",),
+                 "The segment after a seeded long-form seam re-rendered by a close voice, time-aligned, for "
+                 "1 s, 2 s or the whole segment; sham: the source's own render (zero magnitude); control: a "
+                 "same-speaker re-render. On a speaker-labelled recording (take-*), another speaker's words "
+                 "from the seam; sham: another utterance of the source speaker the same way.",
+                 _variants({**seam_voice, "relation": "self", "durationMS": None},
+                           {"mild": {**seam_voice, "relation": "close", "durationMS": 1000.0},
+                            "moderate": {**seam_voice, "relation": "close", "durationMS": 2000.0},
+                            "severe": {**seam_voice, "relation": "close", "durationMS": None}},
+                           controls={"control-same-speaker": {**seam_voice, "relation": "self", "durationMS": None,
+                                                              "renderSeed": 1}}),
+                 _seam_voice,
+                 recording_variants=_take_variants(
+                     {**take_seam, "donor": "same-speaker", "durationMS": None},
+                     {"mild": {**take_seam, "donor": "other-speaker", "durationMS": 1000.0},
+                      "moderate": {**take_seam, "donor": "other-speaker", "durationMS": 2000.0},
+                      "severe": {**take_seam, "donor": "other-speaker", "durationMS": None}})),
     ]
     return {injector.injector_id: injector for injector in injectors}
 
@@ -876,37 +1243,56 @@ def needs(injector_id: str, parameters: Mapping[str, Any]) -> tuple[str, ...]:
         return () if parameters.get("anchor") == "take-end" else ("words",)
     if injector_id in ("CNT-REP", "CNT-DEL", "CNT-INS", "PRS-OCT", "PRS-BRK"):
         return ("words",)
-    if injector_id == "IDN-SWAP":
-        return ("script", "voice", "words")
+    if injector_id in ("IDN-SWAP", "IDN-ONSET"):
+        return ("words", "donor") if "donor" in parameters else ("script", "voice", "words")
+    if injector_id == "SEAM-VOICE":
+        return ("words", "donor", "seams") if "donor" in parameters else ("script", "voice", "seams")
+    if injector_id == "SEAM-DISC":
+        return ("seams",)
     return ()
 
 
 def _has(source: Fixture, need: str) -> bool:
     return bool(source.words if need == "words" else source.pauses if need == "pauses"
+                else source.seams if need == "seams"
                 else source.script is not None if need == "script" else source.voice is not None)
 
 
-def inject(injector_id: str, variant: str, source: Fixture, seed: int) -> Injection:
-    """Apply one catalog (or recording) variant to a source under a seed."""
+def inject(injector_id: str, variant: str, source: Fixture, seed: int, *,
+           donor: Fixture | None = None) -> Injection:
+    """Apply one catalog (or recording) variant to a source under a seed.
+
+    `donor`: the donor recording of a variant that splices one (its `donor`
+    parameter names the relation); any other variant refuses a donor.
+    """
     injector = CATALOG[injector_id]
     chosen = injector.variant(variant)
     parameters = dict(chosen.parameters)
-    missing = [need for need in needs(injector_id, parameters) if not _has(source, need)]
+    required = needs(injector_id, parameters)
+    if donor is not None and "donor" not in required:
+        raise ValueError(f"{injector.key} {chosen.name} takes no donor")
+    missing = [need for need in required if not (donor is not None if need == "donor" else _has(source, need))]
     if missing:
         raise InjectorNotApplicable(f"{source.fixture_id}: {injector.key} {chosen.name} needs "
                                     + "; ".join(NEED_DESCRIPTIONS[need] for need in missing))
     # The stream depends on the injector, the source and the seed, never on the
     # variant: a sham draws the same positions as its positives.
     rng = SeededStream(seed, injector.key, source.digest)
-    samples, labels = injector.apply(source, parameters, rng)
+    result = injector.apply(source, parameters, rng, donor) if donor is not None \
+        else injector.apply(source, parameters, rng)
+    samples, labels = result[0], result[1]
     samples = np.ascontiguousarray(samples, dtype=np.float64)
     samples.setflags(write=False)
+    # Without an explicit mapping, seams stand only where the edit kept the timeline.
+    seams = tuple(int(seam) for seam in result[2]) if len(result) > 2 \
+        else source.seams if samples.size == source.samples.size else ()
     if chosen.severity in NON_DEFECT_SEVERITIES and labels:
         raise AssertionError(f"{injector.key} {variant} labeled a defect in a sham or control")
     if chosen.severity not in NON_DEFECT_SEVERITIES and not labels:
         raise AssertionError(f"{injector.key} {variant} produced no labeled interval")
     return Injection(injector.key, chosen.name, chosen.severity, parameters, seed, source.family,
-                     source.digest, samples, tuple(labels), pcm_digest(samples))
+                     source.digest, samples, tuple(labels), pcm_digest(samples),
+                     donor_digest=None if donor is None else donor.digest, seams=seams)
 
 
 def catalog_description() -> dict:

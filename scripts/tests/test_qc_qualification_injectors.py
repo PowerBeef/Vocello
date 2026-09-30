@@ -106,6 +106,49 @@ GOLDENS = {
     ("IDN-SWAP@1", "moderate"): "ab3f8c289044138ee43b03db4201b8b547828152d562570a89391ec7f4a1ff4b",
     ("IDN-SWAP@1", "severe"): "356ab34f0563912d608852091f5c3d04cb605e85f12c313c94b6d17554cc86c1",
 }
+# Catalog version 3 (every version 2 golden above is unchanged): the new families on source 1, and the
+# seam families on the procedural long-form source 1, whose seams start its second and third segments.
+LONG_FORM_DIGEST = "960d8403d34d4ff11636c940b9cb1d51df1a4b1f47283fc14408403d4a62af12"
+GOLDENS_V3 = {
+    ("SIG-BAND@1", "sham"): "bb5c0ad0c4f77bf9c76a4ebdbc14798fa97202228ab97c6107a20a6fed4fde41",
+    ("SIG-BAND@1", "mild"): "a6b1cf81f2310f7cf7d1f036634e524d0b6fab69355c1abd8f73eca2dc97f20e",
+    ("SIG-BAND@1", "moderate"): "aa94b4dbe909ab0b0153622130e8aca7403dc7196ff489b149ba472bec667d2b",
+    ("SIG-BAND@1", "severe"): "23c0be79ef2a73a5b110438f6b4553677c3a6ab2136313afcb3c3ede7c680a1b",
+    ("PRS-ERRATIC@1", "sham"): SOURCE_DIGEST,
+    ("PRS-ERRATIC@1", "mild"): "e5f6966a4db849fc990894400b97d6ce2194fca38336dcc74aabbdc984a7c9fa",
+    ("PRS-ERRATIC@1", "moderate"): "ea20a5acfdb1734c528c235ad711c4ae35af0d4fad06ca73acb65502e223d635",
+    ("PRS-ERRATIC@1", "severe"): "cd7f7fd56d713be1a88a8ce2adc5cd2cbf6cf5266b21c5cf8e57994ced8d41ad",
+    ("IDN-ONSET@1", "sham"): SOURCE_DIGEST,
+    ("IDN-ONSET@1", "control-same-speaker"): "994cdef62699e682fd6724bb135aa15a23bcade68bcea58105d123a546c6ed43",
+    ("IDN-ONSET@1", "mild"): "ee2b54196d70f25eb3495c71b83f7663c8e2304cb28077027c4445b1092232a1",
+    ("IDN-ONSET@1", "moderate"): "bde279a558d98e889bd5863d24bda87d28f520e46a4bf5e7f93c496ec049d6f8",
+    ("IDN-ONSET@1", "severe"): "2e6392d245422784a8b1bc06e24e3f4319d611832b47e615ccf8e87363db05b0",
+    ("SEAM-DISC@1", "sham"): LONG_FORM_DIGEST,
+    ("SEAM-DISC@1", "mild"): "a89e5368f942f3b5c62259728a3f04b48775d62e004aa27d7128dc138c91ad22",
+    ("SEAM-DISC@1", "moderate"): "35fa493b3582b782397dde242b4717639ac27b0a3883af029c3265c6d15d2857",
+    ("SEAM-DISC@1", "severe"): "57eafc0e51e51de99e6b0e26934c7095dbaa844505b298e64cc43fdf8ab60d11",
+    ("SEAM-VOICE@1", "sham"): LONG_FORM_DIGEST,
+    ("SEAM-VOICE@1", "control-same-speaker"): "673dbd5de4fe3572e02c4eb39686ed9bea0224e60f0d426546f0bbf11d512931",
+    ("SEAM-VOICE@1", "mild"): "b9aaa8df94c36079894e6154c64723b02ea53d9efb329ddf94095b9059e6cd73",
+    ("SEAM-VOICE@1", "moderate"): "056c0ddd1ee1a0f895f53eaaf9364cd59e6299ecb627047ef22efa4b059fa1b4",
+    ("SEAM-VOICE@1", "severe"): "2d214993222fa19add3b1f883efc5482ed72eacf53d0120901d6a45dc7781679",
+}
+# The donor splices of speaker-labelled recordings, on the procedural sources above with procedural donors:
+# modal source 2 as another speaker, and source 1's voice reading script 3 as the same speaker.
+DONOR_GOLDENS = {
+    ("IDN-SWAP@1", "take-sham"): "3982de07cc703ca1863576a03513c098d8edc1f51a924150e49f948f73ba3b6c",
+    ("IDN-SWAP@1", "take-mild"): "793ff7ea93d2623bc98c9c0472d069d7ac84264b7aa17d4014237a6f2f2b75ab",
+    ("IDN-SWAP@1", "take-moderate"): "cb1a82502b78e8647109ef7be3e2da5be579f29bf81f2a40c69e1bacd727dff8",
+    ("IDN-SWAP@1", "take-severe"): "0b4be78e5d137969fa6037b3555bd2bd7b1b997642edd5ef75a5c01c53cc6cbd",
+    ("IDN-ONSET@1", "take-sham"): "c3ce78db867cb3f2620e46abfaa4752d76949a7b7fd0ad4752febeffaa1d3368",
+    ("IDN-ONSET@1", "take-mild"): "1ef7f041f146a2292c56623b14b783b718a679fc546ca73a414f1cfb192be3e5",
+    ("IDN-ONSET@1", "take-moderate"): "cb1a82502b78e8647109ef7be3e2da5be579f29bf81f2a40c69e1bacd727dff8",
+    ("IDN-ONSET@1", "take-severe"): "54760fb263efb21c37e20f8cbc095e5b671819472e60c88a2d941fc51675197a",
+    ("SEAM-VOICE@1", "take-sham"): "8231da2514bf4303133cf86c973e0bdf2caff745977a0cc1d2d335d3075977d8",
+    ("SEAM-VOICE@1", "take-mild"): "f8d6686f0fe1fba42ad7e46489376c0549756a5c46e9ee778aaa2f33c4457657",
+    ("SEAM-VOICE@1", "take-moderate"): "cff2fb5f2f613311feadd7c011cac714e57fb29a222cab5cd8ea1cc966fea5e8",
+    ("SEAM-VOICE@1", "take-severe"): "0ec26c2a83dc28e345dd9d921226d5355db98ec96fffbddc2c6dc6af78518b66",
+}
 FIXTURE_GOLDENS = {
     "modal": "b47b989b559c93adc985a3ec55a25fca0257d7b14185f2c596ed31d84272210e",
     "quiet": "7772ebeeeee00f477912ec27d57adf66fb4484d07022c8c070a0ea2b5ba51e5f",
@@ -117,18 +160,40 @@ FIXTURE_GOLDENS = {
 REQUIRED_FAMILIES = {
     "BND-TRUNC", "BND-RUNON", "CNT-REP", "CNT-DEL", "CNT-INS", "SIG-CLICK", "SIG-DROP", "SIG-CLIP",
     "SIG-NOISE", "PRS-OCT", "PRS-BRK", "IDN-SWAP", "PRS-RATE", "IDN-SHIFT",
+    "SIG-BAND", "PRS-ERRATIC", "IDN-ONSET", "SEAM-DISC", "SEAM-VOICE",
 }
+SEAM_FAMILIES = ("SEAM-DISC", "SEAM-VOICE")
+
+
+def same_speaker(base: fixtures.Fixture, index: int) -> fixtures.Fixture:
+    """Another utterance of `base`'s speaker: another script read by its voice, with its word intervals."""
+    script = fixtures.make_script(index, stratum="modal")
+    return fixtures.make_fixture(f"same-speaker-{index:04d}", script.family, "modal",
+                                 fixtures.render(script, base.voice), words=script.words, pauses=script.pauses,
+                                 text=script.text, script=script, voice=base.voice)
 
 
 class InjectorTests(unittest.TestCase):
     source: fixtures.Fixture
+    long_form: fixtures.Fixture
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = fixtures.clean_fixture(SOURCE_INDEX, "modal")
+        cls.long_form = fixtures.long_form_fixture(SOURCE_INDEX)
+        cls.other_speaker = fixtures.clean_fixture(2, "modal")
+        cls.same_speaker = same_speaker(cls.source, 3)
+
+    def source_for(self, injector_id: str) -> fixtures.Fixture:
+        """The pinned source of a family: the seam families need declared seams."""
+        return self.long_form if injector_id in SEAM_FAMILIES else self.source
+
+    def donor_for(self, variant: injectors.Variant) -> fixtures.Fixture:
+        return self.same_speaker if variant.parameters["donor"] == "same-speaker" else self.other_speaker
 
     def test_the_catalog_covers_the_defect_families(self) -> None:
         self.assertTrue(REQUIRED_FAMILIES <= set(injectors.CATALOG))
+        self.assertEqual(injectors.CATALOG_VERSION, 3)
         for injector in injectors.CATALOG.values():
             severities = {variant.severity for variant in injector.variants}
             self.assertEqual(injector.variants[0].name, "sham", injector.key)
@@ -136,8 +201,13 @@ class InjectorTests(unittest.TestCase):
             self.assertTrue(set(injector.classes) <= set("ABCDEFGHIJ"), injector.key)
             names = [variant.name for variant in injector.variants]
             self.assertEqual(len(names), len(set(names)), injector.key)
-        self.assertEqual(set(GOLDENS), {(injector.key, variant.name) for injector in injectors.CATALOG.values()
-                                        for variant in injector.variants})
+        self.assertFalse(set(GOLDENS) & set(GOLDENS_V3))
+        self.assertEqual(set(GOLDENS) | set(GOLDENS_V3),
+                         {(injector.key, variant.name) for injector in injectors.CATALOG.values()
+                          for variant in injector.variants})
+        self.assertEqual(set(DONOR_GOLDENS), {(injector.key, variant.name) for injector in injectors.CATALOG.values()
+                                              for variant in injector.recording_variants
+                                              if "donor" in variant.parameters})
 
     def test_every_variant_matches_its_golden_digest(self) -> None:
         self.assertEqual(self.source.digest, SOURCE_DIGEST)
@@ -145,11 +215,27 @@ class InjectorTests(unittest.TestCase):
             injection = injectors.inject(key.split("@")[0], variant, self.source, SEED)
             self.assertEqual(injection.digest, expected, f"{key} {variant}")
 
+    def test_every_catalog_3_variant_matches_its_golden_digest(self) -> None:
+        self.assertEqual(self.long_form.digest, LONG_FORM_DIGEST)
+        self.assertEqual(len(self.long_form.seams), 2)
+        for (key, variant), expected in GOLDENS_V3.items():
+            injector_id = key.split("@")[0]
+            injection = injectors.inject(injector_id, variant, self.source_for(injector_id), SEED)
+            self.assertEqual(injection.digest, expected, f"{key} {variant}")
+        for (key, variant), expected in DONOR_GOLDENS.items():
+            injector_id = key.split("@")[0]
+            chosen = injectors.CATALOG[injector_id].variant(variant)
+            injection = injectors.inject(injector_id, variant, self.source_for(injector_id), SEED,
+                                         donor=self.donor_for(chosen))
+            self.assertEqual(injection.digest, expected, f"{key} {variant}")
+            self.assertEqual(injection.recipe()["donorPCMSHA256"], self.donor_for(chosen).digest)
+
     def test_same_input_seed_and_parameters_are_byte_identical(self) -> None:
         for injector in injectors.CATALOG.values():
             severe = [variant.name for variant in injector.variants if variant.severity == "severe"][0]
-            first = injectors.inject(injector.injector_id, severe, self.source, SEED)
-            second = injectors.inject(injector.injector_id, severe, self.source, SEED)
+            source = self.source_for(injector.injector_id)
+            first = injectors.inject(injector.injector_id, severe, source, SEED)
+            second = injectors.inject(injector.injector_id, severe, source, SEED)
             self.assertEqual(first.samples.tobytes(), second.samples.tobytes(), injector.key)
             self.assertEqual(first.recipe(), second.recipe(), injector.key)
         other = injectors.inject("SIG-CLICK", "moderate", self.source, SEED + 1)
@@ -158,7 +244,8 @@ class InjectorTests(unittest.TestCase):
     def test_shams_label_nothing_and_positives_label_their_interval(self) -> None:
         for injector in injectors.CATALOG.values():
             for variant in injector.variants:
-                injection = injectors.inject(injector.injector_id, variant.name, self.source, SEED)
+                injection = injectors.inject(injector.injector_id, variant.name,
+                                             self.source_for(injector.injector_id), SEED)
                 if variant.severity in injectors.NON_DEFECT_SEVERITIES:
                     self.assertFalse(injection.positive)
                     self.assertEqual(injection.labels, (), f"{injector.key} {variant.name}")
@@ -169,6 +256,15 @@ class InjectorTests(unittest.TestCase):
                     self.assertLessEqual(0, label["startSample"])
                     self.assertLessEqual(label["startSample"], label["endSample"])
                     self.assertLessEqual(label["endSample"], injection.samples.size)
+            for variant in injector.recording_variants:
+                if "donor" not in variant.parameters:
+                    continue
+                injection = injectors.inject(injector.injector_id, variant.name,
+                                             self.source_for(injector.injector_id), SEED,
+                                             donor=self.donor_for(variant))
+                # The sham's donor is the source speaker, every positive's another speaker.
+                self.assertEqual(variant.parameters["donor"] == "same-speaker", not injection.positive)
+                self.assertEqual(bool(injection.labels), injection.positive, f"{injector.key} {variant.name}")
 
     def test_labels_are_exact(self) -> None:
         source = self.source
@@ -280,10 +376,198 @@ class InjectorTests(unittest.TestCase):
         recipe = injection.recipe()
         self.assertEqual(recipe["sourcePCMSHA256"], SOURCE_DIGEST)
         self.assertEqual(recipe["outputPCMSHA256"], GOLDENS[("SIG-NOISE@1", "moderate")])
-        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]), ("SIG-NOISE@1", 2, SEED))
+        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]), ("SIG-NOISE@1", 3, SEED))
         self.assertEqual(recipe["mechanism"], "T1-pcm-construction")
+        self.assertNotIn("donorPCMSHA256", recipe)
         description = injectors.catalog_description()
         self.assertEqual(len(description["injectors"]), len(injectors.CATALOG))
+        self.assertFalse({variant["name"] for injector in description["injectors"] for variant in injector["variants"]
+                          if variant["name"].startswith("take-")})
+
+
+class CatalogVersion3Tests(unittest.TestCase):
+    """The families catalog version 3 adds: exact labels, seams and every refusal."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = fixtures.clean_fixture(SOURCE_INDEX, "modal")
+        cls.long_form = fixtures.long_form_fixture(SOURCE_INDEX)
+        cls.other_speaker = fixtures.clean_fixture(2, "modal")
+        cls.same_speaker = same_speaker(cls.source, 3)
+
+    def assert_outside_unchanged(self, output: np.ndarray, source: np.ndarray, label: dict, what: str) -> None:
+        """Before the label the output is the source; after it, the source moved by the length change."""
+        start, end = label["startSample"], label["endSample"]
+        delta = output.size - source.size
+        self.assertTrue(np.array_equal(output[:start], source[:start]), what)
+        self.assertTrue(np.array_equal(output[end:], source[end - delta:]), what)
+
+    def test_band_limit_cuts_relative_to_the_measured_bandwidth(self) -> None:
+        source = self.source
+        bandwidth = injectors.effective_bandwidth(source.samples, source.sample_rate)
+        self.assertEqual(bandwidth, 11_531.25)
+        for variant, fraction in (("mild", 0.7), ("moderate", 0.5), ("severe", 0.3)):
+            injection = injectors.inject("SIG-BAND", variant, source, SEED)
+            (label,) = injection.labels
+            self.assertEqual((label["startSample"], label["endSample"]), (0, source.samples.size))
+            self.assertEqual(injection.samples.size, source.samples.size)
+            self.assertEqual((label["sourceBandwidthHz"], label["cutoffHz"]),
+                             (bandwidth, round(fraction * bandwidth, 3)))
+            after = injectors.effective_bandwidth(injection.samples, source.sample_rate)
+            self.assertEqual(label["outputBandwidthHz"], after)
+            self.assertLess(after, bandwidth)
+            self.assertLess(after, label["cutoffHz"] + 250.0)
+        # The sham runs the same low-pass above the measured band: it keeps the band and labels nothing.
+        sham = injectors.inject("SIG-BAND", "sham", source, SEED)
+        self.assertEqual(sham.labels, ())
+        self.assertEqual(injectors.effective_bandwidth(sham.samples, source.sample_rate), bandwidth)
+        # A FLEURS-like source band-limited near 8 kHz still has a band to cut, at its own fractions.
+        narrow = fixtures.make_fixture("narrow", "narrow", "modal",
+                                       injectors.lowpass(source.samples, 8_000.0, source.sample_rate))
+        narrow_bandwidth = injectors.effective_bandwidth(narrow.samples, narrow.sample_rate)
+        self.assertLess(narrow_bandwidth, 8_300.0)
+        (label,) = injectors.inject("SIG-BAND", "mild", narrow, SEED).labels
+        self.assertEqual(label["cutoffHz"], round(0.7 * narrow_bandwidth, 3))
+
+    def test_band_limit_refuses_a_source_with_no_band_to_cut(self) -> None:
+        silence = fixtures.abstention_fixture("digital-silence")
+        for variant in ("sham", "mild", "severe"):
+            with self.assertRaisesRegex(injectors.InjectorNotApplicable, "no active frame"):
+                injectors.inject("SIG-BAND", variant, silence, SEED)
+        # Already telephone-narrow: 0.3 of a 2.6 kHz band would cut below 1 kHz, while milder cuts still apply.
+        muffled = fixtures.make_fixture("muffled", "muffled", "modal",
+                                        injectors.lowpass(self.source.samples, 2_500.0, self.source.sample_rate))
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "below 1000 Hz"):
+            injectors.inject("SIG-BAND", "severe", muffled, SEED)
+        self.assertTrue(injectors.inject("SIG-BAND", "mild", muffled, SEED).labels)
+
+    def test_erratic_pitch_shifts_seeded_spans_that_tile_the_take(self) -> None:
+        source = self.source
+        severe = injectors.inject("PRS-ERRATIC", "severe", source, SEED)
+        (label,) = severe.labels
+        self.assertEqual((label["startSample"], label["endSample"]), (0, source.samples.size))
+        self.assertEqual(severe.samples.size, source.samples.size)
+        spans = label["spans"]
+        self.assertEqual(spans[0][0], 0)
+        self.assertEqual(spans[-1][1], source.samples.size)
+        for (start, end, semitones), following in zip(spans, spans[1:] + [None]):
+            self.assertIn(semitones, (-7.0, 7.0))
+            self.assertGreaterEqual(end - start, 3_600)
+            if following is not None:
+                self.assertEqual(end, following[0])
+                self.assertLessEqual(end - start, 7_200)
+        # Every severity and the sham draw the same spans and signs; the sham changes nothing.
+        mild = injectors.inject("PRS-ERRATIC", "mild", source, SEED).labels[0]["spans"]
+        self.assertEqual([[start, end, 2.0 * semitones / 7.0] for start, end, semitones in spans], mild)
+        sham = injectors.inject("PRS-ERRATIC", "sham", source, SEED)
+        self.assertEqual((sham.labels, sham.digest), ((), SOURCE_DIGEST))
+        short = fixtures.make_fixture("short", "short", "modal", source.samples[:5_000])
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "two spans"):
+            injectors.inject("PRS-ERRATIC", "severe", short, SEED)
+
+    def test_onset_swap_replaces_the_first_seconds_of_speech(self) -> None:
+        source = self.source
+        onset = source.words[0][0]
+        for variant, seconds in (("mild", 0.3), ("moderate", 1.0), ("severe", 1.5)):
+            injection = injectors.inject("IDN-ONSET", variant, source, SEED)
+            (label,) = injection.labels
+            self.assertEqual((label["startSample"], label["endSample"]), (onset, onset + int(seconds * 24_000)))
+            self.assert_outside_unchanged(injection.samples, source.samples, label, variant)
+        self.assertEqual(injectors.inject("IDN-ONSET", "control-same-speaker", source, SEED).labels, ())
+
+    def test_seam_discontinuity_removes_samples_at_a_seam_and_moves_later_seams(self) -> None:
+        source = self.long_form
+        sham = injectors.inject("SEAM-DISC", "sham", source, SEED)
+        self.assertEqual((sham.digest, sham.labels, sham.seams), (LONG_FORM_DIGEST, (), source.seams))
+        for variant, removed in (("mild", 24), ("moderate", 120), ("severe", 480)):
+            injection = injectors.inject("SEAM-DISC", variant, source, SEED)
+            (label,) = injection.labels
+            seam = label["seamSample"]
+            self.assertIn(seam, source.seams)
+            self.assertEqual((label["startSample"], label["endSample"], label["removedSamples"]), (seam, seam, removed))
+            self.assertEqual(injection.samples.size, source.samples.size - removed)
+            self.assertTrue(np.array_equal(injection.samples[:seam], source.samples[:seam]))
+            self.assertTrue(np.array_equal(injection.samples[seam:], source.samples[seam + removed:]))
+            self.assertEqual(injection.seams, tuple(value if value <= seam else value - removed
+                                                    for value in source.seams))
+        # Every variant draws the same seam from the same stream.
+        seams = {injectors.inject("SEAM-DISC", variant, source, SEED).labels[0]["seamSample"]
+                 for variant in ("mild", "moderate", "severe")}
+        self.assertEqual(len(seams), 1)
+
+    def test_seam_voice_changes_the_voice_after_a_seam(self) -> None:
+        source = self.long_form
+        for variant in ("mild", "moderate", "severe"):
+            injection = injectors.inject("SEAM-VOICE", variant, source, SEED)
+            (label,) = injection.labels
+            self.assertEqual(label["startSample"], label["seamSample"])
+            self.assertIn(label["seamSample"], source.seams)
+            self.assert_outside_unchanged(injection.samples, source.samples, label, variant)
+            self.assertEqual(injection.seams, source.seams)
+        severe = injectors.inject("SEAM-VOICE", "severe", source, SEED).labels[0]
+        # The whole segment: up to the next seam, or to the take's end after the last one.
+        following = [seam for seam in source.seams if seam > severe["seamSample"]]
+        self.assertEqual(severe["endSample"], following[0] if following else source.samples.size)
+
+    def test_donor_splices_label_exactly_what_the_donor_reaches(self) -> None:
+        cases = (("IDN-SWAP", self.source), ("IDN-ONSET", self.source), ("SEAM-VOICE", self.long_form))
+        for injector_id, source in cases:
+            injector = injectors.CATALOG[injector_id]
+            for variant in injector.recording_variants:
+                donor = self.same_speaker if variant.parameters["donor"] == "same-speaker" else self.other_speaker
+                injection = injectors.inject(injector_id, variant.name, source, SEED, donor=donor)
+                what = f"{injector.key} {variant.name}"
+                if variant.severity == "sham":
+                    self.assertEqual(injection.labels, (), what)
+                    continue
+                (label,) = injection.labels
+                self.assertEqual(label["donorRelation"], "other-speaker", what)
+                self.assert_outside_unchanged(injection.samples, source.samples, label, what)
+                # Two 5 ms crossfades, or one when the donor runs to the take's end.
+                fades = 120 if label["endSample"] == injection.samples.size else 240
+                self.assertEqual(injection.samples.size - source.samples.size,
+                                 label["donorSamples"] - label["replacedSamples"] - fades, what)
+                if injector_id == "IDN-ONSET" or variant.parameters["position"] == "onset":
+                    self.assertEqual(label["startSample"], injectors.boundaries(source)[0] - 120, what)
+                if injector_id == "SEAM-VOICE":
+                    self.assertIn(label["seamSample"], source.seams, what)
+                    # Seams at or before the splice stay; none lies inside a segment.
+                    self.assertEqual(injection.seams, source.seams, what)
+
+    def test_refusals_name_what_the_source_or_donor_lacks(self) -> None:
+        source = self.source
+        # No seams: every seam variant is not applicable.
+        for injector_id in SEAM_FAMILIES:
+            for variant in injectors.CATALOG[injector_id].variants:
+                with self.assertRaisesRegex(injectors.InjectorNotApplicable, "seam offsets"):
+                    injectors.inject(injector_id, variant.name, source, SEED)
+        # Seams too close to the end for the largest removal (or a whole segment) are never drawn.
+        crowded = replace(source, seams=(source.samples.size - 100,))
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "no seam followed"):
+            injectors.inject("SEAM-DISC", "sham", crowded, SEED)
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "no seam followed"):
+            injectors.inject("SEAM-VOICE", "severe", crowded, SEED)
+        # A donor variant without its donor, a donor without word intervals, and a donor on a variant taking none.
+        for injector_id in ("IDN-SWAP", "IDN-ONSET"):
+            with self.assertRaisesRegex(injectors.InjectorNotApplicable, "speaker-labelled donor"):
+                injectors.inject(injector_id, "take-severe", source, SEED)
+        wordless = replace(self.other_speaker, words=())
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "donor has no word intervals"):
+            injectors.inject("IDN-SWAP", "take-severe", source, SEED, donor=wordless)
+        with self.assertRaises(ValueError):
+            injectors.inject("IDN-SWAP", "severe", source, SEED, donor=self.other_speaker)
+        # A recording without word intervals refuses a splice even with a donor.
+        recording = replace(source, words=(), pauses=(), script=None, voice=None)
+        with self.assertRaisesRegex(injectors.InjectorNotApplicable, "word intervals"):
+            injectors.inject("IDN-ONSET", "take-mild", recording, SEED, donor=self.other_speaker)
+
+    def test_version_2_outputs_keep_the_source_seams_only_on_an_unchanged_timeline(self) -> None:
+        seamed = self.long_form
+        # A length-keeping edit keeps the seams; a tempo change or a word splice cannot place them.
+        self.assertEqual(injectors.inject("SIG-CLICK", "severe", seamed, SEED).seams, seamed.seams)
+        self.assertEqual(injectors.inject("PRS-RATE", "severe", seamed, SEED).seams, ())
+        self.assertEqual(injectors.inject("CNT-DEL", "mild", seamed, SEED).seams, ())
+        self.assertEqual(injectors.inject("SIG-CLICK", "severe", self.source, SEED).seams, ())
 
 
 class FixtureTests(unittest.TestCase):

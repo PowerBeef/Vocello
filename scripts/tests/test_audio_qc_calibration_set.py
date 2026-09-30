@@ -132,13 +132,22 @@ class RecordingAdapterTests(unittest.TestCase):
                     injection = injectors.inject(injector.injector_id, variant.name, self.source, 7)
                     self.assertEqual(injection.source_digest, self.source.digest)
             for variant in injector.recording_variants:
+                if "donor" in variant.parameters:
+                    # A donor splice (catalog version 3) needs the words of a speaker-labelled recording and
+                    # its donor, which a natural take never has.
+                    self.assertTrue({"words", "donor"} <= set(injectors.needs(injector.injector_id,
+                                                                             variant.parameters)))
+                    with self.assertRaises(injectors.InjectorNotApplicable, msg=f"{injector.key} {variant.name}"):
+                        injectors.inject(injector.injector_id, variant.name, self.source, 7)
+                    continue
                 self.assertEqual(injectors.needs(injector.injector_id, variant.parameters), ())
                 injection = injectors.inject(injector.injector_id, variant.name, self.source, 7)
                 self.assertEqual(bool(injection.labels), injection.positive, f"{injector.key} {variant.name}")
         # Word-aligned edits, voiced or quiet clicks, speech-referenced noise, word-level
-        # truncation and run-on, pitch edits in the longest word and identity swaps.
+        # truncation and run-on, pitch edits in the longest word, identity swaps and the seam families.
         self.assertEqual(refused, {"SIG-CLICK", "SIG-DROP", "SIG-NOISE", "BND-TRUNC", "BND-RUNON", "CNT-REP",
-                                   "CNT-DEL", "CNT-INS", "PRS-OCT", "PRS-BRK", "IDN-SWAP"})
+                                   "CNT-DEL", "CNT-INS", "PRS-OCT", "PRS-BRK", "IDN-SWAP", "IDN-ONSET",
+                                   "SEAM-DISC", "SEAM-VOICE"})
         with self.assertRaises(injectors.InjectorNotApplicable) as refusal:
             injectors.inject("IDN-SWAP", "moderate", self.source, 7)
         self.assertIn("word intervals", str(refusal.exception))

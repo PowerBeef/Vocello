@@ -68,6 +68,11 @@ TARGETS = {
     "PRS-RATE": ("speaking_rate_slow",),
     "IDN-SHIFT": (),
     "IDN-SWAP": (),
+    "SIG-BAND": (),
+    "PRS-ERRATIC": (),
+    "IDN-ONSET": (),
+    "SEAM-DISC": (),
+    "SEAM-VOICE": (),
 }
 META_CODES = frozenset({"instability-warn", "written-output-warn"})
 

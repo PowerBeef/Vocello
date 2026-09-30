@@ -124,10 +124,14 @@ def write_pcm16_wav(path: Path, samples: np.ndarray, *, sample_rate: int = ENGIN
 
 
 def recording_fixture(take_id: str, family: str, stratum: str, samples: np.ndarray, *, text: str = "",
-                      sample_rate: int = ENGINE_SAMPLE_RATE) -> Fixture:
-    """A `Fixture` for a recorded take: its PCM and request text, and nothing it cannot honestly know."""
+                      sample_rate: int = ENGINE_SAMPLE_RATE, seams: Iterable[int] = ()) -> Fixture:
+    """A `Fixture` for a recorded take: its PCM and request text, and nothing it cannot honestly know.
+
+    `seams`: a long-form take's segment boundaries (samples at the engine rate on
+    its own timeline), which its manifest declares as `seamSamples`.
+    """
     return make_fixture(take_id, family, stratum, samples, sample_rate=sample_rate, words=(), pauses=(),
-                        text=text, script=None, voice=None)
+                        text=text, script=None, voice=None, seams=seams)
 
 
 @dataclass(frozen=True)
@@ -196,8 +200,8 @@ def with_alignment(fixture: Fixture, alignment: WordAlignment) -> Fixture:
 
 
 def load_recording(path: Path, *, take_id: str, family: str, stratum: str, text: str = "",
-                   expected_sha256: str | None = None,
-                   source_rate: int = ENGINE_SAMPLE_RATE) -> tuple[Fixture, str]:
+                   expected_sha256: str | None = None, source_rate: int = ENGINE_SAMPLE_RATE,
+                   seams: Iterable[int] = ()) -> tuple[Fixture, str]:
     """Read, digest-check and adapt one take; returns the fixture and the WAV file's SHA-256.
 
     The WAV must be at `source_rate`; a source below the engine rate is
@@ -211,4 +215,4 @@ def load_recording(path: Path, *, take_id: str, family: str, stratum: str, text:
     samples = read_pcm16_wav(path, sample_rate=source_rate)
     if resampling_recipe(source_rate) is not None:
         samples = polyphase_resample(samples, source_rate, ENGINE_SAMPLE_RATE)
-    return recording_fixture(take_id, family, stratum, samples, text=text), digest
+    return recording_fixture(take_id, family, stratum, samples, text=text, seams=seams), digest

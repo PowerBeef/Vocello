@@ -76,9 +76,32 @@ and N2), no declared pause, no script and no render voice
 (`lib/qc_qualification/recordings.py`), so every variant that needs one raises
 `InjectorNotApplicable` and is counted with its reason; injectors with a
 word-free recording variant (`take-*`) use it instead. Identity swaps from the
-manifest's donor pairs are deferred: the donor take is another rendering with
+N3 manifest's donor pairs are deferred: the donor take is another rendering with
 its own timing, so it is not the time-aligned re-render the swap construction
 splices, and aligning the two would need word intervals N3 never has.
+
+Speaker donors (classes E and J, `lib/qc_qualification/speaker_donors.py`): on a
+cohort whose takes name their `speaker` and `gender`, the take-* variants of
+IDN-SWAP, IDN-ONSET and SEAM-VOICE splice a donor recording's words into the
+source (another speaker of its language and gender for a positive, another
+utterance of the source speaker for the sham), and IDN-IMPOSTOR presents another
+speaker's recording (or, as its sham, the source speaker's other utterance) as the
+source speaker, with the source take as the reference clip. Donors come from
+the same manifest (so the same split), a splice's only from takes whose
+alignment is usable; the choice is seeded by `--sample-seed`, recorded in each
+entry and re-derived by `verify`. A take without a speaker label, or without a
+donor of both relations, is not applicable, with that reason.
+
+Seams (class J). A long-form take may declare its segment boundaries as
+`seamSamples` (sample offsets at the engine rate on its own timeline). SEAM-DISC
+and SEAM-VOICE act at one of them; every entry carries the seams of its own
+output (`seamSamples`) where the edit keeps them, and `score` passes them to the
+Stage 0 seam z-score.
+
+Catalog version. A set records the injector catalog version it was built with,
+and `verify` replays only a set of the current version (3). A set of another
+version is refused whole, with its version named: verify it with the code of
+its version (a pre-registered plan binds the version its set was built with).
 
 Report-only. N3 is unlabeled, so a flag rate f bounds the false-alarm rate only
 as f / (1 - pi_max), and T1 on N3 qualifies nothing: a fail bound needs N2 and
@@ -108,7 +131,9 @@ import audio_qc_n2_resynthesis
 import audio_qc_qualification as m1
 from lib import audio_qc, audio_qc_observations
 from lib.playback_capture import resample as polyphase_resample
-from lib.qc_qualification import injectors, language_swap, policy as policy_module, recordings, resampling
+from lib.qc_qualification import (
+    injectors, language_swap, policy as policy_module, recordings, resampling, speaker_donors,
+)
 from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
 
@@ -163,13 +188,21 @@ DONOR_SWAP_STATUS = {
     "injector": injectors.CATALOG["IDN-SWAP"].key,
     "status": "deferred",
     "reason": "a donor pair's second take is another rendering with its own timing, not the time-aligned "
-              "re-render the swap splices; aligning them needs word intervals, which N3 never has",
+              "re-render the swap splices; aligning them needs word intervals, which N3 never has, and the "
+              "recorded donor splice needs speaker labels, which natural takes do not carry",
 }
 COHORT_SWAP_STATUS = {
     "injector": injectors.CATALOG["IDN-SWAP"].key,
     "status": "not-applicable",
-    "reason": "an identity swap splices a time-aligned re-render of the same script by a second voice; a human "
-              "recording has no script to re-render and no render voice",
+    "reason": "an identity swap splices a time-aligned re-render of the same script by a second voice, which a "
+              "human recording cannot give, or a speaker-labelled donor recording, and no take of this cohort "
+              "names its speaker and gender",
+}
+LABELLED_SWAP_STATUS = {
+    "injector": injectors.CATALOG["IDN-SWAP"].key,
+    "status": "donor-splice",
+    "reason": "speaker-labelled takes: the take-* variants splice a donor recording of the same cohort at aligned "
+              "word boundaries (speakerDonors)",
 }
 # Why a language swap cannot be built from a manifest of this kind (None: it can).
 LANGUAGE_SWAP_ISSUES = {
@@ -177,6 +210,14 @@ LANGUAGE_SWAP_ISSUES = {
     N1_KIND: "N1 recordings are 16 kHz and a swap presents the donor's audio as it is; build swaps on the N2 cohort",
     N2_KIND: None,
 }
+# Why an impostor cannot be built from a manifest of this kind (None: it can, given speaker labels).
+IMPOSTOR_ISSUES = {
+    TAKES_KIND: "natural takes carry no speaker label (speaker and gender)",
+    N1_KIND: "N1 recordings are 16 kHz and an impostor presents the donor's audio as it is; build impostors on the "
+             "N2 cohort",
+    N2_KIND: None,
+}
+NO_LABELLED_TAKES = "no take of this manifest names its speaker and gender"
 
 
 class CalibrationError(ValueError):
@@ -265,6 +306,11 @@ def load_takes(path: Path) -> tuple[dict, str]:
         if not isinstance(take.get("language"), str) or not isinstance(take.get("text"), str):
             raise CalibrationError(f"{take_id}: a generated take names its language and text")
         _relative_path(path.parent, take.get("wavPath"), f"{take_id}: wavPath")
+        seams = take.get("seamSamples")
+        if seams is not None and (not isinstance(seams, list) or not all(type(seam) is int and seam > 0
+                                                                         for seam in seams)
+                                  or any(later <= earlier for earlier, later in zip(seams, seams[1:]))):
+            raise CalibrationError(f"{take_id}: seamSamples are increasing positive sample offsets")
         if n1:
             recording = take.get("recording")
             if take.get("population") != "N1" or not isinstance(take.get("eligible"), bool) \
@@ -371,17 +417,20 @@ def voice_label(take: dict) -> dict:
 # --------------------------------------------------------------------------- #
 
 def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_issue: str | None = None,
-               language_swap_rows: bool = False) -> list[dict]:
+               language_swap_rows: bool = False, seams: bool = False, impostor_issue: str | None = None,
+               impostor_rows: bool = False) -> list[dict]:
     """Every catalog injector at sham, mild, moderate and severe: scheduled, replaced or out of scope.
 
     `words`: the sources carry the aligner's word intervals, so a catalog
     variant that needs only words (and pauses) is scheduled, and the injectors
     of `WORD_CATALOG_INJECTORS` run their catalog variants instead of their
-    take-* ones. `language_swap_rows` adds the LNG-SWAP rows (class D), refused
-    with `language_swap_issue` when the manifest cannot build them.
+    take-* ones. `seams`: some sources declare long-form seams. `language_swap_rows`
+    adds the LNG-SWAP rows (class D), refused with `language_swap_issue` when
+    the manifest cannot build them; `impostor_rows` adds the IDN-IMPOSTOR rows
+    (class E) the same way.
     """
     scope = sorted(set(classes))
-    available = {"words", "pauses"} if words else set()
+    available = ({"words", "pauses"} if words else set()) | ({"seams"} if seams else set())
     rows = []
     for injector in injectors.CATALOG.values():
         in_scope = bool(set(injector.classes) & set(scope))
@@ -421,11 +470,24 @@ def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_iss
             else:
                 row.update(status="scheduled", variant=variant, parameters=dict(parameters))
             rows.append(row)
+    if impostor_rows or "E" in scope:
+        for variant, parameters in speaker_donors.IMPOSTOR_VARIANTS.items():
+            row = {"injector": speaker_donors.IMPOSTOR_KEY, "injectorID": speaker_donors.IMPOSTOR_ID,
+                   "classes": list(speaker_donors.CLASSES), "severity": variant, "catalogVariant": None,
+                   "catalogNeeds": ["speaker donors"], "mechanism": speaker_donors.MECHANISM}
+            if "E" not in scope:
+                row.update(status="out-of-scope", variant=None,
+                           reason=f"classes E are outside this set ({'/'.join(scope)})")
+            elif impostor_issue is not None:
+                row.update(status="not-applicable", variant=None, reason=impostor_issue)
+            else:
+                row.update(status="scheduled", variant=variant, parameters=dict(parameters))
+            rows.append(row)
     return rows
 
 
 def schedule(plan: list[dict]) -> list[tuple[str, str]]:
-    """The T1 catalog variants to attempt on each source (language swaps are built apart)."""
+    """The T1 catalog variants to attempt on each source (language swaps and impostors are built apart)."""
     return [(row["injectorID"], row["variant"]) for row in plan
             if row["status"] != "out-of-scope" and row["injectorID"] in injectors.CATALOG]
 
@@ -435,9 +497,23 @@ def swaps_scheduled(plan: list[dict]) -> list[str]:
             if row["injectorID"] == language_swap.INJECTOR_ID and row["status"] == "scheduled"]
 
 
+def impostors_scheduled(plan: list[dict]) -> list[str]:
+    return [row["variant"] for row in plan
+            if row["injectorID"] == speaker_donors.IMPOSTOR_ID and row["status"] == "scheduled"]
+
+
+def donor_relations(plan: list[dict], injector_id: str) -> tuple[str, ...]:
+    """The donor relations the scheduled variants of a T1 splice injector need (none: it splices no donor)."""
+    wanted = {injectors.CATALOG[injector_id].variant(variant).parameters.get("donor")
+              for row_id, variant in schedule(plan) if row_id == injector_id}
+    return tuple(relation for relation in speaker_donors.RELATIONS if relation in wanted)
+
+
 def injector_classes(injector_id: str) -> tuple[str, ...]:
     if injector_id == language_swap.INJECTOR_ID:
         return language_swap.CLASSES
+    if injector_id == speaker_donors.IMPOSTOR_ID:
+        return speaker_donors.CLASSES
     return injectors.CATALOG[injector_id].classes
 
 
@@ -661,12 +737,17 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
     """One seeded, language-stratified family sample per injector, shared by its sham and every severity.
 
     `usable_words`: the takes whose alignment is usable, when the set has word
-    intervals; a word-level injector draws only from their families.
+    intervals; a word-level injector draws only from their families. A donor
+    splice draws only from sources with a donor of every relation it needs, a
+    seam injector only from sources that declare seams, and IDN-IMPOSTOR only
+    from sources with both of its donors.
     """
     languages: dict[str, str] = {}
     for take in takes:
         languages.setdefault(take["family"], str(take.get("language")))
     swap_families = {take["family"] for take in language_swap.eligible_sources(takes)}
+    impostor_families = {take["family"] for take in speaker_donors.DonorPool(takes).sources()}
+    seamed = {take["family"] for take in takes if take.get("seamSamples")}
     worded = None if usable_words is None else {take["family"] for take in takes if take["takeID"] in usable_words}
     chosen: dict[str, dict] = {}
     for row in plan:
@@ -677,12 +758,21 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
         if row["injectorID"] == language_swap.INJECTOR_ID:
             needs = ["parallel recordings"]
             pool = {family: language for family, language in languages.items() if family in swap_families}
+        elif row["injectorID"] == speaker_donors.IMPOSTOR_ID:
+            needs = ["speaker donors"]
+            pool = {family: language for family, language in languages.items() if family in impostor_families}
         else:
             needs = sorted({need for other in rows for need in injectors.needs(
                 other["injectorID"], injectors.CATALOG[other["injectorID"]].variant(other["variant"]).parameters)})
             pool = dict(languages)
             if "words" in needs and worded is not None:
                 pool = {family: language for family, language in pool.items() if family in worded}
+            if "seams" in needs:
+                pool = {family: language for family, language in pool.items() if family in seamed}
+            if "donor" in needs:
+                donors = speaker_donors.DonorPool(takes, eligible=usable_words if "words" in needs else None)
+                served = {take["family"] for take in donors.sources(donor_relations(plan, row["injectorID"]))}
+                pool = {family: language for family, language in pool.items() if family in served}
         families = stratified_sample(pool, per_cell, seed=seed, key=row["injector"])
         chosen[row["injector"]] = {
             "needs": needs, "eligible": dict(sorted(Counter(pool.values()).items())),
@@ -695,8 +785,8 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
                 f"quotas fill round-robin over the languages in ascending SHA-256('{SAMPLE_SCHEMA}|<seed>|<injector>|"
                 "language|<language>') until perCell families or the eligible pool runs out",
         "shared": "one sample per injector: its sham and every severity use the same families, so each (injector, "
-                  "severity) cell and its sham hold the same families (for LNG-SWAP, the same source families; "
-                  "each clip's family is its donor audio's)",
+                  "severity) cell and its sham hold the same families (for LNG-SWAP and IDN-IMPOSTOR, the same "
+                  "source families; each clip's family is its donor audio's)",
         "injectors": chosen,
     }
 
@@ -748,14 +838,18 @@ def parallel(function: Callable[[Any], Any], tasks: list[Any], jobs: int, label:
 
 def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: str, wav_sha256: str,
            source_wav_sha256: str, rate: int, source_resampling: dict | None = None, *, embed_text: bool = False,
-           source_alignment: dict | None = None) -> dict:
+           source_alignment: dict | None = None, donor: dict | None = None,
+           source_seams: tuple[int, ...] = ()) -> dict:
     injector = injectors.CATALOG[injection.injector.split("@")[0]]
-    entry = {key: value for key, value in take.items() if key != "text"}
+    # The source's seams stay behind: the entry carries its own output's (none where the edit moved them).
+    entry = {key: value for key, value in take.items() if key not in ("text", "seamSamples")}
     entry.update(
         takeID=clip_id, sourceTakeID=take["takeID"], family=take["family"], status="generated",
         wavPath=wav_path, wavSHA256=wav_sha256, durationSeconds=round(injection.samples.size / rate, 6),
         textSHA256=hashlib.sha256(take["text"].encode("utf-8")).hexdigest(),
     )
+    if injection.seams:
+        entry["seamSamples"] = list(injection.seams)
     if embed_text:
         entry["text"] = take["text"]
     entry["injection"] = {
@@ -772,6 +866,12 @@ def _entry(take: dict, injection: injectors.Injection, clip_id: str, wav_path: s
     if source_alignment is not None:
         # The source carried the aligner's word and pause intervals (`recordings.word_alignment`).
         entry["injection"]["sourceAlignment"] = source_alignment
+    if source_seams:
+        # The source's long-form seams, which a seam injector draws from.
+        entry["injection"]["sourceSeams"] = list(source_seams)
+    if donor is not None:
+        # The donor recording a splice drew its words from (`speaker_donors`).
+        entry["injection"]["donor"] = donor
     return _plain(entry)
 
 
@@ -792,12 +892,39 @@ def _swap_entry(take: dict, donor: dict, variant: str, clip_id: str, wav_path: s
     return _plain(entry)
 
 
+def _impostor_entry(take: dict, donor: dict, variant: str, clip_id: str, wav_path: str, wav_sha256: str,
+                    samples: np.ndarray, source_pcm_sha256: str, seed: int, *, embed_text: bool) -> dict:
+    """An impostor: the donor's audio and its own text, presented as the source speaker (`speaker`)."""
+    entry = {key: value for key, value in donor.items() if key != "text"}
+    entry.update(
+        takeID=clip_id, sourceTakeID=take["takeID"], family=donor["family"], speaker=take["speaker"],
+        gender=take["gender"], language=take["language"], status="generated", wavPath=wav_path,
+        wavSHA256=wav_sha256, durationSeconds=round(samples.size / recordings.ENGINE_SAMPLE_RATE, 6),
+        textSHA256=text_sha256(donor["text"]),
+    )
+    if embed_text:
+        entry["text"] = donor["text"]
+    entry["injection"] = speaker_donors.impostor_injection(
+        variant=variant, source=take, donor=donor, seed=seed, source_pcm_sha256=source_pcm_sha256,
+        output_pcm_sha256=pcm_digest(samples), frames=int(samples.size))
+    return _plain(entry)
+
+
+def presented_text(entry: dict, takes: dict[str, dict]) -> str:
+    """The text an entry is presented with: the source take's, or for an impostor the donor's own."""
+    injection = entry.get("injection") or {}
+    if injection.get("injectorID") == speaker_donors.IMPOSTOR_ID:
+        return takes[str(injection.get("donorTakeID"))]["text"]
+    return takes[entry["sourceTakeID"]]["text"]
+
+
 def _source_fixture(task: dict) -> tuple[Any, str, dict | None, str | None]:
     """The take as an injector source: its fixture, WAV digest, word alignment (if usable) and why not."""
     take = task["take"]
     fixture, digest = recordings.load_recording(Path(task["wav"]), take_id=take["takeID"], family=take["family"],
                                                 stratum=stratum(take), text=take["text"],
-                                                expected_sha256=take["wavSHA256"], source_rate=source_rate(take))
+                                                expected_sha256=take["wavSHA256"], source_rate=source_rate(take),
+                                                seams=take.get("seamSamples") or ())
     context = task.get("alignment")
     if context is None:
         return fixture, digest, None, None
@@ -815,6 +942,28 @@ def _needs_words(injector_id: str, variant: str) -> bool:
     return "words" in injectors.needs(injector_id, injectors.CATALOG[injector_id].variant(variant).parameters)
 
 
+class _Donors:
+    """A task's chosen splice donors, each loaded once (with its usable word intervals)."""
+
+    def __init__(self, task: dict) -> None:
+        self.chosen = task.get("donors") or {}
+        self.issues = task.get("donorIssues") or {}
+        self.loaded: dict[str, tuple] = {}
+
+    def get(self, injector_id: str, relation: str) -> tuple[Any, dict | None, str | None]:
+        """(fixture, recipe block, None), or (None, None, why there is no donor)."""
+        item = (self.chosen.get(injector_id) or {}).get(relation)
+        if item is None:
+            return None, None, self.issues.get(injector_id) or "no donor was chosen for this take"
+        take = item["take"]
+        if take["takeID"] not in self.loaded:
+            self.loaded[take["takeID"]] = _source_fixture(item)
+        fixture, digest, alignment, _status = self.loaded[take["takeID"]]
+        return fixture, {"takeID": take["takeID"], "family": take["family"], "speaker": take.get("speaker"),
+                         "relation": relation, "wavSHA256": digest, "pcmSHA256": fixture.digest,
+                         "alignment": alignment}, None
+
+
 def _inject_take(task: dict) -> dict:
     take = task["take"]
     rate = source_rate(take)
@@ -822,17 +971,22 @@ def _inject_take(task: dict) -> dict:
     source_resampling = recordings.resampling_recipe(rate)
     output = Path(task["output"])
     embed_text = bool(task.get("embedText"))
+    donors = _Donors(task)
     entries, skips = [], []
     written = 0
     for injector_id, variant in task["schedule"]:
         key = injectors.CATALOG[injector_id].key
         seed = derive_seed(digest, key, task["catalogSeed"])
+        relation = injectors.CATALOG[injector_id].variant(variant).parameters.get("donor")
+        donor, donor_record, donor_issue = donors.get(injector_id, relation) if relation else (None, None, None)
         try:
-            injection = injectors.inject(injector_id, variant, fixture, seed)
+            injection = injectors.inject(injector_id, variant, fixture, seed, donor=donor)
         except injectors.InjectorNotApplicable as error:
             reason = _reason(error, fixture.fixture_id, key, variant)
             if word_status is not None and _needs_words(injector_id, variant):
                 reason = f"{reason} ({word_status})"
+            if donor_issue is not None:
+                reason = f"{reason} ({donor_issue})"
             skips.append([key, variant, reason])
             continue
         clip_id = f"{take['takeID']}__{injector_id}__{variant}"
@@ -841,7 +995,8 @@ def _inject_take(task: dict) -> dict:
                                                 sample_rate=fixture.sample_rate)
         written += (output / relative).stat().st_size
         entries.append(_entry(take, injection, clip_id, relative, wav_sha256, digest, fixture.sample_rate,
-                              source_resampling, embed_text=embed_text, source_alignment=source_alignment))
+                              source_resampling, embed_text=embed_text, source_alignment=source_alignment,
+                              donor=donor_record, source_seams=fixture.seams))
     for swap in task.get("languageSwap") or ():
         donor, variant = swap["donor"], swap["variant"]
         donor_wav = Path(swap["wav"])
@@ -854,6 +1009,18 @@ def _inject_take(task: dict) -> dict:
         written += (output / relative).stat().st_size
         entries.append(_swap_entry(take, donor, variant, clip_id, relative, file_sha256(output / relative), samples,
                                    fixture.digest, task["sampleSeed"], embed_text=embed_text))
+    for impostor in task.get("impostor") or ():
+        donor, variant = impostor["donor"], impostor["variant"]
+        donor_wav = Path(impostor["wav"])
+        if not donor_wav.is_file() or file_sha256(donor_wav) != donor["wavSHA256"]:
+            raise recordings.RecordingError(f"{donor['takeID']}: its WAV is missing or differs from the manifest")
+        clip_id = f"{take['takeID']}__{speaker_donors.IMPOSTOR_ID}__{variant}"
+        relative = f"wav/{clip_id}.wav"
+        language_swap.copy_as_is(donor_wav, output / relative)
+        samples = recordings.read_pcm16_wav(output / relative)
+        written += (output / relative).stat().st_size
+        entries.append(_impostor_entry(take, donor, variant, clip_id, relative, file_sha256(output / relative),
+                                       samples, fixture.digest, task["sampleSeed"], embed_text=embed_text))
     return {"takeID": take["takeID"], "entries": entries, "skips": skips, "bytes": written}
 
 
@@ -900,10 +1067,79 @@ def default_classes(manifest: dict) -> tuple[str, ...]:
     return DEFAULT_N2_CLASSES if manifest["kind"] == N2_KIND else DEFAULT_CLASSES
 
 
+def impostor_issue(manifest: dict) -> str | None:
+    """Why an impostor cannot be built from this manifest (None: it can)."""
+    issue = IMPOSTOR_ISSUES[manifest["kind"]]
+    if issue is None and not any(speaker_donors.labelled(take) for take in generated_takes(manifest)):
+        return NO_LABELLED_TAKES
+    return issue
+
+
 def plan_for(manifest: dict, classes: Iterable[str], *, words: bool) -> list[dict]:
     cohort = manifest["kind"] in COHORT_KINDS
+    seams = any(take.get("seamSamples") for take in generated_takes(manifest))
     return build_plan(classes, words=words, language_swap_issue=LANGUAGE_SWAP_ISSUES[manifest["kind"]],
-                      language_swap_rows=cohort)
+                      language_swap_rows=cohort, seams=seams, impostor_issue=impostor_issue(manifest),
+                      impostor_rows=cohort)
+
+
+def identity_swap_status(manifest: dict) -> dict:
+    if manifest["kind"] not in COHORT_KINDS:
+        return {**DONOR_SWAP_STATUS, "donorPairs": donor_pairs(manifest)}
+    labelled = any(speaker_donors.labelled(take) for take in generated_takes(manifest))
+    return dict(LABELLED_SWAP_STATUS if labelled else COHORT_SWAP_STATUS)
+
+
+def _sampled(sources: list[dict], sampling: dict | None, key: str) -> list[dict]:
+    if sampling is None:
+        return sources
+    families = set((sampling["injectors"].get(key) or {}).get("families") or ())
+    return [take for take in sources if take["family"] in families]
+
+
+def splice_donors(generated: list[dict], plan: list[dict], sampling: dict | None, usable_words: set[str] | None, *,
+                  seed: int) -> dict[str, dict[str, dict[str, str]]]:
+    """Per donor-splice injector: source takeID -> {relation: donor takeID}, re-derivable by `verify`.
+
+    The sources are the takes with a donor of every relation the injector's
+    scheduled variants need (within its sampled families), in manifest order;
+    donors must carry a usable alignment when the set has alignments.
+    """
+    chosen: dict[str, dict[str, dict[str, str]]] = {}
+    for injector_id in dict.fromkeys(row_id for row_id, _ in schedule(plan)):
+        relations = donor_relations(plan, injector_id)
+        if not relations:
+            continue
+        pool = speaker_donors.DonorPool(generated, eligible=usable_words)
+        sources = _sampled(pool.sources(relations), sampling, injectors.CATALOG[injector_id].key)
+        chosen[injector_id] = pool.choose([take["takeID"] for take in sources], seed=seed,
+                                          key=injectors.CATALOG[injector_id].key, relations=relations)
+    return chosen
+
+
+def impostor_relations(variants: Iterable[str]) -> tuple[str, ...]:
+    wanted = {speaker_donors.IMPOSTOR_VARIANTS[variant]["donor"] for variant in variants}
+    return tuple(relation for relation in speaker_donors.RELATIONS if relation in wanted)
+
+
+def impostor_donors(generated: list[dict], plan: list[dict], sampling: dict | None, *,
+                    seed: int) -> dict[str, dict[str, str]]:
+    """Source takeID -> {relation: donor takeID} for the scheduled impostor variants, re-derivable by `verify`."""
+    variants = impostors_scheduled(plan)
+    if not variants:
+        return {}
+    relations = impostor_relations(variants)
+    pool = speaker_donors.DonorPool(generated)
+    sources = _sampled(pool.sources(relations), sampling, speaker_donors.IMPOSTOR_KEY)
+    return pool.choose([take["takeID"] for take in sources], seed=seed, key=speaker_donors.IMPOSTOR_KEY,
+                       relations=relations)
+
+
+def _donor_item(take: dict, takes_path: Path, alignments: dict | None) -> dict:
+    item = {"take": take, "wav": str(take_wav(takes_path, take))}
+    if alignments is not None:
+        item["alignment"] = alignment_context(alignments["takes"].get(take["takeID"]))
+    return item
 
 
 def usable_word_takes(generated: list[dict], alignments: dict | None) -> set[str] | None:
@@ -949,6 +1185,10 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
     sources = swap_sources(generated, plan, sampling)
     donors = language_swap.choose_donors(generated, sources, seed=sample_seed)
     swap_variants = swaps_scheduled(plan)
+    splices = splice_donors(generated, plan, sampling, usable, seed=sample_seed)
+    splice_pool = speaker_donors.DonorPool(generated, eligible=usable)
+    impostor_variants = impostors_scheduled(plan)
+    impostors = impostor_donors(generated, plan, sampling, seed=sample_seed)
     chosen = {key: set(value["families"]) for key, value in (sampling or {}).get("injectors", {}).items()}
     tasks = []
     for take in generated:
@@ -966,7 +1206,25 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
             task["languageSwap"] = [{"variant": variant, "donor": by_id[donors[take["takeID"]][variant]],
                                      "wav": str(take_wav(takes_path, by_id[donors[take["takeID"]][variant]]))}
                                     for variant in swap_variants]
-        if sampling is None or task["schedule"] or task.get("languageSwap"):
+        scheduled_ids = {injector_id for injector_id, _ in task["schedule"]}
+        for injector_id, by_source in splices.items():
+            if injector_id not in scheduled_ids:
+                continue
+            picks = by_source.get(take["takeID"])
+            if picks is None:
+                task.setdefault("donorIssues", {})[injector_id] = splice_pool.issue(
+                    take, donor_relations(plan, injector_id)) or "no donor was chosen for this take"
+                continue
+            task.setdefault("donors", {})[injector_id] = {
+                relation: _donor_item(by_id[donor_id], takes_path, alignments) for relation, donor_id in picks.items()}
+        if take["takeID"] in impostors:
+            task["sampleSeed"] = sample_seed
+            picks = impostors[take["takeID"]]
+            task["impostor"] = [
+                {"variant": variant, "donor": by_id[picks[speaker_donors.IMPOSTOR_VARIANTS[variant]["donor"]]],
+                 "wav": str(take_wav(takes_path, by_id[picks[speaker_donors.IMPOSTOR_VARIANTS[variant]["donor"]]]))}
+                for variant in impostor_variants]
+        if sampling is None or task["schedule"] or task.get("languageSwap") or task.get("impostor"):
             tasks.append(task)
     log(f"inject: {len(tasks)} of {len(generated)} generated takes x {len(scheduled)} scheduled variants"
         + (f" ({per_cell} families per cell)" if sampling is not None else "") + f", {jobs} jobs")
@@ -995,12 +1253,27 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
                           "<injector@version>|<catalog seed>'), big-endian; the variant is not an input, so a "
                           "sham draws the same positions as its positives",
         "plan": plan, "recordingVariants": recording_variants_description(),
-        "identitySwap": {**DONOR_SWAP_STATUS, "donorPairs": donor_pairs(manifest)},
+        "identitySwap": identity_swap_status(manifest),
         "textPolicy": TEXT_POLICY_EMBEDDED if embed else TEXT_POLICY_N3,
     }
     if manifest["kind"] in COHORT_KINDS:
-        head["identitySwap"] = dict(COHORT_SWAP_STATUS)
         head["sourceManifest"]["population"] = population
+    if splices or impostor_variants:
+        head["speakerDonors"] = {
+            "schema": speaker_donors.CHOICE_SCHEMA, "seed": sample_seed, "choice": speaker_donors.CHOICE_RULE,
+            "pool": "this cohort manifest (one split): takes of the source's language and gender that name their "
+                    "speaker; another speaker's for a positive, another utterance of the source speaker for a sham; "
+                    "a splice's donors only among takes whose alignment is usable",
+            "labelledTakes": sum(1 for take in generated if speaker_donors.labelled(take)),
+            "splices": {injectors.CATALOG[injector_id].key: {"relations": list(donor_relations(plan, injector_id)),
+                                                             "sources": len(by_source)}
+                        for injector_id, by_source in splices.items()},
+        }
+    if impostor_variants:
+        head["impostor"] = {**speaker_donors.describe_impostor(), "seed": sample_seed,
+                            "eligibleSources": len(speaker_donors.DonorPool(generated).sources(
+                                impostor_relations(impostor_variants))),
+                            "sources": len(impostors)}
     if alignments is not None:
         head["alignments"] = {
             "sha256": alignments_sha256, "takesSHA256": alignments["takesSHA256"],
@@ -1081,6 +1354,55 @@ def _verify_swap(entry: dict, task: dict, fixture_digest: str, digest: str) -> s
     return "; ".join(problems) if problems else None
 
 
+def _verify_impostor(entry: dict, task: dict, fixture_digest: str, digest: str) -> str | None:
+    """An impostor: the donor the choice re-derives, its audio and text as they are, presented as the source speaker."""
+    take = task["take"]
+    recipe = entry.get("injection") or {}
+    variant = str(recipe.get("variant"))
+    item = (task.get("impostors") or {}).get(variant)
+    if variant not in speaker_donors.IMPOSTOR_VARIANTS or item is None:
+        return "no such impostor was chosen for this source"
+    donor = item["donor"]
+    output = Path(task["setDir"]) / entry["wavPath"]
+    if not output.is_file() or file_sha256(output) != entry.get("wavSHA256"):
+        return "output WAV is missing or its file digest differs"
+    donor_wav = Path(item["wav"])
+    samples = recordings.read_pcm16_wav(output)
+    expected = speaker_donors.impostor_injection(
+        variant=variant, source=take, donor=donor, seed=task["impostorSeed"], source_pcm_sha256=fixture_digest,
+        output_pcm_sha256=pcm_digest(samples), frames=int(samples.size))
+    checks = [
+        (recipe == _plain(expected), "the recipe differs from the re-derived impostor (donor, digests or labels)"),
+        (donor_wav.is_file() and file_sha256(donor_wav) == donor["wavSHA256"], "the donor WAV differs"),
+        (entry.get("wavSHA256") == donor["wavSHA256"], "the clip is not the donor's audio as it is"),
+        (recipe.get("sourceWAVSHA256") == digest, "source WAV digest differs"),
+        (entry.get("family") == donor["family"], "family differs from the donor recording's"),
+        ((entry.get("speaker"), entry.get("gender")) == (take["speaker"], take["gender"]),
+         "the presented speaker is not the source's"),
+        (entry.get("textSHA256") == text_sha256(donor["text"]) and entry.get("text", donor["text"]) == donor["text"],
+         "its text is not its donor's own"),
+    ]
+    problems = [message for ok, message in checks if not ok]
+    return "; ".join(problems) if problems else None
+
+
+def _verify_donor(recipe: dict, task: dict, injector_id: str, relation: str) -> tuple[Any, str | None]:
+    """The donor fixture of a splice entry, or why its recorded donor is not the one the choice re-derives."""
+    item = ((task.get("donors") or {}).get(injector_id) or {}).get(relation)
+    if item is None:
+        return None, "no such donor was chosen for this source"
+    try:
+        fixture, digest, alignment, _status = _source_fixture(item)
+    except recordings.RecordingError as error:
+        return None, f"donor: {error}"
+    donor = item["take"]
+    expected = {"takeID": donor["takeID"], "family": donor["family"], "speaker": donor.get("speaker"),
+                "relation": relation, "wavSHA256": digest, "pcmSHA256": fixture.digest, "alignment": alignment}
+    if recipe.get("donor") != _plain(expected):
+        return None, "the donor differs from the re-derived choice (take, digests or alignment)"
+    return fixture, None
+
+
 def _verify_take(task: dict) -> list[list[str]]:
     take = task["take"]
     failures: list[list[str]] = []
@@ -1092,6 +1414,12 @@ def _verify_take(task: dict) -> list[list[str]]:
     for entry in task["entries"]:
         clip = entry["takeID"]
         recipe = entry.get("injection") or {}
+        if recipe.get("injectorID") == speaker_donors.IMPOSTOR_ID:
+            # An impostor carries its donor's own text, never the source's.
+            problem = _verify_impostor(entry, task, fixture.digest, digest)
+            if problem:
+                failures.append([clip, problem])
+            continue
         if entry.get("textSHA256") != text_sha256(take["text"]) or ("text" in entry and entry["text"] != take["text"]):
             failures.append([clip, "its text is not its source take's"])
             continue
@@ -1106,6 +1434,7 @@ def _verify_take(task: dict) -> list[list[str]]:
         except KeyError:
             failures.append([clip, "the catalog has no such injector or variant"])
             continue
+        relation = variant.parameters.get("donor")
         checks = [
             (recipe.get("injector") == injector.key, "injector version differs from the catalog"),
             (recipe.get("catalogVersion") == injectors.CATALOG_VERSION, "catalog version differs"),
@@ -1117,14 +1446,25 @@ def _verify_take(task: dict) -> list[list[str]]:
              "seed differs from its derivation"),
             (entry.get("family") == take["family"], "family differs from the source take's"),
             (recipe.get("sourceAlignment") == _plain(source_alignment), "source word alignment differs"),
+            (recipe.get("sourceSeams", []) == list(fixture.seams), "source seams differ"),
+            (relation is not None or "donor" not in recipe, "a donor on a variant that splices none"),
         ]
         problems = [message for ok, message in checks if not ok]
         if problems:
             failures.append([clip, "; ".join(problems)])
             continue
-        replay = injectors.inject(injector.injector_id, variant.name, fixture, int(recipe["seed"]))
+        donor = None
+        if relation is not None:
+            donor, problem = _verify_donor(recipe, task, injector.injector_id, relation)
+            if problem:
+                failures.append([clip, problem])
+                continue
+        replay = injectors.inject(injector.injector_id, variant.name, fixture, int(recipe["seed"]), donor=donor)
         if replay.digest != recipe.get("outputPCMSHA256") or _plain(list(replay.labels)) != recipe.get("labels"):
             failures.append([clip, "replay differs from the recorded output digest or labels"])
+            continue
+        if entry.get("seamSamples", []) != list(replay.seams):
+            failures.append([clip, "its seams differ from the replay's"])
             continue
         output = Path(task["setDir"]) / entry["wavPath"]
         if not output.is_file() or file_sha256(output) != entry.get("wavSHA256"):
@@ -1138,6 +1478,14 @@ def _verify_take(task: dict) -> list[list[str]]:
 def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: Path | None = None) -> dict:
     injection_set = load_set(set_path)
     manifest, manifest_sha256 = load_takes(takes_path)
+    version = injection_set.get("catalogVersion")
+    if version != injectors.CATALOG_VERSION:
+        # Refused whole: this code replays only its own catalog version. Version 3 left every version 2
+        # output unchanged, but a replay under another catalog is not the verification of the set's own.
+        return {"entries": len(injection_set["entries"]), "sources": 0, "verified": False,
+                "failures": [["<set>", f"the set was built with injector catalog version {version}; this code "
+                                       f"replays version {injectors.CATALOG_VERSION} only: verify it with the "
+                                       "code of its version, or rebuild it"]]}
     failures: list[list[str]] = []
     if injection_set.get("sourceManifest", {}).get("sha256") != manifest_sha256:
         failures.append(["<set>", "the set was built from another takes manifest"])
@@ -1168,6 +1516,15 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
     if swap is not None:
         donors = language_swap.choose_donors(generated, swap_sources(generated, plan, sampling),
                                              seed=int(swap.get("seed") or 0))
+    # The speaker donors, re-derived as `inject` chose them (a splice's pool depends on the alignments).
+    speakers = injection_set.get("speakerDonors")
+    splices: dict[str, dict[str, dict[str, str]]] = {}
+    if speakers is not None and (declared is None or alignments is not None):
+        splices = splice_donors(generated, plan, sampling, usable_word_takes(generated, alignments),
+                                seed=int(speakers.get("seed") or 0))
+    impostor = injection_set.get("impostor")
+    impostors = {} if impostor is None else impostor_donors(generated, plan, sampling,
+                                                            seed=int(impostor.get("seed") or 0))
     grouped: "OrderedDict[str, list[dict]]" = OrderedDict()
     for entry in injection_set["entries"]:
         source = entry.get("sourceTakeID")
@@ -1185,6 +1542,18 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
             task["swapSeed"] = int(swap["seed"])
             task["swaps"] = {variant: {"donor": takes[donor], "wav": str(take_wav(takes_path, takes[donor]))}
                              for variant, donor in donors[source].items()}
+        for injector_id, by_source in splices.items():
+            if source in by_source:
+                task.setdefault("donors", {})[injector_id] = {
+                    relation: _donor_item(takes[donor], takes_path, alignments)
+                    for relation, donor in by_source[source].items()}
+        if source in impostors:
+            task["impostorSeed"] = int(impostor["seed"])
+            task["impostors"] = {
+                variant: {"donor": takes[impostors[source][speaker_donors.IMPOSTOR_VARIANTS[variant]["donor"]]],
+                          "wav": str(take_wav(takes_path, takes[impostors[source][
+                              speaker_donors.IMPOSTOR_VARIANTS[variant]["donor"]]]))}
+                for variant in impostors_scheduled(plan)}
         tasks.append(task)
     # Completeness (review of 6b1135e9): every scheduled T1 variant is accounted for on exactly its cell's
     # sampled families, as an entry or a recorded not-applicable skip, and no entry comes from outside them.
@@ -1198,7 +1567,7 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
         recorded: dict[tuple[str, str], list[str]] = {}
         for entry in injection_set["entries"]:
             injection = entry.get("injection") or {}
-            if injection.get("injectorID") == language_swap.INJECTOR_ID:
+            if injection.get("injectorID") in (language_swap.INJECTOR_ID, speaker_donors.IMPOSTOR_ID):
                 continue
             recorded.setdefault((str(injection.get("injector")), str(injection.get("variant"))), []).append(
                 str(entry.get("sourceTakeID")))
@@ -1223,6 +1592,11 @@ def run_verify(set_path: Path, takes_path: Path, *, jobs: int, alignments_path: 
                          if (entry.get("injection") or {}).get("injectorID") == language_swap.INJECTOR_ID)
     if recorded_swaps != expected_swaps:
         failures.append(["<set>", f"{recorded_swaps} language swaps recorded, {expected_swaps} re-derived"])
+    expected_impostors = len(impostors_scheduled(plan)) * len(impostors)
+    recorded_impostors = sum(1 for entry in injection_set["entries"]
+                             if (entry.get("injection") or {}).get("injectorID") == speaker_donors.IMPOSTOR_ID)
+    if recorded_impostors != expected_impostors:
+        failures.append(["<set>", f"{recorded_impostors} impostors recorded, {expected_impostors} re-derived"])
     for result in parallel(_verify_take, tasks, jobs, "verify"):
         failures.extend(result)
     return {"entries": len(injection_set["entries"]), "sources": len(tasks), "failures": failures,
@@ -1242,7 +1616,9 @@ def _score_clip(task: dict) -> dict:
     if recordings.resampling_recipe(rate) is not None:
         # An N1 recording reaches the engine rate as it does before any injector (recordings.load_recording).
         samples = polyphase_resample(samples, rate, recordings.ENGINE_SAMPLE_RATE)
-    report = audio_qc.fast_qc_v8(samples, sample_rate=recordings.ENGINE_SAMPLE_RATE, text=task["text"], signal=True)
+    # A long-form clip's seams feed the Stage 0 seam z-score (no v8 flag or verdict reads them).
+    report = audio_qc.fast_qc_v8(samples, sample_rate=recordings.ENGINE_SAMPLE_RATE, text=task["text"], signal=True,
+                                 seam_offsets=task.get("seams") or ())
     fast = {"verdict": report["verdict"], "instabilityVerdict": report["instabilityVerdict"],
             "writtenOutputVerdict": report["writtenOutputVerdict"], "flags": list(report["flags"]),
             "flagLevels": dict(report["flagLevels"])}
@@ -1542,7 +1918,8 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict, popu
             LABELED_NOTES[population] + ".",
             COHORT_CAVEATS[population],
             "Word-level variants run on the takes whose forced alignment is usable (sourceAlignment in the set); "
-            "without it they are not applicable. The take-* variants remain declared word-free constructions.",
+            "without it they are not applicable. The take-* variants are declared constructions: word-free ones, "
+            "and donor splices that need the word intervals of both recordings.",
             "Injections cover a seeded, language-stratified sample of source families per injector when the set "
             "samples (sampling in the set); the clean rates cover every eligible recording.",
             "A language swap (LNG-SWAP) is another recording's audio as it is, presented with the source's "
@@ -1555,6 +1932,13 @@ def build_report(records: list[dict], *, inputs: dict, injection_set: dict, popu
         if population == "N1":
             report["caveats"].append("N1 recordings are 16 kHz and reach 24 kHz through the Kaiser-5 polyphase "
                                      "resampler before Fast QC, as they do before any injector.")
+        if injection_set.get("speakerDonors") is not None:
+            report["caveats"].append(
+                "Speaker donors come from this cohort (speakerDonors in the set): an impostor (IDN-IMPOSTOR) is "
+                "another speaker's recording as it is, presented as the source speaker with its own text, its "
+                "family that recording's; a donor splice keeps the source's family and text, so its sham (the "
+                "source speaker's other utterance) changes the words as much as the positive. v8 has no identity "
+                "detector.")
     report["headline"] = headline(report)
     return report
 
@@ -1740,17 +2124,21 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
                 "text": take["text"], "meta": _meta(take, take_id, population, None)}
         if source_rate(take) != recordings.ENGINE_SAMPLE_RATE:
             task["sourceRate"] = source_rate(take)
+        if take.get("seamSamples"):
+            task["seams"] = list(take["seamSamples"])
         tasks.append(task)
     for entry in injection_set["entries"]:
         take = takes.get(entry.get("sourceTakeID"))
         if take is None:
             raise CalibrationError(f"{entry.get('takeID')}: its source take is not a generated take")
         injection = entry["injection"]
-        tasks.append({"clipID": entry["takeID"], "wav": str(_relative_path(set_path.parent, entry["wavPath"],
-                                                                           f"{entry['takeID']}: wavPath")),
-                      "wavSHA256": entry["wavSHA256"], "text": take["text"],
-                      "meta": _meta(take, entry["takeID"], injection["population"], injection,
-                                    family=entry.get("family"))})
+        task = {"clipID": entry["takeID"], "wav": str(_relative_path(set_path.parent, entry["wavPath"],
+                                                                      f"{entry['takeID']}: wavPath")),
+                "wavSHA256": entry["wavSHA256"], "text": presented_text(entry, takes),
+                "meta": _meta(take, entry["takeID"], injection["population"], injection, family=entry.get("family"))}
+        if entry.get("seamSamples"):
+            task["seams"] = list(entry["seamSamples"])
+        tasks.append(task)
     rejected = rejected_takes(manifest)
     log(f"score: {len(takes)} {population} takes ({len(rejected)} engine-rejected, no audio) and "
         f"{len(injection_set['entries'])} injected clips, {jobs} jobs")
@@ -1781,7 +2169,9 @@ def run_score(takes_path: Path, set_path: Path | None, output: Path, *, jobs: in
     inputs = {"takesManifestSHA256": manifest_sha256,
               "injectionSetSHA256": None if set_path is None else file_sha256(set_path),
               "entriesSHA256": injection_set["entriesSHA256"], "measurementsSHA256": measurements_sha256,
-              "policySHA256": policy_module.policy_digest(), "catalogVersion": injectors.CATALOG_VERSION,
+              "policySHA256": policy_module.policy_digest(),
+              # The set's own catalog version (a set built by other code keeps its version).
+              "catalogVersion": injection_set.get("catalogVersion", injectors.CATALOG_VERSION),
               "catalogSeed": injection_set.get("catalogSeed"), "numpy": np.__version__}
     report = build_report(records, inputs=inputs, injection_set=injection_set, population=population)
     (output / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",

@@ -99,6 +99,10 @@ class Fixture:
     script: Script | None
     voice: Voice | None
     digest: str
+    # Long-form seam offsets on the source's own timeline, in samples: where one assembled segment ends
+    # and the next begins. A procedural source has none; a long-form take declares its own. Like the
+    # word intervals, they are not part of the PCM digest.
+    seams: tuple[int, ...] = ()
 
     @property
     def duration_seconds(self) -> float:
@@ -121,10 +125,10 @@ def _frozen(samples: np.ndarray) -> np.ndarray:
 def make_fixture(fixture_id: str, family: str, stratum: str, samples: np.ndarray, *,
                  sample_rate: int = ENGINE_SAMPLE_RATE, words: Iterable[tuple[int, int]] = (),
                  pauses: Iterable[tuple[int, int]] = (), text: str = "", script: Script | None = None,
-                 voice: Voice | None = None) -> Fixture:
+                 voice: Voice | None = None, seams: Iterable[int] = ()) -> Fixture:
     frozen = _frozen(samples)
     return Fixture(fixture_id, family, stratum, sample_rate, frozen, tuple(words), tuple(pauses), text,
-                   script, voice, pcm_digest(frozen))
+                   script, voice, pcm_digest(frozen), tuple(int(seam) for seam in seams))
 
 
 # --------------------------------------------------------------------------- #
@@ -313,6 +317,25 @@ def clean_fixture(index: int, stratum: str = "modal") -> Fixture:
     return make_fixture(f"proc-{stratum}-{index:04d}", script.family, stratum, samples,
                         sample_rate=script.sample_rate, words=script.words, pauses=script.pauses,
                         text=script.text, script=script, voice=voice)
+
+
+def long_form_fixture(index: int, *, segments: int = 3, words_per_segment: int = 6,
+                      stratum: str = "modal") -> Fixture:
+    """A procedural long-form source for the seam families: one script read by one voice, with a declared seam
+    where each segment after the first starts (its first word's onset, so an edit there reaches speech).
+
+    Its family is its own (`proc-long-form-<stratum>-<index>`), never a clean
+    fixture's; the clean fixtures and their digests are unchanged.
+    """
+    if segments < 2 or words_per_segment < 1:
+        raise ValueError("a long-form source has two or more segments of at least one word")
+    script = replace(make_script(index, stratum=stratum, word_count=segments * words_per_segment),
+                     family=f"proc-long-form-{stratum}-{index:04d}")
+    voice = _voice_for(index, stratum)
+    seams = tuple(script.words[segment * words_per_segment][0] for segment in range(1, segments))
+    return make_fixture(f"proc-long-form-{stratum}-{index:04d}", script.family, stratum, render(script, voice),
+                        sample_rate=script.sample_rate, words=script.words, pauses=script.pauses, text=script.text,
+                        script=script, voice=voice, seams=seams)
 
 
 def donor_voice(voice: Voice, relation: str) -> Voice:

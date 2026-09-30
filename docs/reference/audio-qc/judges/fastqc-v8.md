@@ -43,16 +43,14 @@ Its accuracy is claimed only through the detectors that consume it:
 
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
-| [`signal.clicks@1`](../detectors/signal.clicks-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `clickEventsPerSecond` | not qualified |
-| [`signal.dropout@1`](../detectors/signal.dropout-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `longestSilenceMS` | not qualified |
-| [`signal.terminal-silence@1`](../detectors/signal.terminal-silence-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `trailingSilenceMS` | not qualified |
-| [`signal.dc-offset@1`](../detectors/signal.dc-offset-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | absolute fastqc `dcOffset` | not qualified |
-| [`signal.level@1`](../detectors/signal.level-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `rmsDBFS` | not qualified |
-| [`signal.clipping@1`](../detectors/signal.clipping-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `hotSamples` | not qualified |
-| [`signal.noise@1`](../detectors/signal.noise-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `wadaSNRDB` | not qualified |
+| [`signal.clicks@1`](../detectors/signal.clicks-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `clickEventsPerSecond` | qualified (warn) |
+| [`signal.dropout@1`](../detectors/signal.dropout-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `longestSilenceMS` | qualified (warn) |
+| [`signal.terminal-silence@1`](../detectors/signal.terminal-silence-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `trailingSilenceMS` | qualified (warn) |
+| [`signal.dc-offset@1`](../detectors/signal.dc-offset-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | absolute fastqc `dcOffset` | qualified (warn) |
+| [`signal.level@1`](../detectors/signal.level-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `rmsDBFS` | qualified (warn) |
+| [`signal.clipping@1`](../detectors/signal.clipping-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `hotSamples` | refused |
+| [`signal.noise@1`](../detectors/signal.noise-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `wadaSNRDB` | qualified (warn) |
 | [`signal.band-limit@1`](../detectors/signal.band-limit-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `effectiveBandwidthHz` | not qualified |
-
-**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

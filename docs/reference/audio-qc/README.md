@@ -125,18 +125,18 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 <!-- BEGIN GENERATED audio-qc-docs:detectors (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 | Detector | Class | Stage | Combination | Plan | Qualification | Gates |
 |---|---|---|---|---|---|---|
-| [`signal.clicks@1`](detectors/signal.clicks-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.dropout@1`](detectors/signal.dropout-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.terminal-silence@1`](detectors/signal.terminal-silence-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.dc-offset@1`](detectors/signal.dc-offset-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.level@1`](detectors/signal.level-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.clipping@1`](detectors/signal.clipping-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
-| [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.clicks@1`](detectors/signal.clicks-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.dropout@1`](detectors/signal.dropout-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.terminal-silence@1`](detectors/signal.terminal-silence-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.dc-offset@1`](detectors/signal.dc-offset-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.level@1`](detectors/signal.level-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.clipping@1`](detectors/signal.clipping-v1.md) | A (signal) | 0 | single | confirmed (refused) | refused | - |
+| [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | no plan | not qualified | - |
-| [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | planned, not confirmed | not qualified | - |
-| [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | planned, not confirmed | not qualified | - |
-| [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | planned, not confirmed | not qualified | - |
-| [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | planned, not confirmed | not qualified | - |
+| [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | confirmed (refused) | refused | - |
+| [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | - |
+| [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
+| [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |
 <!-- END GENERATED audio-qc-docs:detectors -->
 
 ## Adding a judge or a detector

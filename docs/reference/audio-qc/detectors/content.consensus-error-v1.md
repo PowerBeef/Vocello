@@ -48,14 +48,60 @@ Registry entry `content.consensus-error@1` in [config/audio-qc-detectors.json](.
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Refused; confirmed (refused).
 
 **Plan.** [config/audio-qc-preregistrations/content.consensus-error@1.json](../../../../config/audio-qc-preregistrations/content.consensus-error@1.json): digest `7ca2a3effc9f6df0`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N2; injector catalog 2, classes A,B,C,D,F, 150 per cell.
 Calibration cohort audio-qc-n2-cohort (fleurs-dev, manifest `59221512a00b2b4a`); confirmation cohort audio-qc-n2-cohort (fleurs-test, manifest `ae62a87f35ed9b7c`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry refused (cross-mechanism-detection-not-met).
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+### Record [record-7ca2a3effc9f6df0.json](../../../../benchmarks/audio-qc-calibration/content.consensus-error@1/record-7ca2a3effc9f6df0.json): refused (cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `7ca2a3effc9f6df0`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.111111 | 27/602 (0.045), upper 0.071 | 0.2 | yes |
+| english | 0.117647 | 8/236 (0.034), upper 0.077 | 0.2 | yes |
+| french | 0.0952381 | 32/286 (0.112), upper 0.168 | 0.2 | yes |
+| german | 0.1 | 36/560 (0.064), upper 0.096 | 0.2 | yes |
+| italian | 0.0416667 | 21/351 (0.060), upper 0.100 | 0.2 | yes |
+| japanese | 0.146341 | 21/357 (0.059), upper 0.099 | 0.2 | yes |
+| korean | 0.0666667 | 15/245 (0.061), upper 0.112 | 0.2 | yes |
+| portuguese | 0.0909091 | 20/359 (0.056), upper 0.095 | 0.2 | yes |
+| russian | 0.0869565 | 11/326 (0.034), upper 0.069 | 0.2 | yes |
+| spanish | 0.0588235 | 25/396 (0.063), upper 0.101 | 0.2 | yes |
+| pooled | - | 216/3718 (0.058), upper 0.065 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/3718 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | CNT-DEL/severe | 124/150 (0.827), lower 0.768 | 0.7 | yes |
+| T1-pcm-construction | CNT-INS/severe | 100/150 (0.667), lower 0.598 | 0.7 | no |
+| T1-pcm-construction | CNT-REP/severe | 77/150 (0.513), lower 0.443 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| CNT-DEL | 7/150 (0.047), upper 0.086 | yes | yes |
+| CNT-INS | 8/150 (0.053), upper 0.094 | yes | yes |
+| CNT-REP | 13/150 (0.087), upper 0.134 | yes | yes |
+
+Counts: calibration 1888 clips, 1888 families, 0 abstained; confirmation N2 3718 clips, 3718 families, 0 abstained; P1 450 clips, 435 families, 0 abstained; S 450 clips, 435 families, 0 abstained. Speakers: 10 (lower-bound, unit `language:fleurs-unidentified`).
+
+| Consensus languages | Judges | Units | Phi | Joint failure |
+|---|---|---|---|---|
+| english, french, german, italian, portuguese, russian, spanish | asr.whisper-large-v3@1, asr.parakeet-tdt-0.6b-v3@1 | 2865 | 0.389013 | 170/2514 (0.068), upper 0.076 |
+| chinese | asr.whisper-large-v3@1, asr.paraformer-zh@1 | 652 | 0.401077 | 34/602 (0.056), upper 0.074 |
+| japanese, korean | asr.whisper-large-v3@1, asr.sensevoice-small-f16@1 | 651 | 0.295244 | 43/602 (0.071), upper 0.091 |
+
+N3 (report-only): flag rate 130/791 (0.164), upper 0.188; FAR bound pi 0.05: 0.172999, pi 0.1: 0.18261, pi 0.2: 0.205436.
+
+Judge output identities: `asr.paraformer-zh@1` `cd3aec442e0fd17f`, `asr.parakeet-tdt-0.6b-v3@1` `cf1534c3855670ab`, `asr.sensevoice-small-f16@1` `60dd465a89773f48`, `asr.whisper-large-v3@1` `0bdd27ea106e2512`. Record limitations: `fleurs-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`; risks: `parakeet-whisper-label-lineage`, `sensevoice-codec-degradation`.
 <!-- END GENERATED audio-qc-docs:qualification -->
 
 ## See also

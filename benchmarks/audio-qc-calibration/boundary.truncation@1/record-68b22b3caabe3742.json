@@ -1,0 +1,664 @@
+{
+  "a4": {
+    "cells": [
+      "BND-TRUNC"
+    ],
+    "uninformative": {},
+    "unit": "injector"
+  },
+  "class": "C",
+  "cohorts": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "59221512a00b2b4a2de06eb35f433fac8f5dad3556fab520b15930679d4994c2",
+      "scoresSHA256": "b4aea9603f9fd1f2827a8bb37103aee7d3f68be95d83c6493fd2a343a31e5634",
+      "source": "fleurs-dev"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "ae62a87f35ed9b7c4f5bfa57003339c6ba6b0e92ae86f7a1be2460bef117e544",
+      "scoresSHA256": "a8abac72a1928b1ef6e16e35c2d00761b9f1c1696584e1bd13b83f3c85a062c9",
+      "source": "fleurs-test"
+    }
+  },
+  "combination": "consensus-min",
+  "counts": {
+    "calibration": {
+      "abstainedClips": 0,
+      "clips": 1888,
+      "families": 1888
+    },
+    "confirmation": {
+      "N2": {
+        "abstainedClips": 0,
+        "clips": 3718,
+        "families": 3718
+      },
+      "P1": {
+        "abstainedClips": 0,
+        "clips": 150,
+        "families": 150
+      },
+      "S": {
+        "abstainedClips": 0,
+        "clips": 150,
+        "families": 150
+      }
+    }
+  },
+  "detector": "boundary.truncation@1",
+  "detectorDefinitionSHA256": "465f8deced04dc5298c6f705e194fc22822ffb6b789e3fec73b66d464ba70f8e",
+  "direction": "above",
+  "evidence": {
+    "confirmationPanels": [
+      {
+        "bundleDigest": "9eac1079410cb7cc017858ef434514ba035bf31ba667ad676880af3208de92e4",
+        "cohort": "N2",
+        "startedAt": "2026-09-29T20:15:11.839964Z"
+      },
+      {
+        "bundleDigest": "f03bd33fb5fb68039324014c87289fa299b256c62076d51a7fb222716e53e45f",
+        "cohort": "P1+S",
+        "startedAt": "2026-09-29T22:16:04.190039Z"
+      }
+    ],
+    "evidenceIdentitySHA256": "65951129f80e71cdab6062e736a15dcbaa340018aad0b6637e365f21b41b7141",
+    "injectionSet": {
+      "construction": {
+        "catalogSeed": 7,
+        "catalogVersion": 2,
+        "classes": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "F"
+        ],
+        "entryCatalogVersions": [
+          2
+        ],
+        "samplePerCell": 150,
+        "sampleSeed": 1
+      },
+      "entriesSHA256": "3c775c50a64ba2b091e62d5530a527126940b64a962b3cce1650f1bfbd449901"
+    },
+    "judgeMetrics": {
+      "asr.paraformer-zh@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.parakeet-tdt-0.6b-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.sensevoice-small-f16@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.whisper-large-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ]
+    },
+    "metricVersions": {
+      "asr.paraformer-zh@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.parakeet-tdt-0.6b-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.sensevoice-small-f16@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.whisper-large-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      }
+    },
+    "orchestratorSHA256": [
+      "7a80e521fceb44301df2fd39e010119af5a74bd0ac340d0e06e772d91fdb6161"
+    ],
+    "planCommittedAt": "2026-09-29T20:14:59Z",
+    "scoringCodeSHA256": "ebe039c1b63b809c1ed74c1b899452261127338019b2e646347d1511be81f23b"
+  },
+  "informational": {
+    "farBound": {
+      "0.05": 0.039923,
+      "0.1": 0.042141,
+      "0.2": 0.047408
+    },
+    "flagRate": {
+      "confidence": 0.95,
+      "events": 30,
+      "lower": 0.027429,
+      "method": "clopper-pearson-one-sided",
+      "rate": 0.037927,
+      "units": 791,
+      "upper": 0.051093
+    },
+    "note": "report-only",
+    "population": "N3"
+  },
+  "judges": [
+    {
+      "judge": "asr.paraformer-zh@1",
+      "outputIdentities": [
+        "cd3aec442e0fd17fd49a0315d0f7a187e8fa3a7135b88552deadea151bb6ea96"
+      ]
+    },
+    {
+      "judge": "asr.parakeet-tdt-0.6b-v3@1",
+      "outputIdentities": [
+        "cf1534c3855670ab67645b6c4dc0fae9b51df050c3106e550a15b5ca5b6f7e34"
+      ]
+    },
+    {
+      "judge": "asr.sensevoice-small-f16@1",
+      "outputIdentities": [
+        "60dd465a89773f48db20339e67057d2a0d7182dda67e92d1d4be110bb4dc97c0"
+      ]
+    },
+    {
+      "judge": "asr.whisper-large-v3@1",
+      "outputIdentities": [
+        "0bdd27ea106e2512c9c9286183700b63e56da50b46eb879e2c448729fe0585b3"
+      ]
+    }
+  ],
+  "kind": "audio-qc-calibration-record",
+  "ledgerOutcomeSHA256": "196cb0d8183b5cea64d1136c89d9f0fc6dad20337ef62cb3cd2ce5f68887a5bf",
+  "level": "warn",
+  "limitations": [
+    "fleurs-no-speaker-ids",
+    "fleurs-speaker-lower-bound",
+    "n2-one-codec"
+  ],
+  "operatingPoint": "warn",
+  "phiAudit": [
+    {
+      "conditionalFailureRate": {
+        "asr.parakeet-tdt-0.6b-v3@1|asr.whisper-large-v3@1Failed": 0.685185,
+        "asr.parakeet-tdt-0.6b-v3@1|asr.whisper-large-v3@1Passed": 0.02061,
+        "asr.whisper-large-v3@1|asr.parakeet-tdt-0.6b-v3@1Failed": 0.587302,
+        "asr.whisper-large-v3@1|asr.parakeet-tdt-0.6b-v3@1Passed": 0.013573
+      },
+      "failureRate": {
+        "asr.parakeet-tdt-0.6b-v3@1": 0.047891,
+        "asr.whisper-large-v3@1": 0.041049
+      },
+      "families": 2514,
+      "jointFailure": {
+        "confidence": 0.95,
+        "events": 74,
+        "lower": 0.024103,
+        "method": "clopper-pearson-one-sided",
+        "rate": 0.029435,
+        "unit": "source-family",
+        "units": 2514,
+        "upper": 0.035603
+      },
+      "jointFailurePerUnit": {
+        "ifIndependent": 0.001966,
+        "lift": 14.307319,
+        "rate": 0.028126
+      },
+      "judges": [
+        "asr.whisper-large-v3@1",
+        "asr.parakeet-tdt-0.6b-v3@1"
+      ],
+      "labeledUnits": {
+        "negatives": 2514,
+        "positives": 117
+      },
+      "languages": [
+        "english",
+        "french",
+        "german",
+        "italian",
+        "portuguese",
+        "russian",
+        "spanish"
+      ],
+      "phi": 0.617483,
+      "phiClusterBootstrap": {
+        "defined": 2000,
+        "families": 2514,
+        "lower": 0.544014,
+        "resamples": 2000,
+        "seed": 20260925,
+        "upper": 0.684888
+      },
+      "table": {
+        "bothFailed": 74,
+        "neitherFailed": 2471,
+        "onlyFirstFailed": 34,
+        "onlySecondFailed": 52
+      },
+      "units": 2631
+    },
+    {
+      "conditionalFailureRate": {
+        "asr.paraformer-zh@1|asr.whisper-large-v3@1Failed": 0.5,
+        "asr.paraformer-zh@1|asr.whisper-large-v3@1Passed": 0.003317,
+        "asr.whisper-large-v3@1|asr.paraformer-zh@1Failed": 0.8,
+        "asr.whisper-large-v3@1|asr.paraformer-zh@1Passed": 0.013136
+      },
+      "failureRate": {
+        "asr.paraformer-zh@1": 0.016155,
+        "asr.whisper-large-v3@1": 0.025848
+      },
+      "families": 602,
+      "jointFailure": {
+        "confidence": 0.95,
+        "events": 8,
+        "lower": 0.006629,
+        "method": "clopper-pearson-one-sided",
+        "rate": 0.013289,
+        "unit": "source-family",
+        "units": 602,
+        "upper": 0.02385
+      },
+      "jointFailurePerUnit": {
+        "ifIndependent": 0.000418,
+        "lift": 30.95,
+        "rate": 0.012924
+      },
+      "judges": [
+        "asr.whisper-large-v3@1",
+        "asr.paraformer-zh@1"
+      ],
+      "labeledUnits": {
+        "negatives": 602,
+        "positives": 17
+      },
+      "languages": [
+        "chinese"
+      ],
+      "phi": 0.625158,
+      "phiClusterBootstrap": {
+        "defined": 2000,
+        "families": 602,
+        "lower": 0.388709,
+        "resamples": 2000,
+        "seed": 20260925,
+        "upper": 0.806793
+      },
+      "table": {
+        "bothFailed": 8,
+        "neitherFailed": 601,
+        "onlyFirstFailed": 8,
+        "onlySecondFailed": 2
+      },
+      "units": 619
+    },
+    {
+      "conditionalFailureRate": {
+        "asr.sensevoice-small-f16@1|asr.whisper-large-v3@1Failed": 0.142857,
+        "asr.sensevoice-small-f16@1|asr.whisper-large-v3@1Passed": 0.099836,
+        "asr.whisper-large-v3@1|asr.sensevoice-small-f16@1Failed": 0.016129,
+        "asr.whisper-large-v3@1|asr.sensevoice-small-f16@1Passed": 0.010791
+      },
+      "failureRate": {
+        "asr.sensevoice-small-f16@1": 0.100324,
+        "asr.whisper-large-v3@1": 0.011327
+      },
+      "families": 602,
+      "jointFailure": {
+        "confidence": 0.95,
+        "events": 1,
+        "lower": 8.5e-05,
+        "method": "clopper-pearson-one-sided",
+        "rate": 0.001661,
+        "unit": "source-family",
+        "units": 602,
+        "upper": 0.007856
+      },
+      "jointFailurePerUnit": {
+        "ifIndependent": 0.001136,
+        "lift": 1.423963,
+        "rate": 0.001618
+      },
+      "judges": [
+        "asr.whisper-large-v3@1",
+        "asr.sensevoice-small-f16@1"
+      ],
+      "labeledUnits": {
+        "negatives": 602,
+        "positives": 16
+      },
+      "languages": [
+        "japanese",
+        "korean"
+      ],
+      "phi": 0.015154,
+      "phiClusterBootstrap": {
+        "defined": 1998,
+        "families": 602,
+        "lower": -0.042561,
+        "resamples": 2000,
+        "seed": 20260925,
+        "upper": 0.124015
+      },
+      "table": {
+        "bothFailed": 1,
+        "neitherFailed": 550,
+        "onlyFirstFailed": 6,
+        "onlySecondFailed": 61
+      },
+      "units": 618
+    }
+  ],
+  "planSHA256": "68b22b3caabe3742753336e8c285bd79a886fe0606a12aadc79aa8b55de08207",
+  "rates": {
+    "cleanAbstention": {
+      "confidence": 0.95,
+      "events": 0,
+      "limit": 0.1,
+      "lower": 0.0,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": null,
+      "rate": 0.0,
+      "units": 3718,
+      "upper": 0.000805
+    },
+    "farPerLanguage": {
+      "confidence": 0.995,
+      "languages": {
+        "chinese": {
+          "confidence": 0.995,
+          "events": 8,
+          "limit": 0.2,
+          "lower": 0.004287,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.013289,
+          "units": 602,
+          "upper": 0.03059
+        },
+        "english": {
+          "confidence": 0.995,
+          "events": 7,
+          "limit": 0.2,
+          "lower": 0.008706,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.029661,
+          "units": 236,
+          "upper": 0.071053
+        },
+        "french": {
+          "confidence": 0.995,
+          "events": 16,
+          "limit": 0.2,
+          "lower": 0.02681,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.055944,
+          "units": 286,
+          "upper": 0.10066
+        },
+        "german": {
+          "confidence": 0.995,
+          "events": 25,
+          "limit": 0.2,
+          "lower": 0.025219,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.044643,
+          "units": 560,
+          "upper": 0.072168
+        },
+        "italian": {
+          "confidence": 0.995,
+          "events": 4,
+          "limit": 0.2,
+          "lower": 0.001922,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.011396,
+          "units": 351,
+          "upper": 0.035444
+        },
+        "japanese": {
+          "confidence": 0.995,
+          "events": 1,
+          "limit": 0.2,
+          "lower": 1.4e-05,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.002801,
+          "units": 357,
+          "upper": 0.020626
+        },
+        "korean": {
+          "confidence": 0.995,
+          "events": 0,
+          "limit": 0.2,
+          "lower": 0.0,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.0,
+          "units": 245,
+          "upper": 0.021394
+        },
+        "portuguese": {
+          "confidence": 0.995,
+          "events": 6,
+          "limit": 0.2,
+          "lower": 0.004302,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.016713,
+          "units": 359,
+          "upper": 0.043036
+        },
+        "russian": {
+          "confidence": 0.995,
+          "events": 10,
+          "limit": 0.2,
+          "lower": 0.011495,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.030675,
+          "units": 326,
+          "upper": 0.064495
+        },
+        "spanish": {
+          "confidence": 0.995,
+          "events": 6,
+          "limit": 0.2,
+          "lower": 0.003898,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.015152,
+          "units": 396,
+          "upper": 0.039065
+        }
+      }
+    },
+    "farPooled": {
+      "confidence": 0.95,
+      "events": 83,
+      "limit": 0.1,
+      "lower": 0.018485,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "rate": 0.022324,
+      "units": 3718,
+      "upper": 0.026734
+    },
+    "mechanisms": {
+      "T1-pcm-construction": {
+        "cells": {
+          "BND-TRUNC/severe": {
+            "confidence": 0.95,
+            "events": 142,
+            "limit": 0.7,
+            "lower": 0.905829,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.946667,
+            "units": 150,
+            "upper": 0.973188
+          }
+        },
+        "meets": true
+      }
+    },
+    "mechanismsMeeting": [
+      "T1-pcm-construction"
+    ],
+    "mechanismsMin": 1,
+    "shams": {
+      "BND-TRUNC": {
+        "confidence": 0.95,
+        "events": 0,
+        "informative": true,
+        "lower": 0.0,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.0,
+        "units": 150,
+        "upper": 0.019773
+      }
+    }
+  },
+  "reasons": [],
+  "registries": {
+    "detectorsSHA256": "1033b7435c3a3b556fc049cf253232dafe02398f7567b82b1ef2a0d23ae4cc1b",
+    "judgesSHA256": "ad21dd21aaa8a6e493c2cd6218c8f15330a2bccaeb882edbc4ea9aa204f77462",
+    "policySHA256": "653ce8a2783e514d581ede273bf14cadbffbe994f51dab97e84904fde13403ec"
+  },
+  "risks": [
+    "parakeet-whisper-label-lineage",
+    "sensevoice-codec-degradation"
+  ],
+  "schema": "vocello.audioqc.qc-calibration/1",
+  "scope": {
+    "exclusions": [],
+    "languages": [
+      "chinese",
+      "english",
+      "french",
+      "german",
+      "italian",
+      "japanese",
+      "korean",
+      "portuguese",
+      "russian",
+      "spanish"
+    ]
+  },
+  "speakers": {
+    "claim": "lower-bound",
+    "count": 10,
+    "unit": "language:fleurs-unidentified"
+  },
+  "split": {
+    "counts": {
+      "families": {
+        "calibration": 1888,
+        "confirmation": 3718
+      },
+      "scripts": {
+        "calibration": 118,
+        "confirmation": 256
+      },
+      "speakers": {
+        "calibration": 10,
+        "confirmation": 10
+      }
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "method": "declared-cohorts"
+  },
+  "stage": 2,
+  "threshold": {
+    "alpha": 0.05,
+    "calibrationUnits": {
+      "chinese": 290,
+      "english": 149,
+      "french": 125,
+      "german": 257,
+      "italian": 175,
+      "japanese": 162,
+      "korean": 157,
+      "portuguese": 185,
+      "russian": 177,
+      "spanish": 211
+    },
+    "ranks": {
+      "chinese": 277,
+      "english": 143,
+      "french": 120,
+      "german": 246,
+      "italian": 168,
+      "japanese": 155,
+      "korean": 151,
+      "portuguese": 177,
+      "russian": 170,
+      "spanish": 202
+    },
+    "rule": "split-conformal",
+    "strata": "language",
+    "unit": "source-family",
+    "values": {
+      "chinese": 0.0,
+      "english": 0.0,
+      "french": 0.0,
+      "german": 0.0,
+      "italian": 0.0,
+      "japanese": 0.0,
+      "korean": 0.0,
+      "portuguese": 0.0,
+      "russian": 0.0,
+      "spanish": 0.0
+    }
+  },
+  "verdict": "qualified"
+}

@@ -68,9 +68,7 @@ Its accuracy is claimed only through the detectors that consume it:
 
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
-| [`language.consensus-lid@1`](../detectors/language.consensus-lid-v1.md) | D (language) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `expectedPosterior` | not qualified |
-
-**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
+| [`language.consensus-lid@1`](../detectors/language.consensus-lid-v1.md) | D (language) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `expectedPosterior` | qualified (warn) |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

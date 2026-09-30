@@ -1,0 +1,493 @@
+{
+  "a4": {
+    "cells": [
+      "BND-RUNON"
+    ],
+    "uninformative": {},
+    "unit": "injector"
+  },
+  "class": "C",
+  "cohorts": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "59221512a00b2b4a2de06eb35f433fac8f5dad3556fab520b15930679d4994c2",
+      "scoresSHA256": "ecdddce35a268d2883e7e9e3a7ba5957e527e4679d17e91e6b5c58e027748c31",
+      "source": "fleurs-dev"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "ae62a87f35ed9b7c4f5bfa57003339c6ba6b0e92ae86f7a1be2460bef117e544",
+      "scoresSHA256": "ddab62a46021b5226e3e71d7e475fd6fe0f7b2e659292aa5828ab2dd3c0c9ec4",
+      "source": "fleurs-test"
+    }
+  },
+  "combination": "difference",
+  "counts": {
+    "calibration": {
+      "abstainedClips": 0,
+      "clips": 1731,
+      "families": 1731
+    },
+    "confirmation": {
+      "N2": {
+        "abstainedClips": 0,
+        "clips": 3473,
+        "families": 3473
+      },
+      "P1": {
+        "abstainedClips": 0,
+        "clips": 135,
+        "families": 135
+      },
+      "S": {
+        "abstainedClips": 0,
+        "clips": 135,
+        "families": 135
+      }
+    }
+  },
+  "detector": "boundary.run-on@1",
+  "detectorDefinitionSHA256": "2ecc7a52104d0c5c600404084d9fa19d4bec25e9087eec1fa2991a1a27de2697",
+  "direction": "above",
+  "evidence": {
+    "confirmationPanels": [
+      {
+        "bundleDigest": "9eac1079410cb7cc017858ef434514ba035bf31ba667ad676880af3208de92e4",
+        "cohort": "N2",
+        "startedAt": "2026-09-29T20:15:11.839964Z"
+      },
+      {
+        "bundleDigest": "f03bd33fb5fb68039324014c87289fa299b256c62076d51a7fb222716e53e45f",
+        "cohort": "P1+S",
+        "startedAt": "2026-09-29T22:16:04.190039Z"
+      }
+    ],
+    "evidenceIdentitySHA256": "55e87973b321bf00e67e5b9878f2871b39fbd9c9c9588221c55504ee4dcfdcf8",
+    "injectionSet": {
+      "construction": {
+        "catalogSeed": 7,
+        "catalogVersion": 2,
+        "classes": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "F"
+        ],
+        "entryCatalogVersions": [
+          2
+        ],
+        "samplePerCell": 150,
+        "sampleSeed": 1
+      },
+      "entriesSHA256": "3c775c50a64ba2b091e62d5530a527126940b64a962b3cce1650f1bfbd449901"
+    },
+    "judgeMetrics": {
+      "align.qwen3-forcedaligner-0.6b@1": [
+        {
+          "definition": "panel-metrics-v1:alignment",
+          "sourcesSHA256": "0b993e6c0a34a8fb61f7ca1d82c475a023d934d54dcf90a31e0cad18d0caa171"
+        }
+      ],
+      "asr.paraformer-zh@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.parakeet-tdt-0.6b-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.sensevoice-small-f16@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.whisper-large-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ]
+    },
+    "metricVersions": {
+      "asr.paraformer-zh@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.parakeet-tdt-0.6b-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.sensevoice-small-f16@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.whisper-large-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      }
+    },
+    "orchestratorSHA256": [
+      "7a80e521fceb44301df2fd39e010119af5a74bd0ac340d0e06e772d91fdb6161"
+    ],
+    "planCommittedAt": "2026-09-29T20:14:59Z",
+    "scoringCodeSHA256": "ebe039c1b63b809c1ed74c1b899452261127338019b2e646347d1511be81f23b"
+  },
+  "informational": {
+    "farBound": {
+      "0.05": 0.033956,
+      "0.1": 0.035842,
+      "0.2": 0.040323
+    },
+    "flagRate": {
+      "confidence": 0.95,
+      "events": 23,
+      "lower": 0.022145,
+      "method": "clopper-pearson-one-sided",
+      "rate": 0.032258,
+      "units": 713,
+      "upper": 0.045394
+    },
+    "note": "report-only",
+    "population": "N3"
+  },
+  "judges": [
+    {
+      "judge": "align.qwen3-forcedaligner-0.6b@1",
+      "outputIdentities": [
+        "bf244e4c8e9bf04984bc0d90d662c035ca15a11846c509db510c564d4c63081d"
+      ]
+    },
+    {
+      "judge": "asr.paraformer-zh@1",
+      "outputIdentities": [
+        "cd3aec442e0fd17fd49a0315d0f7a187e8fa3a7135b88552deadea151bb6ea96"
+      ]
+    },
+    {
+      "judge": "asr.parakeet-tdt-0.6b-v3@1",
+      "outputIdentities": [
+        "cf1534c3855670ab67645b6c4dc0fae9b51df050c3106e550a15b5ca5b6f7e34"
+      ]
+    },
+    {
+      "judge": "asr.sensevoice-small-f16@1",
+      "outputIdentities": [
+        "60dd465a89773f48db20339e67057d2a0d7182dda67e92d1d4be110bb4dc97c0"
+      ]
+    },
+    {
+      "judge": "asr.whisper-large-v3@1",
+      "outputIdentities": [
+        "0bdd27ea106e2512c9c9286183700b63e56da50b46eb879e2c448729fe0585b3"
+      ]
+    }
+  ],
+  "kind": "audio-qc-calibration-record",
+  "ledgerOutcomeSHA256": "41e2664d67379bf54804d5fc82f2159a2f4ce39d34354d4ed4b6c677c0617f3e",
+  "level": null,
+  "limitations": [
+    "fleurs-no-speaker-ids",
+    "fleurs-speaker-lower-bound",
+    "n2-one-codec"
+  ],
+  "operatingPoint": "warn",
+  "phiAudit": [],
+  "planSHA256": "40cbfdf9b37db8a20db9bf71a4c999e289ed24dc6521065b91878bb6a0ab767d",
+  "rates": {
+    "cleanAbstention": {
+      "confidence": 0.95,
+      "events": 0,
+      "limit": 0.1,
+      "lower": 0.0,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": null,
+      "rate": 0.0,
+      "units": 3473,
+      "upper": 0.000862
+    },
+    "farPerLanguage": {
+      "confidence": 0.994444444444,
+      "languages": {
+        "chinese": {
+          "confidence": 0.9944444444444445,
+          "events": 37,
+          "limit": 0.2,
+          "lower": 0.03924,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.061462,
+          "units": 602,
+          "upper": 0.090703
+        },
+        "english": {
+          "confidence": 0.9944444444444445,
+          "events": 14,
+          "limit": 0.2,
+          "lower": 0.027124,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.059322,
+          "units": 236,
+          "upper": 0.109826
+        },
+        "french": {
+          "confidence": 0.9944444444444445,
+          "events": 20,
+          "limit": 0.2,
+          "lower": 0.037129,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.06993,
+          "units": 286,
+          "upper": 0.117364
+        },
+        "german": {
+          "confidence": 0.9944444444444445,
+          "events": 35,
+          "limit": 0.2,
+          "lower": 0.039353,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.0625,
+          "units": 560,
+          "upper": 0.093181
+        },
+        "italian": {
+          "confidence": 0.9944444444444445,
+          "events": 18,
+          "limit": 0.2,
+          "lower": 0.026053,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.051282,
+          "units": 351,
+          "upper": 0.088995
+        },
+        "japanese": {
+          "confidence": 0.9944444444444445,
+          "events": 19,
+          "limit": 0.2,
+          "lower": 0.02762,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.053221,
+          "units": 357,
+          "upper": 0.091029
+        },
+        "portuguese": {
+          "confidence": 0.9944444444444445,
+          "events": 25,
+          "limit": 0.2,
+          "lower": 0.039886,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.069638,
+          "units": 359,
+          "upper": 0.111011
+        },
+        "russian": {
+          "confidence": 0.9944444444444445,
+          "events": 22,
+          "limit": 0.2,
+          "lower": 0.03704,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.067485,
+          "units": 326,
+          "upper": 0.11082
+        },
+        "spanish": {
+          "confidence": 0.9944444444444445,
+          "events": 16,
+          "limit": 0.2,
+          "lower": 0.019513,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.040404,
+          "units": 396,
+          "upper": 0.072668
+        }
+      }
+    },
+    "farPooled": {
+      "confidence": 0.95,
+      "events": 206,
+      "limit": 0.1,
+      "lower": 0.052855,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "rate": 0.059315,
+      "units": 3473,
+      "upper": 0.066332
+    },
+    "mechanisms": {
+      "T1-pcm-construction": {
+        "cells": {
+          "BND-RUNON/severe": {
+            "confidence": 0.95,
+            "events": 43,
+            "limit": 0.7,
+            "lower": 0.252377,
+            "meets": false,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.318519,
+            "units": 135,
+            "upper": 0.390754
+          }
+        },
+        "meets": false
+      }
+    },
+    "mechanismsMeeting": [],
+    "mechanismsMin": 1,
+    "shams": {
+      "BND-RUNON": {
+        "confidence": 0.95,
+        "events": 6,
+        "informative": true,
+        "lower": 0.01953,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.044444,
+        "units": 135,
+        "upper": 0.085832
+      }
+    }
+  },
+  "reasons": [
+    "cross-mechanism-detection-not-met"
+  ],
+  "registries": {
+    "detectorsSHA256": "1033b7435c3a3b556fc049cf253232dafe02398f7567b82b1ef2a0d23ae4cc1b",
+    "judgesSHA256": "ad21dd21aaa8a6e493c2cd6218c8f15330a2bccaeb882edbc4ea9aa204f77462",
+    "policySHA256": "653ce8a2783e514d581ede273bf14cadbffbe994f51dab97e84904fde13403ec"
+  },
+  "risks": [
+    "fleurs-trailing-silence",
+    "aligner-anchoring",
+    "whisper-segment-timing"
+  ],
+  "schema": "vocello.audioqc.qc-calibration/1",
+  "scope": {
+    "exclusions": [
+      {
+        "language": "korean",
+        "reason": "aligner-excludes-korean"
+      }
+    ],
+    "languages": [
+      "chinese",
+      "english",
+      "french",
+      "german",
+      "italian",
+      "japanese",
+      "portuguese",
+      "russian",
+      "spanish"
+    ]
+  },
+  "speakers": {
+    "claim": "lower-bound",
+    "count": 9,
+    "unit": "language:fleurs-unidentified"
+  },
+  "split": {
+    "counts": {
+      "families": {
+        "calibration": 1888,
+        "confirmation": 3718
+      },
+      "scripts": {
+        "calibration": 118,
+        "confirmation": 256
+      },
+      "speakers": {
+        "calibration": 10,
+        "confirmation": 10
+      }
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "method": "declared-cohorts"
+  },
+  "stage": 2,
+  "threshold": {
+    "alpha": 0.05,
+    "calibrationUnits": {
+      "chinese": 290,
+      "english": 149,
+      "french": 125,
+      "german": 257,
+      "italian": 175,
+      "japanese": 162,
+      "portuguese": 185,
+      "russian": 177,
+      "spanish": 211
+    },
+    "ranks": {
+      "chinese": 277,
+      "english": 143,
+      "french": 120,
+      "german": 246,
+      "italian": 168,
+      "japanese": 155,
+      "portuguese": 177,
+      "russian": 170,
+      "spanish": 202
+    },
+    "rule": "split-conformal",
+    "strata": "language",
+    "unit": "source-family",
+    "values": {
+      "chinese": 0.2,
+      "english": 1.92,
+      "french": 0.2,
+      "german": 1.68,
+      "italian": 0.04,
+      "japanese": 2.12,
+      "portuguese": 0.22,
+      "russian": 0.16,
+      "spanish": 0.06
+    }
+  },
+  "verdict": "refused"
+}

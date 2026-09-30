@@ -68,11 +68,9 @@ Its accuracy is claimed only through the detectors that consume it:
 
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
-| [`content.consensus-error@1`](../detectors/content.consensus-error-v1.md) | B (content) | english, french, german, italian, portuguese, russian, spanish | panel `errorRate` | not qualified |
-| [`boundary.truncation@1`](../detectors/boundary.truncation-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish | transcript-tail `trailingUnmatchedFraction` | not qualified |
-| [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish | must complete | not qualified |
-
-**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
+| [`content.consensus-error@1`](../detectors/content.consensus-error-v1.md) | B (content) | english, french, german, italian, portuguese, russian, spanish | panel `errorRate` | refused |
+| [`boundary.truncation@1`](../detectors/boundary.truncation-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish | transcript-tail `trailingUnmatchedFraction` | qualified (warn) |
+| [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish | must complete | refused |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

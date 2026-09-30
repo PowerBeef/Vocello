@@ -1,0 +1,259 @@
+{
+  "cleanAbstention": {
+    "confidence": 0.95,
+    "events": 0,
+    "limit": 0.1,
+    "lower": 0.0,
+    "meets": true,
+    "method": "clopper-pearson-one-sided",
+    "minimumUnits": null,
+    "rate": 0.0,
+    "units": 3718,
+    "upper": 0.000805
+  },
+  "detector": "content.consensus-error@1",
+  "farPerLanguage": {
+    "confidence": 0.995,
+    "languages": {
+      "chinese": {
+        "confidence": 0.995,
+        "events": 27,
+        "limit": 0.2,
+        "lower": 0.025961,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.04485,
+        "units": 602,
+        "upper": 0.071262
+      },
+      "english": {
+        "confidence": 0.995,
+        "events": 8,
+        "limit": 0.2,
+        "lower": 0.010998,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.033898,
+        "units": 236,
+        "upper": 0.076969
+      },
+      "french": {
+        "confidence": 0.995,
+        "events": 32,
+        "limit": 0.2,
+        "lower": 0.068942,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.111888,
+        "units": 286,
+        "upper": 0.168253
+      },
+      "german": {
+        "confidence": 0.995,
+        "events": 36,
+        "limit": 0.2,
+        "lower": 0.040499,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.064286,
+        "units": 560,
+        "upper": 0.095768
+      },
+      "italian": {
+        "confidence": 0.995,
+        "events": 21,
+        "limit": 0.2,
+        "lower": 0.031947,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.059829,
+        "units": 351,
+        "upper": 0.10023
+      },
+      "japanese": {
+        "confidence": 0.995,
+        "events": 21,
+        "limit": 0.2,
+        "lower": 0.031403,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.058824,
+        "units": 357,
+        "upper": 0.098582
+      },
+      "korean": {
+        "confidence": 0.995,
+        "events": 15,
+        "limit": 0.2,
+        "lower": 0.028555,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.061224,
+        "units": 245,
+        "upper": 0.111877
+      },
+      "portuguese": {
+        "confidence": 0.995,
+        "events": 20,
+        "limit": 0.2,
+        "lower": 0.029194,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.05571,
+        "units": 359,
+        "upper": 0.094596
+      },
+      "russian": {
+        "confidence": 0.995,
+        "events": 11,
+        "limit": 0.2,
+        "lower": 0.013373,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.033742,
+        "units": 326,
+        "upper": 0.068618
+      },
+      "spanish": {
+        "confidence": 0.995,
+        "events": 25,
+        "limit": 0.2,
+        "lower": 0.0358,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.063131,
+        "units": 396,
+        "upper": 0.101441
+      }
+    }
+  },
+  "farPooled": {
+    "confidence": 0.95,
+    "events": 216,
+    "limit": 0.1,
+    "lower": 0.05191,
+    "meets": true,
+    "method": "clopper-pearson-one-sided",
+    "minimumUnits": 60,
+    "rate": 0.058096,
+    "units": 3718,
+    "upper": 0.064803
+  },
+  "mechanisms": {
+    "T1-pcm-construction": {
+      "cells": {
+        "CNT-DEL/severe": {
+          "confidence": 0.95,
+          "events": 124,
+          "limit": 0.7,
+          "lower": 0.767733,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": 60,
+          "rate": 0.826667,
+          "units": 150,
+          "upper": 0.875614
+        },
+        "CNT-INS/severe": {
+          "confidence": 0.95,
+          "events": 100,
+          "limit": 0.7,
+          "lower": 0.597922,
+          "meets": false,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": 60,
+          "rate": 0.666667,
+          "units": 150,
+          "upper": 0.73039
+        },
+        "CNT-REP/severe": {
+          "confidence": 0.95,
+          "events": 77,
+          "limit": 0.7,
+          "lower": 0.443133,
+          "meets": false,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": 60,
+          "rate": 0.513333,
+          "units": 150,
+          "upper": 0.583133
+        }
+      },
+      "meets": false
+    }
+  },
+  "mechanismsMeeting": [],
+  "mechanismsMin": 1,
+  "n3": null,
+  "operatingPoint": "warn",
+  "plan": "7ca2a3effc9f6df0f9b8979507d654649fc7b39c2380520361f32cb2ea0fd1bb",
+  "reasons": [
+    "cross-mechanism-detection-not-met"
+  ],
+  "schema": "vocello.audioqc.confirmation/1",
+  "shams": {
+    "CNT-DEL": {
+      "confidence": 0.95,
+      "events": 7,
+      "informative": true,
+      "lower": 0.022104,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "overlaps": true,
+      "present": true,
+      "rate": 0.046667,
+      "units": 150,
+      "upper": 0.085863
+    },
+    "CNT-INS": {
+      "confidence": 0.95,
+      "events": 8,
+      "informative": true,
+      "lower": 0.026812,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "overlaps": true,
+      "present": true,
+      "rate": 0.053333,
+      "units": 150,
+      "upper": 0.094171
+    },
+    "CNT-REP": {
+      "confidence": 0.95,
+      "events": 13,
+      "informative": true,
+      "lower": 0.052026,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "overlaps": true,
+      "present": true,
+      "rate": 0.086667,
+      "units": 150,
+      "upper": 0.134257
+    }
+  },
+  "status": "refused",
+  "threshold": {
+    "chinese": 0.111111111,
+    "english": 0.117647059,
+    "french": 0.095238095,
+    "german": 0.1,
+    "italian": 0.041666667,
+    "japanese": 0.146341463,
+    "korean": 0.066666667,
+    "portuguese": 0.090909091,
+    "russian": 0.086956522,
+    "spanish": 0.058823529
+  },
+  "unit": "source-family"
+}

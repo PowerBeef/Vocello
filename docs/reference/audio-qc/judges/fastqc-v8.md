@@ -45,8 +45,11 @@ Its accuracy is claimed only through the detectors that consume it:
 |---|---|---|---|---|
 | [`signal.clicks@1`](../detectors/signal.clicks-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `clickEventsPerSecond` | qualified (warn) |
 | [`signal.dropout@1`](../detectors/signal.dropout-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `longestSilenceMS` | qualified (warn) |
+| [`signal.dropout@2`](../detectors/signal.dropout-v2.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | pcm `longestInteriorDigitalSilenceMS` | not qualified |
 | [`signal.terminal-silence@1`](../detectors/signal.terminal-silence-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `trailingSilenceMS` | qualified (warn) |
+| [`signal.terminal-silence@2`](../detectors/signal.terminal-silence-v2.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | pcm `trailingDigitalSilenceMS` | not qualified |
 | [`signal.dc-offset@1`](../detectors/signal.dc-offset-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | absolute fastqc `dcOffset` | qualified (warn) |
+| [`signal.dc-offset@2`](../detectors/signal.dc-offset-v2.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | absolute fastqc `dcOffset` | not qualified |
 | [`signal.level@1`](../detectors/signal.level-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `rmsDBFS` | qualified (warn) |
 | [`signal.clipping@1`](../detectors/signal.clipping-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `hotSamples` | refused |
 | [`signal.noise@1`](../detectors/signal.noise-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `wadaSNRDB` | qualified (warn) |

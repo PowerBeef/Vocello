@@ -22,7 +22,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import audio_qc_calibration_set as m2  # noqa: E402
-from lib.qc_qualification import fixtures, injectors, pcm, recordings, stats  # noqa: E402
+from lib.qc_qualification import fixtures, injectors, pcm, pcm_measures, recordings, stats  # noqa: E402
 
 LANGUAGES = ("english", "english", "french")
 # Recording variants on the pinned procedural source 1 at seed 7: a changed
@@ -297,6 +297,21 @@ class CalibrationSetTests(unittest.TestCase):
         self.assertIn(clip["fastQC"]["verdict"], ("pass", "warn", "fail"))
         self.assertTrue(set(m2.FASTQC_FIELDS) <= set(clip["fastQC"]))
         self.assertIn("integratedLoudnessLUFS", clip["observations"])
+        # Every clip carries the PCM shape measures, stamped with the code that measured them.
+        self.assertEqual({item["pcmMeasures"]["sourceSHA256"] for item in clips},
+                         {pcm_measures.source_sha256()})
+
+        def injected(injector: str, severity: str) -> list[dict]:
+            return [item for item in clips if (item["injection"] or {}).get("injectorID") == injector
+                    and item["injection"]["severity"] == severity]
+        for item in injected("SIG-SIL", "severe"):
+            self.assertGreaterEqual(item["pcmMeasures"]["trailingDigitalSilenceMS"], 10_000.0)
+        for item in injected("SIG-CLIP", "severe"):
+            # Hard clipping below full scale flattens both polarities at the level it limits to.
+            self.assertGreater(item["pcmMeasures"]["symmetricFlatTopFraction"], 0.0)
+        for item in clips:
+            if item["population"] == "N3":
+                self.assertEqual(item["pcmMeasures"]["symmetricFlatTopFraction"], 0.0)
         populations = {clip["population"] for clip in clips}
         self.assertEqual(populations, {"N3", "S", "P1"})
         texts = [take["text"] for take in json.loads(self.takes_path.read_text())["takes"] if take["text"]]

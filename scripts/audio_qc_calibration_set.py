@@ -14,10 +14,12 @@ Commands:
           Replay every recipe from the source WAVs and require byte-identical
           output digests (and untouched output WAVs).
   score   --takes <manifest> [--set <injection-set.json>] --output <dir> [--jobs N]
-          Run Fast QC v8 (the Python mirror in scripts/lib/audio_qc.py) and the
-          Stage 0 observations over every clean take (N3, or N1/N2 for a cohort),
-          sham (S) and positive (P1); write measurements.json (ids and digests
-          only), report.json and report.md. Without --set it scores the clean
+          Run Fast QC v8 (the Python mirror in scripts/lib/audio_qc.py), the
+          Stage 0 observations and the PCM shape measures
+          (lib/qc_qualification/pcm_measures.py: flat tops, digital silence,
+          the last active span) over every clean take (N3, or N1/N2 for a
+          cohort), sham (S) and positive (P1); write measurements.json (ids and
+          digests only), report.json and report.md. Without --set it scores the clean
           takes alone. A clip also carries its generation's Stage 0 evidence
           (`generation_evidence`): the engine introspection summary a take (or
           a T2/T3 entry, or a byte-copied donor) records, and a long-form
@@ -144,7 +146,7 @@ import audio_qc_qualification as m1
 from lib import audio_qc, audio_qc_observations
 from lib.playback_capture import resample as polyphase_resample
 from lib.qc_qualification import (
-    injectors, language_swap, policy as policy_module, recordings, resampling, speaker_donors,
+    injectors, language_swap, pcm_measures, policy as policy_module, recordings, resampling, speaker_donors,
 )
 from lib.qc_qualification.pcm import canonical_json, json_digest, pcm_digest
 from lib.qc_qualification.stats import DEFAULT_CONFIDENCE, Rate, bonferroni_confidence
@@ -1913,7 +1915,10 @@ def _score_clip(task: dict) -> dict:
             "flagLevels": dict(report["flagLevels"])}
     fast.update({field: report.get(field) for field in FASTQC_FIELDS})
     clip = {**task["meta"], "wavSHA256": task["wavSHA256"], "pcmSHA256": pcm_digest(samples),
-            "fastQC": fast, "observations": report["signal"]}
+            "fastQC": fast, "observations": report["signal"],
+            # The PCM shape measures the `pcm` detector source reads, stamped with their code's digest (an N1
+            # recording's are measured after its resampling, so its flat tops and zero runs are not its own).
+            "pcmMeasures": pcm_measures.measure(samples, recordings.ENGINE_SAMPLE_RATE)}
     # The Stage 0 blocks the `introspection` and `longform` detector sources read (absent otherwise).
     if task.get("introspection") is not None:
         clip["introspection"] = task["introspection"]

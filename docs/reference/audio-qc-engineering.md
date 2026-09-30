@@ -2130,6 +2130,56 @@ python3 scripts/audio_qc_orchestrator.py manifest \
   --output $D/injection-panel-manifest.json
 ```
 
+### Detector v2 designs after the first warn confirmation (AQ-07, 2026-09-30)
+
+The first warn confirmation refused `content.consensus-error@1`, `boundary.run-on@1` and
+`signal.clipping@1` (A3), and the app's own takes showed that the per-language thresholds of
+`signal.dc-offset@1`, `signal.dropout@1` and `signal.terminal-silence@1` encode FLEURS's per-locale
+recording conditions. The successors are new registry versions; every v1 entry, plan and record stays
+as it was (A7). Their designs were chosen on the spent AQ-07 data only: the calibration cohort
+(FLEURS dev N2, 1,888 families), the spent confirmation cohort (FLEURS test N2, 3,718 families, with
+its injection set) and the 791 N3 takes of 2026-09-27. Those cohorts are spent for pre-registration,
+so every number below is design evidence: each v2 is planned and confirmed once on a fresh FLEURS
+reserve cohort (`config/audio-qc-corpora.json`) under the usual A5 rules. Unless a table says
+otherwise, thresholds are fitted on the dev N2 families and counted on the test N2 families, the
+worst language's FAR bound is at the Bonferroni confidence 0.995, and detection counts the spent
+injection set's 150 families per cell.
+
+**PCM shape measures.** Three of the v2 scores need a quantity no Fast QC v8 field or Stage 0
+observation carries. `scripts/lib/qc_qualification/pcm_measures.py` measures them over each clip's
+PCM16 integers, and `audio_qc_calibration_set.py score` keeps them as the clip's `pcmMeasures` block
+beside Fast QC, read by the registry's `pcm` source: sign-symmetric flat tops (runs of at least two
+equal samples within 1% of the take's peak, on both polarities), exact digital silence (PCM16 zeros)
+inside, after and before the take, and the end of its last active span (10 ms frames at most 35 dB
+below its loud level and at least 10 dB above its floor, spans of 150 ms or more). Each block carries
+the digest of the code that measured it, the detector library refuses a block measured by other code,
+and the module is a scoring source, so a plan binds it (A7). A clip without the block is an evidence
+gap. The measures run in Python only: the app's takes carry no such field until a Swift mirror joins
+the Stage 0 observations, so these detectors serve the evidence lanes.
+
+**Signal chain, not language (`signal.dc-offset@2`, `signal.dropout@2`,
+`signal.terminal-silence@2`).** Generated audio's recording conditions do not vary by language, so
+each v2 fits one threshold pooled over the ten languages, and where the v1 quantity itself followed
+the recording (Fast QC's 0.001 silence floor counts a quiet room as silence) the v2 reads a quantity
+that does not: exact digital silence, which room tone and codec output never reach for long. The
+per-language FAR bound still applies to every language, and the pooled threshold concentrates
+FLEURS's false alarms in its outlying locales, so these plans take alpha 0.01 (at 0.05 the worst
+language's bound was 0.354, 0.283 and 0.265, above the 0.20 limit).
+
+| Detector | v1 N3 flag rate (the v1 record's per-language thresholds) | v2 score | v2 at alpha 0.01: threshold; N2 FAR pooled; worst language | Detection (moderate, severe) | v2 N3 flag rate |
+|---|---|---|---|---|---|
+| `signal.dc-offset@2` | fr 80/80, en 78/80, ru 63/79, ko 10/78, 0-3% elsewhere | \|Fast QC `dcOffset`\|, pooled | 2.7e-3; 27/3718 (upper 0.010); de 22/560 (upper 0.066) | SIG-DC 150/150, 150/150 (mild 150/150) | 0/791 |
+| `signal.dropout@2` | pt 73/77, de 10/80, fr and ja 4/80, 0-1% elsewhere | `longestInteriorDigitalSilenceMS`, pooled | 402 ms; 33/3718 (upper 0.012); zh 29/602 (upper 0.075) | SIG-DROP 150/150, 150/150 (mild 150 ms: 2/150) | 0/791 |
+| `signal.terminal-silence@2` | pt 73/77, de 13/80, fr 3/80, 0-1% elsewhere | `trailingDigitalSilenceMS`, pooled | 11.9 ms; 31/3718 (upper 0.011); en 7/236 (upper 0.071) | SIG-SIL 150/150, 150/150 (mild 150/150) | 0/791 |
+
+The app's DC offset is about 1.6e-4 in every language and voice (N3 95th percentile 2.2e-4 to
+2.9e-4 per language); v1 flagged it wherever FLEURS's own offset was smaller (4.2e-5 in fr, 8.7e-5 in
+en). No N3 take holds more than 1 ms of digital silence, while FLEURS N2 holds exact-zero spans up to
+0.88 s inside zh, es and ru recordings and 17 ms at the end of zh and en ones: they set the pooled
+thresholds, so a 150 ms digital dropout goes undetected. A quiet generated pause or tail that runs
+long is outside these detectors (`digital-silence-only`); the legacy Fast QC v8 flags keep reporting
+it (A10). The shams alarmed on 0, 2 and 1 of 150 families.
+
 ### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
 
 Audit section 4.4 makes pYIN and the window-corrected HNR measurands only "once oracle ladders

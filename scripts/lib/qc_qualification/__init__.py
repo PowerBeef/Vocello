@@ -22,6 +22,9 @@ evidence.
   abstention reasons, and the trailing alignment of a transcript.
 - `pcm`: canonical PCM16 digests and seeded randomness that is stable across
   NumPy releases.
+- `pcm_measures`: PCM shape measures no Fast QC v8 field carries (sign-symmetric
+  flat tops, exact digital silence, the last active span), which the
+  calibration scorer keeps as each clip's `pcmMeasures` block.
 - `fixtures`: procedural speech-like sources and abstention fixtures.
 - `injectors`: the T1 PCM injector catalog, every family with a zero-magnitude
   sham and a severity sweep, every output bound to a golden digest.

@@ -35,7 +35,12 @@ only if the registry says it votes (A6).
 QC's (class I). The summary reports no exact cycle as null, which scores a
 cycle of 0 frames; a clip without a summary abstains. `longform` components
 read a clip's `longForm` block, the long-form assembly evidence
-(`maximumSegmentBoundaryJump`, class J).
+(`maximumSegmentBoundaryJump`, class J). `pcm` components read a clip's
+`pcmMeasures` block, the PCM shape measures `pcm_measures.measure` takes beside
+Fast QC (flat tops, digital silence, the last active span): the block carries
+the digest of the code that measured it, which must be the current
+`pcm_measures.py` (a scoring source, so a plan binds it, A7); a clip without the
+block was measured by older code and is an evidence gap (`not-measured`).
 
 Combinations:
 
@@ -66,7 +71,8 @@ optimal alignments, so no backtrace tie order can pin a recurring last word to
 a later occurrence.
 
 `scoring_code_sha256` digests the code a score depends on (this module,
-`language_metrics` and its normalization data); a plan binds it (A7).
+`pcm_measures`, `language_metrics` and its normalization data); a plan binds it
+(A7).
 """
 
 from __future__ import annotations
@@ -84,13 +90,20 @@ from .pcm import json_digest
 REGISTRY_KIND = "audio-qc-detector-registry"
 REGISTRY_SCHEMA_VERSION = 1
 COMBINATIONS = ("single", "consensus-min", "consensus-max", "difference")
-SOURCES = ("fastqc", "observations", "introspection", "longform", "panel", "transcript-tail", "raw-output")
-MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection", "longform"})
+SOURCES = ("fastqc", "observations", "introspection", "longform", "pcm", "panel", "transcript-tail", "raw-output")
+MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection", "longform", "pcm"})
 # Where a measurements.json clip keeps each measurement source's fields.
 MEASUREMENT_BLOCKS = {"fastqc": "fastQC", "observations": "observations", "introspection": "introspection",
-                      "longform": "longForm"}
+                      "longform": "longForm", "pcm": "pcmMeasures"}
 # The long-form assembly evidence's scored fields (LongFormAssemblyEvidence), a clip's `longForm` block.
 LONGFORM_SCORE_FIELDS = frozenset({"maximumSegmentBoundaryJump"})
+# The PCM shape measures a clip's `pcmMeasures` block carries (pcm_measures.FIELDS), and the module that
+# measures them: its bytes are a scoring source, and a block measured by other bytes is refused (A7).
+PCM_SCORE_FIELDS = frozenset({
+    "peakPCM16", "flatTopPositive", "flatTopNegative", "symmetricFlatTopFraction",
+    "longestInteriorDigitalSilenceMS", "trailingDigitalSilenceMS", "leadingDigitalSilenceMS", "lastActiveSeconds",
+})
+PCM_MEASURES_SOURCE = Path(__file__).resolve().with_name("pcm_measures.py")
 PANEL_SOURCES = frozenset({"panel", "transcript-tail", "raw-output"})
 TRANSFORMS = ("absolute",)
 TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDeletions")
@@ -163,9 +176,14 @@ def definition_digest(entry: Mapping[str, Any]) -> str:
 
 
 def scoring_sources() -> tuple[Path, ...]:
-    """The files whose bytes decide a take's score: this module, language_metrics and its data."""
-    return (Path(__file__).resolve(), Path(language_metrics.__file__).resolve(),
+    """The files whose bytes decide a take's score: this module, pcm_measures, language_metrics and its data."""
+    return (Path(__file__).resolve(), PCM_MEASURES_SOURCE, Path(language_metrics.__file__).resolve(),
             *(Path(path).resolve() for path in language_metrics.NORMALIZATION_DATA_FILES))
+
+
+def pcm_measures_sha256() -> str:
+    """The digest of pcm_measures.py's bytes, which every current `pcmMeasures` block carries."""
+    return hashlib.sha256(PCM_MEASURES_SOURCE.read_bytes()).hexdigest()
 
 
 def scoring_code_sha256() -> str:
@@ -300,6 +318,8 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
             errors.append(f"{where}.field must be a numeric field of the engine introspection summary")
         if source == "longform" and field not in LONGFORM_SCORE_FIELDS:
             errors.append(f"{where}.field must be one of {sorted(LONGFORM_SCORE_FIELDS)}")
+        if source == "pcm" and field not in PCM_SCORE_FIELDS:
+            errors.append(f"{where}.field must be one of the PCM measures {sorted(PCM_SCORE_FIELDS)}")
     elif source in PANEL_SOURCES:
         allowed.update({"judge", "metric"} if source == "panel" else {"judge", "measure"})
         judge = component.get("judge")
@@ -897,6 +917,13 @@ def component_value(component: Mapping[str, Any], *, language: str, clip: Mappin
         if clip is None:
             return None, "not-measured"
         container = clip.get(MEASUREMENT_BLOCKS[source]) or {}
+        if source == "pcm":
+            if not container:
+                # Measured before the scorer took PCM measures: the evidence is missing, not the value.
+                return None, "not-measured"
+            if container.get("sourceSHA256") != pcm_measures_sha256():
+                raise DetectorError(f"{clip.get('clipID')}: its pcmMeasures block was measured by other code than "
+                                    "the current pcm_measures.py; measure the cohort again (A7)")
         value = _finite(container.get(component["field"]))
         if value is None and source == "introspection" and component["field"] in INTROSPECTION_ABSENT_AS_ZERO \
                 and _finite(container.get("codecFrameCount")) is not None:

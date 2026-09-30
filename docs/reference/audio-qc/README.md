@@ -127,8 +127,11 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 |---|---|---|---|---|---|---|
 | [`signal.clicks@1`](detectors/signal.clicks-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.dropout@1`](detectors/signal.dropout-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.dropout@2`](detectors/signal.dropout-v2.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`signal.terminal-silence@1`](detectors/signal.terminal-silence-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.terminal-silence@2`](detectors/signal.terminal-silence-v2.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`signal.dc-offset@1`](detectors/signal.dc-offset-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
+| [`signal.dc-offset@2`](detectors/signal.dc-offset-v2.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`signal.level@1`](detectors/signal.level-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.clipping@1`](detectors/signal.clipping-v1.md) | A (signal) | 0 | single | confirmed (refused) | refused | - |
 | [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |

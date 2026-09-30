@@ -1,7 +1,7 @@
 # `introspection.eos-overrun@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `1a872d278f12de67` (a plan binds it, so any change is a new version, A7).
+Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `e96bbcc2656c5b2e` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Generation steps at which the talker gave EOS a probability of at least 0.5 and generation went on (eosLikelyStepsWithoutStop): the take ran on past points where the talker would likely have stopped.
 
@@ -34,7 +34,7 @@ Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json]
 **Risks.**
 
 - `introspection-rows-kept`: The engine's introspection summary reaches a take through its diagnostics row, which the engine front-trims at its log cap. The qc-takes lane marks the rows present before it starts, raises the cap (QWENVOICE_DIAGNOSTICS_MAX_MB=64), copies each vocello batch's new rows (generation id, WAV digest, Fast QC flag names, failure code and introspection numbers) into its diagnostics/ directory, and audio_qc_calibration_takes.py manifest --diagnostics binds each take to the row whose samplingWAVDigest is its WAV digest; verdict.txt reports the bound count. A take still without its row abstains (no-value); the 2026-09-27 cohort, generated before the lane kept its rows, bound 251 of its 791 takes.
-- `no-generation-knob`: GEN-NOEOS (T3, audit section 5.2) suppresses EOS for 6-50 frames through a registered knob, with no suppression (N = 0) as its sham; config/runtime-debug-knobs.json lists no such knob, so the entropy and EOS detectors have no positives until one is registered under the release-only rules.
+- `generation-knob-published-only`: GEN-NOEOS@1 (T3, audit section 5.2; construction catalog 1) regenerates a confirmation take (its text, voice, batch seed and delivery) under the registered internal-diagnostics knob QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES (config/runtime-debug-knobs.json, group controlled-generation), which holds back the talker's first sampled EOS for 6, 18 or 50 codec frames; N = 0 is its sham. Each take's engine row records its hold, and the builder refuses a take whose row does not. The engine's mandatory Fast QC still refuses some held takes (a long slow or silent tail), and a refused take has no published WAV: P3 positives are published takes only, as N3 negatives are, so the detection rate is conditional on the product publishing the take, and the set counts the refusals per variant. Only Custom and Voice Design takes are regenerated (a clone take would need its reference transcript), and a positive whose talker never sampled EOS before the token cap is no entry.
 
 **Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
 <!-- END GENERATED audio-qc-docs:definition -->

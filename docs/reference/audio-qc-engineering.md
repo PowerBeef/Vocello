@@ -23,6 +23,8 @@ sourceOfTruth:
   - scripts/derive_audio_qc_bounds.py
   - scripts/audio_qc_qualification.py
   - scripts/audio_qc_calibration_set.py
+  - scripts/audio_qc_introspection_positives.py
+  - scripts/lib/qc_qualification/codec_trace.py
   - scripts/lib/qc_qualification/composer.py
   - scripts/audio_qc_orchestrator.py
   - scripts/audio_qc_worker.py
@@ -1772,6 +1774,109 @@ scripts/macos_test.sh qc-n2 --n1-manifest <n1-cohort-manifest.json> [--label L]
 Its artifacts go to `build/artifacts/macos/audio-qc/qc-n2-<run>/` and stay untracked. It publishes
 nothing and writes no benchmark history.
 
+### Class I positives: COD-LOOP (T2) and GEN-NOEOS (T3) (AQ-07, 2026-09-30)
+
+The class I detectors read the engine's introspection summary, which only a take's own generation
+records, so no PCM edit (T1) makes their positives. Two declared constructions do (audit sections
+5.1-5.2, P9), on the confirmation takes they confirm with.
+`scripts/audio_qc_introspection_positives.py` plans and binds both and writes one injection set each
+(kind `audio-qc-injection-set`, construction catalog 1, classes `I`); `verify` recomputes every digest
+a set declares and replays each T2 recipe.
+
+**Source traces.** `vocello batch --capture-codec-trace` (internal diagnostics, telemetry on,
+short-form only) asks the engine for each take's codec trace. Under a registered run id
+(`QVOICE_MAC_BENCH_RUN_ID`) the engine writes it beside its diagnostics
+(`startup-reliability-evidence/<run>/<generation id>/codec-trace-v1.bin`) and records its digest in
+the take's engine row. Since 2026-09-30 qc-takes passes the flag to every short-form batch and moves
+the run's traces to `engine-traces/`; `collect-diagnostics` keeps each row's trace digest, frame count
+and completeness, its speech-tokenizer digest and its EOS hold. Capture changes no sampled code or
+published sample.
+
+**COD-LOOP@1 (T2, P2).** `loop-plan` binds each confirmation take to its trace: the engine row with
+its WAV digest names the generation and the trace digest, the run's copy of the trace must carry that
+digest, and its codebook 0 must reproduce the take's own engine summary (the mirror's integer cycle
+fields), else the plan refuses it as another generation's trace. It draws families stratified by
+language (`--sample-per-cell`, default 150; `--sample-seed`), one take each, and gives each drawn take
+four recipes at one seeded start in the middle 60% of its trace (`--catalog-seed`): the untouched
+trace (the sham), and 4, 12 or 32 frames repeated once (mild, moderate, severe). A trace shorter than
+54 frames (4.3 s) is not applicable. The job is text-free. `vocello bench --codec-loop <job>
+--output-dir <new dir>` verifies every trace and recipe before loading, binds the installed
+CustomVoice Speed model to the pinned catalog bytes (every artifact shares its speech tokenizer; a job
+naming another tokenizer is refused), applies each recipe and writes the mutated trace
+(`<id>.codes.bin`). It decodes that trace through the codec replay's full arm (the production
+non-streaming 25-frame schedule and window, the path `--codec-replay` takes; the incremental arm runs
+the same chunks), writes the PCM16 through the production output limiter and, once the model is
+unloaded, applies the publication marking, so each WAV stands where a published take stands.
+`loop-set` replays every recipe in Python and requires the CLI's mutated trace byte for byte (the
+shared fixture `scripts/tests/fixtures/audio_qc_codec_loop.json` pins the two implementations). Each
+entry carries the mirror summary over its looped codebook 0, bound to its WAV (no entropy or EOS: no
+talker ran), and its provenance: the source trace, recipe and decoder digests (the decoder: the
+tokenizer digest, the model repository and revision, schedule, window and output stage).
+
+**GEN-NOEOS@1 (T3, P3).** The knob `QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES=N` (group
+`controlled-generation` of `config/runtime-debug-knobs.json`; an internal-diagnostics build and
+`QWENVOICE_DEBUG=1`) resolves at the host into each request's sampling configuration
+(`VocelloQwen3SamplingConfiguration.eosSuppressionFrames`, 0 to 256; unset is the production path).
+In the generate loop (`Qwen3EOSSuppressionWindow`) the first step whose sampled token is EOS is
+redrawn from the same logits without EOS, and EOS stays unavailable until N codec frames have been
+generated from there. The step's introspection reads the raw logits, so those steps count as likely
+EOS that did not stop. The engine row's `timingsMS` records `talker_eos_suppression_frames` and
+`talker_eos_suppression_start_frame`. While the hold is armed and not yet open, the loop reads each
+step's token before the code predictor: one host read per step, in diagnostics runs only.
+`noeos-plan` draws Custom and Voice Design families (a clone take would need its reference
+transcript) and writes one line file per (source batch, variant) with that batch's seed, voice and
+variation. The lane runs `vocello batch --app-delivery` on each under the knob (N = 0, 6, 18 or 50),
+resuming after an item the Fast QC refuses. `noeos-set` binds each output by item index, requires
+its engine row (by WAV digest) to record the planned hold, and writes the published takes with their
+own summary, the knob id and the recipe digest (the recipe names the source take, its request and
+N). Refused takes and takes whose hold never opened (the token cap came first) are counted per
+variant, never built; `determinism` reports how many shams reproduced their source's PCM and how many
+holds opened at the source's own stop.
+
+**Run sheet.** Model runs are consent-bound and run one at a time in the lead session; each lane
+builds `cli-optimized`, so the engine change is compiled in. Class I fits on the calibration split and
+confirms on the confirmation split of the take plan, both generated by take plan version 2 (their
+rows kept; the 2026-09-27 cohort bound only 251 of its 791 summaries). The confirmation split must be
+generated after this change, so its takes keep their traces.
+
+```sh
+Q="python3 scripts/audio_qc_detector_calibration.py"; S="python3 scripts/audio_qc_calibration_set.py"
+CAL=<the calibration qc-takes run>; CON=<the confirmation qc-takes run>   # take plan v2 (above)
+OUT=build/artifacts/macos/audio-qc/detector-scores
+# 1. Calibration scores and the three plans; commit the plans on main before anything below runs (A5).
+$S score --takes $CAL/takes-manifest.json --output $CAL/stage0
+for D in introspection.token-loop@1 introspection.high-entropy@1 introspection.eos-overrun@1; do
+  $Q scores --detector $D --role calibration --cohort $CAL/takes-manifest.json \
+    --measurements $CAL/stage0/measurements.json --output $OUT/calibration/$D.json
+  $Q plan --detector $D --calibration-cohort $CAL/takes-manifest.json --confirmation-cohort $CON/takes-manifest.json \
+    --calibration-scores $OUT/calibration/$D.json --alpha 0.05 --injection-catalog-version 1 \
+    --injection-catalog-seed 7 --injection-sample-seed 1 --injection-sample-per-cell 150 --injection-classes I
+done
+# 2. The positives (about 1 to 1.25 hours): COD-LOOP decodes 4 x 150 traces on one model load, both
+#    replay arms at about 3x real time, then marks them (25-35 minutes); GEN-NOEOS regenerates 4 x 150
+#    takes in about 120 batch invocations at 0.27 s of batch wall per audio second plus one model load
+#    each (30-40 minutes).
+scripts/macos_test.sh qc-introspection --takes-run $CON --label aq07-class-i
+SET=build/artifacts/macos/audio-qc/qc-introspection-<that run>
+# 3. Stage 0 over the cohort and each set (a few minutes each), the confirmation scores, then confirm.
+$S score --takes $CON/takes-manifest.json --set $SET/loop/set/injection-set.json --output $SET/loop/score
+$S score --takes $CON/takes-manifest.json --set $SET/noeos/set/injection-set.json --output $SET/noeos/score
+$Q scores --detector introspection.token-loop@1 --role confirmation --cohort $CON/takes-manifest.json \
+  --measurements $SET/loop/score/measurements.json --injection-set $SET/loop/set/injection-set.json \
+  --positive-measurements $SET/loop/score/measurements.json --output $OUT/confirmation/introspection.token-loop@1.json
+$Q scores --detector introspection.eos-overrun@1 --role confirmation --cohort $CON/takes-manifest.json \
+  --measurements $SET/noeos/score/measurements.json --injection-set $SET/noeos/set/injection-set.json \
+  --positive-measurements $SET/noeos/score/measurements.json --output $OUT/confirmation/introspection.eos-overrun@1.json
+# (introspection.high-entropy@1 as eos-overrun), then `$Q confirm` once per detector.
+```
+
+The lane's defaults are the plan flags above; a plan declaring other seeds or another per-cell count
+runs the lane with the same `--sample-per-cell`. How many severe held takes the Fast QC refuses is
+unmeasured: if the severe GEN-NOEOS cell publishes fewer than 60 families (`unpublished` in the set),
+the confirmation refuses to start, so plan the per-cell count with margin. Artifacts go to
+`build/artifacts/macos/audio-qc/qc-introspection-<run>/` and stay untracked; the lane publishes
+nothing and writes no benchmark history.
+
 ### Detector qualification at warn (AQ-07, 2026-09-29)
 
 **Registry.** `config/audio-qc-detectors.json` declares each detector as `id@version`: class and
@@ -1834,8 +1939,8 @@ and the qc-takes lane keeps its diagnostics rows. The last column is the state o
 | `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on both FLEURS reserve panels, its frame track exported per take; pYIN's oracle ladder recorded |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
 | `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on both N3 splits of take plan version 2 (standard, clone and cross-lingual cells) |
-| `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | COD-LOOP (T2): a mutation-recipe replay mode for the codec trace |
-| `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | GEN-NOEOS (T3), a registered EOS-suppression knob |
+| `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | A confirmation qc-takes run that kept its codec traces, then its COD-LOOP (T2) set (`qc-introspection`) |
+| `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | The confirmation takes, then their GEN-NOEOS (T3) set under the registered EOS-hold knob (`qc-introspection`) |
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
 | `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | The long-form cell's takes of both splits (the calibration set reads their seams from the `longForm` block) |
 | `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | As seam-discontinuity; a SEAM-DISC clip is measured at the seams its entry records |
@@ -1947,7 +2052,9 @@ and `n3-controlled-generation` (P3) name declared constructions: `scores` reads 
 with their provenance (T2 trace, recipe and decoder digests; T3 knob and recipe) and builds none,
 and `plan` binds the construction catalog version the lead declares (`--injection-catalog-version`;
 a second tier beside the role set's, such as a fail point's T2 next to T1, `--tier-catalog-version
-T2=N`, checked against each tier's entries).
+T2=N`, checked against each tier's entries). The two constructions exist since 2026-09-30 (COD-LOOP@1
+and GEN-NOEOS@1, construction catalog 1; "Class I positives" below builds them on the confirmation
+takes).
 `audio_qc_calibration_takes.py manifest --diagnostics` binds each take to the engine row whose
 `samplingWAVDigest` is its WAV digest and carries that row's `engineIntrospection`, and `score`
 copies it into each clip (a T2 or T3 entry carries its own; a T1 construction none), refusing a

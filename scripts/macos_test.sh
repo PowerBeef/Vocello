@@ -17,6 +17,10 @@
 #                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
 #   scripts/macos_test.sh qc-n2 --n1-manifest <path> [--label L]
 #                                                 # audio QC N2: N1 codec resynthesis (vocello bench --codec-roundtrip)
+#   scripts/macos_test.sh qc-introspection --takes-run <confirmation qc-takes run> [--parts loop,noeos]
+#                                  [--sample-per-cell N] [--label L]
+#                                                 # audio QC class I positives: COD-LOOP (vocello bench --codec-loop)
+#                                                 # and GEN-NOEOS (vocello batch under the EOS-hold knob)
 #   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
@@ -1211,9 +1215,15 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
   python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" --baseline \
     >/dev/null || die "qc-takes: the engine diagnostics baseline could not be recorded"
 
+  # Each short-form take keeps its codec trace (`vocello batch --capture-codec-trace`), the source of the
+  # class I COD-LOOP positives (qc-introspection). The engine writes it under the registered run id beside
+  # its diagnostics, and its row records the trace digest; the lane moves the run's traces into its own
+  # artifacts after the batches. Capture changes no sampled code or published sample.
+  local trace_root="$diag_root/startup-reliability-evidence/$run_id"
   # The debug data context holds the benchmark models `require_mac_benchmark_models` checked.
   export QWENVOICE_DEBUG=1
   export QWENVOICE_DIAGNOSTICS_MAX_MB=64
+  export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   note "qc-takes: runID=$run_id split=$split takes=$planned_count batches=$batch_total${cells:+ cells=$cells}${label:+ label=$label}"
 
   local row batch_count=0 batch_fail=0 batch_resumes=0 collect_fail=0
@@ -1243,7 +1253,11 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
         ;;
       *) die "qc-takes batch $batch_id: unsupported mode '$mode'" ;;
     esac
-    [[ "$long_form" != "1" ]] || form_args=(--long-form)
+    if [[ "$long_form" == "1" ]]; then
+      form_args=(--long-form)
+    else
+      form_args=(--capture-codec-trace)
+    fi
     note "qc-takes batch $batch_count/$batch_total: $batch_id ($mode/$variant, $count ${long_form:+long-form }takes)"
     # `vocello batch` stops at its first failed item, and the engine's
     # mandatory Fast QC refuses a take as a failure. The lane resumes after
@@ -1287,9 +1301,17 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
       fi
     done
   done <"$batch_index"
-  unset QWENVOICE_DEBUG QWENVOICE_DIAGNOSTICS_MAX_MB
+  unset QWENVOICE_DEBUG QWENVOICE_DIAGNOSTICS_MAX_MB QVOICE_MAC_BENCH_RUN_ID
   (( collect_fail == 0 )) \
     || warn "qc-takes: $collect_fail diagnostics collection(s) failed; their takes may carry no introspection"
+  # <generation id>/codec-trace-v1.bin per short-form take; `audio_qc_introspection_positives.py loop-plan`
+  # binds each to its take through the collected row (WAV digest -> generation id and trace digest).
+  local traces_kept=0
+  if [[ -d "$trace_root" ]]; then
+    mv "$trace_root" "$artifacts/engine-traces" \
+      || warn "qc-takes: the run's codec traces could not be moved into $artifacts/engine-traces"
+    traces_kept="$(find "$artifacts/engine-traces" -name codec-trace-v1.bin 2>/dev/null | wc -l | tr -d ' ')"
+  fi
 
   [[ "$batch_count" -eq "$batch_total" ]] \
     || die "qc-takes: ran $batch_count of $batch_total planned batches; artifacts are preserved in $artifacts"
@@ -1317,7 +1339,7 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
   {
     echo "qc-takes runID=$run_id split=$split${cells:+ cells=$cells}${label:+ label=$label}"
     echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing"
-    echo "introspection_bound=$introspection diagnostics_collect_fail=$collect_fail"
+    echo "introspection_bound=$introspection diagnostics_collect_fail=$collect_fail codec_traces=$traces_kept"
     echo "batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes"
     echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
     echo "manifest_validation=$([[ $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"
@@ -1406,6 +1428,180 @@ cmd_qc_n2() {
   (( manifest_st == 0 && validate_st == 0 )) \
     || die "qc-n2 FAIL: the N2 manifest could not be bound or validated; artifacts are preserved in $artifacts"
   note "qc-n2 PASS · $planned_count resynthesized recordings · no benchmark record (calibration data) · $artifacts"
+}
+
+# qc-introspection: the audio QC class I positives (audit 2026-09-25 section 5.2) on a confirmation qc-takes
+# run. COD-LOOP (T2): the takes' recorded codec traces with a span of frames repeated, decoded by the gated
+# `vocello bench --codec-loop` (one model load). GEN-NOEOS (T3): their Custom and Voice Design takes
+# regenerated by `vocello batch` (same text, voice, batch seed and delivery) under the registered
+# internal-diagnostics knob QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES, one invocation per (source batch,
+# variant), resuming after an item the engine's Fast QC refuses. `audio_qc_introspection_positives.py`
+# plans both, binds the outputs and writes one injection set each. Calibration data, not a benchmark:
+# nothing is published and no history record is written.
+cmd_qc_introspection() {
+  local takes_run="" parts="loop,noeos" per_cell="" label=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --takes-run) takes_run="${2:-}"; shift 2 ;;
+      --takes-run=*) takes_run="${1#*=}"; shift ;;
+      --parts) parts="${2:-}"; shift 2 ;;
+      --parts=*) parts="${1#*=}"; shift ;;
+      --sample-per-cell) per_cell="${2:-}"; shift 2 ;;
+      --sample-per-cell=*) per_cell="${1#*=}"; shift ;;
+      --label) label="${2:-}"; shift 2 ;;
+      --label=*) label="${1#*=}"; shift ;;
+      *) die "unknown qc-introspection arg '$1' (try --takes-run <qc-takes run dir> --parts loop,noeos --sample-per-cell N --label L)" ;;
+    esac
+  done
+  validate_benchmark_label "$label"
+  [[ -n "$takes_run" && -d "$takes_run" ]] || die "qc-introspection needs --takes-run <a confirmation qc-takes run directory>"
+  [[ "$parts" =~ ^(loop|noeos)(,(loop|noeos))?$ ]] || die "--parts takes loop, noeos or both"
+  [[ -z "$per_cell" || "$per_cell" =~ ^[0-9]+$ ]] || die "--sample-per-cell takes a whole number"
+  local manifest="$takes_run/takes-manifest.json"
+  [[ -f "$manifest" ]] || die "qc-introspection: $takes_run holds no takes-manifest.json"
+  if [[ ",$parts," == *",loop,"* ]]; then
+    [[ -d "$takes_run/engine-traces" ]] \
+      || die "qc-introspection: $takes_run kept no codec traces (engine-traces/); COD-LOOP needs a qc-takes run that captured them"
+  fi
+
+  local tool="$SCRIPT_DIR/audio_qc_introspection_positives.py"
+  local takes_tool="$SCRIPT_DIR/audio_qc_calibration_takes.py"
+  # Both CLI variants carry VOCELLO_INTERNAL_DIAGNOSTICS; the optimized one is the shipping build.
+  "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
+  # Read-only: downloads stay an explicit `models ensure` repair action.
+  require_mac_benchmark_models pro_custom_speed pro_design_speed
+
+  local run_id
+  run_id="mac-qc-introspection-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local artifacts="$QVOICE_ARTIFACTS_MACOS/audio-qc/qc-introspection-$run_id"
+  mkdir -p "$artifacts/logs"
+  capture_benchmark_source "$artifacts"
+  local -a sample_args=()
+  [[ -z "$per_cell" ]] || sample_args=(--sample-per-cell "$per_cell")
+  note "qc-introspection: runID=$run_id parts=$parts${label:+ label=$label} takes=$manifest"
+
+  local loop_st="skipped"
+  if [[ ",$parts," == *",loop,"* ]]; then
+    loop_st=0
+    python3 "$tool" loop-plan --takes "$manifest" --diagnostics "$takes_run/diagnostics" \
+      --traces "$takes_run/engine-traces" --out-dir "$artifacts/loop" ${sample_args[@]+"${sample_args[@]}"} \
+      >"$artifacts/loop-plan-summary.json" || loop_st=$?
+    if [[ "$loop_st" == "0" ]]; then
+      # QWENVOICE_DEBUG=1 is the replay's runtime gate; the debug data context holds the checked models.
+      QWENVOICE_DEBUG=1 "$QVOICE_BUILD_ROOT/vocello" bench --codec-loop "$artifacts/loop/codec-loop-job.json" \
+        --output-dir "$artifacts/loop/replay" >"$artifacts/loop-replay-summary.json" \
+        2>"$artifacts/logs/codec-loop.log" </dev/null || loop_st=$?
+    fi
+    if [[ "$loop_st" == "0" ]]; then
+      python3 "$tool" loop-set --plan "$artifacts/loop/codec-loop-plan.json" \
+        --result "$artifacts/loop/replay/codec-loop-result.json" --takes "$manifest" --output "$artifacts/loop/set" \
+        >"$artifacts/loop-set-summary.json" || loop_st=$?
+    fi
+    if [[ "$loop_st" == "0" ]]; then
+      python3 "$tool" verify --set "$artifacts/loop/set/injection-set.json" --takes "$manifest" \
+        >"$artifacts/loop-verify.json" || loop_st=$?
+    fi
+  fi
+
+  local noeos_st="skipped" batch_total=0 batch_fail=0 batch_resumes=0 collect_fail=0
+  if [[ ",$parts," == *",noeos,"* ]]; then
+    noeos_st=0
+    python3 "$tool" noeos-plan --takes "$manifest" --out-dir "$artifacts/noeos" \
+      ${sample_args[@]+"${sample_args[@]}"} >"$artifacts/noeos-plan-summary.json" || noeos_st=$?
+  fi
+  if [[ "$noeos_st" == "0" ]]; then
+    local diag_root="${HOME}/Library/Application Support/QwenVoice-Debug/diagnostics"
+    local run_diagnostics="$artifacts/noeos/diagnostics"
+    mkdir -p "$artifacts/noeos/batch-results" "$artifacts/noeos/batch-out"
+    # The engine front-trims its capped logs: mark the rows present, then keep each segment's rows (qc-takes).
+    python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" --baseline \
+      >/dev/null || die "qc-introspection: the engine diagnostics baseline could not be recorded"
+    export QWENVOICE_DEBUG=1
+    export QWENVOICE_DIAGNOSTICS_MAX_MB=64
+    local row
+    while IFS= read -r row; do
+      [[ -n "$row" ]] || continue
+      batch_total=$((batch_total + 1))
+      local batch_id mode variant variation seed speaker brief count lines_file frames
+      IFS=$'\x1f' read -r batch_id mode variant variation seed speaker brief count lines_file frames <<<"$row"
+      local -a voice_args=()
+      case "$mode" in
+        custom) voice_args=(--speaker "$speaker") ;;
+        design) voice_args=(--voice-brief "$brief") ;;
+        *) die "qc-introspection batch $batch_id: unsupported mode '$mode'" ;;
+      esac
+      [[ "$frames" =~ ^[0-9]+$ ]] || die "qc-introspection batch $batch_id: no hold frame count"
+      note "qc-introspection batch $batch_total: $batch_id ($mode/$variant, hold $frames frames, $count takes)"
+      local offset=0 segment
+      while :; do
+        segment="$batch_id"
+        local segment_lines="$lines_file"
+        if (( offset > 0 )); then
+          segment="$batch_id@$offset"
+          segment_lines="$artifacts/noeos/batches/$segment.txt"
+          tail -n "+$((offset + 1))" "$lines_file" >"$segment_lines"
+        fi
+        local st=0
+        # The knob holds the talker's first EOS for this batch's frames (0 is the sham); stdin is closed so
+        # the CLI never consumes this loop's rows.
+        QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES="$frames" "$QVOICE_BUILD_ROOT/vocello" batch \
+          --file "$segment_lines" --mode "$mode" --variant "$variant" --seed "$seed" --variation "$variation" \
+          --out-dir "$artifacts/noeos/batch-out/$segment" --json --app-delivery "${voice_args[@]}" \
+          >"$artifacts/noeos/batch-results/$segment.json" 2>"$artifacts/logs/$segment.log" </dev/null || st=$?
+        python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" \
+          >>"$artifacts/logs/collect-diagnostics.jsonl" 2>&1 || collect_fail=$((collect_fail + 1))
+        (( st != 0 )) || break
+        local next
+        next="$(python3 "$takes_tool" next-offset --result "$artifacts/noeos/batch-results/$segment.json" \
+          --offset "$offset" --count "$count")" || next="stop"
+        if [[ "$next" == "done" ]]; then
+          break
+        elif [[ "$next" =~ ^[0-9]+$ ]] && (( next > offset )); then
+          note "qc-introspection batch $batch_id: item $((next - 1)) failed; resuming at item $next"
+          batch_resumes=$((batch_resumes + 1))
+          offset="$next"
+        else
+          warn "qc-introspection batch $batch_id: vocello batch exit $st (continuing with the other batches)"
+          batch_fail=$((batch_fail + 1))
+          break
+        fi
+      done
+    done <"$artifacts/noeos/noeos-batches.tsv"
+    unset QWENVOICE_DEBUG QWENVOICE_DIAGNOSTICS_MAX_MB
+    (( collect_fail == 0 )) \
+      || warn "qc-introspection: $collect_fail diagnostics collection(s) failed; their takes may not bind"
+    python3 "$tool" noeos-set --plan "$artifacts/noeos/noeos-plan.json" \
+      --batch-results "$artifacts/noeos/batch-results" --wav-root "$artifacts/noeos/batch-out" \
+      --diagnostics "$run_diagnostics" --takes "$manifest" --output "$artifacts/noeos/set" \
+      >"$artifacts/noeos-set-summary.json" || noeos_st=$?
+    if [[ "$noeos_st" == "0" ]]; then
+      python3 "$tool" verify --set "$artifacts/noeos/set/injection-set.json" --takes "$manifest" \
+        >"$artifacts/noeos-verify.json" || noeos_st=$?
+    fi
+  fi
+
+  local part status loop_verdict noeos_verdict
+  for part in loop noeos; do
+    if [[ "$part" == "loop" ]]; then status="$loop_st"; else status="$noeos_st"; fi
+    case "$status" in
+      0) status="PASS" ;;
+      skipped) ;;
+      *) status="FAIL ($status)" ;;
+    esac
+    if [[ "$part" == "loop" ]]; then loop_verdict="$status"; else noeos_verdict="$status"; fi
+  done
+  {
+    echo "qc-introspection runID=$run_id parts=$parts${label:+ label=$label}"
+    echo "loop=$loop_verdict"
+    echo "noeos=$noeos_verdict"
+    echo "noeos_batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes diagnostics_collect_fail=$collect_fail"
+  } | tee "$artifacts/verdict.txt"
+
+  [[ "$loop_st" == "0" || "$loop_st" == "skipped" ]] \
+    || die "qc-introspection FAIL: the COD-LOOP set could not be built or verified; artifacts are preserved in $artifacts"
+  [[ "$noeos_st" == "0" || "$noeos_st" == "skipped" ]] \
+    || die "qc-introspection FAIL: the GEN-NOEOS set could not be built or verified; artifacts are preserved in $artifacts"
+  note "qc-introspection PASS · class I injection sets under $artifacts/{loop,noeos}/set · no benchmark record (calibration data)"
 }
 
 # test: deterministic Core and owned Qwen3 runtime tests. No UI process is
@@ -1997,6 +2193,11 @@ main() {
       require_quiet_host macos-qc-n2 agents-allowed || die "N2 resynthesis needs a quiet host"
       cmd_qc_n2 "$@"
       ;;
+    qc-introspection)
+      require_build_free_space language-benchmark || die "class I positives storage preflight failed"
+      require_quiet_host macos-qc-introspection || die "class I positives need a quiet host"
+      cmd_qc_introspection "$@"
+      ;;
     test)
       require_build_free_space runtime-tests || die "macOS test storage preflight failed"
       cmd_test "$@"
@@ -2020,7 +2221,7 @@ main() {
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2
       ;;
-    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|qc-takes|qc-n2|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
+    *) die "unknown subcommand '$sub' (try: preflight|core-test|tsan|lang-bench|qc-takes|qc-n2|qc-introspection|test|telemetry-overhead|crashes|debug|logs|profile|memory|gate|release-readiness|models|help)" ;;
   esac
 }
 

@@ -34,6 +34,9 @@ evidence.
 - `language_swap` and `speaker_donors`: second recordings of the same cohort
   as donors: FLoRes parallel sentences for wrong-language swaps, and
   speaker-labelled takes for impostors and the identity and seam-voice splices.
+- `codec_trace`: the engine's codec-trace v1 binary and the T2 codec-loop
+  construction (COD-LOOP) that `scripts/audio_qc_introspection_positives.py`
+  builds class I positives with.
 - `composer`: the pure Stage 3 verdict composer.
 - `policy`: the loader and validator of
   `config/audio-qc-qualification-policy.json`.

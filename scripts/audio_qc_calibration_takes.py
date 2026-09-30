@@ -181,6 +181,11 @@ QC_FLAG = re.compile(r"^[a-z0-9_:(),.-]{1,96}$")
 # collect-diagnostics: the engine logs it reads and the digests of the source lines it has taken.
 ENGINE_LOGS = ("generations.jsonl", "generation-failures.jsonl")
 COLLECTED_LINES = "collected-lines.txt"
+# What a reduced row keeps beside the trace digest (`StartupReliabilityArtifactEvidence.telemetryNotes`), the
+# controlled-generation EOS hold's timings (`Qwen3EOSSuppressionWindow.evidence`) and the tokenizer digest form.
+TRACE_NOTES = {"codecTraceFrameCount": re.compile(r"[0-9]{1,5}"), "codecTraceComplete": re.compile(r"true|false")}
+EOS_HOLD_TIMINGS = ("talker_eos_suppression_frames", "talker_eos_suppression_start_frame")
+TOKENIZER_DIGEST = re.compile(r"(?:sha256:)?[0-9a-f]{64}")
 
 
 class TakeError(ValueError):
@@ -1733,7 +1738,11 @@ def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, outp
 
 def _reduced_generation(value: Mapping[str, Any]) -> dict[str, Any] | None:
     """An engine telemetry row reduced to what the manifest binds: its generation id, the WAV digest and Fast
-    QC flag names of its notes, and its introspection summary. No message, text or path survives."""
+    QC flag names of its notes, and its introspection summary. No message, text or path survives.
+
+    The class I positives (`audio_qc_introspection_positives.py`) also read the codec trace a take recorded
+    (`vocello batch --capture-codec-trace`: its digest, frame count and completeness), the speech tokenizer
+    that generated it, and a controlled generation's EOS hold (its `timingsMS`)."""
     generation_id = value.get("generationID")
     if not isinstance(generation_id, str) or not GENERATION_ID.fullmatch(generation_id):
         return None
@@ -1745,11 +1754,24 @@ def _reduced_generation(value: Mapping[str, Any]) -> dict[str, Any] | None:
     flags = notes.get("audioQCFlags")
     if isinstance(flags, str) and flags and all(QC_FLAG.fullmatch(flag) for flag in flags.split(",")):
         kept["audioQCFlags"] = flags
+    if is_sha256(notes.get("codecTraceSHA256")):
+        kept["codecTraceSHA256"] = notes["codecTraceSHA256"]
+        for key, pattern in TRACE_NOTES.items():
+            if isinstance(notes.get(key), str) and pattern.fullmatch(notes[key]):
+                kept[key] = notes[key]
     if kept:
         row["notes"] = kept
     block = value.get("engineIntrospection")
     if isinstance(block, dict) and not introspection_issues(block):
         row["engineIntrospection"] = block
+    timings = value.get("timingsMS") if isinstance(value.get("timingsMS"), dict) else {}
+    held = {key: timings[key] for key in EOS_HOLD_TIMINGS if _count(timings.get(key))}
+    if held:
+        row["timingsMS"] = held
+    identity = value.get("modelRuntimeIdentity") if isinstance(value.get("modelRuntimeIdentity"), dict) else {}
+    tokenizer = identity.get("speechTokenizerDigest")
+    if isinstance(tokenizer, str) and TOKENIZER_DIGEST.fullmatch(tokenizer):
+        row["speechTokenizerDigest"] = tokenizer
     return row
 
 

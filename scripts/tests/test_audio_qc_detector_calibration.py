@@ -530,6 +530,15 @@ class NewClassRegistryTests(unittest.TestCase):
             self.assertEqual(detectors.target_cell(entry, injector, "severe", "T1-pcm-construction"),
                              f"{injector}/severe")
         self.assertFalse(detectors.needs_raw(self.entry("identity.clone-similarity@1")))
+        # Erratic pitch is fitted on natural expressive takes (N3), with FLEURS read speech informational.
+        instability = self.entry("prosody.pitch-instability@1")
+        self.assertEqual((instability["class"], instability["populations"]), ("F", "n3-takes"))
+        roles = detectors.role_set(self.registry, instability)
+        self.assertEqual((roles["fit"]["population"], roles["confirmNegatives"]["population"],
+                          roles["positives"]["population"], roles["informational"]), ("N3", "N3", "P1", ["N2"]))
+        self.assertEqual(detectors.judges_of(instability), [PYIN])
+        self.assertEqual(detectors.target_injectors(instability), {"PRS-ERRATIC"})
+        self.assertEqual(detectors.declared_cells(instability), {"T1-pcm-construction": {"PRS-ERRATIC/severe"}})
 
     def test_a_dsp_instrument_scores_alone_only_through_its_raw_output(self) -> None:
         # pYIN does not vote: its L2 metric through a `panel` component would make it a family's vote.
@@ -684,6 +693,40 @@ class NewClassScoringTests(unittest.TestCase):
         self.assertEqual(detectors.longest_octave_displacement(self.track((200.0, 1))), 0.0)
         with self.assertRaises(detectors.DetectorError):
             detectors.raw_measure("jitter", steady)
+
+    def test_pitch_instability_counts_jumps_a_voice_cannot_make(self) -> None:
+        pitch = {PYIN: {"status": "complete", "metrics": {"voicedFraction": 0.9}}}
+        entry = self.entry("prosody.pitch-instability@1")
+
+        def rate(track: dict, language: str = "english") -> dict:
+            return detectors.score_take(entry, language, measurements=pitch, raw={PYIN: track})
+
+        # Erratic: 15 spans of 200 ms alternating 4 semitones apart, one-frame jumps: 14 jumps over 3 s.
+        low, high = 200.0, 200.0 * 2 ** (4 / 12)
+        erratic = self.track(*[(high if index % 2 else low, 20) for index in range(15)])
+        self.assertAlmostEqual(rate(erratic)["score"], 14 / 3.0, places=9)
+        self.assertAlmostEqual(rate(erratic, "korean")["score"], 14 / 3.0, places=9)
+        # Wide expressive intonation that glides (12 semitones in 300 ms, 40 semitones per second): no jump.
+        glide = [200.0 * 2 ** (0.4 * frame / 12) for frame in range(30)]
+        track = self.track((200.0, 100), (None, 0), (glide[-1], 100))
+        track["f0Hz"][100:100] = glide
+        track["voiced"][100:100] = [True] * 30
+        self.assertEqual(rate(track)["score"], 0.0)
+        # A jump spread over two frames by pYIN's transition cap is one jump.
+        split = self.track((200.0, 100), (200.0 * 2 ** (1.6 / 12), 1), (200.0 * 2 ** (3.2 / 12), 99))
+        self.assertAlmostEqual(rate(split)["score"], 1 / 2.0, places=9)
+        # Across an unvoiced gap: 7 semitones over 40 ms counts, over 60 ms it is never compared.
+        up = 200.0 * 2 ** (7 / 12)
+        self.assertAlmostEqual(rate(self.track((200.0, 100), (None, 3), (up, 100)))["score"], 1 / 2.0, places=9)
+        self.assertEqual(rate(self.track((200.0, 100), (None, 5), (up, 100)))["score"], 0.0)
+        # Less than a second of voiced speech, or none: abstain.
+        self.assertEqual(rate(self.track((None, 100), (200.0, 99), (None, 100)))["abstain"], "no-value")
+        self.assertIsNotNone(rate(self.track((200.0, 100)))["score"])
+        self.assertEqual(rate(self.track((None, 300)))["abstain"], "no-value")
+        self.assertEqual(detectors.score_take(entry, "english", measurements=pitch)["abstain"], "no-raw-output")
+        self.assertEqual(detectors.score_take(entry, "english", measurements={}, raw={PYIN: erratic})["abstain"],
+                         "not-measured")
+        self.assertEqual(rate(erratic, "dutch")["abstain"], "out-of-scope")
 
     def test_introspection_scores_and_abstentions(self) -> None:
         loop, entropy, eos = (self.entry(detector) for detector in (

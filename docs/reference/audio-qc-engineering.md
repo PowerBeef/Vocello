@@ -1681,6 +1681,7 @@ which. An entry can still change in place until a plan binds its digest.
 | `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; IDN-ONSET (not in catalog v2); the pYIN register and envelope parts of the joint onset rule |
 | `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on the panels with its frame track exported per take; a confirmation N2 cohort no plan has scored; pYIN's oracle ladder |
 | `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
+| `prosody.pitch-instability@1` | F | pYIN jumps per voiced second: F0 changes faster than 150 semitones per second between voiced frames at most 50 ms apart | above | pYIN and its frame track on the N3 splits; PRS-ERRATIC (not in catalog v2); a Voice Clone split |
 | `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | Introspection carried into measurements.json; COD-LOOP (T2) with summaries recomputed from the mutated trace |
 | `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | Introspection carried; GEN-NOEOS (T3), a registered EOS-suppression knob |
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
@@ -1705,7 +1706,13 @@ generator's lab and is at least shadow; its L2 metrics through a `panel` compone
 Class F fits on the FLEURS N2 calibration cohort, and PRS-BRK and PRS-OCT already run on N2 with
 the aligner's intervals (not in Korean). A plan still needs pYIN on both panels, an export of its
 frame track like `alignments`, and a confirmation cohort no plan has scored: the v1 confirmation
-cohort already holds bundles, so `plan` refuses it (A5). Creak is not registered: catalog v2 has no
+cohort already holds bundles, so `plan` refuses it (A5). The pitch-instability detector answers
+the maintainer's report of Voice Clone takes whose pitch is all over the place: a take-level rate
+of jumps no voice makes (about twice the fastest F0 change a speaker produces), so expressive
+intonation that glides stays a negative. It therefore fits and confirms on natural takes (role set
+`n3-takes`, FLEURS read speech informational) and needs a construction that shifts many short spans
+(PRS-ERRATIC); the take plan has no Voice Clone split yet. Window drift is the identity half of the
+same complaint. Creak is not registered: catalog v2 has no
 creak construction (the audit builds one with WORLD, which the catalog lacks), and no voice-quality
 measure has passed its oracle ladder.
 

@@ -32,6 +32,13 @@
       "positives": {"population": "P3", "cohort": "confirmation"},
       "shams": {"population": "S", "cohort": "confirmation"},
       "informational": []
+    },
+    "n3-takes": {
+      "fit": {"population": "N3", "cohort": "calibration", "corpus": "vocello-takes-calibration"},
+      "confirmNegatives": {"population": "N3", "cohort": "confirmation", "corpus": "vocello-takes-confirmation"},
+      "positives": {"population": "P1", "cohort": "confirmation"},
+      "shams": {"population": "S", "cohort": "confirmation"},
+      "informational": ["N2"]
     }
   },
   "limitations": {
@@ -41,7 +48,9 @@
     "speaker-corpus-pending": "FLEURS publishes no speaker ids, so class E has no fit or confirmation corpus yet (role set speaker-labeled-n2, corpora pending a maintainer data decision): it needs a speaker-labeled corpus whose terms allow speaker verification (Common Voice's forbid speaker identification) with at least two utterances per speaker, resynthesized to N2 like FLEURS. Each language stratum needs at least 60 scored calibration families and 60 scored confirmation negative families (the policy's warn minimums; audit section 5.4 sizes a per-language bound on its own families), from at least 3 speakers per language, the two cohorts disjoint by family, speaker and script; the positives need 60 families per severe cell and each injector's sham 60 more. A language without such a corpus becomes a scope exclusion (audit section 5.5 step 5), which changes the definition: a new version once a plan binds it.",
     "speaker-reference-clip": "The speaker judges score a take only against a reference clip: another utterance of the same speaker for a corpus take, the clone's reference in the clone lane (panel_jobs: needs_reference). The orchestrator embeds it only when the manifest names it; without one CAM++ reports no similarity and the take abstains (no-value).",
     "n2-read-speech": "FLEURS is read speech, while the audit's class F negatives are expressive N1 (section 5.7): expressive speech moves F0 further and faster, so a threshold fitted on N2 read speech may flag expressive takes; natural Vocello takes (N3, whose expressive variation is the product default) stay informational at warn.",
-    "n3-no-labels": "A measure that exists only on generated takes (the talker's introspection, long-form seams) has no N2 to confirm on: a codec round trip samples no token and joins no segment, so its fit and confirmation negatives are N3 alone (audit section 5.7), the two splits of config/audio-qc-calibration-takes.json disjoint by family, speaker and script. N3 carries no defect labels, so a flag rate f bounds the false-alarm rate only as f / (1 - pi_max), where pi_max is the largest defect prevalence admitted (section 5.1). Each language stratum needs at least 60 scored families in each split (the calibration split plans 80 per language)."
+    "n3-no-labels": "A measure that exists only on generated takes (the talker's introspection, long-form seams) has no N2 to confirm on: a codec round trip samples no token and joins no segment, so its fit and confirmation negatives are N3 alone (audit section 5.7), the two splits of config/audio-qc-calibration-takes.json disjoint by family, speaker and script. N3 carries no defect labels, so a flag rate f bounds the false-alarm rate only as f / (1 - pi_max), where pi_max is the largest defect prevalence admitted (section 5.1). Each language stratum needs at least 60 scored families in each split (the calibration split plans 80 per language).",
+    "n3-expressive-negatives": "The negatives are natural Vocello takes (N3: the product's expressive variation, Built-in and Voice Design voices), so natural expressive speech is a negative, as the maintainer's report of erratic pitch in Voice Clone takes needs; a threshold fitted on FLEURS read speech (N2, informational here) would flag expressive intonation. N3 carries no labels, so the flag rate bounds the false-alarm rate only as f / (1 - pi_max) (audit section 5.1), and a fail bound still needs an expressive N2 corpus (the audit's expressive N1, section 5.7). Each language stratum needs at least 60 scored families in each split of the take plan (the calibration split plans 80 per language).",
+    "n3-no-clone-takes": "The maintainer hears erratic pitch in Voice Clone takes, but the N3 take plan (config/audio-qc-calibration-takes.json) covers Built-in and Voice Design voices only, so no clone take is a negative or informational yet; a clone split needs reference clips that may be cloned (the class E speaker corpus would serve) and the same families per stratum."
   },
   "exclusionReasons": {
     "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
@@ -70,7 +79,8 @@
     "no-codec-trace-injector": "Injector catalog version 2 is T1 only. COD-LOOP (T2, audit section 5.2) repeats 4-32 codec frames (0.32-2.56 s) of a take's code trace, decoded by the production decoder, with the untouched trace as its sham; it needs a mutation-recipe replay mode, since BenchCodecReplay replays only an unmodified, digest-verified trace. Until it exists the loop detector has no positives.",
     "introspection-from-trace": "A T2 positive never runs the talker, so its summary comes from the Python mirror over the mutated codebook-0 trace (audio_qc_observations.introspection_summary): the cycle fields are exact, but entropy and EOS need the talker's logits, so only the loop detector can use T2 positives. The negatives' summaries come from the engine; the two sides agree exactly on integers (config/audio-qc-stage0-observations.json).",
     "no-generation-knob": "GEN-NOEOS (T3, audit section 5.2) suppresses EOS for 6-50 frames through a registered knob, with no suppression (N = 0) as its sham; config/runtime-debug-knobs.json lists no such knob, so the entropy and EOS detectors have no positives until one is registered under the release-only rules.",
-    "entropy-target-uncertain": "EOS suppression is the only construction the audit names for the entropy detector (T3). Whether the talker's entropy stays at 4 nats or more after a suppressed stop, rather than filling the overrun with silence or a loop, is what the confirmation measures; harvested babble (P4) is the other source of positives."
+    "entropy-target-uncertain": "EOS suppression is the only construction the audit names for the entropy detector (T3). Whether the talker's entropy stays at 4 nats or more after a suppressed stop, rather than filling the overrun with silence or a loop, is what the confirmation measures; harvested babble (P4) is the other source of positives.",
+    "no-erratic-pitch-injector": "Injector catalog version 2 has no erratic-pitch construction: PRS-BRK and PRS-OCT change one span each, which a take-level rate barely registers. PRS-ERRATIC would cut the take into seeded 150-300 ms spans and shift each by a seeded sign and magnitude (2, 4 and 7 semitones for mild, moderate and severe) through the PRS-BRK shifter, with 0 semitones through the same path as its sham; it needs no word interval, so it runs on N3 recordings. Until it exists the detector has no positives."
   },
   "detectors": [
     {
@@ -420,6 +430,24 @@
       "populations": "fleurs-n2",
       "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
       "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "korean-no-word-positives"]
+    },
+    {
+      "id": "prosody.pitch-instability@1",
+      "class": "F",
+      "stage": 1,
+      "measures": "Pitch jumps per voiced second, reduced from pYIN's frame track: F0 changes between consecutive voiced frames at most 50 ms apart faster than 150 semitones per second (about twice the fastest change a speaker makes), a cluster within 50 ms counted once, over the take's voiced seconds. A pitch that jumps from syllable to syllable scores high, while expressive intonation, however wide, glides below the rate; semitone rates do not depend on the voice's register. A take with less than 1 s of voiced speech abstains.",
+      "score": {"combination": "single", "unit": "events-per-second", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "pitchJumpsPerVoicedSecond"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-ERRATIC", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-ERRATIC", "mechanism": "T1-pcm-construction"}],
+      "populations": "n3-takes",
+      "limitations": ["n3-expressive-negatives", "n3-no-clone-takes"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "no-erratic-pitch-injector"]
     },
     {
       "id": "introspection.token-loop@1",

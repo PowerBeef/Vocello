@@ -16,8 +16,9 @@ them in.
 bundle does not keep, to a measure the panel's L2 metrics lack (`RAW_MEASURES`
 names the engine whose output each reads). pYIN's frame track gives
 `maxPitchStepSemitones`, the largest F0 change between voiced frames at most
-50 ms apart, and `longestOctaveDisplacementSeconds`, the longest run of voiced
-frames an octave's worth (9 semitones or more) from the take's median F0
+50 ms apart, `longestOctaveDisplacementSeconds`, the longest run of voiced
+frames an octave's worth (9 semitones or more) from the take's median F0, and
+`pitchJumpsPerVoicedSecond`, the rate of F0 changes faster than a voice moves
 (class F). A `raw-output` component of a deterministic DSP instrument (a `dsp`
 judge with no learned weights, such as pYIN) is a measurement, not a family's
 vote: it may stand alone in a `single` group when it is not from the
@@ -90,11 +91,17 @@ TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDele
 RAW_MEASURES = {
     "maxPitchStepSemitones": "pyin-librosa",
     "longestOctaveDisplacementSeconds": "pyin-librosa",
+    "pitchJumpsPerVoicedSecond": "pyin-librosa",
 }
 # Pitch-track reductions (class F): voiced frames compared up to this far apart, and the distance from
 # the take's median F0 that counts as an octave displacement.
 PITCH_STEP_WINDOW_SECONDS = 0.05
 OCTAVE_DISPLACEMENT_SEMITONES = 9.0
+# A pitch jump: F0 moving faster than this between consecutive voiced frames, about twice the fastest
+# change a speaker makes (some 80 semitones per second over a 12 semitone excursion); a take with less
+# voiced speech than the minimum has no rate.
+PITCH_JUMP_SEMITONES_PER_SECOND = 150.0
+PITCH_JUMP_MINIMUM_VOICED_SECONDS = 1.0
 DIRECTIONS = ("above", "below")
 CLASSES = tuple("ABCDEFGHIJ")
 STAGES = (0, 1, 2)
@@ -752,9 +759,37 @@ def longest_octave_displacement(output: Mapping[str, Any]) -> float | None:
     return longest * hop
 
 
+def pitch_jump_rate(output: Mapping[str, Any]) -> float | None:
+    """Pitch jumps per voiced second: F0 changes between consecutive voiced frames at most 50 ms apart
+    faster than `PITCH_JUMP_SEMITONES_PER_SECOND`, jumps within 50 ms of the previous one counted once.
+
+    Semitone rates do not depend on the voice's register. Intonation, however
+    wide, glides slower than the threshold, while a pitch that jumps from
+    syllable to syllable does not. None with less than a second of voiced speech.
+    """
+    track = _pitch_frames(output)
+    if track is None:
+        return None
+    hop, frames = track
+    voiced_seconds = len(frames) * hop
+    if voiced_seconds < PITCH_JUMP_MINIMUM_VOICED_SECONDS:
+        return None
+    reach = int(math.floor(PITCH_STEP_WINDOW_SECONDS / hop + 1e-9))
+    events, last_jump = 0, None
+    for (earlier, earlier_tone), (frame, tone) in zip(frames, frames[1:]):
+        gap = frame - earlier
+        if gap > reach or abs(tone - earlier_tone) / (gap * hop) < PITCH_JUMP_SEMITONES_PER_SECOND:
+            continue
+        if last_jump is None or frame - last_jump > reach:
+            events += 1
+        last_jump = frame
+    return events / voiced_seconds
+
+
 RAW_REDUCERS = {
     "maxPitchStepSemitones": max_pitch_step,
     "longestOctaveDisplacementSeconds": longest_octave_displacement,
+    "pitchJumpsPerVoicedSecond": pitch_jump_rate,
 }
 
 

@@ -128,6 +128,12 @@ enum BatchCommand {
                         + "and telemetry that is not explicitly off."
                 )
             }
+            guard StartupReliabilityDiagnosticEvidence.captureRunID(
+                environment: ProcessInfo.processInfo.environment,
+                telemetryEnabled: TelemetryGate.resolvedEnabled
+            ) != nil else {
+                throw CLIError("--capture-codec-trace requires a registered bench run id (QVOICE_MAC_BENCH_RUN_ID).")
+            }
             guard !args.flag("long-form") else {
                 throw CLIError("--capture-codec-trace applies to short-form batches only (not --long-form)")
             }

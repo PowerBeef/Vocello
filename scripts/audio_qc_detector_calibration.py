@@ -38,7 +38,11 @@ the ids at plan and confirm time:
   resynthesis of it the plan names (A5).
 - `speaker-labeled-n2`: N2 (or N1) of a speaker-labelled corpus, the N1
   manifest naming its `split` (calibration or confirmation), its `corpus` and
-  each recording's `speaker`; disjoint by family, speaker and script.
+  each recording's `speaker`; disjoint by family, speaker and script. The
+  role set names the corpus (`<corpus>-calibration`, `<corpus>-confirmation`):
+  the class E speaker cohort `audio_qc_corpora.py cohort --source speaker`
+  writes, each take naming its reference clip. A confirmed plan spends the
+  corpus's confirmation split, whichever resynthesis of it a new plan names.
 - `n3-takes`, `n3-codec-trace`, `n3-controlled-generation`: the two splits of
   the N3 take plan (`audio_qc_calibration_takes.py`), disjoint by family (script
   x voice x seed), speaker (a Built-in speaker or a Voice Design brief, never
@@ -1148,7 +1152,10 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         identities.setdefault(registry_lib.STAGE0_JUDGE, set()).add(positive_measurements["identity"])
     injected_clips = {clip.get("clipID"): clip for clip in (positive_measurements or {}).get("clips") or ()
                       if clip.get("injection") is not None}
-    cohort_audio = {take["wavSHA256"] for take in cohort["takes"].values()}
+    # A speaker judge scores audio against a reference clip, so cohort audio is clean only against the reference
+    # its take is scored against (an impostor's sham is a cohort take presented against another take).
+    cohort_audio = {(take["wavSHA256"], take["referenceSHA256"] if referenced else None)
+                    for take in cohort["takes"].values()}
     positive_exports = bind_raw_outputs(entry, positive_raw_outputs, source_sha256=injection_set["fileSHA256"],
                                         bundle=positive_bundle, what="injection set") \
         if positives and raw_judges and needs_panel and positive_bundle is not None else {}
@@ -1214,8 +1221,9 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
                                 ("tier", *POSITIVE_PROVENANCE[population][1])}} \
             if population in POSITIVE_PROVENANCE else {}
         # Clean cohort audio: a byte copy of a cohort take (a language swap's donor) or an identity construction.
-        clean = wav in cohort_audio or (injection.get("outputPCMSHA256") is not None
-                                        and injection.get("outputPCMSHA256") == injection.get("sourcePCMSHA256"))
+        pair = (wav, reference_digest(item, where) if referenced else None)
+        clean = pair in cohort_audio or (injection.get("outputPCMSHA256") is not None
+                                         and injection.get("outputPCMSHA256") == injection.get("sourcePCMSHA256"))
         scored = registry_lib.score_take(entry, language, clip=clip, measurements=evidence, private=private, raw=raw,
                                          seams=seams)
         if (needs_panel and evidence is None) or (needs_measurements and clip is None):
@@ -1309,8 +1317,9 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
     """Every plan file's cohorts by role: {calibration|confirmation|bound|spent: {manifest digest: [detectors]}},
     `bound` being a fail plan's N3 cohort and `spent` a cohort already scored as confirmation evidence: the
     confirmation or N3 cohort of a plan with a ledger entry, or a record's informational N3 cohort. `spentSources`
-    names, by corpus, the fixed recordings such a plan confirmed on: a FLEURS corpus (its confirmation cohort's
-    source) and a labelled corpus's natural positives, so a new resynthesis of them is spent too."""
+    names, by corpus, the fixed recordings such a plan confirmed on: a FLEURS or speaker-labelled corpus (its
+    confirmation cohort's source) and a labelled corpus's natural positives, so a new resynthesis of them is spent
+    too."""
     found: dict[str, dict[str, list[str]]] = {"calibration": {}, "confirmation": {}, "bound": {}, "spent": {},
                                               "spentSources": {}}
     if repository.records.is_dir():
@@ -1348,7 +1357,8 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
                 if digest:
                     found["spent"].setdefault(digest, []).append(plan.detector)
             source = plan.cohorts.confirmation.source
-            for corpus in (source if source.startswith(FLEURS_CORPUS_PREFIX) else None,
+            labelled = plan.cohorts.speaker_unit == SPEAKER_LABELED_RULE.speaker_unit
+            for corpus in (source if source.startswith(FLEURS_CORPUS_PREFIX) or labelled else None,
                            plan.binding("naturalPositivesSource")):
                 if corpus:
                     found["spentSources"].setdefault(corpus, []).append(plan.detector)
@@ -1722,7 +1732,9 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
     confirmation_source = role_corpus(roles, "confirmNegatives", operating_point)
     # The labelled corpus split the natural positives are (`<corpus>-confirmation`, as the role set names it).
     natural_source = f"{natural['cohort'].get('corpus')}-{natural['split']}" if natural is not None else None
-    for corpus, what in ((confirmation_source if rule.fleurs else None, "confirmation corpus"),
+    # A FLEURS or speaker-labelled corpus names fixed recordings: a new resynthesis of a spent split is spent too.
+    for corpus, what in ((confirmation_source if rule.fleurs or rule is SPEAKER_LABELED_RULE else None,
+                          "confirmation corpus"),
                          (natural_source, "natural positives' corpus")):
         spent = declared["spentSources"].get(corpus) if corpus else None
         if spent:

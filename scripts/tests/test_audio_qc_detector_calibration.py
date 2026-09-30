@@ -206,6 +206,7 @@ def fixture_registry() -> dict:
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
                       {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
+                      {**level_entry(), "id": "test.labeled-level@2", "populations": "speaker-labeled-n2"},
                       pitch_entry(), mean_entry(), run_on_entry(), accent_entry(),
                       {**level_entry(), "id": "test.reserve-level@1", "populations": "fleurs-reserve-n2"},
                       {**level_entry(), "id": "test.reserve-level@2", "populations": "fleurs-reserve-n2"}],
@@ -790,7 +791,13 @@ class NewClassRegistryTests(unittest.TestCase):
             self.assertEqual(detectors.judges_of(entry), [CAMPPLUS])
             self.assertTrue(detectors.needs_panel(entry))
             self.assertFalse(detectors.needs_measurements(entry) or detectors.needs_private(entry))
-            self.assertEqual(sorted(entry["scope"]["languages"]), sorted(ALL_LANGUAGES))
+            # The speaker cohort covers eight languages; Japanese and Russian have no speaker corpus.
+            self.assertEqual(sorted(entry["scope"]["languages"]),
+                             sorted(set(ALL_LANGUAGES) - {"japanese", "russian"}))
+            self.assertEqual(entry["scope"]["exclusions"], [{"language": "japanese", "reason": "no-speaker-corpus"},
+                                                            {"language": "russian", "reason": "no-speaker-corpus"}])
+            self.assertEqual((roles["fit"]["corpus"], roles["confirmNegatives"]["corpus"]),
+                             ("speaker-corpora-v1-calibration", "speaker-corpora-v1-confirmation"))
         similarity = self.entry("identity.clone-similarity@1")
         self.assertEqual(detectors.target_injectors(similarity), {"IDN-IMPOSTOR", "IDN-SHIFT"})
         self.assertEqual(detectors.target_mechanism(similarity, "IDN-IMPOSTOR"), "T1-parallel-corpus")
@@ -2537,6 +2544,35 @@ class RoleSetCohortTests(unittest.TestCase):
         cohort["n1ManifestSHA256"] = calibration.file_sha256(unlabelled_n1)
         with self.assertRaisesRegex(calibration.CalibrationError, "names no speaker"):
             calibration.resolve_cohort(cohort, unlabelled_n1)
+
+    def test_a_confirmed_speaker_corpus_is_spent_whichever_resynthesis_a_new_plan_names(self) -> None:
+        fixture = self.fixture
+        cal, cal_n1 = labelled_cohort(fixture, "lab-cal", "lc", "calibration", ("s1", "s2", "s3"))
+        conf, conf_n1 = labelled_cohort(fixture, "lab-conf", "lt", "confirmation", ("s4", "s5", "s6"))
+        splits = ("--confirmation-n1-manifest", str(conf_n1), "--calibration-n1-manifest", str(cal_n1))
+        scores = self.scores("test.labeled-level@1", "calibration", cal, "labelled", "--n1-manifest", str(cal_n1),
+                             "--measurements", str(fixture.measurements(cal, "lab-measurements")))
+        self.plan("test.labeled-level@1", cal, conf, scores, *splits, flags=INJECTION_FLAGS)
+        fixture.commit_plans()
+        fixture.confirmation = conf  # the injection set is built on the labelled confirmation cohort
+        injection = fixture.injection_set(("SIG-LEVEL",), name="lab-injection")
+        measured = fixture.measurements(conf, "lab-confirmation-measurements", injection_set=injection)
+        confirmation = self.scores("test.labeled-level@1", "confirmation", conf, "lab-confirmation", "--n1-manifest",
+                                   str(conf_n1), "--measurements", str(measured), "--injection-set", str(injection),
+                                   "--positive-measurements", str(measured))
+        result = json.loads(self.cli("confirm", "--detector", "test.labeled-level@1", "--calibration-scores",
+                                     str(scores), "--confirmation-scores", str(confirmation)))
+        self.assertEqual(result["verdict"], "qualified")
+        spent = calibration.declared_cohorts(calibration.Repository(fixture.repo))["spentSources"]
+        self.assertEqual(spent, {"test-speakers-confirmation": ["test.labeled-level@1"]})
+        # A new resynthesis of the spent split is no new confirmation cohort (A5).
+        again, again_n1 = labelled_cohort(fixture, "lab-again", "la", "confirmation", ("s4", "s5", "s6"))
+        other = self.scores("test.labeled-level@2", "calibration", cal, "labelled-2", "--n1-manifest", str(cal_n1),
+                            "--measurements", str(fixture.measurements(cal, "lab-measurements-2")))
+        self.assertIn("confirmation corpus test-speakers-confirmation was already scored as confirmation evidence",
+                      self.plan("test.labeled-level@2", cal, again, other, "--confirmation-n1-manifest",
+                                str(again_n1), "--calibration-n1-manifest", str(cal_n1), flags=INJECTION_FLAGS,
+                                expect=2))
 
 
 FAIL_DETECTOR = "test.fail-level@1"

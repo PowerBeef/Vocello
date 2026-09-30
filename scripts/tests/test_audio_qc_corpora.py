@@ -10,6 +10,7 @@ fake worker (the system interpreter has no pyarrow).
 
 from __future__ import annotations
 
+from collections import Counter
 from contextlib import redirect_stderr, redirect_stdout
 import copy
 import hashlib
@@ -1227,6 +1228,174 @@ class LabelledCohortTests(Fixture):
         self.assertEqual(len({take["speaker"] for take in natural["cohort"]["takes"].values()}), 6)
         policy = json.loads(corpora.POLICY_PATH.read_text(encoding="utf-8"))
         self.assertEqual(calibration.natural_label_problems(policy, entry, natural), [])
+
+
+class SpeakerCohortTests(Fixture):
+    """The class E speaker cohort over synthetic extractions of the four sources it reads: speaker- and
+    script-disjoint splits, the eligibility rules, one reference clip per take, and the N1 shape the N2 plan
+    and the detector driver read."""
+
+    SECONDS = 4.5
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.registry = corpora.load_registry()
+
+    def extract(self, source: str, rows: list[tuple]) -> dict:
+        """rows: (language, speaker, text, seconds, gender); one clip each, a tone of its own frequency."""
+        rate = self.registry["sources"][source]["extract"]["outputRate"]
+        directory = corpora.source_directory(self.registry, source, self.root) / corpora.EXTRACTED_DIRECTORY
+        sink = clips.ClipSink(directory / "wav")
+        for index, (language, speaker, text, seconds, gender) in enumerate(rows):
+            source_id = f"{speaker}_{index:04d}"
+            data = pcm16(int(seconds * rate), rate, 120.0 + 3.0 * index)
+            clip, info = clips.clip_from_wav(data, output_rate=rate)
+            labels = {"language": language, "split": "test", "sourceID": source_id, "speaker": speaker,
+                      "gender": gender, "text": text}
+            sink.add(clips.clip_id(source, source_id), clip, info, labels, origin=f"row#{index}",
+                     source_sha256=hashlib.sha256(data).hexdigest())
+        manifest = corpora.build_manifest(self.registry, source, sink.clips, sink.skipped, metadata={}, members={})
+        (directory / corpora.MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def readings(self, language: str, speakers: int, per_speaker: int, *, gendered: bool = True,
+                 prefix: str | None = None) -> list[tuple]:
+        prefix = prefix or language[:2]
+        return [(language, f"{prefix}{speaker}", f"{language} {speaker} reads sentence {reading}.", self.SECONDS,
+                 ("female", "male")[speaker % 2] if gendered else None)
+                for speaker in range(speakers) for reading in range(per_speaker)]
+
+    def extract_all(self) -> None:
+        english = self.readings("english", 6, 3, gendered=False)
+        english += [("english", "en0", "too short", 2.0, None), ("english", "en1", "", self.SECONDS, None),
+                    # One speaker reads one sentence twice: no reference with another script.
+                    ("english", "en9", "once again", self.SECONDS, None),
+                    ("english", "en9", "Once  again", self.SECONDS, None)]
+        self.extract("libritts-r", english)
+        # A reader of German and French is one speaker, whose split follows the language it reads most.
+        mls = self.readings("german", 6, 3) + self.readings("french", 6, 3)
+        mls += [("german", "multi", f"multi reads {index}", self.SECONDS, "female") for index in range(3)]
+        mls += [("french", "multi", "multi lit une phrase", self.SECONDS, "female")]
+        self.extract("mls", mls)
+        # One speaker reads 12 sentences: the cap keeps 10.
+        self.extract("aishell3-subset", self.readings("chinese", 6, 3)
+                     + [("chinese", "zh-many", f"zh many {index}", self.SECONDS, "female") for index in range(12)])
+        # Every Korean speaker reads the same three sentences and two of its own: a script lives in one split.
+        self.extract("zeroth-korean", [("korean", f"ko{speaker}", text, self.SECONDS, None) for speaker in range(8)
+                                       for text in (*(f"korean sentence {reading}" for reading in range(3)),
+                                                    f"ko{speaker} alone 1", f"ko{speaker} alone 2")])
+
+    def build(self, split: str, **options) -> dict:
+        return corpora.speaker_cohort(self.registry, split=split, root=self.root, **options)
+
+    def test_a_missing_extraction_is_refused_with_the_commands_to_run(self) -> None:
+        with self.assertRaisesRegex(corpora.CorporaError, "aishell3-subset is not extracted.*extract --source"):
+            self.build("confirmation")
+
+    def test_the_splits_share_no_speaker_or_script_and_every_take_names_a_reference(self) -> None:
+        self.extract_all()
+        confirmation, calibration = self.build("confirmation"), self.build("calibration")
+        for manifest, split in ((confirmation, "confirmation"), (calibration, "calibration")):
+            self.assertEqual(n1.manifest_digest_issues(manifest), [])
+            self.assertEqual((manifest["kind"], manifest["split"], manifest["corpus"], manifest.get("fleursSplit")),
+                             (n1.MANIFEST_KIND, split, corpora.SPEAKER_CORPUS, None))
+            eligible, _count = n2.eligible_recordings(manifest)
+            self.assertTrue(eligible)
+            directory = corpora.speaker_cohort_path(self.registry, split=split, share=0.5, root=self.root).parent
+            by_id = {take["takeID"]: take for take in manifest["takes"]}
+            for take in manifest["takes"]:
+                self.assertEqual(hashlib.sha256((directory / take["wavPath"]).read_bytes()).hexdigest(),
+                                 take["wavSHA256"])
+                self.assertRegex(take["speaker"], r"^[a-z0-9-]+:[0-9a-f]{16}$")
+                if not take["eligible"]:
+                    self.assertNotIn("reference", take)
+                    continue
+                reference = by_id[take["reference"]["takeID"]]
+                self.assertTrue(reference["eligible"])
+                self.assertEqual(reference["speaker"], take["speaker"])
+                self.assertNotEqual(reference["scriptID"], take["scriptID"])
+                self.assertEqual((take["reference"]["wavPath"], take["reference"]["wavSHA256"]),
+                                 (reference["wavPath"], reference["wavSHA256"]))
+                # A speaker's takes cycle: never a mutual pair when three or more read distinct scripts.
+                mine = [other["scriptID"] for other in manifest["takes"] if other["eligible"]
+                        and other["speaker"] == take["speaker"]]
+                if len(mine) > 2 and len(set(mine)) == len(mine):
+                    self.assertNotEqual(reference["reference"]["takeID"], take["takeID"])
+        takes = {split: [take for take in manifest["takes"] if take["eligible"]]
+                 for split, manifest in (("confirmation", confirmation), ("calibration", calibration))}
+        for key in ("speaker", "scriptID", "family"):
+            shared = {take[key] for take in takes["confirmation"]} & {take[key] for take in takes["calibration"]}
+            self.assertFalse(shared, key)
+        every = [*confirmation["takes"], *calibration["takes"]]
+        reasons = Counter(reason for take in every for reason in take["ineligibleReasons"])
+        self.assertEqual((reasons["duration"], reasons["emptyText"], reasons["speakerCap"], reasons["noReference"]),
+                         (1, 1, 2, 2))
+        # Korean: each shared sentence stays in one split, so the other split's readings of it are out.
+        korean = [take for take in every if take["language"] == "korean"]
+        self.assertTrue(any("sharedScript" in take["ineligibleReasons"] for take in korean))
+        self.assertTrue(all(take["ineligibleReasons"] in ([], ["sharedScript"]) for take in korean))
+        # The German and French reader is one speaker in one split.
+        multi = {take["language"]: take for take in every if take["recording"]["sourceID"].startswith("multi_")}
+        self.assertEqual(len({take["speaker"] for take in multi.values()}), 1)
+        self.assertEqual(sum(1 for split in takes.values() if any(take["speaker"] == multi["german"]["speaker"]
+                                                                  for take in split)), 1)
+        # Gender where the corpus labels it, never a guess; English and Korean carry none.
+        self.assertEqual({take["gender"] for take in every if take["language"] in ("english", "korean")}, {None})
+        self.assertEqual({take["gender"] for take in every if take["language"] == "german"}, {"female", "male"})
+        self.assertEqual(confirmation["byLanguage"], calibration["byLanguage"])
+        self.assertEqual(set(confirmation["byLanguage"]["confirmation"]),
+                         {"english", "german", "french", "chinese", "korean"})
+        summary = corpora.speaker_summary(confirmation, Path("manifest.json"))
+        self.assertIn("below the warn floors", summary["warning"])
+        self.assertEqual(summary["speakers"], confirmation["speakerSplit"]["speakers"])
+        # A rebuild writes the same manifest; the default directory is named by what the cohort is drawn from.
+        self.assertEqual(self.build("confirmation")["manifestDigest"], confirmation["manifestDigest"])
+        self.assertEqual(confirmation["speakerSplit"]["samplingSHA256"], calibration["speakerSplit"]["samplingSHA256"])
+        output = corpora.speaker_cohort_path(self.registry, split="confirmation", share=0.5, root=self.root)
+        self.assertEqual(output.parts[-5], corpora.SPEAKER_COHORT_DIRECTORY)
+        with self.assertRaisesRegex(corpora.CorporaError, "already holds another cohort"):
+            self.build("confirmation", share=0.25, output=output)
+
+    def test_the_detector_driver_reads_the_corpus_the_role_set_names(self) -> None:
+        import audio_qc_detector_calibration as calibration
+
+        self.extract_all()
+        manifest = self.build("calibration")
+        path = corpora.speaker_cohort_path(self.registry, split="calibration", share=0.5, root=self.root)
+        cohort = calibration.load_cohort(path)
+        self.assertEqual(calibration.resolve_cohort(cohort, None), "calibration")
+        self.assertEqual(cohort["corpus"], corpora.SPEAKER_CORPUS)
+        registry = json.loads(corpora.DETECTOR_REGISTRY_PATH.read_text(encoding="utf-8"))
+        roles = registry["roleSets"][corpora.SPEAKER_ROLE_SET]
+        self.assertEqual((roles["fit"]["corpus"], roles["confirmNegatives"]["corpus"]),
+                         (f"{corpora.SPEAKER_CORPUS}-calibration", f"{corpora.SPEAKER_CORPUS}-confirmation"))
+        # Speakers are digests of the corpus and the (already anonymized) label.
+        self.assertEqual(len({take["speaker"] for take in cohort["takes"].values()}),
+                         len({take["speaker"] for take in manifest["takes"] if take["eligible"]}))
+        referenced = [take for take in cohort["takes"].values() if take["referenceSHA256"]]
+        self.assertEqual(len(referenced), len(cohort["takes"]))
+        # Every excluded language has a reason, and the in-scope languages are the ones a corpus covers.
+        self.assertEqual(set(corpora.SPEAKER_SOURCES) | set(corpora.SPEAKER_EXCLUDED_LANGUAGES),
+                         set(corpora.lm.PRODUCT_LANGUAGES))
+        for detector in ("identity.clone-similarity@1", "identity.window-drift@1", "identity.onset-drift@1"):
+            entry = next(item for item in registry["detectors"] if item["id"] == detector)
+            self.assertEqual(sorted(entry["scope"]["languages"]), sorted(corpora.SPEAKER_SOURCES))
+            self.assertEqual({item["language"] for item in entry["scope"]["exclusions"]},
+                             set(corpora.SPEAKER_EXCLUDED_LANGUAGES))
+
+    def test_the_selection_on_its_own_counts_both_splits_without_writing(self) -> None:
+        self.extract_all()
+        extractions = corpora.speaker_extractions(self.registry, root=self.root)
+        splits = corpora.speaker_selection({source: manifest for source, (_directory, manifest)
+                                            in extractions.items()}, share=0.5)
+        wider = corpora.speaker_selection({source: manifest for source, (_directory, manifest)
+                                           in extractions.items()}, share=0.75)
+        self.assertGreater(sum(take["eligible"] for take in wider["confirmation"]),
+                           sum(take["eligible"] for take in splits["confirmation"]))
+        with self.assertRaisesRegex(corpora.CorporaError, "strictly between"):
+            corpora.speaker_selection({}, share=1.0)
+        self.assertFalse(corpora.speaker_cohort_path(self.registry, split="calibration", share=0.5,
+                                                     root=self.root).exists())
 
 
 class RuntimeWiringTests(unittest.TestCase):

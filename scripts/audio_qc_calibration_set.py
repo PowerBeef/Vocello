@@ -112,7 +112,10 @@ source speaker, with the source take as the reference clip. Donors come from
 the same manifest (so the same split), a splice's only from takes whose
 alignment is usable; the choice is seeded by `--sample-seed`, recorded in each
 entry and re-derived by `verify`. A take without a speaker label, or without a
-donor of both relations, is not applicable, with that reason.
+donor of both relations, is not applicable, with that reason. An entry keeps the
+reference clip its take declares (`reference`, which the orchestrator hands to
+the speaker judges), its path made relative to the set; an impostor's reference
+is its source take.
 
 Seams (class J). A long-form take may declare its segment boundaries as
 `seamSamples` (sample offsets at the engine rate on its own timeline); a take of
@@ -1309,7 +1312,25 @@ def _inject_take(task: dict) -> dict:
         written += (output / relative).stat().st_size
         entries.append(_impostor_entry(take, donor, variant, clip_id, relative, file_sha256(output / relative),
                                        samples, fixture.digest, task["sampleSeed"], embed_text=embed_text))
-    return {"takeID": take["takeID"], "entries": entries, "skips": skips, "bytes": written}
+    return {"takeID": take["takeID"], "entries": [_with_reference(entry, task) for entry in entries], "skips": skips,
+            "bytes": written}
+
+
+def _with_reference(entry: dict, task: dict) -> dict:
+    """The reference clip a speaker judge scores an entry against, its path relative to the set: an impostor's
+    is its source take (the speaker it is presented as); any other entry keeps the one its audio's take declares
+    (a relative path there is relative to the cohort manifest)."""
+    output = Path(task["output"]).resolve()
+    if (entry.get("injection") or {}).get("injectorID") == speaker_donors.IMPOSTOR_ID:
+        take = task["take"]
+        return {**entry, "reference": {"takeID": take["takeID"], "wavSHA256": take["wavSHA256"],
+                                       "wavPath": os.path.relpath(Path(task["wav"]).resolve(), output)}}
+    reference = entry.get("reference")
+    if not isinstance(reference, dict) or not isinstance(reference.get("wavPath"), str) or "manifestDir" not in task:
+        return entry
+    path = Path(reference["wavPath"])
+    path = path if path.is_absolute() else Path(task["manifestDir"]) / path
+    return {**entry, "reference": {**reference, "wavPath": os.path.relpath(path.resolve(), output)}}
 
 
 def _write_streamed(path: Path, head: dict, key: str, items: Iterable[dict], tail: Callable[[str], dict]) -> str:
@@ -1481,7 +1502,7 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
     tasks = []
     for take in generated:
         task = {"take": take, "wav": str(take_wav(takes_path, take)), "output": str(output),
-                "schedule": scheduled, "catalogSeed": catalog_seed}
+                "manifestDir": str(takes_path.parent), "schedule": scheduled, "catalogSeed": catalog_seed}
         if sampling is not None:
             task["schedule"] = [(injector_id, variant) for injector_id, variant in scheduled
                                 if take["family"] in chosen[injectors.CATALOG[injector_id].key]]
@@ -1670,6 +1691,8 @@ def _verify_impostor(entry: dict, task: dict, fixture_digest: str, digest: str) 
         (entry.get("family") == donor["family"], "family differs from the donor recording's"),
         ((entry.get("speaker"), entry.get("gender")) == (take["speaker"], take["gender"]),
          "the presented speaker is not the source's"),
+        ((entry.get("reference") or {}).get("wavSHA256") == take["wavSHA256"],
+         "its reference clip is not its source take"),
         (entry.get("textSHA256") == text_sha256(donor["text"]) and entry.get("text", donor["text"]) == donor["text"],
          "its text is not its donor's own"),
     ]

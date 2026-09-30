@@ -20,8 +20,8 @@
       "informational": ["N3", "N1"]
     },
     "speaker-labeled-n2": {
-      "fit": {"population": "N2", "cohort": "calibration", "corpus": "pending-speaker-labeled-calibration"},
-      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "pending-speaker-labeled-confirmation"},
+      "fit": {"population": "N2", "cohort": "calibration", "corpus": "speaker-corpora-v1-calibration"},
+      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "speaker-corpora-v1-confirmation"},
       "positives": {"population": "P1", "cohort": "confirmation"},
       "shams": {"population": "S", "cohort": "confirmation"},
       "informational": ["N3", "N1"]
@@ -69,8 +69,10 @@
     "fleurs-reserve-no-speaker-ids": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured.",
     "fleurs-speaker-lower-bound": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.",
     "n2-one-codec": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).",
-    "speaker-corpus-pending": "FLEURS publishes no speaker ids, so class E has no fit or confirmation corpus yet (role set speaker-labeled-n2, corpora pending a maintainer data decision): it needs a speaker-labeled corpus whose terms allow speaker verification (Common Voice's forbid speaker identification) with at least two utterances per speaker, resynthesized to N2 like FLEURS. Each language stratum needs at least 60 scored calibration families and 60 scored confirmation negative families (the policy's warn minimums; audit section 5.4 sizes a per-language bound on its own families), from at least 3 speakers per language, the two cohorts disjoint by family, speaker and script; the positives need 60 families per severe cell and each injector's sham 60 more. A language without such a corpus becomes a scope exclusion (audit section 5.5 step 5), which changes the definition: a new version once a plan binds it.",
+    "speaker-corpora-v1": "FLEURS publishes no speaker ids, so class E fits and confirms on the speaker cohort (role set speaker-labeled-n2: speaker-corpora-v1-calibration, then speaker-corpora-v1-confirmation), which audio_qc_corpora.py cohort --source speaker builds from the speaker group of config/audio-qc-corpora.json under the maintainer's decision of 2026-09-30 (anonymous same- and different-speaker trials, outputs never published; never speaker identification). Each language reads one corpus: LibriTTS-R dev.clean and test.clean (English), Multilingual LibriSpeech (German, French, Spanish, Italian, Portuguese), the AISHELL-3 test subset (Chinese) and Zeroth-Korean (Korean), all read speech, resynthesized to N2. A take has a transcript and 4-30 s of audio, at most 10 per speaker; the splits are disjoint by speaker (a seeded split within each corpus) and by script, and on the extraction of 2026-09-30 every language holds 167 to 580 families from 22 to 58 speakers per split, above the warn floors (60 scored families and 3 speakers per language). CREMA-D (no transcript, 1-5 s acted clips) and Emozionalmente (Italian reads Multilingual LibriSpeech, so a donor never differs from its source by recording channel) serve no cohort. The negatives are read speech: FAR on conversational or expressive speech is not measured.",
     "speaker-reference-clip": "The speaker judges score a take only against a reference clip: another utterance of the same speaker for a corpus take, the clone's reference in the clone lane (panel_jobs: needs_reference). The orchestrator embeds it only when the manifest names it (a calibration take's or entry's reference: its WAV path and digest); without one CAM++ reports no similarity and the take abstains (no-value), and the calibration refuses evidence measured against another clip than the declared one.",
+    "speaker-reference-n2": "Each cohort take is scored against another take of its speaker in the same split, with another script (the cohort's seeded reference choice), and the N2 manifest names that take's resynthesis, so both sides carry the codec, as an impostor is scored against its N2 source take. The clone lane scores a generated take against the user's raw recording, so its similarity also carries the clone's own shortfall and the codec on one side only: these thresholds bound FAR on pairs of human codec speech, and clone takes stay informational (n3-clone-takes).",
+    "speaker-gender-unlabelled": "IDN-IMPOSTOR and the recorded IDN-SWAP and IDN-ONSET splices draw donors of the source's language and gender, and LibriTTS-R and Zeroth-Korean publish no speaker gender (no pinnable source on the allowed hosts; a gender is never guessed), so English and Korean takes neither receive nor give such a positive (Korean also has no word intervals for a splice: aligner-excludes-korean). Their FAR is bounded like every language's, but those cells are drawn from German, French, Spanish, Italian, Portuguese and Chinese; IDN-SHIFT, which needs no donor, is drawn in every language. English and Korean sensitivity is therefore measured through IDN-SHIFT only (clone-similarity) and not at all for the drift detectors: a lane should read it as report-only there.",
     "n2-read-speech": "FLEURS is read speech, while the audit's class F negatives are expressive N1 (section 5.7): expressive speech moves F0 further and faster, so a threshold fitted on N2 read speech may flag expressive takes; natural Vocello takes (N3, whose expressive variation is the product default) stay informational at warn.",
     "n3-no-labels": "A measure that exists only on generated takes (the talker's introspection, long-form seams) has no N2 to confirm on: a codec round trip samples no token and joins no segment, so its fit and confirmation negatives are N3 alone (audit section 5.7), the two splits of config/audio-qc-calibration-takes.json disjoint by family, speaker and script. N3 carries no defect labels, so a flag rate f bounds the false-alarm rate only as f / (1 - pi_max), where pi_max is the largest defect prevalence admitted (section 5.1). Each language stratum needs at least 60 scored families in each split (the calibration split plans 80 per language).",
     "n3-expressive-negatives": "The negatives are natural Vocello takes (N3: the product's expressive variation, Built-in and Voice Design voices), so natural expressive speech is a negative, as the maintainer's report of erratic pitch in Voice Clone takes needs; a threshold fitted on FLEURS read speech (N2, informational here) would flag expressive intonation. N3 carries no labels, so the flag rate bounds the false-alarm rate only as f / (1 - pi_max) (audit section 5.1), and a fail bound still needs an expressive N2 corpus (the audit's expressive N1, section 5.7). Each language stratum needs at least 60 scored families in each split of the take plan (the calibration split plans 80 per language).",
@@ -87,6 +89,7 @@
   },
   "exclusionReasons": {
     "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean.",
+    "no-speaker-corpus": "The speaker group of config/audio-qc-corpora.json has no corpus in this language with speaker labels and transcripts (Japanese: JVNV, of the emotion group, has four actors and no transcript; Russian: RESD labels no speaker), so there is no speaker cohort to fit or confirm on (audit section 5.5 step 5). A corpus that meets the warn floors brings the language back as a new version.",
     "sensevoice-codec-failures": "The ja and ko content pair is Whisper and SenseVoice, and SenseVoice fails outright on codec audio (error rate above 0.5 on 5.6% of ja and 18.5% of ko N2): under the two-family mean each failure scores about 0.5 on a clean take, so on the spent AQ-07 data the Japanese threshold sat at 0.5 and 6 of 49 Japanese severe content positives alarmed. Japanese and Korean stay outside until a second family survives the codec (Korean also has no word-level positives)."
   },
   "risks": {
@@ -536,12 +539,13 @@
       "stage": 2,
       "measures": "Whole-take speaker similarity (SIM): the cosine between CAM++'s embedding of the take and of its reference clip (another utterance of the same speaker; the clone's reference in the clone lane). A low similarity alarms: a clone mismatch or another voice for the whole take.",
       "score": {"combination": "single", "unit": "cosine", "groups": [
-        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+        {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
          "components": [{"source": "panel", "judge": "speaker.campplus-voxceleb@1", "metric": "cosine"}]}
       ]},
       "direction": "below",
       "strata": {"by": "language", "reason": "Speaker-verification scores shift with language: both speaker families train on VoxCeleb, which is mostly English, and the audit draws impostors from the same language first (section 4.3)."},
-      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
+                "exclusions": [{"language": "japanese", "reason": "no-speaker-corpus"}, {"language": "russian", "reason": "no-speaker-corpus"}]},
       "targets": [
         {"injectorID": "IDN-IMPOSTOR", "severities": ["severe"], "mechanism": "T1-parallel-corpus"},
         {"injectorID": "IDN-SHIFT", "severities": ["severe"], "mechanism": "T1-pcm-construction"}
@@ -551,7 +555,7 @@
         {"injectorID": "IDN-SHIFT", "mechanism": "T1-pcm-construction"}
       ],
       "populations": "speaker-labeled-n2",
-      "limitations": ["speaker-corpus-pending", "speaker-reference-clip"],
+      "limitations": ["speaker-corpora-v1", "speaker-reference-clip", "speaker-reference-n2", "speaker-gender-unlabelled"],
       "risks": ["resnet293-not-voting"]
     },
     {
@@ -560,17 +564,18 @@
       "stage": 2,
       "measures": "Window drift: CAM++'s whole-take cosine to the reference clip minus its lowest 2 s window cosine (0.5 s hop) to the same reference, so a span of another voice inside the take alarms against the take's own similarity while a whole-take mismatch (the clone-similarity detector's) does not.",
       "score": {"combination": "difference", "unit": "cosine", "groups": [
-        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+        {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
          "components": [{"source": "panel", "judge": "speaker.campplus-voxceleb@1", "metric": "cosine"},
                         {"source": "panel", "judge": "speaker.campplus-voxceleb@1", "metric": "windowCosineMinimum"}]}
       ]},
       "direction": "above",
       "strata": {"by": "language", "reason": "Speaker-verification scores shift with language: both speaker families train on VoxCeleb, which is mostly English, and the audit draws impostors from the same language first (section 4.3)."},
-      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
+                "exclusions": [{"language": "japanese", "reason": "no-speaker-corpus"}, {"language": "russian", "reason": "no-speaker-corpus"}]},
       "targets": [{"injectorID": "IDN-SWAP", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "IDN-SWAP", "mechanism": "T1-pcm-construction"}],
       "populations": "speaker-labeled-n2",
-      "limitations": ["speaker-corpus-pending", "speaker-reference-clip"],
+      "limitations": ["speaker-corpora-v1", "speaker-reference-clip", "speaker-reference-n2", "speaker-gender-unlabelled"],
       "risks": ["resnet293-not-voting", "short-window-embeddings"]
     },
     {
@@ -579,17 +584,18 @@
       "stage": 2,
       "measures": "Onset identity delta: CAM++'s whole-take cosine to the reference clip minus the cosine of the take's first 2 s window, so another voice at the start alarms against the take's own similarity. The CAM++ part of the audit's joint onset rule only.",
       "score": {"combination": "difference", "unit": "cosine", "groups": [
-        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+        {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
          "components": [{"source": "panel", "judge": "speaker.campplus-voxceleb@1", "metric": "cosine"},
                         {"source": "panel", "judge": "speaker.campplus-voxceleb@1", "metric": "onsetWindowCosine"}]}
       ]},
       "direction": "above",
       "strata": {"by": "language", "reason": "Speaker-verification scores shift with language: both speaker families train on VoxCeleb, which is mostly English, and the audit draws impostors from the same language first (section 4.3)."},
-      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "korean", "portuguese", "spanish"],
+                "exclusions": [{"language": "japanese", "reason": "no-speaker-corpus"}, {"language": "russian", "reason": "no-speaker-corpus"}]},
       "targets": [{"injectorID": "IDN-ONSET", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
       "shams": [{"injectorID": "IDN-ONSET", "mechanism": "T1-pcm-construction"}],
       "populations": "speaker-labeled-n2",
-      "limitations": ["speaker-corpus-pending", "speaker-reference-clip"],
+      "limitations": ["speaker-corpora-v1", "speaker-reference-clip", "speaker-reference-n2", "speaker-gender-unlabelled"],
       "risks": ["resnet293-not-voting", "short-window-embeddings", "onset-joint-rule-pending"]
     },
     {

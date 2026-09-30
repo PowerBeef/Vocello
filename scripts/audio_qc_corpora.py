@@ -87,6 +87,17 @@ transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
   detector role set declares. It warns when the confirmation split falls below
   the warn floor of severe families. A missing or stale extraction is refused.
   The qc-n2 lane resynthesizes the manifest like a FLEURS cohort.
+- **Speaker cohort (class E).** `cohort --source speaker` pools the speaker
+  group into corpus `SPEAKER_CORPUS`, one source per language
+  (`SPEAKER_SOURCES`; Japanese and Russian have none, CREMA-D and
+  Emozionalmente serve none, each with its reason), by `SPEAKER_COHORT_RULE`:
+  4-30 s takes with a transcript, speakers split by a seeded SHA-256 within
+  each corpus, scripts kept to one split, at most 10 takes per speaker, and
+  per take its anonymized speaker, its gender where labelled and a `reference`
+  clip, another take of its speaker in the same split. It is written under
+  `speaker-cohorts/<sampling digest>/share-<share>/<split>/`; the summary
+  counts each split's families, speakers and audio per language and warns
+  below the warn floors. The qc-n2 lane keeps the labels and the reference.
 
 Commands:
   plan      bytes to download and to extract per group and source, and the free space (no network)
@@ -96,8 +107,9 @@ Commands:
   verify    re-verify downloads, receipts, runtime and extractions offline
   validate  check the committed registry and its sidecars (no network); in the contract gate
   resolve-subset  the AISHELL-3 subset pins from a Hub tree listing, by the registry's seeded rule
-  cohort    --source speechocean762 --split calibration|confirmation [--confirmation-share S] [--output PATH]
-            one speaker-disjoint split of a labelled corpus's extraction as an N1 cohort manifest
+  cohort    --source speechocean762|speaker --split calibration|confirmation [--confirmation-share S] [--output PATH]
+            one speaker-disjoint split of a labelled corpus's extraction (or of the speaker group) as an N1
+            cohort manifest
 """
 
 from __future__ import annotations
@@ -231,6 +243,59 @@ LABELLED_ELIGIBILITY_RULES = [
 LABELLED_SAMPLE_RATES = (16_000, 24_000)
 DEFAULT_CONFIRMATION_SHARE = 0.5
 COHORT_DIRECTORY = "cohorts"
+
+# The class E speaker cohort (`cohort --source speaker`): one corpus per language from the speaker group, pooled
+# into one corpus name so role set speaker-labeled-n2 fits on `<corpus>-calibration` and confirms on
+# `<corpus>-confirmation` (the detector driver digests speakers with the corpus name, so both splits name one).
+# A changed rule, seed or source is a new corpus name: a confirmed plan spends the name.
+SPEAKER_COHORT = "speaker"
+SPEAKER_CORPUS = "speaker-corpora-v1"
+SPEAKER_COHORT_VERSION = "audio-qc-speaker-cohort-v1"
+SPEAKER_COHORT_SEED = "aq07-speaker-cohort-v1"
+SPEAKER_ROLE_SET = "speaker-labeled-n2"
+SPEAKER_COHORT_DIRECTORY = "speaker-cohorts"
+SPEAKER_SOURCES = {
+    "chinese": "aishell3-subset", "english": "libritts-r", "french": "mls", "german": "mls", "italian": "mls",
+    "korean": "zeroth-korean", "portuguese": "mls", "spanish": "mls",
+}
+SPEAKER_EXCLUDED_LANGUAGES = {
+    "japanese": "the speaker group has no Japanese corpus (JVNV, of the emotion group, has four actors and no "
+                "transcript)",
+    "russian": "the speaker group has no Russian corpus (RESD, of the emotion group, labels no speaker)",
+}
+SPEAKER_UNUSED_SOURCES = {
+    "crema-d": "no transcript (the N2 plan, the panel manifest and the aligner read every take's text), clips of "
+               "1-5 s, under the duration floor, and acted emotions",
+    "emozionalmente": "Italian reads Multilingual LibriSpeech: one corpus per language, so an impostor or a donor "
+                      "splice never differs from its source by recording channel; its clips are mostly under the "
+                      "duration floor and acted",
+}
+SPEAKER_DURATION_SECONDS = (4.0, 30.0)
+SPEAKER_PER_SPEAKER = 10
+SPEAKER_COHORT_RULE = (
+    "Each language reads one corpus (sourcesByLanguage). A clip is a take with a speaker, a transcript, 4-30 s of "
+    "16 or 24 kHz audio and a neutral emotion where the corpus labels one. Within each corpus, speakers are "
+    "grouped by the language they read most and each group is ranked by SHA-256(seed NUL corpus NUL speaker): the "
+    "first round(group x confirmationShare) (at least one, never all) form the confirmation split, the rest the "
+    "calibration split, so the splits share no speaker and every utterance goes with its speaker. A script (the "
+    "folded transcript within its corpus) read on both sides belongs to one split by SHA-256(seed NUL script NUL "
+    "script id) against the share; its readings on the other side are out (sharedScript). Each speaker keeps its "
+    "perSpeaker lowest SHA-256(seed NUL speaker NUL clip id) takes (speakerCap). A speaker's kept takes in "
+    "ascending SHA-256(seed NUL reference NUL clip id) form a cycle, and each take's reference clip is the next "
+    "take of the cycle with another script, so two takes are each other's reference only when nothing else can "
+    "serve; a speaker whose kept takes read one script has none (noReference). Speakers are anonymized as "
+    "corpus:SHA-256(corpus NUL label)[:16]."
+)
+SPEAKER_ELIGIBILITY_RULES = [
+    "text: the corpus transcript is not empty (emptyText)",
+    "speaker: the corpus labels the utterance's speaker (noSpeaker)",
+    "duration: 4 to 30 s, at least two of CAM++'s 2 s windows and within the codec round trip's bound (duration)",
+    "rate: 16 or 24 kHz mono PCM16, the rates the recording adapter reads (sampleRate)",
+    "emotion: neutral, where the corpus labels an emotion (emotion)",
+    "script: a script read in both splits stays in one (sharedScript)",
+    "cap: at most 10 takes per speaker (speakerCap)",
+    "reference: its speaker has another kept take with another script (noReference)",
+]
 DETECTOR_REGISTRY_PATH = REPO / "config" / "audio-qc-detectors.json"
 POLICY_PATH = REPO / "config" / "audio-qc-qualification-policy.json"
 
@@ -2166,6 +2231,289 @@ def labelled_summary(manifest: Mapping[str, Any], output: Path) -> dict[str, Any
 
 
 # --------------------------------------------------------------------------- #
+# Speaker-labelled N1 cohorts (class E)
+# --------------------------------------------------------------------------- #
+
+def _speaker_label(source: str, label: str) -> str:
+    """A corpus speaker as a cohort speaker: its source and a digest of its label (anonymous trials only)."""
+    digest = hashlib.sha256(f"{source}\0{label}".encode("utf-8")).hexdigest()
+    return f"{source}:{digest[:16]}"
+
+
+def _speaker_script(source: str, text: str) -> str:
+    """A script is its folded text within its corpus, so two readings of one sentence are one script."""
+    folded = " ".join(text.split()).casefold()
+    return f"{source}-{hashlib.sha256(folded.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _share_rank(seed: str, kind: str, value: str) -> float:
+    return int(_order(seed, kind, value)[:13], 16) / float(1 << 52)
+
+
+def speaker_clip_reasons(clip: Mapping[str, Any]) -> list[str]:
+    """Why an extraction clip cannot be a speaker-cohort take by itself (`SPEAKER_ELIGIBILITY_RULES`)."""
+    reasons = [] if isinstance(clip.get("text"), str) and clip["text"].strip() else ["emptyText"]
+    reasons += [] if isinstance(clip.get("speaker"), str) and clip["speaker"].strip() else ["noSpeaker"]
+    duration = clip.get("durationSeconds")
+    low, high = SPEAKER_DURATION_SECONDS
+    if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not low <= duration <= high:
+        reasons.append("duration")
+    if clip.get("sampleRate") not in LABELLED_SAMPLE_RATES:
+        reasons.append("sampleRate")
+    if clip.get("emotionCanonical") not in (None, "neutral"):
+        reasons.append("emotion")
+    return reasons
+
+
+def speaker_selection(extractions: Mapping[str, Mapping[str, Any]], *,
+                      share: float = DEFAULT_CONFIRMATION_SHARE) -> dict[str, list[dict[str, Any]]]:
+    """Both splits of the speaker cohort from the extractions of `SPEAKER_SOURCES` (`SPEAKER_COHORT_RULE`).
+
+    Returns split -> takes in the N1 take shape, each still naming its source
+    clip (`recording`); pure, so the counts can be read without writing.
+    """
+    if not 0.0 < share < 1.0:
+        raise CorporaError("the confirmation share lies strictly between 0 and 1")
+    seed = SPEAKER_COHORT_SEED
+    rows: list[dict[str, Any]] = []
+    for language, source in sorted(SPEAKER_SOURCES.items()):
+        extraction = extractions.get(source)
+        if extraction is None:
+            raise CorporaError(f"the speaker cohort reads the {source} extraction")
+        for clip in extraction["clips"]:
+            if clip.get("language") != language:
+                continue
+            label = clip["speaker"].strip() if isinstance(clip.get("speaker"), str) else ""
+            text = clip["text"] if isinstance(clip.get("text"), str) else ""
+            rows.append({"clip": clip, "source": source, "language": language, "reasons": speaker_clip_reasons(clip),
+                         "speaker": _speaker_label(source, label) if label else None,
+                         "scriptID": _speaker_script(source, text), "text": text})
+    # Speakers: within each source, grouped by the language they read most (a reader of two languages is one
+    # speaker, as the take plan's clone references count them), each group ranked by seeded SHA-256.
+    languages_of: dict[tuple[str, str], Counter[str]] = {}
+    for row in rows:
+        if row["speaker"] is not None:
+            languages_of.setdefault((row["source"], row["speaker"]), Counter())[row["language"]] += 1
+    groups: dict[tuple[str, str], list[str]] = {}
+    for (source, speaker), counts in languages_of.items():
+        primary = min(counts, key=lambda language: (-counts[language], language))
+        groups.setdefault((source, primary), []).append(speaker)
+    split_of: dict[str, str] = {}
+    for (source, _language), speakers in sorted(groups.items()):
+        ordered = sorted(speakers, key=lambda speaker: (_order(seed, source, speaker), speaker))
+        confirmation = min(len(ordered) - 1, max(1, round(len(ordered) * share))) if len(ordered) > 1 else 0
+        for index, speaker in enumerate(ordered):
+            split_of[speaker] = "confirmation" if index < confirmation else "calibration"
+    # Scripts: a script read on both sides goes to one split by seeded SHA-256; its readings on the other are out.
+    sides: dict[str, set[str]] = {}
+    for row in rows:
+        if not row["reasons"] and row["speaker"] is not None:
+            sides.setdefault(row["scriptID"], set()).add(split_of[row["speaker"]])
+    script_split = {script: "confirmation" if _share_rank(seed, "script", script) < share else "calibration"
+                    for script, found in sides.items() if len(found) > 1}
+    for row in rows:
+        owner = script_split.get(row["scriptID"])
+        if not row["reasons"] and owner is not None and owner != split_of[row["speaker"]]:
+            row["reasons"].append("sharedScript")
+    # A per-speaker cap, lowest seeded SHA-256 of the clip first, then one reference per take.
+    by_speaker: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if not row["reasons"]:
+            by_speaker.setdefault(row["speaker"], []).append(row)
+    for speaker, kept in sorted(by_speaker.items()):
+        kept.sort(key=lambda row: (_order(seed, speaker, row["clip"]["clipID"]), row["clip"]["clipID"]))
+        for row in kept[SPEAKER_PER_SPEAKER:]:
+            row["reasons"].append("speakerCap")
+        kept[:] = kept[:SPEAKER_PER_SPEAKER]
+        if len({row["scriptID"] for row in kept}) < 2:
+            for row in kept:
+                row["reasons"].append("noReference")
+            continue
+        # A seeded cycle over the speaker's takes: each one's reference is the next take with another script, so
+        # two takes are each other's reference only when nothing else can serve (a mutual pair would count one
+        # whole-take cosine twice).
+        cycle = sorted(kept, key=lambda item: (_order(seed, "reference", item["clip"]["clipID"]),
+                                               item["clip"]["clipID"]))
+        for index, row in enumerate(cycle):
+            row["reference"] = next(other for other in cycle[index + 1:] + cycle[:index]
+                                    if other["scriptID"] != row["scriptID"])
+    splits: dict[str, list[dict[str, Any]]] = {name: [] for name in n1.ROLE_SPLITS}
+    for row in rows:
+        if row["speaker"] is None:
+            continue
+        clip = row["clip"]
+        take_id = f"n1-{clip['clipID']}"
+        take = {
+            "takeID": take_id, "family": take_id, "scriptID": row["scriptID"], "language": row["language"],
+            "population": n1.POPULATION, "status": "generated", "text": row["text"],
+            "textSHA256": lm.text_sha256(row["text"]), "wavPath": f"wav/{take_id}.wav", "wavSHA256": clip["wavSHA256"],
+            "durationSeconds": clip.get("durationSeconds"), "speaker": row["speaker"],
+            "gender": clip.get("gender") if clip.get("gender") in ("female", "male") else None,
+            "recording": {"source": row["source"], "split": clip.get("split"), "clipID": clip["clipID"],
+                          "sourceID": clip.get("sourceID"), "samples": clip.get("samples"),
+                          "sampleRate": clip.get("sampleRate")},
+            "eligible": not row["reasons"], "ineligibleReasons": list(row["reasons"]),
+        }
+        reference = row.get("reference")
+        if reference is not None and not row["reasons"]:
+            reference_id = f"n1-{reference['clip']['clipID']}"
+            take["reference"] = {"takeID": reference_id, "wavPath": f"wav/{reference_id}.wav",
+                                 "wavSHA256": reference["clip"]["wavSHA256"]}
+        splits[split_of[row["speaker"]]].append(take)
+    for takes in splits.values():
+        takes.sort(key=lambda take: (lm.PRODUCT_LANGUAGES.index(take["language"]), take["takeID"]))
+    return splits
+
+
+def speaker_language_counts(takes: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per language: the eligible takes (each its own family), their speakers, the speakers with a gender (the
+    identity injectors' donors need one) and the audio seconds a qc-n2 run resynthesizes."""
+    counts: dict[str, dict[str, Any]] = {}
+    for take in takes:
+        if not take["eligible"]:
+            continue
+        entry = counts.setdefault(take["language"], {"families": 0, "speakers": set(), "genderedSpeakers": set(),
+                                                     "audioSeconds": 0.0})
+        entry["families"] += 1
+        entry["speakers"].add(take["speaker"])
+        if take.get("gender"):
+            entry["genderedSpeakers"].add(take["speaker"])
+        entry["audioSeconds"] += float(take["durationSeconds"])
+    return {language: {"families": value["families"], "speakers": len(value["speakers"]),
+                       "genderedSpeakers": len(value["genderedSpeakers"]),
+                       "audioSeconds": round(value["audioSeconds"], 1)}
+            for language, value in sorted(counts.items(), key=lambda item: lm.PRODUCT_LANGUAGES.index(item[0]))}
+
+
+def speaker_extractions(registry: Mapping[str, Any], *, root: Path | None = None) -> dict[str, tuple[Path, dict]]:
+    """source -> (extraction directory, manifest) for every source the speaker cohort reads, each current."""
+    found: dict[str, tuple[Path, dict]] = {}
+    sources = sorted(set(SPEAKER_SOURCES.values()))
+    for source in sources:
+        directory = source_directory(registry, source, root) / EXTRACTED_DIRECTORY
+        problems = extraction_problems(directory, extraction_identity(registry, source), deep=False)
+        if problems:
+            raise CorporaError(f"{source} is not extracted from the current pins ({problems[0]}); run "
+                               f"`python3 scripts/audio_qc_corpora.py fetch --source {source}` and `extract --source "
+                               f"{source}` first (the speaker cohort reads {', '.join(sources)})")
+        found[source] = (directory, json.loads((directory / MANIFEST_NAME).read_text(encoding="utf-8")))
+    return found
+
+
+def speaker_sampling(registry: Mapping[str, Any], extractions: Mapping[str, tuple[Path, dict]]) -> dict[str, Any]:
+    """What a speaker cohort is drawn from and by which rule; its digest names the cohort directory."""
+    return {
+        "version": SPEAKER_COHORT_VERSION, "corpus": SPEAKER_CORPUS, "rule": SPEAKER_COHORT_RULE,
+        "seed": SPEAKER_COHORT_SEED, "durationSeconds": list(SPEAKER_DURATION_SECONDS),
+        "perSpeaker": SPEAKER_PER_SPEAKER, "sourcesByLanguage": dict(sorted(SPEAKER_SOURCES.items())),
+        "excludedLanguages": dict(sorted(SPEAKER_EXCLUDED_LANGUAGES.items())),
+        "unusedSources": dict(sorted(SPEAKER_UNUSED_SOURCES.items())),
+        "extractions": {source: {"manifestDigest": manifest["manifestDigest"],
+                                 "extractionSHA256": manifest["extractionSHA256"]}
+                        for source, (_directory, manifest) in sorted(extractions.items())},
+    }
+
+
+def speaker_cohort_path(registry: Mapping[str, Any], *, split: str, share: float, root: Path | None = None) -> Path:
+    """Where `cohort --source speaker` writes a split: by the digest of what it is drawn from, share and split."""
+    sampling = speaker_sampling(registry, speaker_extractions(registry, root=root))
+    digest = jsonio.sha256_json(sampling, ascii=False)[:12]
+    return (root or cache_root()) / SPEAKER_COHORT_DIRECTORY / digest / f"share-{share:g}" / split / MANIFEST_NAME
+
+
+def speaker_cohort(registry: Mapping[str, Any], *, split: str, share: float = DEFAULT_CONFIRMATION_SHARE,
+                   root: Path | None = None, output: Path | None = None) -> dict[str, Any]:
+    """One split of the class E speaker cohort as an `audio-qc-n1-cohort` manifest, its WAVs linked beside it.
+
+    `corpus` is `SPEAKER_CORPUS`, the name role set speaker-labeled-n2 fits and
+    confirms on (`<corpus>-calibration`, `<corpus>-confirmation`); every take
+    names its (anonymized) speaker, its gender where the corpus labels one, its
+    text and its reference clip, another utterance of its speaker in the same
+    split. The qc-n2 lane resynthesizes it like a FLEURS cohort and carries the
+    labels and the reference to the N2 manifest.
+    """
+    if split not in n1.ROLE_SPLITS:
+        raise CorporaError(f"the split is one of {', '.join(n1.ROLE_SPLITS)}")
+    extractions = speaker_extractions(registry, root=root)
+    splits = speaker_selection({source: manifest for source, (_directory, manifest) in extractions.items()},
+                               share=share)
+    takes = splits[split]
+    eligible = sum(1 for take in takes if take["eligible"])
+    if not eligible:
+        raise CorporaError(f"the speaker cohort's {split} split holds no eligible utterance")
+    from audio_qc_n2_resynthesis import MAX_ITEMS  # deferred: NumPy-backed, only the round trip's bound is read
+
+    if eligible > MAX_ITEMS:
+        raise CorporaError(f"the {split} split holds {eligible} eligible utterances; one qc-n2 run takes at most "
+                           f"{MAX_ITEMS}: build it with another --confirmation-share")
+    sampling = speaker_sampling(registry, extractions)
+    output = (output or speaker_cohort_path(registry, split=split, share=share, root=root)).resolve()
+    speakers = {name: sorted({take["speaker"] for take in value}) for name, value in splits.items()}
+    sources = {}
+    for source in sorted(set(SPEAKER_SOURCES.values())):
+        entry = registry["sources"][source]
+        origin = ({"record": entry["record"], "version": entry["version"]} if host_kind(entry) == "zenodo"
+                  else {"repository": entry["repository"], "revision": entry["revision"]})
+        sources[source] = {**origin, "license": entry["license"]["id"], "attribution": entry["attribution"],
+                           "languages": sorted(language for language, name in SPEAKER_SOURCES.items()
+                                               if name == source),
+                           "extraction": sampling["extractions"][source]}
+    manifest: dict[str, Any] = {
+        "schemaVersion": n1.SCHEMA_VERSION, "kind": n1.MANIFEST_KIND, "population": n1.POPULATION,
+        "corpus": SPEAKER_CORPUS, "dataset": SPEAKER_CORPUS, "split": split,
+        "languages": [language for language in lm.PRODUCT_LANGUAGES if any(take["language"] == language
+                                                                          for take in takes)],
+        "sampleRates": sorted({take["recording"]["sampleRate"] for take in takes}),
+        "sources": sources,
+        "speakerSplit": {"version": SPEAKER_COHORT_VERSION, "rule": SPEAKER_COHORT_RULE, "seed": SPEAKER_COHORT_SEED,
+                         "confirmationShare": share, "roleSet": SPEAKER_ROLE_SET,
+                         "sampling": sampling, "samplingSHA256": jsonio.sha256_json(sampling, ascii=False),
+                         "speakers": {name: len(value) for name, value in speakers.items()},
+                         "speakersSHA256": {name: jsonio.sha256_json(value, ascii=False)
+                                            for name, value in speakers.items()}},
+        "byLanguage": {name: speaker_language_counts(value) for name, value in splits.items()},
+        "eligibility": {"version": SPEAKER_COHORT_VERSION, "rules": SPEAKER_ELIGIBILITY_RULES},
+        "caveats": {source: registry["sources"][source]["caveats"] for source in sorted(set(SPEAKER_SOURCES.values()))},
+        "counts": n1.cohort_counts(takes), "takes": takes,
+    }
+    manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
+    if output.exists():
+        existing = json.loads(output.read_text(encoding="utf-8"))
+        if existing.get("manifestDigest") != manifest["manifestDigest"]:
+            raise CorporaError(f"{output} already holds another cohort; write this one to its own directory")
+    for take in takes:
+        directory, _manifest = extractions[take["recording"]["source"]]
+        n1._place(directory / "wav" / f"{take['recording']['clipID']}.wav", output.parent / take["wavPath"],
+                  take["wavSHA256"])
+    jsonio.atomic_json(output, manifest, ascii=False, allow_nan=False)
+    return manifest
+
+
+def speaker_summary(manifest: Mapping[str, Any], output: Path) -> dict[str, Any]:
+    """What `cohort --source speaker` prints: per split and language, the families, speakers and audio, and a
+    warning for any language below the warn floors (60 scored families, 3 speakers) in either split."""
+    minimum = json.loads(POLICY_PATH.read_text(encoding="utf-8"))["operatingPoints"]["warn"]["minimumUnits"]
+    floor, speakers = int(minimum["calibration"]), int(minimum["speakers"])
+    by_language = manifest["byLanguage"]
+    short = sorted({f"{language} ({split})" for split, languages in by_language.items()
+                    for language in SPEAKER_SOURCES
+                    if (languages.get(language) or {}).get("families", 0) < floor
+                    or (languages.get(language) or {}).get("speakers", 0) < speakers})
+    summary = {"status": "PASS", "manifest": str(output), "split": manifest["split"], "corpus": manifest["corpus"],
+               "manifestDigest": manifest["manifestDigest"],
+               "counts": {key: manifest["counts"][key] for key in ("recordings", "eligible", "ineligible")},
+               "ineligibleReasons": manifest["counts"]["ineligibleReasons"],
+               "speakers": manifest["speakerSplit"]["speakers"], "byLanguage": by_language,
+               "audioSeconds": {split: round(sum(value["audioSeconds"] for value in languages.values()), 1)
+                                for split, languages in by_language.items()}}
+    if short:
+        summary["warning"] = (f"below the warn floors ({floor} scored families and {speakers} speakers per language "
+                              f"and split): {', '.join(short)}; a language that cannot meet them leaves the "
+                              "identity detectors' scope (a registry change), never a smaller floor")
+    return summary
+
+
+# --------------------------------------------------------------------------- #
 # Verify
 # --------------------------------------------------------------------------- #
 
@@ -2264,7 +2612,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                        ("cohort", "one speaker-disjoint split of a labelled corpus as an N1 cohort manifest")):
         command = commands.add_parser(name, help=text)
         if name == "cohort":
-            command.add_argument("--source", required=True, choices=tuple(LABELLED_COHORTS))
+            command.add_argument("--source", required=True, choices=(*LABELLED_COHORTS, SPEAKER_COHORT),
+                                 help="a labelled corpus, or `speaker`: the class E cohort over the speaker group")
             command.add_argument("--split", required=True, choices=tuple(n1.ROLE_SPLITS))
             command.add_argument("--confirmation-share", type=float, default=DEFAULT_CONFIRMATION_SHARE,
                                  help="the share of speakers the confirmation split takes (default 0.5)")
@@ -2300,6 +2649,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                               "sha256": hashlib.sha256(data).hexdigest()}, sort_keys=True), file=sys.stderr)
             return 0
         registry = load_valid_registry()
+        if args.command == "cohort" and args.source == SPEAKER_COHORT:
+            manifest = speaker_cohort(registry, split=args.split, share=args.confirmation_share, output=args.output)
+            output = args.output or speaker_cohort_path(registry, split=args.split, share=args.confirmation_share)
+            print(json.dumps(speaker_summary(manifest, output.resolve()), indent=2, sort_keys=True))
+            return 0
         if args.command == "cohort":
             manifest = labelled_cohort(registry, args.source, split=args.split, share=args.confirmation_share,
                                        output=args.output)

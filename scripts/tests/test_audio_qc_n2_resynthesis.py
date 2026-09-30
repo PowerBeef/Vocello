@@ -268,6 +268,44 @@ class ManifestTests(N2Fixture):
         with self.assertRaisesRegex(orchestrator.OrchestratorError, "digest"):
             orchestrator.manifest_from_calibration_takes(tampered, source_sha256="f" * 64, base_dir=self.run)
 
+    def test_a_speaker_labelled_take_keeps_its_labels_and_names_its_references_resynthesis(self) -> None:
+        takes = [self.n1_take(f"sp-{index}", samples=tone(0.5) // (index + 1)) for index in range(3)]
+        for index, take in enumerate(takes):
+            take.update(speaker=f"corpus:{index // 2:016x}", gender="female")
+        takes[0]["reference"] = {"takeID": "sp-1", "wavPath": takes[1]["wavPath"], "wavSHA256": takes[1]["wavSHA256"]}
+        takes[1]["reference"] = {"takeID": "sp-0", "wavPath": takes[0]["wavPath"], "wavSHA256": takes[0]["wavSHA256"]}
+        # A FLEURS take names no speaker: its gender stays behind, as before.
+        fleurs = {**self.n1_take("fl-0"), "gender": "male"}
+        plan = n2.build_plan(n1_manifest=self.n1_manifest([*takes, fleurs]), out_dir=self.run, run_id="speakers")
+        self.assertEqual(plan["items"][0]["referenceN1TakeID"], "sp-1")
+        self.assertNotIn("gender", plan["items"][3])
+        output = self.run / "n2-manifest.json"
+        manifest = n2.build_manifest(plan_path=self.run / "n2-plan.json", result_path=self.fake_result(plan),
+                                     output=output)
+        by_id = {take["takeID"]: take for take in manifest["takes"]}
+        first = by_id["sp-0--n2"]
+        self.assertEqual((first["speaker"], first["gender"]), (takes[0]["speaker"], "female"))
+        self.assertEqual(first["reference"], {key: by_id["sp-1--n2"][key] for key in
+                                              ("takeID", "n1TakeID", "wavPath", "wavSHA256")})
+        self.assertNotIn("reference", by_id["sp-2--n2"])
+        self.assertFalse({"speaker", "gender", "reference"} & set(by_id["fl-0--n2"]))
+        self.assertEqual(n2.validate_manifest(manifest, manifest_dir=self.run)["status"], "PASS")
+        # The orchestrator hands each take's reference, the resynthesis, to the speaker judges.
+        value = orchestrator.manifest_from_calibration_takes(manifest, source_sha256="f" * 64, base_dir=self.run)
+        panel = {take["id"]: take for take in value["takes"]}
+        self.assertEqual(Path(panel["sp-0--n2"]["referenceAudioPath"]),
+                         (self.run / by_id["sp-1--n2"]["wavPath"]).resolve())
+        self.assertEqual(panel["sp-0--n2"]["referenceAudioSHA256"], by_id["sp-1--n2"]["wavSHA256"])
+        tampered = copy.deepcopy(manifest)
+        tampered["takes"][0]["reference"]["wavSHA256"] = tampered["takes"][2]["wavSHA256"]
+        tampered["manifestDigest"] = n2.self_digest(tampered, "manifestDigest")
+        self.assertIn("sp-0--n2: its reference clip is not another take of the manifest",
+                      n2.validate_manifest(tampered, manifest_dir=self.run)["errors"])
+        # A reference must be another eligible take of the cohort, so the round trip resynthesizes it.
+        takes[2]["reference"] = {"takeID": "gone", "wavPath": "audio/gone.wav", "wavSHA256": "0" * 64}
+        with self.assertRaisesRegex(N2Error, "not another eligible take"):
+            n2.build_plan(n1_manifest=self.n1_manifest(takes), out_dir=self.root / "unreferenced", run_id="refused")
+
     def test_plan_refuses_an_n1_manifest_edited_after_it_was_signed(self) -> None:
         path = self.n1_manifest([self.n1_take("en-001"), self.n1_take("en-002", eligible=False)])
         edited = json.loads(path.read_text())

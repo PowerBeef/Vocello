@@ -31,6 +31,13 @@ count, and an N2 file is exactly as long as its 24 kHz input. Its PCM16 is
 written without the production output limiter, as an engine's raw float output
 stands before QC's limiter pass.
 
+Speaker labels: a take of a speaker-labelled N1 cohort (`audio_qc_corpora.py
+cohort --source speaker`) keeps its `speaker` and `gender`, which the identity
+injectors draw donors by, and its `reference` clip, another take of the same
+cohort: the N2 take names that take's resynthesis, so a speaker judge scores
+codec audio against codec audio (as an impostor is scored against its source).
+A FLEURS take names no speaker and keeps neither.
+
 Everything this module writes (inputs, jobs, plans, manifests) is an untracked
 build artifact. Paths are relative to the file that names them.
 """
@@ -80,6 +87,8 @@ SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\Z")
 REVISION = re.compile(r"[0-9a-f]{40}\Z")
 # The fields an N2 take keeps from its N1 recording, unchanged.
 KEPT_FIELDS = ("family", "scriptID", "language", "text")
+# The labels a take of a speaker-labelled cohort keeps (its speaker and, where the corpus labels it, gender).
+LABEL_FIELDS = ("speaker", "gender")
 
 
 class N2Error(ValueError):
@@ -230,9 +239,29 @@ def eligible_recordings(manifest: Any) -> tuple[list[dict[str, Any]], int]:
         eligible.append(take)
     if not eligible:
         raise N2Error("the N1 manifest has no eligible take")
+    digests = {take["takeID"]: take["wavSHA256"] for take in eligible}
+    for take in eligible:
+        reference = take.get("reference")
+        if reference is None:
+            continue
+        # A reference clip is another eligible take of the cohort, so the round trip resynthesizes it too.
+        if not isinstance(reference, dict) or reference.get("takeID") == take["takeID"] \
+                or reference.get("takeID") not in digests or reference.get("wavSHA256") != digests[reference["takeID"]]:
+            raise N2Error(f"{take['takeID']}: its reference clip is not another eligible take of the cohort")
     if len(eligible) > MAX_ITEMS:
         raise N2Error(f"the N1 manifest has {len(eligible)} eligible takes; one round trip takes at most {MAX_ITEMS}")
     return eligible, len(takes)
+
+
+def take_labels(take: dict[str, Any]) -> dict[str, Any]:
+    """What a speaker-labelled N1 take carries into its plan item: its labels and its reference clip's N1 take
+    id (nothing for a take that names no speaker, such as FLEURS's)."""
+    if not isinstance(take.get("speaker"), str) or not take["speaker"]:
+        return {}
+    labels = {field: take[field] for field in LABEL_FIELDS if isinstance(take.get(field), str) and take[field]}
+    if isinstance(take.get("reference"), dict):
+        labels["referenceN1TakeID"] = take["reference"]["takeID"]
+    return labels
 
 
 def build_plan(*, n1_manifest: Path, out_dir: Path, run_id: str, label: str | None = None) -> dict[str, Any]:
@@ -261,7 +290,7 @@ def build_plan(*, n1_manifest: Path, out_dir: Path, run_id: str, label: str | No
             "id": item_id, "n1TakeID": take_id, **{field: take[field] for field in KEPT_FIELDS},
             "textSHA256": text_sha256(take["text"]), "n1WAVSHA256": take["wavSHA256"],
             "n1SampleRate": source_rate, "inputWAVPath": input_path, "inputWAVSHA256": input_sha256,
-            "inputSampleCount": count,
+            "inputSampleCount": count, **take_labels(take),
         })
         job_items.append({"id": item_id, "wavPath": input_path, "wavSHA256": input_sha256})
     job = {"schemaVersion": 1, "kind": JOB_KIND, "sampleRate": CODEC_RATE, "items": job_items}
@@ -348,6 +377,11 @@ def build_manifest(*, plan_path: Path, result_path: Path, output: Path) -> dict[
     if not _inside(result_dir, manifest_dir):
         raise N2Error("the round-trip output must lie under the manifest's directory")
     takes = []
+    # Each N1 take's resynthesis, which a reference clip names.
+    resynthesized = {planned["n1TakeID"]: {"takeID": f"{planned['n1TakeID']}--n2", "n1TakeID": planned["n1TakeID"],
+                                           "wavPath": os.path.relpath(result_dir / item["outputPath"], manifest_dir),
+                                           "wavSHA256": item["outputSHA256"]}
+                     for item, planned in zip(result["items"], plan["items"])}
     for item, planned in zip(result["items"], plan["items"]):
         wav = result_dir / item["outputPath"]
         codes = result_dir / item["codesPath"]
@@ -355,9 +389,14 @@ def build_manifest(*, plan_path: Path, result_path: Path, output: Path) -> dict[
             raise N2Error(f"{planned['id']}: the resynthesized WAV is missing or does not match its digest")
         if not codes.is_file() or jsonio.sha256_file(codes) != item["codesSHA256"]:
             raise N2Error(f"{planned['id']}: the codes are missing or do not match their digest")
+        labels = {field: planned[field] for field in LABEL_FIELDS if field in planned}
+        if "referenceN1TakeID" in planned:
+            if planned["referenceN1TakeID"] not in resynthesized:
+                raise N2Error(f"{planned['id']}: its reference clip is not an item of the plan")
+            labels["reference"] = dict(resynthesized[planned["referenceN1TakeID"]])
         takes.append({
             "takeID": f"{planned['n1TakeID']}--n2", "n1TakeID": planned["n1TakeID"], "population": "N2",
-            **{field: planned[field] for field in KEPT_FIELDS}, "textSHA256": planned["textSHA256"],
+            **{field: planned[field] for field in KEPT_FIELDS}, "textSHA256": planned["textSHA256"], **labels,
             "wavPath": os.path.relpath(wav, manifest_dir), "wavSHA256": item["outputSHA256"],
             "durationSeconds": item["outputSampleCount"] / CODEC_RATE, "eligible": True,
             "clampedSampleCount": item.get("clampedSampleCount"),
@@ -418,6 +457,7 @@ def validate_manifest(manifest: Any, *, manifest_dir: Path, plan: Any = None) ->
     root = manifest_dir.resolve()
     take_ids: set[str] = set()
     n1_ids: set[str] = set()
+    by_id = {take.get("takeID"): take for take in takes if isinstance(take, dict)}
     for take in takes:
         take_id = take.get("takeID") if isinstance(take, dict) else None
         if not isinstance(take_id, str) or take_id in take_ids:
@@ -453,6 +493,14 @@ def validate_manifest(manifest: Any, *, manifest_dir: Path, plan: Any = None) ->
         duration = take.get("durationSeconds")
         if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not 0 < duration <= 60:
             errors.append(f"{take_id}: invalid duration")
+        if any(field in take and (not isinstance(take[field], str) or not take[field]) for field in LABEL_FIELDS):
+            errors.append(f"{take_id}: a speaker label is a non-empty string")
+        reference = take.get("reference")
+        if reference is not None:
+            other = by_id.get(reference.get("takeID")) if isinstance(reference, dict) else None
+            if other is None or other is take or any(reference.get(key) != other.get(key)
+                                                     for key in ("n1TakeID", "wavPath", "wavSHA256")):
+                errors.append(f"{take_id}: its reference clip is not another take of the manifest")
     counts = {"takes": len(takes)}
     if manifest.get("counts") != counts:
         errors.append("the manifest's counts do not match its takes")

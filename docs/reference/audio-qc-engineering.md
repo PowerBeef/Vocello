@@ -2531,6 +2531,260 @@ likely share speakers (`fleurs-reserve-no-speaker-ids`).
 `longForm` block, not as `seamSamples`, and the calibration set now reads them there (`take_seams`),
 so SEAM-DISC and SEAM-VOICE draw from those takes.
 
+### Run sheet for the batched round (2026-09-30)
+
+One round plans every detector that can be planned now, then runs one confirmation chain. The order
+is fixed by A5:
+
+1. Generate every cohort.
+2. Run the calibration panels and scores.
+3. Commit all the plans on main.
+4. Only then run anything over a confirmation cohort. A plan refuses a confirmation cohort whose
+   directory holds a panel bundle, measurements or scores. Every confirmation panel needs its own
+   new, empty cache root and must start after the plan commit.
+
+Freeze `audio_qc_orchestrator.py`, `lib/qc_pipeline/panel_metrics.py`, `detectors.py`, `pcm_measures.py`
+and `language_metrics.py` from step 5 to the last `confirm` (A7). Never edit a script a running lane
+executes.
+
+**Plans this round, all at warn:**
+
+| Detector | Cohorts | Alpha | Why this alpha |
+|---|---|---|---|
+| `signal.dropout@2`, `signal.terminal-silence@2`, `signal.dc-offset@2` | FLEURS reserve-1, then reserve-2 | 0.01 | `pooled-fleurs-locale-concentration` |
+| `signal.clipping@2`, `signal.band-limit@1` | FLEURS reserve-1, then reserve-2 | 0.05 | the warn default |
+| `prosody.pitch-break@1`, `prosody.octave-jump@1` | FLEURS reserve-1, then reserve-2 | 0.05 | the warn default |
+| `content.consensus-error@2` | FLEURS reserve-1, then reserve-2 | 0.03 | `splice-sham-content-errors` |
+| `boundary.run-on@2` | FLEURS reserve-1, then reserve-2 | 0.02 | `noisy-tail-activity` |
+| `language.nativeness@1` | FLEURS reserve-1, then reserve-2, with the speechocean762 confirmation split as positives | 0.05 | the warn default |
+| `prosody.pitch-instability@1` | the take plan's calibration split, then its confirmation split (standard, clone and cross-lingual cells) | 0.05 | the warn default |
+| `long-form.seam-discontinuity@1`, `long-form.seam-jump@1` | the long-form cell's calibration split, then its confirmation split | 0.05 | the warn default |
+
+**No plan this round.**
+
+- Class E waits for the maintainer's speaker-labelled corpus decision (`speaker-labeled-n2` is pending).
+- Class I has no producer of its positives (COD-LOOP's replay mode, GEN-NOEOS's knob).
+- `long-form.seam-identity@1` has no positives on natural long-form takes (`seam-constructions`).
+- No fail plan is admissible. Every planned detector declares one construction mechanism, where the
+  fail point needs two (A3), and the fail points refuse the two-family mean (`mean-consensus-warn-only`).
+  Reserve-3 stays untouched for a later fail point.
+
+Estimates are for the M6. They scale two measured runs:
+
+- the v1 chain of 2026-09-29: from the confirmation cohort's qc-n2 start to the committed records took
+  about 6 hours, for 3,718 FLEURS recordings, 9,299 injections and two six-judge panels;
+- the 2026-09-27 qc-takes run: 0.27 s of batch wall time per second of audio.
+
+A step marked **[model]** is a consent-bound model run. It runs in the lead session, one lane at a
+time, and may run beside code-only agents. **[maintainer]** marks a maintainer-run network action.
+Every other step loads no model.
+
+```sh
+A=build/artifacts/macos/audio-qc; C=build/cache/audio-qc-corpora; K=build/cache/delivery-analysis
+Q="python3 scripts/audio_qc_detector_calibration.py"; S="python3 scripts/audio_qc_calibration_set.py"
+O="python3 scripts/audio_qc_orchestrator.py"
+# The FLEURS reserve sampling of this registry (extract prints the paths) and speechocean762's cohorts.
+RES=$C/fleurs/70bb2e84b976b7e960aa89f1c648e09c59f894dd/reserve/407a1df60f7c
+SOC=$C/speechocean762/06385584fad212b26134c656fdd3ccf9f093f33e/cohorts/share-0.5
+J6="--judge asr.whisper-large-v3@1 --judge asr.parakeet-tdt-0.6b-v3@1 --judge asr.paraformer-zh@1 \
+  --judge asr.sensevoice-small-f16@1 --judge align.qwen3-forcedaligner-0.6b@1 --judge pitch.pyin@1"
+J7="$J6 --judge lid.voxlingua107-ecapa@1"
+
+# 1. [maintainer] Corpora: FLEURS train reserve, speaker, emotion and accent groups (28.96 GB).
+#    About 1-2 h, depending on the link; the extraction writes about 13.6 GB of WAVs.
+python3 scripts/audio_qc_corpora.py plan --set lean
+python3 scripts/audio_qc_corpora.py runtime
+python3 scripts/audio_qc_corpora.py fetch --set lean && python3 scripts/audio_qc_corpora.py extract --set lean
+python3 scripts/audio_qc_corpora.py verify --set lean
+# 2. speechocean762's speaker-disjoint N1 splits (1 min). Read the summary: a warning means the
+#    confirmation split holds fewer than 60 severe utterances; rebuild it with a larger
+#    --confirmation-share before step 3, and point SOC at the share-<S> directory it prints.
+python3 scripts/audio_qc_corpora.py cohort --source speechocean762 --split confirmation
+# 3. [model] N2 resynthesis: reserve-1 and reserve-2, about 4,000 recordings each, est. 45 min each;
+#    speechocean762's confirmation split, about 2,500 utterances of about 4 s, est. 15 min. Reserve-3
+#    stays held back.
+scripts/macos_test.sh qc-n2 --n1-manifest $RES/cohort-1/manifest.json --label aq07-reserve-1
+scripts/macos_test.sh qc-n2 --n1-manifest $RES/cohort-2/manifest.json --label aq07-reserve-2
+scripts/macos_test.sh qc-n2 --n1-manifest $SOC/confirmation/manifest.json --label aq07-speechocean762
+R1=$A/qc-n2-<reserve-1 run>; R2=$A/qc-n2-<reserve-2 run>; SO=$A/qc-n2-<speechocean762 run>
+# 4. [model] Take plan version 2: both splits, all four cells (about 3.5 h in all, estimated in the
+#    take plan section above).
+scripts/macos_test.sh qc-takes --split calibration --cells standard,clone,cross-lingual --label aq07-calibration-v2
+scripts/macos_test.sh qc-takes --split calibration --cells long-form --label aq07-long-form-calibration-v2
+scripts/macos_test.sh qc-takes --split confirmation --cells standard,clone,cross-lingual --label aq07-confirmation-v2
+scripts/macos_test.sh qc-takes --split confirmation --cells long-form --label aq07-long-form-confirmation-v2
+T1=$A/qc-takes-<calibration run>; L1=$A/qc-takes-<long-form calibration run>
+T2=$A/qc-takes-<confirmation run>; L2=$A/qc-takes-<long-form confirmation run>
+# 5. [model] pYIN's oracle ladder, which class F waits on (pyin-tracker-unvalidated): about 2 min.
+python3 scripts/audio_qc_oracle_ladders.py build --ladder pyin
+$O run --manifest build/artifacts/diagnostics/audio-qc-oracle-ladders/pyin/manifest.json \
+  --judge pitch.pyin@1 --bundle $A/oracle-ladder-pyin-<date>
+python3 scripts/audio_qc_oracle_ladders.py evaluate --ladder pyin --bundle $A/oracle-ladder-pyin-<date>
+# 6. [model] Calibration panels, on the shared cache: reserve-1 with seven judges (est. 1.5-2 h) and
+#    the N3 calibration takes with pYIN (est. 15 min).
+$O manifest --from-calibration-takes $R1/n2-manifest.json --output $R1/panel-manifest.json
+$O run --manifest $R1/panel-manifest.json $J7 --cache-root $K --bundle $R1/panel-bundle
+$O manifest --from-calibration-takes $T1/takes-manifest.json --output $T1/panel-manifest.json
+$O run --manifest $T1/panel-manifest.json --judge pitch.pyin@1 --cache-root $K --bundle $T1/panel-bundle
+#    Optional, informational only (no plan reads them this round): CAM++ over the clone cell's takes and
+#    their reference clips, the design data class E and seam-identity will need.
+#    $O run --manifest $T1/panel-manifest.json --judge speaker.campplus-voxceleb@1 --bundle $T1/speaker-bundle
+# 7. Calibration evidence, no model (about 30 min): Stage 0 and PCM measures, pYIN frame tracks, scores.
+$S score --takes $R1/n2-manifest.json --output $R1/stage0
+$S score --takes $L1/takes-manifest.json --output $L1/stage0
+$S raw-outputs --takes $R1/n2-manifest.json --bundle $R1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
+  --output $R1/pyin-raw.json
+$S raw-outputs --takes $T1/takes-manifest.json --bundle $T1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
+  --output $T1/pyin-raw.json
+D=$A/detector-scores-round2; N1R1=$RES/cohort-1/manifest.json; N1R2=$RES/cohort-2/manifest.json
+for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2 signal.clipping@2 signal.band-limit@1; do
+  $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
+    --measurements $R1/stage0/measurements.json --output $D/calibration/$d.json; done
+for d in content.consensus-error@2 language.nativeness@1; do
+  $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
+    --bundle $R1/panel-bundle --output $D/calibration/$d.json; done
+$Q scores --detector boundary.run-on@2 --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
+  --bundle $R1/panel-bundle --measurements $R1/stage0/measurements.json --output $D/calibration/boundary.run-on@2.json
+for d in prosody.pitch-break@1 prosody.octave-jump@1; do
+  $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
+    --bundle $R1/panel-bundle --raw-outputs $R1/pyin-raw.json --output $D/calibration/$d.json; done
+$Q scores --detector prosody.pitch-instability@1 --role calibration --cohort $T1/takes-manifest.json \
+  --bundle $T1/panel-bundle --raw-outputs $T1/pyin-raw.json --output $D/calibration/prosody.pitch-instability@1.json
+for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
+  $Q scores --detector $d --role calibration --cohort $L1/takes-manifest.json \
+    --measurements $L1/stage0/measurements.json --output $D/calibration/$d.json; done
+# 8. The 13 plans (a few minutes), each checked with derive, then committed on main by the lead
+#    before anything touches a confirmation cohort.
+FL="--calibration-cohort $R1/n2-manifest.json --calibration-n1-manifest $N1R1 \
+  --confirmation-cohort $R2/n2-manifest.json --confirmation-n1-manifest $N1R2"
+INJ="--injection-catalog-seed 7 --injection-sample-seed 1 --injection-sample-per-cell 150"
+for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2; do
+  $Q plan --detector $d $FL --calibration-scores $D/calibration/$d.json --alpha 0.01 $INJ --injection-classes A,B,C,F; done
+for d in signal.clipping@2 signal.band-limit@1 prosody.pitch-break@1 prosody.octave-jump@1; do
+  $Q plan --detector $d $FL --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes A,B,C,F; done
+$Q plan --detector content.consensus-error@2 $FL --calibration-scores $D/calibration/content.consensus-error@2.json \
+  --alpha 0.03 $INJ --injection-classes A,B,C,F
+$Q plan --detector boundary.run-on@2 $FL --calibration-scores $D/calibration/boundary.run-on@2.json \
+  --alpha 0.02 $INJ --injection-classes A,B,C,F
+$Q plan --detector language.nativeness@1 $FL --calibration-scores $D/calibration/language.nativeness@1.json \
+  --alpha 0.05 --natural-positives $SO/n2-manifest.json --natural-n1-manifest $SOC/confirmation/manifest.json
+$Q plan --detector prosody.pitch-instability@1 --calibration-cohort $T1/takes-manifest.json \
+  --confirmation-cohort $T2/takes-manifest.json --calibration-scores $D/calibration/prosody.pitch-instability@1.json \
+  --alpha 0.05 $INJ --injection-classes F
+for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
+  $Q plan --detector $d --calibration-cohort $L1/takes-manifest.json --confirmation-cohort $L2/takes-manifest.json \
+    --calibration-scores $D/calibration/$d.json --alpha 0.05 $INJ --injection-classes J; done
+$Q derive --detector signal.dropout@2 --calibration-scores $D/calibration/signal.dropout@2.json   # each detector
+git add config/audio-qc-preregistrations/<the 13 plan files> && git commit -F -   # on main
+```
+
+The N3 and long-form plans take a nonzero `--injection-sample-per-cell` because a set built with the
+N3 default of 0 records no sample seed for the plan to bind. Their sets hold every family anyway when
+the pool is smaller than 150.
+
+Step 9 is the confirmation chain. Every panel gets a new, empty cache root under `$K/confirmation/`.
+The chain takes an estimated 7 hours, most of it the reserve-2 positives panel.
+
+```sh
+# 9a. [model] The reserve-2 cohort panel, seven judges (est. 1.5-2 h), then its exports and the
+#     schedule-2 injection set with its Stage 0 scores (no model, est. 1 h).
+$O manifest --from-calibration-takes $R2/n2-manifest.json --output $R2/panel-manifest.json
+$O run --manifest $R2/panel-manifest.json $J7 --cache-root $K/confirmation/reserve-2 --bundle $R2/panel-bundle
+$S alignments --takes $R2/n2-manifest.json --bundle $R2/panel-bundle --cache-root $K/confirmation/reserve-2 \
+  --output $R2/alignments.json
+$S raw-outputs --takes $R2/n2-manifest.json --bundle $R2/panel-bundle --judge pitch.pyin@1 \
+  --cache-root $K/confirmation/reserve-2 --output $R2/pyin-raw.json
+$S inject --takes $R2/n2-manifest.json --alignments $R2/alignments.json --output $R2/injection-set \
+  --catalog-seed 7 --sample-seed 1 --sample-per-cell 150 --classes A,B,C,F
+$S verify --set $R2/injection-set/injection-set.json --takes $R2/n2-manifest.json --alignments $R2/alignments.json
+$S score --takes $R2/n2-manifest.json --set $R2/injection-set/injection-set.json --output $R2/stage0
+# 9b. [model] The positives panel, six judges over about 10,700 clips (est. 3-3.5 h), and its pYIN export.
+$O manifest --from-calibration-takes $R2/injection-set/injection-set.json --output $R2/injection-panel-manifest.json
+$O run --manifest $R2/injection-panel-manifest.json $J6 --cache-root $K/confirmation/reserve-2-positives \
+  --bundle $R2/injection-panel-bundle
+$S raw-outputs --takes $R2/injection-set/injection-set.json --bundle $R2/injection-panel-bundle \
+  --judge pitch.pyin@1 --cache-root $K/confirmation/reserve-2-positives --output $R2/injection-pyin-raw.json
+# 9c. [model] The natural positives: speechocean762's N2, Whisper large-v3 and VoxLingua (est. 20 min).
+$O manifest --from-calibration-takes $SO/n2-manifest.json --output $SO/panel-manifest.json
+$O run --manifest $SO/panel-manifest.json --judge asr.whisper-large-v3@1 --judge lid.voxlingua107-ecapa@1 \
+  --cache-root $K/confirmation/speechocean762 --bundle $SO/panel-bundle
+# 9d. [model] The N3 confirmation split: its pYIN panel, PRS-ERRATIC and PRS-RATE injections, their
+#     pYIN panel (est. 30 min in all). Then the long-form cell's SEAM-DISC set and Stage 0 (no model,
+#     est. 5 min).
+$O manifest --from-calibration-takes $T2/takes-manifest.json --output $T2/panel-manifest.json
+$O run --manifest $T2/panel-manifest.json --judge pitch.pyin@1 --cache-root $K/confirmation/n3 --bundle $T2/panel-bundle
+$S raw-outputs --takes $T2/takes-manifest.json --bundle $T2/panel-bundle --judge pitch.pyin@1 \
+  --cache-root $K/confirmation/n3 --output $T2/pyin-raw.json
+$S inject --takes $T2/takes-manifest.json --output $T2/injection-set --catalog-seed 7 --sample-seed 1 \
+  --sample-per-cell 150 --classes F
+$S verify --set $T2/injection-set/injection-set.json --takes $T2/takes-manifest.json
+$O manifest --from-calibration-takes $T2/injection-set/injection-set.json --output $T2/injection-panel-manifest.json
+$O run --manifest $T2/injection-panel-manifest.json --judge pitch.pyin@1 --cache-root $K/confirmation/n3-positives \
+  --bundle $T2/injection-panel-bundle
+$S raw-outputs --takes $T2/injection-set/injection-set.json --bundle $T2/injection-panel-bundle \
+  --judge pitch.pyin@1 --cache-root $K/confirmation/n3-positives --output $T2/injection-pyin-raw.json
+$S inject --takes $L2/takes-manifest.json --output $L2/injection-set --catalog-seed 7 --sample-seed 1 \
+  --sample-per-cell 150 --classes J
+$S verify --set $L2/injection-set/injection-set.json --takes $L2/takes-manifest.json
+$S score --takes $L2/takes-manifest.json --set $L2/injection-set/injection-set.json --output $L2/stage0
+# 9e. Confirmation scores and one confirm per plan (no model, about 15 min).
+SET="--injection-set $R2/injection-set/injection-set.json"
+for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2 signal.clipping@2 signal.band-limit@1; do
+  $Q scores --detector $d --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 $SET \
+    --measurements $R2/stage0/measurements.json --positive-measurements $R2/stage0/measurements.json \
+    --output $D/confirmation/$d.json; done
+$Q scores --detector content.consensus-error@2 --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 \
+  $SET --bundle $R2/panel-bundle --positive-bundle $R2/injection-panel-bundle \
+  --output $D/confirmation/content.consensus-error@2.json
+$Q scores --detector boundary.run-on@2 --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 $SET \
+  --bundle $R2/panel-bundle --positive-bundle $R2/injection-panel-bundle \
+  --measurements $R2/stage0/measurements.json --positive-measurements $R2/stage0/measurements.json \
+  --output $D/confirmation/boundary.run-on@2.json
+for d in prosody.pitch-break@1 prosody.octave-jump@1; do
+  $Q scores --detector $d --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 $SET \
+    --bundle $R2/panel-bundle --positive-bundle $R2/injection-panel-bundle --raw-outputs $R2/pyin-raw.json \
+    --positive-raw-outputs $R2/injection-pyin-raw.json --output $D/confirmation/$d.json; done
+$Q scores --detector language.nativeness@1 --role confirmation --cohort $R2/n2-manifest.json --n1-manifest $N1R2 \
+  --bundle $R2/panel-bundle --natural-positives $SO/n2-manifest.json \
+  --natural-n1-manifest $SOC/confirmation/manifest.json --natural-bundle $SO/panel-bundle \
+  --output $D/confirmation/language.nativeness@1.json
+$Q scores --detector prosody.pitch-instability@1 --role confirmation --cohort $T2/takes-manifest.json \
+  --injection-set $T2/injection-set/injection-set.json --bundle $T2/panel-bundle \
+  --positive-bundle $T2/injection-panel-bundle --raw-outputs $T2/pyin-raw.json \
+  --positive-raw-outputs $T2/injection-pyin-raw.json --output $D/confirmation/prosody.pitch-instability@1.json
+for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
+  $Q scores --detector $d --role confirmation --cohort $L2/takes-manifest.json \
+    --injection-set $L2/injection-set/injection-set.json --measurements $L2/stage0/measurements.json \
+    --positive-measurements $L2/stage0/measurements.json --output $D/confirmation/$d.json; done
+for d in <each of the 13 detectors>; do
+  $Q confirm --detector $d --calibration-scores $D/calibration/$d.json --confirmation-scores $D/confirmation/$d.json
+done
+# 10. Commit every ledger entry and record, regenerate the reference tree, then prune the confirmation
+#     cache roots (dry run first).
+python3 scripts/audio_qc_docs.py regen
+scripts/clean_build_caches.sh --prune-confirmation-caches --dry-run
+```
+
+| Phase | Kind | Estimate |
+|---|---|---|
+| 1. Corpora fetch and extraction | maintainer, network | 1-2 h |
+| 2. speechocean762 cohort | offline | 1 min |
+| 3. qc-n2 of reserve-1, reserve-2 and speechocean762 | model | 1 h 45 min |
+| 4. qc-takes version 2, both splits, four cells | model | 3 h 30 min |
+| 5. pYIN oracle ladder | model | 2 min |
+| 6. Calibration panels | model | 2 h |
+| 7. Calibration evidence and scores | offline | 30 min |
+| 8. Plans, derive, commit | offline, lead | 15 min |
+| 9. Confirmation chain | model and offline | 7 h |
+| 10. Records, docs, prune | offline, lead | 15 min |
+| **Total** | | **about 16-17 h, of which about 14 h is model time** |
+
+`confirm --n3-scores` is optional for the FLEURS detectors. It needs the same detector scored
+`--role informational` on an N3 cohort, with the judges that detector reads run over that cohort:
+the N3 calibration split, or the 2026-09-27 cohort the v1 records reported on. A record pins
+its informational N3 cohort as spent, so a later fail plan cannot bound its N3 flag rate on that
+cohort.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

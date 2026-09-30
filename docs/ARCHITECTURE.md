@@ -902,7 +902,8 @@ includes the opt-in model-download lane. Failed Instruments traces remain explic
 the status inventory reports them separately and only `--compact-profile-failure RUN_ID` (or a
 newer profile of the same platform/kind) may remove their raw trace. Persistent caches can be
 reclaimed independently with `--cache macos|ios|packages|runtime`; ordinary successful builds never
-run a global cleanup as a side effect.
+run a global cleanup as a side effect. Idle audio QC confirmation cache roots under the analysis
+cache go only through `--prune-confirmation-caches`, while the host analysis lock is free.
 
 ---
 

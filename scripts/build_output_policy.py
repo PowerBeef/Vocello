@@ -62,6 +62,8 @@ DIRECT_RECLAIM_POLICIES = {
     "dist",
     "clobber-only",
 }
+CONFIRMATION_ENTRY = "delivery-analysis-cache"
+CONFIRMATION_DIRECTORY = "confirmation"
 IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 MACHO_UUID_RE = re.compile(r"^UUID:\s+([0-9A-Fa-f-]{36})\s+", re.MULTILINE)
@@ -375,6 +377,31 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
         raise PolicyError(
             "childRetention.profiles maximumDiagnosticLogBytes cannot exceed the compacted budget"
         )
+
+    # Confirmation cache roots are children of the analysis cache, never an entry
+    # of their own (entries cannot overlap): only `<entry>/confirmation/<name>`
+    # is ever pruned, never the cache's audio, layers or external-models.
+    confirmation = child_retention.get("analysisConfirmation")
+    if not isinstance(confirmation, dict):
+        raise PolicyError("childRetention.analysisConfirmation must be an object")
+    if (
+        confirmation.get("entry") != CONFIRMATION_ENTRY
+        or entries_by_id.get(CONFIRMATION_ENTRY, {}).get("class") != "cache"
+    ):
+        raise PolicyError(
+            f"childRetention.analysisConfirmation.entry must be the {CONFIRMATION_ENTRY} cache entry"
+        )
+    if confirmation.get("directory") != CONFIRMATION_DIRECTORY:
+        raise PolicyError(
+            f"childRetention.analysisConfirmation.directory must be {CONFIRMATION_DIRECTORY}"
+        )
+    idle_hours = confirmation.get("minimumIdleHours")
+    if not isinstance(idle_hours, int) or isinstance(idle_hours, bool) or idle_hours < 1:
+        raise PolicyError(
+            "childRetention.analysisConfirmation.minimumIdleHours must be a positive integer"
+        )
+    if not isinstance(confirmation.get("retention"), str) or not confirmation["retention"].strip():
+        raise PolicyError("childRetention.analysisConfirmation.retention must be a non-empty string")
 
     heavy_preflight = document.get("heavyLanePreflight")
     if not isinstance(heavy_preflight, dict) or heavy_preflight.get("schemaVersion") != 1:

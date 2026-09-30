@@ -10,7 +10,9 @@ preserved.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -21,7 +23,7 @@ import subprocess
 import time
 import sys
 import tempfile
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 
 LIB_DIRECTORY = Path(__file__).resolve().parent / "lib"
@@ -46,6 +48,12 @@ POLICY_PATH = REPO_ROOT / "config" / "build-output-policy.json"
 HISTORY_HELPER = REPO_ROOT / "scripts" / "benchmark_history.py"
 DEBUG_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice-Debug" / "models"
 SHIPPED_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice" / "models"
+# The host lock every generator and analyzer takes exclusively and every audio QC
+# orchestrator run (and each worker it launches) holds shared for its whole run
+# (`delivery_resource_supervisor.HOST_LOCK_NAME`, under `hostAnalysisLock`).
+HOST_ANALYSIS_LOCK_NAME = "delivery-analysis-supervisor.lock"
+CONFIRMATION_ENTRY = "delivery-analysis-cache"
+CONFIRMATION_DIRECTORY = "confirmation"
 CACHE_ALIASES = {
     "macos": "xcode-macos-derived-data",
     "macos-optimized": "xcode-macos-optimized-derived-data",
@@ -121,6 +129,23 @@ def load_policy() -> dict[str, Any]:
         >= profile_retention["maximumDiagnosticLogBytes"] >= 1
     ):
         raise CleanupError("build-output policy has no valid profile retention contract")
+    confirmation = child_retention.get("analysisConfirmation")
+    idle_hours = confirmation.get("minimumIdleHours") if isinstance(confirmation, dict) else None
+    if not (
+        isinstance(confirmation, dict)
+        and confirmation.get("entry") == CONFIRMATION_ENTRY
+        and confirmation.get("directory") == CONFIRMATION_DIRECTORY
+        and isinstance(idle_hours, int)
+        and not isinstance(idle_hours, bool)
+        and idle_hours >= 1
+        and any(
+            isinstance(entry, dict)
+            and entry.get("id") == CONFIRMATION_ENTRY
+            and entry.get("class") == "cache"
+            for entry in entries
+        )
+    ):
+        raise CleanupError("build-output policy has no valid confirmation cache retention contract")
     heavy_preflight = policy.get("heavyLanePreflight")
     if not (
         isinstance(heavy_preflight, dict)
@@ -323,6 +348,18 @@ def inventory(policy: dict[str, Any]) -> None:
             f"human={human_bytes(size)} path={path} cleanup={entry.get('cleanup')} "
             f"owner={json.dumps(entry.get('owner'), ensure_ascii=True)}"
         )
+    confirmation = confirmation_directory(policy)
+    if confirmation.is_dir() and not confirmation.is_symlink():
+        now = time.time()
+        for child in sorted(confirmation.iterdir()):
+            if child.is_symlink() or not child.is_dir():
+                continue
+            size, newest = tree_state(child)
+            print(
+                f"confirmation-cache: name={child.name} bytes={size} human={human_bytes(size)} "
+                f"idleHours={max(0.0, (now - newest) / 3600):.1f} path={child} "
+                "cleanup=prune-confirmation-caches"
+            )
     for link in policy.get("publicLinks") or []:
         path = REPO_ROOT / str(link.get("path"))
         target = os.readlink(path) if path.is_symlink() else "not-a-symlink"
@@ -908,6 +945,23 @@ def assert_no_active_build(policy: dict[str, Any]) -> None:
         )
 
 
+def open_file_holders(lsof: str, path: Path) -> bool:
+    """Whether any process holds a file open under `path`.
+
+    Judged by the PIDs lsof prints, never by its exit status: lsof exits 1
+    after any partial error (a process it may not inspect) even when it listed
+    the holders, so the status alone would read a busy tree as idle.
+    """
+    probe = subprocess.run(
+        [lsof, "-t", "+D", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    return bool(probe.stdout.strip())
+
+
 def assert_paths_idle(paths: Iterable[Path]) -> None:
     lsof = shutil.which("lsof")
     existing = [path for path in paths if path.exists() and not path.is_symlink()]
@@ -916,25 +970,132 @@ def assert_paths_idle(paths: Iterable[Path]) -> None:
     if lsof is None:
         raise CleanupError("lsof is required to verify that selected build paths are idle")
     for path in existing:
-        probe = subprocess.run(
-            [lsof, "+D", str(path)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if probe.returncode == 0:
+        if open_file_holders(lsof, path):
             raise CleanupError(f"build output appears to be in use: {path}")
 
 
+def path_in_use(path: Path) -> bool:
+    """Whether any process holds a file open under `path` (lsof, required)."""
+    lsof = shutil.which("lsof")
+    if lsof is None:
+        raise CleanupError("lsof is required to verify that a confirmation cache root is idle")
+    return open_file_holders(lsof, path)
+
+
+def host_analysis_lock_root(policy: dict[str, Any]) -> Path:
+    """The host-wide analysis lock root; an absolute override is for tests only."""
+    contract = policy.get("hostAnalysisLock")
+    if not isinstance(contract, dict) or not isinstance(contract.get("defaultPath"), str):
+        raise CleanupError("build-output policy is missing the host analysis lock")
+    override = os.environ.get(str(contract.get("env", "")), "")
+    if override and Path(override).is_absolute():
+        return Path(override)
+    return Path(contract["defaultPath"]).expanduser()
+
+
+@contextlib.contextmanager
+def exclusive_analysis_lock(policy: dict[str, Any]) -> Iterator[None]:
+    """Hold the host analysis lock exclusively, without waiting.
+
+    An audio QC orchestrator holds it shared for its whole run and every worker
+    it launches inherits that descriptor; a generator or standalone analyzer
+    holds it exclusively. Taking it here therefore proves that none of them
+    runs, and keeps any from starting (an orchestrator refuses a busy host)
+    until the lock is released.
+    """
+    root = host_analysis_lock_root(policy)
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / HOST_ANALYSIS_LOCK_NAME).open("a+b") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise CleanupError(
+                "an audio QC orchestrator, generator or analyzer holds the host analysis lock; "
+                "retry once it has finished"
+            ) from None
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def confirmation_directory(policy: dict[str, Any]) -> Path:
+    contract = policy["childRetention"]["analysisConfirmation"]
+    entries = {entry.get("id"): entry for entry in policy_entries(policy)}
+    return managed_path(entries[contract["entry"]]) / contract["directory"]
+
+
+def tree_state(path: Path) -> tuple[int, float]:
+    """Allocated bytes and the newest modification time of a tree, the root included, never following links."""
+    newest = path.lstat().st_mtime
+    for parent, directories, files in os.walk(path, followlinks=False):
+        for name in (*directories, *files):
+            try:
+                newest = max(newest, (Path(parent) / name).lstat().st_mtime)
+            except FileNotFoundError:
+                continue
+    return allocated_bytes(path), newest
+
+
+def prune_confirmation_caches(
+    cleaner: Cleaner, policy: dict[str, Any], *, older_than_hours: float
+) -> None:
+    """Remove idle per-panel confirmation cache roots, `<analysis cache>/confirmation/<name>`.
+
+    A root goes only while the host analysis lock is held exclusively (no
+    orchestrator, generator or analyzer runs or starts), when no process holds a
+    file open under it (lsof) and when nothing in it changed for
+    `older_than_hours`. Only real directories directly under the confirmation
+    directory are candidates: the analysis cache's own `audio`, `layers` and
+    `external-models`, and anything reached through a symlink, are never
+    touched. A dry run only probes the lock, so it never holds off an
+    orchestrator while it walks the roots.
+    """
+    root = confirmation_directory(policy)
+    cache = root.parent
+    for path in (cache, root):
+        if path.is_symlink():
+            raise CleanupError(f"refusing to prune through a symlink: {path}")
+    if not root.exists():
+        print(f"confirmation-cache: none path={root}")
+        return
+    if not root.is_dir():
+        raise CleanupError(f"the confirmation cache directory is not a directory: {root}")
+    if root.resolve().parent != cache.resolve():
+        raise CleanupError(f"the confirmation cache directory escapes its cache: {root}")
+    if cleaner.dry_run:
+        with exclusive_analysis_lock(policy):
+            pass  # a probe: the same refusal, without holding off an orchestrator during the walk
+        held: contextlib.AbstractContextManager[None] = contextlib.nullcontext()
+    else:
+        held = exclusive_analysis_lock(policy)
+    with held:
+        now = time.time()
+        for child in sorted(root.iterdir()):
+            if child.is_symlink() or not child.is_dir():
+                print(f"confirmation-retained: path={child} reason=not-a-cache-root")
+                continue
+            if child.resolve().parent != root.resolve():
+                print(f"confirmation-retained: path={child} reason=escapes-confirmation-directory")
+                continue
+            _size, newest = tree_state(child)
+            idle_hours = max(0.0, (now - newest) / 3600)
+            if idle_hours < older_than_hours:
+                print(
+                    f"confirmation-retained: path={child} idleHours={idle_hours:.1f} "
+                    f"minimumIdleHours={older_than_hours:g} reason=recently-modified"
+                )
+                continue
+            if path_in_use(child):
+                print(f"confirmation-retained: path={child} reason=in-use")
+                continue
+            cleaner.remove(child, reason="idle-confirmation-cache")
+
+
 def remove_external_xcode(cleaner: Cleaner, policy: dict[str, Any]) -> None:
+    lsof = shutil.which("lsof")
     for candidate in matching_external_derived_data(policy):
-        probe = subprocess.run(
-            ["lsof", "+D", str(candidate)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        ) if shutil.which("lsof") else None
-        if probe is not None and probe.returncode == 0:
+        if lsof is not None and open_file_holders(lsof, candidate):
             raise CleanupError(f"external Xcode DerivedData appears to be in use: {candidate}")
         size = allocated_bytes(candidate)
         cleaner.planned += size
@@ -966,20 +1127,38 @@ def parse_arguments() -> argparse.Namespace:
         metavar="RUN_ID",
         help="discard one acknowledged failed raw trace after validating its compact summary",
     )
+    modes.add_argument(
+        "--prune-confirmation-caches",
+        action="store_true",
+        help="remove idle audio QC confirmation cache roots (build/cache/delivery-analysis/confirmation/<name>) "
+        "while no orchestrator, generator or analyzer runs",
+    )
     modes.add_argument("--external-xcode", action="store_true")
     modes.add_argument("--clobber", action="store_true")
     parser.add_argument("--ui-keep", type=int, default=1)
+    parser.add_argument(
+        "--older-than-hours",
+        type=float,
+        metavar="HOURS",
+        help="with --prune-confirmation-caches: how long nothing in a root must have changed "
+        "(default: the policy's minimumIdleHours; 0 drops the age condition, never the lock or lsof checks)",
+    )
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--dry-run", "-n", action="store_true")
     args = parser.parse_args()
     if args.ui_keep < 1:
         parser.error("--ui-keep must be at least 1")
+    if args.older_than_hours is not None:
+        if not args.prune_confirmation_caches:
+            parser.error("--older-than-hours is valid only with --prune-confirmation-caches")
+        if not args.older_than_hours >= 0:
+            parser.error("--older-than-hours must be zero or more")
     selected = sum(
         bool(value)
         for value in (
             args.routine, args.aggressive, args.prune_ui_results, args.dist,
             args.models, bool(args.cache), bool(args.compact_profile_failure),
-            args.external_xcode, args.clobber,
+            args.prune_confirmation_caches, args.external_xcode, args.clobber,
         )
     )
     if args.aggressive and args.routine:
@@ -1005,7 +1184,7 @@ def main() -> int:
             (
                 args.routine, args.aggressive, args.prune_ui_results, args.dist,
                 args.models, bool(args.cache), bool(args.compact_profile_failure),
-                args.external_xcode, args.clobber,
+                args.prune_confirmation_caches, args.external_xcode, args.clobber,
             )
         )
         if not any_mode:
@@ -1073,6 +1252,16 @@ def main() -> int:
                 cleaner,
                 REPO_ROOT / "build" / "artifacts",
                 args.compact_profile_failure,
+            )
+        elif args.prune_confirmation_caches:
+            prune_confirmation_caches(
+                cleaner,
+                policy,
+                older_than_hours=(
+                    args.older_than_hours
+                    if args.older_than_hours is not None
+                    else policy["childRetention"]["analysisConfirmation"]["minimumIdleHours"]
+                ),
             )
         elif args.external_xcode:
             remove_external_xcode(cleaner, policy)

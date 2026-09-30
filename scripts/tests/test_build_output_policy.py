@@ -171,6 +171,32 @@ class BuildOutputPolicyTests(unittest.TestCase):
         with self.assertRaises(POLICY.PolicyError):
             POLICY.load_policy(self.root, self.manifest)
 
+    def test_confirmation_cache_retention_is_a_bounded_child_of_the_analysis_cache(self) -> None:
+        contract = self.document["childRetention"]["analysisConfirmation"]
+        self.assertEqual(
+            (contract["entry"], contract["directory"]),
+            ("delivery-analysis-cache", "confirmation"),
+        )
+        self.assertGreaterEqual(contract["minimumIdleHours"], 1)
+        for change in (
+            lambda value: value.pop("analysisConfirmation"),
+            lambda value: value["analysisConfirmation"].update(entry="audio-qc-corpora-cache"),
+            lambda value: value["analysisConfirmation"].update(entry="scratch-ci"),
+            # Never the cache's own content-addressed layers, audio or judge models.
+            lambda value: value["analysisConfirmation"].update(directory="layers"),
+            lambda value: value["analysisConfirmation"].update(directory="external-models"),
+            lambda value: value["analysisConfirmation"].update(directory="../confirmation"),
+            lambda value: value["analysisConfirmation"].update(minimumIdleHours=0),
+            lambda value: value["analysisConfirmation"].update(minimumIdleHours=True),
+            lambda value: value["analysisConfirmation"].update(minimumIdleHours=1.5),
+            lambda value: value["analysisConfirmation"].update(retention=" "),
+        ):
+            invalid = copy.deepcopy(self.document)
+            change(invalid["childRetention"])
+            self.write_manifest(invalid)
+            with self.assertRaises(POLICY.PolicyError):
+                POLICY.load_policy(self.root, self.manifest)
+
     def test_shell_env_is_complete_absolute_and_shell_safe(self) -> None:
         result = self.command("shell-env")
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -11,6 +12,8 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+import time
+from typing import Any
 import unittest
 
 
@@ -63,8 +66,9 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
     ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment["HOME"] = str(self.home)
-        # The host lock resolves under the fixture HOME, never the real one.
+        # The host locks resolve under the fixture HOME, never the real one.
         environment.pop("QVOICE_NATIVE_LOCK", None)
+        environment.pop("QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT", None)
         result = subprocess.run(
             [str(self.root / "scripts" / SHELL.name), *arguments],
             cwd=self.root,
@@ -703,6 +707,128 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         self.run_clean("--external-xcode", "--yes")
         self.assertFalse(matching.exists())
         self.assertTrue(unrelated.exists())
+
+    @property
+    def analysis_cache(self) -> Path:
+        return self.root / "build" / "cache" / "delivery-analysis"
+
+    @staticmethod
+    def shown(path: Path) -> str:
+        """A path as the cleanup prints it (its checkout resolved, the last component kept)."""
+        return str(path.parent.resolve() / path.name)
+
+    @staticmethod
+    def age(path: Path, hours: float) -> None:
+        stamp = time.time() - hours * 3600
+        for parent, directories, files in os.walk(path, topdown=False):
+            for name in (*files, *directories):
+                os.utime(Path(parent) / name, (stamp, stamp), follow_symlinks=False)
+        os.utime(path, (stamp, stamp))
+
+    def confirmation_fixture(self) -> dict[str, Path]:
+        cache = self.analysis_cache
+        paths = {
+            "audio": self.write(cache / "audio" / "ab" / "canonical.pcm", b"pcm"),
+            "layers": self.write(cache / "layers" / "ab" / "l1.json", "{}"),
+            "models": self.write(cache / "external-models" / "judge" / "weights.bin", b"weights"),
+            "old": self.write(cache / "confirmation" / "cohort" / "layers" / "cd" / "l2.json", "{}").parents[2],
+            "fresh": self.write(cache / "confirmation" / "positives" / "audio" / "x.pcm", b"pcm").parents[1],
+            "stray": self.write(cache / "confirmation" / "notes.txt", "not a cache root"),
+        }
+        self.write(paths["old"] / "audio" / "ef" / "canonical.pcm", b"pcm")
+        self.age(paths["old"], 48)
+        return paths
+
+    def hold_analysis_lock(self) -> Any:
+        root = self.home / "Library" / "Caches" / "Vocello" / "delivery-analysis-lock"
+        root.mkdir(parents=True, exist_ok=True)
+        handle = (root / "delivery-analysis-supervisor.lock").open("a+b")
+        self.addCleanup(handle.close)
+        # Shared, as an orchestrator run (and every worker it launches) holds it.
+        fcntl.flock(handle.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+        return handle
+
+    def test_confirmation_prune_removes_only_idle_roots_under_the_confirmation_directory(self) -> None:
+        paths = self.confirmation_fixture()
+        inventory = self.run_clean()
+        self.assertIn("confirmation-cache: name=cohort", inventory.stdout)
+        self.assertIn("confirmation-cache: name=positives", inventory.stdout)
+
+        preview = self.run_clean("--prune-confirmation-caches", "--dry-run")
+        self.assertIn("would-remove: bytes=", preview.stdout)
+        self.assertIn(f"path={self.shown(paths['old'])} reason=idle-confirmation-cache", preview.stdout)
+        self.assertIn(
+            f"path={self.shown(paths['fresh'])} idleHours=0.0 minimumIdleHours=24 reason=recently-modified",
+            preview.stdout,
+        )
+        self.assertTrue(paths["old"].exists())
+
+        result = self.run_clean("--prune-confirmation-caches")
+        self.assertIn("removed: bytes=", result.stdout)
+        self.assertFalse(paths["old"].exists())
+        self.assertIn(f"path={self.shown(paths['stray'])} reason=not-a-cache-root", result.stdout)
+        for name in ("fresh", "stray", "audio", "layers", "models"):
+            self.assertTrue(paths[name].exists(), name)
+
+        self.run_clean("--prune-confirmation-caches", "--older-than-hours", "0")
+        self.assertFalse(paths["fresh"].exists())
+        for name in ("stray", "audio", "layers", "models"):
+            self.assertTrue(paths[name].exists(), name)
+        # No confirmation directory at all is a no-op, not an error.
+        shutil.rmtree(self.analysis_cache / "confirmation")
+        self.assertIn("confirmation-cache: none", self.run_clean("--prune-confirmation-caches").stdout)
+
+    def test_confirmation_prune_refuses_while_an_orchestrator_holds_the_host_analysis_lock(self) -> None:
+        paths = self.confirmation_fixture()
+        self.hold_analysis_lock()
+        for arguments in (("--prune-confirmation-caches",), ("--prune-confirmation-caches", "--dry-run")):
+            result = self.run_clean(*arguments, expected=1)
+            self.assertIn("holds the host analysis lock", result.stderr)
+        self.assertTrue(paths["old"].exists())
+
+    @unittest.skipIf(shutil.which("lsof") is None, "lsof is not installed")
+    def test_confirmation_prune_keeps_a_root_with_an_open_file(self) -> None:
+        paths = self.confirmation_fixture()
+        handle = (paths["old"] / "audio" / "ef" / "canonical.pcm").open("rb")
+        self.addCleanup(handle.close)
+        self.age(paths["old"], 48)
+        result = self.run_clean("--prune-confirmation-caches")
+        self.assertIn(f"path={self.shown(paths['old'])} reason=in-use", result.stdout)
+        self.assertTrue(paths["old"].exists())
+
+    @unittest.skipIf(shutil.which("lsof") is None, "lsof is not installed")
+    def test_selective_cache_cleanup_refuses_a_cache_with_an_open_file(self) -> None:
+        # lsof may exit 1 after a partial error even when it lists the holder: its output decides.
+        cache = self.write(self.root / "build" / "cache" / "xcode" / "ios-device" / "cache")
+        handle = cache.open("rb")
+        self.addCleanup(handle.close)
+        result = self.run_clean("--cache", "ios", expected=1)
+        self.assertIn("appears to be in use", result.stderr)
+        self.assertTrue(cache.exists())
+
+    def test_confirmation_prune_never_follows_a_symlink(self) -> None:
+        paths = self.confirmation_fixture()
+        linked = self.analysis_cache / "confirmation" / "linked"
+        linked.symlink_to(self.analysis_cache / "layers", target_is_directory=True)
+        result = self.run_clean("--prune-confirmation-caches", "--older-than-hours", "0")
+        self.assertIn(f"path={self.shown(linked)} reason=not-a-cache-root", result.stdout)
+        self.assertTrue(paths["layers"].exists())
+        shutil.rmtree(self.analysis_cache / "confirmation")
+        (self.analysis_cache / "confirmation").symlink_to(self.analysis_cache / "layers", target_is_directory=True)
+        result = self.run_clean("--prune-confirmation-caches", "--older-than-hours", "0", expected=1)
+        self.assertIn("through a symlink", result.stderr)
+        self.assertTrue(paths["layers"].exists())
+
+    def test_confirmation_prune_is_its_own_mode_with_a_bounded_age(self) -> None:
+        paths = self.confirmation_fixture()
+        for arguments in (("--prune-confirmation-caches", "--routine"),
+                          ("--older-than-hours", "1"),
+                          ("--prune-confirmation-caches", "--older-than-hours", "-1"),
+                          ("--prune-confirmation-caches", "--older-than-hours", "nan")):
+            self.run_clean(*arguments, expected=2)
+        # Routine and aggressive-free cleanup leave confirmation roots to their own mode.
+        self.run_clean("--routine")
+        self.assertTrue(paths["old"].exists())
 
     def test_symlinked_build_root_cannot_escape_repository(self) -> None:
         outside = Path(self.temporary.name) / "outside"

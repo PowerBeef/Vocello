@@ -363,7 +363,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/cache/xcode/ios-device/` | Physical-device iOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental physical-device Xcode cache |
 | `build/cache/xcode/source-packages/` | Serialized Xcode SwiftPM resolver | `cache` | `aggressive` | Shared pinned Xcode package checkout and artifact store |
 | `build/cache/swiftpm/mlx-audio-runtime/` | Owned Vocello Qwen3 Core SwiftPM commands | `cache` | `aggressive` | Persistent package-specific SwiftPM scratch cache |
-| `build/cache/delivery-analysis/` | Operator-local delivery evaluator and the audio QC judge panel | `cache` | `aggressive` | Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (scripts/acquire_audio_qc_judges.py, and the corpora-parquet runtime of scripts/audio_qc_corpora.py runtime, re-fetchable); never promotion evidence by itself |
+| `build/cache/delivery-analysis/` | Operator-local delivery evaluator and the audio QC judge panel | `cache` | `aggressive` | Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (scripts/acquire_audio_qc_judges.py, and the corpora-parquet runtime of scripts/audio_qc_corpora.py runtime, re-fetchable), and the per-panel confirmation cache roots under confirmation/<name>, which --prune-confirmation-caches removes once idle (childRetention.analysisConfirmation); never promotion evidence by itself |
 | `build/cache/audio-qc-corpora/` | Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch; scripts/audio_qc_n1_corpus.py fetch and extract; scripts/audio_qc_corpora.py fetch and extract) | `cache` | `aggressive` | Digest-pinned corpus files, one directory per pinned commit or revision (re-fetchable): the CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, the FLEURS N1 TSVs, audio archives and their extracted WAVs, under fleurs, with the FLEURS train reserve cohorts under fleurs/<revision>/reserve, and the qualification corpora of config/audio-qc-corpora.json with their fetch receipts, extracted WAVs and manifests (transcripts included), under <source>/<revision or zenodo-record>; third-party corpus data, never committed and never evidence |
 | `build/scratch/derived-data/foundation/` | Foundation target compile-safety lane | `scratch` | `routine` | Delete after successful invocation and during routine cleanup |
 | `build/scratch/derived-data/package-resolution/` | Serialized Xcode SwiftPM resolver | `scratch` | `routine` | Ephemeral resolver intermediates; the shared checkout lives under build/cache |
@@ -425,6 +425,15 @@ source, tracked benchmark history, persistent caches, current UUID-matched dSYMs
 outputs, publication-repair evidence, and model stores. `--aggressive` additionally removes
 persistent compilation/package caches and the public aliases. `--prune-ui-results` and `--dist`
 target only their named class; `--clobber --yes` removes ignored repository-local generated state.
+`--prune-confirmation-caches` removes the per-panel audio QC confirmation cache roots,
+`build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`), and
+nothing else of that cache: a root goes only while the cleanup holds the host analysis lock
+exclusively (it refuses while any orchestrator, generator or analyzer runs, and none can start
+until it finishes), when no process holds a file open under it and when nothing in it changed for
+`minimumIdleHours` (24; `--older-than-hours` overrides). Its `--dry-run` only probes the lock.
+Routine cleanup leaves these roots alone, since they stay replay inputs until the panel's records
+are committed. Every in-use probe reads the process list `lsof` prints, never its exit status,
+which is 1 after any partial error even when it listed a holder.
 `./scripts/build.sh clean` delegates to bounded aggressive cleanup rather than deleting the whole
 tree. Model deletion remains a separate explicit `--models` action. UI pruning includes smoke,
 benchmark, and model-download lanes: it keeps the latest pass, preserves matching benchmark

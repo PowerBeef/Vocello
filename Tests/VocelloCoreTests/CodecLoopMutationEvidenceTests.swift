@@ -22,11 +22,20 @@ final class CodecLoopMutationEvidenceTests: XCTestCase {
     /// The fixture's frames: frame f, codebook c holds (7f + 13c + (f * c mod 5))
     /// mod its codebook size.
     private static func fixtureFrames(_ count: Int) -> [[Int32]] {
-        (0 ..< count).map { frame in
-            (0 ..< 16).map { codebook in
-                Int32((frame * 7 + codebook * 13 + (frame * codebook) % 5) % (codebook == 0 ? 4_096 : 2_048))
+        // Explicitly typed steps: CI's pinned Xcode 26.6 cannot type-check the one-expression form in time.
+        var frames: [[Int32]] = []
+        frames.reserveCapacity(count)
+        for frame in 0 ..< count {
+            var codes: [Int32] = []
+            codes.reserveCapacity(16)
+            for codebook in 0 ..< 16 {
+                let size: Int = codebook == 0 ? 4_096 : 2_048
+                let value: Int = frame * 7 + codebook * 13 + (frame * codebook) % 5
+                codes.append(Int32(value % size))
             }
+            frames.append(codes)
         }
+        return frames
     }
 
     private static func recipe(

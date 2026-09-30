@@ -78,6 +78,40 @@ final class CLIExecutionTests: XCTestCase {
             seed: nil, variation: nil, deliveryInstructionCellID: nil).isEmpty)
     }
 
+    func testAppDeliveryDefaultsSendTheNeutralPresetOnlyWhereNobodyStyledTheItem() {
+        let neutral = EmotionPreset.neutralPresetInstruction
+        XCTAssertEqual(CLIBatchExecution.applyingAppDefaultDelivery(
+            to: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil)).deliveryInstructionText, neutral)
+        XCTAssertEqual(CLIBatchExecution.applyingAppDefaultDelivery(
+            to: .custom(speakerID: "ryan", deliveryStyle: nil)).deliveryInstructionText, neutral)
+        // An explicit delivery wins, and Clone has no instruction channel.
+        XCTAssertEqual(CLIBatchExecution.applyingAppDefaultDelivery(
+            to: .design(voiceDescription: "A calm narrator.", deliveryStyle: "Speak gently.")).deliveryInstructionText,
+            "Speak gently.")
+        let clone = GenerationRequest.Payload.clone(reference: CloneReference(audioPath: "/fixture/reference.wav"))
+        XCTAssertEqual(CLIBatchExecution.applyingAppDefaultDelivery(to: clone), clone)
+    }
+
+    func testLongFormSegmentRequestsStreamAtTheAppCadenceWithTheirSubseed() {
+        let identifier = UUID()
+        let custom = CLIBatchExecution.makeLongFormSegmentRequest(
+            mode: .custom, modelID: "custom", text: "One segment.", outputPath: "/fixture/project_segment_000.wav",
+            payload: .custom(speakerID: "ryan", deliveryStyle: nil), generationID: identifier, subseed: 42,
+            variation: nil, deliveryInstructionCellID: "custom-fixture"
+        )
+        XCTAssertTrue(custom.shouldStream)
+        XCTAssertEqual(custom.streamingInterval, GenerationSemantics.appStreamingInterval)
+        XCTAssertEqual(custom.seed, 42)
+        XCTAssertEqual(custom.generationID, identifier)
+        XCTAssertEqual(custom.deliveryInstructionCellID, "custom-fixture")
+        let design = CLIBatchExecution.makeLongFormSegmentRequest(
+            mode: .design, modelID: "design", text: "One segment.", outputPath: "/fixture/project_segment_000.wav",
+            payload: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil), generationID: UUID(),
+            subseed: 7, variation: nil, deliveryInstructionCellID: "custom-fixture"
+        )
+        XCTAssertNil(design.deliveryInstructionCellID)
+    }
+
     /// Invoked only by the native subprocess test below; never a product route.
     func testNativeSignalWorker() async throws {
         guard let path = ProcessInfo.processInfo.environment["VOCELLO_TEST_SIGNAL_ROOT"] else { return }

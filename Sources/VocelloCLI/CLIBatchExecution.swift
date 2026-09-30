@@ -25,6 +25,40 @@ enum CLIBatchExecution {
         }
     }
 
+    /// One segment of a long-form project as the apps' runner requests it: a
+    /// streaming take at the app cadence with the planner's derived subseed;
+    /// the delivery cell travels on Custom only.
+    static func makeLongFormSegmentRequest(
+        mode: GenerationMode, modelID: String, text: String, outputPath: String,
+        payload: GenerationRequest.Payload, generationID: UUID, subseed: UInt64,
+        variation: Qwen3SamplingVariation?, deliveryInstructionCellID: String?
+    ) -> GenerationRequest {
+        GenerationRequest(
+            mode: mode, modelID: modelID, text: text, outputPath: outputPath,
+            shouldStream: true,
+            streamingInterval: GenerationSemantics.appStreamingInterval,
+            payload: payload, generationID: generationID, seed: subseed, variation: variation,
+            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil
+        )
+    }
+
+    /// The apps' delivery for an item nobody styled (`--app-delivery`): a new
+    /// Studio draft is the Neutral preset, so Custom and Design carry its
+    /// instruction (the engine drops it on a model without instruction
+    /// control). Without the flag, programmatic requests stay uninstructed
+    /// (`EmotionPreset.neutralPresetInstruction`); an explicit --delivery or
+    /// --delivery-cell always wins, and Clone has no instruction channel.
+    static func applyingAppDefaultDelivery(to payload: GenerationRequest.Payload) -> GenerationRequest.Payload {
+        switch payload {
+        case .custom(let speakerID, .none):
+            return .custom(speakerID: speakerID, deliveryStyle: EmotionPreset.neutralPresetInstruction)
+        case .design(let voiceDescription, .none):
+            return .design(voiceDescription: voiceDescription, deliveryStyle: EmotionPreset.neutralPresetInstruction)
+        case .custom, .design, .clone:
+            return payload
+        }
+    }
+
     enum Status: String, Codable { case completed, failed, cancelled, notAttempted = "not_attempted" }
     struct Row: Encodable {
         let index: Int

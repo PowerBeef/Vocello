@@ -68,8 +68,10 @@ enum BatchCommand {
         let items: [LongFormItemJSON]
     }
     /// A project's terminal row: `generationID` names the segment take that
-    /// failed (or the last one), so the engine's recorded failure binds to it.
-    /// A stopped project keeps the segment takes it completed.
+    /// failed (or the last one), so the engine's recorded failure binds to it;
+    /// it is nil when the join, not a take, failed or was cancelled, and unset
+    /// when the project stopped before its first take was submitted. A stopped
+    /// project keeps the segment takes it completed.
     struct LongFormRow: Encodable {
         let index: Int
         var generationID: UUID?
@@ -108,6 +110,9 @@ enum BatchCommand {
             // A value would silently fall back to the short-form batch.
             throw CLIError("--long-form takes no value (got \"\(value)\"): pass the bare flag --long-form")
         }
+        if let value = args.string("app-delivery") {
+            throw CLIError("--app-delivery takes no value (got \"\(value)\"): pass the bare flag --app-delivery")
+        }
 
         let mode = try GenerateCommand.resolveMode(args)
         let quality = try GenerateCommand.resolveQuality(args)
@@ -129,7 +134,8 @@ enum BatchCommand {
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         // One shared payload keeps the loaded model/session reusable while the
         // command owns each item's result, cancellation, and retained receipt.
-        let payload = try await GenerateCommand.buildPayload(args, mode: mode, runtime: runtime)
+        let built = try await GenerateCommand.buildPayload(args, mode: mode, runtime: runtime)
+        let payload = args.flag("app-delivery") ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
         let deliveryInstructionCellID = try GenerateCommand.resolveDeliveryInstructionCellID(
             args,
             mode: mode
@@ -214,7 +220,10 @@ enum BatchCommand {
     /// planner splits the line (base seed `--seed` for every project, else a
     /// random one per project as the apps draw; each segment samples with its
     /// derived subseed), each segment is one streaming take at the app cadence,
-    /// and the bounded assembler joins them. Only the engine's own Fast QC runs,
+    /// and the bounded assembler joins them. The apps' runner sends the Neutral
+    /// delivery instruction when nobody styled the draft: pass --app-delivery
+    /// for that (without it the segments are uninstructed, like any programmatic
+    /// request). Only the engine's own Fast QC runs,
     /// per segment: the apps' joined-output quality gate, manifest and History
     /// acceptance are not part of it. Every project is planned before any model
     /// work; the batch stops at its first failed segment, keeping the completed
@@ -267,25 +276,24 @@ enum BatchCommand {
             // The planner numbers its segments from 1 (`evidence.index`); the JSON counts from 0.
             for (position, segment) in plan.segments.enumerated() {
                 let generationID = UUID()
-                rows[index].generationID = generationID
-                let request = GenerationRequest(
+                let request = CLIBatchExecution.makeLongFormSegmentRequest(
                     mode: mode, modelID: modelID, text: segment.spokenTextForGeneration,
                     outputPath: outDir.appendingPathComponent(
                         "\(name)_segment_\(String(format: "%03d", position)).wav"
                     ).path,
-                    shouldStream: true,
-                    streamingInterval: GenerationSemantics.appStreamingInterval,
-                    payload: payload, generationID: generationID,
-                    seed: segment.evidence.effectiveSubseed, variation: variation,
-                    deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil
+                    payload: payload, generationID: generationID, subseed: segment.evidence.effectiveSubseed,
+                    variation: variation, deliveryInstructionCellID: deliveryInstructionCellID
                 )
                 do {
                     try Task.checkCancellation()
+                    // Named once submitted: a project cancelled first names no take the engine never saw.
+                    rows[index].generationID = generationID
                     noteVerbose("project \(index + 1)/\(plans.count), segment \(position + 1)/\(plan.segments.count)")
                     let (result, _, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                     guard FileManager.default.fileExists(atPath: result.audioPath) else {
                         rows[index].status = .failed
                         rows[index].errorCode = "published_output_missing"
+                        if Task.isCancelled { rows[index].cancellationRequested = true }
                         stopped = true
                         break projects
                     }
@@ -348,7 +356,9 @@ enum BatchCommand {
             }
             let joinedPath = joinedURL.path
             let duration = Double(assembly.outputFrameCount) / Double(assembly.sampleRate)
-            let finishReason = segments.last?.finishReason
+            // A truncated middle segment is the project's finish reason, never hidden behind the last one's eos.
+            let truncated = segments.contains { $0.finishReason == GenerationFinishReason.maxTokens.rawValue }
+            let finishReason = truncated ? GenerationFinishReason.maxTokens.rawValue : segments.last?.finishReason
             rows[index].status = .completed
             rows[index].audioPath = joinedPath
             rows[index].durationSeconds = duration
@@ -441,6 +451,9 @@ enum BatchCommand {
           --confirm-consent  (clone) required: confirms you own or have permission
                          to clone this voice (ignored by other modes)
           --delivery     optional delivery style (applies to all clips)
+          --app-delivery with no --delivery/--delivery-cell, send the apps' default
+                         delivery (the Neutral preset instruction) on Custom and
+                         Design, as a new Studio draft does; otherwise uninstructed
           --out-dir      output directory; default → <data>/outputs/cli/batch/
           --seed         deterministic sampling seed, applied to every item
                          (re-running the batch reproduces it; steadier segments)

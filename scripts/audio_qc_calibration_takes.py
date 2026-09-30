@@ -450,8 +450,10 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
     if isinstance(version, bool) or not isinstance(version, int) or version < 2:
         issues.append("the policy version must be an integer of at least 2 (the cells layout)")
     generation = policy.get("generation") if isinstance(policy.get("generation"), dict) else {}
+    # delivery "app-default": the lane passes `vocello batch --app-delivery`, so Custom and Design carry the
+    # apps' Neutral preset instruction as a new Studio draft does (uninstructed takes wander in pitch).
     expected_generation = {"customMode": "custom", "designMode": "design", "cloneMode": "clone", "variant": "speed",
-                           "variation": "expressive"}
+                           "variation": "expressive", "delivery": "app-default"}
     for key, value in expected_generation.items():
         if generation.get(key) != value:
             issues.append(f"generation.{key} must be {value!r}")
@@ -1072,6 +1074,7 @@ def build_plan(*, pool_path: Path, policy_path: Path, split: str, run_id: str,
         "poolFileSHA256": jsonio.sha256_file(pool_path), "policyDigest": jsonio.sha256_file(policy_path),
         "policyVersion": policy["version"], "seedPolicy": policy["seedRule"]["policy"],
         "seedGeneration": policy["seedRule"]["generation"], "variant": "speed", "variation": "expressive",
+        "delivery": policy["generation"]["delivery"],
         "expectedTakeCount": expected, "takeCount": len(takes), "batchCount": len(batches),
         "takes": takes, "batches": batches,
     }

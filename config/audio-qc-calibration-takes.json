@@ -11,8 +11,9 @@
     "cloneMode": "clone",
     "variant": "speed",
     "variation": "expressive",
+    "delivery": "app-default",
     "language": "auto-per-text",
-    "note": "vocello batch refuses --language: every item resolves its language from its own text (Auto), as the delivered default does. A long-form batch (vocello batch --long-form) runs each line as one project the way the apps' long-form runner does: the shipping planner splits it, each segment is one streaming take at the app cadence with its derived subseed, and the bounded assembler joins them."
+    "note": "vocello batch refuses --language: every item resolves its language from its own text (Auto), as the delivered default does. Every Custom and Design take carries the apps' default delivery (vocello batch --app-delivery: the Neutral preset instruction a new Studio draft sends); Clone has no instruction channel. A long-form batch (vocello batch --long-form) runs each line as one project the way the apps' long-form runner does: the shipping planner splits it, each segment is one streaming take at the app cadence with its derived subseed, and the bounded assembler joins them."
   },
   "familyRule": "One script x voice x seed is one family, the unit of independence (config/audio-qc-qualification-policy.json statistics.familyRule); a family is deduplicated by PCM digest. A long-form project stands in for the script: one project x voice x seed is one family.",
   "seedRule": {

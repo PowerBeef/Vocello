@@ -1264,7 +1264,7 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
       # stdout is the segment's JSON (bound to the plan by item index); stdin
       # is closed so the CLI never consumes this loop's batch rows.
       "$QVOICE_BUILD_ROOT/vocello" batch --file "$segment_lines" --mode "$mode" --variant "$variant" \
-        --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$segment" --json \
+        --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$segment" --json --app-delivery \
         ${form_args[@]+"${form_args[@]}"} "${voice_args[@]}" >"$artifacts/batch-results/$segment.json" \
         2>"$artifacts/logs/$segment.log" </dev/null || st=$?
       # Keep this segment's engine rows before a later segment's rows trim them.

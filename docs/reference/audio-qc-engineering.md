@@ -1574,7 +1574,12 @@ plan. Each language has three voices per split: two Built-in speakers, a male an
 the native speaker where one exists, and one Voice Design brief. The calibration split uses the
 corpus's calm narrator and the confirmation split a contrasting brief, and no speaker serves both
 splits in any language (§5.5 step 1; policy version 2, below). Takes use the Speed variant, the
-expressive variation and Auto language per text.
+expressive variation and Auto language per text. Since policy version 2 they also carry the apps'
+default delivery (`generation.delivery: app-default`; the lane passes `vocello batch
+--app-delivery`): Custom and Design send the Neutral preset instruction that a new Studio draft
+sends. The 2026-09-27 cohort was generated uninstructed, which the Neutral preset exists to avoid
+(sending nothing measured 2.70 st of cross-seed pitch wander, `EmotionPreset.neutralPresetInstruction`), so its Design and Custom figures overstate
+what the apps produce.
 
 Each script gets one primary voice, rotating over the three voices. A stratified donor subset of
 20 scripts per language also gets the next voice, which gives same-script, different-voice pairs

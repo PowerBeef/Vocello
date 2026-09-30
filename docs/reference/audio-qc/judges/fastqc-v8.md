@@ -52,6 +52,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`signal.dc-offset@2`](../detectors/signal.dc-offset-v2.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | absolute fastqc `dcOffset` | not qualified |
 | [`signal.level@1`](../detectors/signal.level-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `rmsDBFS` | qualified (warn) |
 | [`signal.clipping@1`](../detectors/signal.clipping-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | fastqc `hotSamples` | refused |
+| [`signal.clipping@2`](../detectors/signal.clipping-v2.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | pcm `symmetricFlatTopFraction` | not qualified |
 | [`signal.noise@1`](../detectors/signal.noise-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `wadaSNRDB` | qualified (warn) |
 | [`signal.band-limit@1`](../detectors/signal.band-limit-v1.md) | A (signal) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `effectiveBandwidthHz` | not qualified |
 | [`introspection.token-loop@1`](../detectors/introspection.token-loop-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `tokenCycleSpanFrames` | not qualified |

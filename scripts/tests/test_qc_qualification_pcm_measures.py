@@ -195,5 +195,51 @@ class SignalV2RegistryTests(unittest.TestCase):
         self.assertEqual(scores["signal.dc-offset@2"], 0.004)
 
 
+def bursty_tone() -> np.ndarray:
+    """A 150 Hz tone at 0.1 with three 5 ms bursts at 0.8: like speech, its loudest 1% of samples reach far
+    above the level that 1% exceeds."""
+    time = np.arange(RATE) / RATE
+    samples = 0.1 * np.sin(2.0 * math.pi * 150.0 * time)
+    for start in (0.2, 0.5, 0.8):
+        first = int(start * RATE)
+        samples[first:first + 120] = 0.8 * np.sin(2.0 * math.pi * 150.0 * time[first:first + 120])
+    return samples
+
+
+class ClippingV2Tests(unittest.TestCase):
+    """signal.clipping@2: sign-symmetric flat tops against one pooled threshold."""
+
+    def setUp(self) -> None:
+        registry = json.loads((REPO / "config/audio-qc-detectors.json").read_text(encoding="utf-8"))
+        self.entry = detectors.detector_entry(registry, "signal.clipping@2")
+
+    def score(self, samples: np.ndarray) -> float:
+        clip = {"clipID": "c", "pcmMeasures": pcm_measures.measure(samples, RATE)}
+        return detectors.score_take(self.entry, "japanese", clip=clip)["score"]
+
+    def test_definition(self) -> None:
+        (component,) = detectors.components_of(self.entry)
+        self.assertEqual(component, {"source": "pcm", "field": "symmetricFlatTopFraction"})
+        self.assertIsNone(detectors.strata_by(self.entry))
+        self.assertEqual(detectors.declared_cells(self.entry),
+                         {"T1-pcm-construction": {"SIG-CLIP/moderate", "SIG-CLIP/severe"}})
+
+    def test_every_sig_clip_variant_below_and_at_full_scale_scores(self) -> None:
+        from lib.qc_qualification import injectors, recordings
+        source = recordings.recording_fixture("burst", "burst", "english", bursty_tone())
+        self.assertEqual(self.score(source.samples), 0.0)
+        for variant in ("mild", "moderate", "severe", "soft-knee-moderate", "over-range-moderate"):
+            self.assertGreater(self.score(injectors.inject("SIG-CLIP", variant, source, 7).samples), 0.0, variant)
+        for variant in ("sham", "control-peak-normalized"):
+            self.assertEqual(self.score(injectors.inject("SIG-CLIP", variant, source, 7).samples), 0.0, variant)
+
+    def test_a_soft_knee_that_never_saturates_leaves_no_flat_top(self) -> None:
+        # The limitation the registry declares: a smooth waveform barely above the knee is compressed, not held.
+        from lib.qc_qualification import fixtures, injectors
+        source = fixtures.clean_fixture(1)
+        self.assertEqual(self.score(injectors.inject("SIG-CLIP", "soft-knee-moderate", source, 7).samples), 0.0)
+        self.assertGreater(self.score(injectors.inject("SIG-CLIP", "moderate", source, 7).samples), 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2180,6 +2180,31 @@ thresholds, so a 150 ms digital dropout goes undetected. A quiet generated pause
 long is outside these detectors (`digital-silence-only`); the legacy Fast QC v8 flags keep reporting
 it (A10). The shams alarmed on 0, 2 and 1 of 150 families.
 
+**Clipping below full scale (`signal.clipping@2`).** v1 counted samples above Fast QC's 0.965
+ceiling, and SIG-CLIP flattens at the source's own level, so it detected none of them. v2 scores
+sign-symmetric flat tops: the smaller of the positive and negative counts of samples held on runs of
+equal PCM16 values within 1% of the take's own peak, over the take's samples. A clipping stage holds
+both polarities at the level it limits to, whether it clips hard or through a knee below full scale
+or writes an over-range signal to PCM16, while speech reaches its peak on isolated samples. The
+measure is relative to the take's peak, so a gain change moves nothing. The one-sided count was
+weaker: its Japanese FAR bound was 0.216 at alpha 0.05, because the N2 round trip clamps some loud
+FLEURS recordings at full scale on one side. The two-sided threshold is 0 at every alpha (99% of dev
+families hold no two-sided flat top), so any two-sided flat top alarms.
+
+| Population (spent AQ-07 data) | Alarms |
+|---|---|
+| FLEURS test N2 | 16/3718 (upper 0.007); ja 15/357 (upper 0.077), ko 1/245, 0 elsewhere |
+| SIG-CLIP hard mild, moderate, severe | 140/149 (lower 0.897), 150/150, 150/150 (lower 0.980) |
+| SIG-CLIP soft-knee and over-range at moderate, built in memory on the same 150 sources | 149/150 (lower 0.969), 150/150 |
+| SIG-CLIP sham; peak-normalization control | 1/150; 1/150 (the same source's clamp) |
+| N3 takes of 2026-09-27 | 0/791 |
+
+The N2 injection schedule draws only sham, mild, moderate and severe, so a confirmation set holds no
+soft-knee or over-range clip until the schedule draws the extra variants
+(`clip-variants-not-sampled`). A soft knee leaves a flat top only where it saturates, as speech's crest
+factor makes it do; a smooth procedural waveform barely above the knee is compressed without one
+(`soft-knee-saturation`).
+
 ### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
 
 Audit section 4.4 makes pYIN and the window-corrected HNR measurands only "once oracle ladders

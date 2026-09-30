@@ -60,7 +60,8 @@
     "n3-no-clone-takes": "The maintainer hears erratic pitch in Voice Clone takes, but the N3 take plan (config/audio-qc-calibration-takes.json) covers Built-in and Voice Design voices only, so no clone take is a negative or informational yet; a clone split needs reference clips that may be cloned (the class E speaker corpus would serve) and the same families per stratum.",
     "long-form-takes-pending": "Class J's negatives are natural long-form takes (N3 long form, audit section 5.7): multi-segment projects assembled by the product's long-form path, with their segment boundaries. The N3 take plan holds single-segment takes only, so the fit and confirmation cohorts (role set n3-long-form, corpora pending) wait for a long-form take plan: at least 60 scored families in each (one pooled threshold, over at least 3 languages, speakers and scripts), every family a script x voice x seed project with at least one seam, the two disjoint by family, speaker and script.",
     "digital-silence-only": "The score counts exact digital silence (PCM16 zeros) only: a quiet but nonzero gap or tail (room tone, codec silence tokens, an attenuated span) is not scored, so a generated pause or tail that merely runs long is outside this detector. The legacy Fast QC v8 silence flags keep reporting those (A10), and SIG-DROP's attenuated variant is no target.",
-    "pcm-measures-python-only": "The pcmMeasures block is measured by the calibration scorer (scripts/lib/qc_qualification/pcm_measures.py, audio_qc_calibration_set.py score) over the persisted PCM16, not inside the engine: until a Swift mirror joins the Stage 0 observations the app's own takes carry no such field, so the detector serves the evidence lanes that run the scorer. An N1 recording is measured after its resampling, which smooths flat tops and zero runs."
+    "pcm-measures-python-only": "The pcmMeasures block is measured by the calibration scorer (scripts/lib/qc_qualification/pcm_measures.py, audio_qc_calibration_set.py score) over the persisted PCM16, not inside the engine: until a Swift mirror joins the Stage 0 observations the app's own takes carry no such field, so the detector serves the evidence lanes that run the scorer. An N1 recording is measured after its resampling, which smooths flat tops and zero runs.",
+    "clip-variants-not-sampled": "The N2 injection schedule (audio_qc_calibration_set.py build_plan) draws each injector's sham, mild, moderate and severe catalog variants only, so SIG-CLIP's soft-knee and over-range variants never reach a confirmation set and the moderate cell holds hard clipping alone. Their design-data detection comes from building them in memory on the spent confirmation sources; qualifying them needs the schedule to draw the extra variants."
   },
   "exclusionReasons": {
     "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
@@ -97,7 +98,9 @@
     "speaker-raw-windows-export": "The panel bundle keeps CAM++'s reference-relative L2 metrics only; its window embeddings stay in the orchestrator's L1 cache. audio_qc_calibration_set.py raw-outputs --judge speaker.campplus-voxceleb@1 exports them per take (speaker embeddings: an untracked build artifact, never committed), and scores --raw-outputs passes them with each long-form take's seam times.",
     "seam-window-similarity": "Two 2 s windows of one voice score lower against each other than whole takes do, and a window beside a seam may hold the inserted pause, so the clean long-form distribution, not a speaker-verification threshold, sets the bound; a seam without a whole window on both sides is not scored.",
     "pooled-fleurs-locale-concentration": "One threshold pooled over the languages puts FLEURS's false alarms in the locales whose recording chain sits furthest out, while the confirmation still bounds every language's FAR (0.20 at warn, upper bound at the Bonferroni confidence). On the spent AQ-07 cohorts (design data, fitted on FLEURS dev N2 and counted on test N2), a pooled plan at alpha 0.05 put the worst language's bound at 0.354 (German DC), 0.283 (Spanish digital dropout) and 0.265 (English digital tail), and at alpha 0.01 at 0.066, 0.075 and 0.071: plan these detectors at alpha 0.01.",
-    "fleurs-digital-silence": "FLEURS N2 holds exact-zero spans that generated takes never show (spent AQ-07 cohorts: clean dev N2 interior runs up to 0.88 s, 99th percentile 0.40 s, from zh, es and ru recordings, and trailing runs up to 17 ms in zh and en; the 791 N3 takes of 2026-09-27: at most 1 ms), so the pooled thresholds sit near 0.4 s inside the take and 12 ms at its end, and a shorter digital dropout (SIG-DROP mild, 150 ms) is missed."
+    "fleurs-digital-silence": "FLEURS N2 holds exact-zero spans that generated takes never show (spent AQ-07 cohorts: clean dev N2 interior runs up to 0.88 s, 99th percentile 0.40 s, from zh, es and ru recordings, and trailing runs up to 17 ms in zh and en; the 791 N3 takes of 2026-09-27: at most 1 ms), so the pooled thresholds sit near 0.4 s inside the take and 12 ms at its end, and a shorter digital dropout (SIG-DROP mild, 150 ms) is missed.",
+    "n2-full-scale-clamps": "The N2 round trip clamps some loud FLEURS recordings at full scale (the N2 manifest's clampedSampleCount), leaving genuine two-sided flat tops on clean negatives: on the spent AQ-07 cohorts 16 of 3,718 test N2 families carry any (15 of them Japanese, upper bound 0.077 at 0.995), so the pooled threshold sits at 0 whatever the alpha and the Japanese stratum holds the FAR.",
+    "soft-knee-saturation": "A soft knee leaves a flat top only where it saturates: SIG-CLIP's knee squashes toward an asymptote 12% above its level, so samples far above the knee (speech's crest factor puts the loudest 1% well above the level that 1% exceeds) round to the asymptote on both polarities, while a waveform that barely crosses the knee is compressed without one. On the spent confirmation sources 149 of 150 soft-knee constructions scored; on the smooth procedural fixtures none does."
   },
   "detectors": [
     {
@@ -261,6 +264,24 @@
       "populations": "fleurs-n2",
       "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
       "risks": ["v8-sub-full-scale-clipping"]
+    },
+    {
+      "id": "signal.clipping@2",
+      "class": "A",
+      "stage": 0,
+      "measures": "Sign-symmetric flat tops: the smaller of the take's positive and negative flat-top sample counts over its samples (pcmMeasures symmetricFlatTopFraction), a flat top being a run of at least two equal PCM16 samples within 1% of the take's own peak magnitude, against one threshold pooled over the languages. A clipping stage at any level, below full scale (hard or soft-knee) or at it (an over-range signal written to PCM16), holds both polarities at the level it limits to, while speech reaches its peak on isolated samples; v1 counted only samples above Fast QC's 0.965 ceiling and detected none of the SIG-CLIP injections, which flatten at the source's own level.",
+      "score": {"combination": "single", "unit": "fraction", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "pcm", "field": "symmetricFlatTopFraction"}]}
+      ]},
+      "direction": "above",
+      "strata": null,
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "SIG-CLIP", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "SIG-CLIP", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only", "clip-variants-not-sampled"],
+      "risks": ["n2-full-scale-clamps", "soft-knee-saturation"]
     },
     {
       "id": "signal.noise@1",

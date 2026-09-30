@@ -134,6 +134,7 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`signal.dc-offset@2`](detectors/signal.dc-offset-v2.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`signal.level@1`](detectors/signal.level-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.clipping@1`](detectors/signal.clipping-v1.md) | A (signal) | 0 | single | confirmed (refused) | refused | - |
+| [`signal.clipping@2`](detectors/signal.clipping-v2.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | no plan | not qualified | - |
 | [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | confirmed (refused) | refused | - |

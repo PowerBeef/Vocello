@@ -64,7 +64,7 @@ import struct
 import sys
 import tarfile
 import time
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Collection, Mapping, Sequence
 import urllib.parse
 import urllib.request
 import wave
@@ -660,8 +660,31 @@ def extract_split(archive: Path, pin: Mapping[str, Any], split: str, rows: Seque
     Only the file name is written, under `destination`. Returns that member
     directory and each written file's digest, size and sample count.
     """
+    member_directory, files, _counts = extract_members(archive, pin, split, rows, destination)
+    return member_directory, files
+
+
+def extract_members(archive: Path, pin: Mapping[str, Any], split: str, rows: Sequence[Row], destination: Path,
+                    *, keep: Collection[str] | None = None,
+                    ) -> tuple[str, dict[str, dict[str, Any]], dict[str, int]]:
+    """`extract_split`, or with `keep` only the named recordings of a larger archive (the train reserve).
+
+    With `keep`, every member is still checked as `extract_split` checks it
+    (safe path, one split directory, `<digits>.wav`, no duplicate), but only the
+    kept recordings are decoded and written; a recording its TSV does not list
+    is skipped and counted instead of refused, and every kept recording must be
+    in the archive. Returns the member directory, each written file's facts and
+    the counts: members seen, members the TSV does not list, TSV rows without a
+    member.
+    """
     expected = {row.file: row for row in rows}
+    strict = keep is None
+    wanted = set(expected) if keep is None else set(keep)
+    if not wanted <= set(expected):
+        raise N1Error(f"{pin['path']}: a kept recording is not listed in its TSV")
     files: dict[str, dict[str, Any]] = {}
+    seen: set[str] = set()
+    unlisted = 0
     directories: list[tuple[tarfile.TarInfo, str]] = []
     member_directory: str | None = None
     destination.mkdir(parents=True, exist_ok=False)
@@ -681,10 +704,16 @@ def extract_split(archive: Path, pin: Mapping[str, Any], split: str, rows: Seque
                     member_directory = directory
                 elif directory != member_directory:
                     raise _refuse(label, member, f"is not in {member_directory}/ with the archive's first recording")
-                if name not in expected:
+                if name not in expected and strict:
                     raise _refuse(label, member, "is not listed in its TSV")
-                if name in files:
+                if name in seen:
                     raise _refuse(label, member, "appears twice")
+                seen.add(name)
+                if name not in expected:
+                    unlisted += 1
+                    continue
+                if name not in wanted:
+                    continue
                 if member.size > MAX_MEMBER_BYTES:
                     raise _refuse(label, member, f"is larger than {MAX_MEMBER_BYTES} bytes")
                 stream = bundle.extractfile(member)
@@ -698,12 +727,16 @@ def extract_split(archive: Path, pin: Mapping[str, Any], split: str, rows: Seque
                                "samples": expected[name].samples, **conversion}
     except (tarfile.TarError, EOFError, zlib.error) as error:
         raise N1Error(f"{label} is not a readable tar.gz archive ({type(error).__name__})") from None
-    if len(files) != len(expected) or member_directory is None:
+    if strict and (len(files) != len(expected) or member_directory is None):
         raise N1Error(f"{label}: the archive holds {len(files)} recordings, its TSV lists {len(expected)}")
+    if not strict and (len(files) != len(wanted) or member_directory is None):
+        raise N1Error(f"{label}: {len(wanted) - len(files)} of the {len(wanted)} kept recordings are not in the "
+                      "archive")
     for member, directory in directories:
         if member_directory != directory and not member_directory.startswith(f"{directory}/"):
             raise _refuse(label, member, f"is a directory off the recordings' path {member_directory}/")
-    return member_directory, dict(sorted(files.items()))
+    counts = {"members": len(seen), "unlisted": unlisted, "absent": len(set(expected) - seen)}
+    return member_directory, dict(sorted(files.items())), counts
 
 
 def extraction_directory(sources: Mapping[str, Any], config: str, root: Path | None = None) -> Path:
@@ -846,6 +879,26 @@ def _place(source: Path, destination: Path, digest: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def recording_take(row: Row, *, language: str, config: str, fleurs_split: str, digest: str,
+                   shared_script: bool) -> dict[str, Any]:
+    """One FLEURS recording as a cohort take, in the shape every N1 manifest lists (its WAV at `wavPath`)."""
+    code = lm.LANGUAGE_LOCALE_CODES[language]
+    take_id = f"n1-{code}-{row.file.removesuffix('.wav')}"
+    reasons, lint, proper = ineligible_reasons(row.text, language, shared_script=shared_script)
+    return {
+        "takeID": take_id, "family": take_id, "scriptID": f"flores-{row.sentence_id}",
+        "language": language, "population": POPULATION, "status": "generated",
+        "text": row.text, "textSHA256": lm.text_sha256(row.text),
+        "wavPath": f"wav/{take_id}.wav", "wavSHA256": digest,
+        "durationSeconds": round(row.samples / SAMPLE_RATE, 6), "gender": row.gender,
+        "recording": {"dataset": DATASET, "config": config, "split": fleurs_split,
+                      "file": row.file, "sentenceID": row.sentence_id, "samples": row.samples,
+                      "sampleRate": SAMPLE_RATE},
+        "scriptLintIssues": lint, "properName": proper,
+        "eligible": not reasons, "ineligibleReasons": reasons,
+    }
+
+
 def build_manifest(sources: Mapping[str, Any], *, split: str, output: Path, root: Path | None = None,
                    languages: Sequence[str] | None = None) -> dict[str, Any]:
     """The N1 cohort manifest of one split (`calibration` or `confirmation`), with its WAVs beside it."""
@@ -872,7 +925,6 @@ def build_manifest(sources: Mapping[str, Any], *, split: str, output: Path, root
         files = receipt["splits"][fleurs_split]["files"]
         if set(files) != {row.file for row in rows}:
             raise N1Error(f"{language} {fleurs_split}: the extraction receipt does not list its TSV's recordings")
-        code = lm.LANGUAGE_LOCALE_CODES[language]
         _log(f"{language}: {len(rows)} {fleurs_split} recordings")
         for row in rows:
             source = directory / fleurs_split / row.file
@@ -882,22 +934,10 @@ def build_manifest(sources: Mapping[str, Any], *, split: str, output: Path, root
             if digest != files[row.file]["sha256"]:
                 raise N1Error(f"{language} {fleurs_split}: {row.file} differs from its extraction receipt; "
                               "run `extract` again")
-            take_id = f"n1-{code}-{row.file.removesuffix('.wav')}"
-            _place(source, wav_dir / f"{take_id}.wav", digest)
-            reasons, lint, proper = ineligible_reasons(row.text, language,
-                                                       shared_script=row.sentence_id in other_ids)
-            takes.append({
-                "takeID": take_id, "family": take_id, "scriptID": f"flores-{row.sentence_id}",
-                "language": language, "population": POPULATION, "status": "generated",
-                "text": row.text, "textSHA256": lm.text_sha256(row.text),
-                "wavPath": f"wav/{take_id}.wav", "wavSHA256": digest,
-                "durationSeconds": round(row.samples / SAMPLE_RATE, 6), "gender": row.gender,
-                "recording": {"dataset": DATASET, "config": entry["config"], "split": fleurs_split,
-                              "file": row.file, "sentenceID": row.sentence_id, "samples": row.samples,
-                              "sampleRate": SAMPLE_RATE},
-                "scriptLintIssues": lint, "properName": proper,
-                "eligible": not reasons, "ineligibleReasons": reasons,
-            })
+            take = recording_take(row, language=language, config=entry["config"], fleurs_split=fleurs_split,
+                                  digest=digest, shared_script=row.sentence_id in other_ids)
+            _place(source, wav_dir / f"{take['takeID']}.wav", digest)
+            takes.append(take)
     manifest: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION, "kind": MANIFEST_KIND, "population": POPULATION,
         "dataset": DATASET, "revision": sources["revision"], "sourcesDigest": sources_digest(sources),

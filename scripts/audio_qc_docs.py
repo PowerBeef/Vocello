@@ -17,6 +17,9 @@ Pages:
   detectors from the committed records under `benchmarks/audio-qc-calibration/`
   ("not qualified" without one), the lane gates of
   `config/audio-qc-lane-gates.json` and the judges' canaries.
+- `corpora.md`: the pinned corpora of the next qualification round, rendered
+  from `config/audio-qc-corpora.json`: per group its sources and bytes, and per
+  source its pins, license, attribution, languages, labels and caveats.
 
 Facts appear only inside generated blocks, which this script owns:
 
@@ -55,6 +58,7 @@ from lib.qc_qualification import detectors as registry_lib, thresholds  # noqa: 
 
 DOCS = PurePosixPath("docs/reference/audio-qc")
 LANE_GATES = "config/audio-qc-lane-gates.json"
+CORPORA = "config/audio-qc-corpora.json"
 PREREGISTRATIONS = "config/audio-qc-preregistrations"
 STALE_MESSAGE = "audio-qc docs are stale"
 BEGIN = ("<!-- BEGIN GENERATED audio-qc-docs:{name} (scripts/audio_qc_docs.py regen; "
@@ -232,6 +236,7 @@ class Sources:
     detectors: dict
     policy: dict
     gates: dict
+    corpora: dict
     qualifications: dict[str, Qualification] = field(default_factory=dict)
 
     @classmethod
@@ -240,10 +245,14 @@ class Sources:
         sources = cls(root, load_json(root / calibration.JUDGES, "the judge registry"),
                       load_json(root / calibration.REGISTRY, "the detector registry"),
                       load_json(root / calibration.POLICY, "the qualification policy"),
-                      load_json(root / LANE_GATES, "the lane gates"))
+                      load_json(root / LANE_GATES, "the lane gates"),
+                      load_json(root / CORPORA, "the corpora registry"))
         if not isinstance(sources.judges.get("judges"), Mapping) \
                 or not isinstance(sources.detectors.get("detectors"), list):
             raise DocsError("the judge registry maps its judges and the detector registry lists its detectors")
+        if not isinstance(sources.corpora.get("sources"), Mapping) \
+                or not isinstance(sources.corpora.get("groups"), Mapping):
+            raise DocsError("the corpora registry maps its sources and groups")
         for entry in sources.detector_entries():
             sources.qualifications[entry["id"]] = sources._qualification(entry)
         return sources
@@ -916,6 +925,154 @@ def report_text(sources: Sources) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Corpora
+# --------------------------------------------------------------------------- #
+
+CORPORA_PAGE = DOCS / "corpora.md"
+PIN_KIND_NAMES = {"sha256": "LFS SHA-256", "gitBlobSHA1": "git blob SHA-1", "md5": "Zenodo MD5"}
+
+
+def gb(value: Any) -> str:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return "-"
+    return f"{value / 1e9:.2f} GB"
+
+
+def _groups(corpora: Mapping[str, Any]) -> list[str]:
+    """The groups in the order the sets list them, then any other group by name."""
+    listed: list[str] = []
+    for value in (corpora.get("sets") or {}).values():
+        listed += [group for group in value.get("groups") or () if group not in listed]
+    return [group for group in listed if group in (corpora.get("groups") or {})] + sorted(
+        set(corpora.get("groups") or {}) - set(listed))
+
+
+def _corpus_sources(corpora: Mapping[str, Any]) -> list[tuple[str, Mapping[str, Any]]]:
+    """The sources by group, then by id."""
+    order = _groups(corpora)
+    entries = corpora.get("sources") or {}
+    return sorted(entries.items(), key=lambda item: (order.index(item[1].get("group"))
+                                                     if item[1].get("group") in order else len(order), item[0]))
+
+
+def _corpus_members(corpora: Mapping[str, Any], group: str) -> list[str]:
+    """A group's sources: its own, then those shared into it (`alsoIn`), marked."""
+    entries = _corpus_sources(corpora)
+    own = [source for source, entry in entries if entry.get("group") == group]
+    shared = [f"{source} (shared)" for source, entry in entries if group in (entry.get("alsoIn") or ())]
+    return own + shared
+
+
+def _files(count: Any) -> str:
+    return f"{number(count)} file" + ("" if count == 1 else "s")
+
+
+def _pinned_at(entry: Mapping[str, Any]) -> str:
+    if entry.get("record"):
+        return f"Zenodo record {entry['record']}, version {entry.get('version', '-')}"
+    return f"`{entry.get('repository', '-')}` at `{str(entry.get('revision', '-'))[:12]}`"
+
+
+def _pin_kinds(entry: Mapping[str, Any]) -> str:
+    counts: dict[str, int] = {}
+    for file in entry.get("files") or ():
+        for key in PIN_KIND_NAMES:
+            if key in file:
+                counts[key] = counts.get(key, 0) + 1
+    pin_file = entry.get("pinFile") or {}
+    if pin_file:
+        counts["sha256"] = counts.get("sha256", 0) + int(pin_file.get("files") or 0)
+    return ", ".join(f"{count} by {PIN_KIND_NAMES[key]}" for key, count in counts.items()) or "-"
+
+
+def _labels(entry: Mapping[str, Any]) -> str:
+    return names(label for label, value in (entry.get("labels") or {}).items() if value)
+
+
+def corpora_summary(sources: Sources) -> str:
+    corpora = sources.corpora
+    page = CORPORA_PAGE
+    runtime = corpora.get("parquetRuntime") or {}
+    lines = [f"Rendered from {link(page, CORPORA, CORPORA)} (`{corpora.get('item', '-')}`): "
+             f"{corpora.get('description', '-')}", "", "**Decisions.**", ""]
+    lines += [f"- {decision}" for decision in corpora.get("decisions") or ()]
+    rows = []
+    groups = corpora.get("groups") or {}
+    for group in _groups(corpora):
+        value = groups[group]
+        own = [entry for entry in (corpora.get("sources") or {}).values() if entry.get("group") == group]
+        rows.append([f"`{group}`", number(value.get("class")), number(value.get("title")),
+                     names(_corpus_members(corpora, group)),
+                     number(sum(int((entry.get("totals") or {}).get("files") or 0) for entry in own)),
+                     gb(sum(int((entry.get("totals") or {}).get("bytes") or 0) for entry in own)),
+                     gb(sum(int((entry.get("extract") or {}).get("estimatedBytes") or 0) for entry in own))])
+    lines += ["", "**Groups.** A shared source is counted in its own group only.", ""]
+    lines += table(["Group", "Class", "Title", "Sources", "Files", "Download", "Extracted (estimate)"], rows)
+    lines.append("")
+    for group in _groups(corpora):
+        lines.append(f"- `{group}`: {groups[group].get('description', '-')}")
+    totals = corpora.get("totals") or {}
+    estimate = sum(int((entry.get("extract") or {}).get("estimatedBytes") or 0)
+                   for entry in (corpora.get("sources") or {}).values())
+    lines += ["", f"**Totals.** {number(totals.get('files'))} files, {gb(totals.get('bytes'))} to download; about "
+                  f"{gb(estimate)} of mono PCM16 WAV once extracted (estimates; each extraction checks its own "
+                  "need first)."]
+    for name, value in (corpora.get("sets") or {}).items():
+        lines.append(f"Set `{name}`: {names(f'`{group}`' for group in value.get('groups') or ())}. "
+                     f"{value.get('description', '')}".rstrip())
+    lines += ["", f"**Hosts.** https only, on {names(f'`{host}`' for host in corpora.get('hosts') or ())}.", "",
+              f"**Parquet runtime.** `{runtime.get('family', '-')}`: "
+              f"{link(page, runtime.get('lock', '-'), runtime.get('lock', '-'))}, {number(runtime.get('packages'))} "
+              f"packages, about {gb(runtime.get('downloadBytes'))} of wheels, import probe "
+              f"{names(f'`{module}`' for module in runtime.get('importProbe') or ())}. {runtime.get('note', '')}"
+              .rstrip()]
+    return "\n".join(lines)
+
+
+def corpora_sources(sources: Sources) -> str:
+    corpora = sources.corpora
+    page = CORPORA_PAGE
+    entries = _corpus_sources(corpora)
+    rows = [[f"`{source}`", f"`{entry.get('group')}`" + (f" (+ {names(entry.get('alsoIn') or ())})"
+                                                          if entry.get("alsoIn") else ""),
+             number(entry.get("host")), names(entry.get("languages") or ()), _labels(entry),
+             number((entry.get("license") or {}).get("id")), number((entry.get("totals") or {}).get("files")),
+             gb((entry.get("totals") or {}).get("bytes"))]
+            for source, entry in entries]
+    lines = table(["Source", "Group", "Host", "Languages", "Labels", "License", "Files", "Download"], rows)
+    for source, entry in entries:
+        license_ = entry.get("license") or {}
+        extract = entry.get("extract") or {}
+        pin_file = entry.get("pinFile") or {}
+        lines += ["", f"### {entry.get('title', source)} (`{source}`)", "",
+                  f"- Pinned: {_pinned_at(entry)} on `{entry.get('host', '-')}`; "
+                  f"{_files((entry.get('totals') or {}).get('files'))} "
+                  f"({_pin_kinds(entry)}), {gb((entry.get('totals') or {}).get('bytes'))}."]
+        if pin_file:
+            lines.append(f"- Pin file: {link(page, pin_file.get('path', '-'), pin_file.get('path', '-'))} "
+                         f"(SHA-256 {short(pin_file.get('sha256'))}).")
+        lines.append(f"- License: {license_.get('id', '-')} ([text]({license_.get('url', '-')}); "
+                     f"official source <{license_.get('source', '-')}>).")
+        if license_.get("note"):
+            lines.append(f"- License note: {license_['note']}")
+        lines.append(f"- Attribution: {entry.get('attribution', '-')}")
+        labels = entry.get("labels") or {}
+        present = [f"{label} ({value})" for label, value in labels.items() if value]
+        absent = [label for label, value in labels.items() if not value]
+        lines.append(f"- Labels: {names(present)}; absent: {names(absent)}.")
+        parts = [f"`{extract.get('format', '-')}`", f"written at {number(extract.get('outputRate'))} Hz",
+                 f"about {gb(extract.get('estimatedBytes'))} ({extract.get('estimateBasis', '-')})"]
+        if extract.get("format") == "fleurs-reserve":
+            parts.append(f"{number(extract.get('cohorts'))} cohorts of {number(extract.get('perLanguage'))} "
+                         f"recordings per language, seed `{extract.get('seed', '-')}`")
+        lines.append(f"- Extraction: {'; '.join(parts)}.")
+        if entry.get("subset"):
+            lines.append(f"- Subset: {entry['subset'].get('rule', '-')} Seed `{entry['subset'].get('seed', '-')}`.")
+        lines += [f"- Caveat: {caveat}" for caveat in entry.get("caveats") or ()]
+    return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- #
 # Pages and splicing
 # --------------------------------------------------------------------------- #
 
@@ -932,6 +1089,8 @@ def pages(sources: Sources) -> list[Page]:
              (("judges", readme_judges(sources)), ("detectors", readme_detectors(sources)),
               ("lanes", readme_lanes(sources)), ("verdicts", readme_verdicts(sources)))),
         Page(DOCS / "qualification-policy.md", "Audio QC qualification policy", (("policy", policy_body(sources)),)),
+        Page(CORPORA_PAGE, "Audio QC corpora",
+             (("corpora-summary", corpora_summary(sources)), ("corpora-sources", corpora_sources(sources)))),
     ]
     for identifier, judge in sources.judge_entries().items():
         listed.append(Page(judge_page(identifier), f"`{identifier}`",

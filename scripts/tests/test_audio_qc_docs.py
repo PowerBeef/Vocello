@@ -171,6 +171,19 @@ class CheckAndSpliceTests(FixtureCase):
         self.assertEqual(code, 1)
         self.assertIn(f"{TREE}/judges/fastqc-v8.md", err)
 
+    def test_the_corpora_page_follows_its_registry(self) -> None:
+        self.regen()
+        self.edit_json("config/audio-qc-corpora.json",
+                       lambda value: value["sources"]["hub-mirror"]["caveats"].append("A new caveat."))
+        code, _, err = run(self.root, "--check")
+        self.assertEqual(code, 1)
+        self.assertIn(f"{TREE}/corpora.md", err)
+        self.regen()
+        text = self.read("corpora.md")
+        self.assertIn("- Caveat: A new caveat.", text)
+        self.assertLess(text.index("| `speaker` |"), text.index("| `emotion` |"))
+        self.assertIn("emo-archive, hub-mirror (shared)", text)
+
     def test_hand_written_text_outside_the_blocks_is_kept(self) -> None:
         self.regen()
         page = self.page("judges/fastqc-v8.md")

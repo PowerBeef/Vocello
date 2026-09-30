@@ -38,6 +38,8 @@ sourceOfTruth:
   - scripts/lib/qc_qualification/ladders.py
   - config/audio-qc-canary-set.json
   - scripts/acquire_audio_qc_judges.py
+  - scripts/audio_qc_corpora.py
+  - config/audio-qc-corpora.json
   - config/audio-qc-runtimes/
   - scripts/delivery_resource_supervisor.py
   - config/audio-qc-judges.json
@@ -1988,6 +1990,66 @@ python3 $O evaluate --ladder quality --bundle $B/oracle-ladder-quality-<date>
 python3 $O report --evaluation $L/pyin/evaluation.json --evaluation $L/hnr/evaluation.json \
   --evaluation $L/quality/evaluation.json --output $L/report.json
 ```
+
+### Corpora for the next qualification round
+
+`config/audio-qc-corpora.json` pins the lean set the maintainer chose on 2026-09-29, rendered with
+its licenses, labels and caveats in [audio-qc/corpora.md](audio-qc/corpora.md). Four groups: FLEURS
+train as new, never-scored N1 reserve cohorts (N2 resynthesizes them); speaker-labelled speech for
+class E (CREMA-D, LibriTTS-R dev.clean and test.clean, Multilingual LibriSpeech de, fr, es, it and
+pt, Zeroth-Korean, an AISHELL-3 test subset, Emozionalmente); acted emotion for class H (Thorsten
+emotional v2, EmoDB, JVNV, emoUERJ, RESD, with CREMA-D and Emozionalmente shared); accented English
+for class D (speechocean762). The maintainer runs, in order:
+
+```sh
+python3 scripts/audio_qc_corpora.py plan --set lean      # bytes, destination, free space; no network
+python3 scripts/audio_qc_corpora.py runtime              # the pinned Parquet runtime (PyPI, once)
+python3 scripts/audio_qc_corpora.py fetch --set lean && python3 scripts/audio_qc_corpora.py extract --set lean
+python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of downloads, runtime, extractions
+```
+
+- **Size.** 9,031 files, 28.96 GB to download (plus 7 MB of N1 dev and test TSVs the reserve reads);
+  about 34 GB of WAVs once extracted, most of it Multilingual LibriSpeech (15.7 GB) and
+  Zeroth-Korean (6.1 GB). `plan` compares the need, with the 2 GiB margin, to the free space;
+  `fetch` refuses a selection that does not fit, and each extraction checks its own need first.
+  `--group` and `--source` narrow any command.
+- **Pins and hosts.** Hugging Face files by LFS SHA-256 or git blob SHA-1 at a pinned revision
+  (unofficial mirrors accepted that way, licenses cited from the official source), GitHub LFS
+  content by SHA-256 (the 7,442 CREMA-D WAVs, `config/audio-qc-corpora/crema-d.tsv`), Zenodo
+  archives by the publisher's MD5 and exact size. Downloads reach only huggingface.co and its CDNs,
+  media.githubusercontent.com and zenodo.org, resume with range requests where the host honours
+  them, and move into place only once verified. `corpora-fetch-receipt.json` records each file's
+  SHA-256; for an MD5-pinned file it is recorded on the first verified fetch and checked on every
+  later run. CREMA-D's VideoDemographics.csv (gender) is a plain git file that only
+  raw.githubusercontent.com serves, so it is not fetched and CREMA-D clips carry no gender.
+- **AISHELL-3 subset.** A seeded rule over the pinned test listing: the 76 speakers with at least
+  100 WAVs, 20 WAVs each (lowest SHA-256 of seed and path), resolved to explicit per-WAV pins in
+  `config/audio-qc-corpora/aishell3-test-subset.tsv` by `audio_qc_corpora.py resolve-subset`.
+- **Parquet runtime.** `config/audio-qc-runtimes/corpora-parquet.txt` pins pyarrow, soundfile (its
+  libsndfile decodes the FLAC and Opus cells) and their dependencies with PyPI hashes for CPython
+  3.14 on macOS arm64. It is not a judge runtime: `runtime` builds it with the judge acquisition's
+  own interpreter, hash-locked pip install, RECORD check and import probe, under the same
+  `external-models` root, and `extract` runs `scripts/audio_qc_corpora_worker.py` inside it,
+  offline. The system interpreter needs neither package.
+- **Extraction.** Every clip becomes mono PCM16 WAV at its source's output rate, 16 or 24 kHz (the
+  rates the recording adapter reads): channels averaged, other rates (AISHELL-3 44.1 kHz, JVNV
+  48 kHz, Thorsten 22.05 kHz, part of RESD) resampled with the Kaiser-5 polyphase design of
+  `lib.playback_capture.resample`. Each source gets an untracked `audio-qc-corpus` manifest under
+  `<source>/<revision>/extracted/`: per clip its speaker, gender, emotion (the corpus's label and a
+  canonical name where the registry maps one), accent, pronunciation scores and text where the
+  corpus has them, duration and digests. Identical PCM is kept once with its duplicates listed (the
+  MLS 1-hour set shares speakers with the 9-hour set and may repeat its clips); an undecodable clip
+  is listed as skipped with its reason.
+- **FLEURS reserve cohorts.** Per language, the train recordings the N1 rules mark eligible (a
+  FLoRes sentence id also read in dev or test counts as shared, so it is ineligible) are grouped by
+  sentence; the sentences, in the order of a seeded SHA-256, fill cohort 1 to 400 recordings, then
+  cohort 2 and cohort 3, a sentence belonging to one cohort only. The cohorts are therefore
+  disjoint by sentence from each other and from dev and test (speaker disjointness stays the
+  declared FLEURS limitation). Only the sampled members of each `train.tar.gz` are decoded
+  (`audio_qc_n1_corpus.extract_members`). Each cohort is an `audio-qc-n1-cohort` manifest, split
+  `reserve-<k>`, at `fleurs/<revision>/reserve/<sampling digest>/cohort-<k>/manifest.json`, which
+  the N2 plan and the calibration set take as they take the dev and test cohorts. A language that
+  cannot fill every cohort is reported, not padded.
 
 ### Speech/defect calibration: independent references, no required listening
 

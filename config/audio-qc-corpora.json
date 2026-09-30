@@ -1,0 +1,1338 @@
+{
+  "decisions": [
+    "2026-09-29, maintainer: the lean set (about 29 GB to download).",
+    "Multilingual LibriSpeech is used for anonymous same/different-speaker trials only, never speaker identification.",
+    "A Zenodo source is pinned by the publisher's MD5 and exact size; its SHA-256 is recorded in the fetch receipt on the first verified fetch and binds every later run.",
+    "An unofficial Hugging Face mirror is accepted pinned by revision and LFS SHA-256; its license is cited from the corpus's official source.",
+    "Scope gaps: class E has no acceptable source for Japanese or Russian; class H has none for French, Chinese or Korean, and Spanish is weak and not pinned."
+  ],
+  "description": "The pinned corpora of the next audio QC qualification round (audit sections 5.3 and 5.7): FLEURS train reserve cohorts for N1 and N2, speaker-labelled speech for class E, acted emotion for class H and accented English for class D. Only pins, licenses and attributions are committed; scripts/audio_qc_corpora.py fetches, verifies and extracts into the untracked build/cache/audio-qc-corpora.",
+  "groups": {
+    "accent": {
+      "class": "D",
+      "description": "Class D language: non-native English with expert pronunciation scores, as accented negatives.",
+      "title": "Accented English"
+    },
+    "emotion": {
+      "class": "H",
+      "description": "Class H delivery: actor-labelled emotion; CREMA-D and Emozionalmente come from the speaker group.",
+      "title": "Acted emotion"
+    },
+    "fleurs-train": {
+      "class": "N1",
+      "description": "New, never-scored N1 reserve cohorts from FLEURS train, for N1 and its N2 resynthesis; dev and test stay in config/audio-qc-n1-sources.json.",
+      "title": "FLEURS train reserve"
+    },
+    "speaker": {
+      "class": "E",
+      "description": "Class E identity: same- and different-speaker trials and splice shams.",
+      "title": "Speaker-labelled speech"
+    }
+  },
+  "hosts": [
+    "huggingface.co",
+    "*.hf.co",
+    "*.huggingface.co",
+    "media.githubusercontent.com",
+    "zenodo.org"
+  ],
+  "item": "AQ-07",
+  "kind": "audio-qc-corpora",
+  "parquetRuntime": {
+    "downloadBytes": 51972245,
+    "family": "corpora-parquet",
+    "importProbe": [
+      "pyarrow.parquet",
+      "soundfile",
+      "numpy"
+    ],
+    "kind": "venv",
+    "lock": "config/audio-qc-runtimes/corpora-parquet.txt",
+    "lockSHA256": "a4ac45d5cf090bbb474166925990fdf67cc7163bc8309cc422fbc367ab01b617",
+    "note": "Not a judge runtime: built by scripts/audio_qc_corpora.py runtime with the judge acquisition's interpreter and venv builder, under the same model root.",
+    "packages": 6,
+    "sourceBuilds": [],
+    "venv": "audio-qc-runtime-corpora-parquet-py314"
+  },
+  "schemaVersion": 1,
+  "sets": {
+    "lean": {
+      "description": "Every group: about 29 GB to download.",
+      "groups": [
+        "fleurs-train",
+        "speaker",
+        "emotion",
+        "accent"
+      ]
+    }
+  },
+  "sources": {
+    "aishell3-subset": {
+      "alsoIn": [],
+      "attribution": "AISHELL-3 (Shi et al., 2021, Interspeech), provided by Beijing Shell Shell Technology Co., Ltd., OpenSLR 93, under the Apache License 2.0; read here from the Hugging Face mirror shenyunhang/AISHELL-3. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "An unofficial Hugging Face mirror, pinned by revision and each WAV's LFS SHA-256 (maintainer decision).",
+        "A subset of the test split by the seeded rule in subset: 76 speakers with at least 100 utterances, 20 utterances each (about 0.44 GB).",
+        "44.1 kHz audio, resampled to 24 kHz; the transcripts interleave characters and pinyin, and text keeps the characters."
+      ],
+      "extract": {
+        "estimateBasis": "the pinned WAV bytes (44.1 kHz PCM16) scaled to 24 kHz",
+        "estimatedBytes": 246989789,
+        "format": "wav-files",
+        "members": "^test/wav/(?P<speaker>SSB[0-9]{4})/(?P<id>SSB[0-9]{8})\\.wav$",
+        "metadata": [
+          {
+            "columns": [
+              "speaker",
+              "ageGroup",
+              "gender",
+              "accent"
+            ],
+            "fields": {
+              "accent": "accent",
+              "gender": "gender"
+            },
+            "file": "spk-info.txt",
+            "format": "whitespace",
+            "joinOn": "speaker",
+            "keyColumn": "speaker",
+            "optional": true
+          },
+          {
+            "fields": {
+              "text": "text"
+            },
+            "file": "test/content.txt",
+            "format": "aishell3-content",
+            "joinOn": "sourceID",
+            "optional": true
+          }
+        ],
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "gitBlobSHA1": "33f7b0dfa73f974af34262fe5504049fbe77b567",
+          "path": "spk-info.txt",
+          "role": "metadata",
+          "size": 5029
+        },
+        {
+          "gitBlobSHA1": "80534668ece27a5f0ce7dbbbbd85b8921a438e1a",
+          "path": "test/content.txt",
+          "role": "metadata",
+          "size": 2764898
+        }
+      ],
+      "group": "speaker",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": "spk-info.txt regional accent",
+        "emotion": null,
+        "gender": "spk-info.txt",
+        "pronunciationScores": null,
+        "speaker": "speaker directory",
+        "text": "test/content.txt"
+      },
+      "languages": [
+        "chinese"
+      ],
+      "license": {
+        "id": "Apache-2.0",
+        "source": "https://www.openslr.org/93/",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0"
+      },
+      "pinFile": {
+        "bytes": 453843736,
+        "files": 1520,
+        "path": "config/audio-qc-corpora/aishell3-test-subset.tsv",
+        "sha256": "34a1cfff300868481d5ead90f3a3dfcbb158946aceb5b6b0f9b3d5d6198763bb"
+      },
+      "repository": "shenyunhang/AISHELL-3",
+      "revision": "e1af0fa23933585f1844b3c07b71006f86589bab",
+      "subset": {
+        "directory": "test/wav",
+        "minimumFiles": 100,
+        "perSpeaker": 20,
+        "rule": "Speakers of the pinned revision's test/wav with at least minimumFiles WAVs (76 of 214), each contributing the perSpeaker WAVs of lowest SHA-256(seed NUL path); resolved from the Hub tree listing by `audio_qc_corpora.py resolve-subset` into the pin file.",
+        "seed": "aq07-aishell3-test-subset-v1",
+        "speakers": 76
+      },
+      "title": "AISHELL-3 (test subset)",
+      "totals": {
+        "bytes": 456613663,
+        "files": 1522
+      }
+    },
+    "crema-d": {
+      "alsoIn": [
+        "emotion"
+      ],
+      "attribution": "CREMA-D, the Crowd-sourced Emotional Multimodal Actors Dataset (Cao et al., 2014, IEEE Transactions on Affective Computing 5(4)), by Cheyney University of Pennsylvania and the CREMA-D contributors, under the Open Database License 1.0 with contents under the Database Contents License 1.0. Vocello's audio QC tooling downloads the pinned WAVs into an untracked local cache; no CREMA-D audio or label is redistributed or committed.",
+      "caveats": [
+        "91 actors reading 12 fixed sentences in six acted emotions; the intensity level XX is unspecified.",
+        "Gender and other demographics are in VideoDemographics.csv, a plain git file that media.githubusercontent.com does not serve (it serves LFS content only); it is not fetched, so the clips carry no gender.",
+        "The sentence text is not extracted: each clip carries its sentence code (textID) only."
+      ],
+      "extract": {
+        "estimateBasis": "the pinned WAV bytes (16 kHz mono PCM16, kept as they are)",
+        "estimatedBytes": 605899936,
+        "format": "wav-files",
+        "maps": {
+          "emotion": {
+            "ANG": "angry",
+            "DIS": "disgusted",
+            "FEA": "fearful",
+            "HAP": "happy",
+            "NEU": "neutral",
+            "SAD": "sad"
+          },
+          "intensity": {
+            "HI": "high",
+            "LO": "low",
+            "MD": "medium",
+            "XX": "unspecified"
+          }
+        },
+        "members": "^AudioWAV/(?P<id>(?P<speaker>[0-9]{4})_(?P<textID>[A-Z]{3})_(?P<emotion>[A-Z]{3})_(?P<intensity>[A-Z]{2}))\\.wav$",
+        "outputRate": 16000
+      },
+      "group": "speaker",
+      "host": "media.githubusercontent.com",
+      "labels": {
+        "accent": null,
+        "emotion": "acted emotion and intensity (file name)",
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "actor id (file name)",
+        "text": null
+      },
+      "languages": [
+        "english"
+      ],
+      "license": {
+        "id": "ODbL-1.0 AND DbCL-1.0",
+        "note": "The database is under the Open Database License 1.0 and its contents under the Database Contents License 1.0 (https://opendatacommons.org/licenses/dbcl/1-0/); a derived database shared publicly stays under the ODbL.",
+        "source": "https://github.com/CheyneyComputerScience/CREMA-D/blob/1658cd342dff90010aa843eaeebd53610a08b1dc/LICENSE.txt",
+        "url": "https://opendatacommons.org/licenses/odbl/1-0/"
+      },
+      "pinFile": {
+        "bytes": 605899936,
+        "files": 7442,
+        "path": "config/audio-qc-corpora/crema-d.tsv",
+        "sha256": "76292ac0f82c1b0c9b9bd3415ffcb3e5f670eff426bc50491f9c6c5c01bfd8e7"
+      },
+      "repository": "CheyneyComputerScience/CREMA-D",
+      "revision": "1658cd342dff90010aa843eaeebd53610a08b1dc",
+      "title": "CREMA-D",
+      "totals": {
+        "bytes": 605899936,
+        "files": 7442
+      }
+    },
+    "emodb": {
+      "alsoIn": [],
+      "attribution": "Berlin Database of Emotional Speech (EmoDB; Burkhardt, Paeschke, Kienast, Sendlmeier and Weiss, 2005, Interspeech), Zenodo record 7447302 version 1.3.0 (audformat), under the Creative Commons Attribution 4.0 International license (CC BY 4.0). No audio or label is redistributed or committed.",
+      "caveats": [
+        "10 actors, 7 emotions, 535 utterances kept by a perception test (recognized by more than 80% of listeners and judged natural by more than 60%): prototypical acted emotion, not natural speech.",
+        "No transcript is extracted: each clip carries its sentence code (textID) only. Pinned by Zenodo's MD5 and size; the SHA-256 is recorded on the first verified fetch."
+      ],
+      "extract": {
+        "estimateBasis": "the archive's 16 kHz PCM16 WAVs (about 40 MB) with a 25% margin",
+        "estimatedBytes": 50000000,
+        "format": "zip",
+        "ignore": [
+          "^__MACOSX/",
+          "(^|/)\\._"
+        ],
+        "maps": {
+          "emotion": {
+            "A": "fearful",
+            "E": "disgusted",
+            "F": "happy",
+            "L": "bored",
+            "N": "neutral",
+            "T": "sad",
+            "W": "angry"
+          }
+        },
+        "members": "^emodb/wav/(?P<id>(?P<speaker>[0-9]{2})(?P<textID>[ab][0-9]{2})(?P<emotion>[WLEAFTN])(?P<take>[a-z]))\\.wav$",
+        "metadata": [
+          {
+            "fields": {
+              "gender": "gender"
+            },
+            "format": "csv",
+            "joinOn": "speaker",
+            "keyColumn": "speaker",
+            "keyNormalize": "int",
+            "member": "emodb/db.speaker.csv",
+            "optional": true
+          }
+        ],
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "md5": "9d21362dbc5676ef3ab4745d83ced0db",
+          "path": "emodb.zip",
+          "size": 39981818
+        }
+      ],
+      "group": "emotion",
+      "host": "zenodo.org",
+      "labels": {
+        "accent": null,
+        "emotion": "emotion code (file name)",
+        "gender": "db.speaker.csv",
+        "pronunciationScores": null,
+        "speaker": "actor id (file name)",
+        "text": null
+      },
+      "languages": [
+        "german"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://zenodo.org/records/7447302",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "record": "7447302",
+      "title": "Berlin EmoDB",
+      "totals": {
+        "bytes": 39981818,
+        "files": 1
+      },
+      "version": "1.3.0"
+    },
+    "emouerj": {
+      "alsoIn": [],
+      "attribution": "emoUERJ: an emotional speech database in Portuguese (Bastos Germano, Pompeu Tcheou, da Rocha Henriques and Pinto Gomes Junior, State University of Rio de Janeiro), Zenodo record 5427549 version 1.0.0, under the Creative Commons Attribution 4.0 International license (CC BY 4.0). No audio or label is redistributed or committed.",
+      "caveats": [
+        "Brazilian Portuguese; 8 actors (4 women, 4 men), 377 clips in 4 emotions including neutral.",
+        "Actors chose freely among 10 sentences, so no clip carries its text. Pinned by Zenodo's MD5 and size; the SHA-256 is recorded on the first verified fetch."
+      ],
+      "extract": {
+        "estimateBasis": "the archive's WAV bytes (the Zenodo preview listing), an upper bound once resampled to 24 kHz from a higher rate",
+        "estimatedBytes": 200863000,
+        "format": "zip",
+        "ignore": [
+          "^__MACOSX/",
+          "(^|/)\\._"
+        ],
+        "maps": {
+          "emotion": {
+            "a": "angry",
+            "h": "happy",
+            "n": "neutral",
+            "s": "sad"
+          },
+          "gender": {
+            "m": "male",
+            "w": "female"
+          }
+        },
+        "members": "^emoUERJ/(?P<id>(?P<speaker>(?P<gender>[mw])[0-9]{2})(?P<emotion>[ahns])[0-9]{2})\\.wav$",
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "md5": "7817ccc4cfba39ff85eba0b26a174af8",
+          "path": "emoUERJ.zip",
+          "size": 105084861
+        }
+      ],
+      "group": "emotion",
+      "host": "zenodo.org",
+      "labels": {
+        "accent": null,
+        "emotion": "emotion code (file name)",
+        "gender": "file name",
+        "pronunciationScores": null,
+        "speaker": "actor id (file name)",
+        "text": null
+      },
+      "languages": [
+        "portuguese"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://zenodo.org/records/5427549",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "record": "5427549",
+      "title": "emoUERJ",
+      "totals": {
+        "bytes": 105084861,
+        "files": 1
+      },
+      "version": "1.0.0"
+    },
+    "emozionalmente": {
+      "alsoIn": [
+        "emotion"
+      ],
+      "attribution": "Emozionalmente: a crowdsourced corpus of simulated emotional speech in Italian (F. Catania, J. W. Wilke and F. Garzotto, IEEE Transactions on Audio, Speech and Language Processing 33, 2025, doi:10.1109/TASLPRO.2025.3540662), Zenodo record 12616095 version 1.1, under the Creative Commons Attribution 4.0 International license (CC BY 4.0). No audio or label is redistributed or committed.",
+      "caveats": [
+        "431 amateur actors recorded on non-professional equipment; each clip's emotion is the actor's intended emotion, not a perceived one.",
+        "Pinned by Zenodo's MD5 and size; the SHA-256 is recorded on the first verified fetch.",
+        "The archive carries macOS __MACOSX entries, which are ignored."
+      ],
+      "extract": {
+        "estimateBasis": "6,902 clips of 3.81 s on average (the Zenodo record) of 16 kHz PCM16",
+        "estimatedBytes": 841491840,
+        "format": "zip",
+        "ignore": [
+          "^__MACOSX/",
+          "(^|/)\\._"
+        ],
+        "maps": {
+          "emotion": {
+            "anger": "angry",
+            "disgust": "disgusted",
+            "fear": "fearful",
+            "happiness": "happy",
+            "happy": "happy",
+            "joy": "happy",
+            "neutral": "neutral",
+            "neutrality": "neutral",
+            "sad": "sad",
+            "sadness": "sad",
+            "surprise": "surprised"
+          }
+        },
+        "members": "^emozionalmente/audio/(?P<id>[0-9]+)\\.wav$",
+        "metadata": [
+          {
+            "fields": {
+              "emotion": "emotion_expressed",
+              "speaker": "actor",
+              "text": "sentence"
+            },
+            "format": "csv",
+            "joinOn": "sourceID",
+            "keyColumn": "file_name",
+            "keyNormalize": "stem",
+            "member": "emozionalmente/metadata/samples.csv"
+          },
+          {
+            "fields": {
+              "gender": "gender"
+            },
+            "format": "csv",
+            "joinOn": "speaker",
+            "keyColumn": "username",
+            "member": "emozionalmente/metadata/users.csv",
+            "optional": true
+          }
+        ],
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "md5": "398c6502dd2b0e1e810f927c12897547",
+          "path": "emozionalmente.zip",
+          "size": 558910248
+        }
+      ],
+      "group": "speaker",
+      "host": "zenodo.org",
+      "labels": {
+        "accent": null,
+        "emotion": "metadata/samples.csv emotion_expressed",
+        "gender": "metadata/users.csv",
+        "pronunciationScores": null,
+        "speaker": "metadata/samples.csv actor",
+        "text": "metadata/samples.csv sentence"
+      },
+      "languages": [
+        "italian"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://zenodo.org/records/12616095",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "record": "12616095",
+      "title": "Emozionalmente",
+      "totals": {
+        "bytes": 558910248,
+        "files": 1
+      },
+      "version": "1.1"
+    },
+    "fleurs-train": {
+      "alsoIn": [],
+      "attribution": "FLEURS (Few-shot Learning Evaluation of Universal Representations of Speech; Conneau et al., 2022, arXiv:2205.12446), released by Google as the Hugging Face dataset google/fleurs under the Creative Commons Attribution 4.0 International license (CC BY 4.0). Vocello's audio QC tooling downloads the pinned files into an untracked local cache for detector qualification; no FLEURS audio or transcript is redistributed or committed.",
+      "caveats": [
+        "FLEURS publishes no speaker ids (the N1 limitation fleurs-no-speaker-ids): speaker disjointness between the reserve cohorts and dev or test cannot be verified.",
+        "The reserve cohorts are new and never scored; they stay held back until a qualification round needs a fresh cohort.",
+        "Recordings are 32-bit float WAVs converted to PCM16 by the N1 extractor (audio_qc_n1_corpus decode_wav)."
+      ],
+      "extract": {
+        "cohorts": 3,
+        "estimateBasis": "3 cohorts x 400 recordings x 10 languages at about 14 s of 16 kHz PCM16 each; extract computes the exact need from the TSV sample counts before it writes",
+        "estimatedBytes": 5376000000,
+        "format": "fleurs-reserve",
+        "outputRate": 16000,
+        "perLanguage": 400,
+        "seed": "aq07-fleurs-train-reserve-v1"
+      },
+      "files": [
+        {
+          "gitBlobSHA1": "cd91b0ef2066088e86b938a9eda38d80a0e81f62",
+          "path": "data/en_us/train.tsv",
+          "size": 1414907
+        },
+        {
+          "path": "data/en_us/audio/train.tar.gz",
+          "sha256": "5f4491948c2bd29ac00f4b8afae2378f0a1dcdde4041b5cd284a80dff01fa9f5",
+          "size": 1380572241
+        },
+        {
+          "gitBlobSHA1": "d5b1e63cc0f59127ebfb2555b43458bbb2509252",
+          "path": "data/fr_fr/train.tsv",
+          "size": 2064047
+        },
+        {
+          "path": "data/fr_fr/audio/train.tar.gz",
+          "sha256": "39b5bad1f61d3ae4ef64c2eb16f9524ffb21d8568965dd71b09702befdbd7f95",
+          "size": 1730529959
+        },
+        {
+          "gitBlobSHA1": "0e6cb80a103670130e356bf82e13970f437bbfde",
+          "path": "data/de_de/train.tsv",
+          "size": 1864650
+        },
+        {
+          "path": "data/de_de/audio/train.tar.gz",
+          "sha256": "6708e4052d924a9b18d3f48a7e308d35adff4a0352b1ca26ce21ce0b810ddc11",
+          "size": 1614896315
+        },
+        {
+          "gitBlobSHA1": "7cd40ac17c6d559761df7674bb137d119a6b2d5d",
+          "path": "data/es_419/train.tsv",
+          "size": 1791549
+        },
+        {
+          "path": "data/es_419/audio/train.tar.gz",
+          "sha256": "f832ccb74a59f53ec3bceb77e26826d0516ba6a2e8cd1e9a7f8876615a056985",
+          "size": 1439647524
+        },
+        {
+          "gitBlobSHA1": "341d9dbe339c84b646f8cdaf2287674858de072f",
+          "path": "data/it_it/train.tsv",
+          "size": 1884619
+        },
+        {
+          "path": "data/it_it/audio/train.tar.gz",
+          "sha256": "6a88b1850e27834a8f24d5eb4d94abf14828da822778b029be2fbb61e01d16b4",
+          "size": 1636156015
+        },
+        {
+          "gitBlobSHA1": "cb17e21628c69652e69a31c59a21f0342ba1755a",
+          "path": "data/pt_br/train.tsv",
+          "size": 1638562
+        },
+        {
+          "path": "data/pt_br/audio/train.tar.gz",
+          "sha256": "49c6a02a57576f99bd0e6e51aacebfdea9a0bd2cee146e5d20cdceac56e9be9e",
+          "size": 1805414677
+        },
+        {
+          "gitBlobSHA1": "ad3fbc79df6727f4a168b5bd71ed14eb92cc264d",
+          "path": "data/ru_ru/train.tsv",
+          "size": 2358557
+        },
+        {
+          "path": "data/ru_ru/audio/train.tar.gz",
+          "sha256": "1966e34c17d612317f03916fb45159c793947de77e1988fe76b3b53cf6c40b44",
+          "size": 1427743798
+        },
+        {
+          "gitBlobSHA1": "bec324393c5018fbb00c48021cb4a4b3f56f0250",
+          "path": "data/cmn_hans_cn/train.tsv",
+          "size": 1658957
+        },
+        {
+          "path": "data/cmn_hans_cn/audio/train.tar.gz",
+          "sha256": "812346f79314a46347e1ed481c4948626fa63a6220e511907d1ec5860855df68",
+          "size": 1771862730
+        },
+        {
+          "gitBlobSHA1": "64b0bd4b0d68248cce67bebc82f7fece152e2bec",
+          "path": "data/ja_jp/train.tsv",
+          "size": 1246771
+        },
+        {
+          "path": "data/ja_jp/audio/train.tar.gz",
+          "sha256": "9a67e38bff0077e74dded7c7b735f7958f1d1d2075e330e62f95c9e18deb30a7",
+          "size": 1332680503
+        },
+        {
+          "gitBlobSHA1": "0513d863dbc5515ee233877e27876f072180af07",
+          "path": "data/ko_kr/train.tsv",
+          "size": 1249277
+        },
+        {
+          "path": "data/ko_kr/audio/train.tar.gz",
+          "sha256": "985d45a1ab3967f6851761bac8f7f325360eba3381ffed96f9ce920d3c24e9d9",
+          "size": 1420236944
+        }
+      ],
+      "group": "fleurs-train",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": null,
+        "gender": "TSV gender column",
+        "pronunciationScores": null,
+        "speaker": null,
+        "text": "TSV raw transcription"
+      },
+      "languages": [
+        "english",
+        "french",
+        "german",
+        "spanish",
+        "italian",
+        "portuguese",
+        "russian",
+        "chinese",
+        "japanese",
+        "korean"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://huggingface.co/datasets/google/fleurs",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "google/fleurs",
+      "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+      "title": "FLEURS train (N1 reserve cohorts)",
+      "totals": {
+        "bytes": 15576912602,
+        "files": 20
+      }
+    },
+    "jvnv": {
+      "alsoIn": [],
+      "attribution": "JVNV, a Japanese emotional speech corpus with verbal content and nonverbal vocalizations (Xin, Jiang, Takamichi, Saito, Aizawa and Saruwatari, 2024, IEEE Access), under the Creative Commons Attribution-ShareAlike 4.0 International license (CC BY-SA 4.0); read here from the Hugging Face mirror asahi417/jvnv-emotional-speech-corpus. No audio is redistributed or committed.",
+      "caveats": [
+        "An unofficial Hugging Face mirror, pinned by revision and LFS SHA-256 (maintainer decision); share-alike license.",
+        "4 speakers (F1, F2, M1, M2) in 6 emotions with no neutral style: no neutral baseline. Gender is derived from the speaker id's F or M.",
+        "Utterances embed nonverbal vocalizations by design; this mirror carries no transcript.",
+        "48 kHz 24-bit audio, resampled to 24 kHz."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "emotion": "style",
+          "id": "@audio-path",
+          "speaker": "speaker_id"
+        },
+        "estimateBasis": "14,198 s (datasets-server duration statistics) of 24 kHz PCM16",
+        "estimatedBytes": 681504000,
+        "format": "parquet",
+        "genderFromSpeakerPrefix": {
+          "F": "female",
+          "M": "male"
+        },
+        "maps": {
+          "emotion": {
+            "anger": "angry",
+            "disgust": "disgusted",
+            "fear": "fearful",
+            "happiness": "happy",
+            "happy": "happy",
+            "joy": "happy",
+            "neutral": "neutral",
+            "neutrality": "neutral",
+            "sad": "sad",
+            "sadness": "sad",
+            "surprise": "surprised"
+          }
+        },
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "path": "data/test-00000-of-00005.parquet",
+          "sha256": "e60ecbd079d1817be0b3e94362867768e2a016c5c0d66a824b97f61974c02bd5",
+          "size": 449023740,
+          "split": "test"
+        },
+        {
+          "path": "data/test-00001-of-00005.parquet",
+          "sha256": "c012b5aeb4ebcc5c9b287f0d9082ed586b7dc98e82e829dd295e925dea136df7",
+          "size": 394496599,
+          "split": "test"
+        },
+        {
+          "path": "data/test-00002-of-00005.parquet",
+          "sha256": "ef38610c69004fe704c5b60db79e4c288365aaf48203b99969a4913239a08f77",
+          "size": 377782207,
+          "split": "test"
+        },
+        {
+          "path": "data/test-00003-of-00005.parquet",
+          "sha256": "8254c3b6d4774911db8b28c3a401319f51d42293bd53d4e7e3dda0530546412a",
+          "size": 390570142,
+          "split": "test"
+        },
+        {
+          "path": "data/test-00004-of-00005.parquet",
+          "sha256": "e25e3df2611d1dae8dd2ba59f4b674d6128d88fb143255c5412ed8e0f43b4982",
+          "size": 444074583,
+          "split": "test"
+        }
+      ],
+      "group": "emotion",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": "style column",
+        "gender": "speaker id prefix (F or M)",
+        "pronunciationScores": null,
+        "speaker": "speaker_id column",
+        "text": null
+      },
+      "languages": [
+        "japanese"
+      ],
+      "license": {
+        "id": "CC-BY-SA-4.0",
+        "note": "The license is the official JVNV page's; the mirror's card states none.",
+        "source": "https://sites.google.com/site/shinnosuketakamichi/research-topics/jvnv_corpus",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "repository": "asahi417/jvnv-emotional-speech-corpus",
+      "revision": "3b6c3794754e9e514766e898f69604a0f7417218",
+      "title": "JVNV",
+      "totals": {
+        "bytes": 2055947271,
+        "files": 5
+      }
+    },
+    "libritts-r": {
+      "alsoIn": [],
+      "attribution": "LibriTTS-R (Koizumi et al., 2023, arXiv:2305.18802), the sound-quality-restored LibriTTS corpus (Zen et al., 2019) derived from LibriSpeech and LibriVox, OpenSLR 141, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset mythicinfinity/libritts_r. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "The audio is restored by a speech restoration model (Miipher), not a raw recording: unsuitable as a class A or G signal-quality negative.",
+        "This mirror carries no speaker gender (LibriTTS's SPEAKERS.txt is not in it).",
+        "dev.clean holds 40 speakers and test.clean 39; audio is 24 kHz."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "id": "id",
+          "speaker": "speaker_id",
+          "text": "text_original"
+        },
+        "estimateBasis": "62,877 s (datasets-server duration statistics of dev.clean and test.clean) of 24 kHz PCM16",
+        "estimatedBytes": 3018096000,
+        "format": "parquet",
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "path": "data/dev.clean/dev.clean-00000-of-00004.parquet",
+          "sha256": "9a28bb17d91a289abf81196d95d9bc2de644166d3e95eb81b5c6c4a51aa1c23f",
+          "size": 381946460,
+          "split": "dev.clean"
+        },
+        {
+          "path": "data/dev.clean/dev.clean-00001-of-00004.parquet",
+          "sha256": "1e6518ed09a46dc23de23af5adc565dfd2e3903160403d7e03e9e760dbdaf1ea",
+          "size": 405459531,
+          "split": "dev.clean"
+        },
+        {
+          "path": "data/dev.clean/dev.clean-00002-of-00004.parquet",
+          "sha256": "fec2a5d0b3a07d8bdab2646a51e43b9d21309b3701de3ffd28231d2d336592ff",
+          "size": 383349109,
+          "split": "dev.clean"
+        },
+        {
+          "path": "data/dev.clean/dev.clean-00003-of-00004.parquet",
+          "sha256": "0f19f9f54d91dbe2e3c455de1b8ba4e5a17be5b507717a1c868f6c75cd5517be",
+          "size": 368779639,
+          "split": "dev.clean"
+        },
+        {
+          "path": "data/test.clean/test.clean-00000-of-00003.parquet",
+          "sha256": "a94e1af38e3e10790b37cd792fb57eeb1832f8c6691dfbf3baabcb4b24747b4e",
+          "size": 461645207,
+          "split": "test.clean"
+        },
+        {
+          "path": "data/test.clean/test.clean-00001-of-00003.parquet",
+          "sha256": "5d111396e66a19dc999a8e2676357f88763705aef5ab6e70c1ce3c02785a9cc0",
+          "size": 511740814,
+          "split": "test.clean"
+        },
+        {
+          "path": "data/test.clean/test.clean-00002-of-00003.parquet",
+          "sha256": "6c96a22b34827106240aa2062649967d6601ea8dd184f1d8c333b439bc6ee66a",
+          "size": 498956911,
+          "split": "test.clean"
+        }
+      ],
+      "group": "speaker",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": null,
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "speaker_id column",
+        "text": "text_original column"
+      },
+      "languages": [
+        "english"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://www.openslr.org/141/",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "mythicinfinity/libritts_r",
+      "revision": "0d1718db351207d5a493135a62d5ed8cc4733830",
+      "title": "LibriTTS-R (dev.clean and test.clean)",
+      "totals": {
+        "bytes": 3011877671,
+        "files": 7
+      }
+    },
+    "mls": {
+      "alsoIn": [],
+      "attribution": "Multilingual LibriSpeech (Pratap et al., 2020, arXiv:2012.03411), derived from LibriVox audiobooks, OpenSLR 94, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset facebook/multilingual_librispeech. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "Maintainer decision: anonymous same/different-speaker trials only, never speaker identification.",
+        "Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.",
+        "The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.",
+        "1_hours is a limited-supervision set overlapping 9_hours speakers; identical clips are written once and listed as duplicates.",
+        "This mirror carries no speaker gender."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "id": "id",
+          "speaker": "speaker_id",
+          "text": "transcript"
+        },
+        "estimateBasis": "491,408 s (datasets-server duration statistics of the 20 splits) of 16 kHz PCM16",
+        "estimatedBytes": 15725056000,
+        "format": "parquet",
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "language": "german",
+          "path": "german/dev-00000-of-00001.parquet",
+          "sha256": "4051330ecd71f92d13eac54ea5a5216be531e7ce59d76c96a0a37b42a38a8720",
+          "size": 223322376,
+          "split": "dev"
+        },
+        {
+          "language": "german",
+          "path": "german/test-00000-of-00001.parquet",
+          "sha256": "2453b62d4a506015678f7f6252680621e880aac0d9038ae7bd08e4df26e7efe5",
+          "size": 224781063,
+          "split": "test"
+        },
+        {
+          "language": "german",
+          "path": "german/9_hours-00000-of-00001.parquet",
+          "sha256": "8a757b85d3d1c21465dd1f8c853b1e7aef16bdb52aedf8b425de1917feb080f9",
+          "size": 142227391,
+          "split": "9_hours"
+        },
+        {
+          "language": "german",
+          "path": "german/1_hours-00000-of-00001.parquet",
+          "sha256": "c194f4257c34b3d3d43606952d6924c083df32f85947942975a9314a416ee761",
+          "size": 15655132,
+          "split": "1_hours"
+        },
+        {
+          "language": "french",
+          "path": "french/dev-00000-of-00001.parquet",
+          "sha256": "0cce80b54f458e6fffd92ee06321d553b9c4f80292c1e2ab4ec777d9019ca9df",
+          "size": 157241832,
+          "split": "dev"
+        },
+        {
+          "language": "french",
+          "path": "french/test-00000-of-00001.parquet",
+          "sha256": "118dad8c119d13564464cc2c5d2d4ffaea4f5752f4cb50a589f502e905ede736",
+          "size": 157633503,
+          "split": "test"
+        },
+        {
+          "language": "french",
+          "path": "french/9_hours-00000-of-00001.parquet",
+          "sha256": "ea9e7673f93965a63402f353a92ad6c0d7a7bfbe87057f90937a14f09d3e070d",
+          "size": 142232604,
+          "split": "9_hours"
+        },
+        {
+          "language": "french",
+          "path": "french/1_hours-00000-of-00001.parquet",
+          "sha256": "289811be92a1f41b6d7cc92b342a7d6f6839a78f54ad6bcbaf9e10e034d8b554",
+          "size": 15616007,
+          "split": "1_hours"
+        },
+        {
+          "language": "spanish",
+          "path": "spanish/dev-00000-of-00001.parquet",
+          "sha256": "f0ae1ca05f1c5cf40b57177c50c72683b6069705a7fa598e9d5fcc4fbab576c8",
+          "size": 157102675,
+          "split": "dev"
+        },
+        {
+          "language": "spanish",
+          "path": "spanish/test-00000-of-00001.parquet",
+          "sha256": "ffc32cb4a2d015c9b812a3c1dab3b60d4ea3fd01e3c3f8c9631fd51b730c99f3",
+          "size": 157823544,
+          "split": "test"
+        },
+        {
+          "language": "spanish",
+          "path": "spanish/9_hours-00000-of-00001.parquet",
+          "sha256": "c3a527bcaef277f1ba783d77c84a19af66c6eee1d986a27398a32100bd68f930",
+          "size": 141955854,
+          "split": "9_hours"
+        },
+        {
+          "language": "spanish",
+          "path": "spanish/1_hours-00000-of-00001.parquet",
+          "sha256": "d0a15a694ec72effa51c9679e5f53a758617d1098eafd81c6e3dc32bc09cc2a9",
+          "size": 15650421,
+          "split": "1_hours"
+        },
+        {
+          "language": "italian",
+          "path": "italian/dev-00000-of-00001.parquet",
+          "sha256": "2d24248d2a2e5982716f800e67a6c682b249317df53d30f0c70514773e6bd9c3",
+          "size": 81273318,
+          "split": "dev"
+        },
+        {
+          "language": "italian",
+          "path": "italian/test-00000-of-00001.parquet",
+          "sha256": "8d77c34025a4735fe18330495cf8d36ac6bc68aa66789630ee3f532e61d771dd",
+          "size": 82876885,
+          "split": "test"
+        },
+        {
+          "language": "italian",
+          "path": "italian/9_hours-00000-of-00001.parquet",
+          "sha256": "80d335849eccddae6c835c60418bae9f5c3cbf52643c36a37b83e2ba4e31cd4b",
+          "size": 141141537,
+          "split": "9_hours"
+        },
+        {
+          "language": "italian",
+          "path": "italian/1_hours-00000-of-00001.parquet",
+          "sha256": "49e2bce988e66d1a736a8881645a49182ad53392a81f853aa56dd54be2c88479",
+          "size": 15502683,
+          "split": "1_hours"
+        },
+        {
+          "language": "portuguese",
+          "path": "portuguese/dev-00000-of-00001.parquet",
+          "sha256": "1c4fe3c49acea4cf098e092647e5b32b13d3062eb85ca64230f8b18e997e7185",
+          "size": 57289878,
+          "split": "dev"
+        },
+        {
+          "language": "portuguese",
+          "path": "portuguese/test-00000-of-00001.parquet",
+          "sha256": "73317666498b6889851a72bea52b116c4744691dda4c8e66b8bd98af0496ba90",
+          "size": 58871912,
+          "split": "test"
+        },
+        {
+          "language": "portuguese",
+          "path": "portuguese/9_hours-00000-of-00001.parquet",
+          "sha256": "3f9c1167e2480a6b1bde427b6152e09fd167dd247f1b8a085ff9db125499f9bc",
+          "size": 141091639,
+          "split": "9_hours"
+        },
+        {
+          "language": "portuguese",
+          "path": "portuguese/1_hours-00000-of-00001.parquet",
+          "sha256": "6d40c867c80df7755e7775ffe877d0aca628fb4668d026e47d6f9b061c353091",
+          "size": 15636528,
+          "split": "1_hours"
+        }
+      ],
+      "group": "speaker",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": null,
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "speaker_id column",
+        "text": "transcript column"
+      },
+      "languages": [
+        "german",
+        "french",
+        "spanish",
+        "italian",
+        "portuguese"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://www.openslr.org/94/",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "facebook/multilingual_librispeech",
+      "revision": "2e83e61823b4c47dcbcb1980bb88601274127609",
+      "title": "Multilingual LibriSpeech (de, fr, es, it, pt: dev, test, 9_hours, 1_hours)",
+      "totals": {
+        "bytes": 2144926782,
+        "files": 20
+      }
+    },
+    "resd": {
+      "alsoIn": [],
+      "attribution": "RESD, the Russian Emotional Speech Dialogs dataset of the Aniemore project (Lubenets, Davidchuk, Amentes and others), the Hugging Face dataset Aniemore/resd, under the MIT license its card states. No audio is redistributed or committed.",
+      "caveats": [
+        "The license is stated only on the dataset card (recorded as a caveat).",
+        "No speaker id column: the clips carry no speaker, so RESD serves class H only, never class E.",
+        "Mixed 16 and 44.1 kHz audio, resampled to 16 kHz; enthusiasm has no canonical emotion."
+      ],
+      "extract": {
+        "audioColumn": "speech",
+        "columns": {
+          "emotion": "emotion",
+          "id": "name"
+        },
+        "estimateBasis": "8,430 s (datasets-server duration statistics) of 16 kHz PCM16",
+        "estimatedBytes": 269760000,
+        "format": "parquet",
+        "maps": {
+          "emotion": {
+            "anger": "angry",
+            "disgust": "disgusted",
+            "fear": "fearful",
+            "happiness": "happy",
+            "happy": "happy",
+            "joy": "happy",
+            "neutral": "neutral",
+            "neutrality": "neutral",
+            "sad": "sad",
+            "sadness": "sad",
+            "surprise": "surprised"
+          }
+        },
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "path": "data/test-00000-of-00001-5b28f46e6b0805ba.parquet",
+          "sha256": "05b4cec0eb7f2f2a51fa7ad9d08d8cfc6bbc2ef9b0987254acfa88d5c39c521d",
+          "size": 94631750,
+          "split": "test"
+        },
+        {
+          "path": "data/train-00000-of-00001-d2e27fcc104fa56a.parquet",
+          "sha256": "711e9dd676646a3e788b5e03b7700af5e2ffcf1600243ad9f50e1fffd2415add",
+          "size": 390835482,
+          "split": "train"
+        }
+      ],
+      "group": "emotion",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": "emotion column",
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": null,
+        "text": null
+      },
+      "languages": [
+        "russian"
+      ],
+      "license": {
+        "id": "MIT",
+        "note": "MIT is stated only on the Hugging Face dataset card; no other primary source states it.",
+        "source": "https://huggingface.co/datasets/Aniemore/resd",
+        "url": "https://opensource.org/license/mit"
+      },
+      "repository": "Aniemore/resd",
+      "revision": "8db7068a7717e48d829c2baa32e4908972611138",
+      "title": "RESD (Russian Emotional Speech Dialogs)",
+      "totals": {
+        "bytes": 485467232,
+        "files": 2
+      }
+    },
+    "speechocean762": {
+      "alsoIn": [],
+      "attribution": "speechocean762, an open-source non-native English speech corpus for pronunciation assessment (Zhang et al., 2021, Interspeech), by SpeechOcean and Xiaomi, OpenSLR 101, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset mispeech/speechocean762. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "Every speaker is a Mandarin L1 speaker of English (250 speakers, children and adults): the accent is a constant, not a per-clip label.",
+        "Scores are sentence-level expert scores (accuracy, completeness, fluency, prosodic, total)."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "gender": "gender",
+          "id": "@audio-path",
+          "speaker": "speaker",
+          "text": "text"
+        },
+        "constants": {
+          "accent": "mandarin-l1"
+        },
+        "estimateBasis": "20,043 s (datasets-server duration statistics) of 16 kHz PCM16",
+        "estimatedBytes": 641376000,
+        "format": "parquet",
+        "outputRate": 16000,
+        "scores": [
+          "accuracy",
+          "completeness",
+          "fluency",
+          "prosodic",
+          "total"
+        ]
+      },
+      "files": [
+        {
+          "path": "data/test-00000-of-00001.parquet",
+          "sha256": "c951056c8bbc52f776b571c0d02f46b6753f49774a8526f130fcf89400736e98",
+          "size": 311543671,
+          "split": "test"
+        },
+        {
+          "path": "data/train-00000-of-00001.parquet",
+          "sha256": "b06fe00f49d2c02c7239677714c68502706e914e029bc01d8e8c6c52416326a7",
+          "size": 332843486,
+          "split": "train"
+        }
+      ],
+      "group": "accent",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": "Mandarin L1 (constant)",
+        "emotion": null,
+        "gender": "gender column",
+        "pronunciationScores": "sentence-level expert scores",
+        "speaker": "speaker column",
+        "text": "text column"
+      },
+      "languages": [
+        "english"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "note": "The Hugging Face card says apache-2.0; OpenSLR 101 says CC BY 4.0. Both allow commercial use.",
+        "source": "https://www.openslr.org/101/",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "mispeech/speechocean762",
+      "revision": "06385584fad212b26134c656fdd3ccf9f093f33e",
+      "title": "speechocean762",
+      "totals": {
+        "bytes": 644387157,
+        "files": 2
+      }
+    },
+    "thorsten-emotional": {
+      "alsoIn": [],
+      "attribution": "Thorsten-Voice Dataset 2021.06 emotional (Thorsten Müller, voice; Dominik Kreutz, audio optimization), Zenodo record 5525023 version 2.0 and OpenSLR 110, released under CC0 1.0. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "Denoised, normalized to -24 dB and trimmed of leading and trailing silence (the end of a sentence may be cut off early): unsuitable as a class C boundary or silence negative.",
+        "One speaker, 300 sentences in 8 styles; drunk, sleepy and whisper have no canonical emotion.",
+        "22.05 kHz audio, resampled to 24 kHz. Pinned by Zenodo's MD5 and size; the SHA-256 is recorded on the first verified fetch."
+      ],
+      "extract": {
+        "constants": {
+          "gender": "male",
+          "speaker": "thorsten"
+        },
+        "estimateBasis": "about 175 minutes (the Zenodo record's per-style lengths) of 24 kHz PCM16",
+        "estimatedBytes": 504000000,
+        "format": "tar.gz",
+        "idTemplate": "{emotion}-{textID}",
+        "ignore": [
+          "^__MACOSX/",
+          "(^|/)\\._"
+        ],
+        "maps": {
+          "emotion": {
+            "amused": "happy",
+            "angry": "angry",
+            "disgusted": "disgusted",
+            "neutral": "neutral",
+            "surprised": "surprised"
+          }
+        },
+        "members": "^thorsten-emotional_v02/(?P<emotion>[a-z]+)/(?P<textID>[0-9a-f]{32})\\.wav$",
+        "metadata": [
+          {
+            "fields": {
+              "text": 1
+            },
+            "format": "pipe",
+            "joinOn": "textID",
+            "keyColumn": 0,
+            "member": "thorsten-emotional_v02/thorsten-emotional-metadata.csv",
+            "optional": true
+          }
+        ],
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "md5": "f19585f3759c6d026757c46024a37aa4",
+          "path": "thorsten-emotional_v02.tgz",
+          "size": 399301812
+        }
+      ],
+      "group": "emotion",
+      "host": "zenodo.org",
+      "labels": {
+        "accent": null,
+        "emotion": "style directory",
+        "gender": "one speaker (constant)",
+        "pronunciationScores": null,
+        "speaker": "one speaker (constant)",
+        "text": "thorsten-emotional-metadata.csv"
+      },
+      "languages": [
+        "german"
+      ],
+      "license": {
+        "id": "CC0-1.0",
+        "note": "OpenSLR 110 and the Zenodo record's description say CC0; the Zenodo record's license field says CC-BY-4.0. Both are recorded, and the attribution is given either way.",
+        "source": "https://www.openslr.org/110/",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+      },
+      "record": "5525023",
+      "title": "Thorsten-Voice 2021.06 emotional (v2)",
+      "totals": {
+        "bytes": 399301812,
+        "files": 1
+      },
+      "version": "2.0"
+    },
+    "zeroth-korean": {
+      "alsoIn": [],
+      "attribution": "Zeroth-Korean, the Korean speech corpus of the Zeroth project (Lucas Jo, Wonkyum Lee and Atlas Guide), OpenSLR 40, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face mirror kresnik/zeroth_korean. No audio or transcript is redistributed or committed.",
+      "caveats": [
+        "An unofficial Hugging Face mirror, pinned by revision and LFS SHA-256 (maintainer decision).",
+        "test holds 10 speakers and train 105; this mirror carries no speaker gender."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "id": "id",
+          "speaker": "speaker_id",
+          "text": "text"
+        },
+        "estimateBasis": "190,334 s (datasets-server duration statistics) of 16 kHz PCM16",
+        "estimatedBytes": 6090688000,
+        "format": "parquet",
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "path": "data/test-00000-of-00001.parquet",
+          "sha256": "2f6382b902622ede1bf35e5a167a9b06b0f1b8c896e1947324b8b5180fca7502",
+          "size": 59847930,
+          "split": "test"
+        },
+        {
+          "path": "data/train-00000-of-00006.parquet",
+          "sha256": "6801a64e3f5c9b49bedfffc41733dfceffbf822237ac9cd70c9687944a685943",
+          "size": 499070876,
+          "split": "train"
+        },
+        {
+          "path": "data/train-00001-of-00006.parquet",
+          "sha256": "5f189248aed0befdecea9fb3cd843d18819419acfbe2be32fcc61af94360b64b",
+          "size": 470691683,
+          "split": "train"
+        },
+        {
+          "path": "data/train-00002-of-00006.parquet",
+          "sha256": "b7f7b4cdd57af262313485bd41c454f575509ef4eba17240f2078033693b2069",
+          "size": 444033028,
+          "split": "train"
+        },
+        {
+          "path": "data/train-00003-of-00006.parquet",
+          "sha256": "7b1cc68d924b52d9f7ea938fa3d65ba3d8e7bb81d0149b10f06f89e8d39261a5",
+          "size": 481254881,
+          "split": "train"
+        },
+        {
+          "path": "data/train-00004-of-00006.parquet",
+          "sha256": "f679e7f963e6cf4911c45ac68c4e67be12df73b63d889ebd9373d4af18fcbe91",
+          "size": 459642792,
+          "split": "train"
+        },
+        {
+          "path": "data/train-00005-of-00006.parquet",
+          "sha256": "7c31d0628a6bd0d6624d4bd1505052579a72eec99842e9e526fe1b1c89f6c1ec",
+          "size": 462471629,
+          "split": "train"
+        }
+      ],
+      "group": "speaker",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": null,
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "speaker_id column",
+        "text": "text column"
+      },
+      "languages": [
+        "korean"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://www.openslr.org/40/",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "kresnik/zeroth_korean",
+      "revision": "1fe937899f828af822293d05e086200946088bdf",
+      "title": "Zeroth-Korean (test and train)",
+      "totals": {
+        "bytes": 2877012819,
+        "files": 7
+      }
+    }
+  },
+  "totals": {
+    "bytes": 28962323872,
+    "files": 9031,
+    "groups": {
+      "accent": {
+        "bytes": 644387157,
+        "files": 2
+      },
+      "emotion": {
+        "bytes": 3085782994,
+        "files": 10
+      },
+      "fleurs-train": {
+        "bytes": 15576912602,
+        "files": 20
+      },
+      "speaker": {
+        "bytes": 9655241119,
+        "files": 8999
+      }
+    }
+  }
+}

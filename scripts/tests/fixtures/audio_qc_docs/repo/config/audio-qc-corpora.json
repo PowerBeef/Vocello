@@ -1,0 +1,189 @@
+{
+  "decisions": [
+    "Fixture decision: the lean set only."
+  ],
+  "description": "Fixture corpora: one Hub mirror and one Zenodo archive.",
+  "groups": {
+    "accent": {
+      "class": "D",
+      "description": "Fixture accented speech.",
+      "title": "Accented English"
+    },
+    "emotion": {
+      "class": "H",
+      "description": "Fixture acted emotion.",
+      "title": "Acted emotion"
+    },
+    "fleurs-train": {
+      "class": "N1",
+      "description": "Fixture reserve cohorts.",
+      "title": "FLEURS train reserve"
+    },
+    "speaker": {
+      "class": "E",
+      "description": "Fixture speaker-labelled speech.",
+      "title": "Speaker-labelled speech"
+    }
+  },
+  "hosts": [
+    "huggingface.co",
+    "*.hf.co",
+    "*.huggingface.co",
+    "media.githubusercontent.com",
+    "zenodo.org"
+  ],
+  "item": "AQ-07",
+  "kind": "audio-qc-corpora",
+  "parquetRuntime": {
+    "downloadBytes": 52000000,
+    "family": "corpora-parquet",
+    "importProbe": [
+      "pyarrow.parquet",
+      "soundfile"
+    ],
+    "kind": "venv",
+    "lock": "config/audio-qc-runtimes/corpora-parquet.txt",
+    "lockSHA256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "note": "Fixture runtime.",
+    "packages": 6,
+    "sourceBuilds": [],
+    "venv": "audio-qc-runtime-corpora-parquet-py314"
+  },
+  "schemaVersion": 1,
+  "sets": {
+    "lean": {
+      "description": "Every group.",
+      "groups": [
+        "fleurs-train",
+        "speaker",
+        "emotion",
+        "accent"
+      ]
+    }
+  },
+  "sources": {
+    "emo-archive": {
+      "alsoIn": [],
+      "attribution": "Fixture emotion archive, attributed to its fixture authors under CC BY 4.0.",
+      "caveats": [
+        "Pinned by Zenodo's MD5 and size."
+      ],
+      "extract": {
+        "estimateBasis": "fixture estimate",
+        "estimatedBytes": 20000000,
+        "format": "zip",
+        "members": "^set/(?P<id>(?P<speaker>[a-z])(?P<emotion>[ah]))\\.wav$",
+        "outputRate": 24000
+      },
+      "files": [
+        {
+          "md5": "0123456789abcdef0123456789abcdef",
+          "path": "set.zip",
+          "size": 15000000
+        }
+      ],
+      "group": "emotion",
+      "host": "zenodo.org",
+      "labels": {
+        "accent": null,
+        "emotion": "file name",
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "file name",
+        "text": null
+      },
+      "languages": [
+        "german"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "source": "https://zenodo.org/records/1",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "record": "1",
+      "title": "Fixture emotion archive",
+      "totals": {
+        "bytes": 15000000,
+        "files": 1
+      },
+      "version": "1.0"
+    },
+    "hub-mirror": {
+      "alsoIn": [
+        "emotion"
+      ],
+      "attribution": "Fixture Hub mirror, attributed to its fixture authors under CC BY 4.0.",
+      "caveats": [
+        "An unofficial mirror.",
+        "No gender."
+      ],
+      "extract": {
+        "audioColumn": "audio",
+        "columns": {
+          "id": "id",
+          "speaker": "speaker_id"
+        },
+        "estimateBasis": "fixture estimate",
+        "estimatedBytes": 3000000000,
+        "format": "parquet",
+        "outputRate": 16000
+      },
+      "files": [
+        {
+          "path": "data/test-00000-of-00001.parquet",
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "size": 1500000000,
+          "split": "test"
+        }
+      ],
+      "group": "speaker",
+      "host": "huggingface.co",
+      "labels": {
+        "accent": null,
+        "emotion": null,
+        "gender": null,
+        "pronunciationScores": null,
+        "speaker": "speaker_id column",
+        "text": null
+      },
+      "languages": [
+        "english"
+      ],
+      "license": {
+        "id": "CC-BY-4.0",
+        "note": "Fixture note.",
+        "source": "https://example.org/corpus",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "repository": "owner/corpus",
+      "revision": "0123456789abcdef0123456789abcdef01234567",
+      "title": "Fixture Hub mirror",
+      "totals": {
+        "bytes": 1500000000,
+        "files": 1
+      }
+    }
+  },
+  "totals": {
+    "bytes": 1515000000,
+    "files": 2,
+    "groups": {
+      "accent": {
+        "bytes": 0,
+        "files": 0
+      },
+      "emotion": {
+        "bytes": 15000000,
+        "files": 1
+      },
+      "fleurs-train": {
+        "bytes": 0,
+        "files": 0
+      },
+      "speaker": {
+        "bytes": 1500000000,
+        "files": 1
+      }
+    }
+  }
+}

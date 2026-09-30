@@ -195,6 +195,10 @@ enum BenchCommand {
             try await BenchCodecRoundTrip.run(args)
             return
         }
+        if args.string("codec-loop") != nil || args.flag("codec-loop") {
+            try await BenchCodecLoop.run(args)
+            return
+        }
 
         // Invariant: the filename length token is derived via the same lenBucket
         // the summarizer uses, so producer and consumer agree by construction.
@@ -1778,6 +1782,12 @@ enum BenchCommand {
                          digest-bound mono PCM16 24 kHz WAVs through the installed
                          Voice Cloning Speed model's speech tokenizer on one model
                          load. Requires QWENVOICE_DEBUG=1; no synthesis or publication.
+          --codec-loop <job.json> --output-dir <new-directory>: internal
+                         diagnostics only (audio QC COD-LOOP, T2); repeat a span of
+                         each job trace's codec frames per its recipe and decode it
+                         through the --codec-replay full arm on the installed
+                         CustomVoice Speed model (output limiter, then publication
+                         marking). Requires QWENVOICE_DEBUG=1; no synthesis or publication.
           --quiet|--verbose   suppress / expand stderr progress notes
         """)
     }

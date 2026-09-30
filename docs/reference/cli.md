@@ -214,6 +214,13 @@ compatible. There is no automatic retry, seed substitution, or implicit resume. 
 language per text and non-streaming output; `--language`, `--stream`, and `--out` are rejected
 instead of silently ignored (use `generate` or batch `--out-dir`).
 
+The bare `--capture-codec-trace` flag (internal-diagnostics binaries with `QWENVOICE_DEBUG=1` and
+telemetry on, short-form batches only) asks the engine for each take's codec trace. Under a
+registered run id (`QVOICE_MAC_BENCH_RUN_ID`) the engine keeps it beside its diagnostics as
+codec-trace v1 and records its digest in the take's engine row; sampling and output are unchanged.
+`scripts/macos_test.sh qc-takes` passes it, and the audio QC class I positives are built from those
+traces (see [`audio-qc-engineering.md`](audio-qc-engineering.md), Class I positives).
+
 ### `voices` — manage saved clone voices
 
 ```sh
@@ -398,6 +405,19 @@ tokenizer (audio QC population N2), on one model load. Like the replay, it needs
 internal-diagnostics binary and `QWENVOICE_DEBUG=1`, binds the model to the pinned catalog bytes and
 refuses an existing output directory. `scripts/macos_test.sh qc-n2` writes the job and binds the
 result; see [`audio-qc-engineering.md`](audio-qc-engineering.md) (Codec resynthesis).
+
+### Codec loop (internal diagnostics only)
+
+`bench --codec-loop <job.json> --output-dir <new-untracked-directory>` builds the audio QC COD-LOOP
+positives (tier T2): each job item names a recorded codec trace by digest and one loop recipe (a span
+of frames repeated right after itself, or the untouched trace as the sham). It verifies every trace
+and recipe before loading, binds the installed CustomVoice Speed model to the pinned catalog bytes,
+writes each mutated trace, decodes it through the codec replay's full arm (the production
+non-streaming 25-frame schedule) and writes the PCM16 through the production output limiter, then
+applies the publication marking once the model is unloaded. Like the replay, it needs an
+internal-diagnostics binary and `QWENVOICE_DEBUG=1` with telemetry on, and refuses an existing output
+directory. `scripts/macos_test.sh qc-introspection` writes the job and binds the result; see
+[`audio-qc-engineering.md`](audio-qc-engineering.md) (Class I positives).
 
 ## Examples
 

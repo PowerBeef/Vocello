@@ -7,11 +7,14 @@ import QwenVoiceCore
 enum CLIBatchExecution {
     /// Batch bookkeeping belongs to the CLI. Each request uses the ordinary
     /// single-take API; do not attach engine batch-only fields here.
+    /// `captureCodecTrace` (`--capture-codec-trace`, internal diagnostics only)
+    /// asks the engine for each take's bounded codec trace; it changes no
+    /// sampled code or published sample.
     static func makeRequests(
         lines: [String], mode: GenerationMode, modelID: String,
         outputDirectory: URL, filenamePrefix: String,
         payload: GenerationRequest.Payload, seed: UInt64?, variation: Qwen3SamplingVariation?,
-        deliveryInstructionCellID: String?
+        deliveryInstructionCellID: String?, captureCodecTrace: Bool = false
     ) -> [GenerationRequest] {
         lines.enumerated().map { index, text in
             let name = "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index)).wav"
@@ -20,6 +23,7 @@ enum CLIBatchExecution {
                 outputPath: outputDirectory.appendingPathComponent(name).path,
                 shouldStream: false,
                 payload: payload, generationID: UUID(), seed: seed, variation: variation,
+                captureCodecTrace: captureCodecTrace ? true : nil,
                 deliveryInstructionCellID: deliveryInstructionCellID
             )
         }

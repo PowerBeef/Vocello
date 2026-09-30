@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "mutatedFrameCount": 40,
+      "mutatedTraceSHA256": "76cda6262fe8d1a0633cb7c43810c5644553bb8782c995bf8bbfba57471113f9",
+      "recipe": {
+        "extraCopies": 0,
+        "injector": "COD-LOOP@1",
+        "spanFrames": 0,
+        "startFrame": 0,
+        "variant": "sham"
+      }
+    },
+    {
+      "mutatedFrameCount": 44,
+      "mutatedTraceSHA256": "8f2a1b424da0a91addc9e76d4a5682977b01f351e7947759e0fd50d27bf5034b",
+      "recipe": {
+        "extraCopies": 1,
+        "injector": "COD-LOOP@1",
+        "spanFrames": 4,
+        "startFrame": 8,
+        "variant": "mild"
+      }
+    },
+    {
+      "mutatedFrameCount": 52,
+      "mutatedTraceSHA256": "b8772b872f73296d9b262bddf3ee435aa100a28144e8d74c0e4eca25cd4ea78a",
+      "recipe": {
+        "extraCopies": 1,
+        "injector": "COD-LOOP@1",
+        "spanFrames": 12,
+        "startFrame": 8,
+        "variant": "moderate"
+      }
+    },
+    {
+      "mutatedFrameCount": 72,
+      "mutatedTraceSHA256": "6e2cb32a8d598ddebe6f9de48f84313211a97407d20aa1a5ce5cb56a092b3c8e",
+      "recipe": {
+        "extraCopies": 1,
+        "injector": "COD-LOOP@1",
+        "spanFrames": 32,
+        "startFrame": 4,
+        "variant": "severe"
+      }
+    }
+  ],
+  "frameCount": 40,
+  "note": "COD-LOOP@1 parity: scripts/lib/qc_qualification/codec_trace.py (test_audio_qc_introspection_positives.py) and CodecLoopMutationEvidence (CodecLoopMutationEvidenceTests) make these mutated traces from these frames. Frame f, codebook c holds (7f + 13c + (f * c mod 5)) mod its codebook size (4096 for codebook 0, else 2048).",
+  "schemaVersion": 1,
+  "sourceTraceSHA256": "76cda6262fe8d1a0633cb7c43810c5644553bb8782c995bf8bbfba57471113f9"
+}

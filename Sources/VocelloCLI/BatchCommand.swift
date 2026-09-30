@@ -113,6 +113,25 @@ enum BatchCommand {
         if let value = args.string("app-delivery") {
             throw CLIError("--app-delivery takes no value (got \"\(value)\"): pass the bare flag --app-delivery")
         }
+        if let value = args.string("capture-codec-trace") {
+            throw CLIError(
+                "--capture-codec-trace takes no value (got \"\(value)\"): pass the bare flag --capture-codec-trace"
+            )
+        }
+        let captureCodecTrace = args.flag("capture-codec-trace")
+        if captureCodecTrace {
+            // The engine persists each take's trace only for a registered run
+            // identity with telemetry on; refuse rather than silently keep none.
+            guard RuntimeDebugGate.isEnabled(), TelemetryGate.resolvedEnabled else {
+                throw CLIError(
+                    "--capture-codec-trace requires an internal-diagnostics build, QWENVOICE_DEBUG=1 "
+                        + "and telemetry that is not explicitly off."
+                )
+            }
+            guard !args.flag("long-form") else {
+                throw CLIError("--capture-codec-trace applies to short-form batches only (not --long-form)")
+            }
+        }
 
         let mode = try GenerateCommand.resolveMode(args)
         let quality = try GenerateCommand.resolveQuality(args)
@@ -166,7 +185,7 @@ enum BatchCommand {
         let requests = CLIBatchExecution.makeRequests(
             lines: lines, mode: mode, modelID: modelID, outputDirectory: outDir,
             filenamePrefix: stamp, payload: payload, seed: seed, variation: variation,
-            deliveryInstructionCellID: deliveryInstructionCellID
+            deliveryInstructionCellID: deliveryInstructionCellID, captureCodecTrace: captureCodecTrace
         )
 
         note("loading \(modelID)…")
@@ -463,6 +482,11 @@ enum BatchCommand {
                          seed), each segment a streaming take, joined by the bounded
                          assembler; only the engine's per-segment Fast QC applies; the
                          JSON adds each project's segments and assembly evidence
+          --capture-codec-trace  internal diagnostics only (QWENVOICE_DEBUG=1, telemetry
+                         on, short-form): the engine keeps each take's codec trace
+                         (codec-trace v1) beside its diagnostics when the run names a
+                         bench run id (QVOICE_MAC_BENCH_RUN_ID); its engine row records
+                         the trace digest. Sampling and output are unchanged.
           --play         play each result with afplay when done
           --json         emit a JSON summary on stdout instead of one path per line
           --quiet|--verbose   suppress / expand stderr progress notes

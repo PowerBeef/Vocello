@@ -17,6 +17,54 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 30, later — the whole harness is built; the batched round waits on data
+
+Parallel worktree agents built the rest of the plan, and the lead integrated it with reviews and CI.
+
+**Detectors.** Classes E, F, I and J landed (12 warn detectors), along with v2 of the signal-chain
+detectors (pooled, reading exact digital silence), clipping (flat tops), content and run-on, and
+`language.nativeness@1`.
+
+**Pipeline and data plumbing.**
+- Injector catalog v3.
+- The generalized driver: speaker-labelled and N3 role sets, P2/P3, fail level, raw outputs.
+- AQ-08 oracle ladders.
+- The AQ-09 generated reference tree and lane-gating contract.
+- The pinned corpora fetcher: the lean ~29 GB set, extraction capped per speaker, gender from MLS and
+  CREMA-D metadata.
+- Take plan v2 (clone, cross-lingual, long-form cells), with `vocello batch --long-form` and
+  `--app-delivery`.
+
+**Fixes found on the way.**
+- The harness generated Design and Custom takes uninstructed, while the apps send the Neutral preset
+  instruction.
+- Cleanup's lsof checks never detected a busy tree.
+- Exports read a pruned cache as empty.
+- A git-maintenance race in a test fixture.
+
+**Maintainer decisions (2026-09-30).**
+- The lean corpora set.
+- MLS use.
+- MD5 and mirror pins.
+- Corpus voices as internal-only clone references.
+- Content v2 averaging at warn.
+- speechocean762 T4 scores as nativeness positives.
+
+**In flight.** One agent is on reserve-cohort role sets, the nativeness cohort builder, the SIG-CLIP
+schedule, stale-prose cleanup and the run sheet.
+
+**Then, in order.**
+1. The maintainer runs `python3 scripts/audio_qc_corpora.py runtime`, then `fetch --set lean`, then
+   `extract --set lean`.
+2. qc-n2 over the reserve cohorts, the speaker corpora and speechocean762.
+3. qc-takes v2 on both splits (about 3.5 h).
+4. The panels and plans.
+5. One batched confirmation.
+6. Lane gating.
+
+**Deferred.** The Parakeet and VoxLingua per-chunk memory growth (envelope breaches) waits for the
+next judge requalification, because the worker sources are part of the judges' output identity.
+
 ### September 30 — AQ-07 warn level confirmed: 8 qualified, 3 refused; the harness comes first
 
 The maintainer made the audio-QC plan primary: finish the whole harness before release work. They

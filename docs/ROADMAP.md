@@ -38,18 +38,18 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `AQ-07` | in-flight | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
-| `AQ-08` | planned | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
-| `AQ-09` | planned | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |
+| `AQ-08` | in-flight | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
+| `AQ-09` | in-flight | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |
 
 ### Open items in detail
 
 - **`AQ-07`** (in-flight) — Detector qualification and lane gating sets.
   gate: Calibration records meeting A8 for detector classes A-D (then E, I, J) in declared scopes; correlated-failure audits recorded; the language bench gates on B, C and D and publishes two-family records; the clone lane gates on E.
 
-- **`AQ-08`** (planned) — Prosody, delivery and advisory quality rebuild.
+- **`AQ-08`** (in-flight) — Prosody, delivery and advisory quality rebuild.
   gate: pYIN and HNR pass the oracle ladders; prosody flags are replaced by class F detectors; class H warns at cell level only; the Audiobox and DNSMOS composite passes its ladder test; the DP-31/DP-32 guardrails cite only qualified judges.
 
-- **`AQ-09`** (planned) — Audio QC documentation and generated accuracy report.
+- **`AQ-09`** (in-flight) — Audio QC documentation and generated accuracy report.
   gate: The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; audio-qc-engineering.md is historical; release.md is updated per decision 7.
 
 ## Specialist-audit remediation

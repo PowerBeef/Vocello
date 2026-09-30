@@ -851,6 +851,11 @@ def policy_body(sources: Sources) -> str:
              f"status `{policy.get('status', '-')}`, adopted {adoption.get('date', '-')}).", ""]
     for number_, decision in sorted((adoption.get("decisions") or {}).items()):
         lines.append(f"- Decision {number_}: {decision}")
+    later = [item for item in policy.get("decisions") or () if isinstance(item, Mapping)]
+    if later:
+        lines += ["", "### Later decisions", ""]
+        lines += [f"- {item.get('date', '-')} ({item.get('by', '-')}), `{item.get('id', '-')}`: "
+                  f"{item.get('decision', '-')}" for item in later]
     rules = policy.get("authorityRules") or {}
     lines += ["", "### The five authority rules", "", f"Source: {rules.get('source', '-')}.", ""]
     lines += [f"{index}. {text}" for index, text in enumerate(rules.get("text") or (), 1)]
@@ -861,6 +866,13 @@ def policy_body(sources: Sources) -> str:
     lines += table(["Tier", "Source", "May qualify", "May not qualify"],
                    [[item.get("id"), item.get("source"), names(item.get("mayQualify") or ()),
                      names(item.get("mayNotQualify") or ())] for item in policy.get("labelTiers") or ()])
+    exceptions = [item for item in policy.get("labelTierExceptions") or () if isinstance(item, Mapping)]
+    if exceptions:
+        lines += ["", "Exceptions, each scoped to one detector by a dated decision:", ""]
+        lines += table(["Tier", "Population", "Detector", "Corpus field", "Languages", "May qualify", "Decision"],
+                       [[item.get("tier"), item.get("population"), f"`{item.get('detector')}`",
+                         f"{item.get('corpus')} `{item.get('field')}`", names(item.get("languages") or ()),
+                         item.get("mayQualify"), f"`{item.get('decision')}`"] for item in exceptions])
     lines += ["", "### Populations", ""]
     lines += table(["Population", "Content"], [[item.get("id"), item.get("content")]
                                                for item in policy.get("populations") or ()])

@@ -23,6 +23,11 @@ Rendered from [config/audio-qc-qualification-policy.json](../../../config/audio-
 - Decision 5: (a) warn at the existing 60/60/60 floor; fail at one-sided Clopper-Pearson FAR <= 1% pooled and <= 5% per language on N2 for any product-affecting fail, with (b) acceptable for evidence-lane gating only
 - Decision 7: A1-A10 adopted into this file; Swift gains the abstained outcome
 
+### Later decisions
+
+- 2026-09-30 (maintainer), `mean-consensus-warn-only`: content.consensus-error@2 may combine its two recognizer families by their mean (consensus-mean) at the warn level only, because Whisper large-v3 silently drops repeated words, so a strict consensus cannot see a repetition one family never transcribes. Any fail level for content keeps strict two-family consensus: the fail operating points refuse consensus-mean (refusedCombinations), for every detector.
+- 2026-09-30 (maintainer), `speechocean762-positive-labels`: speechocean762's published expert sentence accuracy (T4) may label the natural positives (P4) of language.nativeness@1, in English only (labelTierExceptions). Every other detector keeps the rule that T4 published labels qualify negatives only.
+
 ### The five authority rules
 
 Source: the retired audio-cadence-qc-contract.json, carried over verbatim on 2026-09-12.
@@ -58,6 +63,12 @@ Source: the retired audio-cadence-qc-contract.json, carried over verbatim on 202
 | T4 | Published labels: corpus transcripts and metadata | negatives for content, language and identity, SV trials | that a recording is defect-free |
 | T5 | Cross-modal: a qualified detector of another modality and another family labels natural takes | confirmation cohorts | sole evidence for a new fail bound, any same-lineage label |
 | T6 | Human annotation (optional): the existing speech-defects-1 protocol | as today | - |
+
+Exceptions, each scoped to one detector by a dated decision:
+
+| Tier | Population | Detector | Corpus field | Languages | May qualify | Decision |
+|---|---|---|---|---|---|---|
+| T4 | P4 | `language.nativeness@1` | speechocean762 `scores.accuracy` | english | the natural positives of this detector, at the severities its role set's label rule gives | `speechocean762-positive-labels` |
 
 ### Populations
 
@@ -102,6 +113,7 @@ Source: the retired audio-cadence-qc-contract.json, carried over verbatim on 202
 | `n3FlagRateScope` | - | "pooled" | "pooled" | - |
 | `tprModerateMin` | - | 0.7 | 0.7 | - |
 | `mechanismsMin` | - | 2 | 2 | - |
+| `refusedCombinations` | - | ["consensus-mean"] | ["consensus-mean"] | - |
 | `productAffecting` | - | - | false | - |
 | `blocks` | - | - | - | false |
 | `countsAsPass` | - | - | - | false |

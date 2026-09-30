@@ -1110,6 +1110,125 @@ class ReserveTests(Fixture):
             self.extract()
 
 
+class LabelledCohortTests(Fixture):
+    """speechocean762's extraction as the N1 cohorts of language.nativeness@1's natural positives: split by
+    speaker, every utterance with its speaker, scores and text, read by the N2 plan and the detector driver."""
+
+    SPEAKERS = 12
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.registry = corpora.load_registry()
+        self.extracted = corpora.source_directory(self.registry, "speechocean762", self.root) / \
+            corpora.EXTRACTED_DIRECTORY
+
+    def extract(self, *, per_speaker: int = 5) -> dict:
+        """A synthetic extraction: per speaker, utterances scored 3 (severe), 6 (moderate) and 8 (outside), one of
+        the first speaker's with an empty transcript and one with no score."""
+        sink = clips.ClipSink(self.extracted / "wav")
+        for speaker in range(self.SPEAKERS):
+            for index in range(per_speaker):
+                source_id = f"{speaker:04d}{index:04d}"
+                data = pcm16(1600 + 16 * index + speaker, 16_000, 200.0 + speaker)
+                clip, info = clips.clip_from_wav(data, output_rate=16_000)
+                accuracy = (3, 6, 8)[index % 3]
+                text = "" if (speaker, index) == (0, 3) else "MARK IS GOING TO SEE ELEPHANT"
+                scores = {"accuracy": None if (speaker, index) == (0, 4) else accuracy, "completeness": 10,
+                          "fluency": 7, "prosodic": 7, "total": accuracy}
+                labels = {"language": "english", "split": "train" if speaker % 2 else "test", "sourceID": source_id,
+                          "speaker": f"{speaker:04d}", "gender": "female", "accent": "mandarin-l1",
+                          "scores": scores, "text": text}
+                sink.add(clips.clip_id("speechocean762", source_id), clip, info, labels, origin=f"row#{source_id}",
+                         source_sha256=hashlib.sha256(data).hexdigest())
+        manifest = corpora.build_manifest(self.registry, "speechocean762", sink.clips, sink.skipped, metadata={},
+                                          members={})
+        (self.extracted / corpora.MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    def build(self, split: str, **options) -> dict:
+        return corpora.labelled_cohort(self.registry, "speechocean762", split=split, root=self.root, **options)
+
+    def test_a_missing_extraction_is_refused_with_the_commands_to_run(self) -> None:
+        with self.assertRaisesRegex(corpora.CorporaError, "not extracted.*fetch --source speechocean762"):
+            self.build("confirmation")
+        with self.assertRaisesRegex(corpora.CorporaError, "no labelled cohort rule"):
+            corpora.labelled_cohort(self.registry, "crema-d", split="confirmation", root=self.root)
+
+    def test_the_splits_share_no_speaker_and_keep_every_label(self) -> None:
+        self.extract()
+        confirmation, calibration = self.build("confirmation"), self.build("calibration")
+        speakers = [{take["speaker"] for take in manifest["takes"]} for manifest in (confirmation, calibration)]
+        self.assertFalse(speakers[0] & speakers[1])
+        self.assertEqual(len(speakers[0] | speakers[1]), self.SPEAKERS)
+        self.assertEqual(confirmation["speakerSplit"]["speakers"], {"calibration": 6, "confirmation": 6})
+        for manifest, split in ((confirmation, "confirmation"), (calibration, "calibration")):
+            self.assertEqual(n1.manifest_digest_issues(manifest), [])
+            self.assertEqual((manifest["kind"], manifest["split"], manifest["corpus"], manifest.get("fleursSplit")),
+                             (n1.MANIFEST_KIND, split, "speechocean762", None))
+            eligible, count = n2.eligible_recordings(manifest)
+            self.assertEqual(count, 30)
+            directory = corpora.cohort_path(self.registry, "speechocean762", split=split, share=0.5,
+                                            root=self.root).parent
+            for take in manifest["takes"]:
+                self.assertEqual(hashlib.sha256((directory / take["wavPath"]).read_bytes()).hexdigest(),
+                                 take["wavSHA256"])
+                self.assertEqual((take["population"], take["language"], take["accent"]), ("N1", "english",
+                                                                                          "mandarin-l1"))
+        takes = {take["recording"]["sourceID"]: take for take in
+                 [*confirmation["takes"], *calibration["takes"]]}
+        self.assertEqual(takes["00000003"]["ineligibleReasons"], ["emptyText"])
+        self.assertEqual(takes["00000004"]["ineligibleReasons"], ["noLabel"])
+        self.assertEqual(takes["00010000"]["scores"]["accuracy"], 3)
+        # One sentence read by every speaker is one script.
+        self.assertEqual(len({take["scriptID"] for take in takes.values() if take["text"]}), 1)
+        # The counts follow the label rule of the role set language.nativeness@1 names (4 or less severe, 5-6
+        # moderate), over each split's eligible utterances.
+        counts = confirmation["labels"]["bySplit"]
+        self.assertEqual(counts, calibration["labels"]["bySplit"])
+        self.assertEqual(sum(counts["confirmation"].values()) + sum(counts["calibration"].values()), 58)
+        # Two severe utterances per speaker, less the first speaker's with an empty transcript.
+        self.assertEqual(sum(value["severe"] for value in counts.values()), 23)
+        self.assertEqual(confirmation["labels"]["field"], "scores.accuracy")
+        summary = corpora.labelled_summary(confirmation, Path("manifest.json"))
+        self.assertIn("below the warn floor of 60", summary["warning"])
+        # A rebuild writes the same manifest; another share into the same directory is refused.
+        self.assertEqual(self.build("confirmation")["manifestDigest"], confirmation["manifestDigest"])
+        output = corpora.cohort_path(self.registry, "speechocean762", split="confirmation", share=0.5, root=self.root)
+        with self.assertRaisesRegex(corpora.CorporaError, "already holds another cohort"):
+            self.build("confirmation", share=0.25, output=output)
+        wider = self.build("confirmation", share=0.75)
+        self.assertEqual(wider["speakerSplit"]["speakers"], {"calibration": 3, "confirmation": 9})
+        self.assertTrue(speakers[0] <= {take["speaker"] for take in wider["takes"]})
+
+    def test_the_detector_driver_reads_the_split_speakers_and_labels(self) -> None:
+        import audio_qc_detector_calibration as calibration
+        from lib.qc_qualification import detectors as registry_lib
+
+        self.extract()
+        manifest = self.build("confirmation")
+        n1_path = corpora.cohort_path(self.registry, "speechocean762", split="confirmation", share=0.5, root=self.root)
+        takes = [{"takeID": f"{take['takeID']}--n2", "n1TakeID": take["takeID"], "population": "N2",
+                  "family": take["family"], "scriptID": take["scriptID"], "language": take["language"],
+                  "textSHA256": take["textSHA256"], "wavSHA256": hashlib.sha256(take["takeID"].encode()).hexdigest(),
+                  "eligible": True} for take in manifest["takes"] if take["eligible"]]
+        n2_manifest = {"kind": n2.MANIFEST_KIND, "schemaVersion": 1, "runID": "n2-accent",
+                       "n1ManifestSHA256": hashlib.sha256(n1_path.read_bytes()).hexdigest(), "takes": takes}
+        n2_manifest["manifestDigest"] = corpora.jsonio.sha256_json(n2_manifest, ascii=False)
+        n2_path = self.tmp / "n2-manifest.json"
+        n2_path.write_text(json.dumps(n2_manifest), encoding="utf-8")
+        registry = json.loads(corpora.DETECTOR_REGISTRY_PATH.read_text(encoding="utf-8"))
+        entry = registry_lib.detector_entry(registry, "language.nativeness@1")
+        natural = calibration.load_natural_positives(entry, registry_lib.role_set(registry, entry), n2_path, n1_path)
+        self.assertEqual((natural["split"], natural["cohort"]["corpus"]), ("confirmation", "speechocean762"))
+        # The target declares the severe cell: the moderate and outside utterances are outside the rule.
+        counts = manifest["labels"]["bySplit"]["confirmation"]
+        self.assertEqual((len(natural["severities"]), natural["outsideRule"]),
+                         (counts["severe"], counts["moderate"] + counts["outside"]))
+        self.assertEqual(len({take["speaker"] for take in natural["cohort"]["takes"].values()}), 6)
+        policy = json.loads(corpora.POLICY_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(calibration.natural_label_problems(policy, entry, natural), [])
+
+
 class RuntimeWiringTests(unittest.TestCase):
     def test_the_runtime_is_built_by_the_judge_acquisition_builder_from_the_registry_view(self) -> None:
         registry = corpora.load_registry()

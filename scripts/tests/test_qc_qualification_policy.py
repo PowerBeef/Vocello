@@ -118,6 +118,33 @@ class PolicyTests(unittest.TestCase):
         errors = self.mutated(lambda value: value["operatingPoints"].update(shadow={"blocks": True, "countsAsPass": False}))
         self.assertTrue(any("shadow" in error for error in errors))
 
+    def test_dated_decisions_scope_their_exceptions_and_fail_keeps_strict_consensus(self) -> None:
+        decisions = {entry["id"]: entry for entry in self.committed["decisions"]}
+        self.assertEqual({entry["date"] for entry in decisions.values()}, {"2026-09-30"})
+        (exception,) = self.committed["labelTierExceptions"]
+        self.assertEqual((exception["tier"], exception["population"], exception["detector"], exception["corpus"],
+                          exception["languages"]), ("T4", "P4", "language.nativeness@1", "speechocean762",
+                                                    ["english"]))
+        self.assertIn(exception["decision"], decisions)
+        for name in ("fail", "evidenceLaneFail"):
+            self.assertEqual(self.committed["operatingPoints"][name]["refusedCombinations"], ["consensus-mean"])
+            errors = self.mutated(lambda value, name=name: value["operatingPoints"][name].update(refusedCombinations=[]))
+            self.assertTrue(any("must refuse consensus-mean" in error for error in errors), errors)
+            errors = self.mutated(lambda value, name=name: value["operatingPoints"][name].update(
+                refusedCombinations=["consensus-mean", "majority"]))
+            self.assertTrue(any("lists detector combinations" in error for error in errors), errors)
+        self.assertNotIn("refusedCombinations", self.committed["operatingPoints"]["warn"])
+        for change, fragment in (
+                (lambda value: value["decisions"][0].update(date="30 September"), "date (YYYY-MM-DD)"),
+                (lambda value: value["decisions"].append(dict(value["decisions"][0])), "declared twice"),
+                (lambda value: value["labelTierExceptions"][0].update(decision="unrecorded"), "does not record"),
+                (lambda value: value["labelTierExceptions"][0].update(detector="nativeness"), "id@version"),
+                (lambda value: value["labelTierExceptions"][0].update(languages=[]), "names its languages"),
+                (lambda value: value["labelTierExceptions"][0].update(tier="T9"), "a label tier and a population"),
+                (lambda value: value["labelTierExceptions"][0].pop("field"), "declares exactly")):
+            errors = self.mutated(change)
+            self.assertTrue(any(fragment in error for error in errors), (fragment, errors))
+
     def test_the_command_passes_the_committed_file_and_refuses_a_broken_one(self) -> None:
         with redirect_stdout(StringIO()) as output:
             self.assertEqual(audio_qc_qualification.main(["validate-policy"]), 0)

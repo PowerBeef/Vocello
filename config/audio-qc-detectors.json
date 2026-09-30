@@ -57,7 +57,7 @@
     "accent-natural-n2": {
       "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-reserve-1"},
       "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-reserve-2", "failCorpus": "fleurs-reserve-3"},
-      "positives": {"population": "P4", "cohort": "confirmation", "corpus": "pending-speechocean762-n2-confirmation",
+      "positives": {"population": "P4", "cohort": "confirmation", "corpus": "speechocean762-confirmation",
                     "labels": {"tier": "T4", "source": "speechocean762 sentence-level accuracy, the experts' 0-10 pronunciation score published with the corpus (config/audio-qc-corpora.json, group accent)", "field": "scores.accuracy",
                                "rules": [{"severity": "severe", "atMost": 4}, {"severity": "moderate", "atMost": 6}]}},
       "shams": {"population": "S", "cohort": "confirmation"},
@@ -81,8 +81,9 @@
     "clip-variants-not-sampled": "The N2 injection schedule (audio_qc_calibration_set.py build_plan) draws each injector's sham, mild, moderate and severe catalog variants only, so SIG-CLIP's soft-knee and over-range variants never reach a confirmation set and the moderate cell holds hard clipping alone. Their design-data detection comes from building them in memory on the spent confirmation sources; qualifying them needs the schedule to draw the extra variants.",
     "substitutions-not-scored": "A substitution (a unit heard as another) does not count, so a mispronounced or wrong word leaves the score unchanged unless it changes the number of units heard: substitution defects stay outside this detector, which the audit keeps warn-only anyway (section 5.7).",
     "accent-positives-english-only": "Natural non-native positives exist for English only (speechocean762: Mandarin-L1 speakers reading English), so the detection rate is English's: the other nine languages' thresholds bound their FAR on native N2 speech, but their sensitivity to an accent is unmeasured. A lane should read them as report-only until a labelled non-native corpus of that language exists; the lane gates declare each lane's languages.",
-    "accent-labels-policy": "The positives' labels are published expert pronunciation scores (T4, speechocean762's sentence-level accuracy), while the policy defines P4 as harvested natural failures with T5 labels and lets T4 qualify negatives only: the role set's corpus stays pending until the maintainer admits published graded labels as positive labels.",
-    "accent-corpus-pending": "speechocean762 is pinned (config/audio-qc-corpora.json, group accent) but not resynthesized: its confirmation positives need an N1 manifest carrying each utterance's scores and speaker (the corpus extraction records both), an N2 round trip like FLEURS's and a panel with Whisper large-v3 and VoxLingua. Every speaker is Mandarin L1, so one accent is measured, and the accuracy rules (4 or less severe, 5-6 moderate, of 10) follow the corpus's rubric (heavy accent, many errors), not a fitted cut."
+    "accent-labels-exception": "The positives' labels are published expert pronunciation scores (T4, speechocean762's sentence-level accuracy). The policy defines P4 as harvested natural failures with T5 labels and lets T4 qualify negatives only; by the maintainer's decision of 2026-09-30 (the policy's labelTierExceptions) speechocean762's accuracy may label this detector's English positives, and no other detector's. The driver refuses natural positives the exception does not name (detector, corpus, field and language). The rules (4 or less severe, 5-6 moderate, of 10) follow the corpus's rubric (heavy accent, many errors), not a fitted cut, so the detection rate is agreement with one expert panel's grading.",
+    "accent-single-l1": "The positives are the confirmation split of speechocean762 (audio_qc_corpora.py cohort, split by speaker from its extraction, which records each utterance's speaker and scores), resynthesized to N2 like the negatives and scored by a panel of Whisper large-v3 and VoxLingua after the plan. Every speaker is Mandarin L1, so one accent is measured. How many utterances score 4 or less is not known before the extraction, so the builder reports how many the confirmation split holds against the warn floor of 60 before any model runs.",
+    "mean-consensus-warn-only": "A two-family mean (consensus-mean) qualifies at warn only, by the maintainer's decision of 2026-09-30 (the policy's decisions): Whisper large-v3 silently drops repeated words, so a strict consensus cannot see what one family never transcribes, but a fail level keeps strict two-family consensus (consensus-min or consensus-max). The policy's fail operating points refuse the combination (refusedCombinations), so plan refuses a fail plan of this version and validate refuses any fail plan or record of it; a fail bound needs a new version with a strict consensus."
   },
   "exclusionReasons": {
     "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean.",
@@ -410,7 +411,7 @@
         {"injectorID": "CNT-REP", "mechanism": "T1-pcm-construction"}
       ],
       "populations": "fleurs-reserve-n2",
-      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "substitutions-not-scored"],
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "substitutions-not-scored", "mean-consensus-warn-only"],
       "risks": ["parakeet-whisper-label-lineage", "one-family-alarm", "splice-sham-content-errors"]
     },
     {
@@ -531,7 +532,7 @@
       "targets": [{"injectorID": "NAT-ACCENT", "severities": ["severe"], "mechanism": "T4-natural-labelled"}],
       "shams": [],
       "populations": "accent-natural-n2",
-      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "accent-positives-english-only", "accent-labels-policy", "accent-corpus-pending"],
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "accent-positives-english-only", "accent-labels-exception", "accent-single-l1", "mean-consensus-warn-only"],
       "risks": ["voxlingua-weak-native-de-ru", "one-classifier-alarm", "accent-by-voice"]
     },
     {

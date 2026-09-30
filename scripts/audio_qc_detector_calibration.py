@@ -62,7 +62,12 @@ recording, keeps the takes the rule turns into a severity the target declares,
 and scores them from their own panel (`--natural-bundle`, computed after the
 plan like every confirmation panel) and measurements. They have no sham (A4
 matches processed positives), and a detector whose positives are all natural
-plans no injection set.
+plans no injection set. The cohort is the corpus split the role set names
+(`<corpus>-confirmation`, as `audio_qc_corpora.py cohort` writes it), and a
+published (T4) label labels a positive only under a dated exception of the
+qualification policy (`labelTierExceptions`) naming the detector, the corpus,
+the label field and the positives' languages; the plan binds the corpus split
+(`naturalPositivesSource`), which a confirmation spends.
 
 Every input is bound to what it claims to measure: a cohort manifest to its own
 `manifestDigest`; a panel bundle to its `bundleDigest`, and each evidence
@@ -155,7 +160,9 @@ Commands:
            detector, and the calibration score quantiles of the given files.
   validate The registry, every committed plan and ledger entry and every
            record, each against the current registry entry; a ledger entry
-           without its record; and any plan, ledger entry or record a commit
+           without its record; a plan or record at an operating point that
+           refuses its detector's combination (a fail point refuses a
+           two-family mean); and any plan, ledger entry or record a commit
            later deleted, modified or renamed (contract gate).
 """
 
@@ -678,6 +685,10 @@ def load_natural_positives(entry: Mapping[str, Any], roles: Mapping[str, Any], p
     if cohort["population"] != roles["confirmNegatives"]["population"]:
         raise CalibrationError(f"{cohort['name']} is {cohort['population']}; natural positives are measured in the "
                                f"negatives' domain ({roles['confirmNegatives']['population']})")
+    declared = (roles.get("positives") or {}).get("corpus")
+    if declared and declared != f"{cohort.get('corpus')}-{split}":
+        raise CalibrationError(f"{cohort['name']}: natural positives are {cohort.get('corpus')}-{split}; the role set "
+                               f"names {declared}")
     own = {take.get("takeID"): take for take in load_json(path, "the natural positives").get("takes") or ()
            if isinstance(take, Mapping)}
     recordings = {} if n1_manifest is None else {
@@ -706,6 +717,28 @@ def natural_source(natural: Mapping[str, Any]) -> dict:
     return {"kind": cohort["kind"], "manifestDigest": cohort["manifestDigest"], "fileSHA256": cohort["fileSHA256"],
             "corpus": cohort.get("corpus"), "split": natural["split"], "labelsSHA256": natural["labelsSHA256"],
             "positives": len(natural["severities"]), "outsideRule": natural["outsideRule"]}
+
+
+def natural_label_problems(policy: Mapping[str, Any], entry: Mapping[str, Any], natural: Mapping[str, Any]) -> list[str]:
+    """Why the policy does not admit the natural positives' labels. A published label (T4) qualifies negatives
+    only, unless a dated, detector-scoped exception (`labelTierExceptions`) names this detector, the corpus, the
+    label field and every language the positives are in."""
+    labels, cohort = natural["labels"], natural["cohort"]
+    corpus = cohort.get("corpus")
+    languages = sorted({take["language"] for take in cohort["takes"].values()})
+    for exception in policy.get("labelTierExceptions") or ():
+        if not isinstance(exception, Mapping):
+            continue
+        if (exception.get("tier"), exception.get("population"), exception.get("detector"), exception.get("corpus"),
+                exception.get("field")) != (labels.get("tier"), TIER_POPULATIONS["T4"], entry["id"], corpus,
+                                            labels.get("field")):
+            continue
+        outside = [language for language in languages if language not in (exception.get("languages") or ())]
+        return [f"the policy admits {corpus}'s {labels.get('field')} as positive labels in "
+                f"{', '.join(exception.get('languages') or ()) or 'no language'} only, not "
+                f"{', '.join(outside)}"] if outside else []
+    return [f"the policy lets {labels.get('tier')} published labels qualify negatives only, and no labelTierExceptions "
+            f"entry admits {corpus}'s {labels.get('field')} as positive labels for {entry['id']}"]
 
 
 def raw_output_judges(entry: Mapping[str, Any]) -> set[str]:
@@ -1384,6 +1417,9 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
             entry, roles, args.natural_positives, args.natural_n1_manifest,
             bundle=Bundle(args.natural_bundle) if args.natural_bundle else None,
             measurements=load_measurements(args.natural_measurements) if args.natural_measurements else None)
+        problems = natural_label_problems(repository.policy(), entry, natural)
+        if problems:
+            raise CalibrationError("the natural positives' labels cannot qualify positives: " + "; ".join(problems))
     elif args.natural_n1_manifest or args.natural_bundle or args.natural_measurements:
         raise CalibrationError("--natural-* evidence belongs to --natural-positives")
     elif args.role == "confirmation" and registry_lib.natural_targets(entry):
@@ -1484,10 +1520,15 @@ def calibration_floor_of(point: Mapping[str, Any], by: str | None) -> int:
 
 
 def fail_plan_problems(entry: Mapping[str, Any], roles: Mapping[str, Any], point: Mapping[str, Any]) -> list[str]:
-    """Why a detector's definition cannot qualify at a fail point, whatever its confirmation shows: FAR is
-    confirmed on the point's population (A2), a per-language bound over the point's languages, and detection
-    on severe and moderate cells of at least `mechanismsMin` construction mechanisms (A3)."""
+    """Why a detector's definition cannot qualify at a fail point, whatever its confirmation shows: a
+    combination the point refuses (a two-family mean qualifies at warn only), FAR confirmed on the point's
+    population (A2), a per-language bound over the point's languages, and detection on severe and moderate cells
+    of at least `mechanismsMin` construction mechanisms (A3)."""
     problems = []
+    combination = entry["score"]["combination"]
+    if combination in (point.get("refusedCombinations") or ()):
+        problems.append(f"its {combination} combination qualifies at warn only; a fail level keeps strict two-family "
+                        "consensus (policy decision mean-consensus-warn-only)")
     population = roles["confirmNegatives"]["population"]
     if population != point["farPopulation"]:
         problems.append(f"the fail FAR is confirmed on {point['farPopulation']} (A2); role set {entry['populations']} "
@@ -1660,6 +1701,9 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                                "the N3 bound cohort (A5)")
     natural_cohort = natural["cohort"] if natural is not None else None
     if natural_cohort is not None:
+        problems = natural_label_problems(policy, entry, natural)
+        if problems:
+            raise CalibrationError("the natural positives' labels cannot qualify positives: " + "; ".join(problems))
         # Natural positives come from another corpus: no speaker, family or script of either cohort.
         for cohort, what in ((calibration, "calibration"), (confirmation, "confirmation")):
             for key in ("speaker", "family", "scriptID"):
@@ -1667,7 +1711,8 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
                         {take[key] for take in cohort["takes"].values()}:
                     raise CalibrationError(f"the natural positives share a {key} with the {what} cohort")
     confirmation_source = role_corpus(roles, "confirmNegatives", operating_point)
-    natural_source = (roles.get("positives") or {}).get("corpus") if natural is not None else None
+    # The labelled corpus split the natural positives are (`<corpus>-confirmation`, as the role set names it).
+    natural_source = f"{natural['cohort'].get('corpus')}-{natural['split']}" if natural is not None else None
     for corpus, what in ((confirmation_source if rule.fleurs else None, "confirmation corpus"),
                          (natural_source, "natural positives' corpus")):
         spent = declared["spentSources"].get(corpus) if corpus else None
@@ -1707,9 +1752,10 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
           for tier, version in sorted(((injection or {}).get("tierCatalogVersions") or {}).items())),
         # A fail point's N3 flag-rate bound is confirmation evidence too: its cohort is pre-registered (A2, A5).
         *((("n3CohortDigest", n3["manifestDigest"]),) if n3 is not None else ()),
-        # Natural positives: the labelled cohort and the rule that selects them are pre-registered (A5).
+        # Natural positives: the labelled cohort, its corpus and the rule that selects them are pre-registered (A5).
         *((("naturalPositivesDigest", natural["cohort"]["manifestDigest"]),
-           ("naturalLabelsSHA256", natural["labelsSHA256"])) if natural is not None else ()),
+           ("naturalLabelsSHA256", natural["labelsSHA256"]),
+           ("naturalPositivesSource", natural_source)) if natural is not None else ()),
     )
     strata = () if entry["strata"] is None else ((entry["strata"]["by"], entry["strata"]["reason"]),)
     plan = thresholds.PreRegistration(
@@ -2646,6 +2692,15 @@ def repository_errors(repository: Repository) -> list[str]:
     def edited(detector: str, digest: Any) -> bool:
         return detector in definitions and definitions[detector] != digest
 
+    # A combination an operating point refuses (a two-family mean qualifies at warn only): no plan or record of it.
+    points = repository.policy().get("operatingPoints") or {}
+
+    def refused(combination: Any, point: Any) -> bool:
+        value = points.get(point) if isinstance(point, str) else None
+        return isinstance(value, Mapping) and combination in (value.get("refusedCombinations") or ())
+
+    combinations = {entry["id"]: (entry.get("score") or {}).get("combination") for entry in registry.get("detectors")
+                    or () if isinstance(entry, Mapping) and isinstance(entry.get("id"), str)}
     errors.extend(f"{path}: a committed plan, ledger entry or record was later deleted, modified or renamed; "
                   "each is written once (A5)" for path in rewritten_files(repository))
     directory = repository.store.directory
@@ -2686,6 +2741,9 @@ def repository_errors(repository: Repository) -> list[str]:
                     and edited(plan.detector, plan.binding("detectorDefinitionSHA256")):
                 errors.append(f"{where}: {plan.detector}'s registry entry changed after its plan; a changed "
                               "definition needs a new version (A7)")
+            if refused(combinations.get(plan.detector), plan.binding("operatingPoint")):
+                errors.append(f"{where}: {plan.detector} combines by {combinations[plan.detector]}, which the "
+                              f"{plan.binding('operatingPoint')} point refuses (a fail level keeps strict consensus)")
             plans[plan.digest()] = data
     if repository.records.is_dir():
         for path in sorted(repository.records.glob("*/*.json")):
@@ -2706,6 +2764,9 @@ def repository_errors(repository: Repository) -> list[str]:
             if edited(record["detector"], record["detectorDefinitionSHA256"]):
                 errors.append(f"{where}: {record['detector']}'s registry entry changed after it was confirmed; a "
                               "changed definition needs a new version (A7)")
+            if refused(record["combination"], record["operatingPoint"]):
+                errors.append(f"{where}: a {record['operatingPoint']} record of a {record['combination']} detector; "
+                              "the point refuses the combination (a fail level keeps strict consensus)")
             if record["planSHA256"] not in plans:
                 errors.append(f"{where}: its plan is not committed beside the ledger")
             outcome = repository.ledger.outcome(record["planSHA256"])

@@ -75,6 +75,18 @@ transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
   the sampled members are decoded (`audio_qc_n1_corpus.extract_members`), and
   each cohort is an `audio-qc-n1-cohort` manifest in the take shape the N2 and
   calibration tools read, under `fleurs/<revision>/reserve/<sampling digest>/`.
+- **Labelled cohorts.** `cohort` turns a labelled corpus's extraction (a
+  source with a `LABELLED_COHORTS` rule: speechocean762) into one split of an
+  `audio-qc-n1-cohort` manifest, `split` calibration or confirmation and
+  `corpus` the source id. Speakers are split by a seeded SHA-256
+  (`LABELLED_COHORT_RULE`, the confirmation share recorded), so the two splits
+  share no speaker. Every utterance keeps its speaker, published scores and
+  text, with its eligibility, and its WAV is linked beside the manifest, under
+  `<source>/<revision>/cohorts/share-<share>/<split>/` by default. The summary
+  counts each split's eligible utterances per severity of the label rule its
+  detector role set declares. It warns when the confirmation split falls below
+  the warn floor of severe families. A missing or stale extraction is refused.
+  The qc-n2 lane resynthesizes the manifest like a FLEURS cohort.
 
 Commands:
   plan      bytes to download and to extract per group and source, and the free space (no network)
@@ -84,6 +96,8 @@ Commands:
   verify    re-verify downloads, receipts, runtime and extractions offline
   validate  check the committed registry and its sidecars (no network); in the contract gate
   resolve-subset  the AISHELL-3 subset pins from a Hub tree listing, by the registry's seeded rule
+  cohort    --source speechocean762 --split calibration|confirmation [--confirmation-share S] [--output PATH]
+            one speaker-disjoint split of a labelled corpus's extraction as an N1 cohort manifest
 """
 
 from __future__ import annotations
@@ -193,6 +207,32 @@ RESERVE_RULE = (
     "then cohort 2, and so on; a sentence belongs to one cohort only (its recordings past a full cohort stay "
     "unused), so the cohorts are disjoint by sentence from each other and from dev and test."
 )
+
+# Labelled N1 cohorts (`cohort`): a corpus whose clips carry speakers, and for the accent group published
+# scores, split into a calibration and a confirmation cohort that share no speaker. A source needs a rule here:
+# its split seed and the detector registry role set whose positives' label rule its counts are reported by.
+LABELLED_COHORT_VERSION = "audio-qc-labelled-cohort-v1"
+LABELLED_COHORT_RULE = (
+    "The extraction's speakers in ascending order of SHA-256(seed NUL source NUL speaker label): the first "
+    "round(speakers x confirmationShare) of them (at least one, never all) form the confirmation split and the "
+    "rest the calibration split, so the two share no speaker; every utterance of a speaker goes with it."
+)
+LABELLED_COHORTS: dict[str, dict[str, Any]] = {
+    # language.nativeness@1's natural positives: Mandarin-L1 English with expert accuracy scores (T4).
+    "speechocean762": {"seed": "aq07-speechocean762-speaker-split-v1", "roleSet": "accent-natural-n2"},
+}
+LABELLED_ELIGIBILITY_RULES = [
+    "text: the corpus transcript is not empty (emptyText)",
+    "speaker: the corpus labels the utterance's speaker (noSpeaker)",
+    "label: where the role set declares a label rule, its field holds a number (noLabel)",
+    "duration: more than 0 and at most 60 s, the codec round trip's bound (duration)",
+    "rate: 16 or 24 kHz mono PCM16, the rates the recording adapter reads (sampleRate)",
+]
+LABELLED_SAMPLE_RATES = (16_000, 24_000)
+DEFAULT_CONFIRMATION_SHARE = 0.5
+COHORT_DIRECTORY = "cohorts"
+DETECTOR_REGISTRY_PATH = REPO / "config" / "audio-qc-detectors.json"
+POLICY_PATH = REPO / "config" / "audio-qc-qualification-policy.json"
 
 Opener = Callable[[urllib.request.Request, float], Any]
 WorkerRunner = Callable[[Path, Mapping[str, Any]], None]
@@ -1953,6 +1993,179 @@ def extract(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path 
 
 
 # --------------------------------------------------------------------------- #
+# Labelled N1 cohorts
+# --------------------------------------------------------------------------- #
+
+def labelled_rule(source: str) -> dict[str, Any]:
+    rule = LABELLED_COHORTS.get(source)
+    if rule is None:
+        raise CorporaError(f"{source} has no labelled cohort rule (sources with one: {', '.join(LABELLED_COHORTS)})")
+    return rule
+
+
+def labelled_labels(rule: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The label rule the detector registry's role set declares for the corpus's positives, if it names one."""
+    if not rule.get("roleSet"):
+        return None
+    registry = json.loads(DETECTOR_REGISTRY_PATH.read_text(encoding="utf-8"))
+    labels = ((registry.get("roleSets") or {}).get(rule["roleSet"]) or {}).get("positives", {}).get("labels")
+    if not isinstance(labels, Mapping):
+        raise CorporaError(f"role set {rule['roleSet']} of the detector registry declares no labels")
+    return dict(labels)
+
+
+def speaker_split(speakers: Iterable[str], *, source: str, seed: str, share: float) -> dict[str, str]:
+    """speaker -> calibration or confirmation (`LABELLED_COHORT_RULE`)."""
+    ordered = sorted(set(speakers), key=lambda speaker: (_order(seed, source, speaker), speaker))
+    if len(ordered) < 2:
+        raise CorporaError(f"{source}: a speaker split needs at least two speakers")
+    confirmation = min(len(ordered) - 1, max(1, round(len(ordered) * share)))
+    return {speaker: "confirmation" if index < confirmation else "calibration"
+            for index, speaker in enumerate(ordered)}
+
+
+def labelled_take(clip: Mapping[str, Any], *, source: str, entry: Mapping[str, Any],
+                  labels: Mapping[str, Any] | None) -> dict[str, Any]:
+    """One extraction clip as an N1 cohort take, in the shape the N2 plan and the calibration tools read."""
+    from lib.qc_qualification import detectors as registry_lib  # deferred: only a labelled cohort reads the rule
+
+    take_id = f"n1-{clip['clipID']}"
+    text = clip.get("text") if isinstance(clip.get("text"), str) else ""
+    folded = " ".join(text.split()).casefold()
+    duration = clip.get("durationSeconds")
+    reasons = [] if text.strip() else ["emptyText"]
+    reasons += [] if clip.get("speaker") else ["noSpeaker"]
+    if labels is not None and registry_lib.label_value(clip, labels["field"]) is None:
+        reasons.append("noLabel")
+    if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not 0 < duration <= 60:
+        reasons.append("duration")
+    if clip.get("sampleRate") not in LABELLED_SAMPLE_RATES:
+        reasons.append("sampleRate")
+    return {
+        "takeID": take_id, "family": take_id,
+        # The corpus reads a fixed sentence list, so a script is its folded text.
+        "scriptID": f"{source}-{hashlib.sha256(folded.encode('utf-8')).hexdigest()[:16]}",
+        "language": clip.get("language"), "population": n1.POPULATION, "status": "generated",
+        "text": text, "textSHA256": lm.text_sha256(text),
+        "wavPath": f"wav/{take_id}.wav", "wavSHA256": clip["wavSHA256"], "durationSeconds": duration,
+        "speaker": clip.get("speaker"), "gender": clip.get("gender"), "accent": clip.get("accent"),
+        "scores": clip.get("scores"),
+        "recording": {"dataset": entry.get("repository") or source, "revision": entry.get("revision"),
+                      "split": clip.get("split"), "clipID": clip["clipID"], "sourceID": clip.get("sourceID"),
+                      "samples": clip.get("samples"), "sampleRate": clip.get("sampleRate")},
+        "eligible": not reasons, "ineligibleReasons": reasons,
+    }
+
+
+def label_counts(takes: Iterable[Mapping[str, Any]], labels: Mapping[str, Any] | None) -> dict[str, int] | None:
+    """Eligible takes per severity the label rule gives (`outside` the rule), or None without a rule."""
+    if labels is None:
+        return None
+    from lib.qc_qualification import detectors as registry_lib  # deferred, as above
+
+    counts: Counter[str] = Counter()
+    for take in takes:
+        if take["eligible"]:
+            counts[registry_lib.label_severity(labels, registry_lib.label_value(take, labels["field"])) or "outside"] += 1
+    return {severity: counts.get(severity, 0)
+            for severity in [*(rule["severity"] for rule in labels["rules"]), "outside"]}
+
+
+def cohort_path(registry: Mapping[str, Any], source: str, *, split: str, share: float,
+                root: Path | None = None) -> Path:
+    """Where `cohort` writes a split by default: beside the source's extraction, by share and split."""
+    return source_directory(registry, source, root) / COHORT_DIRECTORY / f"share-{share:g}" / split / MANIFEST_NAME
+
+
+def labelled_cohort(registry: Mapping[str, Any], source: str, *, split: str, share: float = DEFAULT_CONFIRMATION_SHARE,
+                    root: Path | None = None, output: Path | None = None) -> dict[str, Any]:
+    """One split of a labelled corpus's extraction as an `audio-qc-n1-cohort` manifest, its WAVs linked beside it.
+
+    The speakers are split by `LABELLED_COHORT_RULE`, so the two splits share
+    no speaker; each utterance keeps its speaker, published scores and text,
+    and its eligibility with the reasons. The qc-n2 lane resynthesizes the
+    manifest as it does a FLEURS cohort, and the detector driver reads the
+    split, the corpus, the speakers and the labels from it.
+    """
+    rule = labelled_rule(source)
+    if split not in n1.ROLE_SPLITS:
+        raise CorporaError(f"the split is one of {', '.join(n1.ROLE_SPLITS)}")
+    if not 0.0 < share < 1.0:
+        raise CorporaError("the confirmation share lies strictly between 0 and 1")
+    entry = registry["sources"][source]
+    directory = source_directory(registry, source, root) / EXTRACTED_DIRECTORY
+    problems = extraction_problems(directory, extraction_identity(registry, source), deep=False)
+    if problems:
+        raise CorporaError(f"{source} is not extracted from the current pins ({problems[0]}); run "
+                           f"`python3 scripts/audio_qc_corpora.py fetch --source {source}` and `extract --source "
+                           f"{source}` first")
+    extraction = json.loads((directory / MANIFEST_NAME).read_text(encoding="utf-8"))
+    labels = labelled_labels(rule)
+    records = extraction["clips"]
+    assignment = speaker_split((record["speaker"] for record in records if record.get("speaker")),
+                               source=source, seed=rule["seed"], share=share)
+    takes_by_split: dict[str, list[dict[str, Any]]] = {name: [] for name in n1.ROLE_SPLITS}
+    sources: dict[str, Path] = {}
+    for record in records:
+        target = assignment.get(record.get("speaker") or "")
+        if target is None:
+            continue
+        take = labelled_take(record, source=source, entry=entry, labels=labels)
+        takes_by_split[target].append(take)
+        sources[take["takeID"]] = directory / record["wavPath"]
+    takes = takes_by_split[split]
+    if not takes:
+        raise CorporaError(f"{source}: the {split} split holds no utterance")
+    output = (output or cohort_path(registry, source, split=split, share=share, root=root)).resolve()
+    speakers = {name: sorted({take["speaker"] for take in value}) for name, value in takes_by_split.items()}
+    manifest: dict[str, Any] = {
+        "schemaVersion": n1.SCHEMA_VERSION, "kind": n1.MANIFEST_KIND, "population": n1.POPULATION,
+        "corpus": source, "dataset": entry.get("repository") or source, "revision": entry.get("revision"),
+        "license": entry["license"]["id"], "attribution": entry["attribution"], "split": split,
+        "languages": [language for language in lm.PRODUCT_LANGUAGES if any(take["language"] == language
+                                                                          for take in takes)],
+        "sampleRate": entry["extract"]["outputRate"],
+        "extraction": {"manifestDigest": extraction["manifestDigest"],
+                       "extractionSHA256": extraction["extractionSHA256"]},
+        "speakerSplit": {"version": LABELLED_COHORT_VERSION, "rule": LABELLED_COHORT_RULE, "seed": rule["seed"],
+                         "confirmationShare": share,
+                         "speakers": {name: len(value) for name, value in speakers.items()},
+                         "speakersSHA256": {name: jsonio.sha256_json(value, ascii=False)
+                                            for name, value in speakers.items()}},
+        "labels": None if labels is None else {
+            "roleSet": rule["roleSet"], "tier": labels["tier"], "field": labels["field"], "rules": labels["rules"],
+            "bySplit": {name: label_counts(value, labels) for name, value in takes_by_split.items()}},
+        "eligibility": {"version": LABELLED_COHORT_VERSION, "rules": LABELLED_ELIGIBILITY_RULES},
+        "caveats": entry["caveats"], "counts": n1.cohort_counts(takes), "takes": takes,
+    }
+    manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
+    if output.exists():
+        existing = json.loads(output.read_text(encoding="utf-8"))
+        if existing.get("manifestDigest") != manifest["manifestDigest"]:
+            raise CorporaError(f"{output} already holds another cohort; write this one to its own directory")
+    for take in takes:
+        n1._place(sources[take["takeID"]], output.parent / take["wavPath"], take["wavSHA256"])
+    jsonio.atomic_json(output, manifest, ascii=False, allow_nan=False)
+    return manifest
+
+
+def labelled_summary(manifest: Mapping[str, Any], output: Path) -> dict[str, Any]:
+    """What `cohort` prints: the split's counts and, per split, the eligible utterances per label severity."""
+    summary = {"status": "PASS", "manifest": str(output), "split": manifest["split"],
+               "manifestDigest": manifest["manifestDigest"], "counts": {key: manifest["counts"][key] for key in
+                                                                        ("recordings", "eligible", "ineligible")},
+               "speakers": manifest["speakerSplit"]["speakers"], "labels": (manifest.get("labels") or {}).get("bySplit")}
+    confirmation = ((manifest.get("labels") or {}).get("bySplit") or {}).get("confirmation") or {}
+    # Each utterance is its own family, so a severe cell's floor counts utterances here.
+    floor = json.loads(POLICY_PATH.read_text(encoding="utf-8"))["operatingPoints"]["warn"]["minimumUnits"]["bad"]
+    if manifest.get("labels") and confirmation.get("severe", 0) < floor:
+        summary["warning"] = (f"the confirmation split holds {confirmation.get('severe', 0)} severe utterances, below "
+                              f"the warn floor of {floor} families per severe cell: build it again with a larger "
+                              "--confirmation-share (the calibration split serves no plan)")
+    return summary
+
+
+# --------------------------------------------------------------------------- #
 # Verify
 # --------------------------------------------------------------------------- #
 
@@ -2047,8 +2260,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                        ("extract", "decode the selection to its untracked manifests"),
                        ("verify", "re-verify the selection offline"),
                        ("validate", "check the committed registry (no network)"),
-                       ("resolve-subset", "the AISHELL-3 subset pins from a Hub tree listing")):
+                       ("resolve-subset", "the AISHELL-3 subset pins from a Hub tree listing"),
+                       ("cohort", "one speaker-disjoint split of a labelled corpus as an N1 cohort manifest")):
         command = commands.add_parser(name, help=text)
+        if name == "cohort":
+            command.add_argument("--source", required=True, choices=tuple(LABELLED_COHORTS))
+            command.add_argument("--split", required=True, choices=tuple(n1.ROLE_SPLITS))
+            command.add_argument("--confirmation-share", type=float, default=DEFAULT_CONFIRMATION_SHARE,
+                                 help="the share of speakers the confirmation split takes (default 0.5)")
+            command.add_argument("--output", type=Path,
+                                 help="the manifest path (default: <source>/<revision>/cohorts/share-<share>/"
+                                      "<split>/manifest.json under the corpora cache)")
         if name in ("plan", "fetch", "extract", "verify"):
             command.add_argument("--set", action="extend", nargs="+", choices=SETS)
             command.add_argument("--group", action="extend", nargs="+", choices=tuple(GROUPS), metavar="GROUP")
@@ -2078,6 +2300,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                               "sha256": hashlib.sha256(data).hexdigest()}, sort_keys=True), file=sys.stderr)
             return 0
         registry = load_valid_registry()
+        if args.command == "cohort":
+            manifest = labelled_cohort(registry, args.source, split=args.split, share=args.confirmation_share,
+                                       output=args.output)
+            output = args.output or cohort_path(registry, args.source, split=args.split,
+                                                share=args.confirmation_share)
+            print(json.dumps(labelled_summary(manifest, output.resolve()), indent=2, sort_keys=True))
+            return 0
         if args.command == "validate":
             print(json.dumps({"status": "PASS", "sources": len(registry["sources"]),
                               "files": registry["totals"]["files"], "bytes": registry["totals"]["bytes"]},

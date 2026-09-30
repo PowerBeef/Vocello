@@ -215,9 +215,9 @@
       "id": "audio-qc-corpora-cache",
       "path": "build/cache/audio-qc-corpora",
       "class": "cache",
-      "owner": "Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch; scripts/audio_qc_n1_corpus.py fetch and extract; scripts/audio_qc_corpora.py fetch and extract)",
+      "owner": "Audio QC corpus acquisition (scripts/audio_qc_script_pool.py fetch; scripts/audio_qc_n1_corpus.py fetch and extract; scripts/audio_qc_corpora.py fetch, extract and cohort)",
       "cleanup": "aggressive",
-      "retention": "Digest-pinned corpus files, one directory per pinned commit or revision (re-fetchable): the CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, the FLEURS N1 TSVs, audio archives and their extracted WAVs, under fleurs, with the FLEURS train reserve cohorts under fleurs/<revision>/reserve, and the qualification corpora of config/audio-qc-corpora.json with their fetch receipts, extracted WAVs and manifests (transcripts included), under <source>/<revision or zenodo-record>; third-party corpus data, never committed and never evidence",
+      "retention": "Digest-pinned corpus files, one directory per pinned commit or revision (re-fetchable): the CC0 Common Voice sentence files the AQ-02 script pool is selected from, under common-voice-sentences, the FLEURS N1 TSVs, audio archives and their extracted WAVs, under fleurs, with the FLEURS train reserve cohorts under fleurs/<revision>/reserve, and the qualification corpora of config/audio-qc-corpora.json with their fetch receipts, extracted WAVs and manifests (transcripts included), under <source>/<revision or zenodo-record>, with a labelled corpus's speaker-disjoint N1 cohorts under <source>/<revision>/cohorts; third-party corpus data, never committed and never evidence",
       "env": "QVOICE_AUDIO_QC_CORPORA_CACHE"
     },
     {

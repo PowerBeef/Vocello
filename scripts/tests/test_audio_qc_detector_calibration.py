@@ -187,8 +187,9 @@ def fixture_registry() -> dict:
     roles["speaker-labeled-n2"]["confirmNegatives"]["corpus"] = "test-speakers-confirmation"
     roles["n3-long-form"]["fit"]["corpus"] = "pending-vocello-long-form-calibration"
     roles["n3-long-form"]["confirmNegatives"]["corpus"] = "pending-vocello-long-form-confirmation"
-    # The fixture's labelled accent corpus has data too, and its negatives are the fixture's dev and test cohorts.
-    roles["accent-natural-n2"]["positives"]["corpus"] = "test-accent-confirmation"
+    # The fixture's labelled accent corpus is speechocean762's confirmation split, as the registry names it; its
+    # negatives are the fixture's dev and test cohorts.
+    assert roles["accent-natural-n2"]["positives"]["corpus"] == "speechocean762-confirmation"
     roles["accent-natural-n2"]["fit"]["corpus"] = "fleurs-dev"
     roles["accent-natural-n2"]["confirmNegatives"] = {"population": "N2", "cohort": "confirmation",
                                                       "corpus": "fleurs-test"}
@@ -236,6 +237,11 @@ class Fixture:
         (self.repo / "config").mkdir(parents=True)
         for name in (calibration.JUDGES, calibration.POLICY):
             shutil.copy(REPO / name, self.repo / name)
+        # The fixture's accent detector stands for language.nativeness@1 in the policy's label-tier exception.
+        policy = json.loads((self.repo / calibration.POLICY).read_text(encoding="utf-8"))
+        for exception in policy["labelTierExceptions"]:
+            exception["detector"] = "test.accent@1"
+        (self.repo / calibration.POLICY).write_text(json.dumps(policy, indent=2), encoding="utf-8")
         (self.repo / calibration.REGISTRY).write_text(json.dumps(fixture_registry(), indent=2), encoding="utf-8")
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
         git(self.repo, "add", "config")
@@ -408,7 +414,7 @@ class Fixture:
 
     # -- natural labelled positives ------------------------------------------------
     def natural_cohort(self, name: str = "accent", *, severe: int = 70, outside: int = 20,
-                       split: str = "confirmation", speaker_of=None) -> tuple[Path, Path]:
+                       split: str = "confirmation", speaker_of=None, corpus: str = "speechocean762") -> tuple[Path, Path]:
         """A labelled corpus's N2 cohort (English) and the N1 manifest naming its split, speakers and scores:
         `severe` takes scored at most 4 of 10, `outside` scored 8 (not a positive)."""
         n1_takes, takes = [], []
@@ -422,7 +428,7 @@ class Fixture:
                           "n1TakeID": take_id, "wavSHA256": sha(f"wav:so:{index}"), "textSHA256": sha(REFERENCE)})
         n1 = write_json(self.root / name / "n1-manifest.json", signed({
             "kind": "audio-qc-n1-cohort", "schemaVersion": 1, "population": "N1", "split": split,
-            "corpus": "speechocean762", "takes": n1_takes}))
+            "corpus": corpus, "takes": n1_takes}))
         manifest = write_json(self.root / name / "n2-manifest.json", signed({
             "kind": "audio-qc-n2-cohort", "schemaVersion": 1, "runID": "run-accent",
             "n1ManifestSHA256": calibration.file_sha256(n1), "takes": takes}))
@@ -699,7 +705,19 @@ class NativenessRegistryTests(unittest.TestCase):
         self.assertEqual((detectors.constructed_targets(self.entry), self.entry["shams"]), ([], []))
         roles = detectors.role_set(self.registry, self.entry)
         self.assertEqual(roles["positives"]["population"], "P4")
-        self.assertEqual(calibration.pending_corpora(roles), ["positives (pending-speechocean762-n2-confirmation)"])
+        # The builder exists (audio_qc_corpora.py cohort): the corpus is named, the negatives are the reserve's.
+        self.assertEqual(calibration.pending_corpora(roles), [])
+        self.assertEqual((roles["positives"]["corpus"], roles["fit"]["corpus"], roles["confirmNegatives"]["corpus"]),
+                         ("speechocean762-confirmation", "fleurs-reserve-1", "fleurs-reserve-2"))
+        # The policy admits the corpus's T4 labels as this detector's positives, in English only (2026-09-30).
+        policy = json.loads((REPO / calibration.POLICY).read_text(encoding="utf-8"))
+        (exception,) = policy["labelTierExceptions"]
+        self.assertEqual((exception["detector"], exception["corpus"], exception["field"], exception["languages"]),
+                         ("language.nativeness@1", "speechocean762", roles["positives"]["labels"]["field"],
+                          ["english"]))
+        # A two-family mean qualifies at warn only: the fail points refuse it.
+        problems = calibration.fail_plan_problems(self.entry, roles, policy["operatingPoints"]["fail"])
+        self.assertIn("its consensus-mean combination qualifies at warn only", problems[0])
         self.assertEqual(calibration.positive_populations(roles, self.entry), ("P4",))
         self.assertEqual(len(self.entry["scope"]["languages"]), 10)
         # consensus-lid@1 keeps its maximum: both classifiers low is another language, not an accent.
@@ -1545,6 +1563,7 @@ class FlowTests(unittest.TestCase):
                          json.loads(natural.read_text(encoding="utf-8"))["manifestDigest"])
         self.assertEqual(plan["bindings"]["naturalLabelsSHA256"],
                          json_digest(roles["accent-natural-n2"]["positives"]["labels"]))
+        self.assertEqual(plan["bindings"]["naturalPositivesSource"], "speechocean762-confirmation")
         self.assertFalse(set(calibration.INJECTION_BINDINGS.values()) & set(plan["bindings"]))
         fixture.commit_plans()
         negatives = fixture.negative_bundle(fixture.confirmation, "confirmation/panel-bundle-v2", scale=200.0)
@@ -1574,6 +1593,62 @@ class FlowTests(unittest.TestCase):
                          ["units"], 70)
         self.assertEqual([panel["cohort"] for panel in record["evidence"]["confirmationPanels"]], ["N2", "P4"])
         self.cli("validate")
+        # The labelled corpus split is spent with the confirmation cohort, whichever resynthesis a later plan names.
+        spent = calibration.declared_cohorts(calibration.Repository(fixture.repo))["spentSources"]
+        self.assertEqual(spent, {"fleurs-test": [detector], "speechocean762-confirmation": [detector]})
+
+    def test_natural_labels_need_the_policys_exception_and_the_named_corpus(self) -> None:
+        fixture = self.fixture
+        detector = "test.accent@1"
+        scores = self.calibration_scores(detector, bundle=fixture.negative_bundle(fixture.calibration, "accent-cal"))
+        base = ("plan", "--detector", detector, "--calibration-cohort", str(fixture.calibration),
+                "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
+                str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), "--alpha", "0.05")
+        natural, n1 = fixture.natural_cohort()
+        policy_path = fixture.repo / calibration.POLICY
+        committed = policy_path.read_text(encoding="utf-8")
+        policy = json.loads(committed)
+        for change, message in (
+                (lambda value: value.update(labelTierExceptions=[]), "no labelTierExceptions entry admits "
+                                                                      "speechocean762's scores.accuracy"),
+                (lambda value: value["labelTierExceptions"][0].update(detector="language.nativeness@1"),
+                 "qualify negatives only"),
+                (lambda value: value["labelTierExceptions"][0].update(languages=["french"]),
+                 "in french only, not english")):
+            changed = copy.deepcopy(policy)
+            change(changed)
+            policy_path.write_text(json.dumps(changed), encoding="utf-8")
+            self.assertIn(message, self.cli(*base, "--natural-positives", str(natural), "--natural-n1-manifest",
+                                            str(n1), expect=2))
+        policy_path.write_text(committed, encoding="utf-8")
+        # The natural positives are the corpus split the role set names.
+        other, other_n1 = fixture.natural_cohort("accent-other", corpus="another-accent-corpus")
+        self.assertIn("natural positives are another-accent-corpus-confirmation; the role set names "
+                      "speechocean762-confirmation", self.cli(*base, "--natural-positives", str(other),
+                                                              "--natural-n1-manifest", str(other_n1), expect=2))
+        self.cli(*base, "--natural-positives", str(natural), "--natural-n1-manifest", str(n1))
+
+    def test_a_fail_plan_or_record_of_a_mean_consensus_is_refused(self) -> None:
+        fixture = self.fixture
+        repository = calibration.Repository(fixture.repo)
+        registry = repository.registry()
+        entry = detectors.detector_entry(registry, "test.consensus-mean@1")
+        point = repository.policy()["operatingPoints"]["evidenceLaneFail"]
+        self.assertIn("its consensus-mean combination qualifies at warn only",
+                      calibration.fail_plan_problems(entry, detectors.role_set(registry, entry), point)[0])
+        # A fail plan of it, however it reached the store, fails validation.
+        cohort = calibration.load_cohort(fixture.calibration)
+        plan = thresholds.PreRegistration(
+            detector="test.consensus-mean@1", rule="split-conformal", alpha=0.005, direction="above",
+            cohorts=thresholds.CohortSplit(
+                calibration=thresholds.CohortReference("audio-qc-n2-cohort", cohort["manifestDigest"], "fleurs-dev"),
+                confirmation=thresholds.CohortReference("audio-qc-n2-cohort", "2" * 64, "fleurs-test"),
+                disjoint_by=("family", "script"), speaker_unit="u", speaker_claim="lower-bound",
+                limitations=(("l", "A limitation."),)),
+            bindings=(("operatingPoint", "fail"),))
+        repository.store.commit(plan)
+        self.assertTrue(any("combines by consensus-mean, which the fail point refuses" in error
+                            for error in calibration.repository_errors(repository)))
 
     def test_natural_positives_must_be_another_corpus_named_by_the_plan(self) -> None:
         fixture = self.fixture

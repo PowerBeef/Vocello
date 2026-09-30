@@ -2307,11 +2307,36 @@ such a population:
   label from its N1 recording and keeps the takes the rule selects. It scores them from their own
   panel, fresh after the plan; they have no sham, and the record pins their cohort.
 
-Two decisions keep the path unplannable, so the role set names the corpus `pending-...`:
+Two maintainer decisions of 2026-09-30 make the path plannable, and the role set now names the
+corpus `speechocean762-confirmation`. The negatives come from the FLEURS reserve cohorts, as for
+`fleurs-reserve-n2`.
 
-- **Policy (`accent-labels-policy`).** The policy defines P4 as harvested failures with T5 labels
-  and lets T4 published labels qualify negatives only.
-- **Data (`accent-corpus-pending`).** The corpus has no N2 cohort or panel yet.
+- **Policy (`accent-labels-exception`).** The policy's `labelTierExceptions` admits speechocean762's
+  expert accuracy (T4) as P4 labels for `language.nativeness@1`, in English only. The entry cites its
+  dated decision, which the policy records in `decisions`. Every other detector keeps T4 for
+  negatives only. The driver refuses natural positives at plan and at scoring time unless an
+  exception names the detector, the corpus, the label field and every language of the positives.
+- **Data (`accent-single-l1`).** `audio_qc_corpora.py cohort --source speechocean762 --split
+  confirmation` builds the N1 cohort from the corpus extraction:
+  - speakers are split by a seeded SHA-256, the confirmation share recorded (`--confirmation-share`,
+    default 0.5), so the two splits share no speaker;
+  - every utterance keeps its speaker, its accuracy, completeness, fluency, prosodic and total scores
+    and its text;
+  - an utterance without text, speaker or a numeric accuracy, or one longer than 60 s, is ineligible
+    with its reason.
+
+  The builder counts each split's eligible utterances per severity of the role set's rule (accuracy
+  4 or less severe, 5-6 moderate). It warns when the confirmation split holds fewer severe utterances
+  than the warn floor of 60, since how many score that low is not known before the extraction. It
+  refuses a missing or stale extraction. The qc-n2 lane resynthesizes the cohort like a FLEURS one.
+  The natural positives must be the corpus split the role set names, and the plan binds it
+  (`naturalPositivesSource`), so a confirmation spends it whichever resynthesis a later plan names.
+
+The detector combines its two classifiers by their mean, which by the other decision of 2026-09-30
+qualifies at warn only (`mean-consensus-warn-only`, beside `content.consensus-error@2`). Each fail
+operating point lists it in `refusedCombinations`. `plan` refuses a fail plan of either detector, and
+`validate` refuses any fail plan or record of a combination the point refuses. A fail level keeps
+strict two-family consensus.
 
 The other nine languages keep thresholds that bound their FAR on native speech, but their
 sensitivity is unmeasured (`accent-positives-english-only`): a lane should read them as report-only.

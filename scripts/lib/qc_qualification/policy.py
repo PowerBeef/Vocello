@@ -9,6 +9,11 @@ recomputation, and the verdict vocabulary and lane gating sets are the ones
 the composer implements. A per-language bound is a simultaneous claim over the
 operating point's languages, so its floor is checked at the Bonferroni
 confidence the operating point states; the N3 flag-rate bound is pooled.
+Later maintainer decisions are dated and named (`decisions`); a label-tier
+exception (`labelTierExceptions`) cites one and admits one tier's labels for
+one detector, corpus field and language set; each fail point refuses the
+combinations that qualify at warn only (`refusedCombinations`: a two-family
+mean, decision mean-consensus-warn-only).
 """
 
 from __future__ import annotations
@@ -16,13 +21,21 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 from . import composer
+from .detectors import COMBINATIONS
 from .stats import bonferroni_confidence, cp_lower, cp_upper, minimum_units
 
 REPO = Path(__file__).resolve().parents[3]
 POLICY_PATH = REPO / "config" / "audio-qc-qualification-policy.json"
+# A two-family mean qualifies at warn only (decision mean-consensus-warn-only, 2026-09-30): each fail point
+# refuses it, so a fail level keeps strict two-family consensus.
+FAIL_REFUSED_COMBINATIONS = ("consensus-mean",)
+DATE = re.compile(r"^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")
+CODE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
+DETECTOR_ID = re.compile(r"^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+@[1-9][0-9]*$")
 AUTHORITY_RULES = {
     "requiresUntouchedConfirmation": True,
     "requiresIndependentReferenceEvidence": True,
@@ -105,6 +118,13 @@ def _check_fail_like(errors: list[str], name: str, point: dict, confidence: floa
     for key in ("farPooledMax", "farPerLanguageMax", "n3FlagRateMax", "tprSevereMin", "tprModerateMin",
                 "cleanAbstentionMax"):
         _rate(errors, f"operatingPoints.{name}.{key}", point.get(key))
+    refused = point.get("refusedCombinations")
+    if not isinstance(refused, list) or not set(refused) <= set(COMBINATIONS) or len(set(refused)) != len(refused):
+        errors.append(f"operatingPoints.{name}.refusedCombinations lists detector combinations, once each")
+    elif not set(FAIL_REFUSED_COMBINATIONS) <= set(refused):
+        errors.append(f"operatingPoints.{name}.refusedCombinations must refuse "
+                      f"{', '.join(FAIL_REFUSED_COMBINATIONS)}: a fail level keeps strict two-family consensus "
+                      "(decision mean-consensus-warn-only)")
     if point.get("farPopulation") != "N2":
         errors.append(f"operatingPoints.{name}.farPopulation must be N2 (A2)")
     if not isinstance(point.get("mechanismsMin"), int) or point.get("mechanismsMin", 0) < 2:
@@ -134,6 +154,48 @@ def _check_fail_like(errors: list[str], name: str, point: dict, confidence: floa
                   point["tprSevereMin"], confidence)
     if point["tprModerateMin"] > point["tprSevereMin"]:
         errors.append(f"operatingPoints.{name}: moderate detection cannot be stricter than severe")
+
+
+def _decision_errors(policy: dict[str, Any]) -> list[str]:
+    """Later maintainer decisions, each dated and named, and the label-tier exceptions they grant: an exception
+    admits one tier's labels for one population of one detector, from one corpus field, in named languages."""
+    errors: list[str] = []
+    decisions = policy.get("decisions", [])
+    ids: set[str] = set()
+    if not isinstance(decisions, list):
+        return ["decisions must be a list"]
+    for decision in decisions:
+        if not isinstance(decision, dict) or set(decision) != {"id", "date", "by", "decision"} \
+                or not CODE.fullmatch(str(decision.get("id"))) or not DATE.fullmatch(str(decision.get("date"))) \
+                or not str(decision.get("by") or "").strip() or not str(decision.get("decision") or "").strip():
+            errors.append("each decision names its id, date (YYYY-MM-DD), by whom and what")
+            continue
+        if decision["id"] in ids:
+            errors.append(f"decision {decision['id']} is declared twice")
+        ids.add(decision["id"])
+    exceptions = policy.get("labelTierExceptions", [])
+    if not isinstance(exceptions, list):
+        return errors + ["labelTierExceptions must be a list"]
+    keys = {"decision", "tier", "population", "detector", "corpus", "field", "languages", "mayQualify"}
+    for exception in exceptions:
+        if not isinstance(exception, dict) or set(exception) != keys:
+            errors.append(f"a label-tier exception declares exactly {sorted(keys)}")
+            continue
+        where = f"labelTierExceptions ({exception.get('detector')})"
+        if exception["decision"] not in ids:
+            errors.append(f"{where} cites a decision the policy does not record")
+        if exception["tier"] not in LABEL_TIERS or exception["population"] not in POPULATIONS:
+            errors.append(f"{where} names a label tier and a population")
+        if not DETECTOR_ID.fullmatch(str(exception["detector"])):
+            errors.append(f"{where} names one detector id@version")
+        languages = exception["languages"]
+        if not isinstance(languages, list) or not languages or not all(isinstance(item, str) and item
+                                                                       for item in languages):
+            errors.append(f"{where} names its languages")
+        if not all(isinstance(exception[key], str) and exception[key].strip()
+                   for key in ("corpus", "field", "mayQualify")):
+            errors.append(f"{where} names its corpus, label field and what it may qualify")
+    return errors
 
 
 def validate_policy(policy: dict[str, Any]) -> list[str]:
@@ -169,6 +231,7 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     populations = policy.get("populations")
     if not isinstance(populations, list) or tuple(entry.get("id") for entry in populations) != POPULATIONS:
         errors.append(f"populations must be {', '.join(POPULATIONS)}")
+    errors.extend(_decision_errors(policy))
 
     statistics = policy.get("statistics") if isinstance(policy.get("statistics"), dict) else {}
     confidence = statistics.get("confidence")

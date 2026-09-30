@@ -11,6 +11,10 @@
     },
     "note": "The maintainer accepted every recommendation of the audit on 2026-09-25. This file carries the threshold-change authority's five rules verbatim and adds A1-A10. docs/reference/audio-qc-engineering.md keeps the prose; scripts/audio_qc_qualification.py validate-policy checks this file."
   },
+  "decisions": [
+    {"id": "mean-consensus-warn-only", "date": "2026-09-30", "by": "maintainer", "decision": "content.consensus-error@2 may combine its two recognizer families by their mean (consensus-mean) at the warn level only, because Whisper large-v3 silently drops repeated words, so a strict consensus cannot see a repetition one family never transcribes. Any fail level for content keeps strict two-family consensus: the fail operating points refuse consensus-mean (refusedCombinations), for every detector."},
+    {"id": "speechocean762-positive-labels", "date": "2026-09-30", "by": "maintainer", "decision": "speechocean762's published expert sentence accuracy (T4) may label the natural positives (P4) of language.nativeness@1, in English only (labelTierExceptions). Every other detector keeps the rule that T4 published labels qualify negatives only."}
+  ],
   "authorityRules": {
     "source": "the retired audio-cadence-qc-contract.json, carried over verbatim on 2026-09-12",
     "requiresUntouchedConfirmation": true,
@@ -46,6 +50,9 @@
     {"id": "T4", "source": "Published labels: corpus transcripts and metadata", "mayQualify": ["negatives for content, language and identity", "SV trials"], "mayNotQualify": ["that a recording is defect-free"]},
     {"id": "T5", "source": "Cross-modal: a qualified detector of another modality and another family labels natural takes", "mayQualify": ["confirmation cohorts"], "mayNotQualify": ["sole evidence for a new fail bound", "any same-lineage label"]},
     {"id": "T6", "source": "Human annotation (optional): the existing speech-defects-1 protocol", "mayQualify": ["as today"], "mayNotQualify": []}
+  ],
+  "labelTierExceptions": [
+    {"decision": "speechocean762-positive-labels", "tier": "T4", "population": "P4", "detector": "language.nativeness@1", "corpus": "speechocean762", "field": "scores.accuracy", "languages": ["english"], "mayQualify": "the natural positives of this detector, at the severities its role set's label rule gives"}
   ],
   "populations": [
     {"id": "N1", "content": "Human originals with verified text"},
@@ -95,6 +102,7 @@
       "tprModerateMin": 0.70,
       "mechanismsMin": 2,
       "cleanAbstentionMax": 0.05,
+      "refusedCombinations": ["consensus-mean"],
       "minimumUnits": {"n2Negatives": 1240, "n2NegativesPerLanguage": 124, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
     },
     "evidenceLaneFail": {
@@ -110,6 +118,7 @@
       "tprModerateMin": 0.70,
       "mechanismsMin": 2,
       "cleanAbstentionMax": 0.05,
+      "refusedCombinations": ["consensus-mean"],
       "minimumUnits": {"n2Negatives": 510, "n2NegativesPerLanguage": 51, "languages": 10, "n3NegativesPerLanguage": 60, "positivesPerCell": 60, "cell": "subtype x severity x mechanism"}
     },
     "shadow": {"blocks": false, "countsAsPass": false},

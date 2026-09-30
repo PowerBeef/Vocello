@@ -1,7 +1,7 @@
 # `language.nativeness@1`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `f191c9f440104a1d` (a plan binds it, so any change is a new version, A7).
+Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `94d8b3e35238fbd9` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Whether the take sounds like a native speaker of the expected language: the mean of Whisper large-v3's expected-language probability and VoxLingua107's expected-language posterior, fitted on native read speech (N2 FLEURS), direction below. An accent pulls both classifiers' confidence down while they still identify the language; language.consensus-lid@1 takes the larger of the two, so both must be low (another language), and counts accented speech as a negative (audit section 4.2). Native FLEURS French scores a VoxLingua posterior of 0.999 at the median; the app's French from Serena 0.39.
 
@@ -25,7 +25,7 @@ Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../..
 |---|---|---|---|
 | `NAT-ACCENT` | severe | T4-natural-labelled | no |
 
-**Populations** (role set `accent-natural-n2`): fit N2 (calibration, fleurs-reserve-1); confirmNegatives N2 (confirmation, fleurs-reserve-2; at a fail point fleurs-reserve-3); positives P4 (confirmation, pending-speechocean762-n2-confirmation); shams S (confirmation); informational N3, N1.
+**Populations** (role set `accent-natural-n2`): fit N2 (calibration, fleurs-reserve-1); confirmNegatives N2 (confirmation, fleurs-reserve-2; at a fail point fleurs-reserve-3); positives P4 (confirmation, speechocean762-confirmation); shams S (confirmation); informational N3, N1.
 
 **Limitations.**
 
@@ -33,8 +33,9 @@ Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../..
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 - `accent-positives-english-only`: Natural non-native positives exist for English only (speechocean762: Mandarin-L1 speakers reading English), so the detection rate is English's: the other nine languages' thresholds bound their FAR on native N2 speech, but their sensitivity to an accent is unmeasured. A lane should read them as report-only until a labelled non-native corpus of that language exists; the lane gates declare each lane's languages.
-- `accent-labels-policy`: The positives' labels are published expert pronunciation scores (T4, speechocean762's sentence-level accuracy), while the policy defines P4 as harvested natural failures with T5 labels and lets T4 qualify negatives only: the role set's corpus stays pending until the maintainer admits published graded labels as positive labels.
-- `accent-corpus-pending`: speechocean762 is pinned (config/audio-qc-corpora.json, group accent) but not resynthesized: its confirmation positives need an N1 manifest carrying each utterance's scores and speaker (the corpus extraction records both), an N2 round trip like FLEURS's and a panel with Whisper large-v3 and VoxLingua. Every speaker is Mandarin L1, so one accent is measured, and the accuracy rules (4 or less severe, 5-6 moderate, of 10) follow the corpus's rubric (heavy accent, many errors), not a fitted cut.
+- `accent-labels-exception`: The positives' labels are published expert pronunciation scores (T4, speechocean762's sentence-level accuracy). The policy defines P4 as harvested natural failures with T5 labels and lets T4 qualify negatives only; by the maintainer's decision of 2026-09-30 (the policy's labelTierExceptions) speechocean762's accuracy may label this detector's English positives, and no other detector's. The driver refuses natural positives the exception does not name (detector, corpus, field and language). The rules (4 or less severe, 5-6 moderate, of 10) follow the corpus's rubric (heavy accent, many errors), not a fitted cut, so the detection rate is agreement with one expert panel's grading.
+- `accent-single-l1`: The positives are the confirmation split of speechocean762 (audio_qc_corpora.py cohort, split by speaker from its extraction, which records each utterance's speaker and scores), resynthesized to N2 like the negatives and scored by a panel of Whisper large-v3 and VoxLingua after the plan. Every speaker is Mandarin L1, so one accent is measured. How many utterances score 4 or less is not known before the extraction, so the builder reports how many the confirmation split holds against the warn floor of 60 before any model runs.
+- `mean-consensus-warn-only`: A two-family mean (consensus-mean) qualifies at warn only, by the maintainer's decision of 2026-09-30 (the policy's decisions): Whisper large-v3 silently drops repeated words, so a strict consensus cannot see what one family never transcribes, but a fail level keeps strict two-family consensus (consensus-min or consensus-max). The policy's fail operating points refuse the combination (refusedCombinations), so plan refuses a fail plan of this version and validate refuses any fail plan or record of it; a fail bound needs a new version with a strict consensus.
 
 **Risks.**
 

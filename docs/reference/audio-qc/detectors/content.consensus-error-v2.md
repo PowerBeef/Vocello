@@ -1,7 +1,7 @@
 # `content.consensus-error@2`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `content.consensus-error@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `06a4a8a0d0fef39b` (a plan binds it, so any change is a new version, A7).
+Registry entry `content.consensus-error@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `34d64f97e90537b4` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** The mean of two independent recognizer families' insertion-deletion rates against the script: the units (words, or characters in zh) a family heard beyond the script plus the script's units it did not hear, over the script's length, from the minimum-cost alignment of its private transcript that has the fewest of them (a pair read either way counts as a substitution, a recognizer's own error; substitutions do not count). The mean lets the literal family's hearing count where Whisper large-v3 smooths a repetition away: on the spent AQ-07 data Whisper transcribed none of the repeated units in 73 of 133 CNT-REP severe positives, where the second family heard at least three in 125, so v1's minimum could not reach 0.70. One family alarms alone only with twice the threshold's evidence. Qwen3-ASR is same-lab and never votes (A6).
 
@@ -38,6 +38,7 @@ Excludes korean: The ja and ko content pair is Whisper and SenseVoice, and Sense
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 - `substitutions-not-scored`: A substitution (a unit heard as another) does not count, so a mispronounced or wrong word leaves the score unchanged unless it changes the number of units heard: substitution defects stay outside this detector, which the audit keeps warn-only anyway (section 5.7).
+- `mean-consensus-warn-only`: A two-family mean (consensus-mean) qualifies at warn only, by the maintainer's decision of 2026-09-30 (the policy's decisions): Whisper large-v3 silently drops repeated words, so a strict consensus cannot see what one family never transcribes, but a fail level keeps strict two-family consensus (consensus-min or consensus-max). The policy's fail operating points refuse the combination (refusedCombinations), so plan refuses a fail plan of this version and validate refuses any fail plan or record of it; a fail bound needs a new version with a strict consensus.
 
 **Risks.**
 

@@ -2264,6 +2264,58 @@ take's middle. That is a limit of the recording variant, which repeats a 0.5 s s
 on words (`runon-quiet-span`). The other 5 are Japanese takes whose aligner covered 42-61% of the
 units.
 
+**Nativeness (`language.nativeness@1`, class D, warn).** The maintainer hears a Voice Design voice
+read French like an English speaker. `language.consensus-lid@1` takes the larger of the two
+classifiers' expected-language confidences, so both must be low, and the audit counts accented
+speech as a language-ID negative (section 4.2). It therefore catches only the severe cases. The
+nativeness detector scores the mean of Whisper large-v3's expected-language probability and
+VoxLingua107's expected-language posterior (`consensus-mean`). It fits per-language thresholds on
+native read speech (N2 FLEURS), direction below. An accent pulls both confidences down while both
+still identify the language. Native FLEURS French scores a VoxLingua posterior of 0.999 at the
+median (10th percentile 0.990) and a Whisper probability of 0.99 at the 10th percentile; the app's
+French from Serena scores 0.39 and 0.97 at the median.
+
+| Language | Native N2 FAR at alpha 0.05 (threshold) | App takes flagged, by voice (N3 of 2026-09-27) |
+|---|---|---|
+| French | 25/286 (upper 0.139; 0.978) | Serena 19/27, Aiden 13/26, Design 9/27 |
+| Spanish | (0.932) | Aiden 18/26, Design 17/27, Serena 13/26 |
+| Italian | (0.930) | Vivian 13/27, Design 8/26, Aiden 2/26 |
+| Portuguese | (0.881) | Aiden 5/26, Design 4/24, Serena 2/27 |
+| Chinese, Japanese, Korean | (0.995, 0.983, 0.997) | 7/79, 5/80, 4/78 |
+| English | (0.899) | Serena 3/27, Aiden 1/26, Design 0/27 |
+| German, Russian | (0.487, 0.516: VoxLingua is weak on native speech) | 0/80, 1/79 |
+| All ten | 151/3718 (upper 0.046) | 144/791 |
+
+On the same takes consensus-lid@1 flags 27 of 80 French takes, 1 of the 27 by the Design voice. The
+nativeness score flags 41, 9 of them by the Design voice: an accent that leaves the language
+identifiable is what it adds. N3 carries no labels, so these rates describe how often the app's
+voices sound foreign to two classifiers, not how often a native listener would agree
+(`accent-by-voice`).
+
+*Natural labelled positives.* No construction produces an accent, so the qualification path is
+English only. Its positives are speechocean762 utterances, English read by Mandarin-L1 speakers,
+whose published expert accuracy score is 4 of 10 or less (severe; 5-6 moderate). The corpora
+registry pins them, and they must be resynthesized to N2 like the negatives. The driver now takes
+such a population:
+
+- **Role set.** `accent-natural-n2`'s positives are P4 of mechanism `T4-natural-labelled` and
+  declare their label tier, source, field and rules.
+- **Plan.** `plan --natural-positives` binds the corpus's cohort, its confirmation split, and the
+  label rule. It refuses a cohort that shares a speaker, family or script with either FLEURS cohort,
+  and it plans no injection set.
+- **Scores.** `scores --role confirmation --natural-positives --natural-bundle` reads each take's
+  label from its N1 recording and keeps the takes the rule selects. It scores them from their own
+  panel, fresh after the plan; they have no sham, and the record pins their cohort.
+
+Two decisions keep the path unplannable, so the role set names the corpus `pending-...`:
+
+- **Policy (`accent-labels-policy`).** The policy defines P4 as harvested failures with T5 labels
+  and lets T4 published labels qualify negatives only.
+- **Data (`accent-corpus-pending`).** The corpus has no N2 cohort or panel yet.
+
+The other nine languages keep thresholds that bound their FAR on native speech, but their
+sensitivity is unmeasured (`accent-positives-english-only`): a lane should read them as report-only.
+
 ### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
 
 Audit section 4.4 makes pYIN and the window-corrected HNR measurands only "once oracle ladders

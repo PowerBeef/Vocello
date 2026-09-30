@@ -130,6 +130,15 @@ def run_on_entry() -> dict:
     }
 
 
+def accent_entry() -> dict:
+    """A detector whose only positives are a labelled corpus's natural recordings (no construction, no sham)."""
+    entry = mean_entry()
+    entry.update(id="test.accent@1", populations="accent-natural-n2", shams=[],
+                 targets=[{"injectorID": "NAT-ACCENT", "severities": ["severe"],
+                           "mechanism": detectors.NATURAL_MECHANISM}])
+    return entry
+
+
 def level_entry() -> dict:
     return {
         "id": "test.level@1", "class": "A", "stage": 0, "measures": "RMS level.",
@@ -176,6 +185,8 @@ def fixture_registry() -> dict:
     # The fixture's speaker-labelled corpus has data; the long-form one stays pending.
     roles["speaker-labeled-n2"]["fit"]["corpus"] = "test-speakers-calibration"
     roles["speaker-labeled-n2"]["confirmNegatives"]["corpus"] = "test-speakers-confirmation"
+    # The fixture's labelled accent corpus has data too.
+    roles["accent-natural-n2"]["positives"]["corpus"] = "test-accent-confirmation"
     return {
         "schemaVersion": 1, "kind": detectors.REGISTRY_KIND, "authority": "test", "note": "test",
         "operatingPoint": "warn", "roleSets": roles,
@@ -189,7 +200,7 @@ def fixture_registry() -> dict:
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
                       {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
-                      pitch_entry(), mean_entry(), run_on_entry()],
+                      pitch_entry(), mean_entry(), run_on_entry(), accent_entry()],
     }
 
 
@@ -387,6 +398,34 @@ class Fixture:
     def commit_plans(self) -> None:
         git(self.repo, "add", "config/audio-qc-preregistrations")
         git(self.repo, "commit", "-q", "--no-verify", "-m", "plans", date=PLAN_DATE)
+
+    # -- natural labelled positives ------------------------------------------------
+    def natural_cohort(self, name: str = "accent", *, severe: int = 70, outside: int = 20,
+                       split: str = "confirmation", speaker_of=None) -> tuple[Path, Path]:
+        """A labelled corpus's N2 cohort (English) and the N1 manifest naming its split, speakers and scores:
+        `severe` takes scored at most 4 of 10, `outside` scored 8 (not a positive)."""
+        n1_takes, takes = [], []
+        for index in range(severe + outside):
+            take_id = f"so-{index:03d}"
+            speaker = speaker_of(index) if speaker_of else f"learner-{index % 7}"
+            n1_takes.append({"takeID": take_id, "speaker": speaker, "eligible": True,
+                             "scores": {"accuracy": 3 if index < severe else 8, "total": 5}})
+            takes.append({"takeID": f"{take_id}--n2", "family": f"so-family-{index}", "language": "english",
+                          "scriptID": f"so-script-{index}", "eligible": True, "population": "N2",
+                          "n1TakeID": take_id, "wavSHA256": sha(f"wav:so:{index}"), "textSHA256": sha(REFERENCE)})
+        n1 = write_json(self.root / name / "n1-manifest.json", signed({
+            "kind": "audio-qc-n1-cohort", "schemaVersion": 1, "population": "N1", "split": split,
+            "corpus": "speechocean762", "takes": n1_takes}))
+        manifest = write_json(self.root / name / "n2-manifest.json", signed({
+            "kind": "audio-qc-n2-cohort", "schemaVersion": 1, "runID": "run-accent",
+            "n1ManifestSHA256": calibration.file_sha256(n1), "takes": takes}))
+        return manifest, n1
+
+    def natural_bundle(self, manifest: Path, name: str = "accent-bundle", *, value: float = 0.9,
+                       **header) -> Path:
+        rows = [(take["takeID"], take["language"], take["wavSHA256"], take["textSHA256"],
+                 {WHISPER: self.asr(value), PARAKEET: self.asr(value)}, None) for take in self.takes(manifest)]
+        return self.bundle(self.root / name, rows, **header)
 
 
 class RegistryTests(unittest.TestCase):
@@ -628,6 +667,62 @@ class ContentV2RegistryTests(unittest.TestCase):
             entry["direction"] = "below"
         # The mean has no direction of its own: either is valid.
         self.assertEqual(self.mutate(below), [])
+
+
+class NativenessRegistryTests(unittest.TestCase):
+    """language.nativeness@1 and the natural labelled positives its role set declares."""
+
+    def setUp(self) -> None:
+        self.judges = json.loads((REPO / calibration.JUDGES).read_text(encoding="utf-8"))
+        self.registry = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+        self.entry = detectors.detector_entry(self.registry, "language.nativeness@1")
+
+    def errors(self, change) -> list[str]:
+        registry = copy.deepcopy(self.registry)
+        change(next(entry for entry in registry["detectors"] if entry["id"] == "language.nativeness@1"), registry)
+        return detectors.registry_errors(registry, self.judges)
+
+    def test_definition_and_role_set(self) -> None:
+        self.assertEqual((self.entry["class"], self.entry["direction"], self.entry["score"]["combination"]),
+                         ("D", "below", "consensus-mean"))
+        self.assertEqual(detectors.judges_of(self.entry), [WHISPER, "lid.voxlingua107-ecapa@1"])
+        self.assertEqual(detectors.natural_targets(self.entry),
+                         [{"injectorID": "NAT-ACCENT", "severities": ["severe"],
+                           "mechanism": detectors.NATURAL_MECHANISM}])
+        self.assertEqual((detectors.constructed_targets(self.entry), self.entry["shams"]), ([], []))
+        roles = detectors.role_set(self.registry, self.entry)
+        self.assertEqual(roles["positives"]["population"], "P4")
+        self.assertEqual(calibration.pending_corpora(roles), ["positives (pending-speechocean762-n2-confirmation)"])
+        self.assertEqual(calibration.positive_populations(roles, self.entry), ("P4",))
+        self.assertEqual(len(self.entry["scope"]["languages"]), 10)
+        # consensus-lid@1 keeps its maximum: both classifiers low is another language, not an accent.
+        self.assertEqual(detectors.detector_entry(self.registry, "language.consensus-lid@1")["score"]["combination"],
+                         "consensus-max")
+
+    def test_labels_turn_a_published_score_into_a_severity(self) -> None:
+        labels = detectors.role_set(self.registry, self.entry)["positives"]["labels"]
+        self.assertEqual(detectors.label_errors(labels, "labels"), [])
+        take = {"scores": {"accuracy": 4, "total": 6}}
+        self.assertEqual(detectors.label_value(take, labels["field"]), 4.0)
+        self.assertEqual([detectors.label_severity(labels, value) for value in (0, 4, 4.5, 6, 7, None)],
+                         ["severe", "severe", "moderate", "moderate", None, None])
+        self.assertIsNone(detectors.label_value({"scores": {"accuracy": "high"}}, labels["field"]))
+        broken = {**labels, "rules": [{"severity": "severe", "atMost": 4, "atLeast": 1}]}
+        self.assertTrue(detectors.label_errors(broken, "labels"))
+        self.assertTrue(detectors.label_errors({**labels, "tier": "T5"}, "labels"))
+
+    def test_natural_targets_need_labels_and_no_sham(self) -> None:
+        def sham(entry, _):
+            entry["shams"] = [{"injectorID": "NAT-ACCENT", "mechanism": detectors.NATURAL_MECHANISM}]
+        self.assertTrue(any("matched sham" in error for error in self.errors(sham)))
+
+        def unlabelled(_, registry):
+            registry["roleSets"]["accent-natural-n2"]["positives"].pop("labels")
+        self.assertTrue(any("declare their labels" in error for error in self.errors(unlabelled)))
+
+        def mild(entry, _):
+            entry["targets"][0]["severities"] = ["mild", "severe"]
+        self.assertTrue(any("label rules do not define" in error for error in self.errors(mild)))
 
 
 ALL_LANGUAGES = tuple(language_metrics.PRODUCT_LANGUAGES)
@@ -1421,6 +1516,77 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(calibration.record_errors(record), [])
         # A consensus-mean record without its phi audit is refused like any consensus rule's.
         self.assertIn("phi audit", " ".join(calibration.record_errors({**record, "phiAudit": []})))
+
+    def test_natural_labelled_positives_are_planned_scored_and_confirmed(self) -> None:
+        fixture = self.fixture
+        detector = "test.accent@1"
+        natural, n1 = fixture.natural_cohort()
+        scores = self.calibration_scores(detector, bundle=fixture.negative_bundle(fixture.calibration, "accent-cal"))
+        base = ("plan", "--detector", detector, "--calibration-cohort", str(fixture.calibration),
+                "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
+                str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), "--alpha", "0.05")
+        # Natural positives are pre-registered with the plan; an injection set is not.
+        self.assertIn("--natural-positives", self.cli(*base, expect=2))
+        self.assertIn("no injection flags", self.cli(*base, "--natural-positives", str(natural),
+                                                     "--natural-n1-manifest", str(n1), *INJECTION_FLAGS, expect=2))
+        self.cli(*base, "--natural-positives", str(natural), "--natural-n1-manifest", str(n1))
+        plan = json.loads((fixture.repo / "config/audio-qc-preregistrations/test.accent@1.json").read_text(
+            encoding="utf-8"))
+        roles = json.loads((fixture.repo / calibration.REGISTRY).read_text(encoding="utf-8"))["roleSets"]
+        self.assertEqual(plan["bindings"]["naturalPositivesDigest"],
+                         json.loads(natural.read_text(encoding="utf-8"))["manifestDigest"])
+        self.assertEqual(plan["bindings"]["naturalLabelsSHA256"],
+                         json_digest(roles["accent-natural-n2"]["positives"]["labels"]))
+        self.assertFalse(set(calibration.INJECTION_BINDINGS.values()) & set(plan["bindings"]))
+        fixture.commit_plans()
+        negatives = fixture.negative_bundle(fixture.confirmation, "confirmation/panel-bundle-v2", scale=200.0)
+        positives = fixture.natural_bundle(natural)
+        self.assertIn("--natural-positives", self.confirmation_scores(detector, bundle=negatives, expect=2))
+        self.assertIn("confirmation evidence", self.scores(
+            detector, "calibration", fixture.calibration, n1=fixture.n1["calibration"], name="natural-cal", expect=2,
+            bundle=negatives, natural_positives=natural, natural_n1_manifest=n1, natural_bundle=positives))
+        confirmation = self.confirmation_scores(detector, bundle=negatives, natural_positives=natural,
+                                                natural_n1_manifest=n1, natural_bundle=positives)
+        document = json.loads(confirmation.read_text(encoding="utf-8"))
+        # The label rule selects the 70 takes scored at most 4 of 10; the 20 scored 8 are no positive.
+        self.assertEqual(document["counts"]["expected"]["naturalPositives"], 70)
+        self.assertEqual(document["sources"]["naturalPositives"]["outsideRule"], 20)
+        natural_units = [unit for unit in document["units"] if unit["mechanism"] == detectors.NATURAL_MECHANISM]
+        self.assertEqual({(unit["population"], unit["cell"], unit["severity"]) for unit in natural_units},
+                         {("P4", "NAT-ACCENT/severe", "severe")})
+        self.assertTrue(all(unit["speaker"].startswith("speaker:") for unit in natural_units))
+        result = json.loads(self.confirm(detector, scores, confirmation))
+        self.assertEqual((result["verdict"], result["reasons"]), ("qualified", []))
+        record = json.loads((fixture.repo / result["record"]).read_text(encoding="utf-8"))
+        self.assertEqual(calibration.record_errors(record), [])
+        self.assertEqual(record["a4"]["cells"], [])
+        self.assertEqual(record["cohorts"]["naturalPositives"]["corpus"], "speechocean762")
+        self.assertIsNone(record["evidence"]["injectionSet"])
+        self.assertEqual(record["rates"]["mechanisms"][detectors.NATURAL_MECHANISM]["cells"]["NAT-ACCENT/severe"]
+                         ["units"], 70)
+        self.assertEqual([panel["cohort"] for panel in record["evidence"]["confirmationPanels"]], ["N2", "P4"])
+        self.cli("validate")
+
+    def test_natural_positives_must_be_another_corpus_named_by_the_plan(self) -> None:
+        fixture = self.fixture
+        detector = "test.accent@1"
+        scores = self.calibration_scores(detector, bundle=fixture.negative_bundle(fixture.calibration, "accent-cal"))
+        base = ("plan", "--detector", detector, "--calibration-cohort", str(fixture.calibration),
+                "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
+                str(fixture.n1["confirmation"]), "--calibration-scores", str(scores), "--alpha", "0.05")
+        calibration_split, n1 = fixture.natural_cohort("accent-dev", split="calibration")
+        self.assertIn("confirmation split", self.cli(*base, "--natural-positives", str(calibration_split),
+                                                     "--natural-n1-manifest", str(n1), expect=2))
+        natural, n1 = fixture.natural_cohort()
+        self.cli(*base, "--natural-positives", str(natural), "--natural-n1-manifest", str(n1))
+        fixture.commit_plans()
+        # Another labelled cohort than the plan's is refused at scoring time (A5).
+        other, other_n1 = fixture.natural_cohort("accent-other", severe=65)
+        refused = self.confirmation_scores(detector, bundle=fixture.negative_bundle(fixture.confirmation,
+                                                                                      "confirmation/panel-bundle-v2"),
+                                           natural_positives=other, natural_n1_manifest=other_n1,
+                                           natural_bundle=fixture.natural_bundle(other, "other-bundle"), expect=2)
+        self.assertIn("another cohort than the plan names", refused)
 
     def test_a_pcm_measure_minus_a_panel_timing_reads_both_sources(self) -> None:
         fixture = self.fixture

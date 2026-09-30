@@ -69,6 +69,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
 | [`language.consensus-lid@1`](../detectors/language.consensus-lid-v1.md) | D (language) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `expectedPosterior` | qualified (warn) |
+| [`language.nativeness@1`](../detectors/language.nativeness-v1.md) | D (language) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `expectedPosterior` | not qualified |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

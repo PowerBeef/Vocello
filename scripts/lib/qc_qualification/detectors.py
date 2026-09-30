@@ -59,6 +59,14 @@ Combinations:
   the aligner's registry condition ("supplied only to detectors that already
   have content consensus").
 
+Targets name the injector (or natural population), severities and mechanism
+the detection rate is measured on. A `T4-natural-labelled` target has no
+construction and no sham: its positives are a corpus's own recordings whose
+published label marks the defect (non-native speech with a low expert
+pronunciation score), and its role set's positives declare the label tier,
+source, field and the rule that turns a label into a severity
+(`label_errors`, `label_severity`).
+
 A consensus component must come from a voting judge of its own family that is
 not correlated with the generator's lab (A6), and both components of a group
 must be in the judges' declared language scope. A panel judge whose registry
@@ -149,8 +157,17 @@ DIRECTIONS = ("above", "below")
 CLASSES = tuple("ABCDEFGHIJ")
 STAGES = (0, 1, 2)
 TARGET_SEVERITIES = ("mild", "moderate", "severe")
-MECHANISMS = ("T1-pcm-construction", "T1-parallel-corpus", "T2-codec-construction", "T3-controlled-generation")
+# Natural labelled positives: a corpus's own recordings whose published label marks the defect (no
+# construction, so no sham: A4 matches processed positives only). Their role set's positives declare the
+# label source, field and the rule that turns a label into a severity.
+NATURAL_MECHANISM = "T4-natural-labelled"
+MECHANISMS = ("T1-pcm-construction", "T1-parallel-corpus", "T2-codec-construction", "T3-controlled-generation",
+              NATURAL_MECHANISM)
 POPULATIONS = ("N1", "N2", "N3", "S", "P1", "P2", "P3", "P4")
+LABEL_KEYS = frozenset({"tier", "source", "field", "rules"})
+LABEL_TIERS = ("T4",)
+LABEL_BOUNDS = ("atMost", "atLeast")
+_LABEL_FIELD = re.compile(r"^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*$")
 # A declared stratum gets its own threshold (audit 5.5: stratify only for a reason declared in advance).
 STRATA = ("language",)
 POOLED = "pooled"
@@ -505,6 +522,8 @@ def registry_errors(registry: Any, judges_registry: Mapping[str, Any]) -> list[s
             errors.append(f"roleSets.{name}: positives and shams are built on the confirmation cohort")
         if not isinstance(roles["informational"], list) or not set(roles["informational"]) <= set(POPULATIONS):
             errors.append(f"roleSets.{name}.informational lists populations")
+        if isinstance(roles["positives"], Mapping) and "labels" in roles["positives"]:
+            errors.extend(label_errors(roles["positives"]["labels"], f"roleSets.{name}.positives.labels"))
     detectors = registry.get("detectors")
     if not isinstance(detectors, list) or not detectors:
         return errors + ["detectors must be a non-empty list"]
@@ -592,6 +611,7 @@ def registry_errors(registry: Any, judges_registry: Mapping[str, Any]) -> list[s
             errors.append(f"{where}.shams must be a list")
             shams = []
         target_pairs = set()
+        natural: list[Mapping[str, Any]] = []
         for target in targets:
             if not isinstance(target, Mapping) or set(target) != {"injectorID", "severities", "mechanism"} \
                     or not _INJECTOR_ID.fullmatch(str(target.get("injectorID"))) \
@@ -600,7 +620,25 @@ def registry_errors(registry: Any, judges_registry: Mapping[str, Any]) -> list[s
                     or not set(target["severities"]) <= set(TARGET_SEVERITIES):
                 errors.append(f"{where}.targets: each names an injector id, its severities and its mechanism")
                 continue
+            if target["mechanism"] == NATURAL_MECHANISM:
+                # A natural recording is processed by nothing, so it has no sham (A4 covers processed positives).
+                natural.append(target)
+                continue
             target_pairs.add((target["injectorID"], target["mechanism"]))
+        if natural:
+            roles = role_sets.get(entry["populations"]) if isinstance(role_sets, Mapping) else None
+            labels = ((roles or {}).get("positives") or {}).get("labels") if isinstance(roles, Mapping) else None
+            if not isinstance(labels, Mapping):
+                errors.append(f"{where}: natural labelled positives need a role set whose positives declare their "
+                              "labels (source, field and rule)")
+            else:
+                ruled = {rule.get("severity") for rule in labels.get("rules") or () if isinstance(rule, Mapping)}
+                for target in natural:
+                    if not set(target["severities"]) <= ruled:
+                        errors.append(f"{where}.targets: {target['injectorID']} names severities its role set's "
+                                      "label rules do not define")
+            if len(natural) > 1:
+                errors.append(f"{where}.targets: one natural labelled target per detector")
         if not any("severe" in (target.get("severities") or ()) for target in targets if isinstance(target, Mapping)):
             errors.append(f"{where}.targets: warn measures detection on severe defects")
         sham_pairs = set()
@@ -1112,6 +1150,68 @@ def declared_cells(entry: Mapping[str, Any]) -> dict[str, set[str]]:
         for severity in target["severities"]:
             cells.setdefault(target["mechanism"], set()).add(f"{target['injectorID']}/{severity}")
     return cells
+
+
+# --------------------------------------------------------------------------- #
+# Natural labelled positives
+# --------------------------------------------------------------------------- #
+
+def natural_targets(entry: Mapping[str, Any]) -> list[dict]:
+    """The detector's natural labelled targets (a corpus's own recordings, no construction)."""
+    return [dict(target) for target in entry.get("targets") or () if target.get("mechanism") == NATURAL_MECHANISM]
+
+
+def constructed_targets(entry: Mapping[str, Any]) -> list[dict]:
+    """The targets an injection set constructs (T1, T2 or T3), each with its matched sham."""
+    return [dict(target) for target in entry.get("targets") or () if target.get("mechanism") != NATURAL_MECHANISM]
+
+
+def label_errors(labels: Any, where: str) -> list[str]:
+    """Problems in a role set's declared positive labels: {tier, source, field, rules}.
+
+    `tier` is the label tier of the policy (T4: a corpus's published labels),
+    `source` names the label (its corpus and column), `field` the take field that
+    carries it (a dotted path into the corpus's N1 manifest take), and `rules`
+    turn a label into a severity: the first rule whose bound (`atMost` or
+    `atLeast`) the label meets names its severity; a label no rule meets is not
+    a positive.
+    """
+    if not isinstance(labels, Mapping) or set(labels) != LABEL_KEYS:
+        return [f"{where} declares exactly {sorted(LABEL_KEYS)}"]
+    errors = []
+    if labels["tier"] not in LABEL_TIERS:
+        errors.append(f"{where}.tier must be one of {LABEL_TIERS}")
+    if not isinstance(labels["source"], str) or not labels["source"].strip():
+        errors.append(f"{where}.source names the label's corpus and column")
+    if not isinstance(labels["field"], str) or not _LABEL_FIELD.fullmatch(labels["field"]):
+        errors.append(f"{where}.field is a dotted take field")
+    rules = labels["rules"]
+    if not isinstance(rules, list) or not rules:
+        return errors + [f"{where}.rules must be a non-empty list"]
+    for rule in rules:
+        bounds = [key for key in LABEL_BOUNDS if isinstance(rule, Mapping) and key in rule]
+        if not isinstance(rule, Mapping) or rule.get("severity") not in TARGET_SEVERITIES or len(bounds) != 1 \
+                or set(rule) != {"severity", *bounds} or _finite(rule[bounds[0]]) is None:
+            errors.append(f"{where}.rules: each names a severity and one finite bound ({' or '.join(LABEL_BOUNDS)})")
+    return errors
+
+
+def label_value(take: Mapping[str, Any], field: str) -> float | None:
+    """A take's label at a dotted field path, or None when it has none."""
+    value: Any = take
+    for part in field.split("."):
+        value = value.get(part) if isinstance(value, Mapping) else None
+    return _finite(value)
+
+
+def label_severity(labels: Mapping[str, Any], value: float | None) -> str | None:
+    """The severity the first matching rule names for a label, or None (not a positive)."""
+    if value is None:
+        return None
+    for rule in labels["rules"]:
+        if ("atMost" in rule and value <= rule["atMost"]) or ("atLeast" in rule and value >= rule["atLeast"]):
+            return rule["severity"]
+    return None
 
 
 def summarize(values: Iterable[float], quantiles: Sequence[float] = (0.01, 0.05, 0.5, 0.95, 0.99)) -> dict:

@@ -43,7 +43,18 @@ Positives are the role set's population: P1 (a T1 PCM injection), P2 (a T2
 codec-trace mutation, `injection.provenance` naming the trace, recipe and
 decoder digests) or P3 (a T3 knob take, naming the knob and recipe), each
 beside its S shams; this driver reads them from an injection set and builds
-none.
+none. A `T4-natural-labelled` target's positives are instead a labelled
+corpus's own recordings (P4, `accent-natural-n2`: non-native speech with a low
+published pronunciation score): the role set declares the label tier, source,
+field and rules, `plan --natural-positives` binds the corpus's cohort (its
+confirmation split, N2 like the negatives, sharing no speaker, family or
+script with them) and the label rule, and `scores --role confirmation
+--natural-positives` reads each take's label from its manifest or its N1
+recording, keeps the takes the rule turns into a severity the target declares,
+and scores them from their own panel (`--natural-bundle`, computed after the
+plan like every confirmation panel) and measurements. They have no sham (A4
+matches processed positives), and a detector whose positives are all natural
+plans no injection set.
 
 Every input is bound to what it claims to measure: a cohort manifest to its own
 `manifestDigest`; a panel bundle to its `bundleDigest`, and each evidence
@@ -56,7 +67,9 @@ Commands:
   scores   --detector ID --role calibration|confirmation|informational|bound --cohort MANIFEST
            [--n1-manifest FILE] [--bundle DIR] [--measurements FILE] [--injection-set FILE]
            [--positive-bundle DIR] [--positive-measurements FILE] [--raw-outputs FILE ...]
-           [--positive-raw-outputs FILE ...] [--operating-point warn|fail|evidenceLaneFail] --output FILE
+           [--positive-raw-outputs FILE ...] [--natural-positives MANIFEST --natural-n1-manifest FILE
+           --natural-bundle DIR [--natural-measurements FILE]]
+           [--operating-point warn|fail|evidenceLaneFail] --output FILE
            Per-unit scores (family, language, speaker, script, population,
            injector, severity, score or abstention with its reason, and each
            component), ids and digests only, with the scoring code's digest and
@@ -79,9 +92,10 @@ Commands:
            the plan), fresh after the plan like a confirmation panel.
   plan     --detector ID --calibration-cohort MANIFEST --confirmation-cohort MANIFEST
            [--confirmation-n1-manifest FILE] [--calibration-n1-manifest FILE]
-           --calibration-scores FILE --alpha A --injection-catalog-seed N
-           --injection-sample-seed N --injection-sample-per-cell N --injection-classes A,B,...
+           --calibration-scores FILE --alpha A [--injection-catalog-seed N
+           --injection-sample-seed N --injection-sample-per-cell N --injection-classes A,B,...]
            [--injection-catalog-version N] [--tier-catalog-version T2=N ...]
+           [--natural-positives MANIFEST --natural-n1-manifest FILE]
            [--operating-point warn|fail|evidenceLaneFail] [--n3-cohort MANIFEST]
            Write config/audio-qc-preregistrations/<id>.json (<id>.<point>.json
            at a fail point, with its N3 cohort): the split-conformal rule,
@@ -91,7 +105,8 @@ Commands:
            bindings (definition, calibration scores, policy, scoring code,
            evidence identity, and the confirmation-side injection construction
            with its catalog version: this repository's injector catalog for P1,
-           the declared one for P2 or P3). Refuses a role set whose corpus is
+           the declared one for P2 or P3; for natural positives, their cohort's
+           digest and label rule instead). Refuses a role set whose corpus is
            pending, calibration scores below the calibration floor per stratum,
            with missing evidence, or from a panel whose orchestrator, metric
            reduction or metric versions are not the current code's (the
@@ -193,8 +208,9 @@ PENDING_CORPUS_PREFIX = "pending-"
 # P2 and P3 positives are declared with their provenance (audit 5.1, T2 and T3); P1's is its T1 recipe.
 POSITIVE_PROVENANCE = {"P2": ("T2", ("traceSHA256", "recipeSHA256", "decoderSHA256")),
                        "P3": ("T3", ("knob", "recipeSHA256"))}
-# The positive population each construction tier builds (audit 5.1: P1 PCM, P2 codec, P3 knob).
-TIER_POPULATIONS = {"T1": "P1", "T2": "P2", "T3": "P3"}
+# The positive population each construction tier builds (audit 5.1: P1 PCM, P2 codec, P3 knob), and the
+# natural failures a corpus labels (P4, `T4-natural-labelled`: read from their own cohort, never constructed).
+TIER_POPULATIONS = {"T1": "P1", "T2": "P2", "T3": "P3", "T4": "P4"}
 POPULATION_TIERS = {population: tier for tier, population in TIER_POPULATIONS.items()}
 # A registered generation knob's id (config/runtime-debug-knobs.json style): an identifier, never free text.
 KNOB_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
@@ -219,6 +235,7 @@ TAKES_RULE = CohortRule("vocello-takes", frozenset({N3_KIND}), False, ("family",
                         "vocello-voice", "identified")
 COHORT_RULES = {
     "fleurs-n2": FLEURS_RULE,
+    "accent-natural-n2": FLEURS_RULE,
     "speaker-labeled-n2": SPEAKER_LABELED_RULE,
     "n3-takes": TAKES_RULE,
     "n3-codec-trace": TAKES_RULE,
@@ -497,7 +514,7 @@ def cohort_rule_problems(cohort: Mapping[str, Any], rule: CohortRule, roles: Map
 
 
 def pending_corpora(roles: Mapping[str, Any]) -> list[str]:
-    return [f"{role} ({roles[role]['corpus']})" for role in ("fit", "confirmNegatives")
+    return [f"{role} ({roles[role]['corpus']})" for role in ("fit", "confirmNegatives", "positives")
             if str((roles.get(role) or {}).get("corpus") or "").startswith(PENDING_CORPUS_PREFIX)]
 
 
@@ -574,6 +591,55 @@ def load_raw_outputs(path: Path) -> dict:
         raise CalibrationError(f"{name} names no judge, takes manifest or bundle")
     return {"judge": judge, "takes": data["takes"], "sourceSHA256": source, "bundleDigest": bundle,
             "fileSHA256": file_sha256(path), "takesSHA256": data["takesSHA256"], "name": name}
+
+
+def load_natural_positives(entry: Mapping[str, Any], roles: Mapping[str, Any], path: Path,
+                           n1_manifest: Path | None, *, bundle: "Bundle | None" = None,
+                           measurements: Mapping[str, Any] | None = None) -> dict:
+    """A detector's natural labelled positives: a labelled corpus's cohort (N2, resynthesized like the negatives),
+    each take's label read from its manifest or its N1 recording's (the role set's `labels.field`) and turned into
+    a severity by the label rules. Only takes whose severity the natural target declares are positives; the rest
+    are counted as outside the rule. The cohort is its corpus's confirmation split, with its speakers."""
+    targets = registry_lib.natural_targets(entry)
+    labels = (roles.get("positives") or {}).get("labels")
+    if not targets or not isinstance(labels, Mapping):
+        raise CalibrationError(f"{entry['id']} declares no natural labelled positives")
+    cohort = load_cohort(path)
+    split = resolve_cohort(cohort, n1_manifest)
+    if split != "confirmation":
+        raise CalibrationError(f"{cohort['name']}: natural positives are their corpus's confirmation split, not "
+                               f"{split_name(split)}")
+    if cohort["population"] != roles["confirmNegatives"]["population"]:
+        raise CalibrationError(f"{cohort['name']} is {cohort['population']}; natural positives are measured in the "
+                               f"negatives' domain ({roles['confirmNegatives']['population']})")
+    own = {take.get("takeID"): take for take in load_json(path, "the natural positives").get("takes") or ()
+           if isinstance(take, Mapping)}
+    recordings = {} if n1_manifest is None else {
+        take.get("takeID"): take for take in load_json(n1_manifest, "the N1 manifest").get("takes") or ()
+        if isinstance(take, Mapping)}
+    (target,) = targets
+    severities: dict[str, str] = {}
+    outside = 0
+    for take_id, take in cohort["takes"].items():
+        value = registry_lib.label_value(own.get(take_id) or {}, labels["field"])
+        if value is None:
+            value = registry_lib.label_value(recordings.get(take["n1TakeID"]) or {}, labels["field"])
+        severity = registry_lib.label_severity(labels, value)
+        if severity in target["severities"]:
+            severities[take_id] = severity
+        else:
+            outside += 1
+    return {"cohort": cohort, "split": split, "labels": dict(labels), "labelsSHA256": json_digest(dict(labels)),
+            "target": target, "severities": severities, "outsideRule": outside, "bundle": bundle,
+            "measurements": measurements}
+
+
+def natural_source(natural: Mapping[str, Any]) -> dict:
+    """What a scores document and a plan pin of the natural positives: the cohort and the label rule."""
+    cohort = natural["cohort"]
+    return {"kind": cohort["kind"], "manifestDigest": cohort["manifestDigest"], "fileSHA256": cohort["fileSHA256"],
+            "corpus": cohort.get("corpus"), "split": natural["split"], "labelsSHA256": natural["labelsSHA256"],
+            "positives": len(natural["severities"]), "outsideRule": natural["outsideRule"]}
 
 
 def raw_output_judges(entry: Mapping[str, Any]) -> set[str]:
@@ -807,18 +873,77 @@ def provenance_problems(population: str, injection: Mapping[str, Any], mechanism
     return problems
 
 
+def _natural_units(entry: Mapping[str, Any], cohort: Mapping[str, Any], natural: Mapping[str, Any], *,
+                   identities: dict, versions: dict, panel_judges: Sequence[str], referenced: set[str]) -> list[dict]:
+    """The natural positives' units (P4 at their label's severity), bound to their own evidence."""
+    positives = natural["cohort"]
+    shared = sorted({take["speaker"] for take in positives["takes"].values()}
+                    & {take["speaker"] for take in cohort["takes"].values()})
+    if shared:
+        raise CalibrationError(f"the natural positives share {len(shared)} speakers with the cohort; they come from "
+                               "another corpus's recordings")
+    needs_panel, needs_measurements = registry_lib.needs_panel(entry), registry_lib.needs_measurements(entry)
+    bundle, measurements = natural.get("bundle"), natural.get("measurements")
+    if raw_output_judges(entry):
+        raise CalibrationError(f"{entry['id']} reduces raw outputs, which natural positives do not export")
+    if needs_panel and bundle is None:
+        raise CalibrationError(f"{entry['id']} reads panel evidence: its natural positives need --natural-bundle")
+    if needs_measurements and measurements is None:
+        raise CalibrationError(f"{entry['id']} reads measurements.json: its natural positives need "
+                               "--natural-measurements")
+    if measurements is not None:
+        if measurements["takesManifestSHA256"] != positives["fileSHA256"]:
+            raise CalibrationError(f"--natural-measurements ({measurements['name']}) scored another takes manifest")
+        identities.setdefault(registry_lib.STAGE0_JUDGE, set()).add(measurements["identity"])
+    clips = {clip.get("sourceTakeID") or clip.get("clipID"): clip for clip in (measurements or {}).get("clips") or ()
+             if clip.get("injection") is None}
+    target = natural["target"]
+    population = TIER_POPULATIONS["T4"]
+    units = []
+    for take_id in sorted(natural["severities"]):
+        take, severity = positives["takes"][take_id], natural["severities"][take_id]
+        where = f"{positives['name']}: {take_id}"
+        evidence = bundle.measurements(take_id, audio_sha256=take["wavSHA256"], text_sha256=take["textSHA256"],
+                                       language=take["language"]) if bundle is not None and needs_panel else None
+        private = bundle.private(take_id) if (registry_lib.needs_private(entry) or referenced) \
+            and evidence is not None else None
+        _check_private(private, take["textSHA256"], where)
+        if referenced and evidence is not None:
+            check_reference(private, take.get("referenceSHA256"), where)
+        clip = clips.get(take_id) if needs_measurements else None
+        if clip is not None and clip.get("wavSHA256") != take["wavSHA256"]:
+            raise CalibrationError(f"{where}: measurements.json measured other audio than the manifest's")
+        _identities(identities, versions, evidence, panel_judges)
+        scored = registry_lib.score_take(entry, take["language"], clip=clip, measurements=evidence, private=private)
+        if (needs_panel and evidence is None) or (needs_measurements and clip is None):
+            scored = _without_evidence(scored)
+        elif needs_panel:
+            scored = _run_failed(entry, take["language"], scored, evidence)
+        units.append(_unit({**take, "population": population}, scored, injectorID=target["injectorID"],
+                           severity=severity, mechanism=registry_lib.NATURAL_MECHANISM,
+                           cell=registry_lib.target_cell(entry, target["injectorID"], severity,
+                                                         registry_lib.NATURAL_MECHANISM),
+                           sham=False, cleanAudio=False))
+    return units
+
+
 def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: str, split: str | None = None,
                  bundle: Bundle | None = None, measurements: Mapping[str, Any] | None = None,
                  injection_set: Mapping[str, Any] | None = None, positive_bundle: Bundle | None = None,
                  positive_measurements: Mapping[str, Any] | None = None,
                  positives_population: str | Sequence[str] = "P1",
                  raw_outputs: Sequence[Mapping[str, Any]] = (),
-                 positive_raw_outputs: Sequence[Mapping[str, Any]] = ()) -> dict:
+                 positive_raw_outputs: Sequence[Mapping[str, Any]] = (),
+                 natural: Mapping[str, Any] | None = None) -> dict:
     """Every cohort take's score, then every positive and sham of the detector's injectors.
 
     Positives are the role set's populations (`positives_population`, see
     `positive_populations`: P1, or a declared P2 or P3 construction with its
-    provenance), each of its construction tier; shams are S. A
+    provenance), each of its construction tier; shams are S. `natural`
+    (`load_natural_positives`) adds a labelled corpus's own recordings as P4
+    positives of the detector's natural target, each at the severity its label
+    earns, measured by their own panel and measurements; their speakers must be
+    none of the cohort's. A
     `raw-output` detector reads its judge's raw output from the exports
     (`raw_outputs` for the cohort's panel, `positive_raw_outputs` for the
     injection set's), and a seam measure reads each take's long-form seams (a
@@ -860,8 +985,9 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
     skipped: Counter = Counter()
     units: list[dict] = []
     clean_clips: dict[str, dict] = {}
+    natural_bundle = (natural or {}).get("bundle")
     if needs_panel:
-        for source in (bundle, positive_bundle):
+        for source in (bundle, positive_bundle, natural_bundle):
             if source is None:
                 continue
             digest = source.identity()["orchestratorSHA256"]
@@ -991,6 +1117,9 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         units.append(_unit(meta, scored, injectorID=injector_id, variant=injection.get("variant"),
                            severity=severity, mechanism=mechanism, cell=cell, sham=bool(sham), cleanAudio=clean,
                            **extra))
+    if natural is not None:
+        units.extend(_natural_units(entry, cohort, natural, identities=identities, versions=versions,
+                                    panel_judges=panel_judges, referenced=referenced))
     by_population = Counter(unit["population"] for unit in units)
     abstained = Counter(unit["abstain"] for unit in units if unit["abstain"])
     cohort_block = {"kind": cohort["kind"], "population": cohort["population"],
@@ -1037,6 +1166,16 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
                    "expected": {"cohortTakes": len(cohort["takes"]), "injections": len(positives)}},
         "units": units,
     }
+    if natural is not None:
+        # The natural positives' cohort and label rule, and the evidence they were measured with (A5, A7).
+        measured = natural.get("measurements")
+        document["sources"].update(
+            naturalPositives=natural_source(natural),
+            naturalBundle=natural_bundle.identity() if natural_bundle is not None and needs_panel else None,
+            naturalMeasurements={key: measured[key] for key in ("fileSHA256", "clipsSHA256", "identity",
+                                                                "takesManifestSHA256", "startedAt")}
+            if measured is not None and needs_measurements else None)
+        document["counts"]["expected"]["naturalPositives"] = len(natural["severities"])
     if raw_judges:
         # The raw-output exports read, each bound to its manifest and bundle (sorted by judge).
         for key, bound in (("rawOutputs", exports), ("positiveRawOutputs", positive_exports)):
@@ -1089,8 +1228,12 @@ def declared_cohorts(repository: Repository) -> dict[str, dict[str, list[str]]]:
         found["confirmation"].setdefault(plan.cohorts.confirmation.manifest_digest, []).append(plan.detector)
         if plan.binding("n3CohortDigest"):
             found["bound"].setdefault(plan.binding("n3CohortDigest"), []).append(plan.detector)
+        # A plan's natural positives are confirmation evidence like its confirmation cohort.
+        if plan.binding("naturalPositivesDigest"):
+            found["confirmation"].setdefault(plan.binding("naturalPositivesDigest"), []).append(plan.detector)
         if repository.ledger.outcome(plan.digest()) is not None:
-            for digest in (plan.cohorts.confirmation.manifest_digest, plan.binding("n3CohortDigest")):
+            for digest in (plan.cohorts.confirmation.manifest_digest, plan.binding("n3CohortDigest"),
+                           plan.binding("naturalPositivesDigest")):
                 if digest:
                     found["spent"].setdefault(digest, []).append(plan.detector)
     return found
@@ -1158,6 +1301,20 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         if problems:
             raise CalibrationError("; ".join(problems))
     output = repository.check_output(args.output)
+    natural = None
+    if args.natural_positives is not None:
+        # Natural positives, like constructed ones, are confirmation evidence only (A5).
+        if args.role != "confirmation":
+            raise CalibrationError("natural positives are confirmation evidence: score them under --role confirmation")
+        natural = load_natural_positives(
+            entry, roles, args.natural_positives, args.natural_n1_manifest,
+            bundle=Bundle(args.natural_bundle) if args.natural_bundle else None,
+            measurements=load_measurements(args.natural_measurements) if args.natural_measurements else None)
+    elif args.natural_n1_manifest or args.natural_bundle or args.natural_measurements:
+        raise CalibrationError("--natural-* evidence belongs to --natural-positives")
+    elif args.role == "confirmation" and registry_lib.natural_targets(entry):
+        raise CalibrationError(f"{entry['id']} measures detection on natural labelled positives: pass "
+                               "--natural-positives (the labelled corpus's cohort its plan names)")
     document = build_scores(
         entry, cohort, role=args.role, split=split,
         bundle=Bundle(args.bundle) if args.bundle else None,
@@ -1168,6 +1325,7 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         positives_population=positive_populations(roles, entry),
         raw_outputs=[load_raw_outputs(path) for path in args.raw_outputs or ()],
         positive_raw_outputs=[load_raw_outputs(path) for path in args.positive_raw_outputs or ()],
+        natural=natural,
     )
     if args.role == "confirmation":
         problems = confirmation_evidence_problems(repository, plan, document)
@@ -1335,9 +1493,10 @@ def current_evidence_problems(entry: Mapping[str, Any], identity: Mapping[str, A
 
 def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mapping[str, Any], *,
                calibration: Mapping[str, Any], confirmation: Mapping[str, Any], calibration_scores: Mapping[str, Any],
-               alpha: float, operating_point: str, injection: Mapping[str, Any],
+               alpha: float, operating_point: str, injection: Mapping[str, Any] | None,
                confirmation_split: str | None = None, calibration_split: str | None = None,
-               n3: Mapping[str, Any] | None = None) -> thresholds.PreRegistration:
+               n3: Mapping[str, Any] | None = None,
+               natural: Mapping[str, Any] | None = None) -> thresholds.PreRegistration:
     policy = repository.policy()
     if operating_point not in SUPPORTED_OPERATING_POINTS:
         raise CalibrationError(f"this driver pre-registers {SUPPORTED_OPERATING_POINTS} only")
@@ -1425,7 +1584,16 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
     if n3 is not None and declared["calibration"].get(n3["manifestDigest"]):
         raise CalibrationError(f"the plan of {', '.join(declared['calibration'][n3['manifestDigest']])} fits on "
                                "the N3 bound cohort (A5)")
-    for cohort, what in ((confirmation, "confirmation cohort"), (n3, "N3 bound cohort")):
+    natural_cohort = natural["cohort"] if natural is not None else None
+    if natural_cohort is not None:
+        # Natural positives come from another corpus: no speaker, family or script of either cohort.
+        for cohort, what in ((calibration, "calibration"), (confirmation, "confirmation")):
+            for key in ("speaker", "family", "scriptID"):
+                if {take[key] for take in natural_cohort["takes"].values()} & \
+                        {take[key] for take in cohort["takes"].values()}:
+                    raise CalibrationError(f"the natural positives share a {key} with the {what} cohort")
+    for cohort, what in ((confirmation, "confirmation cohort"), (n3, "N3 bound cohort"),
+                         (natural_cohort, "natural positives cohort")):
         spent = declared["spent"].get(cohort["manifestDigest"]) if cohort is not None else None
         if spent:
             raise CalibrationError(f"the {what} was already scored as confirmation evidence (for "
@@ -1450,11 +1618,15 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         ("policySHA256", file_sha256(repository.policy_path)),
         ("scoringCodeSHA256", scoring_code),
         ("evidenceIdentitySHA256", json_digest(calibration_scores["evidenceIdentity"])),
-        *((binding, construction_value(key, injection[key])) for key, binding in INJECTION_BINDINGS.items()),
+        *((binding, construction_value(key, injection[key])) for key, binding in INJECTION_BINDINGS.items()
+          if injection is not None),
         *((f"{TIER_CATALOG_BINDING}{tier}", str(version))
-          for tier, version in sorted((injection.get("tierCatalogVersions") or {}).items())),
+          for tier, version in sorted(((injection or {}).get("tierCatalogVersions") or {}).items())),
         # A fail point's N3 flag-rate bound is confirmation evidence too: its cohort is pre-registered (A2, A5).
         *((("n3CohortDigest", n3["manifestDigest"]),) if n3 is not None else ()),
+        # Natural positives: the labelled cohort and the rule that selects them are pre-registered (A5).
+        *((("naturalPositivesDigest", natural["cohort"]["manifestDigest"]),
+           ("naturalLabelsSHA256", natural["labelsSHA256"])) if natural is not None else ()),
     )
     strata = () if entry["strata"] is None else ((entry["strata"]["by"], entry["strata"]["reason"]),)
     plan = thresholds.PreRegistration(
@@ -1484,9 +1656,24 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
 
     registry, entry = repository.entry(args.detector)
     rule = cohort_rule(entry)
-    positives = registry_lib.role_set(registry, entry)["positives"]["population"]
+    roles = registry_lib.role_set(registry, entry)
+    positives = roles["positives"]["population"]
+    flags = {"--injection-catalog-seed": args.injection_catalog_seed, "--injection-sample-seed":
+             args.injection_sample_seed, "--injection-sample-per-cell": args.injection_sample_per_cell,
+             "--injection-classes": args.injection_classes}
+    constructed = registry_lib.constructed_targets(entry)
+    if not constructed:
+        # Every positive is a natural recording: no injection set is built, so none is declared.
+        given = [flag for flag, value in flags.items() if value is not None]
+        if given or args.injection_catalog_version is not None or args.tier_catalog_version:
+            raise CalibrationError(f"{entry['id']} has natural positives only: pass no injection flags "
+                                   f"({', '.join(given) or '--injection-catalog-version'})")
+        catalog_version = None
+    elif any(value is None for value in flags.values()):
+        raise CalibrationError("the plan declares how the confirmation injection set will be built: pass "
+                               + ", ".join(flag for flag, value in flags.items() if value is None))
     # P1 positives come from this repository's T1 catalog; a declared P2 or P3 construction names its own.
-    if positives == "P1":
+    elif positives == "P1":
         catalog_version = injectors.CATALOG_VERSION
         if args.injection_catalog_version not in (None, catalog_version):
             raise CalibrationError(f"P1 positives are built with injector catalog {catalog_version}")
@@ -1504,15 +1691,24 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
         raise CalibrationError(f"{calibration['name']} is an N2 cohort: pass --calibration-n1-manifest (the N1 "
                                "manifest it pins) so its split and speakers are known")
     # A second tier's positives (a fail point's T2 beside T1) are built from that tier's catalog, bound too.
-    tiers = [POPULATION_TIERS[population] for population in positive_populations(
-        registry_lib.role_set(registry, entry), entry)[1:]]
+    # (Natural P4 positives are no construction: they have no catalog.)
+    tiers = [POPULATION_TIERS[population] for population in positive_populations(roles, entry)[1:]
+             if population != TIER_POPULATIONS["T4"]]
     declared_tiers = dict(args.tier_catalog_version or ())
     if sorted(declared_tiers) != sorted(tiers):
         raise CalibrationError(f"{entry['id']} reads {', '.join(tiers) or 'no'} second-tier constructions: pass "
                                "--tier-catalog-version TIER=N for each, and only those")
     injection = {"catalogVersion": catalog_version, "catalogSeed": args.injection_catalog_seed,
                  "sampleSeed": args.injection_sample_seed, "samplePerCell": args.injection_sample_per_cell,
-                 "classes": args.injection_classes, "tierCatalogVersions": declared_tiers}
+                 "classes": args.injection_classes, "tierCatalogVersions": declared_tiers} if constructed else None
+    natural = None
+    if registry_lib.natural_targets(entry):
+        if args.natural_positives is None:
+            raise CalibrationError(f"{entry['id']} measures detection on natural labelled positives: pass "
+                                   "--natural-positives (and its --natural-n1-manifest) so the plan names them (A5)")
+        natural = load_natural_positives(entry, roles, args.natural_positives, args.natural_n1_manifest)
+    elif args.natural_positives is not None or args.natural_n1_manifest is not None:
+        raise CalibrationError(f"{entry['id']} declares no natural labelled positives")
     n3 = None
     if args.n3_cohort is not None:
         n3 = load_cohort(args.n3_cohort)
@@ -1524,7 +1720,7 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
                       confirmation_split=resolve_cohort(confirmation, args.confirmation_n1_manifest),
                       calibration_split=calibration_split,
                       calibration_scores=load_scores(args.calibration_scores), alpha=args.alpha,
-                      operating_point=args.operating_point, injection=injection, n3=n3)
+                      operating_point=args.operating_point, injection=injection, n3=n3, natural=natural)
     if repository.ledger.outcome(plan.digest()) is not None:
         raise CalibrationError("this plan was already confirmed")
     existing = repository.store.load(entry["id"], args.operating_point)
@@ -1686,11 +1882,17 @@ def evidence_problems(scores: Mapping[str, Any], what: str = "") -> list[str]:
     if counts.get("skipped"):
         problems.append(f"{what}units were skipped ({counts['skipped']}); every expected unit is scored")
     expected = counts.get("expected") or {}
+    natural = registry_lib.NATURAL_MECHANISM
     cohort_units = sum(1 for unit in scores["units"] if unit["injectorID"] is None)
-    injected_units = sum(1 for unit in scores["units"] if unit["injectorID"] is not None)
+    injected_units = sum(1 for unit in scores["units"] if unit["injectorID"] is not None
+                         and unit.get("mechanism") != natural)
+    natural_units = sum(1 for unit in scores["units"] if unit.get("mechanism") == natural)
     if (cohort_units, injected_units) != (expected.get("cohortTakes"), expected.get("injections")):
         problems.append(f"{what}{cohort_units} cohort and {injected_units} injected units, where the manifests "
                         f"list {expected.get('cohortTakes')} and {expected.get('injections')}")
+    if natural_units != expected.get("naturalPositives", 0):
+        problems.append(f"{what}{natural_units} natural positive units, where their label rule selects "
+                        f"{expected.get('naturalPositives', 0)}")
     gaps = evidence_gaps(scores["units"])
     if gaps:
         problems.append(f"{what}{sum(gaps.values())} in-scope units have no evidence "
@@ -1868,9 +2070,32 @@ def injection_construction_problems(plan: thresholds.PreRegistration, scores: Ma
     return problems
 
 
+def natural_positive_problems(plan: thresholds.PreRegistration, scores: Mapping[str, Any]) -> list[str]:
+    """The natural positives are the labelled cohort and label rule the plan names (A5)."""
+    source = (scores.get("sources") or {}).get("naturalPositives")
+    planned = plan.binding("naturalPositivesDigest")
+    if planned is None:
+        return ["the plan names no natural positives; the scores carry some"] if source else []
+    if not source:
+        return ["the confirmation scores carry no natural positives; the plan names a labelled cohort"]
+    problems = []
+    if source.get("manifestDigest") != planned:
+        problems.append("the natural positives are another cohort than the plan names (A5)")
+    if source.get("labelsSHA256") != plan.binding("naturalLabelsSHA256"):
+        problems.append("the natural positives were labelled by another rule than the plan's (A5)")
+    return problems
+
+
+def plans_injection(plan: thresholds.PreRegistration) -> bool:
+    return any(plan.binding(binding) is not None for binding in INJECTION_BINDINGS.values())
+
+
 def confirmation_evidence_problems(repository: Repository, plan: thresholds.PreRegistration,
                                    scores: Mapping[str, Any]) -> list[str]:
-    return injection_construction_problems(plan, scores) + freshness_problems(repository, plan, scores)
+    # A detector whose positives are all natural recordings plans no injection set.
+    injected = injection_construction_problems(plan, scores) \
+        if plans_injection(plan) or (scores.get("sources") or {}).get("injectionSet") else []
+    return injected + natural_positive_problems(plan, scores) + freshness_problems(repository, plan, scores)
 
 
 def freshness_problems(repository: Repository, plan: thresholds.PreRegistration, scores: Mapping[str, Any], *,
@@ -1880,10 +2105,12 @@ def freshness_problems(repository: Repository, plan: thresholds.PreRegistration,
     planned_at = repository.store.commit_time(plan)
     sources = scores.get("sources") or {}
     cohort = "the N3 bound cohort's" if bound else "the confirmation cohort's"
-    for key, what in (("bundle", f"{cohort} panel bundle"), ("positiveBundle", "the positives' panel bundle")):
+    for key, what in (("bundle", f"{cohort} panel bundle"), ("positiveBundle", "the positives' panel bundle"),
+                      ("naturalBundle", "the natural positives' panel bundle")):
         problems.extend(panel_freshness_problems(sources.get(key), planned_at, what))
     for key, what in (("measurements", f"{cohort} measurements"),
-                      ("positiveMeasurements", "the positives' measurements")):
+                      ("positiveMeasurements", "the positives' measurements"),
+                      ("naturalMeasurements", "the natural positives' measurements")):
         problems.extend(measurement_freshness_problems(sources.get(key), planned_at, what))
     return problems
 
@@ -2048,7 +2275,8 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
     injection = sources["injectionSet"]
     panels = [{"cohort": role, "bundleDigest": sources[key]["bundleDigest"], "startedAt": sources[key]["startedAt"]}
               for key, role in (("bundle", plan.population),
-                                ("positiveBundle", "+".join((*_populations(positives_population), "S"))))
+                                ("positiveBundle", "+".join((*_populations(positives_population), "S"))),
+                                ("naturalBundle", TIER_POPULATIONS["T4"]))
               if sources.get(key)]
     bound_panel = ((bound or {}).get("sources") or {}).get("bundle")
     if bound_panel:
@@ -2080,7 +2308,7 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
             "judgeMetrics": confirmation["evidenceIdentity"]["judgeMetrics"],
             "metricVersions": confirmation["evidenceIdentity"]["metricVersions"],
             "injectionSet": {"entriesSHA256": injection["entriesSHA256"],
-                             "construction": dict(injection["construction"])},
+                             "construction": dict(injection["construction"])} if injection else None,
             "planCommittedAt": _timestamp(planned_at),
             "confirmationPanels": panels,
         },
@@ -2113,6 +2341,11 @@ def build_record(repository: Repository, entry: Mapping[str, Any], plan: thresho
         "informational": dict(informational) if informational else None,
         "ledgerOutcomeSHA256": json_digest(dict(outcome)),
     }
+    natural = sources.get("naturalPositives")
+    if natural:
+        # The labelled corpus's cohort and label rule the natural positives came from (A5), pinned like the others.
+        record["cohorts"]["naturalPositives"] = {key: natural[key] for key in ("kind", "manifestDigest", "corpus",
+                                                                               "split", "labelsSHA256")}
     if bound is not None:
         # The N3 flag-rate bound (A2): what the fail point confirms beside N2, pinned like the cohorts.
         record["cohorts"]["n3"] = {"kind": bound["cohort"]["kind"], "manifestDigest": bound["cohort"]["manifestDigest"],
@@ -2268,7 +2501,10 @@ def record_errors(record: Any) -> list[str]:
     if not is_sha256(evidence.get("scoringCodeSHA256")) or not is_sha256(evidence.get("evidenceIdentitySHA256")):
         errors.append("evidence pins the scoring code and the evidence identity by SHA-256")
     a4 = record["a4"] if isinstance(record["a4"], Mapping) else {}
-    if not isinstance(a4.get("cells"), list) or not a4["cells"] \
+    # Only a detector whose every positive is a natural recording (processed by nothing) has no sham cell.
+    mechanisms = set(((record["rates"] or {}).get("mechanisms") or {}) if isinstance(record["rates"], Mapping) else ())
+    natural_only = bool(mechanisms) and mechanisms <= {registry_lib.NATURAL_MECHANISM}
+    if not isinstance(a4.get("cells"), list) or (not a4["cells"] and not natural_only) \
             or not set(a4.get("uninformative") or {}) <= set(a4["cells"]):
         errors.append("a4 names its sham cells and which of them are uninformative")
     elif set((record["rates"] or {}).get("shams") or {}) != set(a4["cells"]):
@@ -2520,6 +2756,12 @@ def parser() -> argparse.ArgumentParser:
                              "one per judge the detector reduces")
     scores.add_argument("--positive-raw-outputs", type=Path, action="append",
                         help="the same for the injection set's panel")
+    scores.add_argument("--natural-positives", type=Path,
+                        help="confirmation only: the labelled corpus's cohort whose labels select natural positives")
+    scores.add_argument("--natural-n1-manifest", type=Path,
+                        help="the N1 manifest the natural positives' N2 cohort pins (speakers, split and labels)")
+    scores.add_argument("--natural-bundle", type=Path, help="the natural positives' panel bundle")
+    scores.add_argument("--natural-measurements", type=Path, help="the natural positives' measurements.json")
     scores.add_argument("--operating-point", default="warn", choices=SUPPORTED_OPERATING_POINTS,
                         help="the plan that names the cohort (confirmation and bound roles)")
     scores.add_argument("--output", required=True, type=Path)
@@ -2542,12 +2784,17 @@ def parser() -> argparse.ArgumentParser:
                       help="TIER=N for each second construction tier the detector declares (e.g. T2=1)")
     plan.add_argument("--n3-cohort", type=Path,
                       help="for a fail point: the N3 takes manifest its flag rate is bounded on (A2)")
-    plan.add_argument("--injection-catalog-seed", required=True, type=int,
-                      help="the catalog seed the confirmation injection set will be built with")
-    plan.add_argument("--injection-sample-seed", required=True, type=int)
-    plan.add_argument("--injection-sample-per-cell", required=True, type=int)
-    plan.add_argument("--injection-classes", required=True, type=injection_classes,
+    plan.add_argument("--injection-catalog-seed", type=int,
+                      help="the catalog seed the confirmation injection set will be built with (required unless "
+                           "every positive is a natural recording)")
+    plan.add_argument("--injection-sample-seed", type=int)
+    plan.add_argument("--injection-sample-per-cell", type=int)
+    plan.add_argument("--injection-classes", type=injection_classes,
                       help="the classes the confirmation injection set will inject, comma-separated")
+    plan.add_argument("--natural-positives", type=Path,
+                      help="for natural labelled positives: the labelled corpus's cohort (its confirmation split)")
+    plan.add_argument("--natural-n1-manifest", type=Path,
+                      help="the N1 manifest the natural positives' N2 cohort pins (speakers, split and labels)")
     derive = commands.add_parser("derive", help="the threshold under the committed plan")
     derive.add_argument("--detector", required=True)
     derive.add_argument("--calibration-scores", required=True, type=Path)

@@ -26,6 +26,7 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | confirmed (refused) | refused | 206/3473 (0.059), upper 0.066 | french 20/286 (0.070), upper 0.117 | 43/135 (0.319), lower 0.252 | 0/3473 (0.000), upper 0.001 | 3473 / 135 / 135 | [record-40cbfdf9b37db8a2.json](../../../benchmarks/audio-qc-calibration/boundary.run-on@1/record-40cbfdf9b37db8a2.json) |
 | [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | no plan | not qualified | - | - | - | - | - | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | confirmed (qualified) | qualified (warn) | 200/3718 (0.054), upper 0.060 | english 19/236 (0.081), upper 0.137 | 150/150 (1.000), lower 0.980 | 0/3718 (0.000), upper 0.001 | 3718 / 150 / 150 | [record-67b4358cc9d3e121.json](../../../benchmarks/audio-qc-calibration/language.consensus-lid@1/record-67b4358cc9d3e121.json) |
+| [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | no plan | not qualified | - | - | - | - | - | - |
 | [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
 | [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
 | [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |

@@ -143,6 +143,7 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
 | [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | 2 | difference | no plan | not qualified | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |
+| [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | 2 | consensus-mean | no plan | not qualified | - |
 | [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | 2 | single | no plan | not qualified | - |
 | [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | 2 | difference | no plan | not qualified | - |
 | [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | 2 | difference | no plan | not qualified | - |

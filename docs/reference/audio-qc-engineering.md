@@ -1669,6 +1669,28 @@ run-on bound, 20% of German below the language bound and 13% of Japanese above t
 where warn allows 20% per language. The registry records the declared risks (SenseVoice's codec
 degradation in ja and ko, VoxLingua's weakness in de and ru, Parakeet's Whisper label lineage).
 
+**Classes E, F, I and J (registered @1, not yet planned).** The next classes of audit section 5.7
+are registered at warn with the data each still needs. None has a plan: each lacks a cohort, a
+positive construction or a producer of its inputs, and the entries' `limitations` and `risks` say
+which. An entry can still change in place until a plan binds its digest.
+
+| Detector | Class | Score | Direction | Still needs |
+|---|---|---|---|---|
+| `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labeled N2 corpus; reference clips in the panel manifest; IDN-IMPOSTOR (not in catalog v2) |
+| `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus; a recorded IDN-SWAP (v1 swaps procedural sources only) |
+| `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; IDN-ONSET (not in catalog v2); the pYIN register and envelope parts of the joint onset rule |
+
+Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
+two-family rule is a new version then. A panel judge whose registry entry lists no languages
+(the speaker families, pYIN) runs on every take, so the validator counts it as covering every
+language. Its role set `speaker-labeled-n2` names pending corpora: FLEURS has no speaker ids, so
+the fit and confirmation cohorts wait for a maintainer decision on a speaker-labeled corpus whose
+terms allow speaker verification (not Common Voice), with two or more utterances per speaker,
+resynthesized to N2. Each language stratum needs 60 scored calibration families and 60
+confirmation negative families from at least 3 speakers, disjoint by family, speaker and script,
+plus 60 families per severe cell and per sham. `plan` pre-registers FLEURS-derived cohorts only,
+so it also needs a declared split for another corpus.
+
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A
 plan declares its cohorts (`CohortSplit`: both manifests by kind and digest, `disjointBy`, the

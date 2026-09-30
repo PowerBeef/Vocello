@@ -25,7 +25,11 @@ Combinations:
 
 A consensus component must come from a voting judge of its own family that is
 not correlated with the generator's lab (A6), and both components of a group
-must be in the judges' declared language scope.
+must be in the judges' declared language scope. A panel judge whose registry
+entry lists no languages (the speaker families, pYIN) runs on every take, so
+it covers every product language. A `difference` may subtract two metrics of
+one voting judge (class E: CAM++'s whole-take cosine minus a window's), so each
+take is its own baseline.
 
 `trailing_unmatched` compares a transcript with its reference on the primary
 units of `lib/language_metrics.py` (words, or characters in zh, ja and ko) and
@@ -190,6 +194,13 @@ def stratum(by: str | None, language: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def _judge_languages(judge: Mapping[str, Any]) -> set[str]:
+    """The product languages a panel judge runs on: those its `panel.languages` lists, or every product
+    language when its `panel` entry lists none (a language-free judge such as the speaker families or
+    pYIN, which `panel_jobs.judge_scope` schedules on every take); a judge without a `panel` entry
+    covers none."""
+    panel = judge.get("panel")
+    if isinstance(panel, Mapping) and not isinstance(panel.get("languages"), Mapping):
+        return set(language_metrics.PRODUCT_LANGUAGES)
     codes = {code: name for name, code in language_metrics.LANGUAGE_LOCALE_CODES.items()}
     languages: set[str] = set()
     for values in ((judge.get("panel") or {}).get("languages") or {}).values():

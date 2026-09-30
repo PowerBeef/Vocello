@@ -332,7 +332,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.errors(fixture_registry()), [])
         ids = [entry["id"] for entry in self.registry["detectors"]]
         self.assertEqual(sorted({detectors.detector_entry(self.registry, detector)["class"] for detector in ids}),
-                         ["A", "B", "C", "D"])
+                         ["A", "B", "C", "D", "E"])
 
     def test_fastqc_fields_match_the_measurement_writer(self) -> None:
         self.assertLessEqual(detectors.FASTQC_SCORE_FIELDS, set(audio_qc_calibration_set.FASTQC_FIELDS))
@@ -442,6 +442,119 @@ class ScoringTests(unittest.TestCase):
         names = {path.name for path in detectors.scoring_sources()}
         self.assertLessEqual({"detectors.py", "language_metrics.py"}, names)
         self.assertEqual(detectors.scoring_code_sha256(), detectors.scoring_code_sha256())
+
+
+ALL_LANGUAGES = tuple(language_metrics.PRODUCT_LANGUAGES)
+CAMPPLUS, RESNET, PYIN = "speaker.campplus-voxceleb@1", "speaker.resnet293-voxceleb@1", "pitch.pyin@1"
+
+
+class NewClassRegistryTests(unittest.TestCase):
+    """Classes E, F, I and J: role sets, language-free judges, targets and the voter rules they keep."""
+
+    def setUp(self) -> None:
+        self.judges = json.loads((REPO / calibration.JUDGES).read_text(encoding="utf-8"))
+        self.registry = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+
+    def entry(self, detector: str) -> dict:
+        return detectors.detector_entry(self.registry, detector)
+
+    def mutate(self, detector: str, change) -> list[str]:
+        registry = copy.deepcopy(self.registry)
+        change(next(entry for entry in registry["detectors"] if entry["id"] == detector), registry)
+        return detectors.registry_errors(registry, self.judges)
+
+    def test_language_free_panel_judges_cover_every_language(self) -> None:
+        judges = self.judges["judges"]
+        for judge in (CAMPPLUS, RESNET, PYIN):
+            self.assertEqual(detectors._judge_languages(judges[judge]), set(ALL_LANGUAGES))
+        self.assertEqual(detectors._judge_languages(judges["asr.parakeet-tdt-0.6b-v3@1"]),
+                         {"english", "french", "german", "italian", "portuguese", "russian", "spanish"})
+        # No panel entry: not a panel judge, so it covers no language.
+        self.assertEqual(detectors._judge_languages(judges["asr.whisper-small@1"]), set())
+
+    def test_identity_role_set_and_targets(self) -> None:
+        for detector in ("identity.clone-similarity@1", "identity.window-drift@1", "identity.onset-drift@1"):
+            entry = self.entry(detector)
+            self.assertEqual((entry["class"], entry["stage"]), ("E", 2))
+            roles = detectors.role_set(self.registry, entry)
+            self.assertEqual((roles["fit"]["population"], roles["confirmNegatives"]["population"],
+                              roles["positives"]["population"]), ("N2", "N2", "P1"))
+            self.assertEqual(detectors.judges_of(entry), [CAMPPLUS])
+            self.assertTrue(detectors.needs_panel(entry))
+            self.assertFalse(detectors.needs_measurements(entry) or detectors.needs_private(entry))
+            self.assertEqual(sorted(entry["scope"]["languages"]), sorted(ALL_LANGUAGES))
+        similarity = self.entry("identity.clone-similarity@1")
+        self.assertEqual(detectors.target_injectors(similarity), {"IDN-IMPOSTOR", "IDN-SHIFT"})
+        self.assertEqual(detectors.target_mechanism(similarity, "IDN-IMPOSTOR"), "T1-parallel-corpus")
+        self.assertEqual(detectors.target_cell(similarity, "IDN-SHIFT", "severe", "T1-pcm-construction"),
+                         "IDN-SHIFT/severe")
+        self.assertIsNone(detectors.target_cell(similarity, "IDN-SHIFT", "severe", "T1-parallel-corpus"))
+        self.assertEqual(detectors.target_injectors(self.entry("identity.window-drift@1")), {"IDN-SWAP"})
+        self.assertEqual(detectors.target_injectors(self.entry("identity.onset-drift@1")), {"IDN-ONSET"})
+        self.assertTrue(detectors.sham_of(similarity, "IDN-IMPOSTOR", "T1-parallel-corpus"))
+
+    def test_identity_detectors_keep_the_voter_rules(self) -> None:
+        def resnet(entry, _):
+            entry["score"]["groups"][0]["components"][0]["judge"] = RESNET
+        self.assertTrue(any("does not vote" in error for error in self.mutate("identity.clone-similarity@1", resnet)))
+
+        def unknown_metric(entry, _):
+            entry["score"]["groups"][0]["components"][1]["metric"] = "window cosine"
+        self.assertTrue(any("panel metric" in error for error in self.mutate("identity.window-drift@1", unknown_metric)))
+
+    def test_role_sets_are_validated(self) -> None:
+        def confirm_on_calibration(_, registry):
+            registry["roleSets"]["speaker-labeled-n2"]["confirmNegatives"]["cohort"] = "calibration"
+        self.assertTrue(any("roleSets.speaker-labeled-n2" in error
+                            for error in self.mutate("identity.clone-similarity@1", confirm_on_calibration)))
+
+        def unknown_population(_, registry):
+            registry["roleSets"]["speaker-labeled-n2"]["positives"]["population"] = "P9"
+        self.assertTrue(any("roleSets.speaker-labeled-n2.positives" in error
+                            for error in self.mutate("identity.clone-similarity@1", unknown_population)))
+
+        def unnamed_role_set(entry, _):
+            entry["populations"] = "speaker-corpus"
+        self.assertTrue(any("must name a role set" in error
+                            for error in self.mutate("identity.clone-similarity@1", unnamed_role_set)))
+
+
+class NewClassScoringTests(unittest.TestCase):
+    """score_take on fixture evidence for classes E, F, I and J, and their abstentions."""
+
+    def setUp(self) -> None:
+        self.registry = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
+
+    def entry(self, detector: str) -> dict:
+        return detectors.detector_entry(self.registry, detector)
+
+    def test_identity_scores_and_abstentions(self) -> None:
+        metrics = {"cosine": 0.82, "windowCount": 17, "windowCosineMinimum": 0.31, "windowCosineMean": 0.7,
+                   "onsetWindowCosine": 0.74, "embeddingDimension": 512}
+        evidence = {CAMPPLUS: {"status": "complete", "metrics": metrics}}
+        expected = {"identity.clone-similarity@1": 0.82, "identity.window-drift@1": 0.51,
+                    "identity.onset-drift@1": 0.08}
+        for detector, score in expected.items():
+            entry = self.entry(detector)
+            scored = detectors.score_take(entry, "korean", measurements=evidence)
+            self.assertEqual((scored["inScope"], scored["abstain"]), (True, None), detector)
+            self.assertAlmostEqual(scored["score"], score, places=9)
+            # No reference clip: CAM++ completes but reports no similarity, so the take abstains.
+            unreferenced = {CAMPPLUS: {"status": "complete", "metrics": {}}}
+            self.assertEqual(detectors.score_take(entry, "english", measurements=unreferenced)["abstain"], "no-value")
+            # A take shorter than one window has no window cosine.
+            short = {CAMPPLUS: {"status": "complete", "metrics": {**metrics, "windowCount": 0,
+                                                                  "windowCosineMinimum": None,
+                                                                  "onsetWindowCosine": None}}}
+            self.assertEqual(detectors.score_take(entry, "english", measurements=short)["abstain"],
+                             None if detector == "identity.clone-similarity@1" else "no-value")
+            self.assertEqual(detectors.score_take(entry, "english", measurements={})["abstain"], "not-measured")
+            self.assertEqual(detectors.score_take(entry, "english", measurements={
+                CAMPPLUS: {"status": "out-of-scope", "metrics": {}}})["abstain"], "judge-out-of-scope")
+            self.assertEqual(detectors.score_take(entry, "english", measurements={
+                CAMPPLUS: {"status": "unavailable", "metrics": {}}})["abstain"], "judge-unavailable")
+            outside = detectors.score_take(entry, "dutch", measurements=evidence)
+            self.assertEqual((outside["inScope"], outside["abstain"], outside["score"]), (False, "out-of-scope", None))
 
 
 def brute_force_tail(reference: list, hypothesis: list) -> tuple[int, int]:

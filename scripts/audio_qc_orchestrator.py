@@ -32,7 +32,8 @@ of takes and loads no model itself:
   `lib.qc_pipeline.panel_metrics`), keyed by the L1 key, the metric definition
   and the digest of every source that shapes it (a declared list per judge).
   A speaker judge also embeds the take's reference clip (the clone lane's
-  `referenceAudioPath`) as its own L1 row, and its L2 is their cosine.
+  `referenceAudioPath`, or a calibration take's declared `reference`) as its
+  own L1 row, and its L2 is their cosine.
 - **Stage 3 (never cached).** The current verdicts are replayed from L2: the
   language lane's witness verdict (`independent_asr.witness_verdict`) and the
   delivery lane's automated review and route (`run_local_delivery_cascade`),
@@ -281,7 +282,11 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
     (`scripts/audio_qc_calibration_set.py`, which embeds the text for N1 and N2
     sets) expects `fail` when it is a positive (`injection.population` P1) and
     `pass` when it is a sham, unless it names its expected outcome; a language
-    swap's language and text are the expected ones, not its audio's.
+    swap's language and text are the expected ones, not its audio's. A take or
+    entry that declares a `reference` clip (a speaker-labelled corpus's other
+    utterance of the speaker, a clone's reference, an impostor positive's
+    claimed speaker) passes it on, so the speaker judges embed it and score the
+    take against it; the take's private record names its digest.
     """
     kind = source.get("kind")
     if kind not in CALIBRATION_TAKE_KINDS:
@@ -322,10 +327,12 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
         # An injection-set positive (population P1) is a defect a detector should fail; a sham (S) should pass.
         expected = entry.get("expectedOutcome", injection.get(
             "expectedOutcome", "fail" if injection.get("population") == "P1" else "pass"))
+        reference_audio, reference_sha256 = _reference_clip(entry, base_dir)
         takes.append(_take(
             take_id=take_id, generation_id=take_id, audio=str(wav), audio_sha256=entry["wavSHA256"],
             language=entry.get("language"), reference_text=text, script_sha256=text_sha256(text),
             expected_outcome=expected, duration=entry.get("durationSeconds"),
+            reference_audio=reference_audio, reference_audio_sha256=reference_sha256,
         ))
     if not takes:
         raise OrchestratorError(f"the calibration-takes manifest has no generated take ({skipped} skipped)")
@@ -337,6 +344,21 @@ def manifest_from_calibration_takes(source: dict[str, Any], *, source_sha256: st
         "source": {"kind": kind, "sha256": source_sha256, "skippedTakes": skipped},
         "takes": takes, "pairs": [],
     }
+
+
+def _reference_clip(entry: Mapping[str, Any], base_dir: Path) -> tuple[str | None, str | None]:
+    """The reference clip a calibration take declares (`reference`: its WAV path, relative to the source
+    manifest, and digest), which a speaker judge embeds beside it; (None, None) when it declares none."""
+    reference = entry.get("reference")
+    if reference is None:
+        return None, None
+    if not isinstance(reference, Mapping) or not isinstance(reference.get("wavPath"), str) \
+            or not is_sha256(reference.get("wavSHA256")):
+        raise OrchestratorError(f"{entry['takeID']}: a reference clip names its WAV path and digest")
+    if reference["wavSHA256"] == entry.get("wavSHA256"):
+        raise OrchestratorError(f"{entry['takeID']}: a take is never its own reference clip")
+    path = Path(reference["wavPath"])
+    return str(path if path.is_absolute() else (base_dir / path).resolve()), reference["wavSHA256"]
 
 
 def manifest_from_cascade_input(source: dict[str, Any], *, source_sha256: str) -> dict[str, Any]:
@@ -1040,13 +1062,17 @@ class Orchestrator:
                                     recognitions[take_id], stage1.get(take_id), unavailable, out_of_scope,
                                     legacy.get(take_id, {}), scorer, panel_detectors[take_id])
             records.append(record)
-            privates.append({
+            private = {
                 # The record's take identity, and the manifest's own beside it.
                 "schema": PRIVATE_SCHEMA, "takeID": _safe_take_id(take_id), "manifestTakeID": take_id,
                 "audioPath": take["audioPath"],
                 "referenceText": take.get("referenceText"), "transcripts": transcripts[take_id],
                 "externalRecognitionCount": len(take.get("externalRecognitions") or []),
-            })
+            }
+            if "referenceAudioSHA256" in take:
+                # The reference clip a speaker judge scored the take against (audio_qc_detector_calibration binds it).
+                private["referenceAudioSHA256"] = take["referenceAudioSHA256"]
+            privates.append(private)
         run_id = manifest["runID"] if is_token(manifest.get("runID")) else digest(manifest.get("runID"))
         header = {
             "runID": run_id, "lane": lane, "manifestSHA256": digest(manifest),

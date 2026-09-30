@@ -329,6 +329,53 @@ class PanelRunTests(PanelFixture):
             self.assertEqual(records[record["take"]["takeID"]]["takeVerdict"], record["takeVerdict"])
             self.assertEqual(records[record["take"]["takeID"]]["legacyVerdicts"], record["legacyVerdicts"])
 
+    def test_a_calibration_take_s_declared_reference_clip_reaches_the_speaker_judges(self) -> None:
+        import audio_qc_calibration_takes
+
+        english, chinese = self.audio("en", 180), self.audio("zh", 220)
+        reference = self.audio("en-reference", 190)
+        entries = []
+        for take_id, audio, language, clip in (("en--clone", english, "english", reference),
+                                                ("zh--clone", chinese, "chinese", None)):
+            entry = {"takeID": take_id, "family": take_id, "scriptID": take_id, "language": language,
+                     "status": "generated", "text": SCRIPTS[language], "textSHA256": text_sha256(SCRIPTS[language]),
+                     "wavPath": audio.name, "wavSHA256": file_sha256(audio)}
+            if clip is not None:
+                # Relative to the source manifest, like the take's own WAV.
+                entry["reference"] = {"takeID": "en--reference", "wavPath": clip.name, "wavSHA256": file_sha256(clip)}
+            entries.append(entry)
+        source = {"schemaVersion": 1, "kind": "audio-qc-calibration-takes", "runID": "clone-fixture",
+                  "split": "confirmation", "takes": entries}
+        source["manifestDigest"] = audio_qc_calibration_takes.self_digest(source, "manifestDigest")
+        manifest = orchestrator_module.manifest_from_calibration_takes(source, source_sha256="e" * 64,
+                                                                        base_dir=self.root)
+        orchestrator_module.validate_manifest(manifest)
+        en_take, zh_take = manifest["takes"]
+        self.assertEqual((en_take["referenceAudioPath"], en_take["referenceAudioSHA256"]),
+                         (str(reference.resolve()), file_sha256(reference)))
+        self.assertNotIn("referenceAudioPath", zh_take)
+        pcm = {"en": self.pcm(english), "zh": self.pcm(chinese)}
+        whisper = {pcm["en"]: self.whisper_answer(SCRIPTS["english"], "en", english),
+                   pcm["zh"]: self.whisper_answer(SCRIPTS["chinese"], "zh", chinese)}
+        result = self.orchestrator([self.whisper_small(whisper),
+                                    self.panel_judge(CAMPPLUS, embedFromDigest=True)]).run(manifest)
+        self.assertIn("en--clone" + REFERENCE_SUFFIX, result["raw"][CAMPPLUS])
+        records = {record["take"]["takeID"]: {item["judge"]: item for item in record["measurements"]}
+                   for record in result["records"]}
+        self.assertIsNotNone(records["en--clone"][CAMPPLUS]["metrics"]["cosine"])
+        self.assertEqual(records["zh--clone"][CAMPPLUS]["metrics"], {}, "no declared reference, no similarity")
+        private = {entry["manifestTakeID"]: entry for entry in result["privates"]}
+        self.assertEqual(private["en--clone"]["referenceAudioSHA256"], file_sha256(reference))
+        self.assertNotIn("referenceAudioSHA256", private["zh--clone"])
+        for broken, fragment in (({"wavPath": reference.name}, "names its WAV path and digest"),
+                                 ({"wavPath": english.name, "wavSHA256": file_sha256(english)}, "its own reference")):
+            tampered = copy.deepcopy(source)
+            tampered["takes"][0]["reference"] = broken
+            tampered["manifestDigest"] = audio_qc_calibration_takes.self_digest(tampered, "manifestDigest")
+            with self.assertRaisesRegex(OrchestratorError, fragment):
+                orchestrator_module.manifest_from_calibration_takes(tampered, source_sha256="e" * 64,
+                                                                    base_dir=self.root)
+
     def test_each_judges_rows_are_cached_under_its_output_identity(self) -> None:
         manifest, judges, _answers = self.panel_scene()
         first = self.orchestrator(judges).run(manifest)

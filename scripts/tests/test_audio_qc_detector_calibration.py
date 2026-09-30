@@ -65,8 +65,11 @@ def git(root: Path, *argv: str, date: str | None = None) -> None:
     environment = dict(os.environ)
     if date is not None:
         environment.update(GIT_AUTHOR_DATE=date, GIT_COMMITTER_DATE=date)
+    # No background auto-maintenance: it writes and removes .git/objects/maintenance.lock after a commit,
+    # which raced a fixture's shutil.copytree of a template repository on Linux CI.
     subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
-                    "-c", "commit.gpgsign=false", *argv], check=True, stdout=subprocess.DEVNULL, env=environment)
+                    "-c", "commit.gpgsign=false", "-c", "maintenance.auto=false", "-c", "gc.auto=0", *argv],
+                   check=True, stdout=subprocess.DEVNULL, env=environment)
 
 
 def write_json(path: Path, value: dict) -> Path:

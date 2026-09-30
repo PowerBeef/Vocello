@@ -98,6 +98,20 @@ transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
   `speaker-cohorts/<sampling digest>/share-<share>/<split>/`; the summary
   counts each split's families, speakers and audio per language and warns
   below the warn floors. The qc-n2 lane keeps the labels and the reference.
+- **Pruning.** `prune-archives --source S [--source S ...] [--dry-run]`
+  reclaims the disk of a source's pinned downloads once its extraction is
+  complete: its archives, Parquet shards or pinned WAVs, and for `fleurs-train`
+  the ten `train.tar.gz` (never a train TSV, a metadata file, an N1 dev or test
+  file, an extraction, a manifest or a receipt). It first requires the
+  extraction to verify with every WAV hashed (for `fleurs-train`, every reserve
+  cohort the registry's sampling defines and each language's recordings
+  receipt), each file to remove to match its pin and recorded SHA-256, and
+  every path to stay inside the cache root through no symbolic link; one
+  refusal removes nothing. The fetch receipt keeps each removed file, marked
+  `prunedAt`: `verify` reports it pruned, not missing, `plan` counts it as
+  still to fetch, `fetch` downloads and verifies it again (clearing the mark),
+  and an `extract` whose extraction is no longer current refuses until then.
+  `--dry-run` verifies and lists the files and bytes and removes nothing.
 
 Commands:
   plan      bytes to download and to extract per group and source, and the free space (no network)
@@ -105,6 +119,7 @@ Commands:
   fetch     download and verify (--set, --group or --source; maintainer-run)
   extract   decode to the untracked per-source manifests and the FLEURS reserve cohorts
   verify    re-verify downloads, receipts, runtime and extractions offline
+  prune-archives  --source S [--source S ...] [--dry-run] remove the verified downloads of complete extractions
   validate  check the committed registry and its sidecars (no network); in the contract gate
   resolve-subset  the AISHELL-3 subset pins from a Hub tree listing, by the registry's seeded rule
   cohort    --source speechocean762|speaker --split calibration|confirmation [--confirmation-share S] [--output PATH]
@@ -127,6 +142,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import stat
 import string
 import subprocess
 import sys
@@ -987,7 +1003,9 @@ def check_bytes(data: bytes, pin: Pin, recorded_sha256: str | None = None) -> st
 
 class Receipt:
     """`corpora-fetch-receipt.json`: each verified file's size, pin and SHA-256 (the SHA-256 of an MD5-pinned
-    file is recorded on its first verified fetch and binds every later run)."""
+    file is recorded on its first verified fetch and binds every later run). `prune-archives` marks a file it
+    removed with `prunedAt`, keeping its pin and SHA-256; a later verified fetch records it afresh, which clears
+    the mark."""
 
     def __init__(self, directory: Path, source: str) -> None:
         self.path = directory / RECEIPT_NAME
@@ -1014,6 +1032,21 @@ class Receipt:
         with self.lock:
             self.value["files"][pin.path] = {"size": pin.size, pin.kind: pin.digest, "sha256": sha256,
                                              "verifiedOn": dt.date.today().isoformat()}
+
+    def pruned(self, pin: Pin) -> str | None:
+        """When `prune-archives` removed this pinned file (its entry still matching the pin), else None."""
+        entry = self.value["files"].get(pin.path)
+        if self.recorded(pin) is not None and isinstance(entry.get("prunedAt"), str):
+            return entry["prunedAt"]
+        return None
+
+    def mark_pruned(self, pin: Pin, sha256: str, when: str) -> None:
+        with self.lock:
+            entry = self.value["files"].get(pin.path)
+            verified = entry.get("verifiedOn") if isinstance(entry, dict) else None
+            self.value["files"][pin.path] = {"size": pin.size, pin.kind: pin.digest, "sha256": sha256,
+                                             "verifiedOn": verified or dt.date.today().isoformat(),
+                                             "prunedAt": when}
 
     def write(self) -> None:
         with self.lock:
@@ -1058,7 +1091,8 @@ def _fetch_one(entry: Mapping[str, Any], pin: Pin, directory: Path, receipt: Rec
         _log(f"  {pin.path}: {pin.size / 1e6:.1f} MB" + (f", resuming at {resumed / 1e6:.1f} MB" if resumed else ""))
     acquire.download(file_url(entry, pin), part, size=pin.size, opener=use, sleep=sleep)
     try:
-        sha256 = check_file(part, pin)
+        # A file fetched again (after `prune-archives`, say) still matches any SHA-256 its receipt recorded.
+        sha256 = check_file(part, pin, receipt.recorded(pin))
     except CorporaError:
         part.unlink(missing_ok=True)
         raise CorporaError(f"{pin.path} does not match its pinned size and digest; the download was discarded") \
@@ -1173,11 +1207,14 @@ def plan(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path | N
         states = [_state(directory, pin) for pin in pins]
         present = sum(size for _state_name, size in states)
         extracted = _extraction_current(registry, source, base, n1_sources)
+        receipt = Receipt(directory, source)
+        pruned = [pin for pin, (name, _size) in zip(pins, states) if name == "absent" and receipt.pruned(pin)]
         rows.append({
             "source": source, "title": entry["title"], "group": entry["group"], "alsoIn": entry["alsoIn"],
             "license": entry["license"]["id"], "languages": entry["languages"], "files": len(pins),
             "bytes": sum(pin.size for pin in pins), "presentBytes": present,
             "missingBytes": sum(pin.size for pin in pins) - present,
+            "prunedFiles": len(pruned), "prunedBytes": sum(pin.size for pin in pruned),
             "differs": sum(1 for name, _size in states if name == "differs"),
             "extractBytes": entry["extract"]["estimatedBytes"], "extracted": extracted,
             "destination": str(directory),
@@ -1229,6 +1266,9 @@ def _print_plan(value: Mapping[str, Any]) -> None:
               f"{', '.join(row['languages'])}{extracted}")
         if row["differs"]:
             print(f"    {row['differs']} files present with the wrong size; a fetch refuses them")
+        if row["prunedFiles"]:
+            print(f"    {row['prunedFiles']} files ({_gb(row['prunedBytes'])}) pruned after a verified extraction; "
+                  "`fetch` restores them")
     for group, totals in value["groups"].items():
         print(f"  group {group}: download {_gb(totals['bytes'])} ({_gb(totals['missingBytes'])} to fetch), "
               f"extract about {_gb(totals['extractBytes'])}")
@@ -1768,12 +1808,18 @@ def extract_source(registry: Mapping[str, Any], source: str, *, root: Path | Non
     directory = source_directory(registry, source, root)
     final = directory / EXTRACTED_DIRECTORY
     identity = extraction_identity(registry, source)
-    if not extraction_problems(final, identity):
+    stale = extraction_problems(final, identity)
+    if not stale:
         _log(f"{source}: extraction present and verified")
         manifest = json.loads((final / MANIFEST_NAME).read_text(encoding="utf-8"))
         return {"source": source, "status": "present", "counts": manifest["counts"]}
     pins = source_pins(registry, source)
     receipt = Receipt(directory, source)
+    pruned = [pin for pin in pins if receipt.pruned(pin) and not (directory / pin.path).exists()]
+    if pruned:
+        raise CorporaError(f"{source}: {len(pruned)} pinned files ({pruned[0].path} first) were pruned after a "
+                           f"verified extraction, and the extraction is no longer current ({stale[0]}); run "
+                           f"`python3 scripts/audio_qc_corpora.py fetch --source {source}` first")
     if spec["format"] != "wav-files":
         for pin in pins:
             if pin.role != "audio":
@@ -1878,6 +1924,15 @@ def sampling_digest(registry: Mapping[str, Any], source: str, n1_sources: Mappin
     }, ascii=False)
 
 
+def _reserve_extraction(reserve: Path, digest: str, config: str, tsv_pin: Pin,
+                        archive_pin: Pin) -> tuple[Path, dict[str, Any]]:
+    """One language's reserve recordings: their directory, and what their receipt binds them to (the sampling,
+    the train TSV and archive pins and the decoder). While it matches, `extract` never reads the archive."""
+    return reserve / EXTRACTED_DIRECTORY / config, {
+        "schemaVersion": SCHEMA_VERSION, "kind": RESERVE_RECEIPT_KIND, "samplingDigest": digest, "config": config,
+        "tsv": tsv_pin.as_record(), "archive": archive_pin.as_record(), "decoder": n1.EXTRACTOR}
+
+
 def _reserve_receipt_matches(directory: Path, expected: Mapping[str, Any]) -> bool:
     try:
         receipt = json.loads((directory / n1.RECEIPT_NAME).read_text(encoding="utf-8"))
@@ -1925,10 +1980,7 @@ def extract_fleurs_reserve(registry: Mapping[str, Any], source: str, *, root: Pa
                                           seed=spec["seed"])
             shortfall[language] = [spec["perLanguage"] - len(rows) for rows in selection]
             keep = {row.file for rows in selection for row in rows}
-            extracted = reserve / EXTRACTED_DIRECTORY / config
-            expected = {"schemaVersion": SCHEMA_VERSION, "kind": RESERVE_RECEIPT_KIND, "samplingDigest": digest,
-                        "config": config, "tsv": tsv_pin.as_record(), "archive": archive_pin.as_record(),
-                        "decoder": n1.EXTRACTOR}
+            extracted, expected = _reserve_extraction(reserve, digest, config, tsv_pin, archive_pin)
             if _reserve_receipt_matches(extracted, expected):
                 _log(f"{language}: reserve recordings present and verified")
                 files = json.loads((extracted / n1.RECEIPT_NAME).read_text(encoding="utf-8"))["files"]
@@ -1964,6 +2016,10 @@ def _extract_reserve_language(corpus: Path, receipt: Receipt, archive_pin: Pin, 
     archive = corpus / archive_pin.path
     _log(f"{language}: verifying {archive_pin.path} ({archive_pin.size / 1e6:.1f} MB)")
     if not archive.exists():
+        if receipt.pruned(archive_pin):
+            raise CorporaError(f"{archive_pin.path} was pruned after a verified reserve extraction, and the {language} "
+                               "reserve recordings no longer match it; run `python3 scripts/audio_qc_corpora.py "
+                               "fetch --group fleurs-train` first")
         raise CorporaError(f"{archive_pin.path} is not fetched; run `fetch --group fleurs-train` first")
     receipt.record(archive_pin, check_file(archive, archive_pin, receipt.recorded(archive_pin)))
     samples = {row.file: row.samples for row in train}
@@ -2521,18 +2577,23 @@ def verify(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path |
            runtime: Callable[[], list[str]] | None = None,
            n1_sources: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     """Offline: every selected download against its pin and receipt, every extraction against its manifest, and
-    the Parquet runtime against its lock."""
+    the Parquet runtime against its lock. A download `prune-archives` removed is a note, not a problem, while the
+    extraction it served still verifies."""
     results = []
     for source in selected:
         entry = registry["sources"][source]
         directory = source_directory(registry, source, root)
         receipt = Receipt(directory, source)
         problems: list[str] = []
-        absent = verified = 0
+        notes: list[str] = []
+        absent = verified = pruned = 0
         for pin in source_pins(registry, source):
             path = directory / pin.path
             if not path.exists():
-                absent += 1
+                if receipt.pruned(pin):
+                    pruned += 1
+                else:
+                    absent += 1
                 continue
             try:
                 check_file(path, pin, receipt.recorded(pin))
@@ -2541,19 +2602,234 @@ def verify(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path |
                 problems.append(str(error))
         if absent:
             problems.append(f"{absent} pinned files are not fetched")
+        if pruned:
+            notes.append(f"{pruned} pinned files pruned after a verified extraction; `fetch` restores them")
         if entry["extract"]["format"] == "fleurs-reserve":
             extraction = reserve_problems(registry, source, root=root, n1_sources=n1_sources)
         else:
             extraction = extraction_problems(directory / EXTRACTED_DIRECTORY, extraction_identity(registry, source))
         problems += [f"extraction: {problem}" for problem in extraction]
+        if extraction and pruned:
+            problems.append(f"its downloads were pruned: run `fetch --source {source}`, then `extract --source "
+                            f"{source}`")
         results.append({"source": source, "status": "FAIL" if problems else "PASS", "verifiedFiles": verified,
-                        "problems": problems})
+                        "prunedFiles": pruned, "problems": problems, "notes": notes})
     if runtime is not None and any(registry["sources"][source]["extract"]["format"] == "parquet"
                                    for source in selected):
         problems = runtime()
         results.append({"source": f"runtime:{RUNTIME_FAMILY}", "status": "FAIL" if problems else "PASS",
-                        "verifiedFiles": 0, "problems": problems})
+                        "verifiedFiles": 0, "prunedFiles": 0, "problems": problems, "notes": []})
     return results
+
+
+# --------------------------------------------------------------------------- #
+# Prune: reclaim the downloads of a complete extraction
+# --------------------------------------------------------------------------- #
+
+# Never removed, whatever a pin names: the tool's own outputs, receipts and manifests.
+PRUNE_KEPT_DIRECTORIES = frozenset({EXTRACTED_DIRECTORY, RESERVE_DIRECTORY, COHORT_DIRECTORY, PARTIAL_DIRECTORY})
+PRUNE_KEPT_NAMES = frozenset({RECEIPT_NAME, MANIFEST_NAME, n1.RECEIPT_NAME, acquire.OWNED_MARKER})
+
+
+@dataclass(frozen=True)
+class PruneTarget:
+    """A pinned download `prune-archives` removes: verified against its pin and receipt, in the file state (device,
+    inode, size, modification time) it was verified in, which must still hold when it is unlinked."""
+
+    pin: Pin
+    sha256: str
+    state: tuple[int, int, int, int]
+    reclaim_bytes: int
+
+
+def prunable_pins(registry: Mapping[str, Any], source: str) -> list[Pin]:
+    """The downloads `prune-archives` may remove once the source's extraction is complete: the FLEURS train
+    archives (never a train TSV, which the reserve sampling reads on every `extract`), otherwise the source's audio
+    files (archives, Parquet shards, pinned WAVs), never a metadata file."""
+    if registry["sources"][source]["extract"]["format"] == "fleurs-reserve":
+        return [archive for _tsv, archive in _reserve_pins(registry, source).values()]
+    return [pin for pin in source_pins(registry, source) if pin.role == "audio"]
+
+
+def prune_blockers(registry: Mapping[str, Any], source: str, *, root: Path | None = None,
+                   n1_sources: Mapping[str, Any] | None = None) -> list[str]:
+    """Why the source's downloads are still needed: its extraction is missing, stale or differs from its manifest
+    (every WAV hashed); for the FLEURS reserve, a cohort the registry's sampling defines is not in place, or a
+    language's recordings no longer match the receipt that lets `extract` skip its archive."""
+    if registry["sources"][source]["extract"]["format"] != "fleurs-reserve":
+        return extraction_problems(source_directory(registry, source, root) / EXTRACTED_DIRECTORY,
+                                   extraction_identity(registry, source))
+    n1_sources = n1_sources or load_n1_sources()
+    problems = reserve_problems(registry, source, root=root, n1_sources=n1_sources)
+    if problems:
+        return problems
+    digest = sampling_digest(registry, source, n1_sources)
+    reserve = source_directory(registry, source, root) / RESERVE_DIRECTORY / digest[:12]
+    used: set[str] = set()
+    for index in range(1, registry["sources"][source]["extract"]["cohorts"] + 1):
+        manifest = json.loads((reserve / f"cohort-{index}" / MANIFEST_NAME).read_text(encoding="utf-8"))
+        used |= {take["language"] for take in manifest["takes"]}
+    for language, (tsv_pin, archive_pin) in _reserve_pins(registry, source).items():
+        config = n1.language_entry(n1_sources, language)["config"]
+        extracted, expected = _reserve_extraction(reserve, digest, config, tsv_pin, archive_pin)
+        # A language no cohort samples is never read from its archive.
+        if language in used and not _reserve_receipt_matches(extracted, expected):
+            problems.append(f"the {language} reserve recordings do not match their extraction receipt")
+    return problems
+
+
+def prune_path(base: Path, directory: Path, pin: Pin) -> Path:
+    """The pinned file's path, refused unless it names no extraction, receipt or manifest, stays inside the corpora
+    cache root and is reached from it through no symbolic link."""
+    parts = pin.path.split("/")
+    if not _safe_relative(pin.path) or parts[0] in PRUNE_KEPT_DIRECTORIES or parts[0].startswith(".staging-") \
+            or parts[-1] in PRUNE_KEPT_NAMES:
+        raise CorporaError(f"{pin.path} names an extraction, a receipt or a manifest; nothing is removed")
+    path = directory / pin.path
+    try:
+        relative = path.relative_to(base)
+    except ValueError:
+        raise CorporaError(f"{pin.path} is not under the corpora cache root; nothing is removed") from None
+    current = base
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise CorporaError(f"{pin.path}: {current.relative_to(base).as_posix()} is a symbolic link; nothing is "
+                               "removed")
+    if not _inside(base, path):
+        raise CorporaError(f"{pin.path} resolves outside the corpora cache root; nothing is removed")
+    return path
+
+
+def _file_state(path: Path) -> tuple[int, int, int, int]:
+    info = path.lstat()
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+
+
+def _remove_empty_parents(directory: Path, stop: Path) -> None:
+    """The directories a pruned file leaves empty, up to (never including) its source directory."""
+    while directory != stop and directory.is_relative_to(stop):
+        try:
+            directory.rmdir()
+        except OSError:
+            return
+        directory = directory.parent
+
+
+def _utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _prune_targets(registry: Mapping[str, Any], source: str, base: Path, directory: Path, receipt: Receipt,
+                   kept: set[str], refusals: list[str]) -> tuple[list[PruneTarget], int, int]:
+    """The source's files to remove, each verified; (targets, already pruned, never fetched). A file that cannot
+    be removed safely is added to `refusals`."""
+    targets: list[PruneTarget] = []
+    already = absent = 0
+    for pin in prunable_pins(registry, source):
+        try:
+            if pin.path in kept:
+                raise CorporaError(f"{pin.path} is an N1 file of config/audio-qc-n1-sources.json; nothing is removed")
+            path = prune_path(base, directory, pin)
+            if not os.path.lexists(path):
+                if receipt.pruned(pin):
+                    already += 1
+                else:
+                    absent += 1
+                continue
+            if not stat.S_ISREG(path.lstat().st_mode):
+                raise CorporaError(f"{pin.path} is not a plain file; nothing is removed")
+            state = _file_state(path)
+            if pin.size >= PROGRESS_STEP_BYTES:
+                _log(f"{source}: verifying {pin.path} ({pin.size / 1e6:.1f} MB)")
+            sha256 = check_file(path, pin, receipt.recorded(pin))
+            if _file_state(path) != state:
+                raise CorporaError(f"{pin.path} changed while it was verified; nothing is removed")
+        except CorporaError as error:
+            refusals.append(f"{source}: {error}")
+            continue
+        targets.append(PruneTarget(pin, sha256, state, pin.size if path.lstat().st_nlink == 1 else 0))
+    return targets, already, absent
+
+
+def prune_archives(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path | None = None,
+                   dry_run: bool = False, n1_sources: Mapping[str, Any] | None = None,
+                   now: Callable[[], str] = _utc_now) -> dict[str, Any]:
+    """Remove the selected sources' pinned downloads (`prunable_pins`) once their extraction is complete, or with
+    `dry_run` only list them. Everything is checked before anything is removed: the extraction verifies against
+    its manifest or receipts with every WAV hashed (`prune_blockers`), every file matches its pin and any SHA-256
+    its receipt recorded, and every path stays inside the corpora cache root through no symbolic link
+    (`prune_path`); one refusal removes nothing. Each removed file stays in its fetch receipt, marked `prunedAt`:
+    `verify` reports it, `plan` counts it as missing and `fetch` downloads and verifies it again."""
+    base = root or cache_root()
+    if base.is_symlink() or not base.is_dir():
+        raise CorporaError("the corpora cache root is missing or a symbolic link; nothing is removed")
+    plans: list[tuple[str, Path, Receipt, list[PruneTarget], int, int]] = []
+    refusals: list[str] = []
+    for source in selected:
+        reserve = registry["sources"][source]["extract"]["format"] == "fleurs-reserve"
+        if reserve:
+            n1_sources = n1_sources or load_n1_sources()
+        directory = source_directory(registry, source, base)
+        receipt = Receipt(directory, source)
+        _log(f"{source}: verifying its extraction")
+        blockers = prune_blockers(registry, source, root=base, n1_sources=n1_sources)
+        if blockers:
+            gone = any(receipt.pruned(pin) and not os.path.lexists(directory / pin.path)
+                       for pin in prunable_pins(registry, source))
+            step = (f"run `fetch --source {source}`, then `extract --source {source}`" if gone
+                    else f"run `extract --source {source}` first")
+            refusals.append(f"{source}: its extraction is not complete and current ({blockers[0]}); {step}")
+            continue
+        kept = {pin["path"] for pin in n1.pinned_files(n1_sources)} if reserve else set()
+        targets, already, absent = _prune_targets(registry, source, base, directory, receipt, kept, refusals)
+        plans.append((source, directory, receipt, targets, already, absent))
+    if refusals:
+        raise CorporaError("prune-archives removed nothing:\n  " + "\n  ".join(refusals))
+    when = now()
+    report = []
+    for source, directory, receipt, targets, already, absent in plans:
+        removed: list[PruneTarget] = []
+        try:
+            for target in targets:
+                if not dry_run:
+                    path = prune_path(base, directory, target.pin)
+                    if not os.path.lexists(path) or _file_state(path) != target.state:
+                        raise CorporaError(f"{source}: {target.pin.path} changed after it was verified; it and the "
+                                           "files after it were not removed")
+                    path.unlink()
+                    receipt.mark_pruned(target.pin, target.sha256, when)
+                    _remove_empty_parents(path.parent, directory)
+                removed.append(target)
+        finally:
+            if removed and not dry_run:
+                receipt.write()
+        report.append({"source": source, "directory": directory.relative_to(base).as_posix(),
+                       "files": [{"path": target.pin.path, "bytes": target.pin.size,
+                                  "reclaimBytes": target.reclaim_bytes} for target in removed],
+                       "alreadyPruned": already, "notFetched": absent,
+                       "reclaimBytes": sum(target.reclaim_bytes for target in removed)})
+    return {"status": "PASS", "dryRun": dry_run, "root": str(base), "prunedAt": None if dry_run else when,
+            "sources": report, "reclaimBytes": sum(row["reclaimBytes"] for row in report)}
+
+
+def _print_prune(value: Mapping[str, Any]) -> None:
+    verb = "would remove" if value["dryRun"] else "removed"
+    print(f"Corpora cache {value['root']}" + (" (dry run: nothing is removed)" if value["dryRun"] else ""))
+    for row in value["sources"]:
+        extra = "".join(f"; {count} {label}" for count, label in ((row["alreadyPruned"], "already pruned"),
+                                                                   (row["notFetched"], "not fetched")) if count)
+        print(f"  {row['source']}: {len(row['files'])} files, {row['reclaimBytes']} bytes "
+              f"({_gb(row['reclaimBytes'])}){extra}")
+        for item in row["files"]:
+            shared = "" if item["reclaimBytes"] == item["bytes"] else " (another hard link keeps its bytes)"
+            print(f"    {verb} {row['directory']}/{item['path']}: {item['bytes']} bytes{shared}")
+    total = value["reclaimBytes"]
+    if value["dryRun"]:
+        print(f"Would reclaim {total} bytes ({_gb(total)}); nothing was removed.")
+    else:
+        print(f"Reclaimed {total} bytes ({_gb(total)}). `fetch --source <source>` downloads and verifies a pruned "
+              "file again.")
 
 
 # --------------------------------------------------------------------------- #
@@ -2607,6 +2883,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                        ("fetch", "download and verify the selection (maintainer-run)"),
                        ("extract", "decode the selection to its untracked manifests"),
                        ("verify", "re-verify the selection offline"),
+                       ("prune-archives", "remove the verified downloads of complete extractions (--dry-run lists "
+                                          "them)"),
                        ("validate", "check the committed registry (no network)"),
                        ("resolve-subset", "the AISHELL-3 subset pins from a Hub tree listing"),
                        ("cohort", "one speaker-disjoint split of a labelled corpus as an N1 cohort manifest")):
@@ -2624,7 +2902,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.add_argument("--set", action="extend", nargs="+", choices=SETS)
             command.add_argument("--group", action="extend", nargs="+", choices=tuple(GROUPS), metavar="GROUP")
             command.add_argument("--source", action="extend", nargs="+", metavar="SOURCE")
-        if name in ("plan", "verify"):
+        if name == "prune-archives":
+            command.add_argument("--source", action="extend", nargs="+", required=True, metavar="SOURCE",
+                                 help="the sources whose downloads to remove (each named explicitly)")
+            command.add_argument("--dry-run", action="store_true",
+                                 help="verify and list what would be removed, and the bytes; remove nothing")
+        if name in ("plan", "verify", "prune-archives"):
             command.add_argument("--json", action="store_true")
         if name == "fetch":
             command.add_argument("--jobs", type=int, default=DEFAULT_JOBS,
@@ -2672,6 +2955,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps({"status": "FAIL" if problems else "PASS", "python": str(python),
                               "problems": problems}, sort_keys=True))
             return 1 if problems else 0
+        if args.command == "prune-archives":
+            value = prune_archives(registry, select(registry, sources=args.source), dry_run=args.dry_run)
+            if args.json:
+                print(json.dumps(value, indent=2, sort_keys=True))
+            else:
+                _print_prune(value)
+            return 0
         selected = _selection(registry, args, default_lean=args.command in ("plan", "verify"))
         if args.command == "plan":
             value = plan(registry, selected)
@@ -2693,8 +2983,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(results, indent=2, sort_keys=True))
         else:
             for item in results:
-                detail = f": {'; '.join(item['problems'][:3])}" if item["problems"] else ""
-                print(f"{item['status']:5s} {item['source']} ({item['verifiedFiles']} files verified){detail}")
+                detail = f": {'; '.join((item['problems'] or item['notes'])[:3])}" \
+                    if item["problems"] or item["notes"] else ""
+                pruned = f", {item['prunedFiles']} pruned" if item["prunedFiles"] else ""
+                print(f"{item['status']:5s} {item['source']} ({item['verifiedFiles']} files verified{pruned})"
+                      f"{detail}")
         return 0 if all(item["status"] == "PASS" for item in results) else 1
     except (CorporaError, n1.N1Error, acquire.AcquisitionError, JudgeRegistryError, OSError, KeyError,
             clips.CorpusAudioError) as error:

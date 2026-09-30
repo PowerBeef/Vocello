@@ -2629,6 +2629,7 @@ python3 scripts/audio_qc_corpora.py plan --set lean      # bytes, destination, f
 python3 scripts/audio_qc_corpora.py runtime              # the pinned Parquet runtime (PyPI, once)
 python3 scripts/audio_qc_corpora.py fetch --set lean && python3 scripts/audio_qc_corpora.py extract --set lean
 python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of downloads, runtime, extractions
+python3 scripts/audio_qc_corpora.py prune-archives --source fleurs-train --dry-run   # reclaim disk
 ```
 
 - **Size.** 9,037 files, 28.96 GB to download (plus 7 MB of N1 dev and test TSVs the reserve reads);
@@ -2692,6 +2693,22 @@ python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of d
   `reserve-<k>`, at `fleurs/<revision>/reserve/<sampling digest>/cohort-<k>/manifest.json`, which
   the N2 plan and the calibration set take as they take the dev and test cohorts. A language that
   cannot fill every cohort is reported, not padded.
+- **Reclaiming disk.** Once a source is extracted its downloads are only a re-fetchable copy.
+  `prune-archives --source <source> [--source ...]` removes a source's pinned downloads: its
+  archives, Parquet shards or pinned WAVs, and for `fleurs-train` its ten `train.tar.gz` (15.6 GB).
+  It never removes a train TSV (the reserve sampling reads them on every `extract`), a metadata file,
+  an N1 dev or test file of `config/audio-qc-n1-sources.json`, an extraction, a manifest, a receipt
+  or an unpinned file. Everything is checked before anything is removed. The extraction must verify
+  with every WAV hashed; for `fleurs-train` that means every reserve cohort the registry's sampling
+  defines and each sampled language's recordings against the receipt that lets `extract` skip its
+  archive. Each file must match its pin and recorded SHA-256, and each path must stay inside the
+  cache root through no symbolic link. One refusal removes nothing. `--dry-run` runs the same checks
+  and lists the files and bytes. A removed file stays in the fetch receipt, marked `prunedAt` with
+  its digests: `verify` reports it as pruned, not missing; `plan` counts it as still to fetch; and
+  `fetch` downloads it again, checks it against its pin and the recorded SHA-256, and clears the
+  mark. An `extract` whose extraction is no longer current refuses and names `fetch` until then. It
+  is the corpora cache's registered cleanup (`config/build-output-policy.json`), in place of an ad
+  hoc `rm` under `build/cache`.
 
 **Which reserve cohort does what.** FLEURS test is spent: the v1 warn plans confirmed on it. Role set
 `fleurs-reserve-n2` of `config/audio-qc-detectors.json` fixes the rule: reserve-1 fits, reserve-2
@@ -2790,6 +2807,8 @@ python3 scripts/audio_qc_corpora.py plan --set lean
 python3 scripts/audio_qc_corpora.py runtime
 python3 scripts/audio_qc_corpora.py fetch --set lean && python3 scripts/audio_qc_corpora.py extract --set lean
 python3 scripts/audio_qc_corpora.py verify --set lean
+#    Short of disk once verify passes: prune the downloads (again without --dry-run; fetch restores).
+python3 scripts/audio_qc_corpora.py prune-archives --source fleurs-train --dry-run
 # 2. speechocean762's speaker-disjoint N1 splits (1 min). Read the summary: a warning means the
 #    confirmation split holds fewer than 60 severe utterances; rebuild it with a larger
 #    --confirmation-share before step 3, and point SOC at the share-<S> directory it prints.

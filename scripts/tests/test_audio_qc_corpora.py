@@ -16,7 +16,9 @@ import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
+import shutil
 import struct
 import sys
 import tarfile
@@ -47,6 +49,12 @@ NO_LABELS = {label: None for label in corpora.LABELS}
 def quiet(function, *args, **kwargs):
     with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
         return function(*args, **kwargs)
+
+
+def snapshot(root: Path) -> dict[str, bytes]:
+    """Every plain file under `root` (links not followed) by its relative path, with its bytes."""
+    return {path.relative_to(root).as_posix(): path.read_bytes()
+            for path in sorted(root.rglob("*")) if path.is_file() and not path.is_symlink()}
 
 
 def tone(samples: int, rate: int, frequency: float = 220.0, amplitude: float = 0.3) -> np.ndarray:
@@ -963,6 +971,208 @@ class ParquetTests(Fixture):
 
 
 # --------------------------------------------------------------------------- #
+# Pruning the downloads of a complete extraction
+# --------------------------------------------------------------------------- #
+
+class PruneTests(Fixture):
+    """`prune-archives`: only the pinned downloads of a complete, verified extraction go, each marked in its
+    receipt, and `fetch` restores them; any refusal removes nothing."""
+
+    WHEN = "2026-09-30T12:00:00Z"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.archive = zip_bytes({"emoUERJ/m01a01.wav": pcm16(1600, 24000),
+                                  "emoUERJ/w02h03.wav": pcm16(1700, 24000, 330.0)})
+        emo = entry([{"path": "set.zip", "size": len(self.archive), "md5": hashlib.md5(self.archive).hexdigest()}],
+                    {"format": "zip", "outputRate": 24000,
+                     "members": "^emoUERJ/(?P<id>(?P<speaker>[mw][0-9]{2})[ahns][0-9]{2})\\.wav$"},
+                    host="zenodo.org", record="7", version="1", languages=["portuguese"])
+        del emo["repository"], emo["revision"]
+        self.wavs = {"AudioWAV/1001_DFA_ANG_XX.wav": pcm16(1600, 16000),
+                     "AudioWAV/1002_IEO_HAP_HI.wav": pcm16(1700, 16000, 330.0)}
+        self.demographics = b"ActorID,Sex\n1001,Male\n1002,Female\n"
+        pins = [sha256_pin(path, data) for path, data in self.wavs.items()]
+        pins.append({"path": "VideoDemographics.csv", "size": len(self.demographics),
+                     "gitBlobSHA1": n1.git_blob_sha1(self.demographics), "role": "metadata"})
+        crema = entry(pins, {"format": "wav-files", "outputRate": 16000,
+                             "members": "^AudioWAV/(?P<id>(?P<speaker>[0-9]{4})_[A-Z]{3}_[A-Z]{3}_[A-Z]{2})\\.wav$",
+                             "maps": {"gender": {"Female": "female", "Male": "male"}},
+                             "metadata": [{"file": "VideoDemographics.csv", "format": "csv", "keyColumn": "ActorID",
+                                           "keyNormalize": "int", "joinOn": "speaker", "fields": {"gender": "Sex"}}]},
+                      host="media.githubusercontent.com")
+        self.registry = registry_of(emo=emo, crema=crema)
+        self.emo = self.place(self.registry, "emo", {"set.zip": self.archive})
+        self.crema = self.place(self.registry, "crema", {**self.wavs, "VideoDemographics.csv": self.demographics})
+        for source in ("emo", "crema"):
+            quiet(corpora.extract_source, self.registry, source, root=self.root)
+        self.receipts = {f"emo/zenodo-7/{corpora.RECEIPT_NAME}", f"crema/{REVISION}/{corpora.RECEIPT_NAME}"}
+
+    def prune(self, sources=("emo", "crema"), **kwargs) -> dict:
+        return quiet(corpora.prune_archives, self.registry, list(sources), root=self.root, now=lambda: self.WHEN,
+                     **kwargs)
+
+    def receipt(self, directory: Path) -> dict:
+        return json.loads((directory / corpora.RECEIPT_NAME).read_text())["files"]
+
+    def test_a_dry_run_lists_the_downloads_and_their_bytes_and_removes_nothing(self) -> None:
+        before = snapshot(self.root)
+        value = self.prune(dry_run=True)
+        self.assertEqual(snapshot(self.root), before)
+        rows = {row["source"]: row for row in value["sources"]}
+        self.assertEqual([item["path"] for item in rows["emo"]["files"]], ["set.zip"])
+        self.assertEqual([item["path"] for item in rows["crema"]["files"]], sorted(self.wavs))
+        self.assertEqual(value["reclaimBytes"], len(self.archive) + sum(len(data) for data in self.wavs.values()))
+        self.assertIsNone(value["prunedAt"])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            corpora._print_prune(value)
+        self.assertIn("would remove emo/zenodo-7/set.zip", output.getvalue())
+        self.assertIn(f"Would reclaim {value['reclaimBytes']} bytes", output.getvalue())
+
+    def test_only_pinned_downloads_go_and_the_receipt_marks_each_one_pruned(self) -> None:
+        (self.emo / "other.zip").write_bytes(b"a file no pin names")
+        (self.crema / "AudioWAV" / "stray.wav").write_bytes(b"a file no pin names")
+        before = snapshot(self.root)
+        value = self.prune()
+        after = snapshot(self.root)
+        self.assertEqual(set(before) - set(after),
+                         {"emo/zenodo-7/set.zip", *(f"crema/{REVISION}/{path}" for path in self.wavs)})
+        # Extractions, manifests, metadata and unpinned files stay byte for byte; only the receipts change.
+        self.assertEqual({path: data for path, data in after.items() if path not in self.receipts},
+                         {path: before[path] for path in after if path not in self.receipts})
+        self.assertEqual(value["prunedAt"], self.WHEN)
+        self.assertEqual(value["reclaimBytes"], len(self.archive) + sum(len(data) for data in self.wavs.values()))
+        archive = self.receipt(self.emo)["set.zip"]
+        self.assertEqual((archive["prunedAt"], archive["size"], archive["md5"], archive["sha256"]),
+                         (self.WHEN, len(self.archive), hashlib.md5(self.archive).hexdigest(),
+                          hashlib.sha256(self.archive).hexdigest()))
+        crema = self.receipt(self.crema)
+        self.assertEqual({path for path, item in crema.items() if "prunedAt" in item}, set(self.wavs))
+        self.assertTrue((self.crema / "VideoDemographics.csv").is_file())
+        for source in ("emo", "crema"):
+            self.assertEqual(corpora.prune_blockers(self.registry, source, root=self.root), [])
+        again = self.prune()
+        self.assertEqual(again["reclaimBytes"], 0)
+        self.assertEqual({row["source"]: row["alreadyPruned"] for row in again["sources"]}, {"emo": 1, "crema": 2})
+
+    def test_verify_reports_a_pruned_file_plan_counts_it_missing_and_fetch_restores_it(self) -> None:
+        self.prune(sources=("emo",))
+        results = quiet(corpora.verify, self.registry, ["emo"], root=self.root)
+        self.assertEqual((results[0]["status"], results[0]["prunedFiles"], results[0]["problems"]), ("PASS", 1, []))
+        self.assertIn("`fetch` restores them", results[0]["notes"][0])
+        with mock.patch.object(corpora, "runtime_spec", return_value={
+                "venv": "none", "lockSHA256": "x", "downloadBytes": 1, "packages": 1}):
+            row = corpora.plan(self.registry, ["emo"], root=self.root, model_root=self.tmp)["sources"][0]
+        self.assertEqual((row["presentBytes"], row["missingBytes"], row["prunedFiles"], row["prunedBytes"],
+                          row["extracted"]), (0, len(self.archive), 1, len(self.archive), True))
+        host = FakeHost({url_of(self.registry["sources"]["emo"], "set.zip", "md5"): self.archive})
+        report = quiet(corpora.fetch, self.registry, ["emo"], root=self.root, opener=host, sleep=lambda _seconds: None)
+        self.assertEqual(report[0]["fetched"], 1)
+        self.assertEqual((self.emo / "set.zip").read_bytes(), self.archive)
+        self.assertNotIn("prunedAt", self.receipt(self.emo)["set.zip"])
+        results = quiet(corpora.verify, self.registry, ["emo"], root=self.root)
+        self.assertEqual((results[0]["status"], results[0]["verifiedFiles"], results[0]["prunedFiles"]),
+                         ("PASS", 1, 0))
+
+    def test_a_pruned_md5_file_fetched_again_must_match_its_recorded_sha256(self) -> None:
+        self.prune(sources=("emo",))
+        path = self.emo / corpora.RECEIPT_NAME
+        receipt = json.loads(path.read_text())
+        receipt["files"]["set.zip"]["sha256"] = "0" * 64
+        path.write_text(json.dumps(receipt))
+        host = FakeHost({url_of(self.registry["sources"]["emo"], "set.zip", "md5"): self.archive})
+        with self.assertRaisesRegex(corpora.CorporaError, "does not match its pinned size and digest"):
+            quiet(corpora.fetch, self.registry, ["emo"], root=self.root, opener=host, sleep=lambda _seconds: None)
+        self.assertFalse((self.emo / "set.zip").exists())
+
+    def test_a_missing_or_stale_extraction_refuses_and_removes_nothing(self) -> None:
+        shutil.rmtree(self.emo / corpora.EXTRACTED_DIRECTORY)
+        before = snapshot(self.root)
+        with self.assertRaisesRegex(corpora.CorporaError, "removed nothing:\n  emo: its extraction is not complete "
+                                                          "and current \\(not extracted\\); run `extract --source "
+                                                          "emo` first"):
+            self.prune()
+        self.assertEqual(snapshot(self.root), before)
+        quiet(corpora.extract_source, self.registry, "emo", root=self.root)
+        manifest = json.loads((self.crema / corpora.EXTRACTED_DIRECTORY / corpora.MANIFEST_NAME).read_text())
+        wav = self.crema / corpora.EXTRACTED_DIRECTORY / manifest["clips"][0]["wavPath"]
+        data = bytearray(wav.read_bytes())
+        data[-1] ^= 1  # same size: only the deep check (every WAV hashed) sees it
+        wav.write_bytes(bytes(data))
+        before = snapshot(self.root)
+        with self.assertRaisesRegex(corpora.CorporaError, "crema: its extraction is not complete and current "
+                                                          "\\(.* differs from its manifest\\)"):
+            self.prune()
+        self.assertEqual(snapshot(self.root), before)
+        self.registry["sources"]["emo"]["extract"]["outputRate"] = 16000
+        with self.assertRaisesRegex(corpora.CorporaError, "emo: .*extracted from other pins or another extraction "
+                                                          "spec"):
+            self.prune(sources=("emo",))
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_a_file_that_differs_from_its_pin_refuses_every_source(self) -> None:
+        path = self.crema / "AudioWAV/1002_IEO_HAP_HI.wav"
+        data = bytearray(path.read_bytes())
+        data[-1] ^= 1
+        path.write_bytes(bytes(data))
+        before = snapshot(self.root)
+        with self.assertRaisesRegex(corpora.CorporaError, "removed nothing:\n  crema: AudioWAV/1002_IEO_HAP_HI.wav "
+                                                          "does not match its pinned sha256"):
+            self.prune()
+        self.assertEqual(snapshot(self.root), before)  # the verified zip of the other source stays too
+
+    def test_a_symbolic_link_anywhere_on_the_path_refuses(self) -> None:
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        (outside / "set.zip").write_bytes(self.archive)
+        (self.emo / "set.zip").unlink()
+        (self.emo / "set.zip").symlink_to(outside / "set.zip")
+        with self.assertRaisesRegex(corpora.CorporaError, "set.zip: emo/zenodo-7/set.zip is a symbolic link"):
+            self.prune(sources=("emo",))
+        self.assertEqual((outside / "set.zip").read_bytes(), self.archive)
+        audio = self.crema / "AudioWAV"
+        audio.rename(outside / "AudioWAV")
+        audio.symlink_to(outside / "AudioWAV", target_is_directory=True)
+        with self.assertRaisesRegex(corpora.CorporaError, f"crema/{REVISION}/AudioWAV is a symbolic link"):
+            self.prune(sources=("crema",))
+        self.assertEqual(sorted(path.name for path in (outside / "AudioWAV").iterdir()),
+                         sorted(Path(path).name for path in self.wavs))
+        for name in ("extracted/manifest.json", corpora.RECEIPT_NAME, ".staging-extracted/x.wav"):
+            with self.assertRaisesRegex(corpora.CorporaError, "names an extraction, a receipt or a manifest"):
+                corpora.prune_path(self.root, self.emo, corpora.Pin(name, 1, "sha256", "0" * 64))
+        linked_root = self.tmp / "linked-root"
+        linked_root.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(corpora.CorporaError, "cache root is missing or a symbolic link"):
+            quiet(corpora.prune_archives, self.registry, ["emo"], root=linked_root, dry_run=True)
+
+    def test_an_extract_after_a_prune_refuses_until_fetch_restores_the_download(self) -> None:
+        self.prune(sources=("emo",))
+        self.assertEqual(quiet(corpora.extract_source, self.registry, "emo", root=self.root)["status"], "present")
+        (self.emo / corpora.EXTRACTED_DIRECTORY / corpora.MANIFEST_NAME).unlink()
+        with self.assertRaisesRegex(corpora.CorporaError, "emo: 1 pinned files \\(set.zip first\\) were pruned after "
+                                                          "a verified extraction.*fetch --source emo"):
+            quiet(corpora.extract_source, self.registry, "emo", root=self.root)
+        results = quiet(corpora.verify, self.registry, ["emo"], root=self.root)
+        self.assertEqual(results[0]["status"], "FAIL")
+        self.assertIn("its downloads were pruned: run `fetch --source emo`, then `extract --source emo`",
+                      results[0]["problems"])
+        with self.assertRaisesRegex(corpora.CorporaError, "run `fetch --source emo`, then `extract --source emo`"):
+            self.prune(sources=("emo",))
+
+    def test_the_command_takes_explicit_sources_and_reports_a_refusal(self) -> None:
+        self.root.mkdir(exist_ok=True)
+        errors = io.StringIO()
+        with mock.patch.dict(os.environ, {n1.CACHE_ENV: str(self.root)}), redirect_stderr(errors), \
+                redirect_stdout(io.StringIO()):
+            status = corpora.main(["prune-archives", "--source", "emodb", "--dry-run"])
+        self.assertEqual(status, 1)
+        self.assertIn("emodb: its extraction is not complete and current (not extracted)", errors.getvalue())
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            corpora.main(["prune-archives", "--dry-run"])
+
+
+# --------------------------------------------------------------------------- #
 # FLEURS reserve cohorts
 # --------------------------------------------------------------------------- #
 
@@ -1109,6 +1319,51 @@ class ReserveTests(Fixture):
         (self.corpus / f"data/{config}/audio/train.tar.gz").write_bytes(archive)
         with self.assertRaisesRegex(n1.N1Error, "kept recordings are not in the archive"):
             self.extract()
+
+    def prune(self, **kwargs) -> dict:
+        with mock.patch.object(n1, "sources_digest", return_value="d" * 64):
+            return quiet(corpora.prune_archives, self.registry, ["fleurs-train"], root=self.root,
+                         n1_sources=self.n1_sources, now=lambda: "2026-09-30T12:00:00Z", **kwargs)
+
+    def test_prune_removes_only_the_train_archives_once_every_reserve_cohort_verifies(self) -> None:
+        with self.assertRaisesRegex(corpora.CorporaError, "removed nothing(.|\n)*cohort 1 is not extracted"):
+            self.prune(dry_run=True)
+        report = self.extract()
+        receipt_path = f"fleurs/{REVISION}/{corpora.RECEIPT_NAME}"
+        before = snapshot(self.root)
+        archives = [f"data/{n1.FLEURS_CONFIGS[language]}/audio/train.tar.gz" for language in self.LANGUAGES]
+        dry = self.prune(dry_run=True)
+        self.assertEqual(snapshot(self.root), before)
+        self.assertEqual([item["path"] for item in dry["sources"][0]["files"]], archives)
+        self.assertEqual(dry["reclaimBytes"], sum(len(self.train[path]) for path in archives))
+        value = self.prune()
+        self.assertEqual(value["reclaimBytes"], dry["reclaimBytes"])
+        after = snapshot(self.root)
+        # Only the train archives go: the train TSVs, the N1 dev and test files, the reserve recordings and cohorts
+        # stay byte for byte; the receipt marks each archive pruned.
+        self.assertEqual(set(before) - set(after), {f"fleurs/{REVISION}/{path}" for path in archives})
+        self.assertEqual({path: data for path, data in after.items() if path != receipt_path},
+                         {path: before[path] for path in after if path != receipt_path})
+        self.assertTrue(all(f"fleurs/{REVISION}/{path}" in after for path in self.n1_files))
+        receipt = json.loads((self.root / receipt_path).read_text())["files"]
+        self.assertEqual({path for path, item in receipt.items() if "prunedAt" in item}, set(archives))
+        # The reserve's receipts let `extract` skip the pruned archives, and `verify` reports them as pruned.
+        again = self.extract()
+        self.assertEqual([item["counts"] for item in again["cohorts"]], [item["counts"] for item in report["cohorts"]])
+        with mock.patch.object(n1, "sources_digest", return_value="d" * 64):
+            results = quiet(corpora.verify, self.registry, ["fleurs-train"], root=self.root,
+                            n1_sources=self.n1_sources)
+        self.assertEqual((results[0]["status"], results[0]["prunedFiles"]), ("PASS", 2))
+        # Recordings that no longer match their receipt need the archive again: extract and prune both say fetch.
+        french = self.corpus / corpora.RESERVE_DIRECTORY / report["samplingDigest"][:12] / \
+            corpora.EXTRACTED_DIRECTORY / n1.FLEURS_CONFIGS["french"]
+        next(french.glob("*.wav")).unlink()  # the cohort's hard link keeps the cohort itself whole
+        with self.assertRaisesRegex(corpora.CorporaError, "was pruned after a verified reserve extraction.*"
+                                                          "fetch --group fleurs-train"):
+            self.extract()
+        with self.assertRaisesRegex(corpora.CorporaError, "french reserve recordings do not match their extraction "
+                                                          "receipt\\); run `fetch --source fleurs-train`"):
+            self.prune(dry_run=True)
 
 
 class LabelledCohortTests(Fixture):

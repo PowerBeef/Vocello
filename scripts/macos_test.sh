@@ -12,7 +12,8 @@
 #   scripts/macos_test.sh tsan                      # core TSan subset (push CI blocking job + nightly cold run)
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
 #                                                 # headless macOS language-hint matrix (vocello CLI)
-#   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b] [--label L]
+#   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b]
+#                                  [--cells standard,clone,cross-lingual|long-form] [--label L]
 #                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
 #   scripts/macos_test.sh qc-n2 --n1-manifest <path> [--label L]
 #                                                 # audio QC N2: N1 codec resynthesis (vocello bench --codec-roundtrip)
@@ -1128,28 +1129,35 @@ PY
 }
 
 # qc-takes: the AQ-07 natural calibration takes (audio QC population N3). One
-# `vocello batch` per planned (language, voice, seed) batch over one split of the
-# committed CC0 script pool; the takes are calibration data, not a benchmark, so
-# nothing is published and no history record is written. A failed batch stops
-# only itself; every planned take without output is recorded as missing, and the
-# lane then exits non-zero with its artifacts preserved.
+# `vocello batch` per planned (cell, language, voice, seed) batch over one split
+# of the committed CC0 script pool; the takes are calibration data, not a
+# benchmark, so nothing is published and no history record is written. The
+# cells (config/audio-qc-calibration-takes.json) are standard (the default),
+# clone (Voice Clone on the extracted speaker corpora's reference clips),
+# cross-lingual and long-form (`vocello batch --long-form`, planned alone). A
+# failed batch stops only itself; every planned take without output is recorded
+# as missing, and the lane then exits non-zero with its artifacts preserved.
 cmd_qc_takes() {
-  local split="calibration" languages="" label=""
+  local split="calibration" languages="" cells="" label=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --split) split="${2:-}"; shift 2 ;;
       --split=*) split="${1#*=}"; shift ;;
       --languages) languages="${2:-}"; shift 2 ;;
       --languages=*) languages="${1#*=}"; shift ;;
+      --cells) cells="${2:-}"; shift 2 ;;
+      --cells=*) cells="${1#*=}"; shift ;;
       --label) label="${2:-}"; shift 2 ;;
       --label=*) label="${1#*=}"; shift ;;
-      *) die "unknown qc-takes arg '$1' (try --split calibration|confirmation --languages english,french --label L)" ;;
+      *) die "unknown qc-takes arg '$1' (try --split calibration|confirmation --languages english,french --cells standard,clone,cross-lingual|long-form --label L)" ;;
     esac
   done
   validate_benchmark_label "$label"
   [[ "$split" == "calibration" || "$split" == "confirmation" ]] || die "--split must be calibration or confirmation"
   [[ -z "$languages" || "$languages" =~ ^[a-z]+(,[a-z]+)*$ ]] \
     || die "--languages takes comma-separated canonical language ids (english,french,...)"
+  [[ -z "$cells" || "$cells" =~ ^[a-z-]+(,[a-z-]+)*$ ]] \
+    || die "--cells takes comma-separated cells (standard,clone,cross-lingual or long-form alone)"
 
   local pool="$ROOT_DIR/config/audio-qc-script-pool.json"
   local policy="$ROOT_DIR/config/audio-qc-calibration-takes.json"
@@ -1161,13 +1169,20 @@ cmd_qc_takes() {
 
   "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
   # Read-only: downloads stay an explicit `models ensure` repair action.
-  require_mac_benchmark_models pro_custom_speed pro_design_speed
+  local -a models=(pro_custom_speed pro_design_speed)
+  local planned_cells="$cells"
+  [[ -n "$planned_cells" ]] || planned_cells="$(python3 -c 'import json, sys
+print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
+  [[ ",$planned_cells," != *",clone,"* ]] || models+=(pro_clone_speed)
+  require_mac_benchmark_models "${models[@]}"
 
   local run_id
   run_id="mac-qc-takes-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/audio-qc/qc-takes-$run_id"
-  # The debug engine records each failure's code and Fast QC flags here.
+  # The debug engine records each failure's code, Fast QC flags and introspection
+  # summary here; the lane collects its own rows into $run_diagnostics.
   local diag_root="${HOME}/Library/Application Support/QwenVoice-Debug/diagnostics"
+  local run_diagnostics="$artifacts/diagnostics"
   mkdir -p "$artifacts/batches" "$artifacts/batch-results" "$artifacts/batch-out" "$artifacts/logs"
   capture_benchmark_source "$artifacts"
 
@@ -1175,27 +1190,41 @@ cmd_qc_takes() {
   local -a plan_command=(python3 "$takes_tool" plan --pool "$pool" --policy "$policy" --split "$split"
     --run-id "$run_id" --output "$plan")
   [[ -z "$languages" ]] || plan_command+=(--languages "$languages")
+  [[ -z "$cells" ]] || plan_command+=(--cells "$cells")
   "${plan_command[@]}" >"$artifacts/plan-summary.json" \
-    || die "qc-takes: the immutable take plan could not be written"
+    || die "qc-takes: the immutable take plan could not be written (a clone cell needs the extracted speaker corpora)"
   local batch_index="$artifacts/batches/index.tsv"
-  python3 "$takes_tool" batch-files --plan "$plan" --out-dir "$artifacts/batches" >"$batch_index" \
+  # Also copies each clone batch's reference clip into $artifacts/references.
+  python3 "$takes_tool" batch-files --plan "$plan" --out-dir "$artifacts/batches" \
+    --references-dir "$artifacts/references" >"$batch_index" \
     || die "qc-takes: the batch line files could not be written"
   local planned_count batch_total
   planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
   batch_total="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["batchCount"])' "$plan")"
 
+  # The engine front-trims its capped diagnostics logs (8 MB by default, about
+  # 300 rows), so a long run lost its early takes' rows before its manifest bound
+  # them. The rows already present are marked as taken, the lane copies each
+  # segment's new rows into the run as the batches finish, and the registered
+  # bounded-observability knob (config/runtime-debug-knobs.json) raises the cap
+  # so one segment's rows always survive until they are copied.
+  python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" --baseline \
+    >/dev/null || die "qc-takes: the engine diagnostics baseline could not be recorded"
+
   # The debug data context holds the benchmark models `require_mac_benchmark_models` checked.
   export QWENVOICE_DEBUG=1
-  note "qc-takes: runID=$run_id split=$split takes=$planned_count batches=$batch_total${label:+ label=$label}"
+  export QWENVOICE_DIAGNOSTICS_MAX_MB=64
+  note "qc-takes: runID=$run_id split=$split takes=$planned_count batches=$batch_total${cells:+ cells=$cells}${label:+ label=$label}"
 
-  local row batch_count=0 batch_fail=0 batch_resumes=0
+  local row batch_count=0 batch_fail=0 batch_resumes=0 collect_fail=0
   while IFS= read -r row; do
     [[ -n "$row" ]] || continue
     batch_count=$((batch_count + 1))
-    local batch_id mode variant variation seed speaker brief count lines_file
-    # Unit-separated fields (texts and briefs are single lines; the plan refuses separators).
-    IFS=$'\x1f' read -r batch_id mode variant variation seed speaker brief count lines_file <<<"$row"
-    local -a voice_args=()
+    local batch_id mode variant variation seed speaker brief count lines_file reference transcript long_form
+    # Unit-separated fields (texts, briefs and transcripts are single lines; the plan refuses separators).
+    IFS=$'\x1f' read -r batch_id mode variant variation seed speaker brief count lines_file reference transcript \
+      long_form <<<"$row"
+    local -a voice_args=() form_args=()
     case "$mode" in
       custom)
         [[ -n "$speaker" ]] || die "qc-takes batch $batch_id: the plan names no Built-in speaker"
@@ -1205,9 +1234,17 @@ cmd_qc_takes() {
         [[ -n "$brief" ]] || die "qc-takes batch $batch_id: the plan names no Voice Design brief"
         voice_args=(--voice-brief "$brief")
         ;;
+      clone)
+        [[ -n "$reference" && -f "$reference" && -n "$transcript" ]] \
+          || die "qc-takes batch $batch_id: the plan names no copied reference clip and transcript"
+        # Corpus recordings licensed for reuse (the policy's cells.clone.consent);
+        # the bare consent flag stays last so it never takes a value.
+        voice_args=(--reference "$reference" --transcript "$transcript" --confirm-consent)
+        ;;
       *) die "qc-takes batch $batch_id: unsupported mode '$mode'" ;;
     esac
-    note "qc-takes batch $batch_count/$batch_total: $batch_id ($mode/$variant, $count takes)"
+    [[ "$long_form" != "1" ]] || form_args=(--long-form)
+    note "qc-takes batch $batch_count/$batch_total: $batch_id ($mode/$variant, $count ${long_form:+long-form }takes)"
     # `vocello batch` stops at its first failed item, and the engine's
     # mandatory Fast QC refuses a take as a failure. The lane resumes after
     # that item in a new segment (`<batchID>@<offset>`): the seed is the
@@ -1228,8 +1265,11 @@ cmd_qc_takes() {
       # is closed so the CLI never consumes this loop's batch rows.
       "$QVOICE_BUILD_ROOT/vocello" batch --file "$segment_lines" --mode "$mode" --variant "$variant" \
         --seed "$seed" --variation "$variation" --out-dir "$artifacts/batch-out/$segment" --json \
-        "${voice_args[@]}" >"$artifacts/batch-results/$segment.json" \
+        ${form_args[@]+"${form_args[@]}"} "${voice_args[@]}" >"$artifacts/batch-results/$segment.json" \
         2>"$artifacts/logs/$segment.log" </dev/null || st=$?
+      # Keep this segment's engine rows before a later segment's rows trim them.
+      python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" \
+        >>"$artifacts/logs/collect-diagnostics.jsonl" 2>&1 || collect_fail=$((collect_fail + 1))
       (( st != 0 )) || break
       local next
       next="$(python3 "$takes_tool" next-offset --result "$artifacts/batch-results/$segment.json" \
@@ -1247,29 +1287,37 @@ cmd_qc_takes() {
       fi
     done
   done <"$batch_index"
-  unset QWENVOICE_DEBUG
+  unset QWENVOICE_DEBUG QWENVOICE_DIAGNOSTICS_MAX_MB
+  (( collect_fail == 0 )) \
+    || warn "qc-takes: $collect_fail diagnostics collection(s) failed; their takes may carry no introspection"
 
   [[ "$batch_count" -eq "$batch_total" ]] \
     || die "qc-takes: ran $batch_count of $batch_total planned batches; artifacts are preserved in $artifacts"
 
+  # The manifest binds the run's own collected rows (failure codes, QC flags,
+  # introspection by WAV digest) and each clone take's copied reference clip.
   local manifest="$artifacts/takes-manifest.json" manifest_st=0 validate_st=0
   python3 "$takes_tool" manifest --plan "$plan" --batch-results "$artifacts/batch-results" \
-    --wav-root "$artifacts/batch-out" --diagnostics "$diag_root" --output "$manifest" \
-    >"$artifacts/manifest-counts.json" || manifest_st=$?
+    --wav-root "$artifacts/batch-out" --diagnostics "$run_diagnostics" --references-dir "$artifacts/references" \
+    --output "$manifest" >"$artifacts/manifest-counts.json" || manifest_st=$?
   if (( manifest_st == 0 )); then
     python3 "$takes_tool" validate-manifest --manifest "$manifest" --plan "$plan" \
       >"$artifacts/manifest-validation.json" || validate_st=$?
   fi
 
-  local generated="?" rejected="?" failed="?" missing="?"
+  local generated="?" rejected="?" failed="?" missing="?" introspection="?"
   if (( manifest_st == 0 )); then
-    read -r generated rejected failed missing < <(python3 -c 'import json, sys
-counts = json.load(open(sys.argv[1]))["counts"]
-print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"])' "$manifest")
+    read -r generated rejected failed missing introspection < <(python3 -c 'import json, sys
+manifest = json.load(open(sys.argv[1]))
+counts = manifest["counts"]
+bound = manifest.get("introspection", {})
+print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"],
+      "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)))' "$manifest")
   fi
   {
-    echo "qc-takes runID=$run_id split=$split${label:+ label=$label}"
+    echo "qc-takes runID=$run_id split=$split${cells:+ cells=$cells}${label:+ label=$label}"
     echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing"
+    echo "introspection_bound=$introspection diagnostics_collect_fail=$collect_fail"
     echo "batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes"
     echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
     echo "manifest_validation=$([[ $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"

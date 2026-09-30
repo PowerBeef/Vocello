@@ -1,25 +1,27 @@
 {
   "schemaVersion": 1,
   "kind": "audio-qc-calibration-takes-policy",
-  "version": 1,
+  "version": 2,
   "population": "N3",
   "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md sections 5.1, 5.4, 5.5 and 5.7; config/audio-qc-qualification-policy.json",
-  "description": "The take plan of the natural calibration takes (population N3): every script of one split of config/audio-qc-script-pool.json spoken by one primary voice, rotating over the language's three voices, plus a deterministic donor subset spoken by a second voice for same-script, different-voice pairs (identity-swap construction, class E). scripts/audio_qc_calibration_takes.py plans, binds and validates the takes; scripts/macos_test.sh qc-takes generates them. Takes are calibration data, never a benchmark: nothing is published and no history record is written.",
+  "description": "The take plan of the natural calibration takes (population N3), in cells that each exercise one of the product's generation paths over one split of config/audio-qc-script-pool.json. standard: every script spoken by one primary voice, rotating over the language's two Built-in speakers and one Voice Design brief, plus a deterministic donor subset spoken by a second voice (same-script, different-voice pairs for the class E identity swap); the version 1 layout and seed identity. clone: Voice Clone takes conditioned on human reference clips of the pinned speaker corpora, same-language and cross-language. cross-lingual: every Built-in speaker of the split and Voice Design briefs written in English and in the target language speaking each language. long-form: multi-segment projects that the product's long-form planner splits and its bounded assembler joins, with their seams. scripts/audio_qc_calibration_takes.py plans, binds and validates the takes; scripts/macos_test.sh qc-takes generates them. Takes are calibration data, never a benchmark: nothing is published and no history record is written.",
   "generation": {
     "customMode": "custom",
     "designMode": "design",
+    "cloneMode": "clone",
     "variant": "speed",
     "variation": "expressive",
     "language": "auto-per-text",
-    "note": "vocello batch refuses --language: every item resolves its language from its own text (Auto), as the delivered default does."
+    "note": "vocello batch refuses --language: every item resolves its language from its own text (Auto), as the delivered default does. A long-form batch (vocello batch --long-form) runs each line as one project the way the apps' long-form runner does: the shipping planner splits it, each segment is one streaming take at the app cadence with its derived subseed, and the bounded assembler joins them."
   },
-  "familyRule": "One script x voice x seed is one family, the unit of independence (config/audio-qc-qualification-policy.json statistics.familyRule); a family is deduplicated by PCM digest.",
+  "familyRule": "One script x voice x seed is one family, the unit of independence (config/audio-qc-qualification-policy.json statistics.familyRule); a family is deduplicated by PCM digest. A long-form project stands in for the script: one project x voice x seed is one family.",
   "seedRule": {
     "policy": "sha256-audio-qc-takes-v1-generation-split-language-mode-voice-63bit",
     "generation": 1,
     "identity": "audio-qc-calibration-seed-v1|<generation>|<split>|<language>|<mode>|<voiceKey>",
+    "cellScope": "The standard cell keeps this identity, so its seeds reproduce the version 1 plan; every other cell appends |<cell>, so no two cells share a batch seed.",
     "bits": 63,
-    "scope": "One seed per (split, language, mode, voice) batch: vocello batch --seed applies one seed to every item of a batch. It mirrors the seed-identity scheme of scripts/language_bench_evidence.py (the first 8 bytes of a SHA-256, masked to 63 bits). A new generation number draws new, independent families."
+    "scope": "One seed per (split, cell, language, mode, voice) batch: vocello batch --seed applies one seed to every item of a batch (a long-form project's base seed, from which the planner derives each segment's subseed). It mirrors the seed-identity scheme of scripts/language_bench_evidence.py (the first 8 bytes of a SHA-256, masked to 63 bits). A new generation number draws new, independent families."
   },
   "assignment": {
     "primary": "The split's scripts of a language, ordered by script ID, take the language's voices in declared order (Built-in, Built-in, Voice Design) in rotation.",
@@ -38,38 +40,124 @@
     "ono_anna": "female",
     "sohee": "female"
   },
+  "speakerPartition": {
+    "calibration": ["aiden", "serena", "vivian", "uncle_fu", "ono_anna", "sohee"],
+    "confirmation": ["ryan", "dylan", "eric"],
+    "rule": "The qualification driver (scripts/audio_qc_detector_calibration.py, role sets n3-*) refuses two cohorts that share a speaker in any language, so a Built-in speaker belongs to one split. Version 1 gave a language's two splits different speakers but let vivian and serena serve calibration in some languages and confirmation in others; its confirmation split was never generated. Calibration keeps the six speakers of the 2026-09-27 calibration cohort, so that cohort can stand beside a confirmation cohort; confirmation has the other three, all male, and its female voices are the Voice Design briefs (its brief is female) and clone references."
+  },
   "designBriefs": {
     "calm-narrator": {
       "text": "A warm, friendly narrator with a calm, measured pace.",
+      "language": "english",
+      "concept": "calm-narrator",
       "source": "config/language-bench-corpus.json designInstruction"
     },
+    "calm-narrator-fr": {"text": "Une voix de narration chaleureuse et amicale, au débit calme et posé.", "language": "french", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-de": {"text": "Eine warme, freundliche Erzählstimme mit ruhigem, gemessenem Tempo.", "language": "german", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-es": {"text": "Una voz narradora cálida y amable, con un ritmo tranquilo y pausado.", "language": "spanish", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-it": {"text": "Una voce narrante calda e cordiale, dal ritmo calmo e misurato.", "language": "italian", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-pt": {"text": "Uma voz narradora calorosa e simpática, com um ritmo calmo e pausado.", "language": "portuguese", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-ru": {"text": "Тёплый, дружелюбный голос рассказчика со спокойным, размеренным темпом.", "language": "russian", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-zh": {"text": "一位温暖友善的讲述者，语速平静而从容。", "language": "chinese", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-ja": {"text": "温かく親しみやすい語り手で、落ち着いたゆったりとしたペースで話す。", "language": "japanese", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
+    "calm-narrator-ko": {"text": "따뜻하고 친근한 내레이터로, 차분하고 절제된 속도로 말한다.", "language": "korean", "concept": "calm-narrator", "source": "a translation of calm-narrator (this policy)"},
     "bright-presenter": {
-      "text": "A bright, youthful presenter with a lively, upbeat pace.",
-      "source": "the contrasting brief of this policy"
-    }
+      "text": "A bright, youthful female presenter with a lively, upbeat pace.",
+      "language": "english",
+      "concept": "bright-presenter",
+      "source": "the contrasting brief of this policy; female since version 2, because the confirmation split's Built-in speakers are all male"
+    },
+    "bright-presenter-fr": {"text": "Une présentatrice jeune et pétillante, au rythme vif et enjoué.", "language": "french", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-de": {"text": "Eine strahlende, junge Moderatorin mit lebhaftem, beschwingtem Tempo.", "language": "german", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-es": {"text": "Una presentadora joven y radiante, con un ritmo vivo y alegre.", "language": "spanish", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-it": {"text": "Una presentatrice giovane e brillante, dal ritmo vivace e allegro.", "language": "italian", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-pt": {"text": "Uma apresentadora jovem e radiante, com um ritmo animado e alegre.", "language": "portuguese", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-ru": {"text": "Яркая молодая ведущая с живым, бодрым темпом речи.", "language": "russian", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-zh": {"text": "一位明亮而年轻的女主持人，语速轻快活泼。", "language": "chinese", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-ja": {"text": "明るく若々しい女性の司会者で、生き生きとした軽快なペースで話す。", "language": "japanese", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "bright-presenter-ko": {"text": "밝고 젊은 여성 진행자로, 활기차고 경쾌한 속도로 말한다.", "language": "korean", "concept": "bright-presenter", "source": "a translation of bright-presenter (this policy)"},
+    "deep-storyteller": {"text": "A deep-voiced older man telling a story at a slow, deliberate pace.", "language": "english", "concept": "deep-storyteller", "source": "a cross-lingual brief of this policy"},
+    "cheerful-host": {"text": "A cheerful young woman hosting a radio show at a quick, conversational pace.", "language": "english", "concept": "cheerful-host", "source": "a cross-lingual brief of this policy"},
+    "crisp-announcer": {"text": "A crisp, confident male announcer with a steady, even delivery.", "language": "english", "concept": "crisp-announcer", "source": "a cross-lingual brief of this policy"},
+    "gentle-teacher": {"text": "A gentle, patient female teacher explaining things at an unhurried pace.", "language": "english", "concept": "gentle-teacher", "source": "a cross-lingual brief of this policy"}
   },
   "splits": {
     "calibration": {
       "designBrief": "calm-narrator",
+      "crossLingualBriefs": ["deep-storyteller", "cheerful-host"],
       "expectedScriptsPerLanguage": 60,
       "expectedTakeCount": 800,
-      "expectedTakeCountRule": "10 languages x (60 primary takes + 20 donor takes)"
+      "expectedTakeCountRule": "the standard cell: 10 languages x (60 primary takes + 20 donor takes)"
     },
     "confirmation": {
-      "designBrief": "bright-presenter"
+      "designBrief": "bright-presenter",
+      "crossLingualBriefs": ["crisp-announcer", "gentle-teacher"],
+      "expectedScriptsPerLanguage": 60,
+      "expectedTakeCount": 800,
+      "expectedTakeCountRule": "the standard cell: 10 languages x (60 primary takes + 20 donor takes)"
     }
   },
-  "splitRule": "Calibration and confirmation are disjoint by family, speaker and script (audit section 5.5 step 1): each language's two splits share no Built-in speaker and no Voice Design brief. Japanese and Korean have one native Built-in speaker each; it speaks the calibration split, and their confirmation split relies on non-native Built-in speakers beside its Voice Design voice.",
+  "splitRule": "Calibration and confirmation are disjoint by family, speaker and script (audit section 5.5 step 1) across every language and cell: the pool splits the scripts, a Built-in speaker belongs to one split (speakerPartition), a Voice Design brief and its translations belong to one split, and a clone reference speaker belongs to one split. In the calibration split each language pairs a male and a female Built-in speaker, the native one where it exists; the confirmation split's Built-in speakers are all male, so a split whose speakers have one gender pairs no genders.",
   "languages": [
-    {"language": "english", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
-    {"language": "french", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
-    {"language": "german", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
-    {"language": "spanish", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
-    {"language": "italian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
-    {"language": "portuguese", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "vivian"]},
-    {"language": "russian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "serena"]},
-    {"language": "chinese", "calibration": ["vivian", "uncle_fu"], "confirmation": ["serena", "dylan"]},
-    {"language": "japanese", "calibration": ["ono_anna", "aiden"], "confirmation": ["vivian", "ryan"]},
-    {"language": "korean", "calibration": ["sohee", "aiden"], "confirmation": ["serena", "ryan"]}
-  ]
+    {"language": "english", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "dylan"]},
+    {"language": "french", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "eric"]},
+    {"language": "german", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "dylan"]},
+    {"language": "spanish", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "eric"]},
+    {"language": "italian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "dylan"]},
+    {"language": "portuguese", "calibration": ["aiden", "serena"], "confirmation": ["ryan", "eric"]},
+    {"language": "russian", "calibration": ["aiden", "vivian"], "confirmation": ["ryan", "dylan"]},
+    {"language": "chinese", "calibration": ["vivian", "uncle_fu"], "confirmation": ["dylan", "eric"]},
+    {"language": "japanese", "calibration": ["ono_anna", "aiden"], "confirmation": ["dylan", "ryan"]},
+    {"language": "korean", "calibration": ["sohee", "aiden"], "confirmation": ["eric", "ryan"]}
+  ],
+  "defaultCells": ["standard"],
+  "cells": {
+    "standard": {
+      "description": "The version 1 layout: each script once by its primary voice, rotating over the language's two Built-in speakers and the split's Voice Design brief, and 20 donor scripts by the next voice. Its batch ids, take ids and seed identity are version 1's, so the calibration split plans version 1's batches; the confirmation split, never generated under version 1, now pairs ryan, dylan and eric (speakerPartition) with the female brief.",
+      "expectedTakeCount": {"calibration": 800, "confirmation": 800}
+    },
+    "clone": {
+      "description": "Voice Clone takes (the pro_clone Speed model, transcript-backed conditioning as the apps' saved voices use) on human reference clips of the pinned speaker corpora. Each language's 60 scripts are spoken once by 12 primary references in rotation (5 scripts each): same-language references where a speaker corpus covers the language, cross-language references otherwise (Japanese and Russian). 20 more scripts are spoken by 4 cross-language secondary references. Every clone take records its reference clip (corpus, speaker, gender where labelled, language, WAV digest), which the speaker judges score it against.",
+      "referenceSources": {
+        "english": ["libritts-r"],
+        "french": ["mls"],
+        "german": ["mls"],
+        "spanish": ["mls"],
+        "italian": ["mls", "emozionalmente"],
+        "portuguese": ["mls"],
+        "russian": [],
+        "chinese": ["aishell3-subset"],
+        "japanese": [],
+        "korean": ["zeroth-korean"]
+      },
+      "excludedSources": {
+        "crema-d": "Its clips carry a sentence code but no transcript, and last 2-3 s of acted emotion: a transcript-backed reference needs its text."
+      },
+      "referenceWindowSeconds": {"minimum": 5.0, "preferredMinimum": 10.0, "maximum": 30.0},
+      "referenceEmotions": ["neutral"],
+      "primaryReferencesPerLanguage": 12,
+      "secondaryReferencesPerLanguage": 4,
+      "scriptsPerReference": 5,
+      "speakerSplitRule": "Within each source, its speakers (over all its languages) are ranked by SHA-256 of audio-qc-clone-speaker-split-v1|<source>|<speaker>; even ranks belong to calibration, odd ranks to confirmation, so a reference speaker never crosses splits, even one who reads in two of a corpus's languages.",
+      "referenceRule": "A clip is eligible when it names its speaker, carries a one-line transcript, lasts between the window's minimum and maximum, and its canonical emotion, where the corpus labels one, is listed. Each speaker's reference is its eligible clip with the lowest SHA-256 of audio-qc-clone-reference-v1|<split>|<source>|<clipID>, among the clips of at least the preferred minimum when it has any (the apps' recorder takes 10 to 20 s). A language's candidates interleave its sources, each ranked by SHA-256 of audio-qc-clone-reference-v1|<split>|<source>|<speaker> and alternating female and male where the corpus labels gender. Every language's primary same-language references are allocated first, then the cross-language ones, each target language drawing round-robin over the other reference languages starting after its own; a speaker serves one reference per split. Secondary scripts are the 20 with the lowest SHA-256 of audio-qc-clone-secondary-v1|<split>|<language>|<scriptID>.",
+      "consent": "The references are recordings the pinned corpora license for reuse (config/audio-qc-corpora.json: CC BY 4.0 or Apache 2.0); the maintainer chose them for class E on 2026-09-29. The clones are calibration data only: nothing is published, and the lane passes --confirm-consent only for these batches.",
+      "expectedTakeCount": {"calibration": 800, "confirmation": 800}
+    },
+    "cross-lingual": {
+      "description": "Every Built-in speaker of the split speaks each language (the speakers the standard cell does not pair with the language), beside Voice Design briefs written in the target language (a translation of the split's brief, for every language but English) and in English (the split's crossLingualBriefs): the English-accent-in-French case. Each take records the voice's own language (a Built-in speaker's native language from the speaker contract, a brief's language) beside its target language. The 60 scripts rotate over the voices, and 20 donor scripts take the next voice.",
+      "donorScriptsPerLanguage": 20,
+      "donorSelection": "As the standard cell's, ranked by SHA-256 of audio-qc-calibration-cross-lingual-donor-v1|<split>|<language>|<scriptID>.",
+      "expectedTakeCount": {"calibration": 800, "confirmation": 800}
+    },
+    "long-form": {
+      "description": "Multi-segment projects: pool scripts of one language and split joined into one text above the planner's runtime token limit, so the product's long-form planner splits every project at least once. A project runs through vocello batch --long-form, the apps' long-form path, spoken by the language's standard voices in rotation. Each take records the assembler's evidence (its longForm block: seams and maximum boundary jump) and each segment's take. Long-form takes are the n3-long-form cohort: a plan holds them alone.",
+      "languages": ["english", "french", "german", "spanish", "italian", "portuguese", "russian", "chinese", "japanese", "korean"],
+      "projectsPerLanguage": 8,
+      "runtimeTokenLimit": 300,
+      "estimateWindow": {"minimum": 330, "maximum": 480},
+      "unspacedLanguages": ["chinese", "japanese"],
+      "projectRule": "Project k of a language orders the split's scripts by SHA-256 of audio-qc-long-form-v1|<split>|<language>|<k>|<scriptID> and appends them, joined by a space (none in unspaced languages), skipping a script that would take the project past the window's maximum, until its conservative token estimate (LongFormPlanning.swift ConservativeTokenEstimator, estimator version 1, mirrored in Python) reaches the window's minimum, above runtimeTokenLimit (LongFormPlanningConfiguration.shippingRuntimeTokenLimit). Projects draw scripts with replacement, so a script recurs in a few projects of its split, never across splits.",
+      "expectedTakeCount": {"calibration": 80, "confirmation": 80}
+    }
+  }
 }

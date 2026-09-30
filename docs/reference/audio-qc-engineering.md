@@ -1572,9 +1572,9 @@ Population N3 is natural Vocello takes over one split of the CC0 script pool
 (`config/audio-qc-script-pool.json`). `config/audio-qc-calibration-takes.json` fixes the take
 plan. Each language has three voices per split: two Built-in speakers, a male and a female with
 the native speaker where one exists, and one Voice Design brief. The calibration split uses the
-corpus's calm narrator and the confirmation split a contrasting brief, and a language's two splits
-share no speaker (§5.5 step 1). Takes use the Speed variant, the expressive variation and Auto
-language per text.
+corpus's calm narrator and the confirmation split a contrasting brief, and no speaker serves both
+splits in any language (§5.5 step 1; policy version 2, below). Takes use the Speed variant, the
+expressive variation and Auto language per text.
 
 Each script gets one primary voice, rotating over the three voices. A stratified donor subset of
 20 scripts per language also gets the next voice, which gives same-script, different-voice pairs
@@ -1589,14 +1589,14 @@ benchmark's seed identity. A family is still script × voice × seed. The calibr
 - `batch-files` writes one line file per batch.
 - `manifest` binds each batch's `--json` output to the plan by item index, checking each item's
   text. It moves every WAV to `wav/<takeID>.wav`. A take the engine's mandatory Fast QC refused is
-  `rejected`, with the flag families the engine recorded (from the debug diagnostics, by generation
-  id); another engine failure is `failed` with its code; a planned take with no output is `missing`
-  with its reason.
+  `rejected`, with the flag families the engine recorded (from the run's collected engine
+  diagnostics, by generation id); another engine failure is `failed` with its code; a planned take
+  with no output is `missing` with its reason.
 - `validate-manifest` recomputes the digests and checks the manifest against the plan.
 
 The consent-bound lane `scripts/macos_test.sh qc-takes [--split calibration|confirmation]
-[--languages a,b] [--label L]` runs these steps around one `vocello batch` per batch on a quiet
-host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>/` and stay untracked.
+[--languages a,b] [--cells …] [--label L]` runs these steps around one `vocello batch` per batch on
+a quiet host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>/` and stay untracked.
 `vocello batch` stops at its first failed item, so the lane resumes the batch after that item in a
 new segment (`<batchID>@<offset>`, `next-offset`): the seed is the batch's, and each item's sampling
 depends only on the seed and its text. A rejected take is an outcome that N3 flag rates must count
@@ -1604,6 +1604,92 @@ depends only on the seed and its text. A rejected take is an outcome that N3 fla
 take fails the lane. The lane publishes nothing and writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
 takes manifest, an injection-set manifest or an N1 cohort manifest into a language-lane manifest for
 the panel judges; it skips and counts missing takes and ineligible N1 recordings.
+
+### Take plan version 2: clone, cross-lingual and long-form cells (2026-09-30)
+
+The maintainer hears three defects the version 1 plan could not measure: erratic pitch in Voice
+Clone takes, seams in long-form projects, and English-accented French from Built-in and Voice
+Design voices. Version 2 of `config/audio-qc-calibration-takes.json` groups the takes in cells, one
+per generation path; `plan --cells` (and the lane's `--cells`) picks them, `standard` by default.
+
+| Cell | Per split | What it measures |
+|---|---|---|
+| `standard` | 800 takes, 30 batches | The version 1 layout and seed identity. |
+| `clone` | 800 takes, 160 batches | Voice Clone on human reference clips: per language 60 scripts by 12 primary references (same-language where a speaker corpus covers the language, cross-language for Japanese and Russian) and 20 by 4 cross-language references. |
+| `cross-lingual` | 800 takes, 69 or 39 batches | Every Built-in speaker of the split that the standard cell does not pair with the language, the split's brief translated into the language, and two English briefs; 60 scripts plus 20 donors per language. |
+| `long-form` | 80 projects, 30 batches | 8 projects per language, pool scripts joined above the planner's 300-unit limit (330 to 480 units, about 30 to 110 s), spoken by the standard voices. |
+
+Every take records its `cell` and `voiceLanguage` (a Built-in speaker's native language from the
+speaker contract, a brief's language, a reference's language) beside its target `language`, so a
+French take by an English brief or an English-native speaker is one filter away. Long-form takes are
+the n3-long-form cohort, so a plan holds them alone. Each cell keeps at least 60 families per
+language per split (80 planned; long-form pools 80 over ten languages).
+
+- **Speakers.** The qualification driver refuses two cohorts that share a speaker in any language
+  (`check_cohort_disjointness` over voice keys), which version 1 broke: vivian and serena spoke
+  calibration in some languages and confirmation in others. `speakerPartition` gives each Built-in
+  speaker to one split. Calibration keeps the six speakers of the 2026-09-27 cohort (its batches are
+  unchanged); confirmation, never generated, now pairs ryan, dylan and eric, all male, so its brief
+  became female and its female voices are that brief, the cross-lingual briefs and clone references.
+  A brief and its translations belong to one split.
+- **Clone references.** `plan` reads the extracted speaker corpora (`audio_qc_corpora.py
+  extract`: LibriTTS-R, Multilingual LibriSpeech, Emozionalmente, the AISHELL-3 subset and
+  Zeroth-Korean; CREMA-D carries no transcript). A clip is eligible with a speaker, a one-line
+  transcript, 5 to 30 s of audio and a neutral emotion where the corpus labels one; each speaker's
+  reference is its lowest-hash clip, among the clips of at least 10 s when it has any. Speakers are
+  split by a hash over their whole source, alternate female and male where labelled, and serve one
+  reference per split. `batch-files` copies each reference to `references/<key>.wav` and verifies
+  its digest; the lane passes it with its transcript and `--confirm-consent`, and each clone take
+  records `reference` (path relative to the manifest, digest, corpus, speaker), which the
+  orchestrator hands to the speaker judges.
+- **Long-form.** `vocello batch --long-form` (`Sources/VocelloCLI/BatchCommand.swift`) runs each
+  line the way the apps' long-form runner does: `SpokenTextPlanner` and `LongFormPlanner` at the
+  shipping token limit (`--seed` is the base seed, each segment samples its subseed), one streaming
+  take per segment at the app cadence, `BoundedLongFormAssembler` for the join. Its JSON adds each
+  project's segment takes and `LongFormAssemblyEvidence`. `manifest` refuses evidence whose output
+  digest is not the take's WAV, records the `longForm` block and `longFormSegments`, and binds each
+  segment's introspection by its WAV digest (the joined WAV has no engine row).
+- **Engine rows.** The engine front-trims each diagnostics log at 8 MB (about 300 rows), so the
+  2026-09-27 run bound only 251 of its 791 takes' introspection. The lane now marks the rows present
+  before it starts (`collect-diagnostics --baseline`), copies each segment's new rows, reduced to
+  generation id, WAV digest, Fast QC flag names, failure code and introspection numbers, into
+  `diagnostics/` after every `vocello batch`, raises the cap with the registered
+  bounded-observability knob `QWENVOICE_DIAGNOSTICS_MAX_MB=64`, and binds the manifest against its
+  own copy. `verdict.txt` reports the bound count.
+- **The 2026-09-27 cohort** still validates and shares no speaker with the new confirmation split.
+  It was planned from script pool version 1, whose ids are ranks: 176 of its 600 script ids name
+  confirmation scripts of the current pool, although only 7 of its texts moved split. The driver
+  compares script ids, so pair it with a new confirmation cohort only through its texts
+  ([language-bench.md](language-bench.md), "Versions and cohorts"), or regenerate the standard
+  calibration cell (about 19 minutes).
+
+How the lead runs it. The clone cell first needs the speaker corpora (maintainer-run, network); a
+dry `plan` shows the allocation without a model. The lanes are consent-bound and run one at a time
+(each builds the CLI, so the `--long-form` change is compiled in):
+
+```sh
+python3 scripts/audio_qc_corpora.py fetch --group speaker && python3 scripts/audio_qc_corpora.py extract --group speaker
+python3 scripts/audio_qc_calibration_takes.py plan --split calibration --cells standard,clone,cross-lingual \
+  --run-id dry-run --output build/artifacts/macos/audio-qc/plan-dry-run.json
+scripts/macos_test.sh qc-takes --split calibration --cells standard,clone,cross-lingual --label aq07-calibration-v2
+scripts/macos_test.sh qc-takes --split calibration --cells long-form --label aq07-long-form-calibration-v2
+scripts/macos_test.sh qc-takes --split confirmation --cells standard,clone,cross-lingual --label aq07-confirmation-v2
+scripts/macos_test.sh qc-takes --split confirmation --cells long-form --label aq07-long-form-confirmation-v2
+```
+
+To keep the 2026-09-27 cohort as the standard calibration data instead, drop `standard` from the
+first calibration run.
+
+Time. The 2026-09-27 run spent 0.27 s of batch wall time per second of audio (1,131 s for 4,151 s
+over 39 invocations, model loads included; 19 minutes end to end). Per split, from the plans'
+conservative token estimates at that run's seconds per unit: standard and cross-lingual about
+4,100 s of audio each (about 19 minutes each), clone about 4,100 s over 160 model loads (reference
+prefill unmeasured: 30 to 40 minutes), long-form about 5,650 s of streaming segments (unmeasured:
+25 to 35 minutes). About 1 hour 45 minutes per split, 3.5 hours for both.
+
+The detector registry's `n3-no-clone-takes` and `long-form-takes-pending` limitations and its
+`introspection-not-carried` and `long-form-evidence-not-carried` risks describe the gaps this plan
+closes; their owner updates them once the cohorts exist.
 
 ### Codec resynthesis (N2, audit P9)
 

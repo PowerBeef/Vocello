@@ -25,7 +25,8 @@
     "fleurs-speaker-lower-bound": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.",
     "n2-one-codec": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).",
     "speaker-corpus-pending": "FLEURS publishes no speaker ids, so class E has no fit or confirmation corpus yet (role set speaker-labeled-n2, corpora pending a maintainer data decision): it needs a speaker-labeled corpus whose terms allow speaker verification (Common Voice's forbid speaker identification) with at least two utterances per speaker, resynthesized to N2 like FLEURS. Each language stratum needs at least 60 scored calibration families and 60 scored confirmation negative families (the policy's warn minimums; audit section 5.4 sizes a per-language bound on its own families), from at least 3 speakers per language, the two cohorts disjoint by family, speaker and script; the positives need 60 families per severe cell and each injector's sham 60 more. A language without such a corpus becomes a scope exclusion (audit section 5.5 step 5), which changes the definition: a new version once a plan binds it.",
-    "speaker-reference-clip": "The speaker judges score a take only against a reference clip: another utterance of the same speaker for a corpus take, the clone's reference in the clone lane (panel_jobs: needs_reference). The orchestrator embeds it only when the manifest names it; without one CAM++ reports no similarity and the take abstains (no-value)."
+    "speaker-reference-clip": "The speaker judges score a take only against a reference clip: another utterance of the same speaker for a corpus take, the clone's reference in the clone lane (panel_jobs: needs_reference). The orchestrator embeds it only when the manifest names it; without one CAM++ reports no similarity and the take abstains (no-value).",
+    "n2-read-speech": "FLEURS is read speech, while the audit's class F negatives are expressive N1 (section 5.7): expressive speech moves F0 further and faster, so a threshold fitted on N2 read speech may flag expressive takes; natural Vocello takes (N3, whose expressive variation is the product default) stay informational at warn."
   },
   "exclusionReasons": {
     "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
@@ -45,7 +46,11 @@
     "no-impostor-injector": "Injector catalog version 2 has no impostor construction: a recording of another speaker of the same language and gender presented against the source speaker's reference clip (T1-parallel-corpus, built from published speaker labels as LNG-SWAP is from parallel sentences), with another utterance of the source speaker as its sham. Until IDN-IMPOSTOR exists the whole-take detector has no impostor positives and its confirmation cannot start.",
     "no-recorded-identity-swap": "IDN-SWAP@1 splices a time-aligned re-render by a second procedural voice, so it runs on procedural sources only: a human recording has no script to re-render and no render voice (audio_qc_calibration_set.py COHORT_SWAP_STATUS). On the speaker corpus it needs a recorded variant, a span of another same-language speaker's recording spliced at aligned word boundaries with a same-speaker splice as its sham (audit section 5.7); until then the window-drift detector has no positives.",
     "no-onset-swap-injector": "The onset detector's severe defect is another voice over the first 1.5 s of the take, which IDN-SWAP@1 never builds (its severe span sits in the middle; only its moderate one starts at the onset). It names IDN-ONSET, which catalog version 2 lacks: another voice over the first 0.3 s (mild), 1.0 s (moderate) and 1.5 s (severe), with a same-speaker splice as its sham.",
-    "onset-joint-rule-pending": "The audit judges the onset jointly on the CAM++ cosine, the pYIN register delta in semitones and a spectral-envelope Mahalanobis distance, since embeddings alone cannot judge the first 1.5 s (section 4.3). Nothing reduces the last two yet and the registry has no joint combination, so this version reads the CAM++ part alone; it stays warn until natural onset breaks are harvested."
+    "onset-joint-rule-pending": "The audit judges the onset jointly on the CAM++ cosine, the pYIN register delta in semitones and a spectral-envelope Mahalanobis distance, since embeddings alone cannot judge the first 1.5 s (section 4.3). Nothing reduces the last two yet and the registry has no joint combination, so this version reads the CAM++ part alone; it stays warn until natural onset breaks are harvested.",
+    "pyin-tracker-unvalidated": "The audit qualifies class F only after the pitch tracker is validated (section 5.7), and pYIN's oracle ladder is not recorded yet. pYIN's own octave errors (a halved or doubled F0 on creak, breath or low energy) read as jumps, so its error rate on clean N2 sets these detectors' false-alarm floor.",
+    "pyin-raw-track-export": "The panel bundle keeps pYIN's whole-take L2 statistics only; its frame track (f0Hz, voiced, hopSeconds) stays in the orchestrator's L1 cache. The scores need it exported per take, as audio_qc_calibration_set.py alignments exports the aligner's intervals, and passed to score_take as raw; no command does that yet, and pYIN is not among the six judges the v1 confirmation panels run.",
+    "pyin-transition-limit": "pYIN's HMM caps F0 transitions at 35.92 octaves per second (4.3 semitones per 10 ms frame), so a step spreads over two or three frames or loses voicing briefly; the step measure compares voiced frames up to 50 ms apart for that reason, and a break across a longer unvoiced gap is missed.",
+    "korean-no-word-positives": "PRS-BRK and PRS-OCT act inside the longest aligned word, and the aligner is out of scope for Korean, so Korean takes carry no positives: the Korean stratum's threshold is fitted and its false alarms bounded on Korean negatives, while its detection rate is the other languages'."
   },
   "detectors": [
     {
@@ -359,6 +364,42 @@
       "populations": "speaker-labeled-n2",
       "limitations": ["speaker-corpus-pending", "speaker-reference-clip"],
       "risks": ["resnet293-not-voting", "short-window-embeddings", "no-onset-swap-injector", "onset-joint-rule-pending"]
+    },
+    {
+      "id": "prosody.pitch-break@1",
+      "class": "F",
+      "stage": 1,
+      "measures": "The largest F0 change, in semitones, between two pYIN voiced frames at most 50 ms apart, reduced from pYIN's frame track (the panel's L2 pitch metrics are whole-take statistics). A pitch break steps further within 50 ms than intonation moves; a take without two voiced frames that close abstains.",
+      "score": {"combination": "single", "unit": "semitones", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "maxPitchStepSemitones"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-BRK", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-BRK", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "pyin-transition-limit", "korean-no-word-positives"]
+    },
+    {
+      "id": "prosody.octave-jump@1",
+      "class": "F",
+      "stage": 1,
+      "measures": "The longest run, in seconds, of consecutive pYIN voiced frames at least 9 semitones from the median F0 of the take's voiced frames, reduced from pYIN's frame track: an octave jump holds the displaced register for its span, where intonation passes through it. A take without a voiced frame abstains.",
+      "score": {"combination": "single", "unit": "seconds", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "longestOctaveDisplacementSeconds"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-OCT", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-OCT", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "korean-no-word-positives"]
     }
   ]
 }

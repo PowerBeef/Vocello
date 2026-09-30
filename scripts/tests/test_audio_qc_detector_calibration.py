@@ -8,6 +8,7 @@ from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 from io import StringIO
 import json
+import math
 import os
 from pathlib import Path
 import random
@@ -332,7 +333,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.errors(fixture_registry()), [])
         ids = [entry["id"] for entry in self.registry["detectors"]]
         self.assertEqual(sorted({detectors.detector_entry(self.registry, detector)["class"] for detector in ids}),
-                         ["A", "B", "C", "D", "E"])
+                         ["A", "B", "C", "D", "E", "F"])
 
     def test_fastqc_fields_match_the_measurement_writer(self) -> None:
         self.assertLessEqual(detectors.FASTQC_SCORE_FIELDS, set(audio_qc_calibration_set.FASTQC_FIELDS))
@@ -518,6 +519,44 @@ class NewClassRegistryTests(unittest.TestCase):
         self.assertTrue(any("must name a role set" in error
                             for error in self.mutate("identity.clone-similarity@1", unnamed_role_set)))
 
+    def test_prosody_detectors_reduce_the_pitch_track(self) -> None:
+        for detector, injector in (("prosody.pitch-break@1", "PRS-BRK"), ("prosody.octave-jump@1", "PRS-OCT")):
+            entry = self.entry(detector)
+            self.assertEqual((entry["class"], entry["stage"], entry["populations"]), ("F", 1, "fleurs-n2"))
+            self.assertEqual(detectors.judges_of(entry), [PYIN])
+            self.assertTrue(detectors.needs_panel(entry) and detectors.needs_raw(entry))
+            self.assertFalse(detectors.needs_private(entry) or detectors.needs_measurements(entry))
+            self.assertEqual(detectors.target_injectors(entry), {injector})
+            self.assertEqual(detectors.target_cell(entry, injector, "severe", "T1-pcm-construction"),
+                             f"{injector}/severe")
+        self.assertFalse(detectors.needs_raw(self.entry("identity.clone-similarity@1")))
+
+    def test_a_dsp_instrument_scores_alone_only_through_its_raw_output(self) -> None:
+        # pYIN does not vote: its L2 metric through a `panel` component would make it a family's vote.
+        def panel_metric(entry, _):
+            entry["score"]["groups"][0]["components"][0] = {"source": "panel", "judge": PYIN,
+                                                            "metric": "f0RangeSemitones"}
+        self.assertTrue(any("does not vote" in error for error in self.mutate("prosody.pitch-break@1", panel_metric)))
+
+        def speaker_track(entry, _):
+            entry["score"]["groups"][0]["components"][0]["judge"] = CAMPPLUS
+        self.assertTrue(any("pyin-librosa" in error for error in self.mutate("prosody.pitch-break@1", speaker_track)))
+
+        def unknown_measure(entry, _):
+            entry["score"]["groups"][0]["components"][0]["measure"] = "jitter"
+        self.assertTrue(any(".measure must be one of" in error
+                            for error in self.mutate("prosody.octave-jump@1", unknown_measure)))
+
+        for change, expected in ((lambda judge: judge.update(status="candidate"), "below shadow"),
+                                 (lambda judge: judge["independence"].update(generatorLabCorrelated=True), "A6")):
+            judges = copy.deepcopy(self.judges)
+            change(judges["judges"][PYIN])
+            self.assertTrue(any(expected in error for error in detectors.registry_errors(self.registry, judges)))
+        # A neural judge is no instrument, whatever its kind of output.
+        judges = copy.deepcopy(self.judges)
+        judges["judges"][PYIN]["kind"] = "neural"
+        self.assertTrue(any("does not vote" in error for error in detectors.registry_errors(self.registry, judges)))
+
 
 class NewClassScoringTests(unittest.TestCase):
     """score_take on fixture evidence for classes E, F, I and J, and their abstentions."""
@@ -555,6 +594,58 @@ class NewClassScoringTests(unittest.TestCase):
                 CAMPPLUS: {"status": "unavailable", "metrics": {}}})["abstain"], "judge-unavailable")
             outside = detectors.score_take(entry, "dutch", measurements=evidence)
             self.assertEqual((outside["inScope"], outside["abstain"], outside["score"]), (False, "out-of-scope", None))
+
+    @staticmethod
+    def track(*spans: tuple[float | None, int]) -> dict:
+        """A pYIN frame track at a 10 ms hop: (F0 in Hz, or None for unvoiced frames, frame count) spans."""
+        f0: list = []
+        for hertz, count in spans:
+            f0.extend([hertz] * count)
+        return {"hopSeconds": 0.01, "f0Hz": f0, "voiced": [value is not None for value in f0],
+                "voicedProbability": [0.9 if value is not None else 0.1 for value in f0]}
+
+    def test_pitch_scores_and_abstentions(self) -> None:
+        pitch = {PYIN: {"status": "complete", "metrics": {"voicedFraction": 0.8}}}
+        step, octave = self.entry("prosody.pitch-break@1"), self.entry("prosody.octave-jump@1")
+        up_seven = 200.0 * 2 ** (7 / 12)
+
+        def score(entry: dict, track: dict | None, measurements: dict = pitch, language: str = "english") -> dict:
+            return detectors.score_take(entry, language, measurements=measurements,
+                                        raw=None if track is None else {PYIN: track})
+
+        # A 7 semitone break reached over two frames (pYIN's transition cap) scores 7 semitones.
+        broken = self.track((200.0, 50), (250.0, 1), (up_seven, 49))
+        self.assertAlmostEqual(score(step, broken)["score"], 7.0, places=6)
+        self.assertEqual(score(octave, broken)["score"], 0.0)
+        # An octave held for 370 ms: a 12 semitone step and a 0.37 s displacement.
+        jumped = self.track((200.0, 100), (400.0, 37), (200.0, 100))
+        self.assertAlmostEqual(score(step, jumped)["score"], 12.0, places=6)
+        self.assertAlmostEqual(score(octave, jumped)["score"], 0.37, places=9)
+        self.assertAlmostEqual(score(octave, jumped, language="chinese")["score"], 0.37, places=9)
+        # An unvoiced frame ends a displaced run.
+        split = self.track((200.0, 100), (400.0, 10), (None, 1), (400.0, 20), (200.0, 100))
+        self.assertAlmostEqual(score(octave, split)["score"], 0.2, places=9)
+        # Voiced frames more than 50 ms apart are never compared.
+        gapped = self.track((200.0, 10), (None, 6), (300.0, 10))
+        self.assertEqual(score(step, gapped)["score"], 0.0)
+        self.assertAlmostEqual(score(step, self.track((200.0, 10), (None, 4), (300.0, 10)))["score"],
+                               12 * math.log2(1.5), places=9)
+        steady = self.track((None, 20), (180.0, 200), (None, 20))
+        self.assertEqual((score(step, steady)["score"], score(octave, steady)["score"]), (0.0, 0.0))
+        # Silence (no voiced frame), a malformed track, no exported track, no or failed pYIN row: abstain.
+        for entry in (step, octave):
+            self.assertEqual(score(entry, self.track((None, 300)))["abstain"], "no-value")
+            self.assertEqual(score(entry, {**steady, "voiced": steady["voiced"][:-1]})["abstain"], "no-value")
+            self.assertEqual(score(entry, None)["abstain"], "no-raw-output")
+            self.assertEqual(score(entry, steady, measurements={})["abstain"], "not-measured")
+            self.assertEqual(score(entry, steady, measurements={PYIN: {"status": "unavailable"}})["abstain"],
+                             "judge-unavailable")
+            self.assertEqual(score(entry, steady, language="dutch")["abstain"], "out-of-scope")
+        # The raw measures are pure functions of the track.
+        self.assertIsNone(detectors.max_pitch_step(self.track((200.0, 1))))
+        self.assertEqual(detectors.longest_octave_displacement(self.track((200.0, 1))), 0.0)
+        with self.assertRaises(detectors.DetectorError):
+            detectors.raw_measure("jitter", steady)
 
 
 def brute_force_tail(reference: list, hypothesis: list) -> tuple[int, int]:

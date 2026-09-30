@@ -2,14 +2,27 @@
 
 `config/audio-qc-detectors.json` declares each detector as `id@version`: its
 class and stage, its score (components read from a Fast QC or Stage 0 field of
-`measurements.json`, from a panel judge's metrics, or from a judge's private
-transcript aligned against the reference), how the components combine, its
-direction, its strata (one threshold per language, with the reason declared
-in advance, or one pooled threshold), its language scope with a reason per
-exclusion, the injectors and severities its detection rate is measured on with
-their matched shams, and its population roles. Nothing here reads a file or
-runs a model: the callers load the registry, the evidence and the private
-transcripts and pass them in.
+`measurements.json`, from a panel judge's metrics, from a judge's private
+transcript aligned against the reference, or from a judge's raw output reduced
+here), how the components combine, its direction, its strata (one threshold per
+language, with the reason declared in advance, or one pooled threshold), its
+language scope with a reason per exclusion, the injectors and severities its
+detection rate is measured on with their matched shams, and its population
+roles. Nothing here reads a file or runs a model: the callers load the
+registry, the evidence, the private transcripts and the raw outputs and pass
+them in.
+
+`raw-output` components reduce a panel judge's raw (L1) output, which the
+bundle does not keep, to a measure the panel's L2 metrics lack (`RAW_MEASURES`
+names the engine whose output each reads). pYIN's frame track gives
+`maxPitchStepSemitones`, the largest F0 change between voiced frames at most
+50 ms apart, and `longestOctaveDisplacementSeconds`, the longest run of voiced
+frames an octave's worth (9 semitones or more) from the take's median F0
+(class F). A `raw-output` component of a deterministic DSP instrument (a `dsp`
+judge with no learned weights, such as pYIN) is a measurement, not a family's
+vote: it may stand alone in a `single` group when it is not from the
+generator's lab and is at least shadow. Any other judge still decides a take
+only if the registry says it votes (A6).
 
 Combinations:
 
@@ -58,11 +71,21 @@ from .pcm import json_digest
 REGISTRY_KIND = "audio-qc-detector-registry"
 REGISTRY_SCHEMA_VERSION = 1
 COMBINATIONS = ("single", "consensus-min", "consensus-max", "difference")
-SOURCES = ("fastqc", "observations", "panel", "transcript-tail")
+SOURCES = ("fastqc", "observations", "panel", "transcript-tail", "raw-output")
 MEASUREMENT_SOURCES = frozenset({"fastqc", "observations"})
-PANEL_SOURCES = frozenset({"panel", "transcript-tail"})
+PANEL_SOURCES = frozenset({"panel", "transcript-tail", "raw-output"})
 TRANSFORMS = ("absolute",)
 TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDeletions")
+# What this module reduces from a panel judge's raw (L1) output -> the engine whose output it reads
+# (the judge registry's execution.engine).
+RAW_MEASURES = {
+    "maxPitchStepSemitones": "pyin-librosa",
+    "longestOctaveDisplacementSeconds": "pyin-librosa",
+}
+# Pitch-track reductions (class F): voiced frames compared up to this far apart, and the distance from
+# the take's median F0 that counts as an octave displacement.
+PITCH_STEP_WINDOW_SECONDS = 0.05
+OCTAVE_DISPLACEMENT_SEMITONES = 9.0
 DIRECTIONS = ("above", "below")
 CLASSES = tuple("ABCDEFGHIJ")
 STAGES = (0, 1, 2)
@@ -168,6 +191,11 @@ def needs_private(entry: Mapping[str, Any]) -> bool:
     return any(component.get("source") == "transcript-tail" for component in components_of(entry))
 
 
+def needs_raw(entry: Mapping[str, Any]) -> bool:
+    """The detector reduces a judge's raw (L1) output, which the caller exports and passes as `raw`."""
+    return any(component.get("source") == "raw-output" for component in components_of(entry))
+
+
 def group_for(entry: Mapping[str, Any], language: str) -> dict | None:
     for group in (entry.get("score") or {}).get("groups") or ():
         if language in (group.get("languages") or ()):
@@ -230,6 +258,14 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
             errors.append(f"{where}.metric must name a panel metric")
         if source == "transcript-tail" and component.get("measure") not in TAIL_MEASURES:
             errors.append(f"{where}.measure must be one of {TAIL_MEASURES}")
+        if source == "raw-output":
+            measure = component.get("measure")
+            if measure not in RAW_MEASURES:
+                errors.append(f"{where}.measure must be one of {tuple(RAW_MEASURES)}")
+            elif isinstance(judges.get(judge), Mapping) \
+                    and (judges[judge].get("execution") or {}).get("engine") != RAW_MEASURES[measure]:
+                errors.append(f"{where}: {measure} reduces the raw output of a {RAW_MEASURES[measure]} judge, "
+                              f"not {judge}'s")
     else:
         return [f"{where}.source must be one of {SOURCES}"]
     if component.get("transform") is not None and component.get("transform") not in TRANSFORMS:
@@ -254,6 +290,25 @@ def _voter_errors(judge_id: str, judges: Mapping[str, Any], where: str) -> list[
         errors.append(f"{where}: {judge_id} does not vote, so it cannot be a consensus family (A6)")
     if (judge.get("independence") or {}).get("generatorLabCorrelated"):
         errors.append(f"{where}: {judge_id} shares the generator's lab and never votes (A6)")
+    if judge.get("status") not in QUALIFYING_JUDGE_STATUSES:
+        errors.append(f"{where}: {judge_id} is {judge.get('status')}, below shadow")
+    return errors
+
+
+def _is_instrument(judge: Any) -> bool:
+    """A deterministic DSP measurement with no learned weights (pYIN): no family, no training labels."""
+    return isinstance(judge, Mapping) and judge.get("kind") == "dsp" \
+        and (judge.get("pins") or {}).get("digestStatus") == "no-learned-weights"
+
+
+def _instrument_errors(judge_id: str, judges: Mapping[str, Any], where: str) -> list[str]:
+    """A DSP instrument's raw output may score a `single` detector alone: not same-lab, at least shadow."""
+    judge = judges.get(judge_id)
+    if not isinstance(judge, Mapping):
+        return []
+    errors = []
+    if (judge.get("independence") or {}).get("generatorLabCorrelated"):
+        errors.append(f"{where}: {judge_id} shares the generator's lab and never decides a take (A6)")
     if judge.get("status") not in QUALIFYING_JUDGE_STATUSES:
         errors.append(f"{where}: {judge_id} is {judge.get('status')}, below shadow")
     return errors
@@ -301,7 +356,9 @@ def _group_errors(entry: Mapping[str, Any], group: Any, where: str, judges: Mapp
         if None in families or families[0] == families[1]:
             errors.append(f"{where}: consensus needs two recognizer families, got {families}")
     elif combination == "single":
-        if panel_judges:
+        if panel_judges and components[0]["source"] == "raw-output" and _is_instrument(judges.get(panel_judges[0])):
+            errors.extend(_instrument_errors(panel_judges[0], judges, where))
+        elif panel_judges:
             errors.extend(_voter_errors(panel_judges[0], judges, where))
     elif combination == "difference":
         errors.extend(_voter_errors(component_judge(components[0]), judges, where))
@@ -608,6 +665,86 @@ def transcript_tail(reference: str, hypothesis: str, language: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Raw-output reductions (class F pitch track)
+# --------------------------------------------------------------------------- #
+
+def _pitch_frames(output: Mapping[str, Any]) -> tuple[float, list[tuple[int, float]]] | None:
+    """(hop in seconds, [(frame, F0 in semitones)]) of pYIN's voiced frames with a finite, positive F0;
+    None when the output is not a frame track (hopSeconds, f0Hz and voiced of one length)."""
+    hop = _finite(output.get("hopSeconds"))
+    f0, voiced = output.get("f0Hz"), output.get("voiced")
+    if hop is None or hop <= 0 or not isinstance(f0, list) or not isinstance(voiced, list) or len(f0) != len(voiced):
+        return None
+    frames = []
+    for frame, (value, flag) in enumerate(zip(f0, voiced)):
+        hertz = _finite(value)
+        if flag is True and hertz is not None and hertz > 0:
+            frames.append((frame, 12.0 * math.log2(hertz)))
+    return hop, frames
+
+
+def max_pitch_step(output: Mapping[str, Any]) -> float | None:
+    """The largest F0 change, in semitones, between two voiced frames at most 50 ms apart.
+
+    pYIN's HMM caps a transition at its maxTransitionRate (35.92 octaves per
+    second, 4.3 semitones per 10 ms frame), so a pitch break or an octave jump
+    spreads over two or three frames, or loses voicing for a frame or two:
+    voiced frames up to `PITCH_STEP_WINDOW_SECONDS` apart are compared, whatever
+    lies between them. None without two voiced frames that close.
+    """
+    track = _pitch_frames(output)
+    if track is None:
+        return None
+    hop, frames = track
+    reach = int(math.floor(PITCH_STEP_WINDOW_SECONDS / hop + 1e-9))
+    best = None
+    for position, (frame, tone) in enumerate(frames):
+        earlier = position - 1
+        while earlier >= 0 and frame - frames[earlier][0] <= reach:
+            step = abs(tone - frames[earlier][1])
+            if best is None or step > best:
+                best = step
+            earlier -= 1
+    return best
+
+
+def longest_octave_displacement(output: Mapping[str, Any]) -> float | None:
+    """The longest run, in seconds, of consecutive voiced frames at least 9 semitones from the median F0
+    of the take's voiced frames: an octave jump holds the displaced register for its span, where
+    intonation passes through it. 0.0 when no frame is displaced; None without a voiced frame.
+    An unvoiced frame ends a run."""
+    track = _pitch_frames(output)
+    if track is None or not track[1]:
+        return None
+    hop, frames = track
+    tones = sorted(tone for _, tone in frames)
+    middle = len(tones) // 2
+    median = tones[middle] if len(tones) % 2 else (tones[middle - 1] + tones[middle]) / 2.0
+    longest = run = 0
+    previous = None
+    for frame, tone in frames:
+        displaced = abs(tone - median) >= OCTAVE_DISPLACEMENT_SEMITONES
+        run = (run + 1 if previous == frame - 1 else 1) if displaced else 0
+        previous = frame
+        longest = max(longest, run)
+    return longest * hop
+
+
+RAW_REDUCERS = {
+    "maxPitchStepSemitones": max_pitch_step,
+    "longestOctaveDisplacementSeconds": longest_octave_displacement,
+}
+
+
+def raw_measure(measure: str, output: Mapping[str, Any]) -> float | None:
+    """One `raw-output` measure of a judge's raw output, or None when the output has no value for it."""
+    reducer = RAW_REDUCERS.get(measure)
+    if reducer is None:
+        raise DetectorError(f"unknown raw-output measure {measure!r}")
+    return reducer(output)
+
+
+# --------------------------------------------------------------------------- #
 # Scoring one take
 # --------------------------------------------------------------------------- #
 
@@ -620,8 +757,14 @@ def _finite(value: Any) -> float | None:
 
 def component_value(component: Mapping[str, Any], *, language: str, clip: Mapping[str, Any] | None = None,
                     measurements: Mapping[str, Mapping[str, Any]] | None = None,
-                    private: Mapping[str, Any] | None = None) -> tuple[float | None, str | None]:
-    """One component's value for one take, or None with the abstention reason."""
+                    private: Mapping[str, Any] | None = None,
+                    raw: Mapping[str, Mapping[str, Any]] | None = None) -> tuple[float | None, str | None]:
+    """One component's value for one take, or None with the abstention reason.
+
+    `raw` maps a judge id to its raw (L1) output for the take; a `raw-output`
+    component also needs the judge's measurement to have completed, so the
+    evidence still binds the take's audio and the judge's output identity.
+    """
     source = component["source"]
     if source in MEASUREMENT_SOURCES:
         if clip is None:
@@ -641,6 +784,13 @@ def component_value(component: Mapping[str, Any], *, language: str, clip: Mappin
             return None, "judge-unavailable"
         if source == "panel":
             value = _finite((measurement.get("metrics") or {}).get(component["metric"]))
+            if value is None:
+                return None, "no-value"
+        elif source == "raw-output":
+            output = (raw or {}).get(component["judge"])
+            if not isinstance(output, Mapping):
+                return None, "no-raw-output"
+            value = _finite(raw_measure(component["measure"], output))
             if value is None:
                 return None, "no-value"
         else:
@@ -675,7 +825,8 @@ def combine(combination: str, values: Sequence[float]) -> float:
 
 def score_take(entry: Mapping[str, Any], language: str, *, clip: Mapping[str, Any] | None = None,
                measurements: Mapping[str, Mapping[str, Any]] | None = None,
-               private: Mapping[str, Any] | None = None) -> dict:
+               private: Mapping[str, Any] | None = None,
+               raw: Mapping[str, Mapping[str, Any]] | None = None) -> dict:
     """A detector's score of one take: {inScope, score, components, abstain}.
 
     A take outside the detector's languages is out of scope (A1) and never
@@ -694,7 +845,7 @@ def score_take(entry: Mapping[str, Any], language: str, *, clip: Mapping[str, An
     reason = None
     for component in group["components"]:
         value, why = component_value(component, language=language, clip=clip, measurements=measurements,
-                                     private=private)
+                                     private=private, raw=raw)
         values[component_key(component)] = None if value is None else round(value, 9)
         if value is None and reason is None:
             reason = why

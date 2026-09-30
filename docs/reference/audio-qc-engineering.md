@@ -1679,6 +1679,8 @@ which. An entry can still change in place until a plan binds its digest.
 | `identity.clone-similarity@1` | E | CAM++ `cosine` of the take to its same-speaker reference clip | below | The speaker-labeled N2 corpus; reference clips in the panel manifest; IDN-IMPOSTOR (not in catalog v2) |
 | `identity.window-drift@1` | E | CAM++ `cosine` minus its lowest 2 s window cosine | above | The same corpus; a recorded IDN-SWAP (v1 swaps procedural sources only) |
 | `identity.onset-drift@1` | E | CAM++ `cosine` minus its first 2 s window cosine | above | The same corpus; IDN-ONSET (not in catalog v2); the pYIN register and envelope parts of the joint onset rule |
+| `prosody.pitch-break@1` | F | Largest F0 change between pYIN voiced frames at most 50 ms apart (semitones) | above | pYIN on the panels with its frame track exported per take; a confirmation N2 cohort no plan has scored; pYIN's oracle ladder |
+| `prosody.octave-jump@1` | F | Longest run of voiced frames 9 semitones or more from the take's median F0 (seconds) | above | As pitch-break |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1690,6 +1692,19 @@ resynthesized to N2. Each language stratum needs 60 scored calibration families 
 confirmation negative families from at least 3 speakers, disjoint by family, speaker and script,
 plus 60 families per severe cell and per sham. `plan` pre-registers FLEURS-derived cohorts only,
 so it also needs a declared split for another corpus.
+
+Class F reads a new source, `raw-output`: `detectors.py` reduces a panel judge's raw (L1) output,
+which the bundle does not keep, and `score_take(..., raw={judge: output})` takes it once the judge's
+measurement completed. pYIN's HMM caps a transition at 4.3 semitones per 10 ms frame, so the step
+measure compares voiced frames up to 50 ms apart. pYIN does not vote, but as a DSP instrument with
+no learned weights its raw output may score a `single` detector alone if it is not from the
+generator's lab and is at least shadow; its L2 metrics through a `panel` component still may not.
+Class F fits on the FLEURS N2 calibration cohort, and PRS-BRK and PRS-OCT already run on N2 with
+the aligner's intervals (not in Korean). A plan still needs pYIN on both panels, an export of its
+frame track like `alignments`, and a confirmation cohort no plan has scored: the v1 confirmation
+cohort already holds bundles, so `plan` refuses it (A5). Creak is not registered: catalog v2 has no
+creak construction (the audit builds one with WORLD, which the catalog lacks), and no voice-quality
+measure has passed its oracle ladder.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A

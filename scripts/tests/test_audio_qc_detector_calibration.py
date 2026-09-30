@@ -333,7 +333,8 @@ class Fixture:
     def injection_set(self, injectors_: tuple[str, ...] = ("CNT-DEL",), *, name: str = "injection",
                       catalog_seed: int = 7, clean_shams: bool = False, shams_per_language: int | None = None,
                       sham_injectors: tuple[str, ...] | None = None, mechanism: str = "T1-pcm-construction",
-                      entry_catalog_version: int = injectors.CATALOG_VERSION) -> Path:
+                      entry_catalog_version: int = injectors.CATALOG_VERSION,
+                      schedule: int | None = audio_qc_calibration_set.SCHEDULE_VERSION) -> Path:
         shams_per_language = self.positives_per_language if shams_per_language is None else shams_per_language
         sham_injectors = injectors_ if sham_injectors is None else sham_injectors
         entries = []
@@ -362,6 +363,7 @@ class Fixture:
             "sourceManifest": {"sha256": calibration.file_sha256(self.confirmation), "kind": "audio-qc-n2-cohort"},
             "catalogVersion": injectors.CATALOG_VERSION, "catalogSeed": catalog_seed,
             "classes": ["A", "B", "C", "D", "F"], "sampling": {"perCell": 150, "seed": 1},
+            **({"schedule": {"version": schedule}} if schedule is not None else {}),
             "entries": entries, "entriesSHA256": json_digest(entries)})
 
     @staticmethod
@@ -1456,17 +1458,31 @@ class FlowTests(unittest.TestCase):
         self.plan("test.consensus-error@1", scores)
         plan_file = fixture.repo / "config/audio-qc-preregistrations/test.consensus-error@1.json"
         bindings = json.loads(plan_file.read_text(encoding="utf-8"))["bindings"]
-        # A FLEURS plan keeps the shape every committed warn plan has.
+        # A FLEURS plan keeps the shape every committed warn plan has, and binds the injection schedule it expects
+        # (schedule 2 draws the SIG-CLIP and BND-RUNON extra variants); a committed v1 plan, without the binding,
+        # expects schedule 1.
         split = json.loads(plan_file.read_text(encoding="utf-8"))["split"]
         self.assertEqual((split["disjointBy"], split["speakers"], sorted(bindings)),
                          (["family", "script"], {"unit": "language:fleurs-unidentified", "claim": "lower-bound"},
                           ["calibrationScoresSHA256", "detectorDefinitionSHA256", "evidenceIdentitySHA256",
                            "injectionCatalogSeed", "injectionClasses", "injectionSamplePerCell", "injectionSampleSeed",
-                           "injectorCatalogVersion", "operatingPoint", "policySHA256", "scoringCodeSHA256"]))
+                           "injectionSchedule", "injectorCatalogVersion", "operatingPoint", "policySHA256",
+                           "scoringCodeSHA256"]))
+        self.assertEqual(bindings["injectionSchedule"], str(audio_qc_calibration_set.SCHEDULE_VERSION))
         committed = json.loads((REPO / "config/audio-qc-preregistrations/signal.clicks@1.json").read_text(
             encoding="utf-8"))
-        self.assertEqual((committed["split"]["disjointBy"], committed["split"]["speakers"], sorted(committed["bindings"])),
+        self.assertEqual((committed["split"]["disjointBy"], committed["split"]["speakers"],
+                          sorted([*committed["bindings"], calibration.SCHEDULE_BINDING])),
                          (split["disjointBy"], split["speakers"], sorted(bindings)))
+        v1 = thresholds.PreRegistration.from_dict(committed)
+        unscheduled = {"sources": {"injectionSet": {"construction": {
+            "catalogVersion": 2, "catalogSeed": 7, "sampleSeed": 1, "samplePerCell": 150,
+            "classes": ["A", "B", "C", "D", "F"], "entryCatalogVersions": [2]}}}}
+        self.assertEqual(calibration.injection_construction_problems(v1, unscheduled), [])
+        scheduled = copy.deepcopy(unscheduled)
+        scheduled["sources"]["injectionSet"]["construction"]["schedule"] = 2
+        self.assertIn("the injection set drew schedule 2, the plan declares 1 (A5)",
+                      calibration.injection_construction_problems(v1, scheduled))
         self.assertEqual({key: bindings[key] for key in calibration.INJECTION_BINDINGS.values()},
                          {"injectorCatalogVersion": str(injectors.CATALOG_VERSION), "injectionCatalogSeed": "7",
                           "injectionSampleSeed": "1", "injectionSamplePerCell": "150",
@@ -2003,6 +2019,11 @@ class FlowTests(unittest.TestCase):
         self.assertIn("entries carry catalog versions", self.confirmation_scores(
             bundle=negatives, injection_set=older, expect=2,
             positive_bundle=fixture.positive_bundle(older, name="older-positives")))
+        # A set that drew the sweep alone (schedule 1) is not the schedule-2 set the plan declares.
+        unscheduled = fixture.injection_set(name="unscheduled", schedule=None)
+        self.assertIn("the injection set drew schedule 1, the plan declares 2", self.confirmation_scores(
+            bundle=negatives, injection_set=unscheduled, expect=2,
+            positive_bundle=fixture.positive_bundle(unscheduled, name="unscheduled-positives")))
         self.no_ledger()
 
     def test_confirmation_panels_are_computed_from_scratch_after_the_plan(self) -> None:
@@ -2601,7 +2622,8 @@ class FailFixture(Fixture):
             "kind": calibration.INJECTION_SET_KIND, "schemaVersion": 1,
             "sourceManifest": {"sha256": calibration.file_sha256(self.confirmation), "kind": "audio-qc-n2-cohort"},
             "catalogVersion": injectors.CATALOG_VERSION, "catalogSeed": 7, "classes": ["A", "B", "C", "D", "F"],
-            "sampling": {"perCell": 150, "seed": 1}, "entries": entries, "entriesSHA256": json_digest(entries)})
+            "sampling": {"perCell": 150, "seed": 1}, "schedule": {"version": audio_qc_calibration_set.SCHEDULE_VERSION},
+            "entries": entries, "entriesSHA256": json_digest(entries)})
 
     def measurements(self, cohort: Path, name: str, *, injection_set: Path | None = None,
                      started_at: str | None = FRESH) -> Path:

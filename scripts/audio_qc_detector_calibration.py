@@ -117,9 +117,10 @@ Commands:
            disjoint by, the speaker unit and claim, the limitations) and the
            bindings (definition, calibration scores, policy, scoring code,
            evidence identity, and the confirmation-side injection construction
-           with its catalog version: this repository's injector catalog for P1,
-           the declared one for P2 or P3; for natural positives, their cohort's
-           digest and label rule instead). Refuses a role set whose corpus is
+           with its catalog version: this repository's injector catalog and
+           the calibration set's schedule (`injectionSchedule`) for P1, the
+           declared one for P2 or P3; for natural positives, their cohort's
+           digest, corpus split and label rule instead). Refuses a role set whose corpus is
            pending, calibration scores below the calibration floor per stratum,
            with missing evidence, or from a panel whose orchestrator, metric
            reduction or metric versions are not the current code's (the
@@ -299,6 +300,10 @@ TIER_CATALOG_BINDING = "injectorCatalogVersion"
 INJECTION_BINDINGS = {"catalogVersion": "injectorCatalogVersion", "catalogSeed": "injectionCatalogSeed",
                       "sampleSeed": "injectionSampleSeed", "samplePerCell": "injectionSamplePerCell",
                       "classes": "injectionClasses"}
+# Which variants the set draws beside the sweep (audio_qc_calibration_set.SCHEDULE_VERSION): a P1 plan binds the
+# schedule of the code it was planned with; a plan without the binding (every v1 plan) expects schedule 1.
+SCHEDULE_BINDING = "injectionSchedule"
+UNSCHEDULED = 1
 
 
 class CalibrationError(ValueError):
@@ -634,6 +639,10 @@ def load_injection_set(path: Path) -> dict:
                                         if isinstance(entry, dict) and isinstance(entry.get("injection"), dict)
                                         and isinstance(entry["injection"].get("catalogVersion"), int)}),
     }
+    schedule = data.get("schedule")
+    if isinstance(schedule, dict):
+        # The variants the set drew beside the sweep (a set without one drew schedule 1, the sweep alone).
+        construction["schedule"] = schedule.get("version")
     tiers: dict[str, set[int]] = {}
     for entry in data["entries"]:
         injection = entry.get("injection") if isinstance(entry, dict) else None
@@ -1748,6 +1757,7 @@ def build_plan(repository: Repository, registry: Mapping[str, Any], entry: Mappi
         ("evidenceIdentitySHA256", json_digest(calibration_scores["evidenceIdentity"])),
         *((binding, construction_value(key, injection[key])) for key, binding in INJECTION_BINDINGS.items()
           if injection is not None),
+        *(((SCHEDULE_BINDING, str(injection["schedule"])),) if (injection or {}).get("schedule") else ()),
         *((f"{TIER_CATALOG_BINDING}{tier}", str(version))
           for tier, version in sorted(((injection or {}).get("tierCatalogVersions") or {}).items())),
         # A fail point's N3 flag-rate bound is confirmation evidence too: its cohort is pre-registered (A2, A5).
@@ -1830,6 +1840,11 @@ def command_plan(args: argparse.Namespace, repository: Repository) -> int:
     injection = {"catalogVersion": catalog_version, "catalogSeed": args.injection_catalog_seed,
                  "sampleSeed": args.injection_sample_seed, "samplePerCell": args.injection_sample_per_cell,
                  "classes": args.injection_classes, "tierCatalogVersions": declared_tiers} if constructed else None
+    if injection is not None and positives == "P1":
+        # This repository's calibration set builds P1 positives, with the schedule of the code planning them.
+        import audio_qc_calibration_set  # deferred: NumPy-backed, only its schedule version is read
+
+        injection["schedule"] = audio_qc_calibration_set.SCHEDULE_VERSION
     natural = None
     if registry_lib.natural_targets(entry):
         if args.natural_positives is None:
@@ -2176,6 +2191,10 @@ def injection_construction_problems(plan: thresholds.PreRegistration, scores: Ma
         actual = construction_value(key, recorded.get(key))
         if actual != expected:
             problems.append(f"the injection set's {key} is {actual}, the plan declares {expected} (A5)")
+    schedule = str(recorded.get("schedule", UNSCHEDULED))
+    if schedule != (plan.binding(SCHEDULE_BINDING) or str(UNSCHEDULED)):
+        problems.append(f"the injection set drew schedule {schedule}, the plan declares "
+                        f"{plan.binding(SCHEDULE_BINDING) or UNSCHEDULED} (A5)")
     planned = plan.binding(INJECTION_BINDINGS["catalogVersion"])
     tier_versions = recorded.get("tierCatalogVersions")
     extra = {key.removeprefix(TIER_CATALOG_BINDING): value for key, value in plan.bindings

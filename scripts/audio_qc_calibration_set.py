@@ -57,6 +57,16 @@ of a word-level injector is the takes whose alignment is usable. The draw is
 recorded in the set (`sampling`) and re-derived by `verify`. N2 defaults to 150
 per cell; N1 and N3 default to every source (0 means every source).
 
+Schedule (`SCHEDULE_VERSION`, recorded as the set's `schedule`). Version 2
+draws, beside each injector's sham and severity sweep, the catalog's extra
+variants at a severity a registered successor detector targets
+(`SCHEDULE_EXTRAS`: SIG-CLIP soft-knee and over-range at moderate, BND-RUNON's
+reversed tail at moderate), on the same sampled families, so the cell holds
+every construction of the defect; the ones it leaves out say why
+(`SCHEDULE_EXCLUDED`). A set without a `schedule` drew version 1, the sweep
+alone, and `verify` replays any set by the plan rows it recorded, so earlier
+sets stay verifiable. A plan binds the version it expects.
+
 Word intervals. The panel's forced aligner (`align.qwen3-forcedaligner-0.6b@1`)
 stored its raw output (units and intervals) in the orchestrator's L1 cache;
 the bundle keeps only reduced metrics. `alignments` rebuilds each take's L1 key
@@ -185,6 +195,28 @@ REPORT_SCHEMA = "vocello.audioqc.calibration-report/1"
 GENERATOR = "audio-qc-calibration-set/1"
 SEED_SCHEMA = "vocello.audioqc.calibration-seed/1"
 SEVERITY_SWEEP = ("sham", "mild", "moderate", "severe")
+# The schedule a set draws, recorded in its head (`schedule`); a set without one drew version 1, the sham and
+# severity sweep alone, and `verify` replays every set by the plan rows it recorded. Version 2 (2026-09-30) also
+# draws the catalog's extra variants at a severity a registered successor targets, so its cell holds every
+# construction of the defect it claims, on the same sampled families. A plan binds the version
+# (`injectionSchedule`, audio_qc_detector_calibration.py).
+SCHEDULE_VERSION = 2
+SCHEDULE_EXTRAS = {
+    # signal.clipping@2 reads sign-symmetric flat tops, whatever the knee: hard, soft-knee and over-range.
+    "SIG-CLIP": ("soft-knee-moderate", "over-range-moderate"),
+    # boundary.run-on@2 reads speech-level audio after the script's aligned end, whatever it says.
+    "BND-RUNON": ("reversed-moderate",),
+}
+# Extra variants of a targeted severity the schedule leaves out, each with the reason it is no target.
+SCHEDULE_EXCLUDED = {
+    "SIG-DROP": {"attenuated-ramped": "signal.dropout@2 scores exact digital silence; a span attenuated by 60 dB "
+                                      "is no target (digital-silence-only)"},
+    "SIG-SIL": {"leading-moderate": "signal.terminal-silence@2 scores the trailing digital silence; a leading one "
+                                    "is no target"},
+}
+SCHEDULE_RULE = ("each in-scope injector at sham, mild, moderate and severe (its take-* recording variant where it "
+                 "declares one), plus the extra catalog variants of SCHEDULE_EXTRAS (rows marked extra), all on the "
+                 "injector's one sampled family set")
 DEFAULT_CLASSES = ("A", "C", "F")
 DEFAULT_CATALOG_SEED = 7
 PI_MAX = (0.05, 0.10, 0.20)
@@ -448,7 +480,8 @@ def voice_label(take: dict) -> dict:
 def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_issue: str | None = None,
                language_swap_rows: bool = False, seams: bool = False, impostor_issue: str | None = None,
                impostor_rows: bool = False) -> list[dict]:
-    """Every catalog injector at sham, mild, moderate and severe: scheduled, replaced or out of scope.
+    """Every catalog injector at sham, mild, moderate and severe, then its `SCHEDULE_EXTRAS` variants (rows
+    marked `extra`): scheduled, replaced, not applicable or out of scope.
 
     `words`: the sources carry the aligner's word intervals, so a catalog
     variant that needs only words (and pauses) is scheduled, and the injectors
@@ -484,6 +517,19 @@ def build_plan(classes: Iterable[str], *, words: bool = False, language_swap_iss
                            variant=catalog.name, parameters=dict(catalog.parameters))
                 if word_catalog and chosen is not None:
                     row["replacesRecordingVariant"] = chosen.name
+            rows.append(row)
+        for name in SCHEDULE_EXTRAS.get(injector.injector_id, ()):
+            extra = injector.variant(name)
+            extra_needs = list(injectors.needs(injector.injector_id, extra.parameters))
+            row = {"injector": injector.key, "injectorID": injector.injector_id, "classes": list(injector.classes),
+                   "severity": extra.severity, "catalogVariant": extra.name, "catalogNeeds": extra_needs,
+                   "extra": True}
+            if not in_scope:
+                row.update(status="out-of-scope", variant=None,
+                           reason=f"classes {'/'.join(injector.classes)} are outside this set ({'/'.join(scope)})")
+            else:
+                row.update(status="not-applicable" if set(extra_needs) - available else "scheduled",
+                           variant=extra.name, parameters=dict(extra.parameters))
             rows.append(row)
     if language_swap_rows or "D" in scope:
         description = language_swap.describe()
@@ -993,8 +1039,10 @@ def build_sampling(takes: list[dict], plan: list[dict], *, per_cell: int, seed: 
     for row in plan:
         if row["status"] == "out-of-scope" or row["variant"] is None or row["injector"] in chosen:
             continue
+        # An extra variant draws from the sweep's families (and is not applicable where it needs more), so the
+        # pool, and each cell's sample, is the one the sweep alone would draw.
         rows = [other for other in plan if other["injector"] == row["injector"] and other["variant"] is not None
-                and other["status"] != "out-of-scope"]
+                and other["status"] != "out-of-scope" and not other.get("extra")]
         if row["injectorID"] == language_swap.INJECTOR_ID:
             needs = ["parallel recordings"]
             pool = {family: language for family, language in languages.items() if family in swap_families}
@@ -1492,6 +1540,9 @@ def run_inject(takes_path: Path, output: Path, *, catalog_seed: int, classes: It
         "seedDerivation": f"{SEED_SCHEMA}: first 48 bits of SHA-256('{SEED_SCHEMA}|<source WAV SHA-256>|"
                           "<injector@version>|<catalog seed>'), big-endian; the variant is not an input, so a "
                           "sham draws the same positions as its positives",
+        "schedule": {"version": SCHEDULE_VERSION, "rule": SCHEDULE_RULE,
+                     "extras": {injectors.CATALOG[injector_id].key: list(names)
+                                for injector_id, names in SCHEDULE_EXTRAS.items()}},
         "plan": plan, "recordingVariants": recording_variants_description(),
         "identitySwap": identity_swap_status(manifest),
         "textPolicy": TEXT_POLICY_EMBEDDED if embed else TEXT_POLICY_N3,

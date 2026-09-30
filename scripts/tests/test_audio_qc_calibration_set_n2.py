@@ -17,6 +17,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -372,6 +373,51 @@ class N2InjectionTests(N2Fixture):
               alignments_path=self.alignments_path, sample_per_cell=6, sample_seed=3)
         self.assertEqual((again / "injection-set.json").read_bytes(), self.set_path.read_bytes())
         shutil.rmtree(again)
+
+    def test_schedule_two_draws_the_clip_and_run_on_extras_on_the_sweeps_families(self) -> None:
+        summary = self.summary
+        self.assertEqual((summary["schedule"]["version"], summary["schedule"]["extras"]),
+                         (m2.SCHEDULE_VERSION, {"SIG-CLIP@2": ["soft-knee-moderate", "over-range-moderate"],
+                                                "BND-RUNON@1": ["reversed-moderate"]}))
+        extras = sorted((row["injectorID"], row["variant"], row["severity"], row["status"])
+                        for row in summary["plan"] if row.get("extra"))
+        self.assertEqual(extras, [("BND-RUNON", "reversed-moderate", "moderate", "scheduled"),
+                                  ("SIG-CLIP", "over-range-moderate", "moderate", "scheduled"),
+                                  ("SIG-CLIP", "soft-knee-moderate", "moderate", "scheduled")])
+        cells = summary["sampling"]["injectors"]
+        for variant in ("soft-knee-moderate", "over-range-moderate"):
+            entries = [entry for entry in self.entries("SIG-CLIP") if entry["injection"]["variant"] == variant]
+            self.assertEqual({entry["family"] for entry in entries}, set(cells["SIG-CLIP@2"]["families"]), variant)
+            self.assertTrue(all(entry["injection"]["population"] == "P1" for entry in entries))
+        # The reversed tail needs the words the aligner gives: none on the Korean or squeezed takes.
+        reversed_tail = [entry for entry in self.entries("BND-RUNON")
+                         if entry["injection"]["variant"] == "reversed-moderate"]
+        self.assertTrue(reversed_tail)
+        self.assertTrue({entry["family"] for entry in reversed_tail} <= set(cells["BND-RUNON@1"]["families"]))
+        self.assertFalse({entry["sourceTakeID"] for entry in reversed_tail} & {f"{KOREAN}--n2", f"{SQUEEZED}--n2"})
+        # The extras draw no family of their own: the sample is the one the sweep alone draws.
+        manifest, digest = m2.load_takes(self.manifest_path)
+        alignments, _ = m2.load_alignments(self.alignments_path, digest)
+        generated = m2.generated_takes(manifest)
+        sweep = [row for row in summary["plan"] if not row.get("extra")]
+        redrawn = m2.build_sampling(generated, sweep, per_cell=6, seed=3,
+                                    usable_words=m2.usable_word_takes(generated, alignments))
+        self.assertEqual(m2._plain(redrawn), summary["sampling"])
+
+    def test_a_set_that_drew_the_sweep_alone_still_verifies(self) -> None:
+        older = self.root / "schedule-1"
+        with mock.patch.dict(m2.SCHEDULE_EXTRAS, clear=True):
+            quiet(m2.run_inject, self.manifest_path, older, catalog_seed=7, classes=("A", "C"), jobs=1,
+                  alignments_path=self.alignments_path, sample_per_cell=4, sample_seed=3)
+        path = older / "injection-set.json"
+        value = json.loads(path.read_text(encoding="utf-8"))
+        # A set built before schedule 2 records no schedule; its plan rows are the sweep alone.
+        value.pop("schedule")
+        self.assertFalse(any(row.get("extra") for row in value["plan"]))
+        path.write_text(json.dumps(value), encoding="utf-8")
+        result = quiet(m2.run_verify, path, self.manifest_path, jobs=1, alignments_path=self.alignments_path)
+        self.assertTrue(result["verified"], result["failures"])
+        shutil.rmtree(older)
 
     def test_word_level_variants_run_through_the_catalog_on_aligned_takes(self) -> None:
         plan = {(row["injectorID"], row["severity"]): row for row in self.summary["plan"]}

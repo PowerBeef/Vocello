@@ -2200,11 +2200,33 @@ families hold no two-sided flat top), so any two-sided flat top alarms.
 | SIG-CLIP sham; peak-normalization control | 1/150; 1/150 (the same source's clamp) |
 | N3 takes of 2026-09-27 | 0/791 |
 
-The N2 injection schedule draws only sham, mild, moderate and severe, so a confirmation set holds no
-soft-knee or over-range clip until the schedule draws the extra variants
-(`clip-variants-not-sampled`). A soft knee leaves a flat top only where it saturates, as speech's crest
-factor makes it do; a smooth procedural waveform barely above the knee is compressed without one
-(`soft-knee-saturation`).
+Schedule version 2 of the injection set (below) draws the soft-knee and over-range clips at moderate on
+the hard sweep's families, so the confirmation set holds all three constructions. A warn confirmation
+gates on severe cells only, where clipping is hard, so their detection is measured per unit and judged
+only at a fail point (`clip-variants-moderate`). A soft knee leaves a flat top only where it saturates,
+as speech's crest factor makes it do; a smooth procedural waveform barely above the knee is compressed
+without one (`soft-knee-saturation`).
+
+**Injection schedule, version 2.** The version 1 schedule drew each injector's sham, mild, moderate and
+severe variants and nothing else, so a successor's cell could miss a construction of the defect it
+claims. `audio_qc_calibration_set.py` now records the schedule a set drew (`schedule.version`). Version 2
+also draws `SCHEDULE_EXTRAS`, the catalog's extra variants at a severity an unplanned detector targets,
+on the same sampled families. An extra variant never changes the draw, and one that needs words is not
+applicable, with its reason, on a take without a usable alignment.
+
+| Injector | Extra variant | Drawn? | Why |
+|---|---|---|---|
+| SIG-CLIP | `soft-knee-moderate`, `over-range-moderate` | yes | `signal.clipping@2` reads flat tops at any knee |
+| BND-RUNON | `reversed-moderate` | yes | `boundary.run-on@2` reads speech-level audio after the script, whatever it says |
+| SIG-DROP | `attenuated-ramped` | no | `signal.dropout@2` scores exact digital silence (`digital-silence-only`) |
+| SIG-SIL | `leading-moderate` | no | `signal.terminal-silence@2` scores the trailing silence only |
+
+A test keeps this table and the registry in step: every extra variant at a severity an unplanned detector
+targets is drawn or excluded with a reason. `verify` replays any set by the plan rows it recorded, so a
+set without `schedule` (version 1) still verifies. A P1 plan binds the version it expects
+(`injectionSchedule`). A plan without the binding, as every committed v1 plan is, expects version 1, and
+`scores` and `confirm` refuse a set that drew another schedule (A5). The catalog version stays 3: no
+injector's output changed.
 
 **Content: insertions and repetitions (`content.consensus-error@2`).** v1 took the smaller of the
 two families' error rates, so a take alarmed only when both families heard the defect, and Whisper

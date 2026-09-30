@@ -413,6 +413,51 @@ class CalibrationSetTests(unittest.TestCase):
         shutil.rmtree(output)
 
 
+class ScheduleTests(unittest.TestCase):
+    """Schedule version 2 draws every extra catalog variant of a severity an unplanned (successor) detector
+    targets, or leaves it out with the reason it is no target of that detector."""
+
+    def test_every_successor_target_variant_is_drawn_or_excluded_with_a_reason(self) -> None:
+        repo = Path(__file__).resolve().parents[2]
+        registry = json.loads((repo / "config/audio-qc-detectors.json").read_text(encoding="utf-8"))
+        planned = {path.name.split(".json")[0].split(".fail")[0]
+                   for path in (repo / "config/audio-qc-preregistrations").glob("*.json")
+                   if not path.name.startswith("confirmation-")}
+        found = set()
+        for entry in registry["detectors"]:
+            if entry["id"] in planned:
+                continue
+            for target in entry["targets"]:
+                injector = injectors.CATALOG.get(target["injectorID"])
+                if injector is None or target["mechanism"] != injectors.MECHANISM:
+                    continue
+                for variant in injector.variants:
+                    if variant.name in m2.SEVERITY_SWEEP or variant.severity not in target["severities"]:
+                        continue
+                    drawn = variant.name in m2.SCHEDULE_EXTRAS.get(injector.injector_id, ())
+                    excluded = variant.name in m2.SCHEDULE_EXCLUDED.get(injector.injector_id, {})
+                    self.assertTrue(drawn != excluded, f"{entry['id']}: {injector.key} {variant.name}")
+                    found.add((injector.injector_id, variant.name))
+        declared = {(injector_id, name) for injector_id, names in m2.SCHEDULE_EXTRAS.items() for name in names}
+        declared |= {(injector_id, name) for injector_id, names in m2.SCHEDULE_EXCLUDED.items() for name in names}
+        self.assertEqual(found, declared)
+        self.assertEqual(found, {("SIG-CLIP", "soft-knee-moderate"), ("SIG-CLIP", "over-range-moderate"),
+                                 ("BND-RUNON", "reversed-moderate"), ("SIG-DROP", "attenuated-ramped"),
+                                 ("SIG-SIL", "leading-moderate")})
+
+    def test_the_extras_join_the_plan_after_the_sweep(self) -> None:
+        plan = m2.build_plan(("A", "C"), words=True)
+        rows = [(row["injectorID"], row["severity"], row["variant"], row["status"]) for row in plan
+                if row["injectorID"] in ("SIG-CLIP", "BND-RUNON")]
+        self.assertEqual(rows[4:6], [("SIG-CLIP", "moderate", "soft-knee-moderate", "scheduled"),
+                                     ("SIG-CLIP", "moderate", "over-range-moderate", "scheduled")])
+        self.assertEqual(rows[-1], ("BND-RUNON", "moderate", "reversed-moderate", "scheduled"))
+        without_words = {(row["injectorID"], row["variant"]): row["status"] for row in m2.build_plan(("A", "C"))}
+        self.assertEqual(without_words[("BND-RUNON", "reversed-moderate")], "not-applicable")
+        out_of_scope = {(row["injectorID"], row["variant"]): row["status"] for row in m2.build_plan(("B",))}
+        self.assertEqual(out_of_scope.get(("SIG-CLIP", None)), "out-of-scope")
+
+
 class LongFormSeamTests(unittest.TestCase):
     """A take of the take plan's long-form cell records its seams in its `longForm` block, not as `seamSamples`:
     the seam injectors read them there."""

@@ -1,7 +1,7 @@
 # `signal.clipping@2`
 
 <!-- BEGIN GENERATED audio-qc-docs:definition (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
-Registry entry `signal.clipping@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `3e9ac09ae51187a8` (a plan binds it, so any change is a new version, A7).
+Registry entry `signal.clipping@2` in [config/audio-qc-detectors.json](../../../../config/audio-qc-detectors.json); definition digest `c53dd8505b4b845c` (a plan binds it, so any change is a new version, A7).
 
 **Measures.** Sign-symmetric flat tops: the smaller of the take's positive and negative flat-top sample counts over its samples (pcmMeasures symmetricFlatTopFraction), a flat top being a run of at least two equal PCM16 samples within 1% of the take's own peak magnitude, against one threshold pooled over the languages. A clipping stage at any level, below full scale (hard or soft-knee) or at it (an over-range signal written to PCM16), holds both polarities at the level it limits to, while speech reaches its peak on isolated samples; v1 counted only samples above Fast QC's 0.965 ceiling and detected none of the SIG-CLIP injections, which flatten at the source's own level.
 
@@ -31,7 +31,7 @@ Registry entry `signal.clipping@2` in [config/audio-qc-detectors.json](../../../
 - `fleurs-speaker-lower-bound`: Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.
 - `n2-one-codec`: N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn).
 - `pcm-measures-python-only`: The pcmMeasures block is measured by the calibration scorer (scripts/lib/qc_qualification/pcm_measures.py, audio_qc_calibration_set.py score) over the persisted PCM16, not inside the engine: until a Swift mirror joins the Stage 0 observations the app's own takes carry no such field, so the detector serves the evidence lanes that run the scorer. An N1 recording is measured after its resampling, which smooths flat tops and zero runs.
-- `clip-variants-not-sampled`: The N2 injection schedule (audio_qc_calibration_set.py build_plan) draws each injector's sham, mild, moderate and severe catalog variants only, so SIG-CLIP's soft-knee and over-range variants never reach a confirmation set and the moderate cell holds hard clipping alone. Their design-data detection comes from building them in memory on the spent confirmation sources; qualifying them needs the schedule to draw the extra variants.
+- `clip-variants-moderate`: SIG-CLIP's soft-knee and over-range variants exist at moderate only (1% of samples). Schedule 2 of the calibration set (audio_qc_calibration_set.py SCHEDULE_EXTRAS; the plan binds injectionSchedule) draws both beside the hard sweep on the same sampled families, so the confirmation set's moderate cell holds all three constructions and each scored unit names its variant. A warn confirmation gates on severe cells only, where clipping is hard, so the soft-knee and over-range detection is measured per unit but judged only at a fail point.
 
 **Risks.**
 

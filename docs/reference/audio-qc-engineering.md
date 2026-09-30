@@ -2242,6 +2242,28 @@ heard an inserted unit. The app takes at alpha 0.03 flag 29 of 80 in French and 
 80 in Italian and Spanish (Serena 31 of 107), much as v1 flags them. French recognition of the
 app's French is itself poor (see the nativeness detector below).
 
+**Run-on (`boundary.run-on@2`).** v1 subtracted the aligner's script end from Whisper large-v3's
+last segment end, and Whisper ignores most material after the script: on the spent BND-RUNON severe
+positives its end sat a median 0.04 s past the aligner's, so v1 detected 43 of 135. The recognizers'
+transcripts do no better: neither family's trailing insertions exceed 0 at the median of the severe
+cell. v2 reads the audio itself. The end of the take's last active span (`pcmMeasures`
+`lastActiveSeconds`) minus the aligner's script end measures the seconds of speech-level audio after
+the script. It is gated on both content voters, as v1 was, and keeps language strata: the aligner's
+end and FLEURS's post-speech sounds differ by language (dev 95th percentile 0.09 s in es to 3.2 s in
+ja).
+
+| Alpha (per language) | N2 FAR pooled; worst language | BND-RUNON mild / moderate / severe | Sham | N3 flag rate |
+|---|---|---|---|---|
+| 0.05 | 135/3473 (upper 0.045); zh 31/602 (0.079) | 105, 120, 125 of 135 (severe lower 0.878) | 11/135 (lower 0.046: departs, A4) | 20/713 |
+| 0.02 | 60/3473 (upper 0.021); pt 10/359 (0.058) | 72, 113, 123 of 135 (moderate lower 0.776, severe 0.860) | 1/135 | 3/713 |
+
+The sham appends 300 ms of -80 dBFS room tone. On noisy recordings that lowers the frame floor, and
+the noise after the last word can then form an active span (`noisy-tail-activity`), so plan v2 at
+alpha 0.02. Of the 12 severe positives missed at 0.02, 7 appended copies of a quiet span from the
+take's middle. That is a limit of the recording variant, which repeats a 0.5 s span it cannot place
+on words (`runon-quiet-span`). The other 5 are Japanese takes whose aligner covered 42-61% of the
+units.
+
 ### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
 
 Audit section 4.4 makes pYIN and the window-corrected HNR measurands only "once oracle ladders

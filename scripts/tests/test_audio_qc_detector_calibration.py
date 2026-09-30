@@ -109,6 +109,27 @@ def mean_entry() -> dict:
     return entry
 
 
+ALIGNER = "align.qwen3-forcedaligner-0.6b@1"
+IDENTITY[ALIGNER] = "e" * 64
+
+
+def run_on_entry() -> dict:
+    """A PCM measure minus a non-voting panel timing, gated on both content voters (boundary.run-on@2's shape)."""
+    return {
+        "id": "test.run-on@1", "class": "C", "stage": 2, "measures": "Active audio after the script's end.",
+        "score": {"combination": "difference", "unit": "seconds", "groups": [
+            {"languages": list(LANGUAGES), "components": [{"source": "pcm", "field": "lastActiveSeconds"},
+                                                          {"source": "panel", "judge": ALIGNER,
+                                                           "metric": "spanEndSeconds"}],
+             "requiresComplete": [WHISPER, PARAKEET]}]},
+        "direction": "above", "strata": {"by": "language", "reason": "The aligner's end differs by language."},
+        "scope": scope(),
+        "targets": [{"injectorID": "BND-RUNON", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+        "shams": [{"injectorID": "BND-RUNON", "mechanism": "T1-pcm-construction"}],
+        "populations": "fleurs-n2", "limitations": ["fleurs-no-speaker-ids"], "risks": [],
+    }
+
+
 def level_entry() -> dict:
     return {
         "id": "test.level@1", "class": "A", "stage": 0, "measures": "RMS level.",
@@ -168,7 +189,7 @@ def fixture_registry() -> dict:
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
                       {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
-                      pitch_entry(), mean_entry()],
+                      pitch_entry(), mean_entry(), run_on_entry()],
     }
 
 
@@ -1400,6 +1421,43 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(calibration.record_errors(record), [])
         # A consensus-mean record without its phi audit is refused like any consensus rule's.
         self.assertIn("phi audit", " ".join(calibration.record_errors({**record, "phiAudit": []})))
+
+    def test_a_pcm_measure_minus_a_panel_timing_reads_both_sources(self) -> None:
+        fixture = self.fixture
+        takes = fixture.takes(fixture.calibration)
+        rows = [(take["takeID"], take["language"], take["wavSHA256"], take["textSHA256"],
+                 {WHISPER: fixture.asr(0.0), PARAKEET: "unavailable" if position == 0 else fixture.asr(0.0),
+                  ALIGNER: {"spanEndSeconds": 5.0}}, None)
+                for position, take in enumerate(takes)]
+        bundle = fixture.bundle(fixture.root / "run-on-bundle", rows)
+
+        def measurements(name: str, digest: str) -> Path:
+            clips = [{"clipID": take["takeID"], "population": "N2", "family": take["family"],
+                      "sourceTakeID": take["takeID"], "language": take["language"], "injection": None,
+                      "wavSHA256": take["wavSHA256"], "fastQC": {}, "observations": {},
+                      "pcmMeasures": {"version": "pcm-measures/1", "sourceSHA256": digest,
+                                      "lastActiveSeconds": 5.0 + fixture.index(take["takeID"]) / 100.0}}
+                     for take in takes]
+            return write_json(fixture.root / f"{name}.json", {
+                "kind": calibration.MEASUREMENTS_KIND, "schemaVersion": 1, "startedAt": FRESH,
+                "subject": {"detector": "fastqc@8"}, "takesManifestSHA256": calibration.file_sha256(fixture.calibration),
+                "entriesSHA256": None, "clipsSHA256": json_digest(clips), "clips": clips})
+        scores = self.calibration_scores("test.run-on@1", bundle=bundle,
+                                         measurements=measurements("run-on-measurements",
+                                                                   detectors.pcm_measures_sha256()))
+        units = {unit["unitID"]: unit for unit in json.loads(scores.read_text(encoding="utf-8"))["units"]}
+        first = takes[0]["takeID"]
+        # The first take's Parakeet row failed: a content voter the timing needs did not complete.
+        self.assertEqual(units[first]["abstain"], "judge-unavailable")
+        second = units[takes[1]["takeID"]]
+        self.assertAlmostEqual(second["score"], fixture.index(takes[1]["takeID"]) / 100.0, places=9)
+        self.assertEqual(sorted(second["components"]), [f"{ALIGNER}:panel:spanEndSeconds",
+                                                        "fastqc@8:pcm:lastActiveSeconds"])
+        # A block measured by other pcm_measures code is refused, never scored.
+        refused = self.scores("test.run-on@1", "calibration", fixture.calibration, n1=fixture.n1["calibration"],
+                              name="stale", expect=2, bundle=bundle,
+                              measurements=measurements("stale-measurements", "0" * 64))
+        self.assertIn("pcm_measures.py", refused)
 
     def test_a_pooled_signal_detector_reads_measurements(self) -> None:
         fixture = self.fixture

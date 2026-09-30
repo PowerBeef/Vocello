@@ -104,7 +104,9 @@
     "n2-full-scale-clamps": "The N2 round trip clamps some loud FLEURS recordings at full scale (the N2 manifest's clampedSampleCount), leaving genuine two-sided flat tops on clean negatives: on the spent AQ-07 cohorts 16 of 3,718 test N2 families carry any (15 of them Japanese, upper bound 0.077 at 0.995), so the pooled threshold sits at 0 whatever the alpha and the Japanese stratum holds the FAR.",
     "soft-knee-saturation": "A soft knee leaves a flat top only where it saturates: SIG-CLIP's knee squashes toward an asymptote 12% above its level, so samples far above the knee (speech's crest factor puts the loudest 1% well above the level that 1% exceeds) round to the asymptote on both polarities, while a waveform that barely crosses the knee is compressed without one. On the spent confirmation sources 149 of 150 soft-knee constructions scored; on the smooth procedural fixtures none does.",
     "one-family-alarm": "Under the two-family mean one family's evidence alarms alone once it reaches twice the threshold, so a passage one recognizer hallucinates or drops (Whisper hallucinates on non-speech) can alarm without the other. The per-language conformal threshold still bounds the N2 FAR, and the phi audit records how the two families fail together; a strict consensus (both high) cannot see what one family never transcribes, which is why v1 missed repetitions.",
-    "splice-sham-content-errors": "CNT-REP's sham, a splice at the same boundary with nothing repeated, raises the two families' insertion-deletion rate: on the spent AQ-07 data 14 of 133 sham families alarmed at alpha 0.05 against 164 of 3,116 clean ones, intervals that do not overlap (A4 would refuse), and 9 of 133 against 104 of 3,116 at alpha 0.03, which overlap narrowly. Plan at alpha 0.03, where the severe cells still met A3 (lower bounds 0.868, 0.816 and 0.913)."
+    "splice-sham-content-errors": "CNT-REP's sham, a splice at the same boundary with nothing repeated, raises the two families' insertion-deletion rate: on the spent AQ-07 data 14 of 133 sham families alarmed at alpha 0.05 against 164 of 3,116 clean ones, intervals that do not overlap (A4 would refuse), and 9 of 133 against 104 of 3,116 at alpha 0.03, which overlap narrowly. Plan at alpha 0.03, where the severe cells still met A3 (lower bounds 0.868, 0.816 and 0.913).",
+    "runon-quiet-span": "BND-RUNON's recording variant appends copies of a 0.5 s span of the take's middle, which can be a pause: such a positive adds nothing at speech level and the score cannot see it (7 of the 12 spent severe positives it missed at alpha 0.02). The other 5 were Japanese takes whose aligner placed the script's end past the last active span, with 42-61% of their units aligned.",
+    "noisy-tail-activity": "On a noisy recording the activity margin (10 dB over the 10th-percentile frame) is close to the noise's own spread, so noise after the last word can form an active span: BND-RUNON's sham, 300 ms of -80 dBFS room tone after the take, lowers such a take's floor and moved its active end 0.7-0.8 s later on 3 of 135 spent sham families. At alpha 0.05 the sham's 11 of 135 alarms depart narrowly from the clean N2 interval (A4), at alpha 0.02 its 1 of 135 does not: plan at alpha 0.02."
   },
   "detectors": [
     {
@@ -441,6 +443,35 @@
       "populations": "fleurs-n2",
       "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec"],
       "risks": ["fleurs-trailing-silence", "aligner-anchoring", "whisper-segment-timing"]
+    },
+    {
+      "id": "boundary.run-on@2",
+      "class": "C",
+      "stage": 2,
+      "measures": "Seconds of speech-level audio after the script ends: the end of the take's last active span (pcmMeasures lastActiveSeconds: 10 ms frames within 35 dB of the take's loud level and at least 10 dB above its floor, in spans of 150 ms or more) minus the aligner's last aligned script unit end, only where both content voters of the language completed (the aligner times, never votes). A run-on keeps the take active past the script's end whether or not a recognizer transcribes it: v1 read Whisper large-v3's last segment end, which stays at the script's end on most BND-RUNON positives (median 0.04 s past the aligner's end at severe on the spent AQ-07 set), and detected 43 of 135.",
+      "score": {"combination": "difference", "unit": "seconds", "groups": [
+        {"languages": ["english", "french", "german", "italian", "portuguese", "russian", "spanish"],
+         "components": [{"source": "pcm", "field": "lastActiveSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.parakeet-tdt-0.6b-v3@1"]},
+        {"languages": ["chinese"],
+         "components": [{"source": "pcm", "field": "lastActiveSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.paraformer-zh@1"]},
+        {"languages": ["japanese"],
+         "components": [{"source": "pcm", "field": "lastActiveSeconds"},
+                        {"source": "panel", "judge": "align.qwen3-forcedaligner-0.6b@1", "metric": "spanEndSeconds"}],
+         "requiresComplete": ["asr.whisper-large-v3@1", "asr.sensevoice-small-f16@1"]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "The aligner's script end and what FLEURS recordings hold after the last word (breaths, noise, a partial alignment) differ by language (spent AQ-07 dev N2, 95th percentile of the score: 0.09 s in es to 3.2 s in ja)."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "portuguese", "russian", "spanish"],
+                "exclusions": [{"language": "korean", "reason": "aligner-excludes-korean"}]},
+      "targets": [{"injectorID": "BND-RUNON", "severities": ["moderate", "severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "BND-RUNON", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-n2",
+      "limitations": ["fleurs-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "pcm-measures-python-only"],
+      "risks": ["aligner-anchoring", "runon-quiet-span", "noisy-tail-activity"]
     },
     {
       "id": "language.consensus-lid@1",

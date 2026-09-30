@@ -241,5 +241,52 @@ class ClippingV2Tests(unittest.TestCase):
         self.assertGreater(self.score(injectors.inject("SIG-CLIP", "moderate", source, 7).samples), 0.0)
 
 
+class RunOnV2Tests(unittest.TestCase):
+    """boundary.run-on@2: the last active span's end minus the aligner's script end."""
+
+    ALIGNER = "align.qwen3-forcedaligner-0.6b@1"
+
+    def setUp(self) -> None:
+        self.registry = json.loads((REPO / "config/audio-qc-detectors.json").read_text(encoding="utf-8"))
+        self.entry = detectors.detector_entry(self.registry, "boundary.run-on@2")
+
+    def evidence(self, second: str, *, end: float = 5.0, complete: bool = True) -> dict:
+        status = "complete" if complete else "unavailable"
+        return {"asr.whisper-large-v3@1": {"status": "complete", "metrics": {}},
+                second: {"status": status, "metrics": {}},
+                self.ALIGNER: {"status": "complete", "metrics": {"spanEndSeconds": end}}}
+
+    def test_definition(self) -> None:
+        self.assertEqual(self.entry["score"]["combination"], "difference")
+        self.assertTrue(detectors.needs_measurements(self.entry) and detectors.needs_panel(self.entry))
+        self.assertEqual({(group["languages"][0], tuple(group["requiresComplete"]))
+                          for group in self.entry["score"]["groups"]},
+                         {("english", ("asr.whisper-large-v3@1", "asr.parakeet-tdt-0.6b-v3@1")),
+                          ("chinese", ("asr.whisper-large-v3@1", "asr.paraformer-zh@1")),
+                          ("japanese", ("asr.whisper-large-v3@1", "asr.sensevoice-small-f16@1"))})
+        self.assertEqual([item["language"] for item in self.entry["scope"]["exclusions"]], ["korean"])
+        self.assertEqual(detectors.declared_cells(self.entry),
+                         {"T1-pcm-construction": {"BND-RUNON/moderate", "BND-RUNON/severe"}})
+        self.assertEqual(detectors.component_judge(detectors.components_of(self.entry)[0]), detectors.STAGE0_JUDGE)
+
+    def test_speech_after_the_script_end_scores_and_the_gates_hold(self) -> None:
+        speech = noise(4.0, 0.1, "speech")
+        take = np.concatenate([np.zeros(RATE // 2), speech, noise(1.0, 1e-4, "tail")])
+        run_on = np.concatenate([take, noise(1.5, 0.1, "run-on")])
+        parakeet = "asr.parakeet-tdt-0.6b-v3@1"
+        for samples, expected in ((take, 0.0), (run_on, 2.5)):
+            clip = {"clipID": "c", "pcmMeasures": pcm_measures.measure(samples, RATE)}
+            scored = detectors.score_take(self.entry, "french", clip=clip, measurements=self.evidence(parakeet, end=4.5))
+            self.assertAlmostEqual(scored["score"], expected, places=6)
+        clip = {"clipID": "c", "pcmMeasures": pcm_measures.measure(run_on, RATE)}
+        gated = detectors.score_take(self.entry, "french", clip=clip,
+                                     measurements=self.evidence(parakeet, complete=False))
+        self.assertEqual(gated["abstain"], "content-voters-incomplete")
+        self.assertEqual(detectors.score_take(self.entry, "korean", clip=clip)["abstain"], "out-of-scope")
+        # A take measured before the scorer took PCM measures is an evidence gap, not a pass.
+        self.assertEqual(detectors.score_take(self.entry, "french", clip={"clipID": "c"},
+                                              measurements=self.evidence(parakeet))["abstain"], "not-measured")
+
+
 if __name__ == "__main__":
     unittest.main()

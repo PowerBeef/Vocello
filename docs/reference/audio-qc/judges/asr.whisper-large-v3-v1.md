@@ -66,6 +66,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`content.consensus-error@2`](../detectors/content.consensus-error-v2.md) | B (content) | english, french, german, italian, portuguese, russian, spanish, chinese | transcript-edit `insertionDeletionRate` | not qualified |
 | [`boundary.truncation@1`](../detectors/boundary.truncation-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese, korean | transcript-tail `trailingUnmatchedFraction` | qualified (warn) |
 | [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese | panel `lastSegmentEndSeconds`, must complete | refused |
+| [`boundary.run-on@2`](../detectors/boundary.run-on-v2.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese | must complete | not qualified |
 | [`language.consensus-lid@1`](../detectors/language.consensus-lid-v1.md) | D (language) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | panel `expectedLanguageProbability` | qualified (warn) |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 

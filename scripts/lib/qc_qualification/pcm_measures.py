@@ -32,7 +32,9 @@ PCM16 values (the persisted integers, read back at 1/32767 and rounded as
   `ACTIVE_ABOVE_FLOOR_DB` above its floor (the 10th percentile); active frames
   separated by at most `ACTIVE_GAP_FRAMES` inactive ones form one span, and only
   a span of at least `ACTIVE_MIN_FRAMES` frames counts, so a click or a short
-  breath after the last word does not. None when no span counts.
+  breath after the last word does not. None when no span counts. On a noisy
+  recording the floor margin is close to the noise's own spread, so the noise
+  after the last word can form a span (see the run-on detector's risks).
 
 `source_sha256` digests this file; `measure` stamps it into every block, and
 `detectors.component_value` refuses a block measured by other code, while

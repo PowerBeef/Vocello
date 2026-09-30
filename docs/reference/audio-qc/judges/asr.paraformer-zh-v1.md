@@ -73,6 +73,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`content.consensus-error@2`](../detectors/content.consensus-error-v2.md) | B (content) | chinese | transcript-edit `insertionDeletionRate` | not qualified |
 | [`boundary.truncation@1`](../detectors/boundary.truncation-v1.md) | C (boundary) | chinese | transcript-tail `trailingUnmatchedFraction` | qualified (warn) |
 | [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | chinese | must complete | refused |
+| [`boundary.run-on@2`](../detectors/boundary.run-on-v2.md) | C (boundary) | chinese | must complete | not qualified |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

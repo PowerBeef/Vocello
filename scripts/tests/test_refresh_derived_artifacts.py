@@ -61,6 +61,7 @@ STALE_BUILDERS = {
     "hant-hans-fold-swift": ("render", "stale\n"),
     "readme-charts": ("render_all", {"stale-chart.svg": "stale"}),
     "third-party-attributions": ("build", {"stale": True}),
+    "audio-qc-docs": ("render_all", {"docs/reference/audio-qc/stale.md": "stale\n"}),
     "roadmap-render": ("render", "stale\n"),
 }
 

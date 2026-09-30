@@ -1,0 +1,60 @@
+{
+  "alpha": 0.05,
+  "bindings": {
+    "calibrationScoresSHA256": "ab8d337d82798aa8540a44ae95f92842795fe398ee883a6c09435039be4c3725",
+    "detectorDefinitionSHA256": "70e9b82f45c710db6dbb87dafd88cbea098b8ba013f53e6fce8c1aae8aa54e3f",
+    "evidenceIdentitySHA256": "ee8250fb76e094b34b471f13a73dbbe51d1ae142e9df59d7c0d31ec20f0a0a8e",
+    "injectionCatalogSeed": "7",
+    "injectionClasses": "B",
+    "injectionSamplePerCell": "150",
+    "injectionSampleSeed": "1",
+    "injectorCatalogVersion": "2",
+    "operatingPoint": "warn",
+    "policySHA256": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+    "scoringCodeSHA256": "6c95538d8e8c70504d144272598e7682d7c215f8b0f7359261ba3d828c36ce49"
+  },
+  "confidence": 0.95,
+  "detector": "content.consensus-error@1",
+  "direction": "above",
+  "grid": [],
+  "population": "N2",
+  "rule": "split-conformal",
+  "schema": "vocello.audioqc.preregistration/1",
+  "split": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "ef260e9aa3c673af240d17a2660480361a8e081d1ffeca2a5ed0e3219fc18567",
+      "source": "fleurs-dev"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "source": "fleurs-test"
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "limitations": [
+      {
+        "id": "fleurs-no-speaker-ids",
+        "statement": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown."
+      },
+      {
+        "id": "fleurs-speaker-lower-bound",
+        "statement": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages."
+      }
+    ],
+    "method": "declared-cohorts",
+    "speakers": {
+      "claim": "lower-bound",
+      "unit": "language:fleurs-unidentified"
+    }
+  },
+  "strata": [
+    {
+      "name": "language",
+      "reason": "Error rates differ by language: word against character units and each recognizer's quality per language (clean N2 95th percentile: 0.037 in it to 0.14 in ja; 13% of ja above the pooled 0.094)."
+    }
+  ]
+}

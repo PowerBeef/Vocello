@@ -1,0 +1,174 @@
+{
+  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md sections 5.5-5.9; config/audio-qc-qualification-policy.json",
+  "detectors": [
+    {
+      "class": "A",
+      "direction": "above",
+      "id": "signal.clicks@1",
+      "limitations": [
+        "fleurs-no-speaker-ids",
+        "fleurs-speaker-lower-bound",
+        "n2-one-codec"
+      ],
+      "measures": "Click events per second (Fast QC v8 clustered click events over the take's duration).",
+      "populations": "fleurs-n2",
+      "risks": [],
+      "scope": {
+        "exclusions": [],
+        "languages": [
+          "english",
+          "french",
+          "german"
+        ]
+      },
+      "score": {
+        "combination": "single",
+        "groups": [
+          {
+            "components": [
+              {
+                "field": "clickEventsPerSecond",
+                "source": "fastqc"
+              }
+            ],
+            "languages": [
+              "english",
+              "french",
+              "german"
+            ]
+          }
+        ],
+        "unit": "events-per-second"
+      },
+      "shams": [
+        {
+          "injectorID": "SIG-CLICK",
+          "mechanism": "T1-pcm-construction"
+        }
+      ],
+      "stage": 0,
+      "strata": {
+        "by": "language",
+        "reason": "FLEURS records each locale separately, under its own conditions, so each language is its own clean distribution (clean N2 aligner tail gap, 95th percentile: 2.0 s in ru to 4.3 s in zh)."
+      },
+      "targets": [
+        {
+          "injectorID": "SIG-CLICK",
+          "mechanism": "T1-pcm-construction",
+          "severities": [
+            "severe"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "B",
+      "direction": "above",
+      "id": "content.consensus-error@1",
+      "limitations": [
+        "fleurs-no-speaker-ids",
+        "fleurs-speaker-lower-bound",
+        "n2-one-codec"
+      ],
+      "measures": "The smaller of two independent recognizer families' error rates (WER, or CER in zh, ja and ko) against the script, so both must be high to alarm. Qwen3-ASR is same-lab and never votes (A6).",
+      "populations": "fleurs-n2",
+      "risks": [
+        "parakeet-whisper-label-lineage"
+      ],
+      "scope": {
+        "exclusions": [],
+        "languages": [
+          "english",
+          "french",
+          "german"
+        ]
+      },
+      "score": {
+        "combination": "consensus-min",
+        "groups": [
+          {
+            "components": [
+              {
+                "judge": "asr.whisper-large-v3@1",
+                "metric": "errorRate",
+                "source": "panel"
+              },
+              {
+                "judge": "asr.parakeet-tdt-0.6b-v3@1",
+                "metric": "errorRate",
+                "source": "panel"
+              }
+            ],
+            "languages": [
+              "english",
+              "french",
+              "german"
+            ]
+          }
+        ],
+        "unit": "error-rate"
+      },
+      "shams": [
+        {
+          "injectorID": "CNT-DEL",
+          "mechanism": "T1-pcm-construction"
+        }
+      ],
+      "stage": 2,
+      "strata": {
+        "by": "language",
+        "reason": "Error rates differ by language: word against character units and each recognizer's quality per language (clean N2 95th percentile: 0.037 in it to 0.14 in ja; 13% of ja above the pooled 0.094)."
+      },
+      "targets": [
+        {
+          "injectorID": "CNT-DEL",
+          "mechanism": "T1-pcm-construction",
+          "severities": [
+            "severe"
+          ]
+        }
+      ]
+    }
+  ],
+  "exclusionReasons": {
+    "aligner-excludes-korean": "The forced aligner is out of scope for Korean: mlx-audio tokenizes it with soynlp (GPL-3.0), which the exclusion list refuses, so there is no script-end time in Korean."
+  },
+  "kind": "audio-qc-detector-registry",
+  "limitations": {
+    "fleurs-no-speaker-ids": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. Speaker disjointness between the dev (calibration) and test (confirmation) splits cannot be verified, and neither can a speaker count: family and script disjointness hold, speaker disjointness is assumed, not shown.",
+    "fleurs-speaker-lower-bound": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages.",
+    "n2-one-codec": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn)."
+  },
+  "note": "Each detector is id@version: what it scores (a Fast QC or Stage 0 field from measurements.json, or judge metrics from panel evidence), how its components combine, its direction, its language scope with a reason for each exclusion, the injectors and severities its detection rate is measured on with their matched shams, and the population roles. scripts/audio_qc_detector_calibration.py validates this file in the contract gate, and a plan binds each detector's definition by digest, so any change to a definition needs a new version (A7).",
+  "operatingPoint": "warn",
+  "risks": {
+    "parakeet-whisper-label-lineage": "Parakeet's training labels include Whisper pseudo-labels (Granary), so the pair may fail together; the phi audit in the record measures it before the pair gates."
+  },
+  "roleSets": {
+    "fleurs-n2": {
+      "confirmNegatives": {
+        "cohort": "confirmation",
+        "corpus": "fleurs-test",
+        "population": "N2"
+      },
+      "fit": {
+        "cohort": "calibration",
+        "corpus": "fleurs-dev",
+        "population": "N2"
+      },
+      "informational": [
+        "N3",
+        "N1"
+      ],
+      "positives": {
+        "cohort": "confirmation",
+        "population": "P1"
+      },
+      "shams": {
+        "cohort": "confirmation",
+        "population": "S"
+      }
+    }
+  },
+  "schemaVersion": 1
+}

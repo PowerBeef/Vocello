@@ -55,6 +55,8 @@ The September 6 review began at `25b305f1`. This is a living technical reference
 second roadmap or a new release gate. AV-07 owns acoustic calibration, AV-08 multilingual
 validity, DP-28 the experimental evaluator, and RF-06 the unresolved product audio.
 User-requested QC engineering does not close any of those acceptance gates.
+One page per registry judge and detector, with generated pins, scope and measured accuracy, is in
+the [audio QC reference tree](audio-qc/README.md) (AQ-09).
 
 ## What exists and what each result means
 

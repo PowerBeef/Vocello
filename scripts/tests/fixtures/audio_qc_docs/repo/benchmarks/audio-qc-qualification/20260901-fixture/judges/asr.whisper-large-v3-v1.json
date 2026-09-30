@@ -1,0 +1,23 @@
+{
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "rowsBitExact": 9,
+    "rowsCompared": 9
+  },
+  "judge": "asr.whisper-large-v3@1",
+  "outputIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "qualification": {
+    "passed": true,
+    "reasons": []
+  },
+  "resources": {
+    "canonicalHostPeakBytes": 6124622480
+  },
+  "schema": "vocello.audioqc.qc-canary/1",
+  "session": {
+    "date": "2026-09-01",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20260901-fixture"
+  }
+}

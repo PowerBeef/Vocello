@@ -377,6 +377,10 @@ class TransportTests(unittest.TestCase):
             handler.redirect_request(request, None, 302, "Found", {}, "https://bucket.s3.amazonaws.com/x")
         with self.assertRaisesRegex(corpora.CorporaError, "not an allowed corpora host"):
             corpora._open(urllib.request.Request("https://example.org/x"), 1.0)
+        # raw.githubusercontent.com serves only blob-pinned metadata requested directly: never a redirect target.
+        self.assertFalse(corpora.allowed_url("https://raw.githubusercontent.com/a/b/c/d", raw=False))
+        with self.assertRaisesRegex(corpora.CorporaError, "not an allowed corpora host"):
+            handler.redirect_request(request, None, 302, "Found", {}, "https://raw.githubusercontent.com/a/b/c/d")
 
     def test_each_host_kind_downloads_from_its_pinned_place(self) -> None:
         hub = entry([], {"format": "parquet"})

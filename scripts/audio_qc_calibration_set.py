@@ -122,6 +122,8 @@ directory, an untracked build artifact; no model, device or native build runs.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import json
 import math
@@ -572,6 +574,57 @@ def preview_alignment(take: dict, record: dict | None) -> recordings.WordAlignme
     return recordings.word_alignment(interval_pairs(record), frames=frames)
 
 
+PANEL_CACHE_GAPS = ("not-in-cache", "cache-entry-invalid")
+
+
+def panel_cache(cache_root: Path) -> Any:
+    """The panel run's own L1 cache; a root without analysis layers refuses.
+
+    A pruned confirmation root, or a path that is not the panel's, would
+    otherwise read every complete measurement as not-in-cache and export
+    nothing without an error.
+    """
+    if not (Path(cache_root) / "layers").is_dir():
+        raise CalibrationError(f"the cache root {Path(cache_root).name} holds no analysis layers: it was pruned or "
+                               "is not the panel run's own --cache-root")
+    from delivery_analysis_cache import DeliveryAnalysisCache
+
+    return DeliveryAnalysisCache(cache_root)
+
+
+def refuse_cache_gaps(records: dict[str, dict], what: str) -> None:
+    """A measurement the bundle calls complete must have its L1 entry: never export around a gap."""
+    gaps = Counter(record["status"] for record in records.values() if record["status"] in PANEL_CACHE_GAPS)
+    if gaps:
+        raise CalibrationError(f"{what}: {sum(gaps.values())} complete measurement(s) have no usable L1 entry "
+                               f"({', '.join(f'{status} {count}' for status, count in sorted(gaps.items()))}); "
+                               "pass the panel run's own --cache-root, or rerun the panel on a fresh root")
+
+
+@contextlib.contextmanager
+def shared_analysis_lock() -> Iterator[None]:
+    """Hold the host analysis lock shared while an export reads a panel cache.
+
+    Orchestrator runs hold it shared too; a generator, an exclusive analyzer or
+    a confirmation-cache prune (build_cleanup.py) holds it exclusive, so a
+    prune cannot remove a root mid-export and an export never starts under one.
+    """
+    from delivery_resource_supervisor import HOST_LOCK_NAME, host_analysis_lock_root
+
+    root = host_analysis_lock_root()
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / HOST_LOCK_NAME).open("a+b") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise CalibrationError("a generator, an exclusive analyzer or a cache prune holds the host analysis "
+                                   "lock; export when it is free") from None
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def export_alignments(takes_path: Path, bundle: Path, output: Path, *, cache_root: Path,
                       judge_id: str = ALIGNER_JUDGE, registry_path: Path | None = None) -> dict:
     """The aligner's intervals per take, from the L1 entries the orchestrator stored for a panel bundle.
@@ -623,7 +676,7 @@ def export_alignments(takes_path: Path, bundle: Path, output: Path, *, cache_roo
                                    "file is missing, outside the bundle or changed")
         record = json.loads(target.read_text(encoding="utf-8"))
         evidence[str((record.get("take") or {}).get("takeID"))] = record
-    cache = DeliveryAnalysisCache(cache_root)
+    cache = panel_cache(cache_root)
     takes: dict[str, dict] = {}
     identities: set[str] = set()
     for take in generated_takes(manifest):
@@ -673,6 +726,7 @@ def export_alignments(takes_path: Path, bundle: Path, output: Path, *, cache_roo
                            "unitSHA256": text_sha256(str(item.get("unit", "")))}
                           for item in payload.get("intervals") or []],
         }
+    refuse_cache_gaps(takes, "alignments")
     statuses = Counter(record["status"] for record in takes.values())
     issues = Counter()
     for take in generated_takes(manifest):
@@ -802,7 +856,7 @@ def export_raw_outputs(takes_path: Path, bundle: Path, output: Path, *, judge_id
                                    "file is missing, outside the bundle or changed")
         record = json.loads(target.read_text(encoding="utf-8"))
         evidence[str((record.get("take") or {}).get("takeID"))] = record
-    cache = DeliveryAnalysisCache(cache_root)
+    cache = panel_cache(cache_root)
     exported: dict[str, dict] = {}
     identities: set[str] = set()
     for take in takes:
@@ -842,6 +896,7 @@ def export_raw_outputs(takes_path: Path, bundle: Path, output: Path, *, judge_id
         exported[take_id] = {**base_record, "status": "complete", "canonicalPCMSHA256": seen["canonicalPCMSHA256"],
                              "outputIdentity": identity.output_identity, "l1Key": key.key,
                              "output": _plain({field: payload.get(field) for field in RAW_OUTPUT_FIELDS[engine]})}
+    refuse_cache_gaps(exported, f"raw outputs of {judge_id}")
     statuses = Counter(record["status"] for record in exported.values())
     export = {
         "schemaVersion": 1, "kind": RAW_OUTPUTS_KIND, "generator": GENERATOR,
@@ -2487,12 +2542,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--jobs must be positive")
     try:
         if args.command == "alignments":
-            export = export_alignments(args.takes, args.bundle, args.output, cache_root=args.cache_root)
+            with shared_analysis_lock():
+                export = export_alignments(args.takes, args.bundle, args.output, cache_root=args.cache_root)
             print(json.dumps(export["counts"], sort_keys=True))
             return 0
         if args.command == "raw-outputs":
-            export = export_raw_outputs(args.takes, args.bundle, args.output, judge_id=args.judge,
-                                        cache_root=args.cache_root)
+            with shared_analysis_lock():
+                export = export_raw_outputs(args.takes, args.bundle, args.output, judge_id=args.judge,
+                                            cache_root=args.cache_root)
             print(json.dumps(export["counts"], sort_keys=True))
             return 0
         if args.command == "inject":

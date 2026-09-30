@@ -743,8 +743,12 @@ def ordered_sources(registry: Mapping[str, Any]) -> list[str]:
 # Transport
 # --------------------------------------------------------------------------- #
 
-def allowed_url(url: str) -> bool:
-    """https with no credentials and the default port, on one of the corpora hosts or a Hub CDN."""
+def allowed_url(url: str, *, raw: bool = True) -> bool:
+    """https with no credentials and the default port, on one of the corpora hosts or a Hub CDN.
+
+    raw.githubusercontent.com serves only a GitHub source's blob-pinned metadata files, which `file_url`
+    requests directly; with `raw=False` (every redirect) it is refused, so no download can be redirected there.
+    """
     try:
         parts = urllib.parse.urlsplit(url)
         port = parts.port
@@ -753,6 +757,8 @@ def allowed_url(url: str) -> bool:
     host = (parts.hostname or "").lower()
     if parts.scheme != "https" or parts.username or parts.password or port not in (None, 443):
         return False
+    if host == GITHUB_RAW_HOST:
+        return raw
     return host in TRANSPORT_HOSTS or host.endswith(HOST_SUFFIXES)
 
 
@@ -761,7 +767,7 @@ class CorporaRedirectHandler(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any,
                          newurl: str) -> urllib.request.Request | None:
-        if not allowed_url(newurl):
+        if not allowed_url(newurl, raw=False):
             raise CorporaError(f"a download was redirected to {acquire._described(newurl)}, which is not an "
                                "allowed corpora host; nothing is fetched from it")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -792,7 +798,7 @@ def file_url(entry: Mapping[str, Any], pin: Pin) -> str:
         url = f"https://zenodo.org/api/records/{entry['record']}/files/{urllib.parse.quote(pin.path, safe='')}/content"
     else:
         raise CorporaError(f"{pin.path}: its host is not a corpora host")
-    if not allowed_url(url):
+    if not allowed_url(url, raw=kind == "github-lfs" and pin.kind == "gitBlobSHA1"):
         raise CorporaError(f"{pin.path} does not resolve to an allowed corpora host")
     return url
 

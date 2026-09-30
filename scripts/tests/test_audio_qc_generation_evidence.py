@@ -221,6 +221,10 @@ class RawOutputExportTests(unittest.TestCase):
             request = panel_request(spec, scope, {"language": take["language"]})
             if take["takeID"] != "s2--aiden":
                 cache.store(l1_identity(canonical, self.identity, request), pitch_track(200.0 + number))
+            else:
+                # Left out of the cache: the export refuses until the test stores it.
+                self.store_gap = (lambda key=l1_identity(canonical, self.identity, request), value=number:
+                                  cache.store(key, pitch_track(200.0 + value)))
             evidence = {"schema": "vocello.audioqc.take-evidence/1",
                         "measurements": [{"judge": PYIN, "status": "complete", "reasons": [], "metrics": {},
                                           "outputIdentity": self.identity.output_identity}],
@@ -242,9 +246,14 @@ class RawOutputExportTests(unittest.TestCase):
         import audio_qc_detector_calibration as calibration
 
         output = self.root / "raw.json"
+        # A complete measurement without its L1 entry refuses the whole export: nothing is exported around a gap.
+        with self.assertRaisesRegex(m2.CalibrationError, "no usable L1 entry"):
+            quiet(m2.export_raw_outputs, self.manifest, self.bundle, output, judge_id=PYIN, cache_root=self.cache_root)
+        self.assertFalse(output.exists())
+        self.store_gap()
         export = quiet(m2.export_raw_outputs, self.manifest, self.bundle, output, judge_id=PYIN,
                        cache_root=self.cache_root)
-        self.assertEqual(export["counts"]["byStatus"], {"complete": 2, "not-in-cache": 1})
+        self.assertEqual(export["counts"]["byStatus"], {"complete": 3})
         record = export["takes"]["s0--aiden"]
         self.assertEqual(sorted(record["output"]), ["f0Hz", "hopSeconds", "voiced"])
         self.assertEqual(record["output"]["f0Hz"][5], 201.0)

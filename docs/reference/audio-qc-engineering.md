@@ -1971,7 +1971,10 @@ after. `scripts/clean_build_caches.sh --prune-confirmation-caches --dry-run`, th
 24 hours (`--older-than-hours` overrides; `childRetention.analysisConfirmation` in
 `config/build-output-policy.json`), only while no orchestrator, generator or analyzer holds the
 host analysis lock and no process has a file open under it; the shared cache's `audio`, `layers`
-and `external-models` are never touched.
+and `external-models` are never touched. Prune only after the records are committed: the
+`alignments` and `raw-outputs` exports hold the lock shared (a prune refuses mid-export), and they
+refuse a root without analysis layers or any complete measurement without its L1 entry, so an
+early prune fails loudly instead of exporting around the gap.
 
 **Injections on N2 (AQ-07 positives).** `scripts/audio_qc_calibration_set.py` reads an N2 cohort as
 an injection source: every take is an eligible, generated 24 kHz resynthesis whose family is its N1

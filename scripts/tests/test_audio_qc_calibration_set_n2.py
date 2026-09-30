@@ -221,12 +221,16 @@ class CohortAndAlignmentTests(N2Fixture):
         for take in self.manifest()["takes"]:
             self.assertNotIn(take["text"], written)
         self.assertNotIn('"w0"', written)
-        # An entry the cache does not hold is reported, never guessed.
+        # An entry the cache does not hold refuses the export (never guessed, never exported around), and so
+        # does a cache root without analysis layers (a pruned confirmation root, or not the panel's own root).
         other = self.root / "uncached"
         bundle, cache_root = write_panel(other, self.manifest_path, self.scripts, uncached="n1-fr-0002--n2")
-        missing = quiet(m2.export_alignments, self.manifest_path, bundle, other / "alignments.json",
-                        cache_root=cache_root)
-        self.assertEqual(missing["takes"]["n1-fr-0002--n2"]["status"], "not-in-cache")
+        with self.assertRaisesRegex(m2.CalibrationError, "no usable L1 entry"):
+            quiet(m2.export_alignments, self.manifest_path, bundle, other / "alignments.json", cache_root=cache_root)
+        self.assertFalse((other / "alignments.json").exists())
+        with self.assertRaisesRegex(m2.CalibrationError, "holds no analysis layers"):
+            m2.export_alignments(self.manifest_path, bundle, other / "alignments.json",
+                                 cache_root=self.root / "pruned")
         # A bundle whose digest no longer matches is refused.
         record = json.loads((bundle / "bundle.json").read_text())
         record["runID"] = "edited"
@@ -279,6 +283,30 @@ class CohortAndAlignmentTests(N2Fixture):
         short = recordings.with_alignment(fixture, recordings.WordAlignment(fixture.words[:2], (), 2, 0, None))
         with self.assertRaises(injectors.InjectorNotApplicable):
             injectors.inject("CNT-DEL", "severe", short, 7)
+
+
+class AnalysisLockTests(unittest.TestCase):
+    def test_an_export_holds_the_host_analysis_lock_shared_and_refuses_an_exclusive_holder(self) -> None:
+        import fcntl
+        from unittest import mock
+
+        import delivery_resource_supervisor as supervisor
+
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(supervisor, "host_analysis_lock_root", return_value=Path(directory)):
+            lock = Path(directory) / supervisor.HOST_LOCK_NAME
+            with m2.shared_analysis_lock():
+                # A prune (exclusive) cannot start while an export reads a cache; another reader can.
+                with lock.open("a+b") as prune:
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(prune.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with lock.open("a+b") as reader:
+                    fcntl.flock(reader.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            with lock.open("a+b") as holder:
+                fcntl.flock(holder.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with self.assertRaisesRegex(m2.CalibrationError, "host analysis lock"):
+                    with m2.shared_analysis_lock():
+                        pass
 
 
 class SamplingTests(unittest.TestCase):

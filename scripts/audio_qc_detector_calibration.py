@@ -40,7 +40,8 @@ its `entriesSHA256` and to the cohort manifest it was built on (always checked).
 Commands:
   scores   --detector ID --role calibration|confirmation|informational --cohort MANIFEST
            [--n1-manifest FILE] [--bundle DIR] [--measurements FILE] [--injection-set FILE]
-           [--positive-bundle DIR] [--positive-measurements FILE] --output FILE
+           [--positive-bundle DIR] [--positive-measurements FILE] [--raw-outputs FILE ...]
+           [--positive-raw-outputs FILE ...] --output FILE
            Per-unit scores (family, language, speaker, script, population,
            injector, severity, score or abstention with its reason, and each
            component), ids and digests only, with the scoring code's digest and
@@ -48,7 +49,12 @@ Commands:
            cohort names its split (and a labelled corpus its speakers) through
            the N1 manifest it pins (--n1-manifest); an N3 takes manifest names
            its take-plan split. Positives are the injection set's entries, of
-           the role set's positive population. A confirmation role needs the
+           the role set's positive population. A `raw-output` detector reads
+           its judge's raw output from `audio_qc_calibration_set.py
+           raw-outputs` exports bound to the manifest and bundle (a missing
+           output is an evidence gap), a seam measure a long-form take's seams,
+           and a speaker detector requires the panel to have embedded the
+           reference clip each take declares. A confirmation role needs the
            detector's committed plan naming that cohort, the planned injection
            construction and panels computed from scratch after the plan (see
            confirm); calibration and informational roles refuse the role set's
@@ -188,8 +194,10 @@ PI_MAX = (0.05, 0.10, 0.20)
 SKIPPED_DIRECTORIES = frozenset({"roundtrip", "inputs", "logs", "wav", "evidence", "private", "batches",
                                  "batch-out", "batch-results"})
 # An in-scope unit whose expected evidence is absent (the bundle lacks the take, a consumed judge was not
-# run on it, or measurements.json lacks the clip): never a qualification input.
-EVIDENCE_GAPS = ("no-evidence", "not-measured")
+# run on it, measurements.json lacks the clip, or the raw-output export lacks the judge's output for it):
+# never a qualification input.
+EVIDENCE_GAPS = ("no-evidence", "not-measured", "no-raw-output")
+RAW_OUTPUTS_KIND = "audio-qc-raw-outputs"
 # An in-scope unit a consumed judge's row failed on (admission timeout, row timeout, crash, envelope
 # breach): the run's failure, never the detector's abstention, so a confirmation never starts on it.
 RUN_FAILURES = ("judge-unavailable",)
@@ -311,7 +319,8 @@ def load_cohort(path: Path) -> dict:
                           "scriptID": str(take.get("scriptID")), "speaker": speaker,
                           "wavSHA256": take["wavSHA256"], "textSHA256": text,
                           "speakerLabel": label if isinstance(label, str) and label else None,
-                          "n1TakeID": take.get("n1TakeID"), "seams": _seams(take.get("longForm"), f"{name}: {take_id}")}
+                          "n1TakeID": take.get("n1TakeID"), "seams": _seams(take.get("longForm"), f"{name}: {take_id}"),
+                          "referenceSHA256": reference_digest(take, f"{name}: {take_id}")}
     if not takes:
         raise CalibrationError(f"{name} has no eligible takes")
     return {"kind": kind, "population": population, "manifestDigest": digest, "fileSHA256": file_sha256(path),
@@ -331,6 +340,20 @@ def _voice_speaker(voice: Any) -> str:
         return f"voice:{voice_key(dict(voice))}"
     except (KeyError, TypeError):
         return f"voice:{voice.get('kind')}-{json_digest(dict(voice))[:16]}"
+
+
+def reference_digest(take: Mapping[str, Any], where: str) -> str | None:
+    """The WAV digest of the reference clip a take declares (`reference`: another utterance of its speaker, or
+    a clone's reference), which a speaker judge scores it against; None when it declares none."""
+    reference = take.get("reference")
+    if reference is None:
+        return None
+    digest = reference.get("wavSHA256") if isinstance(reference, Mapping) else None
+    if not is_sha256(digest) or not isinstance(reference.get("wavPath"), str):
+        raise CalibrationError(f"{where}: its reference names its WAV path and digest")
+    if digest == take.get("wavSHA256"):
+        raise CalibrationError(f"{where}: a take is never its own reference clip")
+    return digest
 
 
 def _seams(block: Any, where: str) -> list[float] | None:
@@ -486,6 +509,102 @@ def load_injection_set(path: Path) -> dict:
             "entriesSHA256": data["entriesSHA256"], "construction": construction, "name": name}
 
 
+def load_raw_outputs(path: Path) -> dict:
+    """A raw-output export (`audio_qc_calibration_set.py raw-outputs`): one judge's raw output per take."""
+    name = Path(path).name
+    data = load_json(path, "the raw-output export")
+    if not isinstance(data, dict) or data.get("kind") != RAW_OUTPUTS_KIND or data.get("schemaVersion") != 1 \
+            or not isinstance(data.get("takes"), dict):
+        raise CalibrationError(f"{name} is not an {RAW_OUTPUTS_KIND} schema 1 file")
+    if json_digest(data["takes"]) != data.get("takesSHA256"):
+        raise CalibrationError(f"{name}: its takes differ from its takesSHA256 (edited after the export)")
+    judge = (data.get("judge") or {}).get("judge")
+    source = (data.get("takesManifest") or {}).get("sha256")
+    bundle = (data.get("bundle") or {}).get("bundleDigest")
+    if not isinstance(judge, str) or not is_sha256(source) or not is_sha256(bundle):
+        raise CalibrationError(f"{name} names no judge, takes manifest or bundle")
+    return {"judge": judge, "takes": data["takes"], "sourceSHA256": source, "bundleDigest": bundle,
+            "fileSHA256": file_sha256(path), "takesSHA256": data["takesSHA256"], "name": name}
+
+
+def raw_output_judges(entry: Mapping[str, Any]) -> set[str]:
+    return {component["judge"] for component in registry_lib.components_of(entry)
+            if component.get("source") == "raw-output"}
+
+
+def bind_raw_outputs(entry: Mapping[str, Any], exports: Sequence[Mapping[str, Any]], *, source_sha256: str,
+                     bundle: "Bundle | None", what: str) -> dict[str, Mapping[str, Any]]:
+    """The detector's raw-output exports by judge, each bound to the manifest the panel ran over and its bundle."""
+    wanted = raw_output_judges(entry)
+    found: dict[str, Mapping[str, Any]] = {}
+    for export in exports:
+        if export["judge"] not in wanted:
+            raise CalibrationError(f"{export['name']} exports {export['judge']}, which {entry['id']} does not reduce")
+        if export["judge"] in found:
+            raise CalibrationError(f"{what}: two exports of {export['judge']}")
+        if export["sourceSHA256"] != source_sha256:
+            raise CalibrationError(f"{export['name']} was exported for another manifest than the {what}")
+        if bundle is None or export["bundleDigest"] != bundle.identity()["bundleDigest"]:
+            raise CalibrationError(f"{export['name']} was exported from another panel bundle than the {what}'s")
+        found[export["judge"]] = export
+    missing = sorted(wanted - set(found))
+    if missing:
+        raise CalibrationError(f"{entry['id']} reduces the raw output of {', '.join(missing)}: pass the {what}'s "
+                               "export (audio_qc_calibration_set.py raw-outputs)")
+    return found
+
+
+def raw_for(take_id: str, audio_sha256: str, evidence: Mapping[str, Mapping] | None,
+            exports: Mapping[str, Mapping[str, Any]], where: str) -> dict[str, Mapping[str, Any]]:
+    """The take's raw output per judge; a judge without a complete exported output is left out (the unit then
+    abstains no-raw-output, an evidence gap). The export must hold the audio and output identity the evidence
+    records."""
+    raw: dict[str, Mapping[str, Any]] = {}
+    for judge, export in exports.items():
+        record = export["takes"].get(take_id)
+        if not isinstance(record, Mapping) or record.get("status") != "complete":
+            continue
+        measurement = (evidence or {}).get(judge) or {}
+        if record.get("audioSHA256") != audio_sha256:
+            raise CalibrationError(f"{where}: {export['name']} holds another audio's {judge} output")
+        if record.get("outputIdentity") != measurement.get("outputIdentity"):
+            raise CalibrationError(f"{where}: {export['name']} holds {judge} output of another identity than its "
+                                   "evidence")
+        if isinstance(record.get("output"), Mapping):
+            raw[judge] = record["output"]
+    return raw
+
+
+def reference_judges(entry: Mapping[str, Any]) -> set[str]:
+    """The panel judges whose metrics a detector reads only against a reference clip (the speaker families)."""
+    from lib.qc_pipeline.panel_jobs import PanelJobError, profile  # deferred: read only for speaker detectors
+
+    judges = set()
+    for component in registry_lib.components_of(entry):
+        if component.get("source") != "panel":
+            continue
+        try:
+            if profile(component["judge"]).needs_reference:
+                judges.add(component["judge"])
+        except PanelJobError:
+            continue
+    return judges
+
+
+def check_reference(private: Mapping[str, Any] | None, declared: str | None, where: str) -> None:
+    """The panel embedded the reference clip the manifest declares for the take, or none when it declares none
+    (the orchestrator records its digest in the take's private file)."""
+    embedded = (private or {}).get("referenceAudioSHA256")
+    if embedded == declared:
+        return
+    if declared is None:
+        raise CalibrationError(f"{where}: the panel scored it against a reference clip its manifest does not declare")
+    if embedded is None:
+        raise CalibrationError(f"{where}: its manifest declares a reference clip the panel did not embed (build the "
+                               "panel manifest with the current audio_qc_orchestrator.py manifest)")
+    raise CalibrationError(f"{where}: its evidence was measured against another reference clip than its manifest's")
+
+
 class Bundle:
     """A private panel bundle (read-only): its own digest, and each file checked against its digest."""
 
@@ -627,15 +746,27 @@ def provenance_problems(population: str, injection: Mapping[str, Any], mechanism
 def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: str, split: str | None = None,
                  bundle: Bundle | None = None, measurements: Mapping[str, Any] | None = None,
                  injection_set: Mapping[str, Any] | None = None, positive_bundle: Bundle | None = None,
-                 positive_measurements: Mapping[str, Any] | None = None, positives_population: str = "P1") -> dict:
+                 positive_measurements: Mapping[str, Any] | None = None, positives_population: str = "P1",
+                 raw_outputs: Sequence[Mapping[str, Any]] = (),
+                 positive_raw_outputs: Sequence[Mapping[str, Any]] = ()) -> dict:
     """Every cohort take's score, then every positive and sham of the detector's injectors.
 
     Positives are the role set's population (`positives_population`: P1, or a
-    declared P2 or P3 construction with its provenance); shams are S.
+    declared P2 or P3 construction with its provenance); shams are S. A
+    `raw-output` detector reads its judge's raw output from the exports
+    (`raw_outputs` for the cohort's panel, `positive_raw_outputs` for the
+    injection set's), and a seam measure reads each take's long-form seams (a
+    positive's own, else its source's). A detector reading a speaker judge's
+    reference-relative metrics requires the panel to have embedded the reference
+    clip each take declares.
     """
     detector = entry["id"]
     needs_panel, needs_measurements = registry_lib.needs_panel(entry), registry_lib.needs_measurements(entry)
     needs_private = registry_lib.needs_private(entry)
+    needs_seams, referenced = registry_lib.needs_seams(entry), reference_judges(entry)
+    raw_judges = raw_output_judges(entry)
+    if (raw_outputs or positive_raw_outputs) and not raw_judges:
+        raise CalibrationError(f"{detector} reduces no judge's raw output: pass no raw-output export")
     if needs_measurements and measurements is None:
         raise CalibrationError(f"{detector} reads measurements.json: pass --measurements")
     if needs_panel and bundle is None:
@@ -678,19 +809,25 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         for clip in measurements["clips"]:
             if clip.get("injection") is None and clip.get("population") == cohort["population"]:
                 clean_clips[clip.get("sourceTakeID") or clip.get("clipID")] = clip
+    exports = bind_raw_outputs(entry, raw_outputs, source_sha256=cohort["fileSHA256"], bundle=bundle,
+                               what="cohort") if raw_judges and needs_panel and bundle is not None else {}
     for take_id in sorted(cohort["takes"]):
         take = cohort["takes"][take_id]
         meta = {**take, "population": cohort["population"]}
         where = f"{cohort['name']}: {take_id}"
         evidence = bundle.measurements(take_id, audio_sha256=take["wavSHA256"], text_sha256=take["textSHA256"],
                                        language=take["language"]) if bundle is not None and needs_panel else None
-        private = bundle.private(take_id) if needs_private and evidence is not None else None
+        private = bundle.private(take_id) if (needs_private or referenced) and evidence is not None else None
         _check_private(private, take["textSHA256"], where)
+        if referenced and evidence is not None:
+            check_reference(private, take.get("referenceSHA256"), where)
         clip = clean_clips.get(take_id) if needs_measurements else None
         if clip is not None and clip.get("wavSHA256") != take["wavSHA256"]:
             raise CalibrationError(f"{where}: measurements.json measured other audio than the manifest's")
         _identities(identities, versions, evidence, panel_judges)
-        scored = registry_lib.score_take(entry, meta["language"], clip=clip, measurements=evidence, private=private)
+        raw = raw_for(take_id, take["wavSHA256"], evidence, exports, where) if exports else None
+        scored = registry_lib.score_take(entry, meta["language"], clip=clip, measurements=evidence, private=private,
+                                         raw=raw, seams=take.get("seams") if needs_seams else None)
         if (needs_panel and evidence is None) or (needs_measurements and clip is None):
             scored = _without_evidence(scored)
         elif needs_panel:
@@ -711,6 +848,9 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
     injected_clips = {clip.get("clipID"): clip for clip in (positive_measurements or {}).get("clips") or ()
                       if clip.get("injection") is not None}
     cohort_audio = {take["wavSHA256"] for take in cohort["takes"].values()}
+    positive_exports = bind_raw_outputs(entry, positive_raw_outputs, source_sha256=injection_set["fileSHA256"],
+                                        bundle=positive_bundle, what="injection set") \
+        if positives and raw_judges and needs_panel and positive_bundle is not None else {}
     for item, injection in positives:
         source = cohort["takes"].get(item.get("sourceTakeID"))
         if source is None:
@@ -742,9 +882,15 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         evidence = positive_bundle.measurements(item["takeID"], audio_sha256=wav, text_sha256=text,
                                                 language=language) \
             if positive_bundle is not None and needs_panel else None
-        private = positive_bundle.private(item["takeID"]) if needs_private and evidence is not None else None
+        private = positive_bundle.private(item["takeID"]) \
+            if (needs_private or referenced) and evidence is not None else None
         _check_private(private, text, where)
+        if referenced and evidence is not None:
+            check_reference(private, reference_digest(item, where), where)
         _identities(identities, versions, evidence, panel_judges)
+        raw = raw_for(item["takeID"], wav, evidence, positive_exports, where) if positive_exports else None
+        # A construction that moved the seams records its own long-form block; otherwise its source's hold.
+        seams = (_seams(item.get("longForm"), where) or source.get("seams")) if needs_seams else None
         clip = injected_clips.get(item["takeID"]) if needs_measurements else None
         if clip is not None:
             recorded = clip.get("injection") or {}
@@ -764,7 +910,8 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
         # Clean cohort audio: a byte copy of a cohort take (a language swap's donor) or an identity construction.
         clean = wav in cohort_audio or (injection.get("outputPCMSHA256") is not None
                                         and injection.get("outputPCMSHA256") == injection.get("sourcePCMSHA256"))
-        scored = registry_lib.score_take(entry, language, clip=clip, measurements=evidence, private=private)
+        scored = registry_lib.score_take(entry, language, clip=clip, measurements=evidence, private=private, raw=raw,
+                                         seams=seams)
         if (needs_panel and evidence is None) or (needs_measurements and clip is None):
             scored = _without_evidence(scored)
         elif needs_panel:
@@ -818,6 +965,12 @@ def build_scores(entry: Mapping[str, Any], cohort: Mapping[str, Any], *, role: s
                    "expected": {"cohortTakes": len(cohort["takes"]), "injections": len(positives)}},
         "units": units,
     }
+    if raw_judges:
+        # The raw-output exports read, each bound to its manifest and bundle (sorted by judge).
+        for key, bound in (("rawOutputs", exports), ("positiveRawOutputs", positive_exports)):
+            document["sources"][key] = [{name: export[name] for name in ("judge", "fileSHA256", "takesSHA256",
+                                                                          "bundleDigest")}
+                                        for _, export in sorted(bound.items())]
     document["scoresSHA256"] = json_digest(document)
     return document
 
@@ -902,6 +1055,8 @@ def command_scores(args: argparse.Namespace, repository: Repository) -> int:
         positive_bundle=Bundle(args.positive_bundle) if args.positive_bundle else None,
         positive_measurements=load_measurements(args.positive_measurements) if args.positive_measurements else None,
         positives_population=roles["positives"]["population"],
+        raw_outputs=[load_raw_outputs(path) for path in args.raw_outputs or ()],
+        positive_raw_outputs=[load_raw_outputs(path) for path in args.positive_raw_outputs or ()],
     )
     if args.role == "confirmation":
         problems = confirmation_evidence_problems(repository, plan, document)
@@ -1988,6 +2143,11 @@ def parser() -> argparse.ArgumentParser:
     scores.add_argument("--injection-set", type=Path)
     scores.add_argument("--positive-bundle", type=Path)
     scores.add_argument("--positive-measurements", type=Path)
+    scores.add_argument("--raw-outputs", type=Path, action="append",
+                        help="a raw-output export of the cohort's panel (audio_qc_calibration_set.py raw-outputs), "
+                             "one per judge the detector reduces")
+    scores.add_argument("--positive-raw-outputs", type=Path, action="append",
+                        help="the same for the injection set's panel")
     scores.add_argument("--output", required=True, type=Path)
     plan = commands.add_parser("plan", help="write the detector's pre-registration")
     plan.add_argument("--detector", required=True)

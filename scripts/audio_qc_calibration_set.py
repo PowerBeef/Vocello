@@ -27,6 +27,12 @@ Commands:
           [--cache-root <dir>]
           Export the forced aligner's word intervals for the cohort's takes from
           the orchestrator's L1 cache (see "Word intervals" below).
+  raw-outputs --takes <cohort manifest or injection set> --bundle <panel bundle> --judge ID
+          --output <raw-outputs.json> [--cache-root <dir>]
+          Export one panel judge's raw output per take from the same L1 cache
+          (`export_raw_outputs`: pYIN's frame track, a speaker judge's window
+          embeddings), for the `raw-output` detectors
+          (`audio_qc_detector_calibration.py scores --raw-outputs`).
 
 `inject` and `verify` also take an `audio-qc-n1-cohort` manifest
 (`scripts/audio_qc_n1_corpus.py`): its eligible FLEURS recordings (population
@@ -695,6 +701,157 @@ def export_alignments(takes_path: Path, bundle: Path, output: Path, *, cache_roo
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(export, indent=1, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
+                         encoding="utf-8")
+    os.replace(temporary, output)
+    return export
+
+
+# --------------------------------------------------------------------------- #
+# Raw outputs
+# --------------------------------------------------------------------------- #
+
+RAW_OUTPUTS_KIND = "audio-qc-raw-outputs"
+# Per judge engine, the raw-output fields the detectors' reducers read (detectors.RAW_MEASURES).
+RAW_OUTPUT_FIELDS = {"pyin-librosa": ("hopSeconds", "f0Hz", "voiced"), "wespeaker-onnx": ("dimension", "windows")}
+RAW_OUTPUT_STATUSES = ("complete", "no-evidence", "audio-differs", "not-run", "out-of-scope", "unavailable",
+                       "skipped", "not-in-cache", "cache-entry-invalid")
+
+
+def _raw_output_takes(path: Path) -> tuple[dict, str, list[dict]]:
+    """A cohort manifest's generated takes or an injection set's entries, with the manifest and its SHA-256."""
+    raw = path.read_bytes()
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise CalibrationError(f"{path.name} is not JSON: {error}") from error
+    if isinstance(document, dict) and document.get("kind") == SET_KIND:
+        injection_set = load_set(path)
+        if json_digest(injection_set["entries"]) != injection_set.get("entriesSHA256"):
+            raise CalibrationError(f"{path.name}'s entries differ from its entriesSHA256")
+        entries = [entry for entry in injection_set["entries"] if isinstance(entry, dict)]
+        if any(not TAKE_ID.fullmatch(str(entry.get("takeID"))) or not SHA256.fullmatch(str(entry.get("wavSHA256")))
+               or not isinstance(entry.get("language"), str) for entry in entries):
+            raise CalibrationError(f"{path.name}: every entry names its takeID, WAV digest and language")
+        return injection_set, hashlib.sha256(raw).hexdigest(), entries
+    manifest, digest = load_takes(path)
+    return manifest, digest, generated_takes(manifest)
+
+
+def export_raw_outputs(takes_path: Path, bundle: Path, output: Path, *, judge_id: str, cache_root: Path,
+                       registry_path: Path | None = None) -> dict:
+    """One panel judge's raw (L1) output per take, as `detectors.score_take(..., raw=...)` reads it.
+
+    The panel bundle keeps each judge's reduced metrics only; a `raw-output`
+    detector (class F's pitch track, class J's speaker windows) reduces the raw
+    output itself. As `alignments` does for the aligner, each take's L1 key is
+    rebuilt from its evidence (the audio and canonical digests, the judge's
+    output identity) and the request `panel_jobs.panel_request` builds, and the
+    entry is loaded through the digest-verified `DeliveryAnalysisCache.load`.
+    Only the fields the detectors' reducers read are kept (`RAW_OUTPUT_FIELDS`:
+    pYIN's hop, F0 and voicing track; a speaker judge's 2 s window embeddings).
+    `takes_path` is the manifest the panel ran over: a cohort or an injection
+    set (whose entries are the positives and shams). The export holds speaker
+    embeddings: an untracked build artifact, never committed.
+    """
+    from dataclasses import replace as replace_identity
+    from types import SimpleNamespace
+
+    from delivery_analysis_cache import AnalysisCacheError, DeliveryAnalysisCache
+    from lib.jsonio import sha256_json
+    from lib.qc_pipeline.evidence import BUNDLE_SCHEMA
+    from lib.qc_pipeline.layered_cache import L1_LAYER, l1_identity
+    from lib.qc_pipeline.panel_jobs import PanelJobError, judge_scope, panel_identity, panel_request, profile
+
+    manifest, manifest_sha256, takes = _raw_output_takes(takes_path)
+    registry_path = registry_path or Path(__file__).resolve().parents[1] / "config" / "audio-qc-judges.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    judge = (registry.get("judges") or {}).get(judge_id)
+    engine = ((judge or {}).get("execution") or {}).get("engine") if isinstance(judge, dict) else None
+    if engine not in RAW_OUTPUT_FIELDS:
+        raise CalibrationError(f"{judge_id} is not a registered judge whose raw output a detector reduces "
+                               f"({', '.join(sorted(RAW_OUTPUT_FIELDS))})")
+    try:
+        spec = profile(judge_id)
+    except PanelJobError as error:
+        raise CalibrationError(str(error)) from error
+    scope = judge_scope(judge)
+    model = panel_identity(judge_id, registry, {"threads": None})
+    try:
+        bundle_record = json.loads((bundle / "bundle.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise CalibrationError(f"the bundle's bundle.json is unreadable ({type(error).__name__})") from error
+    body = {key: value for key, value in bundle_record.items() if key != "bundleDigest"}
+    if bundle_record.get("schema") != BUNDLE_SCHEMA \
+            or bundle_record.get("bundleDigest") != sha256_json(body, ascii=False, allow_nan=False):
+        raise CalibrationError(f"the bundle is not a {BUNDLE_SCHEMA} whose digest matches its content")
+    evidence: dict[str, dict] = {}
+    base = bundle.resolve()
+    for entry in bundle_record.get("takes") or []:
+        relative = entry.get("evidence") if isinstance(entry, dict) else None
+        target = (bundle / str(relative)).resolve()
+        if not isinstance(relative, str) or base not in target.parents or not target.is_file() \
+                or file_sha256(target) != entry.get("evidenceSHA256"):
+            raise CalibrationError(f"take {entry.get('takeID') if isinstance(entry, dict) else '?'}: its evidence "
+                                   "file is missing, outside the bundle or changed")
+        record = json.loads(target.read_text(encoding="utf-8"))
+        evidence[str((record.get("take") or {}).get("takeID"))] = record
+    cache = DeliveryAnalysisCache(cache_root)
+    exported: dict[str, dict] = {}
+    identities: set[str] = set()
+    for take in takes:
+        take_id = take["takeID"]
+        base_record = {"language": take["language"], "audioSHA256": take["wavSHA256"]}
+        record = evidence.get(take_id)
+        if record is None:
+            exported[take_id] = {**base_record, "status": "no-evidence"}
+            continue
+        seen = record.get("take") or {}
+        if seen.get("audioSHA256") != take["wavSHA256"]:
+            exported[take_id] = {**base_record, "status": "audio-differs"}
+            continue
+        measurement = next((item for item in record.get("measurements") or [] if item.get("judge") == judge_id), None)
+        request = panel_request(spec, scope, {"language": take["language"], "referenceText": None,
+                                              "scriptSHA256": None})
+        if measurement is None or request is None:
+            exported[take_id] = {**base_record, "status": "out-of-scope" if request is None else "not-run"}
+            continue
+        if measurement.get("status") != "complete":
+            status = measurement.get("status") if measurement.get("status") in RAW_OUTPUT_STATUSES else "unavailable"
+            exported[take_id] = {**base_record, "status": status}
+            continue
+        identity = replace_identity(model, output_identity=measurement["outputIdentity"])
+        canonical = SimpleNamespace(original_wav_sha256=seen["audioSHA256"],
+                                    canonical_derivative_sha256=seen["canonicalPCMSHA256"])
+        key = l1_identity(canonical, identity, request)
+        try:
+            payload = cache.load(key)
+        except AnalysisCacheError:
+            exported[take_id] = {**base_record, "status": "cache-entry-invalid"}
+            continue
+        if payload is None:
+            exported[take_id] = {**base_record, "status": "not-in-cache", "l1Key": key.key}
+            continue
+        identities.add(identity.output_identity)
+        exported[take_id] = {**base_record, "status": "complete", "canonicalPCMSHA256": seen["canonicalPCMSHA256"],
+                             "outputIdentity": identity.output_identity, "l1Key": key.key,
+                             "output": _plain({field: payload.get(field) for field in RAW_OUTPUT_FIELDS[engine]})}
+    statuses = Counter(record["status"] for record in exported.values())
+    export = {
+        "schemaVersion": 1, "kind": RAW_OUTPUTS_KIND, "generator": GENERATOR,
+        "privacy": "raw judge outputs (a pitch track, speaker window embeddings), ids and digests: no text, "
+                   "transcript or path; an untracked build artifact, never committed",
+        "takesManifest": {"sha256": manifest_sha256, "kind": manifest.get("kind"), "runID": manifest.get("runID")},
+        "bundle": {"bundleDigest": bundle_record.get("bundleDigest"), "runID": bundle_record.get("runID"),
+                   "manifestSHA256": bundle_record.get("manifestSHA256")},
+        "judge": {"judge": judge_id, "engine": engine, "layer": f"{L1_LAYER}:{judge_id}", "modelID": model.model_id,
+                  "modelRevision": model.model_revision, "weightsSHA256": model.weights_sha256,
+                  "outputIdentities": sorted(identities), "fields": list(RAW_OUTPUT_FIELDS[engine])},
+        "counts": {"takes": len(exported), "byStatus": dict(sorted(statuses.items()))},
+        "takes": exported, "takesSHA256": json_digest(exported),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(export, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
                          encoding="utf-8")
     os.replace(temporary, output)
     return export
@@ -2301,6 +2458,15 @@ def main(argv: list[str] | None = None) -> int:
     alignments.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT,
                             help="the orchestrator's analysis cache (default build/cache/delivery-analysis or "
                                  "$QVOICE_DELIVERY_ANALYSIS_CACHE)")
+    raw_outputs = commands.add_parser("raw-outputs", help="export a panel judge's raw outputs (pitch track, speaker "
+                                                          "windows) from L1")
+    raw_outputs.add_argument("--takes", type=Path, required=True,
+                             help="the cohort manifest or injection set the panel ran over")
+    raw_outputs.add_argument("--bundle", type=Path, required=True, help="the panel's private bundle directory")
+    raw_outputs.add_argument("--judge", required=True, help="pitch.pyin@1 or speaker.campplus-voxceleb@1")
+    raw_outputs.add_argument("--output", type=Path, required=True)
+    raw_outputs.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT,
+                             help="the orchestrator's analysis cache the panel ran on")
     for command in (inject, verify, score):
         command.add_argument("--jobs", type=int, default=default_jobs(),
                              help="worker processes (default: half the cores)")
@@ -2310,6 +2476,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "alignments":
             export = export_alignments(args.takes, args.bundle, args.output, cache_root=args.cache_root)
+            print(json.dumps(export["counts"], sort_keys=True))
+            return 0
+        if args.command == "raw-outputs":
+            export = export_raw_outputs(args.takes, args.bundle, args.output, judge_id=args.judge,
+                                        cache_root=args.cache_root)
             print(json.dumps(export["counts"], sort_keys=True))
             return 0
         if args.command == "inject":

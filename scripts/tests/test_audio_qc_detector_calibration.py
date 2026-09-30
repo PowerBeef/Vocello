@@ -38,7 +38,8 @@ REPO = Path(__file__).resolve().parents[2]
 LANGUAGES = ("english", "french", "german")
 OTHERS = tuple(language for language in language_metrics.PRODUCT_LANGUAGES if language not in LANGUAGES)
 WHISPER, PARAKEET = "asr.whisper-large-v3@1", "asr.parakeet-tdt-0.6b-v3@1"
-IDENTITY = {WHISPER: "a" * 64, PARAKEET: "b" * 64}
+IDENTITY = {WHISPER: "a" * 64, PARAKEET: "b" * 64, "pitch.pyin@1": "c" * 64,
+            "speaker.campplus-voxceleb@1": "d" * 64}
 REFERENCE = "one two three four five six seven eight nine ten"
 METRIC_VERSION = "normalization-v3-edit-rate-v4"
 # Plans are committed at a fixed time; a confirmation panel starts after it unless a test says otherwise.
@@ -123,6 +124,20 @@ def token_loop_entry(detector: str = "test.token-loop@1", populations: str = "n3
     }
 
 
+def pitch_entry() -> dict:
+    """A class F detector that reduces pYIN's raw frame track (a DSP instrument, so it may stand alone)."""
+    return {
+        "id": "test.pitch-break@1", "class": "F", "stage": 1, "measures": "The largest pitch step.",
+        "score": {"combination": "single", "unit": "semitones", "groups": [
+            {"languages": list(LANGUAGES), "components": [{"source": "raw-output", "judge": "pitch.pyin@1",
+                                                            "measure": "maxPitchStepSemitones"}]}]},
+        "direction": "above", "strata": None, "scope": scope(),
+        "targets": [{"injectorID": "PRS-BRK", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+        "shams": [{"injectorID": "PRS-BRK", "mechanism": "T1-pcm-construction"}],
+        "populations": "fleurs-n2", "limitations": ["fleurs-no-speaker-ids"], "risks": [],
+    }
+
+
 def fixture_registry() -> dict:
     real = json.loads((REPO / calibration.REGISTRY).read_text(encoding="utf-8"))
     roles = copy.deepcopy(real["roleSets"])
@@ -141,7 +156,8 @@ def fixture_registry() -> dict:
                                       what="trailingUnmatchedFraction", injectors_=("BND-TRUNC",), klass="C"),
                       consensus_entry("test.two-injectors@1", injectors_=("CNT-DEL", "CNT-INS")),
                       token_loop_entry(), token_loop_entry("test.long-loop@1", "n3-long-form"),
-                      {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"}],
+                      {**level_entry(), "id": "test.labeled-level@1", "populations": "speaker-labeled-n2"},
+                      pitch_entry()],
     }
 
 
@@ -1873,6 +1889,136 @@ class RoleSetCohortTests(unittest.TestCase):
         cohort["n1ManifestSHA256"] = calibration.file_sha256(unlabelled_n1)
         with self.assertRaisesRegex(calibration.CalibrationError, "names no speaker"):
             calibration.resolve_cohort(cohort, unlabelled_n1)
+
+
+class RawOutputAndReferenceTests(unittest.TestCase):
+    """A `raw-output` detector reads exported raw outputs bound to its manifest, bundle and evidence; a speaker
+    detector requires the panel to have embedded the reference clip each take declares."""
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.fixture = Fixture(Path(self.directory.name))
+        self.out = self.fixture.root / "out"
+
+    def tearDown(self) -> None:
+        self.directory.cleanup()
+
+    def cli(self, *argv: str, expect: int = 0) -> str:
+        code, out, err = run("--repo-root", str(self.fixture.repo), *argv)
+        self.assertEqual(code, expect, f"{argv[0]}: {err}")
+        return out + err
+
+    def pitch_bundle(self, name: str, cohort: Path | None = None) -> Path:
+        fixture = self.fixture
+        rows = [(take["takeID"], take["language"], take["wavSHA256"], take["textSHA256"],
+                 {PYIN: {"voicedFraction": 0.8}}, None) for take in fixture.takes(cohort or fixture.calibration)]
+        return fixture.bundle(fixture.root / name, rows, judgeMetrics=judge_metrics(PYIN))
+
+    def export(self, cohort: Path, bundle: Path, name: str, *, missing: tuple[str, ...] = (),
+               identity: str = IDENTITY["pitch.pyin@1"]) -> Path:
+        """What `audio_qc_calibration_set.py raw-outputs` writes: each take's pYIN track, a step of index % 7
+        semitones between two held pitches."""
+        takes = {}
+        for take in self.fixture.takes(cohort):
+            base = {"language": take["language"], "audioSHA256": take["wavSHA256"]}
+            if take["takeID"] in missing:
+                takes[take["takeID"]] = {**base, "status": "not-in-cache"}
+                continue
+            step = self.fixture.index(take["takeID"]) % 7
+            f0 = [200.0] * 40 + [200.0 * 2 ** (step / 12)] * 40
+            takes[take["takeID"]] = {**base, "status": "complete", "outputIdentity": identity,
+                                     "output": {"hopSeconds": 0.01, "f0Hz": f0, "voiced": [True] * 80}}
+        digest = json.loads((bundle / "bundle.json").read_text(encoding="utf-8"))["bundleDigest"]
+        return write_json(self.fixture.root / "raw" / name, {
+            "schemaVersion": 1, "kind": calibration.RAW_OUTPUTS_KIND,
+            "takesManifest": {"sha256": calibration.file_sha256(cohort)}, "bundle": {"bundleDigest": digest},
+            "judge": {"judge": PYIN}, "takes": takes, "takesSHA256": json_digest(takes)})
+
+    def scores(self, name: str, *extra: str, detector: str = "test.pitch-break@1", expect: int = 0) -> Path | str:
+        output = self.out / f"{name}.json"
+        text = self.cli("scores", "--detector", detector, "--role", "calibration", "--cohort",
+                        str(self.fixture.calibration), "--n1-manifest", str(self.fixture.n1["calibration"]),
+                        "--output", str(output), *extra, expect=expect)
+        return output if expect == 0 else text
+
+    def test_raw_output_scores_come_from_a_bound_export(self) -> None:
+        fixture = self.fixture
+        bundle = self.pitch_bundle("pitch-bundle")
+        first = fixture.takes(fixture.calibration)[0]["takeID"]
+        export = self.export(fixture.calibration, bundle, "raw.json", missing=(first,))
+        scores = json.loads(self.scores("pitch", "--bundle", str(bundle), "--raw-outputs", str(export))
+                            .read_text(encoding="utf-8"))
+        units = {unit["unitID"]: unit for unit in scores["units"]}
+        self.assertEqual(units[first]["abstain"], "no-raw-output")
+        take = fixture.takes(fixture.calibration)[5]["takeID"]
+        self.assertAlmostEqual(units[take]["score"], 5.0, places=6)
+        self.assertEqual(scores["sources"]["rawOutputs"],
+                         [{"judge": PYIN, "fileSHA256": calibration.file_sha256(export),
+                           "takesSHA256": json.loads(export.read_text(encoding="utf-8"))["takesSHA256"],
+                           "bundleDigest": json.loads((bundle / "bundle.json").read_text())["bundleDigest"]}])
+        # A missing raw output is an evidence gap: the plan refuses scores that have one.
+        self.assertIn("have no evidence ({'no-raw-output': 1})", self.cli(
+            "plan", "--detector", "test.pitch-break@1", "--calibration-cohort", str(fixture.calibration),
+            "--confirmation-cohort", str(fixture.confirmation), "--confirmation-n1-manifest",
+            str(fixture.n1["confirmation"]), "--calibration-scores", str(self.out / "pitch.json"), "--alpha",
+            "0.05", *INJECTION_FLAGS, expect=2))
+        # The export is required, and bound to the manifest, the bundle and the evidence's output identity.
+        self.assertIn("reduces the raw output of pitch.pyin@1", self.scores("none", "--bundle", str(bundle),
+                                                                            expect=2))
+        other_bundle = self.pitch_bundle("other-bundle")
+        self.assertIn("another panel bundle", self.scores(
+            "moved", "--bundle", str(other_bundle), "--raw-outputs", str(export), expect=2))
+        foreign = self.export(fixture.confirmation, bundle, "foreign.json")
+        self.assertIn("exported for another manifest", self.scores(
+            "foreign", "--bundle", str(bundle), "--raw-outputs", str(foreign), expect=2))
+        stranger = self.export(fixture.calibration, bundle, "stranger.json", identity="e" * 64)
+        self.assertIn("of another identity than its evidence", self.scores(
+            "stranger", "--bundle", str(bundle), "--raw-outputs", str(stranger), expect=2))
+        self.assertIn("reduces no judge's raw output", self.scores(
+            "level", "--measurements", str(fixture.measurements(fixture.calibration, "level-measurements")),
+            "--raw-outputs", str(export), detector="test.level@1", expect=2))
+
+    def test_a_speaker_detector_scores_only_against_the_declared_reference_clip(self) -> None:
+        fixture = self.fixture
+        entry = {**pitch_entry(), "id": "test.similarity@1", "class": "E", "stage": 2, "direction": "below",
+                 "score": {"combination": "single", "unit": "cosine", "groups": [
+                     {"languages": list(LANGUAGES), "components": [{"source": "panel", "judge": CAMPPLUS,
+                                                                     "metric": "cosine"}]}]}}
+        manifest = json.loads(fixture.calibration.read_text(encoding="utf-8"))
+        manifest.pop("manifestDigest")
+        for take in manifest["takes"]:
+            take["reference"] = {"takeID": f"{take['takeID']}-ref", "wavPath": f"ref/{take['takeID']}.wav",
+                                 "wavSHA256": sha(f"ref:{take['takeID']}")}
+        referenced = write_json(fixture.root / "referenced" / "n2-manifest.json", signed(manifest))
+        cohort = calibration.load_cohort(referenced)
+
+        def bundle(name: str, reference) -> Path:
+            rows = []
+            for take in manifest["takes"]:
+                private = {"referenceText": REFERENCE, "transcripts": {}}
+                embedded = reference(take)
+                if embedded is not None:
+                    private["referenceAudioSHA256"] = embedded
+                rows.append((take["takeID"], take["language"], take["wavSHA256"], take["textSHA256"],
+                             {CAMPPLUS: {"cosine": 0.81}}, private))
+            return fixture.bundle(fixture.root / name, rows)
+
+        def score(directory: Path, source: dict = cohort) -> dict:
+            return calibration.build_scores(entry, source, role="informational", split="dev",
+                                            bundle=calibration.Bundle(directory))
+
+        scored = score(bundle("embedded", lambda take: take["reference"]["wavSHA256"]))
+        self.assertEqual({unit["score"] for unit in scored["units"]}, {0.81})
+        for name, reference, fragment in (("absent", lambda take: None, "did not embed"),
+                                          ("other", lambda take: sha("another clip"), "another reference clip")):
+            with self.assertRaisesRegex(calibration.CalibrationError, fragment):
+                score(bundle(name, reference))
+        with self.assertRaisesRegex(calibration.CalibrationError, "does not declare"):
+            score(bundle("undeclared", lambda take: sha("a clip")), calibration.load_cohort(fixture.calibration))
+        manifest.pop("manifestDigest")
+        manifest["takes"][0]["reference"]["wavSHA256"] = manifest["takes"][0]["wavSHA256"]
+        with self.assertRaisesRegex(calibration.CalibrationError, "never its own reference"):
+            calibration.load_cohort(write_json(fixture.root / "self" / "n2-manifest.json", signed(manifest)))
 
 
 def evidence_record(take: dict) -> dict:

@@ -333,7 +333,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.errors(fixture_registry()), [])
         ids = [entry["id"] for entry in self.registry["detectors"]]
         self.assertEqual(sorted({detectors.detector_entry(self.registry, detector)["class"] for detector in ids}),
-                         ["A", "B", "C", "D", "E", "F", "I"])
+                         ["A", "B", "C", "D", "E", "F", "I", "J"])
 
     def test_fastqc_fields_match_the_measurement_writer(self) -> None:
         self.assertLessEqual(detectors.FASTQC_SCORE_FIELDS, set(audio_qc_calibration_set.FASTQC_FIELDS))
@@ -501,7 +501,8 @@ class NewClassRegistryTests(unittest.TestCase):
 
         def unknown_metric(entry, _):
             entry["score"]["groups"][0]["components"][1]["metric"] = "window cosine"
-        self.assertTrue(any("panel metric" in error for error in self.mutate("identity.window-drift@1", unknown_metric)))
+        self.assertTrue(any("panel metric" in error
+                            for error in self.mutate("identity.window-drift@1", unknown_metric)))
 
     def test_role_sets_are_validated(self) -> None:
         def confirm_on_calibration(_, registry):
@@ -603,6 +604,39 @@ class NewClassRegistryTests(unittest.TestCase):
             entry["score"]["groups"][0]["components"][0] = {"source": "panel", "judge": CAMPPLUS, "metric": "cosine"}
         self.assertTrue(any("Stage 0 detector" in error
                             for error in self.mutate("introspection.eos-overrun@1", panel_at_stage_zero)))
+
+    def test_long_form_role_set_sources_and_seam_measure(self) -> None:
+        expected = {"long-form.seam-discontinuity@1": (0, "SEAM-DISC", [detectors.STAGE0_JUDGE]),
+                    "long-form.seam-jump@1": (0, "SEAM-DISC", [detectors.STAGE0_JUDGE]),
+                    "long-form.seam-identity@1": (2, "SEAM-VOICE", [CAMPPLUS])}
+        for detector, (stage, injector, judges) in expected.items():
+            entry = self.entry(detector)
+            self.assertEqual((entry["class"], entry["stage"], entry["strata"]), ("J", stage, None))
+            roles = detectors.role_set(self.registry, entry)
+            self.assertEqual((entry["populations"], roles["fit"]["population"], roles["positives"]["population"],
+                              roles["informational"]), ("n3-long-form", "N3", "P1", []))
+            self.assertEqual(detectors.judges_of(entry), judges)
+            self.assertEqual(detectors.target_injectors(entry), {injector})
+            self.assertEqual(detectors.needs_seams(entry), detector == "long-form.seam-identity@1")
+            self.assertEqual(detectors.needs_measurements(entry), stage == 0)
+            self.assertEqual(detectors.stratum(detectors.strata_by(entry), "french"), detectors.POOLED)
+
+        def unknown_long_form_field(entry, _):
+            entry["score"]["groups"][0]["components"][0]["field"] = "segmentCount"
+        self.assertTrue(any("maximumSegmentBoundaryJump" in error
+                            for error in self.mutate("long-form.seam-jump@1", unknown_long_form_field)))
+
+        def resnet(entry, _):
+            entry["score"]["groups"][0]["components"][0]["judge"] = RESNET
+        self.assertTrue(any("does not vote" in error for error in self.mutate("long-form.seam-identity@1", resnet)))
+
+        def pitch_judge(entry, _):
+            entry["score"]["groups"][0]["components"][0]["judge"] = PYIN
+        self.assertTrue(any("wespeaker-onnx" in error
+                            for error in self.mutate("long-form.seam-identity@1", pitch_judge)))
+        judges = copy.deepcopy(self.judges)
+        judges["judges"][CAMPPLUS]["preprocessing"]["windows"]["seconds"] = 1.5
+        self.assertTrue(any("2 s windows" in error for error in detectors.registry_errors(self.registry, judges)))
 
 
 class NewClassScoringTests(unittest.TestCase):
@@ -762,6 +796,51 @@ class NewClassScoringTests(unittest.TestCase):
         empty = audio_qc_observations.introspection_summary([])
         self.assertEqual(detectors.score_take(loop, "english", clip={"introspection": empty})["score"], 0.0)
         self.assertIsNone(empty["entropyP95Nats"])
+
+    def test_long_form_scores_and_abstentions(self) -> None:
+        discontinuity, jump, identity = (self.entry(detector) for detector in (
+            "long-form.seam-discontinuity@1", "long-form.seam-jump@1", "long-form.seam-identity@1"))
+        clip = {"fastQC": {}, "observations": {"seamDiscontinuityMaxZ": 14.25},
+                "longForm": {"maximumSegmentBoundaryJump": 5120}}
+        self.assertEqual(detectors.score_take(discontinuity, "german", clip=clip)["score"], 14.25)
+        self.assertEqual(detectors.score_take(jump, "german", clip=clip)["score"], 5120.0)
+        for entry in (discontinuity, jump):
+            # The offline scorer passes no seam and carries no longForm block yet: no value, never a pass.
+            self.assertEqual(detectors.score_take(entry, "german", clip={"observations": {
+                "seamDiscontinuityMaxZ": None}})["abstain"], "no-value")
+            self.assertEqual(detectors.score_take(entry, "german")["abstain"], "not-measured")
+            self.assertEqual(detectors.score_take(entry, "dutch", clip=clip)["abstain"], "out-of-scope")
+
+        voice, other, mixed = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.6, 0.8, 0.0]
+
+        def windows(change_at: float, after: list, length: float = 10.0) -> dict:
+            items = []
+            for index in range(int((length - 2.0) / 0.5) + 1):
+                start = index * 0.5
+                embedding = voice if start + 2.0 <= change_at else after if start >= change_at else mixed
+                items.append({"startSeconds": start, "embedding": embedding})
+            return {"embedding": voice, "dimension": 3, "windows": items}
+
+        evidence = {CAMPPLUS: {"status": "complete", "metrics": {}}}
+
+        def score(output: dict | None, seams: list | None, language: str = "italian") -> dict:
+            return detectors.score_take(identity, language, measurements=evidence,
+                                        raw=None if output is None else {CAMPPLUS: output}, seams=seams)
+
+        # Another voice after the seam at 5 s: the windows either side are orthogonal.
+        self.assertEqual(score(windows(5.0, other), [5.0])["score"], 0.0)
+        self.assertEqual(score(windows(5.0, voice), [5.0])["score"], 1.0)
+        # The lowest over the seams; a seam without a whole window on each side is not scored.
+        self.assertEqual(score(windows(5.0, other), [7.0, 5.0, 1.0])["score"], 0.0)
+        self.assertEqual(score(windows(5.0, other), [1.0, 9.5])["abstain"], "no-value")
+        self.assertEqual(score(windows(5.0, voice), [])["abstain"], "no-seams")
+        self.assertEqual(score(windows(5.0, voice), None)["abstain"], "no-seams")
+        self.assertEqual(score(None, [5.0])["abstain"], "no-raw-output")
+        self.assertEqual(detectors.score_take(identity, "italian", measurements={}, raw={CAMPPLUS: windows(5.0, voice)},
+                                              seams=[5.0])["abstain"], "not-measured")
+        self.assertEqual(score(windows(5.0, voice), [5.0], language="dutch")["abstain"], "out-of-scope")
+        self.assertAlmostEqual(detectors.seam_window_cosine_minimum(windows(5.0, mixed), [5.0]), 0.6, places=12)
+        self.assertIsNone(detectors.raw_measure("seamWindowCosineMinimum", windows(5.0, voice)))
 
 
 def brute_force_tail(reference: list, hypothesis: list) -> tuple[int, int]:

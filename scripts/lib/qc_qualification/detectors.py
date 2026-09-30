@@ -19,7 +19,10 @@ names the engine whose output each reads). pYIN's frame track gives
 50 ms apart, `longestOctaveDisplacementSeconds`, the longest run of voiced
 frames an octave's worth (9 semitones or more) from the take's median F0, and
 `pitchJumpsPerVoicedSecond`, the rate of F0 changes faster than a voice moves
-(class F). A `raw-output` component of a deterministic DSP instrument (a `dsp`
+(class F). A speaker judge's 2 s windows give `seamWindowCosineMinimum`, the
+lowest cosine between the windows either side of a long-form seam, which
+also reads the take's seam times (`score_take(..., seams=...)`; class J).
+A `raw-output` component of a deterministic DSP instrument (a `dsp`
 judge with no learned weights, such as pYIN) is a measurement, not a family's
 vote: it may stand alone in a `single` group when it is not from the
 generator's lab and is at least shadow. Any other judge still decides a take
@@ -30,7 +33,9 @@ only if the registry says it votes (A6).
 `audio_qc_observations.introspection_summary` mirrors it) from a clip's
 `introspection` block in `measurements.json`, a Stage 0 measurement like Fast
 QC's (class I). The summary reports no exact cycle as null, which scores a
-cycle of 0 frames; a clip without a summary abstains.
+cycle of 0 frames; a clip without a summary abstains. `longform` components
+read a clip's `longForm` block, the long-form assembly evidence
+(`maximumSegmentBoundaryJump`, class J).
 
 Combinations:
 
@@ -79,10 +84,13 @@ from .pcm import json_digest
 REGISTRY_KIND = "audio-qc-detector-registry"
 REGISTRY_SCHEMA_VERSION = 1
 COMBINATIONS = ("single", "consensus-min", "consensus-max", "difference")
-SOURCES = ("fastqc", "observations", "introspection", "panel", "transcript-tail", "raw-output")
-MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection"})
+SOURCES = ("fastqc", "observations", "introspection", "longform", "panel", "transcript-tail", "raw-output")
+MEASUREMENT_SOURCES = frozenset({"fastqc", "observations", "introspection", "longform"})
 # Where a measurements.json clip keeps each measurement source's fields.
-MEASUREMENT_BLOCKS = {"fastqc": "fastQC", "observations": "observations", "introspection": "introspection"}
+MEASUREMENT_BLOCKS = {"fastqc": "fastQC", "observations": "observations", "introspection": "introspection",
+                      "longform": "longForm"}
+# The long-form assembly evidence's scored fields (LongFormAssemblyEvidence), a clip's `longForm` block.
+LONGFORM_SCORE_FIELDS = frozenset({"maximumSegmentBoundaryJump"})
 PANEL_SOURCES = frozenset({"panel", "transcript-tail", "raw-output"})
 TRANSFORMS = ("absolute",)
 TAIL_MEASURES = ("trailingUnmatchedFraction", "trailingUnmatched", "trailingDeletions")
@@ -92,7 +100,13 @@ RAW_MEASURES = {
     "maxPitchStepSemitones": "pyin-librosa",
     "longestOctaveDisplacementSeconds": "pyin-librosa",
     "pitchJumpsPerVoicedSecond": "pyin-librosa",
+    "seamWindowCosineMinimum": "wespeaker-onnx",
 }
+# Raw-output measures that also read the take's seam times (`score_take(..., seams=...)`), and the
+# speaker windows they compare (the judge registry's preprocessing.windows.seconds).
+SEAM_MEASURES = frozenset({"seamWindowCosineMinimum"})
+SPEAKER_WINDOW_SECONDS = 2.0
+SEAM_TOLERANCE_SECONDS = 1e-6
 # Pitch-track reductions (class F): voiced frames compared up to this far apart, and the distance from
 # the take's median F0 that counts as an octave displacement.
 PITCH_STEP_WINDOW_SECONDS = 0.05
@@ -223,6 +237,12 @@ def needs_raw(entry: Mapping[str, Any]) -> bool:
     return any(component.get("source") == "raw-output" for component in components_of(entry))
 
 
+def needs_seams(entry: Mapping[str, Any]) -> bool:
+    """The detector reads the take's seam times (long-form segment boundaries), passed as `seams`."""
+    return any(component.get("source") == "raw-output" and component.get("measure") in SEAM_MEASURES
+               for component in components_of(entry))
+
+
 def group_for(entry: Mapping[str, Any], language: str) -> dict | None:
     for group in (entry.get("score") or {}).get("groups") or ():
         if language in (group.get("languages") or ()):
@@ -278,6 +298,8 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
             errors.append(f"{where}.field must be a Stage 0 observation measurements.json keeps")
         if source == "introspection" and field not in INTROSPECTION_SCORE_FIELDS:
             errors.append(f"{where}.field must be a numeric field of the engine introspection summary")
+        if source == "longform" and field not in LONGFORM_SCORE_FIELDS:
+            errors.append(f"{where}.field must be one of {sorted(LONGFORM_SCORE_FIELDS)}")
     elif source in PANEL_SOURCES:
         allowed.update({"judge", "metric"} if source == "panel" else {"judge", "measure"})
         judge = component.get("judge")
@@ -295,6 +317,11 @@ def _component_errors(component: Any, where: str, judges: Mapping[str, Any]) -> 
                     and (judges[judge].get("execution") or {}).get("engine") != RAW_MEASURES[measure]:
                 errors.append(f"{where}: {measure} reduces the raw output of a {RAW_MEASURES[measure]} judge, "
                               f"not {judge}'s")
+            elif measure in SEAM_MEASURES and isinstance(judges.get(judge), Mapping) \
+                    and _finite((((judges[judge].get("preprocessing") or {}).get("windows") or {})
+                                 .get("seconds"))) != SPEAKER_WINDOW_SECONDS:
+                errors.append(f"{where}: {measure} compares {SPEAKER_WINDOW_SECONDS:g} s windows, which {judge} "
+                              "does not embed")
     else:
         return [f"{where}.source must be one of {SOURCES}"]
     if component.get("transform") is not None and component.get("transform") not in TRANSFORMS:
@@ -694,7 +721,7 @@ def transcript_tail(reference: str, hypothesis: str, language: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Raw-output reductions (class F pitch track)
+# Raw-output reductions (class F pitch track, class J seam windows)
 # --------------------------------------------------------------------------- #
 
 def _pitch_frames(output: Mapping[str, Any]) -> tuple[float, list[tuple[int, float]]] | None:
@@ -786,15 +813,55 @@ def pitch_jump_rate(output: Mapping[str, Any]) -> float | None:
     return events / voiced_seconds
 
 
+def _cosine(first: Sequence[Any], second: Sequence[Any]) -> float | None:
+    a, b = [_finite(value) for value in first], [_finite(value) for value in second]
+    if not a or len(a) != len(b) or any(value is None for value in (*a, *b)):
+        return None
+    norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    return None if norm == 0.0 else sum(x * y for x, y in zip(a, b)) / norm
+
+
+def seam_window_cosine_minimum(output: Mapping[str, Any], seams: Sequence[Any]) -> float | None:
+    """The lowest cosine, over the take's seams, between the speaker judge's last window ending at or
+    before a seam and its first window starting at or after it (class J seam identity).
+
+    `output` is the judge's raw output (`windows`: startSeconds and embedding, each window
+    `SPEAKER_WINDOW_SECONDS` long) and `seams` the seam times in seconds on the same timeline. None when
+    no seam has a window on both sides.
+    """
+    windows = []
+    for item in output.get("windows") or ():
+        start = _finite(item.get("startSeconds")) if isinstance(item, Mapping) else None
+        embedding = item.get("embedding") if isinstance(item, Mapping) else None
+        if start is not None and isinstance(embedding, list) and embedding:
+            windows.append((start, embedding))
+    lowest = None
+    for seam in seams:
+        at = _finite(seam)
+        if at is None:
+            continue
+        before = [window for window in windows if window[0] + SPEAKER_WINDOW_SECONDS <= at + SEAM_TOLERANCE_SECONDS]
+        after = [window for window in windows if window[0] >= at - SEAM_TOLERANCE_SECONDS]
+        if not before or not after:
+            continue
+        cosine = _cosine(max(before, key=lambda window: window[0])[1], min(after, key=lambda window: window[0])[1])
+        if cosine is not None and (lowest is None or cosine < lowest):
+            lowest = cosine
+    return lowest
+
+
 RAW_REDUCERS = {
     "maxPitchStepSemitones": max_pitch_step,
     "longestOctaveDisplacementSeconds": longest_octave_displacement,
     "pitchJumpsPerVoicedSecond": pitch_jump_rate,
 }
+SEAM_REDUCERS = {"seamWindowCosineMinimum": seam_window_cosine_minimum}
 
 
-def raw_measure(measure: str, output: Mapping[str, Any]) -> float | None:
+def raw_measure(measure: str, output: Mapping[str, Any], seams: Sequence[Any] = ()) -> float | None:
     """One `raw-output` measure of a judge's raw output, or None when the output has no value for it."""
+    if measure in SEAM_REDUCERS:
+        return SEAM_REDUCERS[measure](output, seams)
     reducer = RAW_REDUCERS.get(measure)
     if reducer is None:
         raise DetectorError(f"unknown raw-output measure {measure!r}")
@@ -815,12 +882,15 @@ def _finite(value: Any) -> float | None:
 def component_value(component: Mapping[str, Any], *, language: str, clip: Mapping[str, Any] | None = None,
                     measurements: Mapping[str, Mapping[str, Any]] | None = None,
                     private: Mapping[str, Any] | None = None,
-                    raw: Mapping[str, Mapping[str, Any]] | None = None) -> tuple[float | None, str | None]:
+                    raw: Mapping[str, Mapping[str, Any]] | None = None,
+                    seams: Sequence[Any] | None = None) -> tuple[float | None, str | None]:
     """One component's value for one take, or None with the abstention reason.
 
     `raw` maps a judge id to its raw (L1) output for the take; a `raw-output`
     component also needs the judge's measurement to have completed, so the
     evidence still binds the take's audio and the judge's output identity.
+    `seams` are the take's seam times in seconds (long-form segment boundaries);
+    a seam measure abstains without one.
     """
     source = component["source"]
     if source in MEASUREMENT_SOURCES:
@@ -851,7 +921,9 @@ def component_value(component: Mapping[str, Any], *, language: str, clip: Mappin
             output = (raw or {}).get(component["judge"])
             if not isinstance(output, Mapping):
                 return None, "no-raw-output"
-            value = _finite(raw_measure(component["measure"], output))
+            if component["measure"] in SEAM_MEASURES and not seams:
+                return None, "no-seams"
+            value = _finite(raw_measure(component["measure"], output, seams or ()))
             if value is None:
                 return None, "no-value"
         else:
@@ -887,7 +959,8 @@ def combine(combination: str, values: Sequence[float]) -> float:
 def score_take(entry: Mapping[str, Any], language: str, *, clip: Mapping[str, Any] | None = None,
                measurements: Mapping[str, Mapping[str, Any]] | None = None,
                private: Mapping[str, Any] | None = None,
-               raw: Mapping[str, Mapping[str, Any]] | None = None) -> dict:
+               raw: Mapping[str, Mapping[str, Any]] | None = None,
+               seams: Sequence[Any] | None = None) -> dict:
     """A detector's score of one take: {inScope, score, components, abstain}.
 
     A take outside the detector's languages is out of scope (A1) and never
@@ -906,7 +979,7 @@ def score_take(entry: Mapping[str, Any], language: str, *, clip: Mapping[str, An
     reason = None
     for component in group["components"]:
         value, why = component_value(component, language=language, clip=clip, measurements=measurements,
-                                     private=private, raw=raw)
+                                     private=private, raw=raw, seams=seams)
         values[component_key(component)] = None if value is None else round(value, 9)
         if value is None and reason is None:
             reason = why

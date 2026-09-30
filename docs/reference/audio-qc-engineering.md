@@ -1685,6 +1685,9 @@ which. An entry can still change in place until a plan binds its digest.
 | `introspection.token-loop@1` | I | Span of the longest exact codebook-0 cycle of period 2-32, in codec frames (0 without one) | above | Introspection carried into measurements.json; COD-LOOP (T2) with summaries recomputed from the mutated trace |
 | `introspection.high-entropy@1` | I | Longest run of steps with at least 4 nats of talker entropy | above | Introspection carried; GEN-NOEOS (T3), a registered EOS-suppression knob |
 | `introspection.eos-overrun@1` | I | Steps with EOS probability 0.5 or more that did not stop | above | As high-entropy |
+| `long-form.seam-discontinuity@1` | J | Stage 0 `seamDiscontinuityMaxZ` | above | Long-form N3 takes; segment boundaries passed to the scorer; SEAM-DISC (not in catalog v2) |
+| `long-form.seam-jump@1` | J | The assembler's `maximumSegmentBoundaryJump` (PCM16 units) | above | Long-form N3 takes; a `longForm` block in measurements.json with a Python mirror for positives; SEAM-DISC |
+| `long-form.seam-identity@1` | J | Lowest CAM++ cosine between the 2 s windows either side of a seam | below | Long-form N3 takes; CAM++ windows exported with the seam times; SEAM-VOICE (not in catalog v2) |
 
 Class E reads CAM++ alone: ResNet293 votes only after its correlated-failure audit, and the
 two-family rule is a new version then. A panel judge whose registry entry lists no languages
@@ -1726,6 +1729,15 @@ per language in each (the calibration split plans 80). Its role sets `n3-codec-t
 and S injections only and `plan` takes FLEURS-derived cohorts only. The summary also has no
 producer here: it lands in the telemetry row's `engineIntrospection`, and neither the N3 takes
 manifest nor `score` carries it, so every clip abstains until they do.
+
+Class J reads the Stage 0 seam z-score, a fourth new source, `longform` (a clip's `longForm` block:
+the long-form assembly evidence), and the `raw-output` seam measure, which also takes the take's
+seam times (`score_take(..., seams=[...])`, abstaining `no-seams` without one). Its role set
+`n3-long-form` names pending corpora: the take plan has single-segment takes only, so class J
+waits for a long-form take plan with at least 60 scored families per split (one pooled threshold
+over at least 3 languages, speakers and scripts), each a project with at least one seam. The
+offline scorer passes no seam, so today every `seamDiscontinuityMaxZ` in measurements.json is null.
+Seam-identity uses `raw-output` from class F, so its commit comes after F's.
 
 **Plan, derive, confirm.** FLEURS dev (N2 calibration) fits and FLEURS test (N2 confirmation)
 confirms; they are disjoint by family and script (checked on the ids at plan and confirm time). A

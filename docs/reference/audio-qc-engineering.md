@@ -34,6 +34,8 @@ sourceOfTruth:
   - scripts/lib/qc_pipeline/panel_metrics.py
   - scripts/lib/qc_pipeline/qualification.py
   - scripts/audio_qc_panel_qualification.py
+  - scripts/audio_qc_oracle_ladders.py
+  - scripts/lib/qc_qualification/ladders.py
   - config/audio-qc-canary-set.json
   - scripts/acquire_audio_qc_judges.py
   - config/audio-qc-runtimes/
@@ -1854,6 +1856,65 @@ python3 scripts/audio_qc_calibration_set.py score --takes $D/n2-manifest.json \
 python3 scripts/audio_qc_orchestrator.py manifest \
   --from-calibration-takes $D/injection-set/injection-set.json \
   --output $D/injection-panel-manifest.json
+```
+
+### Oracle ladders for pYIN, HNR and the quality composite (AQ-08, 2026-09-29)
+
+Audit section 4.4 makes pYIN and the window-corrected HNR measurands only "once oracle ladders
+pass", and section 4.6 lets the Audiobox and DNSMOS composite serve as a DP-31/DP-32 guardrail
+column only after a ladder test. `scripts/lib/qc_qualification/ladders.py` defines three ladders
+whose truth is known by construction (T1; no judge labels anything), and
+`scripts/audio_qc_oracle_ladders.py` builds, scores and records them. No WAV is committed: each
+ladder is pinned by a golden digest over every clip's PCM16 digest and truth.
+
+| Ladder | Clips | Construction | Scored from |
+|---|---|---|---|
+| `pyin` | 48, 80.5 s at 16 kHz | Steady harmonic tones 55-950 Hz, formant-shaped vowels, exponential glides, vibrato, octave jumps, voiced/unvoiced alternation over silence or fricative noise, white noise at 30-0 dB SNR. Truth per 10 ms frame on the registry's pYIN grid; frames within 52 ms of a voicing change, F0 jump or clip edge are not scored | `pitch.pyin@1` through the orchestrator; per-frame F0 from the run's L1 entries (the bundle keeps statistics only), keyed as `audio_qc_calibration_set.py alignments` keys the aligner's |
+| `hnr` | 39, 58.5 s at 24 kHz | Noiseless sines at 80, 150 and 300 Hz; formant-shaped harmonic sources at 100-300 Hz with white noise scaled to an exact 0-40 dB ratio (one scaled draw per source), plus the noiseless rung | In-process, no model: the Stage 1 `prosody@3` proxy (`voice_hnr_db_mean`) and the window-corrected candidate (`audio_phonation.py`) |
+| `quality` | 92, 5.6 min at 24 kHz | Four procedural speech sources (or up to eight lead-supplied recordings, `--quality-sources`), each with five rungs of white noise (40-0 dB SNR), hard clipping (0.2-20% of samples), a zero-phase low-pass (7-1.5 kHz) and mu-law quantization (8-3 bits), plus shams (noise at 80 dB SNR, low-pass at 11.9 kHz) | Audiobox PQ and DNSMOS OVRL through the orchestrator; the composite is section 4.6's z(PQ) + z(OVRL) - z(WER), duration regressed out, the WER term only where every rung has `--wer-judge`'s error rate (never on procedural pseudo-text) |
+
+**Criteria.** Each names its source. From the audit: HNR at least 37 dB on noiseless sines and
+within 1 dB of Parselmouth on the SNR rungs (4.4), readings monotone in the constructed ratio and a
+composite whose Spearman correlation with severity is -0.9 or lower on every ladder (5.8's
+"monotonically with severity, Spearman >= 0.9"; quality falls). Provisional, because the audit
+states none: every pYIN limit (per group GPE, the share of jointly voiced frames more than 20% off,
+of 0.02 on clean in-range signals, 0.05 on the 50-70 and 400-1,000 Hz extensions, 0.03 at 20 dB SNR
+or better and 0.05 at 10 dB; RMS fine error of 20, 25, 25 and 35 cents; voicing decision error of
+0.05, 0.10, 0.08 and 0.15; the 5 and 0 dB rungs are reported only), the composite's step tolerance
+(a rung may exceed the milder one by 0.10 z-units) and sham tolerance (0.25), and HNR within 1 dB of
+the constructed ratio up to 30 dB, which stands in for the Parselmouth comparison until an oracle
+file is supplied (a tracker at the 37 dB floor adds at most 0.79 dB there). A ladder is `pass` only
+when every gating criterion is the audit's and was evaluated, `pass-provisional` when a provisional
+criterion gates or an audit criterion was not evaluated, `fail` on any failed gating criterion and
+`incomplete` when a clip has no measurement.
+
+**First in-process result (HNR, no model).** The `prosody@3` proxy fails: it reads 0.50, 6.99 and
+13.29 dB on the noiseless sines (AQ-F16) and is up to 27.2 dB below the constructed ratio, though
+monotone. The window-corrected candidate is `pass-provisional`: at least 56.7 dB on the noiseless
+sines, within 0.23 dB of the constructed ratio from 0 to 30 dB, and monotone. The Parselmouth
+criterion awaits an isolated reference run (`--oracle-hnr`, a `vocello.audioqc.hnr-oracle/1` file of
+per-clip readings; Parselmouth is never linked or run from the repository).
+
+The pYIN and quality ladders run models, so the lead runs them like any orchestrator panel; both
+are short (est.: pYIN about a minute with its worker start, the quality pair two to three minutes). Pass
+`evaluate --cache-root` when the run used a non-default cache root. Every output stays under the
+build root; the report holds clip ids, digests and numbers only and passes the evidence privacy
+walker.
+
+```sh
+L=build/artifacts/diagnostics/audio-qc-oracle-ladders
+B=build/artifacts/macos/audio-qc
+O=scripts/audio_qc_oracle_ladders.py
+python3 $O build                                   # all three ladders under $L
+python3 $O evaluate --ladder hnr                   # in-process DSP; add --oracle-hnr <file> when one exists
+python3 scripts/audio_qc_orchestrator.py run --manifest $L/pyin/manifest.json \
+  --judge pitch.pyin@1 --bundle $B/oracle-ladder-pyin-<date>
+python3 $O evaluate --ladder pyin --bundle $B/oracle-ladder-pyin-<date>
+python3 scripts/audio_qc_orchestrator.py run --manifest $L/quality/manifest.json \
+  --judge quality.audiobox-aesthetics@1 --judge quality.dnsmos-p835@1 --bundle $B/oracle-ladder-quality-<date>
+python3 $O evaluate --ladder quality --bundle $B/oracle-ladder-quality-<date>
+python3 $O report --evaluation $L/pyin/evaluation.json --evaluation $L/hnr/evaluation.json \
+  --evaluation $L/quality/evaluation.json --output $L/report.json
 ```
 
 ### Speech/defect calibration: independent references, no required listening

@@ -337,6 +337,53 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         )
     }
 
+    /// Audio QC GEN-NOEOS: the EOS hold travels request-locally from the
+    /// sampling configuration to the runtime policy, only inside its bound, and
+    /// a configuration without it encodes exactly as before.
+    func testSamplingConfigurationCarriesTheBoundedEOSHold() async throws {
+        func sampling(_ frames: Int?) -> VocelloQwen3SamplingConfiguration {
+            VocelloQwen3SamplingConfiguration(
+                effectiveSeed: 11,
+                talker: .init(temperature: 0.9, topP: 0.95, topK: 50, minP: 0),
+                subtalker: .init(temperature: 0.9, topP: 0.95, topK: 50, minP: 0),
+                repetitionPenalty: 1.05,
+                maxNewTokens: 64,
+                requestedSeed: 11,
+                eosSuppressionFrames: frames
+            )
+        }
+        let memory = VocelloQwen3MemoryConfiguration(clearCacheOnStreamChunk: true, tokenMemoryClearCadence: 50)
+        for frames in [nil, 0, 18] as [Int?] {
+            let compatibilityModel = FacadeCompatibilityModel()
+            let loaded = try makeLoadedFixture(compatibilityModel: compatibilityModel)
+            _ = try await loaded.generateCustomVoice(
+                text: "Hold the first end of sequence.",
+                language: "en-US",
+                speaker: "fixture-speaker",
+                instruction: nil,
+                sampling: sampling(frames),
+                memory: memory
+            )
+            let captured = try XCTUnwrap(compatibilityModel.capturedSamplingPolicy)
+            XCTAssertEqual(captured.eosSuppressionFrames, frames)
+        }
+
+        XCTAssertNoThrow(try sampling(0).validated())
+        XCTAssertNoThrow(try sampling(VocelloQwen3SamplingConfiguration.maximumEOSSuppressionFrames).validated())
+        for frames in [-1, VocelloQwen3SamplingConfiguration.maximumEOSSuppressionFrames + 1] {
+            XCTAssertThrowsError(try sampling(frames).validated()) {
+                XCTAssertEqual($0 as? VocelloQwen3ContractError, .invalidEOSSuppressionFrames)
+            }
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let production = try XCTUnwrap(String(data: try encoder.encode(sampling(nil)), encoding: .utf8))
+        XCTAssertFalse(production.contains("eosSuppressionFrames"))
+        let held = try encoder.encode(sampling(18))
+        XCTAssertEqual(try JSONDecoder().decode(VocelloQwen3SamplingConfiguration.self, from: held), sampling(18))
+    }
+
     func testTerminalStatePreservesFirstCancellationReason() async {
         let state = VocelloQwen3TerminalState()
         await state.requestCancellation(.memoryPressure)

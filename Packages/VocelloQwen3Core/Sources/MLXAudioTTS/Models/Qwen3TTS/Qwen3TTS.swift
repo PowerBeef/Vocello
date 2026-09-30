@@ -3234,6 +3234,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let minP = samplingPolicy.talker.minP
         let maxTokens = samplingPolicy.maximumCodecTokens
         let subtalkerSampling = samplingPolicy.subtalker
+        // Audio QC GEN-NOEOS (diagnostics only): nil on every production request.
+        var eosSuppression = samplingPolicy.eosSuppressionFrames.map(Qwen3EOSSuppressionWindow.init(frames:))
 
         let talkerConfig = config.talkerConfig!
         let isPureVoiceDesign = speaker == nil && refAudio == nil && voiceClonePrompt == nil
@@ -3754,12 +3756,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             os_signpost(.end, log: stepSignpostLog, name: "Talker Forward")
             talkerForwardTotal += talkerForwardStartedAt.elapsed
 
-            let allowsEOS = generatedCodeCount >= Self.productionMinimumGeneratedCodeTokensBeforeEOS
+            let allowsEOS = eosSuppression?.allowsEOS(
+                generatedCodeCount: generatedCodeCount,
+                productionMinimum: Self.productionMinimumGeneratedCodeTokensBeforeEOS
+            ) ?? (generatedCodeCount >= Self.productionMinimumGeneratedCodeTokensBeforeEOS)
 
             // Sample first codebook token
             let sampleFirstCodebookStartedAt = ContinuousClock.now
             os_signpost(.begin, log: stepSignpostLog, name: "Sample First Codebook")
-            let nextToken = Self.sampleToken(
+            var nextToken = Self.sampleToken(
                 logits,
                 temperature: temperature,
                 topP: topP,
@@ -3771,6 +3776,26 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 allowsEOS: allowsEOS,
                 observe: samplerObserver
             )
+            // GEN-NOEOS (internal diagnostics only; `eosSuppression` is nil on
+            // every production request): read this step's token before the
+            // code predictor, and when the talker first samples EOS, redraw the
+            // step from the same logits with EOS unavailable and open the hold.
+            if eosSuppression?.watchesForFirstEOS(allowsEOS: allowsEOS) == true,
+               (nextToken .== eosTokenArray).item(Bool.self) {
+                eosSuppression?.open(atGeneratedCodeCount: generatedCodeCount)
+                nextToken = Self.sampleToken(
+                    logits,
+                    temperature: temperature,
+                    topP: topP,
+                    topK: topK,
+                    repetitionPenalty: repetitionPenalty,
+                    eosTokenId: nil,
+                    minP: minP,
+                    scratch: samplerScratch,
+                    allowsEOS: false,
+                    observe: samplerObserver
+                )
+            }
             os_signpost(.end, log: stepSignpostLog, name: "Sample First Codebook")
             sampleFirstCodebookTotal += sampleFirstCodebookStartedAt.elapsed
 
@@ -4135,6 +4160,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 clearGenerationCache()
             }
 
+        }
+
+        // GEN-NOEOS evidence on the engine row: the frames held and where the hold opened.
+        if let eosSuppression {
+            mergePreparationTimingsMS(eosSuppression.evidence)
         }
 
         tokenLoopAttributedAtExit = tokenLoopAttributedTotal()

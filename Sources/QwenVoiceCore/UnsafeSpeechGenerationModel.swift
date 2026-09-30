@@ -17,6 +17,25 @@ enum Qwen3TalkerSamplingOverride {
     /// Talker-only repetition penalty for bench A/B against dropout counts
     /// (Stage 0.4). The subtalker remains deliberately unpenalized.
     static let envRepetitionPenalty: Float? = floatValue("QWENVOICE_TALKER_REPPEN")
+    /// Audio QC controlled generation GEN-NOEOS (audit 2026-09-25 section 5.2):
+    /// hold back the talker's first sampled EOS for this many codec frames. It
+    /// exists only for the class I positives (`vocello batch` in the
+    /// `qc-introspection` lane); 0 arms the hold at zero frames (the sham).
+    static let envEOSSuppressionFrames: Int? = eosSuppressionFrames(
+        RuntimeDebugGate.value(for: "QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES")
+    )
+
+    /// A whole number of codec frames within the facade's bound; anything else
+    /// leaves the hold unset (the production path), and the qc-introspection
+    /// builder refuses a take whose engine row does not record the hold.
+    static func eosSuppressionFrames(_ raw: String?) -> Int? {
+        guard let raw,
+              let value = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              (0 ... VocelloQwen3SamplingConfiguration.maximumEOSSuppressionFrames).contains(value) else {
+            return nil
+        }
+        return value
+    }
 
     private static func floatValue(_ key: String) -> Float? {
         guard let raw = RuntimeDebugGate.value(for: key),
@@ -75,7 +94,8 @@ enum Qwen3TalkerSamplingOverride {
             subtalker: subtalker,
             repetitionPenalty: envRepetitionPenalty ?? official.repetitionPenalty,
             maxNewTokens: official.maxNewTokens,
-            requestedSeed: requestedSeed
+            requestedSeed: requestedSeed,
+            eosSuppressionFrames: envEOSSuppressionFrames
         )
     }
 }

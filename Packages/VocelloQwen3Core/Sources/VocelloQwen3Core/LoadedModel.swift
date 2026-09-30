@@ -571,7 +571,8 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 minP: policy.subtalker.minP
             ),
             repetitionPenalty: policy.repetitionPenalty,
-            maximumCodecTokens: policy.maxNewTokens
+            maximumCodecTokens: policy.maxNewTokens,
+            eosSuppressionFrames: policy.eosSuppressionFrames
         )
     }
 

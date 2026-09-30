@@ -215,14 +215,19 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         return model
     }
 
-    private static func samplingPolicy(seed: UInt64, maximumCodecTokens: Int = 16) -> Qwen3RequestSamplingPolicy {
+    private static func samplingPolicy(
+        seed: UInt64,
+        maximumCodecTokens: Int = 16,
+        eosSuppressionFrames: Int? = nil
+    ) -> Qwen3RequestSamplingPolicy {
         let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
         return Qwen3RequestSamplingPolicy(
             effectiveSeed: seed,
             talker: stage,
             subtalker: stage,
             repetitionPenalty: 1.05,
-            maximumCodecTokens: maximumCodecTokens
+            maximumCodecTokens: maximumCodecTokens,
+            eosSuppressionFrames: eosSuppressionFrames
         )
     }
 
@@ -236,7 +241,8 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
     private func generate(
         _ model: Qwen3TTSModel,
         seed: UInt64,
-        maximumCodecTokens: Int = 16
+        maximumCodecTokens: Int = 16,
+        eosSuppressionFrames: Int? = nil
     ) async throws -> Take {
         let frames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
         let completion = try await model.generateVoiceDesignQualityFirst(
@@ -244,7 +250,11 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             language: "auto",
             voiceDescription: "A calm narrator.",
             generationParameters: model.defaultGenerationParameters,
-            samplingPolicy: Self.samplingPolicy(seed: seed, maximumCodecTokens: maximumCodecTokens),
+            samplingPolicy: Self.samplingPolicy(
+                seed: seed,
+                maximumCodecTokens: maximumCodecTokens,
+                eosSuppressionFrames: eosSuppressionFrames
+            ),
             memoryPolicy: .compatibilityDefault,
             onPrepared: {},
             codecTraceSink: { frame in frames.withLock { $0.append(frame) } },
@@ -491,5 +501,47 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertEqual(replayTake.frames, take.frames)
         model.resetPreparationDiagnostics()
         XCTAssertNil(model.latestGenerationIntrospection)
+    }
+
+    /// Audio QC GEN-NOEOS (T3): the hold redraws the step whose talker first
+    /// sampled EOS and keeps EOS unavailable for its frames. Up to that step the
+    /// held take is the unheld take frame for frame (the hold only reads the
+    /// step's token early), zero held frames is the unheld take, and the engine
+    /// row's timings record the frames held and where the hold opened.
+    func testEOSHoldKeepsTheTakeGoingForItsFramesFromTheFirstEOS() async throws {
+        let model = try Self.makeModel()
+        let cap = 128
+        let held = 6
+        var natural: (seed: UInt64, take: Take)?
+        for offset in 0 ..< 64 {
+            let seed = 0x5EED_0100 + UInt64(offset)
+            model.resetPreparationDiagnostics()
+            let take = try await generate(model, seed: seed, maximumCodecTokens: cap)
+            if take.finishReason == .eos, take.frames.count + 2 * held < cap {
+                natural = (seed, take)
+                break
+            }
+        }
+        let (seed, unheld) = try XCTUnwrap(natural, "No seed's tiny-talker take ended by EOS before the cap")
+        XCTAssertNil(model.latestPreparationTimingsMS["talker_eos_suppression_frames"], "no hold was requested")
+
+        model.resetPreparationDiagnostics()
+        let take = try await generate(model, seed: seed, maximumCodecTokens: cap, eosSuppressionFrames: held)
+        XCTAssertEqual(Array(take.frames.prefix(unheld.frames.count)), unheld.frames)
+        XCTAssertGreaterThanOrEqual(take.frames.count, unheld.frames.count + held)
+        let timings = model.latestPreparationTimingsMS
+        XCTAssertEqual(timings["talker_eos_suppression_frames"], held)
+        XCTAssertEqual(timings["talker_eos_suppression_start_frame"], unheld.frames.count)
+        let summary = try XCTUnwrap(model.latestGenerationIntrospection)
+        XCTAssertEqual(summary.codecFrameCount, take.frames.count)
+        // The redrawn step is observed as a step that did not stop.
+        XCTAssertEqual(summary.observedStepCount, take.frames.count + (take.finishReason == .eos ? 1 : 0))
+
+        model.resetPreparationDiagnostics()
+        let sham = try await generate(model, seed: seed, maximumCodecTokens: cap, eosSuppressionFrames: 0)
+        XCTAssertEqual(sham.frames, unheld.frames)
+        XCTAssertEqual(sham.finishReason, .eos)
+        XCTAssertEqual(model.latestPreparationTimingsMS["talker_eos_suppression_frames"], 0)
+        XCTAssertNil(model.latestPreparationTimingsMS["talker_eos_suppression_start_frame"])
     }
 }

@@ -18,7 +18,21 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         // Shipped default; a different value requires the Stage 0.4 bench A/B
         // to win on deterministic QC first.
         XCTAssertEqual(policy.repetitionPenalty, 1.05, accuracy: 0.0001)
+        // Production requests carry no EOS hold (the audio QC GEN-NOEOS knob is unset).
+        XCTAssertNil(policy.eosSuppressionFrames)
         XCTAssertNoThrow(try policy.validated())
+    }
+
+    /// The registered GEN-NOEOS knob's value: a whole number of codec frames
+    /// inside the facade's bound, or no hold at all.
+    func testEOSSuppressionKnobParsesOnlyBoundedWholeFrames() {
+        let parse = Qwen3TalkerSamplingOverride.eosSuppressionFrames
+        XCTAssertEqual(parse("0"), 0)
+        XCTAssertEqual(parse(" 50\n"), 50)
+        XCTAssertEqual(parse("256"), 256)
+        for raw in [nil, "", "-1", "257", "6.5", "six", "0x10"] as [String?] {
+            XCTAssertNil(parse(raw), String(describing: raw))
+        }
     }
 
     func testUnseededRequestStillReceivesReplayableEffectiveSeed() {

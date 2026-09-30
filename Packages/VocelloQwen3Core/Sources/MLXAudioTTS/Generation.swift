@@ -38,6 +38,9 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     public let subtalker: Qwen3SamplingStage
     public let repetitionPenalty: Float
     public let maximumCodecTokens: Int
+    /// Audio QC GEN-NOEOS: the codec frames the talker's first sampled EOS is
+    /// held back for (`Qwen3EOSSuppressionWindow`); nil is the production path.
+    public let eosSuppressionFrames: Int?
 
     public init(
         algorithmVersion: Int = Self.currentAlgorithmVersion,
@@ -45,7 +48,8 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
         talker: Qwen3SamplingStage,
         subtalker: Qwen3SamplingStage,
         repetitionPenalty: Float,
-        maximumCodecTokens: Int
+        maximumCodecTokens: Int,
+        eosSuppressionFrames: Int? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.effectiveSeed = effectiveSeed
@@ -53,6 +57,7 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
         self.subtalker = subtalker
         self.repetitionPenalty = repetitionPenalty
         self.maximumCodecTokens = maximumCodecTokens
+        self.eosSuppressionFrames = eosSuppressionFrames
     }
 
     /// Run every random operation in `body` against a fresh request-local MLX
@@ -105,6 +110,55 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
             repetitionPenalty: parameters.repetitionPenalty ?? 1.05,
             maximumCodecTokens: parameters.maxTokens ?? 4_096
         )
+    }
+}
+
+/// Audio QC controlled generation GEN-NOEOS (tier T3, audit 2026-09-25
+/// section 5.2): a request-local hold on the talker's end of sequence. The
+/// first time the talker samples EOS, that step is redrawn from the same
+/// logits with EOS unavailable, and EOS stays unavailable until `frames` codec
+/// frames have been generated from there; the production gate then resumes.
+/// `frames == 0` never holds anything (the construction's sham). The host sets
+/// it only through its registered internal-diagnostics knob; a request without
+/// it never builds one, so the production loop is unchanged.
+struct Qwen3EOSSuppressionWindow: Equatable, Sendable {
+    let frames: Int
+    /// The generated codec frame whose step first sampled EOS, once it has.
+    private(set) var startFrame: Int?
+
+    init(frames: Int) {
+        self.frames = max(0, frames)
+    }
+
+    /// Whether this step may sample EOS: never before the production minimum,
+    /// and never inside an open window.
+    func allowsEOS(generatedCodeCount: Int, productionMinimum: Int) -> Bool {
+        guard generatedCodeCount >= productionMinimum else { return false }
+        guard let startFrame else { return true }
+        return generatedCodeCount >= startFrame + frames
+    }
+
+    /// Whether the step must read its sampled token before the code predictor
+    /// (one host read per step, diagnostics only): the hold is armed, has not
+    /// opened, and this step could sample EOS.
+    func watchesForFirstEOS(allowsEOS: Bool) -> Bool {
+        frames > 0 && startFrame == nil && allowsEOS
+    }
+
+    /// The talker sampled EOS at this generated frame: the window opens there.
+    mutating func open(atGeneratedCodeCount count: Int) {
+        guard frames > 0, startFrame == nil else { return }
+        startFrame = count
+    }
+
+    /// What the generation records (its `timingsMS`, so the engine row carries
+    /// it): the frames held and, once opened, the frame the window opened at.
+    var evidence: [String: Int] {
+        var values = ["talker_eos_suppression_frames": frames]
+        if let startFrame {
+            values["talker_eos_suppression_start_frame"] = startFrame
+        }
+        return values
     }
 }
 

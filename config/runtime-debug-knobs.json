@@ -136,6 +136,17 @@
       ]
     },
     {
+      "id": "controlled-generation",
+      "classification": "behavior-or-policy-mutation",
+      "gateRequired": true,
+      "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
+      "releaseBehavior": "unavailable-without-internal-capability",
+      "purpose": "Audio QC tier T3 controlled generation (audit 2026-09-25 section 5.2, GEN-NOEOS): QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES=N holds back the talker's first sampled EOS for N codec frames (0-256; 0 is the sham), giving the class I entropy and EOS detectors positives with a certain effect. Production safety: the host resolves it through RuntimeDebugGate into each request's immutable sampling configuration (request-local, never process-global runtime state), so it needs the VOCELLO_INTERNAL_DIAGNOSTICS compile condition that distribution builds omit plus QWENVOICE_DEBUG=1; unset or out of range, no request carries a hold and the generate loop is the production loop. Each held take records the frames and the frame the hold opened at in its engine row, and runtime debug provenance names the key.",
+      "keys": [
+        "QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES"
+      ]
+    },
+    {
       "id": "master-gate",
       "classification": "capability-gate",
       "gateRequired": false,

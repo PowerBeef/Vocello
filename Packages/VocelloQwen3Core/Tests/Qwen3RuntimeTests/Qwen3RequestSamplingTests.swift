@@ -58,6 +58,42 @@ final class Qwen3RequestSamplingTests: XCTestCase {
         XCTAssertNotEqual(drawSequence(using: makePolicy(seed: 0x55AB)), expected)
     }
 
+    /// Audio QC GEN-NOEOS: the hold opens once, at the first sampled EOS, keeps
+    /// EOS unavailable for exactly its frames, and never relaxes the production
+    /// minimum; zero frames holds nothing. A policy carries no hold by default.
+    func testEOSSuppressionWindowHoldsFromTheFirstEOSForItsFrames() {
+        var window = Qwen3EOSSuppressionWindow(frames: 3)
+        XCTAssertFalse(window.allowsEOS(generatedCodeCount: 1, productionMinimum: 2))
+        XCTAssertTrue(window.allowsEOS(generatedCodeCount: 2, productionMinimum: 2))
+        XCTAssertTrue(window.watchesForFirstEOS(allowsEOS: true))
+        XCTAssertFalse(window.watchesForFirstEOS(allowsEOS: false))
+        XCTAssertEqual(window.evidence, ["talker_eos_suppression_frames": 3])
+
+        window.open(atGeneratedCodeCount: 10)
+        XCTAssertEqual(window.startFrame, 10)
+        XCTAssertFalse(window.watchesForFirstEOS(allowsEOS: true))
+        for count in 10 ..< 13 {
+            XCTAssertFalse(window.allowsEOS(generatedCodeCount: count, productionMinimum: 2), "frame \(count)")
+        }
+        XCTAssertTrue(window.allowsEOS(generatedCodeCount: 13, productionMinimum: 2))
+        window.open(atGeneratedCodeCount: 20)
+        XCTAssertEqual(window.startFrame, 10, "the hold opens once")
+        XCTAssertEqual(
+            window.evidence,
+            ["talker_eos_suppression_frames": 3, "talker_eos_suppression_start_frame": 10]
+        )
+
+        var sham = Qwen3EOSSuppressionWindow(frames: 0)
+        XCTAssertFalse(sham.allowsEOS(generatedCodeCount: 1, productionMinimum: 2))
+        XCTAssertTrue(sham.allowsEOS(generatedCodeCount: 2, productionMinimum: 2))
+        XCTAssertFalse(sham.watchesForFirstEOS(allowsEOS: true))
+        sham.open(atGeneratedCodeCount: 5)
+        XCTAssertNil(sham.startFrame)
+        XCTAssertEqual(sham.evidence, ["talker_eos_suppression_frames": 0])
+
+        XCTAssertNil(makePolicy(seed: 1).eosSuppressionFrames)
+    }
+
     private func makePolicy(seed: UInt64) -> Qwen3RequestSamplingPolicy {
         let stage = Qwen3SamplingStage(
             temperature: 0.9,

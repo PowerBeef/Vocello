@@ -58,7 +58,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Generation.swift",
-      "sha256": "2eff5a88c5b2efb9ed2f443cad06a6c581a5560cf8f60076da5238e6d2c7cdf8",
+      "sha256": "81db754786163bbd552197efe90456bbd39af4835e9f70f618df311b721df605",
       "upstreamStatus": "modified"
     },
     {
@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "af42b3487c5fca0e032b45939951662bfbeb186e9234eadb2d0bce51564110cc",
+      "sha256": "d91ca0891e8af91d94610eb4fd11662b0991b510a43dde9bc409fc5d04130a09",
       "upstreamStatus": "modified"
     },
     {
@@ -148,7 +148,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "9a5793d194f070aca35731e0b075649603d0a6e5ef719331c8d2130da49ee5f0",
+      "sha256": "b226feb7b427c068a801245a70193c1dc93ddd4408edce7752088a43e216a21e",
       "upstreamStatus": "added"
     },
     {
@@ -163,7 +163,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "f8895f13725d68894cb1b465a217b9605ecea5d8af7354e4326fa01972fc0692",
+      "sha256": "ca33f83d772ff8bdd64cb14691195d1e826dff1cdca551049de49bec80c59164",
       "upstreamStatus": "added"
     },
     {
@@ -218,7 +218,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3RequestSamplingTests.swift",
-      "sha256": "b331c4b062c1748a53264ff6a3387992544a127f7787ea07b5000d3a23eb7db4",
+      "sha256": "4233fc939533fa07242ae46ff68010c255dc87083f0027f5ac2aa992483cb5a6",
       "upstreamStatus": "added"
     },
     {
@@ -243,7 +243,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "00481a14e2c28290b3daf6ecd24ff775150dec09ae84e985bcd95672be1634a9",
+      "sha256": "b8b92936eb11a598fef3ced9c0c98d2ca675d70618cbbdda3399ab028a2c8c9d",
       "upstreamStatus": "added"
     },
     {
@@ -258,7 +258,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift",
-      "sha256": "a3baf3fc38d9db895b8010d0b5fd506ceac1463c30ce1a78b4b0602ba0abafa4",
+      "sha256": "a3fe5c3807f9930e985c962f511888a65f6586af2968c84a5b5b0d8b53db7248",
       "upstreamStatus": "added"
     }
   ],

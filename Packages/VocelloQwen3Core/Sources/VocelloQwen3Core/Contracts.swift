@@ -121,6 +121,8 @@ public struct VocelloQwen3SamplingStage: Codable, Hashable, Sendable {
 public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
     public static let currentAlgorithmVersion = 2
     public static let compatibilityDefaultTopK = 50
+    /// Upper bound of `eosSuppressionFrames` (20.48 s of codec frames).
+    public static let maximumEOSSuppressionFrames = 256
 
     public let algorithmVersion: Int
     public let effectiveSeed: UInt64
@@ -132,6 +134,12 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
     public let topK: Int
     public let repetitionPenalty: Float
     public let seed: UInt64?
+    /// Audio QC controlled generation (GEN-NOEOS, audit 2026-09-25 section
+    /// 5.2): when the talker first samples EOS, EOS stays unavailable for this
+    /// many codec frames. Only the host's registered internal-diagnostics knob
+    /// sets it; nil is the production path and 0 is the construction's sham
+    /// (the same request with the hold armed at zero frames).
+    public let eosSuppressionFrames: Int?
 
     public init(
         maxNewTokens: Int,
@@ -156,6 +164,7 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         self.topK = topK
         self.repetitionPenalty = repetitionPenalty
         self.seed = seed
+        self.eosSuppressionFrames = nil
     }
 
     public init(
@@ -165,7 +174,8 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         subtalker: VocelloQwen3SamplingStage,
         repetitionPenalty: Float,
         maxNewTokens: Int,
-        requestedSeed: UInt64? = nil
+        requestedSeed: UInt64? = nil,
+        eosSuppressionFrames: Int? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.effectiveSeed = effectiveSeed
@@ -177,6 +187,7 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         self.topK = talker.topK
         self.repetitionPenalty = repetitionPenalty
         self.seed = requestedSeed
+        self.eosSuppressionFrames = eosSuppressionFrames
     }
 
     public func validated() throws -> Self {
@@ -192,6 +203,10 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
             throw VocelloQwen3ContractError.inconsistentTalkerAliases
         }
         guard repetitionPenalty > 0 else { throw VocelloQwen3ContractError.invalidRepetitionPenalty }
+        if let eosSuppressionFrames,
+           !(0 ... Self.maximumEOSSuppressionFrames).contains(eosSuppressionFrames) {
+            throw VocelloQwen3ContractError.invalidEOSSuppressionFrames
+        }
         return self
     }
 
@@ -527,4 +542,5 @@ public enum VocelloQwen3ContractError: Error, Equatable, Sendable {
     case invalidMemoryClearCadence
     case invalidTalkerKVWindow
     case invalidChunkConfiguration
+    case invalidEOSSuppressionFrames
 }

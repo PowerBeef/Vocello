@@ -1327,18 +1327,20 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
       >"$artifacts/manifest-validation.json" || validate_st=$?
   fi
 
-  local generated="?" rejected="?" failed="?" missing="?" introspection="?"
+  local generated="?" rejected="?" failed="?" missing="?" introspection="?" limit="?"
   if (( manifest_st == 0 )); then
-    read -r generated rejected failed missing introspection < <(python3 -c 'import json, sys
+    read -r generated rejected failed missing introspection limit < <(python3 -c 'import json, sys
 manifest = json.load(open(sys.argv[1]))
 counts = manifest["counts"]
 bound = manifest.get("introspection", {})
+limit = sum(1 for take in manifest["takes"] if take.get("status") == "failed"
+            and (take.get("failure") or {}).get("errorCode") == "generation.incomplete")
 print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"],
-      "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)))' "$manifest")
+      "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)), limit)' "$manifest")
   fi
   {
     echo "qc-takes runID=$run_id split=$split${cells:+ cells=$cells}${label:+ label=$label}"
-    echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing"
+    echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing generation_limit=$limit"
     echo "introspection_bound=$introspection diagnostics_collect_fail=$collect_fail codec_traces=$traces_kept"
     echo "batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes"
     echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
@@ -1349,9 +1351,13 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
     die "qc-takes FAIL: the takes manifest could not be bound or validated; artifacts are preserved in $artifacts"
   fi
   # A take the engine's mandatory QC refused is an outcome, recorded with its
-  # flags; a take with no output or another engine failure fails the lane.
-  if [[ "$missing" != "0" || "$failed" != "0" ]]; then
-    die "qc-takes FAIL: $missing missing and $failed failed of $planned_count planned takes; artifacts are preserved in $artifacts"
+  # flags. So is a take that reached the model's generation limit before it
+  # finished speaking (`generation.incomplete`: the engine discards it and the
+  # apps show an error), recorded as failed with that code; the detectors
+  # abstain on it (no audio). A take with no output or any other engine failure
+  # fails the lane.
+  if [[ "$missing" != "0" || "$((failed - limit))" != "0" ]]; then
+    die "qc-takes FAIL: $missing missing and $((failed - limit)) failed (besides $limit at the generation limit) of $planned_count planned takes; artifacts are preserved in $artifacts"
   fi
   note "qc-takes PASS · $planned_count takes · no benchmark record (calibration data) · $artifacts"
 }

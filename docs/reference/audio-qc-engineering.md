@@ -1620,8 +1620,12 @@ a quiet host. The artifacts go to `build/artifacts/macos/audio-qc/qc-takes-<run>
 `vocello batch` stops at its first failed item, so the lane resumes the batch after that item in a
 new segment (`<batchID>@<offset>`, `next-offset`): the seed is the batch's, and each item's sampling
 depends only on the seed and its text. A rejected take is an outcome that N3 flag rates must count
-(`audio_qc_calibration_set.py score` counts it as a v8 fail without audio); any failed or missing
-take fails the lane. The lane publishes nothing and writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
+(`audio_qc_calibration_set.py score` counts it as a v8 fail without audio). So is a take that reached
+the model's generation limit before it finished speaking (`generation.incomplete`: the engine discards
+it and the apps show an error). It stays `failed` with that code, the detectors abstain on it, and the
+verdict reports it as `generation_limit` (since 2026-09-30, when the first take plan v2 calibration
+run met four, all Voice Clone in Chinese and Portuguese). Any other failed or missing take fails the
+lane. The lane publishes nothing and writes no benchmark history. `audio_qc_orchestrator.py manifest --from-calibration-takes` turns the
 takes manifest, an injection-set manifest or an N1 cohort manifest into a language-lane manifest for
 the panel judges; it skips and counts missing takes and ineligible N1 recordings.
 

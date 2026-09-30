@@ -217,7 +217,7 @@ class CommittedRegistryTests(unittest.TestCase):
         self.assertEqual(corpora.encode_registry(self.registry), corpora.REGISTRY_PATH.read_bytes())
         self.assertEqual(quiet(corpora.main, ["validate"]), 0)
         self.assertEqual((self.registry["totals"]["files"], self.registry["totals"]["bytes"]),
-                         (9031, 28_962_323_872))
+                         (9037, 28_964_969_758))
         self.assertEqual(set(self.registry["sources"]), {
             "fleurs-train", "crema-d", "libritts-r", "mls", "zeroth-korean", "aishell3-subset", "emozionalmente",
             "thorsten-emotional", "emodb", "jvnv", "emouerj", "resd", "speechocean762"})
@@ -262,7 +262,7 @@ class CommittedRegistryTests(unittest.TestCase):
         broken = copy.deepcopy(self.registry)
         broken["sources"]["aishell3-subset"]["pinFile"]["files"] += 1
         self.assertTrue(any("pinFile records" in issue for issue in self.issues(broken)))
-        pins = corpora.source_pins(self.registry, "crema-d")
+        pins = [pin for pin in corpora.source_pins(self.registry, "crema-d") if pin.role == "audio"]
         self.assertEqual((len(pins), sum(pin.size for pin in pins)), (7442, 605_899_936))
         subset = corpora.source_pins(self.registry, "aishell3-subset")
         self.assertEqual(sum(1 for pin in subset if pin.role == "audio"), 76 * 20)
@@ -278,6 +278,44 @@ class CommittedRegistryTests(unittest.TestCase):
                 (lambda r: r["sources"]["crema-d"]["extract"].update(members="(?P<nope>x)"), "unknown groups"),
                 (lambda r: r["sources"]["mls"]["files"][0].pop("language"), "names each audio file's language"),
                 (lambda r: r["sources"]["libritts-r"].update(revision="main"), "full 40-character commit")):
+            broken = copy.deepcopy(self.registry)
+            change(broken)
+            self.assertTrue(any(expected in issue for issue in self.issues(broken)), expected)
+
+    def test_mls_and_crema_d_take_speaker_gender_from_blob_pinned_metadata(self) -> None:
+        mls = self.registry["sources"]["mls"]
+        metadata = [pin for pin in corpora.source_pins(self.registry, "mls") if pin.role == "metadata"]
+        # One metainfo.txt per language, pinned by git blob SHA-1 and labelling that language's clips only.
+        self.assertEqual([(pin.path, pin.language, pin.kind) for pin in metadata],
+                         [(f"data/mls_{language}/metainfo.txt", language, "gitBlobSHA1")
+                          for language in mls["languages"]])
+        self.assertEqual([(table["file"], table["joinOn"], table["fields"], table.get("header"))
+                          for table in mls["extract"]["metadata"]],
+                         [(pin.path, "speaker", {"gender": 1}, True) for pin in metadata])
+        crema = self.registry["sources"]["crema-d"]
+        [demographics] = [pin for pin in corpora.source_pins(self.registry, "crema-d") if pin.role == "metadata"]
+        self.assertEqual((demographics.path, demographics.kind), ("VideoDemographics.csv", "gitBlobSHA1"))
+        self.assertEqual(corpora.file_url(crema, demographics),
+                         f"https://raw.githubusercontent.com/{crema['repository']}/{crema['revision']}"
+                         "/VideoDemographics.csv")
+        # Only the Sex column is ever read: never age, race or ethnicity.
+        self.assertEqual([table["fields"] for table in crema["extract"]["metadata"]], [{"gender": "Sex"}])
+        for source in ("mls", "crema-d", "aishell3-subset", "emozionalmente"):
+            self.assertTrue(self.registry["sources"][source]["labels"]["gender"], source)
+        for source in ("libritts-r", "zeroth-korean"):
+            entry_ = self.registry["sources"][source]
+            self.assertIsNone(entry_["labels"]["gender"], source)
+            self.assertTrue(any(caveat.startswith("No speaker gender") for caveat in entry_["caveats"]), source)
+
+    def test_metadata_pins_are_read_scoped_and_hosted_as_declared(self) -> None:
+        for change, expected in (
+                (lambda r: r["sources"]["mls"]["extract"]["metadata"].pop(), "no extract.metadata table reads it"),
+                (lambda r: r["sources"]["mls"]["files"][-1].update(language="english"), "names a language only"),
+                (lambda r: r["sources"]["mls"]["files"][0].update(path="german/dev.arrow"), ".parquet shards"),
+                (lambda r: r["sources"]["crema-d"]["files"][0].pop("role"), "is a metadata file"),
+                (lambda r: r["sources"]["crema-d"]["extract"]["metadata"][0].update(header=True), "header"),
+                (lambda r: r["sources"]["crema-d"]["extract"]["metadata"][0].update(file="Other.csv"),
+                 "not a pinned metadata file")):
             broken = copy.deepcopy(self.registry)
             change(broken)
             self.assertTrue(any(expected in issue for issue in self.issues(broken)), expected)
@@ -306,8 +344,8 @@ class CommittedRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             value = corpora.plan(self.registry, corpora.select(self.registry, sets=["lean"]), root=Path(directory),
                                  model_root=Path(directory), n1_sources=self.n1_sources)
-        self.assertEqual(value["downloadBytes"], 28_962_323_872)
-        self.assertEqual(value["missingBytes"], 28_962_323_872 + value["n1TSVBytes"])
+        self.assertEqual(value["downloadBytes"], 28_964_969_758)
+        self.assertEqual(value["missingBytes"], 28_964_969_758 + value["n1TSVBytes"])
         self.assertEqual(set(value["groups"]), set(corpora.GROUPS))
         # The per-speaker caps of MLS, Zeroth-Korean and LibriTTS-R keep the extraction near 13.6 GB (34 GB uncapped).
         self.assertGreater(value["extractTotalBytes"], 10e9)
@@ -324,9 +362,10 @@ class TransportTests(unittest.TestCase):
     def test_only_https_on_the_corpora_hosts_is_allowed(self) -> None:
         for url in ("https://huggingface.co/datasets/a/b/resolve/x/y", "https://cas-bridge.xethub.hf.co/x",
                     "https://us.aws.cdn.hf.co/x", "https://media.githubusercontent.com/media/a/b/c/d",
-                    "https://zenodo.org/api/records/1/files/x/content"):
+                    "https://raw.githubusercontent.com/a/b/c/d", "https://zenodo.org/api/records/1/files/x/content"):
             self.assertTrue(corpora.allowed_url(url), url)
-        for url in ("http://huggingface.co/x", "https://raw.githubusercontent.com/a/b/c/d",
+        for url in ("http://huggingface.co/x", "http://raw.githubusercontent.com/a/b/c/d",
+                    "https://raw.githubusercontent.com.example.org/a", "https://gist.githubusercontent.com/a/b",
                     "https://github.com/a/b", "https://example.org/x", "https://user:secret@zenodo.org/x",
                     "https://zenodo.org:8443/x", "https://zenodo.org.example.org/x", "ftp://zenodo.org/x"):
             self.assertFalse(corpora.allowed_url(url), url)
@@ -348,6 +387,9 @@ class TransportTests(unittest.TestCase):
                          f"https://huggingface.co/datasets/owner/corpus/resolve/{REVISION}/data/a%20b.parquet")
         self.assertEqual(url_of(lfs, "AudioWAV/x.wav"),
                          f"https://media.githubusercontent.com/media/owner/corpus/{REVISION}/AudioWAV/x.wav")
+        # A GitHub source's plain git file (not LFS content) comes from raw, at the same pinned commit.
+        self.assertEqual(url_of(lfs, "Video Demographics.csv", "gitBlobSHA1"),
+                         f"https://raw.githubusercontent.com/owner/corpus/{REVISION}/Video%20Demographics.csv")
         self.assertEqual(url_of(zen, "set.zip", "md5"), "https://zenodo.org/api/records/42/files/set.zip/content")
 
 
@@ -438,6 +480,27 @@ class FetchTests(Fixture):
         with self.assertRaisesRegex(corpora.CorporaError, "meta.txt holds|does not match its pinned"):
             self.fetch(sources=("hub",))
         self.assertEqual((hub / "meta.txt").read_bytes(), self.blob.upper())
+
+    def test_a_github_metadata_file_downloads_from_raw_and_is_bound_to_its_git_blob(self) -> None:
+        demographics = b"ActorID,Sex\n1001,Male\n"
+        audio = self.lfs_files["AudioWAV/0.wav"]
+        source = entry([sha256_pin("AudioWAV/0.wav", audio),
+                        {"path": "VideoDemographics.csv", "size": len(demographics),
+                         "gitBlobSHA1": n1.git_blob_sha1(demographics), "role": "metadata"}],
+                       {"format": "wav-files"}, host="media.githubusercontent.com")
+        registry = registry_of(crema=source)
+        raw = url_of(source, "VideoDemographics.csv", "gitBlobSHA1")
+        host = FakeHost({url_of(source, "AudioWAV/0.wav"): audio, raw: demographics})
+        report = quiet(corpora.fetch, registry, ["crema"], root=self.root, opener=host, sleep=lambda _seconds: None)
+        self.assertEqual(report[0]["fetched"], 2)
+        self.assertIn(raw, {url for url, _range in host.requests})
+        self.assertTrue(raw.startswith("https://raw.githubusercontent.com/"))
+        tampered = FakeHost({url_of(source, "AudioWAV/0.wav"): audio, raw: demographics.replace(b"Male", b"Mole")})
+        with self.assertRaisesRegex(corpora.CorporaError, "does not match its pinned size and digest"):
+            quiet(corpora.fetch, registry, ["crema"], root=self.tmp / "other", opener=tampered,
+                  sleep=lambda _seconds: None, jobs=1)
+        self.assertFalse((corpora.source_directory(registry, "crema", self.tmp / "other")
+                          / "VideoDemographics.csv").exists())
 
     def test_the_whole_selection_must_fit_before_anything_is_fetched(self) -> None:
         with mock.patch.object(corpora, "FREE_SPACE_MARGIN_BYTES", 10 ** 18):
@@ -683,6 +746,43 @@ class ExtractTests(Fixture):
             self.extract(registry, "crema")
         self.assertFalse((directory / f".staging-{corpora.EXTRACTED_DIRECTORY}").exists())
 
+    def test_a_pinned_demographics_file_adds_only_gender_to_wav_files(self) -> None:
+        files = {"AudioWAV/1001_DFA_ANG_XX.wav": pcm16(1600, 16000),
+                 "AudioWAV/1002_IEO_HAP_HI.wav": pcm16(1700, 16000, 330.0),
+                 "AudioWAV/1003_IEO_SAD_LO.wav": pcm16(1800, 16000, 440.0)}
+        demographics = ("ActorID,Age,Sex,Race,Ethnicity\n"
+                        "1001,AgeSentinel,Male,RaceSentinel,EthnicitySentinel\n"
+                        "1002,AgeSentinel,Female,RaceSentinel,EthnicitySentinel\n").encode()
+        spec = {"format": "wav-files", "outputRate": 16000,
+                "members": ("^AudioWAV/(?P<id>(?P<speaker>[0-9]{4})_(?P<textID>[A-Z]{3})_(?P<emotion>[A-Z]{3})_"
+                            "(?P<intensity>[A-Z]{2}))\\.wav$"),
+                "maps": {"gender": {"Female": "female", "Male": "male"}},
+                "metadata": [{"file": "VideoDemographics.csv", "format": "csv", "keyColumn": "ActorID",
+                              "keyNormalize": "int", "joinOn": "speaker", "fields": {"gender": "Sex"}}]}
+        pins = [sha256_pin(path, data) for path, data in files.items()]
+        pins.append({"path": "VideoDemographics.csv", "size": len(demographics),
+                     "gitBlobSHA1": n1.git_blob_sha1(demographics), "role": "metadata"})
+        registry = registry_of(crema=entry(pins, spec, host="media.githubusercontent.com"))
+        self.assertEqual(corpora._extract_issues("crema", registry["sources"]["crema"],
+                                                 corpora.source_pins(registry, "crema")), [])
+        directory = self.place(registry, "crema", files)
+        with self.assertRaisesRegex(corpora.CorporaError, "VideoDemographics.csv is not fetched"):
+            self.extract(registry, "crema")
+        (directory / "VideoDemographics.csv").write_bytes(demographics.replace(b"Male", b"Mole"))
+        with self.assertRaisesRegex(corpora.CorporaError, "does not match its pinned gitBlobSHA1"):
+            self.extract(registry, "crema")
+        (directory / "VideoDemographics.csv").write_bytes(demographics)
+        self.extract(registry, "crema")
+        manifest = self.manifest(registry, "crema")
+        clip = {record["sourceID"]: record for record in manifest["clips"]}
+        self.assertEqual([clip[name]["gender"] for name in sorted(clip)], ["male", "female", None])
+        self.assertEqual(manifest["metadata"]["VideoDemographics.csv"], {"rows": 2, "unjoinedClips": 1})
+        text = json.dumps(manifest)
+        for sentinel in ("AgeSentinel", "RaceSentinel", "EthnicitySentinel"):
+            self.assertNotIn(sentinel, text)
+        receipt = json.loads((directory / corpora.RECEIPT_NAME).read_text())
+        self.assertIn("VideoDemographics.csv", receipt["files"])
+
     def test_an_unsafe_member_or_an_unnamed_wav_refuses_the_archive_and_keeps_nothing(self) -> None:
         for members, reason in (({"emoUERJ/m01a01.wav": pcm16(100, 24000), "../evil.wav": b"x"}, "unsafe path"),
                                 ({"emoUERJ/m01a01.wav": pcm16(100, 24000), "emoUERJ/extra/m01a02.wav": b"x"},
@@ -781,6 +881,48 @@ class ParquetTests(Fixture):
         self.assertEqual(keep, {german_one, ("german/dev-0.parquet", 2), ("french/dev-0.parquet", 0),
                                 ("french/dev-0.parquet", 1)})
         self.assertIsNone(worker.speaker_cap({"extract": {}, "files": []}, reader))
+
+    def test_per_language_metadata_files_join_gender_by_speaker_within_their_language(self) -> None:
+        header = " SPEAKER   |   GENDER   | PARTITION  |  MINUTES   |  BOOK ID   |  TITLE  |  CHAPTER\n"
+        german = (header + "  1  |  F  | dev | 10.0 | 100 | Ein Buch | 1\n  1  |  F  | dev | 12.0 | 101 | Zwei | 2\n"
+                  "  2  |  F  | dev | 5.0 | 102 | Buch | 1\n  2  |  M  | dev | 5.0 | 103 | Buch | 2\n").encode()
+        french = (header + "  1  |  M  | dev | 10.0 | 200 | Un livre | 1\n  9  |  F  | dev | 8.0 | 201 | Livre | 1\n"
+                  ).encode()
+        metadata = {"data/mls_german/metainfo.txt": german, "data/mls_french/metainfo.txt": french}
+        source = self.registry["sources"]["mls"]
+        source["files"] += [{"path": path, "size": len(data), "gitBlobSHA1": n1.git_blob_sha1(data),
+                             "role": "metadata", "language": path.split("/")[1].removeprefix("mls_")}
+                            for path, data in metadata.items()]
+        source["extract"]["metadata"] = [{"file": path, "format": "pipe", "header": True, "keyColumn": 0,
+                                          "keyNormalize": "int", "joinOn": "speaker", "fields": {"gender": 1}}
+                                         for path in metadata]
+        source["extract"]["maps"] = {"gender": {"F": "female", "M": "male"}}
+        self.assertEqual(corpora._extract_issues("mls", source, corpora.source_pins(self.registry, "mls")), [])
+        self.place(self.registry, "mls", metadata)
+
+        def row(identity: str, speaker: str, frequency: float) -> dict:
+            return {"id": identity, "speaker_id": speaker, "transcript": "Hallo.", "total": 5,
+                    "audio": {"bytes": pcm16(1600, 16000, frequency), "path": None}}
+
+        # The worker reads only the shards: a metadata file in its job would have no rows here.
+        rows = {"german/dev-0.parquet": [row("1_1_1", "1", 200.0), row("2_1_1", "2", 300.0),
+                                         row("7_1_1", "7", 400.0)],
+                "french/dev-0.parquet": [row("9_1_1", "9", 500.0), row("1_1_2", "0001", 600.0)]}
+        quiet(corpora.extract_source, self.registry, "mls", root=self.root, worker=self.fake_worker(rows))
+        manifest = json.loads((self.directory / corpora.EXTRACTED_DIRECTORY / corpora.MANIFEST_NAME).read_text())
+        gender = {record["clipID"]: record["gender"] for record in manifest["clips"]}
+        # German speaker 1 is female in German; the French table's speaker 1 (male) labels French clips only.
+        # German speaker 2's rows disagree, so it keeps no gender; speaker 7 is in no table.
+        self.assertEqual(gender, {"mls-de-1_1_1": "female", "mls-de-2_1_1": None, "mls-de-7_1_1": None,
+                                  "mls-fr-9_1_1": "female", "mls-fr-1_1_2": "male"})
+        self.assertEqual(manifest["metadata"], {
+            "data/mls_german/metainfo.txt": {"rows": 2, "unjoinedClips": 1, "conflictingKeys": 1},
+            "data/mls_french/metainfo.txt": {"rows": 2, "unjoinedClips": 0}})
+        self.assertEqual(manifest["counts"]["byGender"], {"female": 2, "male": 1, "unknown": 2})
+        (self.directory / corpora.EXTRACTED_DIRECTORY / corpora.MANIFEST_NAME).unlink()
+        (self.directory / "data/mls_german/metainfo.txt").unlink()
+        with self.assertRaisesRegex(corpora.CorporaError, "data/mls_german/metainfo.txt is not fetched"):
+            quiet(corpora.extract_source, self.registry, "mls", root=self.root, worker=self.fake_worker(rows))
 
     def test_a_worker_that_writes_no_result_leaves_nothing(self) -> None:
         with self.assertRaisesRegex(corpora.CorporaError, "wrote no readable result"):

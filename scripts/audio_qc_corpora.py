@@ -2,9 +2,10 @@
 """Pinned corpora for the next audio QC qualification round (AQ-07): registry, fetch, verify, extract.
 
 The maintainer runs the downloads (a dataset download is a maintainer-run
-action). The lean set is 28.96 GB to download and about 34 GB of WAVs once
-extracted; `plan` prints the exact download bytes, the extraction estimate and
-the free space before anything is written:
+action). The lean set is 28.96 GB to download and about 13.6 GB of WAVs once
+extracted (the per-speaker caps of MLS, Zeroth-Korean and LibriTTS-R; about
+34 GB uncapped); `plan` prints the exact download bytes, the extraction
+estimate and the free space before anything is written:
 
     python3 scripts/audio_qc_corpora.py plan --set lean
     python3 scripts/audio_qc_corpora.py runtime
@@ -16,17 +17,20 @@ the N1 reserve cohorts; `speaker`, class E; `emotion`, class H; `accent`, class
 D), and per source its host, repository and revision (or Zenodo record and
 version), license with its official source, attribution, caveats, languages,
 the labels it carries and every file pinned by size and digest: the LFS SHA-256
-of a Hugging Face or GitHub LFS file, the git blob SHA-1 of a small Hub file,
-or the publisher's MD5 of a Zenodo file (the maintainer accepted MD5 plus the
-exact size there). The 7,442 CREMA-D pins and the AISHELL-3 subset sit in
+of a Hugging Face or GitHub LFS file, the git blob SHA-1 of a small Hub file
+or of a plain git metadata file of a GitHub commit, or the publisher's MD5 of
+a Zenodo file (the maintainer accepted MD5 plus the exact size there). The
+7,442 CREMA-D WAV pins and the AISHELL-3 subset sit in
 sidecar TSVs under `config/audio-qc-corpora/`, bound to the registry by their
 SHA-256. Only pins, licenses and attributions are committed; audio,
 transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
 (`config/build-output-policy.json`, `QVOICE_AUDIO_QC_CORPORA_CACHE`).
 
 - **Transport.** https only, on huggingface.co and its CDNs (`*.hf.co`,
-  `*.huggingface.co`), media.githubusercontent.com (GitHub LFS content) and
-  zenodo.org; a redirect anywhere else refuses the download. Each file streams
+  `*.huggingface.co`), media.githubusercontent.com (GitHub LFS content),
+  raw.githubusercontent.com (a GitHub source's plain git metadata files, read
+  at its pinned commit and pinned by git blob SHA-1) and zenodo.org; a
+  redirect anywhere else refuses the download. Each file streams
   into `.partial/<path>.part`, resumes with an HTTP range request where the
   host honours one (a host that answers 200 starts over), and moves into place
   only once its size and pin match; a mismatch deletes the partial file. A
@@ -53,7 +57,11 @@ transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
   scores and text where the corpus has them, duration, rate and digests of the
   written WAV and of the source audio. Labels come from the member names (a
   registry pattern), the Parquet columns the registry names, and metadata
-  files joined by key. Identical PCM is one clip with its duplicates listed; a
+  tables (archive members, or pinned metadata files beside WAV files or
+  Parquet shards) joined by key after decoding; a pinned file that names its
+  language labels that language's clips only, and a key whose rows disagree on
+  a label keeps none (MLS speaker gender, CREMA-D actor sex: only the declared
+  columns are kept). Identical PCM is one clip with its duplicates listed; a
   clip that cannot be decoded is listed under `skipped` with its reason, never
   silently dropped; an unsafe archive member, or a WAV the source's pattern
   does not name, refuses the archive. The extraction is staged and moved into
@@ -141,9 +149,14 @@ GROUPS: dict[str, str] = {"fleurs-train": "N1", "speaker": "E", "emotion": "H", 
 SETS = ("lean",)
 HOSTS: dict[str, str] = {"huggingface.co": "hub", "media.githubusercontent.com": "github-lfs",
                          "zenodo.org": "zenodo"}
+# A GitHub source's plain git files (not LFS content) are served only here, each read at the source's pinned
+# commit and pinned by its git blob SHA-1.
+GITHUB_RAW_HOST = "raw.githubusercontent.com"
+TRANSPORT_HOSTS = frozenset({*HOSTS, GITHUB_RAW_HOST})
 HOST_SUFFIXES = (".hf.co", ".huggingface.co")
-ALLOWED_HOSTS = ("huggingface.co", "*.hf.co", "*.huggingface.co", "media.githubusercontent.com", "zenodo.org")
-PIN_KINDS: dict[str, tuple[str, ...]] = {"hub": ("sha256", "gitBlobSHA1"), "github-lfs": ("sha256",),
+ALLOWED_HOSTS = ("huggingface.co", "*.hf.co", "*.huggingface.co", "media.githubusercontent.com", GITHUB_RAW_HOST,
+                 "zenodo.org")
+PIN_KINDS: dict[str, tuple[str, ...]] = {"hub": ("sha256", "gitBlobSHA1"), "github-lfs": ("sha256", "gitBlobSHA1"),
                                          "zenodo": ("md5",)}
 PIN_PATTERNS = {"sha256": re.compile(r"[0-9a-f]{64}"), "gitBlobSHA1": re.compile(r"[0-9a-f]{40}"),
                 "md5": re.compile(r"[0-9a-f]{32}")}
@@ -300,15 +313,21 @@ def _pattern_issues(label: str, pattern: Any, allowed: frozenset[str]) -> tuple[
     return ([f"{label} names unknown groups {', '.join(sorted(unknown))}"] if unknown else []), groups
 
 
-def _metadata_issues(source: str, spec: Mapping[str, Any], metadata: Any, pins: Sequence[Pin]) -> list[str]:
+def _metadata_issues(source: str, spec: Mapping[str, Any], metadata: Any, pins: Sequence[Pin],
+                     languages: Sequence[str]) -> list[str]:
     issues: list[str] = []
-    if metadata is None:
-        return issues
-    if not isinstance(metadata, list):
-        return [f"{source}: extract.metadata must be a list"]
-    metadata_paths = {pin.path for pin in pins if pin.role == "metadata"}
+    metadata_pins = {pin.path: pin for pin in pins if pin.role == "metadata"}
     archive = spec["format"] in ("zip", "tar.gz")
-    for index, table in enumerate(metadata):
+    if metadata is not None and not isinstance(metadata, list):
+        return [f"{source}: extract.metadata must be a list"]
+    read = {table.get("file") for table in metadata or () if isinstance(table, dict)} if not archive else set()
+    for path, pin in metadata_pins.items():
+        if path not in read:
+            issues.append(f"{source}: the metadata file {path} is pinned but no extract.metadata table reads it")
+        if pin.language is not None and (len(languages) < 2 or pin.language not in languages):
+            issues.append(f"{source}: the metadata file {path} names a language only in a source of several "
+                          "languages, and one of them (its rows then label that language's clips only)")
+    for index, table in enumerate(metadata or ()):
         label = f"{source}: extract.metadata[{index}]"
         if not isinstance(table, dict) or table.get("format") not in METADATA_FORMATS:
             issues.append(f"{label} names a format of {', '.join(METADATA_FORMATS)}")
@@ -316,7 +335,7 @@ def _metadata_issues(source: str, spec: Mapping[str, Any], metadata: Any, pins: 
         where = table.get("member") if archive else table.get("file")
         if not _safe_relative(where):
             issues.append(f"{label} names its {'member' if archive else 'file'}")
-        elif not archive and where not in metadata_paths:
+        elif not archive and where not in metadata_pins:
             issues.append(f"{label}: {where} is not a pinned metadata file of the source")
         if table.get("joinOn") not in JOIN_FIELDS:
             issues.append(f"{label} joins on one of {', '.join(JOIN_FIELDS)}")
@@ -327,6 +346,9 @@ def _metadata_issues(source: str, spec: Mapping[str, Any], metadata: Any, pins: 
             issues.append(f"{label} maps some of {', '.join(sorted(JOIN_LABELS))} to its columns")
         if table.get("optional") not in (None, True, False):
             issues.append(f"{label}: optional is true or false")
+        if table.get("header") not in (None, True, False) or (table.get("header") is not None
+                                                              and table["format"] not in ("pipe", "whitespace")):
+            issues.append(f"{label}: header (true or false) skips the first row of a pipe or whitespace table")
         if table["format"] == "whitespace" and not (isinstance(table.get("columns"), list) and table["columns"]):
             issues.append(f"{label}: a whitespace table names its columns")
     return issues
@@ -382,9 +404,10 @@ def _extract_issues(source: str, entry: Mapping[str, Any], pins: Sequence[Pin]) 
                 or any(str(columns.get(name) or "@").startswith("@") for name in ("id", "speaker"))):
             issues.append(f"{source}: a per-speaker cap names perSpeaker and capSeed and reads id and speaker "
                           "columns")
-        if any(pin.role != "audio" for pin in pins) or not all(pin.path.endswith(".parquet") for pin in pins):
-            issues.append(f"{source}: a Parquet source pins only its .parquet shards")
-        return issues
+        if not all(pin.path.endswith(".parquet") for pin in pins if pin.role == "audio"):
+            issues.append(f"{source}: a Parquet source pins its .parquet shards as audio, beside the metadata files "
+                          "its extract.metadata reads")
+        return issues + _metadata_issues(source, spec, spec.get("metadata"), pins, entry.get("languages") or ())
     member_issues, groups = _pattern_issues(f"{source}: extract.members", spec.get("members"), MEMBER_GROUPS)
     issues += member_issues
     for pattern in spec.get("ignore") or ():
@@ -397,7 +420,7 @@ def _extract_issues(source: str, entry: Mapping[str, Any], pins: Sequence[Pin]) 
             fields = {"?"}
         if not isinstance(template, str) or not fields or not fields <= groups:
             issues.append(f"{source}: extract.idTemplate formats only the member pattern's groups")
-    issues += _metadata_issues(source, spec, spec.get("metadata"), pins)
+    issues += _metadata_issues(source, spec, spec.get("metadata"), pins, entry.get("languages") or ())
     audio = [pin for pin in pins if pin.role == "audio"]
     if fmt in ("zip", "tar.gz") and (len(audio) != 1 or not audio[0].path.endswith(".zip" if fmt == "zip"
                                                                                    else (".tgz", ".tar.gz"))):
@@ -455,6 +478,9 @@ def _file_issues(source: str, kind: str, values: Any) -> list[str]:
             issues.append(f"{source}: {path}: size must be a positive integer of at most {limit} bytes")
         if value.get("role", "audio") not in ("audio", "metadata"):
             issues.append(f"{source}: {path}: role is audio or metadata")
+        elif kind == "github-lfs" and pin_kind == "gitBlobSHA1" and value.get("role") != "metadata":
+            issues.append(f"{source}: {path}: a plain git file of a GitHub source ({GITHUB_RAW_HOST}) is a metadata "
+                          "file; its audio is LFS content pinned by SHA-256")
         if value.get("language") is not None and value["language"] not in lm.PRODUCT_LANGUAGES:
             issues.append(f"{source}: {path}: language is a product language")
     return issues
@@ -727,7 +753,7 @@ def allowed_url(url: str) -> bool:
     host = (parts.hostname or "").lower()
     if parts.scheme != "https" or parts.username or parts.password or port not in (None, 443):
         return False
-    return host in HOSTS or host.endswith(HOST_SUFFIXES)
+    return host in TRANSPORT_HOSTS or host.endswith(HOST_SUFFIXES)
 
 
 class CorporaRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -751,11 +777,15 @@ def _open(request: urllib.request.Request, timeout: float) -> Any:
 
 
 def file_url(entry: Mapping[str, Any], pin: Pin) -> str:
-    """Where one pinned file downloads from: its Hub revision, its GitHub LFS commit or its Zenodo record."""
+    """Where one pinned file downloads from: its Hub revision, its GitHub commit (LFS content from
+    media.githubusercontent.com, a plain git file pinned by its blob SHA-1 from raw.githubusercontent.com) or its
+    Zenodo record."""
     kind = host_kind(entry)
     quoted = urllib.parse.quote(pin.path)
     if kind == "hub":
         url = f"https://huggingface.co/datasets/{entry['repository']}/resolve/{entry['revision']}/{quoted}"
+    elif kind == "github-lfs" and pin.kind == "gitBlobSHA1":
+        url = f"https://{GITHUB_RAW_HOST}/{entry['repository']}/{entry['revision']}/{quoted}"
     elif kind == "github-lfs":
         url = f"https://media.githubusercontent.com/media/{entry['repository']}/{entry['revision']}/{quoted}"
     elif kind == "zenodo":
@@ -1198,8 +1228,37 @@ def _normalize_key(value: Any, how: str | None) -> str | None:
 PINYIN = re.compile(r"[a-z]+[1-5]?", re.ASCII)
 
 
-def parse_table(data: bytes, spec: Mapping[str, Any], label: str) -> dict[str, dict[str, str | None]]:
-    """A metadata table keyed by its normalized key, holding only the declared fields."""
+@dataclass(frozen=True)
+class MetadataTable:
+    """One declared metadata table as read: its rows by normalized key (None when an optional table is missing or
+    unreadable, `problem` saying why), how many keys had rows that disagree on a label (that label is dropped for
+    the key, never guessed), and the one language whose clips it labels (a metadata file that names its language;
+    None labels every clip)."""
+
+    spec: Mapping[str, Any]
+    rows: dict[str, dict[str, str | None]] | None
+    problem: str | None = None
+    conflicts: int = 0
+    language: str | None = None
+
+
+def _keep_row(table: dict[str, dict[str, str | None]], conflicted: set[str], key: str | None,
+              values: dict[str, str | None]) -> None:
+    """The first row of a key wins; a later row that gives a label another value drops that label for the key."""
+    if key is None:
+        return
+    kept = table.setdefault(key, values)
+    if kept is values:
+        return
+    for name, value in values.items():
+        if value is not None and kept.get(name) is not None and kept[name] != value:
+            kept[name] = None
+            conflicted.add(key)
+
+
+def parse_table(data: bytes, spec: Mapping[str, Any], label: str) -> tuple[dict[str, dict[str, str | None]], int]:
+    """A metadata table keyed by its normalized key, holding only the declared fields, and the number of keys whose
+    rows disagree on a field (`_keep_row`)."""
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -1207,6 +1266,7 @@ def parse_table(data: bytes, spec: Mapping[str, Any], label: str) -> dict[str, d
     fields: Mapping[str, Any] = spec["fields"]
     how = spec.get("keyNormalize")
     table: dict[str, dict[str, str | None]] = {}
+    conflicted: set[str] = set()
     fmt = spec["format"]
     if fmt == "csv":
         reader = csv.DictReader(io.StringIO(text))
@@ -1216,12 +1276,15 @@ def parse_table(data: bytes, spec: Mapping[str, Any], label: str) -> dict[str, d
         if missing:
             raise CorporaError(f"{label} has no column {', '.join(missing)}; its header is {', '.join(header)}")
         for row in reader:
-            key = _normalize_key(row.get(spec["keyColumn"]), how)
-            if key is not None and key not in table:
-                table[key] = {name: clips.label_text(row.get(column)) for name, column in fields.items()}
-        return table
+            _keep_row(table, conflicted, _normalize_key(row.get(spec["keyColumn"]), how),
+                      {name: clips.label_text(row.get(column)) for name, column in fields.items()})
+        return table, len(conflicted)
+    skip_header = bool(spec.get("header"))
     for line in text.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if skip_header:
+            skip_header = False
             continue
         if fmt == "pipe":
             parts = line.split("|")
@@ -1245,46 +1308,51 @@ def parse_table(data: bytes, spec: Mapping[str, Any], label: str) -> dict[str, d
             else:
                 sentence = " ".join(rest)
             values = {name: (sentence or None) if column == "text" else None for name, column in fields.items()}
-        if key is not None and key not in table:
-            table[key] = values
-    return table
+        _keep_row(table, conflicted, key, values)
+    return table, len(conflicted)
 
 
-def load_table(spec: Mapping[str, Any], data: bytes | None,
-               label: str) -> tuple[Mapping[str, Any], dict | None, str | None]:
+def load_table(spec: Mapping[str, Any], data: bytes | None, label: str, *,
+               language: str | None = None) -> MetadataTable:
     """A metadata table parsed; an optional one that is missing or unreadable is kept as its reason instead,
     so a label enrichment never costs the corpus."""
     try:
         if data is None:
             raise CorporaError(f"{label} is missing")
-        return spec, parse_table(data, spec, label), None
+        rows, conflicts = parse_table(data, spec, label)
+        if conflicts:
+            _log(f"{label}: {conflicts} keys have rows that disagree on a label; it is dropped for them")
+        return MetadataTable(spec, rows, conflicts=conflicts, language=language)
     except CorporaError as error:
         if not spec.get("optional"):
             raise
         _log(f"optional metadata not joined: {error}")
-        return spec, None, str(error)
+        return MetadataTable(spec, None, str(error), language=language)
 
 
-def apply_metadata(records: list[dict[str, Any]],
-                   tables: Sequence[tuple[Mapping[str, Any], dict | None, str | None]]) -> dict[str, Any]:
-    """Join each metadata table onto the clips in registry order; returns rows and unjoined clips per table."""
+def apply_metadata(records: list[dict[str, Any]], tables: Sequence[MetadataTable]) -> dict[str, Any]:
+    """Join each metadata table onto the clips in registry order (a table of one language onto that language's
+    clips only); returns rows, unjoined clips and any conflicting keys per table."""
     joined: dict[str, Any] = {}
-    for spec, table, problem in tables:
+    for table in tables:
+        spec = table.spec
         name = spec.get("member") or spec.get("file")
-        if table is None:
-            joined[name] = {"rows": 0, "unjoinedClips": len(records), "problem": problem}
+        scoped = [record for record in records if table.language is None or record.get("language") == table.language]
+        if table.rows is None:
+            joined[name] = {"rows": 0, "unjoinedClips": len(scoped), "problem": table.problem}
             continue
         unjoined = 0
-        for record in records:
+        for record in scoped:
             key = _normalize_key(record.get(spec["joinOn"]), spec.get("keyNormalize"))
-            row = table.get(key) if key is not None else None
+            row = table.rows.get(key) if key is not None else None
             if row is None:
                 unjoined += 1
                 continue
             for label, value in row.items():
                 if value is not None:
                     record[label] = value
-        joined[name] = {"rows": len(table), "unjoinedClips": unjoined}
+        joined[name] = {"rows": len(table.rows), "unjoinedClips": unjoined,
+                        **({"conflictingKeys": table.conflicts} if table.conflicts else {})}
     return joined
 
 
@@ -1326,17 +1394,29 @@ def _labels(entry: Mapping[str, Any], matched: Mapping[str, str], pin: Pin | Non
     return {"language": language, "split": pin.split if pin is not None else None, **matched}
 
 
-def _extract_wav_files(source: str, entry: Mapping[str, Any], pins: Sequence[Pin], directory: Path,
-                       receipt: Receipt, sink: clips.ClipSink, tables: list) -> dict[str, int]:
-    spec = entry["extract"]
-    members = Members(spec)
+def file_tables(spec: Mapping[str, Any], pins: Sequence[Pin], directory: Path,
+                receipt: Receipt) -> list[MetadataTable]:
+    """The source's pinned metadata files as tables, each checked against its pin first: a file present but
+    differing refuses the source, a required one not fetched too, an optional one missing is kept as its reason.
+    A file that names its language labels that language's clips only."""
+    tables = []
     for table in spec.get("metadata") or ():
         pin = next(pin for pin in pins if pin.path == table["file"])
         path = directory / pin.path
         data = path.read_bytes() if path.is_file() and not path.is_symlink() else None
         if data is not None:
             receipt.record(pin, check_bytes(data, pin, receipt.recorded(pin)))
-        tables.append(load_table(table, data, pin.path))
+        elif not table.get("optional"):
+            raise CorporaError(f"{pin.path} is not fetched; run `fetch` first")
+        tables.append(load_table(table, data, pin.path, language=pin.language))
+    return tables
+
+
+def _extract_wav_files(source: str, entry: Mapping[str, Any], pins: Sequence[Pin], directory: Path,
+                       receipt: Receipt, sink: clips.ClipSink, tables: list) -> dict[str, int]:
+    spec = entry["extract"]
+    members = Members(spec)
+    tables += file_tables(spec, pins, directory, receipt)
     counts: Counter[str] = Counter()
     audio = [pin for pin in pins if pin.role == "audio"]
     for index, pin in enumerate(audio, 1):
@@ -1448,7 +1528,8 @@ def _extract_parquet(source: str, entry: Mapping[str, Any], pins: Sequence[Pin],
         "results": str(staging / RESULTS_NAME),
         "files": [{"path": str(directory / pin.path), "shard": pin.path, "split": pin.split,
                    "language": pin.language or entry["languages"][0],
-                   "idPrefix": lm.LANGUAGE_LOCALE_CODES[pin.language] if multilingual else None} for pin in pins],
+                   "idPrefix": lm.LANGUAGE_LOCALE_CODES[pin.language] if multilingual else None}
+                  for pin in pins if pin.role == "audio"],
     }
     job_path = staging / JOB_NAME
     jsonio.atomic_json(job_path, job, ascii=False, allow_nan=False)
@@ -1584,6 +1665,8 @@ def extract_source(registry: Mapping[str, Any], source: str, *, root: Path | Non
     receipt = Receipt(directory, source)
     if spec["format"] != "wav-files":
         for pin in pins:
+            if pin.role != "audio":
+                continue  # a metadata file is checked as its table is read
             final_path = directory / pin.path
             _log(f"{source}: verifying {pin.path} ({pin.size / 1e6:.1f} MB)")
             if not final_path.exists():
@@ -1595,9 +1678,10 @@ def extract_source(registry: Mapping[str, Any], source: str, *, root: Path | Non
     staging.mkdir(parents=True)
     (staging / acquire.OWNED_MARKER).write_text(f"audio QC corpus extraction {source}\n", encoding="utf-8")
     try:
-        tables: list[tuple[Mapping[str, Any], dict | None, str | None]] = []
+        tables: list[MetadataTable] = []
         members: dict[str, int] = {}
         if spec["format"] == "parquet":
+            tables += file_tables(spec, pins, directory, receipt)
             if worker is None:
                 problems, python = runtime_problems(registry)
                 if problems:

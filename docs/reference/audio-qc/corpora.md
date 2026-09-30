@@ -34,7 +34,7 @@ Rendered from [config/audio-qc-corpora.json](../../../config/audio-qc-corpora.js
 | Group | Class | Title | Sources | Files | Download | Extracted (estimate) |
 |---|---|---|---|---|---|---|
 | `fleurs-train` | N1 | FLEURS train reserve | fleurs-train | 20 | 15.58 GB | 5.38 GB |
-| `speaker` | E | Speaker-labelled speech | aishell3-subset, crema-d, emozionalmente, libritts-r, mls, zeroth-korean | 8999 | 9.66 GB | 5.85 GB |
+| `speaker` | E | Speaker-labelled speech | aishell3-subset, crema-d, emozionalmente, libritts-r, mls, zeroth-korean | 9005 | 9.66 GB | 5.85 GB |
 | `emotion` | H | Acted emotion | emodb, emouerj, jvnv, resd, thorsten-emotional, crema-d (shared), emozionalmente (shared) | 10 | 3.09 GB | 1.71 GB |
 | `accent` | D | Accented English | speechocean762 | 2 | 0.64 GB | 0.64 GB |
 
@@ -43,10 +43,10 @@ Rendered from [config/audio-qc-corpora.json](../../../config/audio-qc-corpora.js
 - `emotion`: Class H delivery: actor-labelled emotion; CREMA-D and Emozionalmente come from the speaker group.
 - `accent`: Class D language: non-native English with expert pronunciation scores, as accented negatives.
 
-**Totals.** 9031 files, 28.96 GB to download; about 13.58 GB of mono PCM16 WAV once extracted (estimates; each extraction checks its own need first).
+**Totals.** 9037 files, 28.96 GB to download; about 13.58 GB of mono PCM16 WAV once extracted (estimates; each extraction checks its own need first).
 Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 29 GB to download.
 
-**Hosts.** https only, on `huggingface.co`, `*.hf.co`, `*.huggingface.co`, `media.githubusercontent.com`, `zenodo.org`.
+**Hosts.** https only, on `huggingface.co`, `*.hf.co`, `*.huggingface.co`, `media.githubusercontent.com`, `raw.githubusercontent.com`, `zenodo.org`.
 
 **Parquet runtime.** `corpora-parquet`: [config/audio-qc-runtimes/corpora-parquet.txt](../../../config/audio-qc-runtimes/corpora-parquet.txt), 6 packages, about 0.05 GB of wheels, import probe `pyarrow.parquet`, `soundfile`, `numpy`. Not a judge runtime: built by scripts/audio_qc_corpora.py runtime with the judge acquisition's interpreter and venv builder, under the same model root.
 <!-- END GENERATED audio-qc-docs:corpora-summary -->
@@ -56,10 +56,10 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 |---|---|---|---|---|---|---|---|
 | `fleurs-train` | `fleurs-train` | huggingface.co | english, french, german, spanish, italian, portuguese, russian, chinese, japanese, korean | gender, text | CC-BY-4.0 | 20 | 15.58 GB |
 | `aishell3-subset` | `speaker` | huggingface.co | chinese | accent, gender, speaker, text | Apache-2.0 | 1522 | 0.46 GB |
-| `crema-d` | `speaker` (+ emotion) | media.githubusercontent.com | english | emotion, speaker | ODbL-1.0 AND DbCL-1.0 | 7442 | 0.61 GB |
+| `crema-d` | `speaker` (+ emotion) | media.githubusercontent.com | english | emotion, gender, speaker | ODbL-1.0 AND DbCL-1.0 | 7443 | 0.61 GB |
 | `emozionalmente` | `speaker` (+ emotion) | zenodo.org | italian | emotion, gender, speaker, text | CC-BY-4.0 | 1 | 0.56 GB |
 | `libritts-r` | `speaker` | huggingface.co | english | speaker, text | CC-BY-4.0 | 7 | 3.01 GB |
-| `mls` | `speaker` | huggingface.co | german, french, spanish, italian, portuguese | speaker, text | CC-BY-4.0 | 20 | 2.14 GB |
+| `mls` | `speaker` | huggingface.co | german, french, spanish, italian, portuguese | gender, speaker, text | CC-BY-4.0 | 25 | 2.15 GB |
 | `zeroth-korean` | `speaker` | huggingface.co | korean | speaker, text | CC-BY-4.0 | 7 | 2.88 GB |
 | `emodb` | `emotion` | zenodo.org | german | emotion, gender, speaker | CC-BY-4.0 | 1 | 0.04 GB |
 | `emouerj` | `emotion` | zenodo.org | portuguese | emotion, gender, speaker | CC-BY-4.0 | 1 | 0.11 GB |
@@ -94,15 +94,15 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 
 ### CREMA-D (`crema-d`)
 
-- Pinned: `CheyneyComputerScience/CREMA-D` at `1658cd342dff` on `media.githubusercontent.com`; 7442 files (7442 by LFS SHA-256), 0.61 GB.
+- Pinned: `CheyneyComputerScience/CREMA-D` at `1658cd342dff` on `media.githubusercontent.com`; 7443 files (1 by git blob SHA-1, 7442 by LFS SHA-256), 0.61 GB.
 - Pin file: [config/audio-qc-corpora/crema-d.tsv](../../../config/audio-qc-corpora/crema-d.tsv) (SHA-256 `76292ac0f82c1b0c`).
 - License: ODbL-1.0 AND DbCL-1.0 ([text](https://opendatacommons.org/licenses/odbl/1-0/); official source <https://github.com/CheyneyComputerScience/CREMA-D/blob/1658cd342dff90010aa843eaeebd53610a08b1dc/LICENSE.txt>).
 - License note: The database is under the Open Database License 1.0 and its contents under the Database Contents License 1.0 (https://opendatacommons.org/licenses/dbcl/1-0/); a derived database shared publicly stays under the ODbL.
 - Attribution: CREMA-D, the Crowd-sourced Emotional Multimodal Actors Dataset (Cao et al., 2014, IEEE Transactions on Affective Computing 5(4)), by Cheyney University of Pennsylvania and the CREMA-D contributors, under the Open Database License 1.0 with contents under the Database Contents License 1.0. Vocello's audio QC tooling downloads the pinned WAVs into an untracked local cache; no CREMA-D audio or label is redistributed or committed.
-- Labels: emotion (acted emotion and intensity (file name)), speaker (actor id (file name)); absent: accent, gender, pronunciationScores, text.
+- Labels: emotion (acted emotion and intensity (file name)), gender (VideoDemographics.csv Sex column, joined by actor id), speaker (actor id (file name)); absent: accent, pronunciationScores, text.
 - Extraction: `wav-files`; written at 16000 Hz; about 0.61 GB (the pinned WAV bytes (16 kHz mono PCM16, kept as they are)).
 - Caveat: 91 actors reading 12 fixed sentences in six acted emotions; the intensity level XX is unspecified.
-- Caveat: Gender and other demographics are in VideoDemographics.csv, a plain git file that media.githubusercontent.com does not serve (it serves LFS content only); it is not fetched, so the clips carry no gender.
+- Caveat: Gender comes from VideoDemographics.csv, a plain git file of the pinned commit that only raw.githubusercontent.com serves, pinned by its git blob SHA-1 and kept in the untracked cache: the extraction joins only its Sex column, by ActorID; its age, race and ethnicity columns never reach a manifest, a clip or any record.
 - Caveat: The sentence text is not extracted: each clip carries its sentence code (textID) only.
 
 ### Emozionalmente (`emozionalmente`)
@@ -124,21 +124,21 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - Labels: speaker (speaker_id column), text (text_original column); absent: accent, emotion, gender, pronunciationScores.
 - Extraction: `parquet`; written at 24000 Hz; about 0.45 GB (per-speaker cap: 79 speakers x 20 utterances x 5.95 s mean (62,877 s over 10,573 utterances of dev.clean and test.clean, datasets-server duration statistics) of 24 kHz PCM16).
 - Caveat: The audio is restored by a speech restoration model (Miipher), not a raw recording: unsuitable as a class A or G signal-quality negative.
-- Caveat: This mirror carries no speaker gender (LibriTTS's SPEAKERS.txt is not in it).
 - Caveat: dev.clean holds 40 speakers and test.clean 39; audio is 24 kHz.
+- Caveat: No speaker gender: LibriTTS's SPEAKERS.txt is not in this mirror and no pinnable source for it was found on the allowed hosts, so its clips carry none and the class E impostor injectors, which draw same-language, same-gender donors, do not use them.
 
 ### Multilingual LibriSpeech (de, fr, es, it, pt: dev, test, 9_hours, 1_hours) (`mls`)
 
-- Pinned: `facebook/multilingual_librispeech` at `2e83e61823b4` on `huggingface.co`; 20 files (20 by LFS SHA-256), 2.14 GB.
+- Pinned: `facebook/multilingual_librispeech` at `2e83e61823b4` on `huggingface.co`; 25 files (20 by LFS SHA-256, 5 by git blob SHA-1), 2.15 GB.
 - License: CC-BY-4.0 ([text](https://creativecommons.org/licenses/by/4.0/); official source <https://www.openslr.org/94/>).
 - Attribution: Multilingual LibriSpeech (Pratap et al., 2020, arXiv:2012.03411), derived from LibriVox audiobooks, OpenSLR 94, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset facebook/multilingual_librispeech. No audio or transcript is redistributed or committed.
-- Labels: speaker (speaker_id column), text (transcript column); absent: accent, emotion, gender, pronunciationScores.
+- Labels: gender (data/mls_<language>/metainfo.txt GENDER column, joined by speaker id within its language), speaker (speaker_id column), text (transcript column); absent: accent, emotion, pronunciationScores.
 - Extraction: `parquet`; written at 16000 Hz; about 3.09 GB (per-speaker cap: 322 speakers (union of dev, test, 9_hours and 1_hours) x 20 utterances x about 15 s (MLS segments run 10-20 s) of 16 kHz PCM16; uncapped 491,408 s (datasets-server duration statistics of the 20 splits)).
 - Caveat: Maintainer decision: anonymous same/different-speaker trials only, never speaker identification.
 - Caveat: Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.
 - Caveat: The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.
 - Caveat: 1_hours is a limited-supervision set overlapping 9_hours speakers; identical clips are written once and listed as duplicates.
-- Caveat: This mirror carries no speaker gender.
+- Caveat: Speaker gender comes from each language's metainfo.txt, the OpenSLR metadata this mirror carries under data/mls_<language>/ (SPEAKER | GENDER | PARTITION | MINUTES | BOOK ID | TITLE | CHAPTER), pinned by git blob SHA-1 and joined by speaker id within that language; only its SPEAKER and GENDER columns are used, and a speaker whose rows disagree keeps no gender.
 
 ### Zeroth-Korean (test and train) (`zeroth-korean`)
 
@@ -148,7 +148,8 @@ Set `lean`: `fleurs-train`, `speaker`, `emotion`, `accent`. Every group: about 2
 - Labels: speaker (speaker_id column), text (text column); absent: accent, emotion, gender, pronunciationScores.
 - Extraction: `parquet`; written at 16000 Hz; about 0.62 GB (per-speaker cap: 115 speakers x 20 utterances x 8.38 s mean (190,334 s over 22,720 utterances, datasets-server duration statistics) of 16 kHz PCM16).
 - Caveat: An unofficial Hugging Face mirror, pinned by revision and LFS SHA-256 (maintainer decision).
-- Caveat: test holds 10 speakers and train 105; this mirror carries no speaker gender.
+- Caveat: test holds 10 speakers and train 105.
+- Caveat: No speaker gender: this mirror has no speaker table and no pinnable source for one was found on the allowed hosts, so its clips carry none and the class E impostor injectors, which draw same-language, same-gender donors, do not use them.
 
 ### Berlin EmoDB (`emodb`)
 

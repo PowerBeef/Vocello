@@ -34,6 +34,7 @@
     "*.hf.co",
     "*.huggingface.co",
     "media.githubusercontent.com",
+    "raw.githubusercontent.com",
     "zenodo.org"
   ],
   "item": "AQ-07",
@@ -171,7 +172,7 @@
       "attribution": "CREMA-D, the Crowd-sourced Emotional Multimodal Actors Dataset (Cao et al., 2014, IEEE Transactions on Affective Computing 5(4)), by Cheyney University of Pennsylvania and the CREMA-D contributors, under the Open Database License 1.0 with contents under the Database Contents License 1.0. Vocello's audio QC tooling downloads the pinned WAVs into an untracked local cache; no CREMA-D audio or label is redistributed or committed.",
       "caveats": [
         "91 actors reading 12 fixed sentences in six acted emotions; the intensity level XX is unspecified.",
-        "Gender and other demographics are in VideoDemographics.csv, a plain git file that media.githubusercontent.com does not serve (it serves LFS content only); it is not fetched, so the clips carry no gender.",
+        "Gender comes from VideoDemographics.csv, a plain git file of the pinned commit that only raw.githubusercontent.com serves, pinned by its git blob SHA-1 and kept in the untracked cache: the extraction joins only its Sex column, by ActorID; its age, race and ethnicity columns never reach a manifest, a clip or any record.",
         "The sentence text is not extracted: each clip carries its sentence code (textID) only."
       ],
       "extract": {
@@ -187,6 +188,10 @@
             "NEU": "neutral",
             "SAD": "sad"
           },
+          "gender": {
+            "Female": "female",
+            "Male": "male"
+          },
           "intensity": {
             "HI": "high",
             "LO": "low",
@@ -195,14 +200,34 @@
           }
         },
         "members": "^AudioWAV/(?P<id>(?P<speaker>[0-9]{4})_(?P<textID>[A-Z]{3})_(?P<emotion>[A-Z]{3})_(?P<intensity>[A-Z]{2}))\\.wav$",
+        "metadata": [
+          {
+            "fields": {
+              "gender": "Sex"
+            },
+            "file": "VideoDemographics.csv",
+            "format": "csv",
+            "joinOn": "speaker",
+            "keyColumn": "ActorID",
+            "keyNormalize": "int"
+          }
+        ],
         "outputRate": 16000
       },
+      "files": [
+        {
+          "gitBlobSHA1": "94a2db22d3b359d3ad90d936640d4cff1ade5b91",
+          "path": "VideoDemographics.csv",
+          "role": "metadata",
+          "size": 4033
+        }
+      ],
       "group": "speaker",
       "host": "media.githubusercontent.com",
       "labels": {
         "accent": null,
         "emotion": "acted emotion and intensity (file name)",
-        "gender": null,
+        "gender": "VideoDemographics.csv Sex column, joined by actor id",
         "pronunciationScores": null,
         "speaker": "actor id (file name)",
         "text": null
@@ -226,8 +251,8 @@
       "revision": "1658cd342dff90010aa843eaeebd53610a08b1dc",
       "title": "CREMA-D",
       "totals": {
-        "bytes": 605899936,
-        "files": 7442
+        "bytes": 605903969,
+        "files": 7443
       }
     },
     "emodb": {
@@ -719,8 +744,8 @@
       "attribution": "LibriTTS-R (Koizumi et al., 2023, arXiv:2305.18802), the sound-quality-restored LibriTTS corpus (Zen et al., 2019) derived from LibriSpeech and LibriVox, OpenSLR 141, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face dataset mythicinfinity/libritts_r. No audio or transcript is redistributed or committed.",
       "caveats": [
         "The audio is restored by a speech restoration model (Miipher), not a raw recording: unsuitable as a class A or G signal-quality negative.",
-        "This mirror carries no speaker gender (LibriTTS's SPEAKERS.txt is not in it).",
-        "dev.clean holds 40 speakers and test.clean 39; audio is 24 kHz."
+        "dev.clean holds 40 speakers and test.clean 39; audio is 24 kHz.",
+        "No speaker gender: LibriTTS's SPEAKERS.txt is not in this mirror and no pinnable source for it was found on the allowed hosts, so its clips carry none and the class E impostor injectors, which draw same-language, same-gender donors, do not use them."
       ],
       "extract": {
         "audioColumn": "audio",
@@ -814,7 +839,7 @@
         "Portuguese mixes pt-PT and pt-BR speakers without a label; it has 46 speakers, 38 with at least 20 utterances.",
         "The audio is cut from LibriVox 64 kbps MP3 audiobooks (the original_path column) and stored compressed in this mirror (about 35 kbps), so it carries lossy coding artifacts: not a class A or G negative.",
         "1_hours is a limited-supervision set overlapping 9_hours speakers; identical clips are written once and listed as duplicates.",
-        "This mirror carries no speaker gender."
+        "Speaker gender comes from each language's metainfo.txt, the OpenSLR metadata this mirror carries under data/mls_<language>/ (SPEAKER | GENDER | PARTITION | MINUTES | BOOK ID | TITLE | CHAPTER), pinned by git blob SHA-1 and joined by speaker id within that language; only its SPEAKER and GENDER columns are used, and a speaker whose rows disagree keeps no gender."
       ],
       "extract": {
         "audioColumn": "audio",
@@ -827,6 +852,69 @@
         "estimateBasis": "per-speaker cap: 322 speakers (union of dev, test, 9_hours and 1_hours) x 20 utterances x about 15 s (MLS segments run 10-20 s) of 16 kHz PCM16; uncapped 491,408 s (datasets-server duration statistics of the 20 splits)",
         "estimatedBytes": 3091200000,
         "format": "parquet",
+        "maps": {
+          "gender": {
+            "F": "female",
+            "M": "male"
+          }
+        },
+        "metadata": [
+          {
+            "fields": {
+              "gender": 1
+            },
+            "file": "data/mls_german/metainfo.txt",
+            "format": "pipe",
+            "header": true,
+            "joinOn": "speaker",
+            "keyColumn": 0,
+            "keyNormalize": "int"
+          },
+          {
+            "fields": {
+              "gender": 1
+            },
+            "file": "data/mls_french/metainfo.txt",
+            "format": "pipe",
+            "header": true,
+            "joinOn": "speaker",
+            "keyColumn": 0,
+            "keyNormalize": "int"
+          },
+          {
+            "fields": {
+              "gender": 1
+            },
+            "file": "data/mls_spanish/metainfo.txt",
+            "format": "pipe",
+            "header": true,
+            "joinOn": "speaker",
+            "keyColumn": 0,
+            "keyNormalize": "int"
+          },
+          {
+            "fields": {
+              "gender": 1
+            },
+            "file": "data/mls_italian/metainfo.txt",
+            "format": "pipe",
+            "header": true,
+            "joinOn": "speaker",
+            "keyColumn": 0,
+            "keyNormalize": "int"
+          },
+          {
+            "fields": {
+              "gender": 1
+            },
+            "file": "data/mls_portuguese/metainfo.txt",
+            "format": "pipe",
+            "header": true,
+            "joinOn": "speaker",
+            "keyColumn": 0,
+            "keyNormalize": "int"
+          }
+        ],
         "outputRate": 16000,
         "perSpeaker": 20
       },
@@ -970,6 +1058,41 @@
           "sha256": "6d40c867c80df7755e7775ffe877d0aca628fb4668d026e47d6f9b061c353091",
           "size": 15636528,
           "split": "1_hours"
+        },
+        {
+          "gitBlobSHA1": "c5e55ac8590108adcce2ee2b41952b59da2be7c6",
+          "language": "german",
+          "path": "data/mls_german/metainfo.txt",
+          "role": "metadata",
+          "size": 907150
+        },
+        {
+          "gitBlobSHA1": "904f4aa5e3e98625c420be27dfaea75116476590",
+          "language": "french",
+          "path": "data/mls_french/metainfo.txt",
+          "role": "metadata",
+          "size": 716290
+        },
+        {
+          "gitBlobSHA1": "ef3ad19ae3bfb525d670bdfa78e34a4698ae69af",
+          "language": "spanish",
+          "path": "data/mls_spanish/metainfo.txt",
+          "role": "metadata",
+          "size": 662175
+        },
+        {
+          "gitBlobSHA1": "41dcb971a6830435d51ce9d44c1e923df2788ece",
+          "language": "italian",
+          "path": "data/mls_italian/metainfo.txt",
+          "role": "metadata",
+          "size": 183461
+        },
+        {
+          "gitBlobSHA1": "071e1eebb34e83476fb495ca12631bee57d5c592",
+          "language": "portuguese",
+          "path": "data/mls_portuguese/metainfo.txt",
+          "role": "metadata",
+          "size": 172777
         }
       ],
       "group": "speaker",
@@ -977,7 +1100,7 @@
       "labels": {
         "accent": null,
         "emotion": null,
-        "gender": null,
+        "gender": "data/mls_<language>/metainfo.txt GENDER column, joined by speaker id within its language",
         "pronunciationScores": null,
         "speaker": "speaker_id column",
         "text": "transcript column"
@@ -998,8 +1121,8 @@
       "revision": "2e83e61823b4c47dcbcb1980bb88601274127609",
       "title": "Multilingual LibriSpeech (de, fr, es, it, pt: dev, test, 9_hours, 1_hours)",
       "totals": {
-        "bytes": 2144926782,
-        "files": 20
+        "bytes": 2147568635,
+        "files": 25
       }
     },
     "resd": {
@@ -1232,7 +1355,8 @@
       "attribution": "Zeroth-Korean, the Korean speech corpus of the Zeroth project (Lucas Jo, Wonkyum Lee and Atlas Guide), OpenSLR 40, under the Creative Commons Attribution 4.0 International license (CC BY 4.0); read here from the Hugging Face mirror kresnik/zeroth_korean. No audio or transcript is redistributed or committed.",
       "caveats": [
         "An unofficial Hugging Face mirror, pinned by revision and LFS SHA-256 (maintainer decision).",
-        "test holds 10 speakers and train 105; this mirror carries no speaker gender."
+        "test holds 10 speakers and train 105.",
+        "No speaker gender: this mirror has no speaker table and no pinnable source for one was found on the allowed hosts, so its clips carry none and the class E impostor injectors, which draw same-language, same-gender donors, do not use them."
       ],
       "extract": {
         "audioColumn": "audio",
@@ -1320,8 +1444,8 @@
     }
   },
   "totals": {
-    "bytes": 28962323872,
-    "files": 9031,
+    "bytes": 28964969758,
+    "files": 9037,
     "groups": {
       "accent": {
         "bytes": 644387157,
@@ -1336,8 +1460,8 @@
         "files": 20
       },
       "speaker": {
-        "bytes": 9655241119,
-        "files": 8999
+        "bytes": 9657887005,
+        "files": 9005
       }
     }
   }

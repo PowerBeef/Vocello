@@ -2104,20 +2104,31 @@ python3 scripts/audio_qc_corpora.py fetch --set lean && python3 scripts/audio_qc
 python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of downloads, runtime, extractions
 ```
 
-- **Size.** 9,031 files, 28.96 GB to download (plus 7 MB of N1 dev and test TSVs the reserve reads);
-  about 34 GB of WAVs once extracted, most of it Multilingual LibriSpeech (15.7 GB) and
-  Zeroth-Korean (6.1 GB). `plan` compares the need, with the 2 GiB margin, to the free space;
-  `fetch` refuses a selection that does not fit, and each extraction checks its own need first.
-  `--group` and `--source` narrow any command.
+- **Size.** 9,037 files, 28.96 GB to download (plus 7 MB of N1 dev and test TSVs the reserve reads);
+  about 13.6 GB of WAVs once extracted, since Multilingual LibriSpeech, Zeroth-Korean and
+  LibriTTS-R keep 20 utterances per speaker (a seeded per-speaker cap; about 34 GB uncapped); the
+  FLEURS reserve cohorts (5.4 GB) and MLS (3.1 GB) are the largest. `plan` compares the need, with
+  the 2 GiB margin, to the free space; `fetch` refuses a selection that does not fit, and each
+  extraction checks its own need first. `--group` and `--source` narrow any command.
 - **Pins and hosts.** Hugging Face files by LFS SHA-256 or git blob SHA-1 at a pinned revision
   (unofficial mirrors accepted that way, licenses cited from the official source), GitHub LFS
-  content by SHA-256 (the 7,442 CREMA-D WAVs, `config/audio-qc-corpora/crema-d.tsv`), Zenodo
-  archives by the publisher's MD5 and exact size. Downloads reach only huggingface.co and its CDNs,
-  media.githubusercontent.com and zenodo.org, resume with range requests where the host honours
-  them, and move into place only once verified. `corpora-fetch-receipt.json` records each file's
-  SHA-256; for an MD5-pinned file it is recorded on the first verified fetch and checked on every
-  later run. CREMA-D's VideoDemographics.csv (gender) is a plain git file that only
-  raw.githubusercontent.com serves, so it is not fetched and CREMA-D clips carry no gender.
+  content by SHA-256 (the 7,442 CREMA-D WAVs, `config/audio-qc-corpora/crema-d.tsv`), a GitHub
+  source's plain git metadata file by git blob SHA-1 at its pinned commit (CREMA-D's
+  VideoDemographics.csv), Zenodo archives by the publisher's MD5 and exact size. Downloads reach
+  only huggingface.co and its CDNs, media.githubusercontent.com, raw.githubusercontent.com (a
+  blob-pinned metadata file only) and zenodo.org, resume with range requests where the host
+  honours them, and move into place only once verified. `corpora-fetch-receipt.json` records each
+  file's SHA-256; for an MD5-pinned file it is recorded on the first verified fetch and checked on
+  every later run.
+- **Speaker gender.** The class E impostor, identity-swap, onset and seam-voice injectors draw
+  same-language, same-gender donors, so they use only clips that carry a speaker and a gender.
+  Multilingual LibriSpeech takes it from each language's `data/mls_<language>/metainfo.txt` (the
+  OpenSLR metadata the mirror carries, pinned by git blob SHA-1, `F`/`M` joined by speaker id
+  within that language), CREMA-D from the `Sex` column of VideoDemographics.csv joined by actor id
+  (its age, race and ethnicity columns are never read into a manifest or record), AISHELL-3 from
+  `spk-info.txt` and Emozionalmente from its `users.csv`. A speaker whose rows disagree keeps no
+  gender, never a guess. LibriTTS-R and Zeroth-Korean carry none: their mirrors have no speaker
+  table and no pinnable source was found on the allowed hosts.
 - **AISHELL-3 subset.** A seeded rule over the pinned test listing: the 76 speakers with at least
   100 WAVs, 20 WAVs each (lowest SHA-256 of seed and path), resolved to explicit per-WAV pins in
   `config/audio-qc-corpora/aishell3-test-subset.tsv` by `audio_qc_corpora.py resolve-subset`.
@@ -2133,7 +2144,10 @@ python3 scripts/audio_qc_corpora.py verify --set lean    # offline re-check of d
   `lib.playback_capture.resample`. Each source gets an untracked `audio-qc-corpus` manifest under
   `<source>/<revision>/extracted/`: per clip its speaker, gender, emotion (the corpus's label and a
   canonical name where the registry maps one), accent, pronunciation scores and text where the
-  corpus has them, duration and digests. Identical PCM is kept once with its duplicates listed (the
+  corpus has them, duration and digests. Metadata tables (archive members, or pinned files beside
+  WAV files or Parquet shards) are joined by key after decoding, outside the Parquet worker; the
+  manifest's `metadata` counts each table's rows, unjoined clips and any conflicting keys.
+  Identical PCM is kept once with its duplicates listed (the
   MLS 1-hour set shares speakers with the 9-hour set and may repeat its clips); an undecodable clip
   is listed as skipped with its reason.
 - **FLEURS reserve cohorts.** Per language, the train recordings the N1 rules mark eligible (a

@@ -27,3 +27,10 @@ audiobox_aesthetics==0.0.4
 torchfcpe==0.0.4
 einops==0.8.2
 local-attention==1.9.0
+
+# --- agent B ---
+# qc.runners.wav2vec2_phones (the ZIPA fallback) needs only torch, transformers, numpy and
+# soundfile, all pinned in agent C's block (torch==2.14.1 loads pytorch_model.bin with
+# weights_only; Wav2Vec2ForCTC and Wav2Vec2FeatureExtractor are in transformers==5.2.0).
+# No package of its own.
+# --- end agent B ---

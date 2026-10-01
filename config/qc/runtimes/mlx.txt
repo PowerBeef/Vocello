@@ -2,3 +2,19 @@
 # One requirement per line, each pinned with == (or an https direct reference).
 # Installed by: python3 scripts/qc.py runtimes setup --runtime mlx
 # into build/cache/qc/runtimes/mlx; a change here makes the venv stale until setup re-runs.
+
+# --- agent B ---
+# qc.runners.qwen3_asr and qc.runners.qwen3_aligner: Qwen3-ASR and Qwen3-ForcedAligner through
+# mlx-audio (mlx_audio.stt.models.qwen3_asr; 0.5.7 changed nothing there since 0.5.6). mlx-audio
+# loads their tokenizer and WhisperFeatureExtractor with transformers (it needs >= 5.14).
+mlx==0.32.3
+mlx-audio==0.5.7
+transformers==5.18.0
+# qc.runners.whisper: Whisper large-v3 through mlx-whisper, which also pulls torch, numba and
+# tiktoken (numba 0.68 keeps numpy below 2.6).
+mlx-whisper==0.4.3
+torch==2.14.1
+# Every mlx runner: arrays and WAV input (the same pins as the onnx and torch runtimes).
+numpy==2.5.3
+soundfile==0.14.0
+# --- end agent B ---

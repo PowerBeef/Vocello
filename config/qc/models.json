@@ -802,6 +802,48 @@
       "memoryGB": 3.5,
       "languages": "any",
       "version": 1
+    },
+    {
+      "id": "g2p.espeak-ng",
+      "kind": "g2p",
+      "role": "primary",
+      "runner": "qc.runners.espeak_g2p",
+      "runtime": "onnx",
+      "source": {
+        "host": "github-raw",
+        "repo": "dmort27/panphon",
+        "revision": "a49c242d3307864312a2701055faefa4e548501c",
+        "files": {
+          "LICENSE.txt": {
+            "sha256": "3b1fb30693f359509d028738dd6d19b131256a125604e9021a6512f098445523",
+            "bytes": 1070
+          },
+          "panphon/data/feature_weights.csv": {
+            "sha256": "03e80a6489e4993de6f17e063eaa74eb59c1d9ba9bc0dec9bec6ffce0cb8080d",
+            "bytes": 209
+          },
+          "panphon/data/ipa_all.csv": {
+            "sha256": "0ec0052edf4e58c8c23eda10c0195687eb167ce9bd206cf9a85b9cce8b181f0a",
+            "bytes": 356894
+          }
+        }
+      },
+      "license": "GPL-3.0-or-later (espeak-ng 1.52 in the espeakng-loader 0.2.4 wheel, MIT loader); MIT (PanPhon feature data)",
+      "notice": "G2P runs libespeak-ng in-process from the espeakng-loader wheel inside the QC onnx runtime only; nothing ships with the product. The pinned files are PanPhon's articulatory feature table and weights (Copyright (c) 2015 Carnegie Mellon University, MIT), read by qc.phones for the phone-alignment distance; the PanPhon package itself is not installed.",
+      "memoryGB": 0.5,
+      "languages": [
+        "chinese",
+        "english",
+        "french",
+        "german",
+        "italian",
+        "japanese",
+        "korean",
+        "portuguese",
+        "russian",
+        "spanish"
+      ],
+      "version": 1
     }
   ]
 }

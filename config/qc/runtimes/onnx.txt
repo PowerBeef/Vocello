@@ -12,3 +12,14 @@ swift-f0==0.3.0
 numpy==2.5.3
 scipy==1.18.1
 soundfile==0.14.0
+
+# --- agent B ---
+# qc.runners.zipa: ZIPA CR-CTC on onnxruntime (pinned in agent C's block, 1.30.0) with the Kaldi
+# fbank front end from kaldi-native-fbank (no torch, lhotse or k2).
+kaldi-native-fbank==1.22.3
+# qc.runners.espeak_g2p (behind qc.phones.g2p): espeak-ng 1.52 in-process. The wheel ships
+# libespeak-ng and espeak-ng-data (GPL-3.0-or-later); the loader is MIT. PanPhon's feature table
+# is a pinned data file of the g2p.espeak-ng registry entry, not a package.
+espeakng-loader==0.2.4
+# numpy==2.5.3 and soundfile==0.14.0 come from agent C's block.
+# --- end agent B ---

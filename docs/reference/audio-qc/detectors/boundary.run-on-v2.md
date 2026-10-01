@@ -43,7 +43,7 @@ Excludes korean: The forced aligner is out of scope for Korean: mlx-audio tokeni
 - `runon-quiet-span`: BND-RUNON's recording variant appends copies of a 0.5 s span of the take's middle, which can be a pause: such a positive adds nothing at speech level and the score cannot see it (7 of the 12 spent severe positives it missed at alpha 0.02). The other 5 were Japanese takes whose aligner placed the script's end past the last active span, with 42-61% of their units aligned.
 - `noisy-tail-activity`: On a noisy recording the activity margin (10 dB over the 10th-percentile frame) is close to the noise's own spread, so noise after the last word can form an active span: BND-RUNON's sham, 300 ms of -80 dBFS room tone after the take, lowers such a take's floor and moved its active end 0.7-0.8 s later on 3 of 135 spent sham families. At alpha 0.05 the sham's 11 of 135 alarms depart narrowly from the clean N2 interval (A4), at alpha 0.02 its 1 of 135 does not: plan at alpha 0.02.
 
-**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
+**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): language-bench at warn.
 <!-- END GENERATED audio-qc-docs:definition -->
 
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->

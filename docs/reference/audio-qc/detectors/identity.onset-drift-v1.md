@@ -42,7 +42,7 @@ Excludes russian: The speaker group of config/audio-qc-corpora.json has no corpu
 - `short-window-embeddings`: Speaker embeddings degrade on short windows (audit section 4.3): a 2 s window scores lower against the reference than the whole take even on clean speech. The drift and onset scores subtract the window's cosine from the take's own whole-take cosine, so each take is its own baseline; a take shorter than one window has none and abstains (no-value).
 - `onset-joint-rule-pending`: The audit judges the onset jointly on the CAM++ cosine, the pYIN register delta in semitones and a spectral-envelope Mahalanobis distance, since embeddings alone cannot judge the first 1.5 s (section 4.3). Nothing reduces the last two yet and the registry has no joint combination, so this version reads the CAM++ part alone; it stays warn until natural onset breaks are harvested.
 
-**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
+**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): clone-lane at warn.
 <!-- END GENERATED audio-qc-docs:definition -->
 
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->

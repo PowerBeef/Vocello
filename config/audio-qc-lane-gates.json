@@ -12,7 +12,7 @@
         "modes": ["custom", "design"],
         "farPopulation": "N2"
       },
-      "gates": []
+      "gates": [{"detector": "boundary.truncation@1", "level": "warn"}, {"detector": "boundary.run-on@2", "level": "warn"}, {"detector": "language.consensus-lid@1", "level": "warn"}]
     },
     "clone-lane": {
       "kind": "evidence-lane",
@@ -22,7 +22,7 @@
         "modes": ["clone"],
         "farPopulation": "N2"
       },
-      "gates": []
+      "gates": [{"detector": "identity.clone-similarity@1", "level": "warn"}, {"detector": "identity.onset-drift@1", "level": "warn"}]
     }
   }
 }

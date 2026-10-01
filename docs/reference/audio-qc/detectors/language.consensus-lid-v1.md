@@ -37,7 +37,7 @@ Registry entry `language.consensus-lid@1` in [config/audio-qc-detectors.json](..
 
 - `voxlingua-weak-german-russian`: VoxLingua's expected-language posterior is below 0.5 on 21.4% (de) and 43.5% (ru) of N1 FLEURS dev recordings, 22.2% and 44.1% on N2 (panels of 2026-09-29). Under max() a low VoxLingua posterior never alarms alone, so in German and Russian the consensus reduces to Whisper's vote.
 
-**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
+**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): language-bench at warn.
 <!-- END GENERATED audio-qc-docs:definition -->
 
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->

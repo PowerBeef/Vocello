@@ -40,7 +40,7 @@ Registry entry `boundary.truncation@1` in [config/audio-qc-detectors.json](../..
 - `parakeet-whisper-label-lineage`: Parakeet's training labels include Whisper pseudo-labels (Granary), so the pair may fail together; the phi audit in the record measures it before the pair gates.
 - `sensevoice-codec-degradation`: SenseVoice degrades through the codec: its error rate exceeds 0.5 on 0% (ja) and 9.6% (ko) of N1 FLEURS dev recordings and on 5.6% and 18.5% of their N2 resyntheses (panels of 2026-09-29). Under min() a failed SenseVoice transcript leaves Whisper as the effective vote in ja and ko; the confirmation decides and the phi audit shows it.
 
-**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): none.
+**Lanes it gates** ([config/audio-qc-lane-gates.json](../../../../config/audio-qc-lane-gates.json)): language-bench at warn.
 <!-- END GENERATED audio-qc-docs:definition -->
 
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->

@@ -45,8 +45,8 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | Lane | Gating classes | Stages | Kind | Scope | Gated by |
 |---|---|---|---|---|---|
 | publication | - | 0 | - | not declared | none |
-| language-bench | B, C, D | - | evidence-lane | chinese, english, french, german, japanese, spanish; modes custom, design; FAR on N2 | none |
-| clone-lane | E | - | evidence-lane | english; modes clone; FAR on N2 | none |
+| language-bench | B, C, D | - | evidence-lane | chinese, english, french, german, japanese, spanish; modes custom, design; FAR on N2 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) (warn), [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) (warn), [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) (warn) |
+| clone-lane | E | - | evidence-lane | english; modes clone; FAR on N2 | [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) (warn), [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) (warn) |
 | delivery-bench | H | - | - | not declared | none |
 | release-promotion | B, C, D, E, H | 0 | - | not declared | none |
 

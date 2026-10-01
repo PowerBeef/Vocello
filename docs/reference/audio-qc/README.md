@@ -81,8 +81,8 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | Lane | Gating classes | Stages | Kind | Scope | Gated by |
 |---|---|---|---|---|---|
 | publication | - | 0 | - | not declared | none |
-| language-bench | B, C, D | - | evidence-lane | chinese, english, french, german, japanese, spanish; modes custom, design; FAR on N2 | none |
-| clone-lane | E | - | evidence-lane | english; modes clone; FAR on N2 | none |
+| language-bench | B, C, D | - | evidence-lane | chinese, english, french, german, japanese, spanish; modes custom, design; FAR on N2 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) (warn), [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) (warn), [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) (warn) |
+| clone-lane | E | - | evidence-lane | english; modes clone; FAR on N2 | [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) (warn), [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) (warn) |
 | delivery-bench | H | - | - | not declared | none |
 | release-promotion | B, C, D, E, H | 0 | - | not declared | none |
 <!-- END GENERATED audio-qc-docs:lanes -->
@@ -139,14 +139,14 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | confirmed (refused) | refused | - |
 | [`content.consensus-error@2`](detectors/content.consensus-error-v2.md) | B (content) | 2 | consensus-mean | confirmed (qualified) | qualified (warn) | - |
-| [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | - |
+| [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | language-bench (warn) |
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
-| [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | 2 | difference | confirmed (qualified) | qualified (warn) | - |
-| [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |
+| [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | 2 | difference | confirmed (qualified) | qualified (warn) | language-bench (warn) |
+| [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | language-bench (warn) |
 | [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | 2 | consensus-mean | confirmed (refused) | refused | - |
-| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | 2 | single | confirmed (qualified) | qualified (warn) | - |
+| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | 2 | single | confirmed (qualified) | qualified (warn) | clone-lane (warn) |
 | [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | 2 | difference | confirmed (refused) | refused | - |
-| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | 2 | difference | confirmed (qualified) | qualified (warn) | - |
+| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | 2 | difference | confirmed (qualified) | qualified (warn) | clone-lane (warn) |
 | [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |

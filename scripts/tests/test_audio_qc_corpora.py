@@ -23,6 +23,7 @@ import struct
 import sys
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 import urllib.error
@@ -1206,10 +1207,11 @@ class ReserveTests(Fixture):
                 fleurs_row(505, "50008.wav", "Warm bread waits on the kitchen table."),
                 fleurs_row(506, "50009.wav", "Children laugh as the snow begins to fall."),
             ],
+            # FLEURS reads one FLoRes sentence in every language: French reads English's 501, 503 and 505.
             ("french", "train"): [
-                fleurs_row(601, "60001.wav", "La pluie tombe doucement sur le jardin."),
-                fleurs_row(602, "60002.wav", "Le vent souffle fort ce matin."),
-                fleurs_row(603, "60003.wav", "Nous marchons vers la gare."),
+                fleurs_row(501, "60001.wav", "La pluie tombe doucement sur le jardin."),
+                fleurs_row(503, "60002.wav", "Le vent souffle fort ce matin."),
+                fleurs_row(505, "60003.wav", "Nous marchons vers la gare."),
             ],
         }
         self.n1_files: dict[str, bytes] = {}
@@ -1255,23 +1257,59 @@ class ReserveTests(Fixture):
 
     def test_the_selection_is_seeded_stratified_disjoint_and_eligible_only(self) -> None:
         rows = n1.parse_tsv(tsv(self.rows[("english", "train")]), "t")
-        pick = corpora.reserve_selection(rows, language="english", shared_ids={101, 201}, cohorts=2,
-                                         per_language=3, seed="s")
-        self.assertEqual(pick, corpora.reserve_selection(list(reversed(rows)), language="english",
-                                                         shared_ids={101, 201}, cohorts=2, per_language=3, seed="s"))
-        sentences = [{row.sentence_id for row in cohort} for cohort in pick]
+
+        def pick(train, shared, **kwargs):
+            values = {"cohorts": 2, "per_language": 3, "seed": "s", **kwargs}
+            return corpora.reserve_allocation(train, shared_ids=shared, **values)
+
+        english = pick({"english": rows}, {"english": {101, 201}})["english"]
+        self.assertEqual(english, pick({"english": list(reversed(rows))}, {"english": {101, 201}})["english"])
+        sentences = [{row.sentence_id for row in cohort} for cohort in english]
         self.assertFalse(sentences[0] & sentences[1])
-        chosen = {row.file for cohort in pick for row in cohort}
+        chosen = {row.file for cohort in english for row in cohort}
         self.assertFalse(chosen & {"50001.wav", "50004.wav"})
-        self.assertTrue(all(len(cohort) <= 3 for cohort in pick))
-        self.assertEqual(sum(len(cohort) for cohort in pick), 6)
-        others = {tuple(tuple(row.file for row in cohort) for cohort in corpora.reserve_selection(
-            rows, language="english", shared_ids={101}, cohorts=2, per_language=3, seed=seed))
-            for seed in ("a", "b", "c", "d", "e")}
+        self.assertTrue(all(len(cohort) <= 3 for cohort in english))
+        self.assertEqual(sum(len(cohort) for cohort in english), 6)
+        others = {tuple(tuple(row.file for row in cohort) for cohort in pick({"english": rows}, {"english": {101}},
+                                                                             seed=seed)["english"])
+                  for seed in ("a", "b", "c", "d", "e")}
         self.assertGreater(len(others), 1)
-        short = corpora.reserve_selection(rows, language="english", shared_ids=set(), cohorts=3, per_language=3,
-                                          seed="s")
-        self.assertLess(len(short[2]), 3)
+        # Seven eligible recordings cannot fill three cohorts of three: the shortfall stays visible.
+        short = pick({"english": rows}, {"english": set()}, cohorts=3)["english"]
+        self.assertLess(min(len(cohort) for cohort in short), 3)
+
+    def test_a_sentence_joins_one_cohort_in_every_language(self) -> None:
+        """Rule v2: the allocation is global. Ten sentences, each read twice in each of three languages (one
+        language's reading of sentence 7 shares dev, another's of sentence 8 has a digit), fill two cohorts of
+        four recordings per language with no sentence in both, whatever the input order."""
+        texts = {"english": "The river runs past the old mill.", "french": "La rivière passe devant le moulin.",
+                 "german": "Der Fluss fließt an der Mühle vorbei."}
+        train = {language: [n1.Row(sentence, f"{index}{sentence:02d}{take}.wav",
+                                   "There were 3 boats." if (language, sentence) == ("german", 8) else text,
+                                   1600, "female")
+                            for sentence in range(1, 11) for take in range(2)]
+                 for index, (language, text) in enumerate(texts.items(), 1)}
+        shared = {"english": {7}, "french": set(), "german": set()}
+        allocation = corpora.reserve_allocation(train, shared_ids=shared, cohorts=2, per_language=4, seed="g")
+        reordered = corpora.reserve_allocation({language: list(reversed(rows)) for language, rows in
+                                                reversed(list(train.items()))},
+                                               shared_ids=shared, cohorts=2, per_language=4, seed="g")
+        self.assertEqual(allocation, {language: reordered[language] for language in allocation})
+        owner: dict[int, set[int]] = {}
+        for language, cohorts in allocation.items():
+            self.assertEqual([len(rows) for rows in cohorts], [4, 4], language)
+            for index, rows in enumerate(cohorts):
+                for row in rows:
+                    owner.setdefault(row.sentence_id, set()).add(index)
+        self.assertTrue(all(len(indexes) == 1 for indexes in owner.values()), owner)
+        self.assertNotIn(7, {row.sentence_id for rows in allocation["english"] for row in rows})
+        self.assertNotIn(8, {row.sentence_id for rows in allocation["german"] for row in rows})
+        # The pool is three sentences short of a third cohort in each language: it falls short, never padded.
+        three = corpora.reserve_allocation(train, shared_ids=shared, cohorts=3, per_language=8, seed="g")
+        self.assertTrue(all(sum(len(rows) for rows in cohorts) <= 20 for cohorts in three.values()))
+        self.assertLess(min(len(rows) for cohorts in three.values() for rows in cohorts), 8)
+        scripts = [{row.sentence_id for cohorts in three.values() for row in cohorts[index]} for index in range(3)]
+        self.assertFalse(scripts[0] & scripts[1] or scripts[0] & scripts[2] or scripts[1] & scripts[2])
 
     def test_reserve_cohorts_are_n1_manifests_the_n2_and_calibration_tools_accept(self) -> None:
         report = self.extract()
@@ -1364,6 +1402,249 @@ class ReserveTests(Fixture):
         with self.assertRaisesRegex(corpora.CorporaError, "french reserve recordings do not match their extraction "
                                                           "receipt\\); run `fetch --source fleurs-train`"):
             self.prune(dry_run=True)
+
+
+    def test_verify_names_a_reserve_of_an_earlier_rule(self) -> None:
+        self.extract()
+        earlier = self.corpus / corpora.RESERVE_DIRECTORY / "0123456789ab" / "cohort-1" / corpora.MANIFEST_NAME
+        earlier.parent.mkdir(parents=True)
+        earlier.write_text(json.dumps({"reserve": {"cohort": 1, "version": "audio-qc-fleurs-reserve-v1"}}))
+        with mock.patch.object(n1, "sources_digest", return_value="d" * 64):
+            results = quiet(corpora.verify, self.registry, ["fleurs-train"], root=self.root,
+                            n1_sources=self.n1_sources)
+        self.assertEqual(results[0]["status"], "PASS")
+        self.assertEqual(len(results[0]["notes"]), 1)
+        self.assertIn("reserve/0123456789ab holds cohorts sampled by audio-qc-fleurs-reserve-v1",
+                      results[0]["notes"][0])
+        self.assertIn("reserve-disjoint --reserve 0123456789ab", results[0]["notes"][0])
+
+
+TOKENIZER = "e" * 64
+
+
+def fake_roundtrip(run: Path, plan: dict) -> Path:
+    """What the codec round trip writes for a plan: `<id>.wav` (24 kHz) and `<id>.codes.bin` beside its result."""
+    out = run / "roundtrip"
+    out.mkdir(parents=True, exist_ok=True)
+    items = []
+    for index, item in enumerate(plan["items"]):
+        audio = pcm16(item["inputSampleCount"], 24_000, 300.0 + index)
+        (out / f"{item['id']}.wav").write_bytes(audio)
+        codes = b"VQCT" + item["id"].encode()
+        (out / f"{item['id']}.codes.bin").write_bytes(codes)
+        items.append({"id": item["id"], "inputSHA256": item["inputWAVSHA256"], "status": "complete",
+                      "inputSampleCount": item["inputSampleCount"], "outputPath": f"{item['id']}.wav",
+                      "outputSHA256": hashlib.sha256(audio).hexdigest(), "outputSampleCount": item["inputSampleCount"],
+                      "clampedSampleCount": 0, "frameCount": 7, "codebookCount": 16,
+                      "codesPath": f"{item['id']}.codes.bin", "codesSHA256": hashlib.sha256(codes).hexdigest()})
+    result = {"schemaVersion": 1, "kind": n2.RESULT_KIND, "runID": "codec-roundtrip-x",
+              "jobSHA256": plan["job"]["sha256"], "modelID": "pro_clone_speed", "modelRevision": REVISION,
+              "tokenizerSHA256": TOKENIZER, "encoderInput": n2.ENCODER_INPUT, "decodeSemantics": n2.DECODE_SEMANTICS,
+              "outputFormat": n2.OUTPUT_FORMAT, "sampleRate": n2.CODEC_RATE, "status": "complete",
+              "modelLoadCount": 1, "items": items}
+    path = out / "codec-roundtrip-result.json"
+    path.write_text(json.dumps(result), encoding="utf-8")
+    return path
+
+
+class ReserveDisjointTests(Fixture):
+    """`reserve-disjoint`: rule v1 cohorts sharing sentences across languages become script-disjoint subsets,
+    their qc-n2 runs' matching takes a derived N2 manifest each, with every source untouched and every validator
+    the N2 tooling, the calibration set and the detector driver apply passing."""
+
+    # (cohort, language, sentence, file): rule v1 put sentence 501 in cohort 1 in English and cohort 2 in French.
+    RECORDINGS = [
+        (1, "english", 501, "50001.wav"), (1, "english", 502, "50002.wav"), (1, "french", 503, "60001.wav"),
+        (1, "french", 504, "60002.wav"), (1, "english", 505, "50003.wav"), (1, "french", 506, "60003.wav"),
+        (2, "french", 501, "60004.wav"), (2, "english", 503, "50004.wav"), (2, "english", 507, "50005.wav"),
+        (2, "french", 508, "60005.wav"), (2, "english", 506, "50006.wav"), (2, "french", 509, "60006.wav"),
+        (3, "english", 504, "50007.wav"), (3, "french", 505, "60007.wav"), (3, "english", 510, "50008.wav"),
+        (3, "french", 511, "60008.wav"),
+    ]
+    TEXTS = {"english": "A small boat drifts across the quiet lake.",
+             "french": "Le petit bateau glisse sur le lac tranquille."}
+    SAMPLING = "f" * 64
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.registry = corpora.load_registry()
+        self.reserve = corpora.source_directory(self.registry, "fleurs-train", self.root) / \
+            corpora.RESERVE_DIRECTORY / self.SAMPLING[:12]
+        sources = self.tmp / "extracted"
+        sources.mkdir()
+        cohorts: dict[int, list[dict]] = {}
+        for index, (cohort, language, sentence, file) in enumerate(self.RECORDINGS):
+            data = pcm16(1600 + 160 * index, 16_000, 200.0 + 10 * index)
+            (sources / file).write_bytes(data)
+            cohorts.setdefault(cohort, []).append({
+                "row": n1.Row(sentence, file, self.TEXTS[language], 1600 + 160 * index, "female"),
+                "language": language, "config": n1.FLEURS_CONFIGS[language], "source": sources / file,
+                "digest": hashlib.sha256(data).hexdigest()})
+        self.paths = {}
+        with mock.patch.object(n1, "sources_digest", return_value="d" * 64):
+            for cohort, members in cohorts.items():
+                self.paths[cohort] = self.reserve / f"cohort-{cohort}" / corpora.MANIFEST_NAME
+                corpora.write_reserve_manifest({"revision": REVISION}, members, output=self.paths[cohort],
+                                               cohort=cohort, digest=self.SAMPLING,
+                                               spec={"cohorts": 3, "perLanguage": 6, "seed": "s"}, identity="e" * 64)
+        self.runs = {cohort: self.resynthesize(cohort) for cohort in (1, 2)}
+
+    def resynthesize(self, cohort: int) -> Path:
+        """A qc-n2 run of a reserve cohort: plan, round trip, manifest, as the lane writes them."""
+        run = self.tmp / "artifacts" / f"qc-n2-run-{cohort}"
+        quiet(n2.build_plan, n1_manifest=self.paths[cohort], out_dir=run, run_id=f"mac-qc-n2-{cohort}")
+        n2.build_manifest(plan_path=run / n2.PLAN_NAME, result_path=fake_roundtrip(run, json.loads(
+            (run / n2.PLAN_NAME).read_text())), output=run / corpora.N2_MANIFEST_NAME)
+        return run
+
+    def derive(self, cohorts=(1, 2), **kwargs) -> dict:
+        values = {"reserve": self.SAMPLING[:12], "cohorts": cohorts, "n2_runs": self.runs, "root": self.root, **kwargs}
+        return corpora.derive_disjoint_cohorts(self.registry, "fleurs-train", **values)
+
+    def owner(self, script: str, cohorts=(1, 2)) -> int:
+        reading = [cohort for cohort in cohorts
+                   if any(take["scriptID"] == script for take in self.source(cohort)["takes"])]
+        return corpora.disjoint_owner(script, reading, seed=corpora.DISJOINT_SEED)
+
+    def source(self, cohort: int) -> dict:
+        return json.loads(self.paths[cohort].read_text())
+
+    def test_derivation_keeps_each_shared_script_in_one_cohort_and_every_source_untouched(self) -> None:
+        before = snapshot(self.tmp)
+        dry = self.derive(dry_run=True)
+        self.assertEqual(snapshot(self.tmp), before)
+        self.assertEqual((dry["status"], dry["sharedScripts"]), ("dry-run", 3))
+        self.assertEqual(dry["sourceOverlaps"]["1-2"], {"scripts": 3, "families": 0, "speakers": 0})
+        self.assertEqual(dry["overlaps"]["1-2"], {"scripts": 0, "families": 0, "speakers": 0})
+        report = self.derive()
+        self.assertEqual({path: data for path, data in snapshot(self.tmp).items() if path in before}, before)
+        self.assertEqual({key: value for key, value in report.items() if key != "status"},
+                         {key: value for key, value in dry.items() if key != "status"})
+        derived = {}
+        for item in report["derived"]:
+            cohort, path = item["cohort"], Path(item["manifest"])
+            self.assertEqual(path.parent.parent, self.reserve / corpora.DISJOINT_DIRECTORY /
+                             report["derivationDigest"][:12])
+            manifest = json.loads(path.read_text())
+            source = self.source(cohort)
+            derived[cohort] = manifest
+            self.assertEqual(n1.manifest_digest_issues(manifest), [])
+            kept = [take for take in source["takes"] if self.owner(take["scriptID"]) == cohort]
+            self.assertEqual(manifest["takes"], kept)
+            self.assertEqual(manifest["counts"], n1.cohort_counts(kept))
+            self.assertEqual({key: manifest[key] for key in ("split", "fleursSplit", "reserve")},
+                             {key: source[key] for key in ("split", "fleursSplit", "reserve")})
+            self.assertEqual({key: manifest["derivedFrom"][key] for key in
+                              ("version", "rule", "seed", "cohorts", "manifestDigest", "manifestSHA256", "takes")},
+                             {"version": corpora.DISJOINT_VERSION, "rule": corpora.DISJOINT_RULE,
+                              "seed": corpora.DISJOINT_SEED, "cohorts": [1, 2],
+                              "manifestDigest": source["manifestDigest"],
+                              "manifestSHA256": hashlib.sha256(self.paths[cohort].read_bytes()).hexdigest(),
+                              "takes": len(source["takes"])})
+            for take in kept:
+                self.assertEqual(hashlib.sha256((path.parent / take["wavPath"]).read_bytes()).hexdigest(),
+                                 take["wavSHA256"])
+            eligible, count = n2.eligible_recordings(manifest)
+            self.assertEqual(len(eligible), count)
+        scripts = [{take["scriptID"] for take in derived[cohort]["takes"]} for cohort in (1, 2)]
+        self.assertFalse(scripts[0] & scripts[1])
+        self.assertEqual(sum(len(value["takes"]) for value in derived.values()), 12 - 3)
+        # Deriving again is a no-op; another seed writes its own directory.
+        self.assertEqual(self.derive(), report)
+        other = self.derive(seed="another-seed")
+        self.assertNotEqual(other["output"], report["output"])
+
+    def test_derived_n2_manifests_pass_the_n2_calibration_set_and_driver_checks(self) -> None:
+        import audio_qc_calibration_set as calibration_set
+        import audio_qc_detector_calibration as calibration
+        from lib.qc_qualification import thresholds
+
+        report = self.derive()
+        cohorts = {}
+        for item in report["derived"]:
+            cohort, n1_path, n2_path = item["cohort"], Path(item["manifest"]), Path(item["n2"]["manifest"])
+            run = self.runs[cohort]
+            self.assertEqual(n2_path.parent.name, f"{run.name}-disjoint-{report['derivationDigest'][:12]}")
+            manifest = json.loads(n2_path.read_text())
+            source = json.loads((run / corpora.N2_MANIFEST_NAME).read_text())
+            kept = {take["takeID"] for take in json.loads(n1_path.read_text())["takes"]}
+            self.assertEqual(manifest["takes"], [take for take in source["takes"] if take["n1TakeID"] in kept])
+            self.assertEqual(manifest["n1ManifestSHA256"], hashlib.sha256(n1_path.read_bytes()).hexdigest())
+            self.assertEqual((manifest["derivedFrom"]["manifestDigest"], manifest["derivedFrom"]["n1ManifestSHA256"],
+                              manifest["runID"], manifest["planDigest"]),
+                             (source["manifestDigest"], source["n1ManifestSHA256"], source["runID"],
+                              source["planDigest"]))
+            plan = json.loads((run / n2.PLAN_NAME).read_text())
+            for checked in (n2.validate_manifest(manifest, manifest_dir=n2_path.parent),
+                            n2.validate_manifest(manifest, manifest_dir=n2_path.parent, plan=plan)):
+                self.assertEqual(checked["status"], "PASS", checked["errors"])
+            self.assertEqual(n2.manifest_digest_issues(manifest), [])
+            calibration_set.load_takes(n2_path)
+            cohort_value = calibration.load_cohort(n2_path)
+            self.assertEqual(calibration.resolve_cohort(cohort_value, n1_path), f"reserve-{cohort}")
+            cohorts[cohort] = cohort_value
+            # A derived manifest whose takes leave plan order is refused against its plan.
+            shuffled = {**manifest, "takes": list(reversed(manifest["takes"]))}
+            shuffled["manifestDigest"] = n2.self_digest(shuffled, "manifestDigest")
+            checked = n2.validate_manifest(shuffled, manifest_dir=n2_path.parent, plan=plan)
+            self.assertIn("the derived manifest's takes are not items of its plan in plan order", checked["errors"])
+        # The driver's declared split (FLEURS: family and script) holds on the derived cohorts, not the sources.
+        split = SimpleNamespace(cohorts=SimpleNamespace(disjoint_by=calibration.FLEURS_RULE.disjoint_by))
+        thresholds.check_cohort_disjointness(split, calibration._triples(cohorts[1]), calibration._triples(cohorts[2]))
+        sources = {cohort: calibration.load_cohort(run / corpora.N2_MANIFEST_NAME) for cohort, run in self.runs.items()}
+        with self.assertRaisesRegex(thresholds.PreRegistrationError, "the cohorts share 3 script value"):
+            thresholds.check_cohort_disjointness(split, calibration._triples(sources[1]),
+                                                 calibration._triples(sources[2]))
+
+    def test_three_cohorts_and_a_cohort_without_a_run(self) -> None:
+        report = self.derive(cohorts=(1, 2, 3))
+        self.assertEqual([("n2" in item) for item in report["derived"]], [True, True, False])
+        scripts = [{take["scriptID"] for take in json.loads(Path(item["manifest"]).read_text())["takes"]}
+                   for item in report["derived"]]
+        self.assertFalse(scripts[0] & scripts[1] or scripts[0] & scripts[2] or scripts[1] & scripts[2])
+        self.assertEqual(report["sharedScripts"], 5)
+        self.assertNotEqual(report["derivationDigest"], self.derive(dry_run=True)["derivationDigest"])
+
+    def test_refusals(self) -> None:
+        with self.assertRaisesRegex(corpora.CorporaError, "two or more reserve cohorts"):
+            self.derive(cohorts=(1,))
+        with self.assertRaisesRegex(corpora.CorporaError, "outside"):
+            self.derive(n2_runs={3: self.runs[1]})
+        # A run of another cohort resynthesized another N1 manifest.
+        with self.assertRaisesRegex(n2.N2Error, "does not derive from the N1 manifest this run resynthesized"):
+            self.derive(n2_runs={1: self.runs[2]}, dry_run=True)
+        # A tampered source run fails its own validation first.
+        wav = next((self.runs[1] / "roundtrip").glob("*.wav"))
+        original = wav.read_bytes()
+        wav.write_bytes(original[:-2] + b"\x01\x00")
+        with self.assertRaisesRegex(n2.N2Error, "the source N2 manifest does not validate"):
+            self.derive(dry_run=True)
+        wav.write_bytes(original)
+        # Never over another derivation's manifest.
+        output = self.tmp / "derived"
+        self.derive(output=output, n2_runs={})
+        (output / "cohort-1" / corpora.MANIFEST_NAME).write_text("{}")
+        with self.assertRaisesRegex(corpora.CorporaError, "already holds another manifest"):
+            self.derive(output=output, n2_runs={})
+        # A derived cohort is never a source.
+        derived = self.tmp / "derived-once"
+        self.derive(output=derived, n2_runs={})
+        with self.assertRaisesRegex(corpora.CorporaError, "itself derived"):
+            self.derive(reserve=str(derived), n2_runs={}, dry_run=True)
+
+    def test_command_line(self) -> None:
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            code = corpora.main(["reserve-disjoint", "--reserve", str(self.reserve), "--cohorts", "1,2",
+                                 "--n2", f"1={self.runs[1]}", "--n2", f"2={self.runs[2] / corpora.N2_MANIFEST_NAME}",
+                                 "--dry-run"])
+        self.assertEqual(code, 0)
+        value = json.loads(out.getvalue())
+        self.assertEqual(value["status"], "dry-run")
+        self.assertEqual([item["n2"]["takes"] for item in value["derived"]],
+                         [item["recordings"] for item in value["derived"]])
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            corpora.main(["reserve-disjoint", "--reserve", str(self.reserve), "--cohorts", "1"])
 
 
 class LabelledCohortTests(Fixture):

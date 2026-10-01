@@ -2688,15 +2688,55 @@ python3 scripts/audio_qc_corpora.py prune-archives --source fleurs-train --dry-r
   MLS 1-hour set shares speakers with the 9-hour set and may repeat its clips); an undecodable clip
   is listed as skipped with its reason.
 - **FLEURS reserve cohorts.** Per language, the train recordings the N1 rules mark eligible (a
-  FLoRes sentence id also read in dev or test counts as shared, so it is ineligible) are grouped by
-  sentence; the sentences, in the order of a seeded SHA-256, fill cohort 1 to 400 recordings, then
-  cohort 2 and cohort 3, a sentence belonging to one cohort only. The cohorts are therefore
-  disjoint by sentence from each other and from dev and test (speaker disjointness stays the
-  declared FLEURS limitation). Only the sampled members of each `train.tar.gz` are decoded
-  (`audio_qc_n1_corpus.extract_members`). Each cohort is an `audio-qc-n1-cohort` manifest, split
-  `reserve-<k>`, at `fleurs/<revision>/reserve/<sampling digest>/cohort-<k>/manifest.json`, which
-  the N2 plan and the calibration set take as they take the dev and test cohorts. A language that
-  cannot fill every cohort is reported, not padded.
+  FLoRes sentence id also read in that language's dev or test counts as shared, so it is
+  ineligible) are grouped by sentence. FLEURS reads one FLoRes sentence in all ten languages, so
+  the allocation is global (rule `audio-qc-fleurs-reserve-v2`, `RESERVE_RULE`): the sentences, in
+  the order of a seeded SHA-256 of the sentence id alone, each join one cohort for every language,
+  the one their eligible recordings add the most to (each language up to the cohort's room below
+  400), ties going to the cohort with the most room left, then the lowest-numbered. The cohorts
+  are therefore disjoint by sentence from each other across languages, and from dev and test
+  (speaker disjointness stays the declared FLEURS limitation). The cohorts fill together: on the
+  pinned TSVs every language reaches 400 per cohort except English (about 344, its 1,032 eligible
+  recordings split three ways) and Russian (about 397). Only the sampled members of each
+  `train.tar.gz` are decoded (`audio_qc_n1_corpus.extract_members`). Each cohort is an
+  `audio-qc-n1-cohort` manifest, split `reserve-<k>`, at
+  `fleurs/<revision>/reserve/<sampling digest>/cohort-<k>/manifest.json`, which the N2 plan and the
+  calibration set take as they take the dev and test cohorts. A language that cannot fill every
+  cohort is reported, not padded.
+- **Script-disjoint cohorts from rule v1.** Rule v1 allocated each language on its own, so its
+  cohorts (`reserve/407a1df60f7c`, extracted 2026-09-30) put one sentence in cohort 1 in one
+  language and in cohort 2 in another: cohorts 1 and 2 share 734 scripts, and the detector driver
+  refuses the pair (`the cohorts share 734 script value(s)`). `verify` now reports the registry's
+  v2 cohorts as not extracted (the train archives are pruned; `fetch --group fleurs-train` and
+  `extract` rebuild them) and names the v1 reserve. `reserve-disjoint` derives disjoint subsets of
+  v1 cohorts without regenerating audio (`DISJOINT_RULE`): a script two of the given cohorts read
+  stays in the one with the lowest SHA-256(seed NUL scriptID NUL cohort), and its recordings in
+  the others are dropped. Each derived N1 manifest keeps its source's `split`, `fleursSplit` and
+  `reserve` block, its kept takes unchanged and in order, and records `derivedFrom` (the source
+  manifest's digest and file SHA-256, the rule, seed, cohorts and derivation digest); it goes to
+  `reserve/<sampling>/disjoint/<derivation digest[:12]>/cohort-<k>/` with its WAVs linked. For each
+  `--n2 K=RUN`, the run must validate (every WAV and codes file hashed) and pin cohort K's source
+  manifest; the derived N2 manifest (`audio_qc_n2_resynthesis.derive_manifest`) keeps its takes of
+  kept recordings unchanged, their WAVs and codes linked under the same paths, binds
+  `n1ManifestSHA256` to the derived N1 manifest and goes to a new `<run>-disjoint-<digest[:12]>/`
+  beside the run. Nothing is written into a source, and `--dry-run` checks everything and writes
+  nothing. Since the derived manifests keep the split and reserve block, the driver takes them
+  unchanged: derived reserve-1 fits and derived reserve-2 confirms, and its corpus is still
+  `fleurs-reserve-2` for `spentSources`. `validate-manifest --plan` accepts a derived N2 manifest
+  whose takes are items of the run's plan in plan order.
+
+  ```sh
+  A=build/artifacts/macos/audio-qc
+  python3 scripts/audio_qc_corpora.py reserve-disjoint --reserve 407a1df60f7c --cohorts 1,2 \
+    --n2 1=$A/qc-n2-mac-qc-n2-20260930-160406-972e0465 --n2 2=$A/qc-n2-mac-qc-n2-20260930-165444-01bf8804 \
+    [--seed aq07-fleurs-reserve-disjoint-v1] [--dry-run]
+  ```
+
+  On the 2026-09-30 cohorts with the default seed (derivation `e6219213744d`), cohorts 1 and 2
+  keep 2,262 and 2,348 of 4,000 recordings (204-259 and 213-257 per language), share no script,
+  family or speaker label (FLEURS labels none), and their qc-n2 runs keep the same takes. Deriving
+  1, 2 and 3 together leaves cohort 3 only 87 English recordings, below a fail point's 124 per
+  language, so a fail point on reserve-3 needs other cohorts, such as a v2 extraction.
 - **Reclaiming disk.** Once a source is extracted its downloads are only a re-fetchable copy.
   `prune-archives --source <source> [--source ...]` removes a source's pinned downloads: its
   archives, Parquet shards or pinned WAVs, and for `fleurs-train` its ten `train.tar.gz` (15.6 GB).
@@ -2730,7 +2770,10 @@ unchanged. `audio_qc_detector_calibration.py` enforces the rule:
   (`spentSources`), whichever N2 resynthesis of it the plan names.
 
 The reserve cohorts are grouped by sentence, not by speaker, so the calibration and confirmation cohorts
-likely share speakers (`fleurs-reserve-no-speaker-ids`).
+likely share speakers (`fleurs-reserve-no-speaker-ids`). The batched round fits and confirms on the
+script-disjoint cohorts derived from rule v1 (above): a derived cohort keeps its source's split and
+reserve block, so it plays its source's role, and the plan's family and script check refuses any
+pairing of a derived cohort with an underived one that shares a script.
 
 **Long-form cohorts.** Role set `n3-long-form` names the take plan's long-form cell
 (`vocello-long-form-calibration` and `-confirmation`). A long-form take records its seams in its
@@ -2766,6 +2809,9 @@ executes.
 | `prosody.pitch-instability@1` | the take plan's calibration split, then its confirmation split (standard, clone and cross-lingual cells) | 0.05 | the warn default |
 | `long-form.seam-discontinuity@1`, `long-form.seam-jump@1`, `long-form.seam-identity@1` | the long-form cell's calibration split, then its confirmation split | 0.05 | the warn default |
 | `identity.clone-similarity@1`, `identity.window-drift@1`, `identity.onset-drift@1` | the speaker cohort's calibration split, then its confirmation split (N2, eight languages) | 0.05 | the warn default |
+
+FLEURS reserve-1 and reserve-2 are the script-disjoint cohorts derived from rule v1's cohorts in
+step 3b, not the v1 cohorts themselves, which share sentences across languages.
 
 Seam-identity's positives are SEAM-VOICE splices from voice donors: each long-form take's generation
 voice is its speaker label, so the confirmation split's 80 takes each get another voice's segment
@@ -2833,8 +2879,19 @@ scripts/macos_test.sh qc-n2 --n1-manifest $RES/cohort-2/manifest.json --label aq
 scripts/macos_test.sh qc-n2 --n1-manifest $SOC/confirmation/manifest.json --label aq07-speechocean762
 scripts/macos_test.sh qc-n2 --n1-manifest $SPK/calibration/manifest.json --label aq07-speaker-calibration
 scripts/macos_test.sh qc-n2 --n1-manifest $SPK/confirmation/manifest.json --label aq07-speaker-confirmation
-R1=$A/qc-n2-<reserve-1 run>; R2=$A/qc-n2-<reserve-2 run>; SO=$A/qc-n2-<speechocean762 run>
+R1SRC=$A/qc-n2-mac-qc-n2-20260930-160406-972e0465; R2SRC=$A/qc-n2-mac-qc-n2-20260930-165444-01bf8804
+SO=$A/qc-n2-<speechocean762 run>
 E1=$A/qc-n2-<speaker calibration run>; E2=$A/qc-n2-<speaker confirmation run>
+# 3b. Script-disjoint reserve cohorts (no model, about a minute; --dry-run first prints the counts).
+#     Rule v1's cohorts 1 and 2 share 734 scripts across languages, which every plan refuses. The
+#     derived cohorts are subsets of both N1 cohorts and of both qc-n2 runs, nothing resynthesized:
+#     2,262 and 2,348 recordings, 204-259 per language. Derived reserve-1 is the calibration cohort
+#     (the reserve-1 panel bundle of step 6 already covers its takes); derived reserve-2 is the
+#     confirmation cohort and stays unscored until the plans are committed.
+python3 scripts/audio_qc_corpora.py reserve-disjoint --reserve 407a1df60f7c --cohorts 1,2 \
+  --n2 1=$R1SRC --n2 2=$R2SRC
+DJ=e6219213744d   # the derivation digest it prints (the default seed)
+R1=$R1SRC-disjoint-$DJ; R2=$R2SRC-disjoint-$DJ; P1=$R1SRC/panel-bundle
 # 4. [model] Take plan version 2: both splits, all four cells (about 3.5 h in all, estimated in the
 #    take plan section above).
 scripts/macos_test.sh qc-takes --split calibration --cells standard,clone,cross-lingual --label aq07-calibration-v2
@@ -2849,13 +2906,14 @@ $O run --manifest build/artifacts/diagnostics/audio-qc-oracle-ladders/pyin/manif
   --judge pitch.pyin@1 --bundle $A/oracle-ladder-pyin-<date>
 python3 scripts/audio_qc_oracle_ladders.py evaluate --ladder pyin --bundle $A/oracle-ladder-pyin-<date>
 # 6. [model] Calibration panels, on the shared cache:
-#    - reserve-1 with seven judges, est. 1.5-2 h;
+#    - reserve-1 with seven judges, est. 1.5-2 h (run 2026-09-30 over all of rule v1's reserve-1:
+#      its bundle P1 holds every take of the derived cohort, so it is not run again);
 #    - the N3 calibration takes with pYIN, est. 15 min;
 #    - the long-form calibration takes with CAM++, est. 5 min;
 #    - the speaker calibration split with CAM++, est. 15-30 min. The panel manifest hands each take
 #      its reference clip, the resynthesis of another take of its speaker.
-$O manifest --from-calibration-takes $R1/n2-manifest.json --output $R1/panel-manifest.json
-$O run --manifest $R1/panel-manifest.json $J7 --cache-root $K --bundle $R1/panel-bundle
+$O manifest --from-calibration-takes $R1SRC/n2-manifest.json --output $R1SRC/panel-manifest.json
+$O run --manifest $R1SRC/panel-manifest.json $J7 --cache-root $K --bundle $P1
 $O manifest --from-calibration-takes $T1/takes-manifest.json --output $T1/panel-manifest.json
 $O run --manifest $T1/panel-manifest.json --judge pitch.pyin@1 --cache-root $K --bundle $T1/panel-bundle
 $O manifest --from-calibration-takes $L1/takes-manifest.json --output $L1/panel-manifest.json
@@ -2870,27 +2928,30 @@ $O run --manifest $E1/panel-manifest.json $JE --cache-root $K --bundle $E1/panel
 #    $O run --manifest $E1/panel-manifest.json --judge speaker.resnet293-voxceleb@1 --cache-root $K --bundle $E1/resnet-bundle
 #    $O run --manifest $T1/panel-manifest.json $JE --bundle $T1/speaker-bundle
 # 7. Calibration evidence, no model (about 35 min): Stage 0 and PCM measures, pYIN frame tracks, CAM++
-#    windows, scores.
+#    windows, scores. Measurements, raw-output exports and scores bind the manifest they ran over, so
+#    the derived reserve-1's are made afresh over $R1 (from P1 and the shared cache: no model runs);
+#    scores of rule v1's whole reserve-1 are replaced, since a plan refuses them.
 $S score --takes $R1/n2-manifest.json --output $R1/stage0
 $S score --takes $L1/takes-manifest.json --output $L1/stage0
-$S raw-outputs --takes $R1/n2-manifest.json --bundle $R1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
+$S raw-outputs --takes $R1/n2-manifest.json --bundle $P1 --judge pitch.pyin@1 --cache-root $K \
   --output $R1/pyin-raw.json
 $S raw-outputs --takes $T1/takes-manifest.json --bundle $T1/panel-bundle --judge pitch.pyin@1 --cache-root $K \
   --output $T1/pyin-raw.json
 $S raw-outputs --takes $L1/takes-manifest.json --bundle $L1/panel-bundle --judge speaker.campplus-voxceleb@1 \
   --cache-root $K --output $L1/campplus-raw.json
-D=$A/detector-scores-round2; N1R1=$RES/cohort-1/manifest.json; N1R2=$RES/cohort-2/manifest.json
+D=$A/detector-scores-round2; N1R1=$RES/disjoint/$DJ/cohort-1/manifest.json
+N1R2=$RES/disjoint/$DJ/cohort-2/manifest.json
 for d in signal.dropout@2 signal.terminal-silence@2 signal.dc-offset@2 signal.clipping@2 signal.band-limit@1; do
   $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
     --measurements $R1/stage0/measurements.json --output $D/calibration/$d.json; done
 for d in content.consensus-error@2 language.nativeness@1; do
   $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
-    --bundle $R1/panel-bundle --output $D/calibration/$d.json; done
+    --bundle $P1 --output $D/calibration/$d.json; done
 $Q scores --detector boundary.run-on@2 --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
-  --bundle $R1/panel-bundle --measurements $R1/stage0/measurements.json --output $D/calibration/boundary.run-on@2.json
+  --bundle $P1 --measurements $R1/stage0/measurements.json --output $D/calibration/boundary.run-on@2.json
 for d in prosody.pitch-break@1 prosody.octave-jump@1; do
   $Q scores --detector $d --role calibration --cohort $R1/n2-manifest.json --n1-manifest $N1R1 \
-    --bundle $R1/panel-bundle --raw-outputs $R1/pyin-raw.json --output $D/calibration/$d.json; done
+    --bundle $P1 --raw-outputs $R1/pyin-raw.json --output $D/calibration/$d.json; done
 $Q scores --detector prosody.pitch-instability@1 --role calibration --cohort $T1/takes-manifest.json \
   --bundle $T1/panel-bundle --raw-outputs $T1/pyin-raw.json --output $D/calibration/prosody.pitch-instability@1.json
 for d in long-form.seam-discontinuity@1 long-form.seam-jump@1; do
@@ -3062,6 +3123,7 @@ scripts/clean_build_caches.sh --prune-confirmation-caches --dry-run
 | 1. Corpora fetch and extraction | maintainer, network | 1-2 h |
 | 2. speechocean762 and speaker cohorts | offline | 3 min |
 | 3. qc-n2 of reserve-1, reserve-2, speechocean762 and both speaker splits | model | 3-3.5 h |
+| 3b. Script-disjoint reserve-1 and reserve-2 | offline | 1-2 min |
 | 4. qc-takes version 2, both splits, four cells | model | 3 h 30 min |
 | 5. pYIN oracle ladder | model | 2 min |
 | 6. Calibration panels (without the optional ResNet293 run, 2-4 h more) | model | 2 h 35 min |

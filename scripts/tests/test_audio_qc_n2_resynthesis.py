@@ -401,5 +401,85 @@ class ManifestTests(N2Fixture):
                                       str(self.root / "x"), "--run-id", "run-1"]), 1)
 
 
+class DerivedManifestTests(N2Fixture):
+    """`derive_manifest`: a subset of a run's takes for a subset of its N1 manifest, no new round trip."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        takes = [self.n1_take(f"sp-{index}", samples=tone(0.5) // (index + 1)) for index in range(3)]
+        for index, take in enumerate(takes):
+            take.update(speaker=f"corpus:{index // 2:016x}", gender="female")
+        takes[0]["reference"] = {"takeID": "sp-1", "wavPath": takes[1]["wavPath"], "wavSHA256": takes[1]["wavSHA256"]}
+        takes[1]["reference"] = {"takeID": "sp-0", "wavPath": takes[0]["wavPath"], "wavSHA256": takes[0]["wavSHA256"]}
+        self.n1_path = self.n1_manifest([*takes, self.n1_take("fl-0")])
+        plan = n2.build_plan(n1_manifest=self.n1_path, out_dir=self.run, run_id="derive")
+        self.source = self.run / "n2-manifest.json"
+        n2.build_manifest(plan_path=self.run / "n2-plan.json", result_path=self.fake_result(plan), output=self.source)
+
+    def subset(self, keep: set[str], **derived_from) -> tuple[dict, str]:
+        """The source N1 manifest cut to `keep`, as `audio_qc_corpora.py reserve-disjoint` writes one."""
+        manifest = json.loads(self.n1_path.read_text())
+        manifest["takes"] = [take for take in manifest["takes"] if take["takeID"] in keep]
+        manifest["derivedFrom"] = {"manifestSHA256": hashlib.sha256(self.n1_path.read_bytes()).hexdigest(),
+                                   **derived_from}
+        manifest["manifestDigest"] = self_digest(manifest, "manifestDigest")
+        return manifest, hashlib.sha256(json.dumps(manifest).encode()).hexdigest()
+
+    def derive(self, keep: set[str], output: Path | None = None, **kwargs) -> dict:
+        manifest, digest = self.subset(keep)
+        return n2.derive_manifest(source=self.source, n1_manifest=manifest, n1_manifest_sha256=digest,
+                                  output=output or self.root / "derived" / "n2-manifest.json",
+                                  derived_from={"rule": "test"}, **kwargs)
+
+    def test_a_derived_manifest_keeps_its_takes_and_files_and_validates(self) -> None:
+        source = json.loads(self.source.read_text())
+        before = {path: path.read_bytes() for path in self.run.rglob("*") if path.is_file()}
+        self.assertEqual(self.derive({"sp-0", "sp-1", "fl-0"}, dry_run=True)["counts"], {"takes": 3})
+        self.assertFalse((self.root / "derived").exists())
+        manifest = self.derive({"sp-0", "sp-1", "fl-0"})
+        self.assertEqual({path: path.read_bytes() for path in self.run.rglob("*") if path.is_file()}, before)
+        self.assertEqual(manifest["takes"], [take for take in source["takes"] if take["n1TakeID"] != "sp-2"])
+        self.assertEqual((manifest["derivedFrom"]["manifestDigest"], manifest["derivedFrom"]["takes"],
+                          manifest["derivedFrom"]["rule"]), (source["manifestDigest"], 4, "test"))
+        directory = self.root / "derived"
+        for take in manifest["takes"]:
+            self.assertEqual(hashlib.sha256((directory / take["wavPath"]).read_bytes()).hexdigest(), take["wavSHA256"])
+        plan = json.loads((self.run / "n2-plan.json").read_text())
+        for report in (n2.validate_manifest(manifest, manifest_dir=directory),
+                       n2.validate_manifest(manifest, manifest_dir=directory, plan=plan)):
+            self.assertEqual(report["status"], "PASS", report["errors"])
+        broken = {**manifest, "derivedFrom": {"rule": "test"}}
+        broken["manifestDigest"] = n2.self_digest(broken, "manifestDigest")
+        self.assertIn("derivedFrom names the source N2 manifest (digest and file SHA-256) and its N1 manifest",
+                      n2.validate_manifest(broken, manifest_dir=directory)["errors"])
+        # The same derivation again is a no-op; another one never lands over it.
+        self.assertEqual(self.derive({"sp-0", "sp-1", "fl-0"}), manifest)
+        with self.assertRaisesRegex(N2Error, "already holds another manifest"):
+            self.derive({"fl-0"})
+
+    def test_refusals(self) -> None:
+        # A kept take's reference clip must be kept too.
+        with self.assertRaisesRegex(N2Error, "reference clip"):
+            self.derive({"sp-0", "fl-0"}, dry_run=True)
+        # The derived N1 manifest derives from the one the run resynthesized.
+        manifest, digest = self.subset({"fl-0"}, manifestSHA256="0" * 64)
+        with self.assertRaisesRegex(N2Error, "does not derive from the N1 manifest this run resynthesized"):
+            n2.derive_manifest(source=self.source, n1_manifest=manifest, n1_manifest_sha256=digest,
+                               output=self.root / "x" / "n2-manifest.json", derived_from={})
+        # Never into the source run.
+        with self.assertRaisesRegex(N2Error, "never into its source run"):
+            self.derive({"fl-0"}, output=self.run / "derived" / "n2-manifest.json")
+        # A source that no longer validates, or is itself derived, is no source.
+        derived = self.derive({"fl-0"})
+        with self.assertRaisesRegex(N2Error, "itself derived"):
+            n2.derive_manifest(source=self.root / "derived" / "n2-manifest.json", n1_manifest=self.subset({"fl-0"})[0],
+                               n1_manifest_sha256="1" * 64, output=self.root / "again" / "n2-manifest.json",
+                               derived_from={}, dry_run=True)
+        self.assertEqual(derived["counts"], {"takes": 1})
+        (self.run / "roundtrip/n2-00004.codes.bin").write_bytes(b"changed")
+        with self.assertRaisesRegex(N2Error, "the source N2 manifest does not validate"):
+            self.derive({"fl-0"}, dry_run=True)
+
+
 if __name__ == "__main__":
     unittest.main()

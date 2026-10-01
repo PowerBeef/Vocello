@@ -38,6 +38,15 @@ cohort: the N2 take names that take's resynthesis, so a speaker judge scores
 codec audio against codec audio (as an impostor is scored against its source).
 A FLEURS take names no speaker and keeps neither.
 
+Derived manifests (`derive_manifest`, which `audio_qc_corpora.py
+reserve-disjoint` calls): a subset of a validated run's takes, for an N1
+manifest derived as a subset of the one the run resynthesized, without a new
+round trip. Each kept take is unchanged, its WAV and codes linked into the new
+directory under the same paths; `n1ManifestSHA256` names the derived N1
+manifest and `derivedFrom` the source run's manifest and the rule.
+`validate-manifest --plan` accepts a derived manifest whose takes are items of
+the run's plan in plan order.
+
 Everything this module writes (inputs, jobs, plans, manifests) is an untracked
 build artifact. Paths are relative to the file that names them.
 """
@@ -452,8 +461,17 @@ def validate_manifest(manifest: Any, *, manifest_dir: Path, plan: Any = None) ->
         planned = [(item["n1TakeID"], item["id"]) for item in plan["items"]]
         observed = [(take.get("n1TakeID"), _mapping(take.get("source")).get("planItemID"))
                     if isinstance(take, dict) else None for take in takes]
-        if observed != planned:
+        if manifest.get("derivedFrom") is not None:
+            # A derived manifest (`derive_manifest`) keeps a subset of its run's takes, still in plan order.
+            remaining = iter(planned)
+            if not all(pair in remaining for pair in observed):
+                errors.append("the derived manifest's takes are not items of its plan in plan order")
+        elif observed != planned:
             errors.append("the manifest's takes are not exactly the plan's items in plan order")
+    derived_from = manifest.get("derivedFrom")
+    if derived_from is not None and (not isinstance(derived_from, dict) or not all(
+            is_sha256(derived_from.get(key)) for key in ("manifestDigest", "manifestSHA256", "n1ManifestSHA256"))):
+        errors.append("derivedFrom names the source N2 manifest (digest and file SHA-256) and its N1 manifest")
     root = manifest_dir.resolve()
     take_ids: set[str] = set()
     n1_ids: set[str] = set()
@@ -505,6 +523,82 @@ def validate_manifest(manifest: Any, *, manifest_dir: Path, plan: Any = None) ->
     if manifest.get("counts") != counts:
         errors.append("the manifest's counts do not match its takes")
     return {"status": "PASS" if not errors else "FAIL", "errors": errors, "counts": counts}
+
+
+def derive_manifest(*, source: Path, n1_manifest: dict[str, Any], n1_manifest_sha256: str, output: Path,
+                    derived_from: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
+    """An N2 cohort over a subset of a qc-n2 run's recordings, without a new round trip.
+
+    `source` is the run's manifest; it must validate (every WAV and codes file
+    hashed) and must not itself be derived. `n1_manifest` is the derived N1
+    manifest, a subset of the one the run resynthesized: its
+    `derivedFrom.manifestSHA256` must be the run's `n1ManifestSHA256`, and
+    `n1_manifest_sha256` is the digest of its file. The derived manifest keeps,
+    unchanged and in plan order, the source takes whose N1 recording the derived
+    N1 manifest keeps eligible, and every such recording must have one. Each
+    kept take's WAV and codes are linked beside `output` under the same
+    relative paths (a hard link, or a verified copy across volumes). The
+    manifest binds `n1ManifestSHA256` to the derived N1 manifest and records
+    its source run and rule in `derivedFrom`. The source run is never written.
+    `dry_run` returns the manifest without writing or linking anything.
+    """
+    source = Path(source)
+    manifest = load_json(source)
+    report = validate_manifest(manifest, manifest_dir=source.parent)
+    if report["status"] != "PASS":
+        raise N2Error(f"the source N2 manifest does not validate: {report['errors'][0]}")
+    if manifest.get("derivedFrom") is not None:
+        raise N2Error("the source N2 manifest is itself derived; derive from the qc-n2 run's own manifest")
+    if _mapping(n1_manifest.get("derivedFrom")).get("manifestSHA256") != manifest.get("n1ManifestSHA256"):
+        raise N2Error("the derived N1 manifest does not derive from the N1 manifest this run resynthesized "
+                      "(n1ManifestSHA256)")
+    eligible, _count = eligible_recordings(n1_manifest)
+    keep = {take["takeID"]: take for take in eligible}
+    takes = [take for take in manifest["takes"] if take["n1TakeID"] in keep]
+    missing = sorted(set(keep) - {take["n1TakeID"] for take in takes})
+    if missing:
+        raise N2Error(f"{len(missing)} eligible recordings of the derived N1 manifest have no resynthesis in the "
+                      f"run (e.g. {missing[0]})")
+    for take in takes:
+        recording = keep[take["n1TakeID"]]
+        if _mapping(take.get("source")).get("n1WAVSHA256") != recording["wavSHA256"] \
+                or any(take[field] != recording[field] for field in KEPT_FIELDS):
+            raise N2Error(f"{take['takeID']}: the derived N1 recording differs from the one the run resynthesized")
+        reference = take.get("reference")
+        if isinstance(reference, dict) and reference.get("n1TakeID") not in keep:
+            raise N2Error(f"{take['takeID']}: its reference clip's recording is not kept")
+    derived = {key: value for key, value in manifest.items() if key != "manifestDigest"}
+    derived.update({
+        "n1ManifestSHA256": n1_manifest_sha256,
+        "derivedFrom": {**derived_from, "manifestDigest": manifest["manifestDigest"],
+                        "manifestSHA256": jsonio.sha256_file(source),
+                        "n1ManifestSHA256": manifest["n1ManifestSHA256"], "takes": len(manifest["takes"])},
+        "counts": {"takes": len(takes)}, "takes": takes,
+    })
+    derived["manifestDigest"] = self_digest(derived, "manifestDigest")
+    if dry_run:
+        return derived
+    output = Path(output)
+    out_dir = output.resolve().parent
+    if _inside(out_dir, source.resolve().parent):
+        raise N2Error("the derived manifest goes into a new directory, never into its source run")
+    data = jsonio.pretty_bytes(derived, ascii=False, allow_nan=False)
+    if output.exists() and output.read_bytes() != data:
+        raise N2Error(f"{output.name} already holds another manifest; derive into a new directory")
+    for take in takes:
+        for relative, digest, what in ((take["wavPath"], take["wavSHA256"], "wavPath"),
+                                       (take["codec"]["codesPath"], take["codec"]["codesSHA256"], "codesPath")):
+            where = f"{take['takeID']}: {what}"
+            try:
+                audio_qc_n1_corpus._place(_relative(source.parent, relative, where, contained=True),
+                                          _relative(out_dir, relative, where, contained=True), digest)
+            except audio_qc_n1_corpus.N1Error as error:
+                raise N2Error(str(error)) from None
+    jsonio.atomic_write_bytes(output, data)
+    report = validate_manifest(derived, manifest_dir=out_dir)
+    if report["status"] != "PASS":
+        raise N2Error(f"the derived N2 manifest does not validate: {report['errors'][0]}")
+    return derived
 
 
 # --------------------------------------------------------------------------- #

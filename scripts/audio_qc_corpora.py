@@ -68,13 +68,24 @@ transcripts and manifests stay untracked under `build/cache/audio-qc-corpora`
   place whole, and kept while its manifest and WAVs still match.
 - **FLEURS reserve.** The FLEURS train split (same revision as the N1 pins in
   `config/audio-qc-n1-sources.json`, whose dev and test TSVs are fetched with
-  it) is not unpacked whole: a seeded, language-stratified sample of eligible
-  recordings forms `cohorts` disjoint reserve cohorts of `perLanguage`
-  recordings each (the registry's `fleurs-train` entry, `RESERVE_RULE`),
-  disjoint by FLoRes sentence id from each other and from dev and test. Only
-  the sampled members are decoded (`audio_qc_n1_corpus.extract_members`), and
-  each cohort is an `audio-qc-n1-cohort` manifest in the take shape the N2 and
-  calibration tools read, under `fleurs/<revision>/reserve/<sampling digest>/`.
+  it) is not unpacked whole: a seeded sample of eligible recordings forms
+  `cohorts` reserve cohorts of up to `perLanguage` recordings per language (the
+  registry's `fleurs-train` entry, `RESERVE_RULE`). Each FLoRes sentence joins
+  one cohort in every language, so the cohorts are disjoint by sentence from
+  each other across languages (FLEURS reads one sentence in all ten) and from
+  dev and test. Only the sampled members are decoded
+  (`audio_qc_n1_corpus.extract_members`), and each cohort is an
+  `audio-qc-n1-cohort` manifest in the take shape the N2 and calibration tools
+  read, under `fleurs/<revision>/reserve/<sampling digest>/`.
+- **Script-disjoint derived cohorts.** Rule v1 (`audio-qc-fleurs-reserve-v1`)
+  allocated each language on its own, so its cohorts share sentences across
+  languages. `reserve-disjoint` derives disjoint subsets of such cohorts
+  without regenerating audio (`DISJOINT_RULE`): a sentence two cohorts read
+  stays in the one a seeded SHA-256 picks, each derived N1 manifest (its
+  `derivedFrom` naming the source manifest and the rule) goes under
+  `reserve/<sampling>/disjoint/<derivation>/cohort-<k>/`, and each given qc-n2
+  run's matching takes, unchanged and linked, form a derived N2 manifest in
+  `<run>-disjoint-<derivation>/`. `verify` names a reserve of an earlier rule.
 - **Labelled cohorts.** `cohort` turns a labelled corpus's extraction (a
   source with a `LABELLED_COHORTS` rule: speechocean762) into one split of an
   `audio-qc-n1-cohort` manifest, `split` calibration or confirmation and
@@ -125,6 +136,9 @@ Commands:
   cohort    --source speechocean762|speaker --split calibration|confirmation [--confirmation-share S] [--output PATH]
             one speaker-disjoint split of a labelled corpus's extraction (or of the speaker group) as an N1
             cohort manifest
+  reserve-disjoint  --reserve DIGEST12|DIR --cohorts 1,2[,3] [--seed S] [--n2 K=RUN ...] [--output DIR] [--dry-run]
+            script-disjoint cohorts derived from the reserve cohorts of one sampling, and the matching subsets
+            of their qc-n2 runs (no audio is regenerated; no source is written)
 """
 
 from __future__ import annotations
@@ -161,6 +175,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import acquire_audio_qc_judges as acquire  # noqa: E402
 import audio_qc_n1_corpus as n1  # noqa: E402
+import audio_qc_n2_resynthesis as n2  # noqa: E402
 from audio_qc_calibration_takes import self_digest  # noqa: E402
 from audio_qc_judges import JudgeRegistryError, runtime_lock  # noqa: E402
 from lib import corpus_clips as clips  # noqa: E402
@@ -178,7 +193,9 @@ RECEIPT_KIND = "audio-qc-corpora-fetch"
 MANIFEST_KIND = "audio-qc-corpus"
 RESERVE_RECEIPT_KIND = "audio-qc-corpora-fleurs-reserve-extraction"
 EXTRACTOR = "audio-qc-corpora-extract-v1"
-RESERVE_VERSION = "audio-qc-fleurs-reserve-v1"
+# v2: a FLoRes sentence joins one cohort across every language (v1 allocated each language on its own, so one
+# sentence could sit in cohort 1 in one language and cohort 2 in another).
+RESERVE_VERSION = "audio-qc-fleurs-reserve-v2"
 RECEIPT_NAME = "corpora-fetch-receipt.json"
 MANIFEST_NAME = "manifest.json"
 EXTRACTED_DIRECTORY = "extracted"
@@ -229,11 +246,28 @@ RECEIPT_EVERY_FILES = 250
 CHUNK_BYTES = 1 << 20
 RESERVE_RULE = (
     "Per language, the train recordings the N1 manifest would mark eligible (audio_qc_n1_corpus eligibility, "
-    "a FLoRes sentence id also read in dev or test counting as shared), grouped by FLoRes sentence id. The "
-    "sentences in ascending order of SHA-256(seed NUL language NUL sentence id), and each sentence's recordings "
-    "in ascending order of SHA-256(seed NUL language NUL file), fill cohort 1 up to perLanguage recordings, "
-    "then cohort 2, and so on; a sentence belongs to one cohort only (its recordings past a full cohort stay "
-    "unused), so the cohorts are disjoint by sentence from each other and from dev and test."
+    "a FLoRes sentence id also read in that language's dev or test counting as shared). The FLoRes sentences "
+    "with an eligible recording in any language, in ascending order of SHA-256(seed NUL sentence id), each join "
+    "one cohort for every language: the cohort its eligible recordings add the most to (each language adding at "
+    "most the cohort's room there, perLanguage minus the recordings it holds), on a tie the one with the most "
+    "room left in the sentence's languages, then the lowest-numbered; a sentence that adds nothing stays unused. "
+    "In each of its languages its recordings, in ascending order of SHA-256(seed NUL language NUL file), fill "
+    "that room and the rest stay unused. A sentence therefore belongs to one cohort in every language: the "
+    "cohorts are disjoint by sentence from each other across languages, and from dev and test per language; a "
+    "language whose eligible recordings cannot fill every cohort falls short (reported, never padded)."
+)
+# Script-disjoint cohorts derived from the cohorts of an earlier sampling (`reserve-disjoint`): no audio is
+# regenerated, every kept take and its WAV stay as they were.
+DISJOINT_VERSION = "audio-qc-fleurs-reserve-disjoint-v1"
+DISJOINT_SEED = "aq07-fleurs-reserve-disjoint-v1"
+DISJOINT_DIRECTORY = "disjoint"
+DISJOINT_RULE = (
+    "Of the given reserve cohorts (the N1 manifests of one sampling), a FLoRes sentence (scriptID) that two or "
+    "more of them read, in any language, stays in the one with the lowest SHA-256(seed NUL scriptID NUL cohort "
+    "number), and its recordings in the others are dropped, in every language; every other recording stays. A "
+    "derived cohort is the subset of its source manifest's takes that stay, each unchanged and in source order, "
+    "so the derived cohorts share no sentence. A derived N2 manifest keeps the takes of its cohort's qc-n2 run "
+    "whose N1 recording stays, each with the same WAV and codes, bound to the derived N1 manifest."
 )
 
 # Labelled N1 cohorts (`cohort`): a corpus whose clips carry speakers, and for the accent group published
@@ -1884,24 +1918,33 @@ def _order(seed: str, language: str, value: Any) -> str:
     return hashlib.sha256(f"{seed}\0{language}\0{value}".encode("utf-8")).hexdigest()
 
 
-def reserve_selection(rows: Sequence[n1.Row], *, language: str, shared_ids: set[int], cohorts: int,
-                      per_language: int, seed: str) -> list[list[n1.Row]]:
-    """The seeded cohorts of one language (`RESERVE_RULE`)."""
-    by_sentence: dict[int, list[n1.Row]] = {}
-    for row in rows:
-        reasons, _lint, _proper = n1.ineligible_reasons(row.text, language,
-                                                        shared_script=row.sentence_id in shared_ids)
-        if not reasons:
-            by_sentence.setdefault(row.sentence_id, []).append(row)
-    selected: list[list[n1.Row]] = [[] for _ in range(cohorts)]
-    index = 0
-    for sentence in sorted(by_sentence, key=lambda value: _order(seed, language, value)):
-        if index == cohorts:
-            break
-        recordings = sorted(by_sentence[sentence], key=lambda row: _order(seed, language, row.file))
-        selected[index].extend(recordings[:per_language - len(selected[index])])
-        if len(selected[index]) == per_language:
-            index += 1
+def reserve_allocation(train: Mapping[str, Sequence[n1.Row]], *, shared_ids: Mapping[str, set[int]], cohorts: int,
+                       per_language: int, seed: str) -> dict[str, list[list[n1.Row]]]:
+    """The seeded cohorts of every language at once (`RESERVE_RULE`): each FLoRes sentence joins one cohort in
+    every language, so no sentence is read in two cohorts whatever the language."""
+    readings: dict[int, dict[str, list[n1.Row]]] = {}
+    for language, rows in train.items():
+        shared = shared_ids.get(language, set())
+        for row in rows:
+            reasons, _lint, _proper = n1.ineligible_reasons(row.text, language,
+                                                            shared_script=row.sentence_id in shared)
+            if not reasons:
+                readings.setdefault(row.sentence_id, {}).setdefault(language, []).append(row)
+    selected: dict[str, list[list[n1.Row]]] = {language: [[] for _ in range(cohorts)] for language in train}
+
+    def rank(sentence: Mapping[str, list[n1.Row]], index: int) -> tuple[int, int, int]:
+        rooms = {language: per_language - len(selected[language][index]) for language in sentence}
+        return (sum(min(len(rows), rooms[language]) for language, rows in sentence.items()), sum(rooms.values()),
+                -index)
+
+    for sentence_id in sorted(readings, key=lambda value: hashlib.sha256(f"{seed}\0{value}".encode()).hexdigest()):
+        sentence = readings[sentence_id]
+        index = max(range(cohorts), key=lambda value: rank(sentence, value))
+        if rank(sentence, index)[0] == 0:
+            continue
+        for language, rows in sentence.items():
+            room = per_language - len(selected[language][index])
+            selected[language][index].extend(sorted(rows, key=lambda row: _order(seed, language, row.file))[:room])
     return selected
 
 
@@ -1960,10 +2003,13 @@ def extract_fleurs_reserve(registry: Mapping[str, Any], source: str, *, root: Pa
     receipt = Receipt(corpus, source)
     cohorts: list[list[dict[str, Any]]] = [[] for _ in range(spec["cohorts"])]
     shortfall: dict[str, list[int]] = {}
+    pins = _reserve_pins(registry, source)
+    trains: dict[str, list[n1.Row]] = {}
+    shared: dict[str, set[int]] = {}
     try:
-        for language, (tsv_pin, archive_pin) in _reserve_pins(registry, source).items():
+        # Every language's TSVs first: the allocation is global, each sentence one cohort in every language.
+        for language, (tsv_pin, _archive_pin) in pins.items():
             entry = n1.language_entry(n1_sources, language)
-            config = entry["config"]
             dev, test = (n1.read_tsv(corpus / n1.split_entry(entry, name)["tsv"]["path"],
                                      n1.split_entry(entry, name)["tsv"]) for name in ("dev", "test"))
             tsv_path = corpus / tsv_pin.path
@@ -1971,13 +2017,15 @@ def extract_fleurs_reserve(registry: Mapping[str, Any], source: str, *, root: Pa
                 raise CorporaError(f"{tsv_pin.path} is not fetched; run `fetch --group fleurs-train` first")
             data = tsv_path.read_bytes()
             receipt.record(tsv_pin, check_bytes(data, tsv_pin, receipt.recorded(tsv_pin)))
-            train = n1.parse_tsv(data, tsv_pin.path)
-            if {row.file for row in train} & {row.file for row in [*dev, *test]}:
+            trains[language] = n1.parse_tsv(data, tsv_pin.path)
+            if {row.file for row in trains[language]} & {row.file for row in [*dev, *test]}:
                 raise CorporaError(f"{tsv_pin.path} names a recording file that dev or test also names")
-            selection = reserve_selection(train, language=language,
-                                          shared_ids={row.sentence_id for row in [*dev, *test]},
-                                          cohorts=spec["cohorts"], per_language=spec["perLanguage"],
-                                          seed=spec["seed"])
+            shared[language] = {row.sentence_id for row in [*dev, *test]}
+        allocation = reserve_allocation(trains, shared_ids=shared, cohorts=spec["cohorts"],
+                                        per_language=spec["perLanguage"], seed=spec["seed"])
+        for language, (tsv_pin, archive_pin) in pins.items():
+            config = n1.language_entry(n1_sources, language)["config"]
+            selection = allocation[language]
             shortfall[language] = [spec["perLanguage"] - len(rows) for rows in selection]
             keep = {row.file for rows in selection for row in rows}
             extracted, expected = _reserve_extraction(reserve, digest, config, tsv_pin, archive_pin)
@@ -1985,8 +2033,8 @@ def extract_fleurs_reserve(registry: Mapping[str, Any], source: str, *, root: Pa
                 _log(f"{language}: reserve recordings present and verified")
                 files = json.loads((extracted / n1.RECEIPT_NAME).read_text(encoding="utf-8"))["files"]
             else:
-                files = _extract_reserve_language(corpus, receipt, archive_pin, train, keep, extracted, expected,
-                                                  language)
+                files = _extract_reserve_language(corpus, receipt, archive_pin, trains[language], keep, extracted,
+                                                  expected, language)
             for index, rows in enumerate(selection):
                 for row in rows:
                     cohorts[index].append({"row": row, "language": language, "config": config,
@@ -2100,6 +2148,178 @@ def reserve_problems(registry: Mapping[str, Any], source: str, *, root: Path | N
                 problems.append(f"cohort {index}: {take['takeID']} is missing or differs from its manifest")
                 break
     return problems
+
+
+def earlier_reserves(registry: Mapping[str, Any], source: str, *, root: Path | None = None) -> list[str]:
+    """Notes on the reserve directories an earlier sampling rule wrote (their cohort manifests' `reserve.version`):
+    they stay readable, and `reserve-disjoint` derives script-disjoint cohorts from them."""
+    notes = []
+    for path in sorted((source_directory(registry, source, root) / RESERVE_DIRECTORY).glob("*/cohort-1/" +
+                                                                                           MANIFEST_NAME)):
+        try:
+            version = (json.loads(path.read_text(encoding="utf-8")).get("reserve") or {}).get("version")
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            continue
+        if version != RESERVE_VERSION:
+            notes.append(f"reserve/{path.parent.parent.name} holds cohorts sampled by {version}, which may share a "
+                         "sentence across languages; `reserve-disjoint --reserve "
+                         f"{path.parent.parent.name}` derives script-disjoint cohorts from them")
+    return notes
+
+
+# --------------------------------------------------------------------------- #
+# Script-disjoint cohorts derived from an earlier sampling (`reserve-disjoint`)
+# --------------------------------------------------------------------------- #
+
+N2_MANIFEST_NAME = "n2-manifest.json"  # what the qc-n2 lane writes at its run directory's root
+
+
+def reserve_source(registry: Mapping[str, Any], source: str, reserve: str, *, root: Path | None = None) -> Path:
+    """`--reserve`: a sampling's directory name (12 hex digits) under the source's reserve directory, or a path."""
+    if re.fullmatch(r"[0-9a-f]{12}", reserve):
+        return source_directory(registry, source, root) / RESERVE_DIRECTORY / reserve
+    return Path(reserve)
+
+
+def disjoint_owner(script: str, cohorts: Iterable[int], *, seed: str) -> int:
+    """The one of the cohorts reading a shared script that keeps it (`DISJOINT_RULE`)."""
+    return min(cohorts, key=lambda cohort: hashlib.sha256(f"{seed}\0{script}\0{cohort}".encode("utf-8")).hexdigest())
+
+
+def _source_cohort(path: Path, cohort: int) -> dict[str, Any]:
+    """A sampled reserve cohort's N1 manifest, checked: its own digest, its split and its reserve block."""
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CorporaError(f"reserve cohort {cohort}: {path} is unreadable ({type(error).__name__})") from None
+    issues = n1.manifest_digest_issues(manifest)
+    if issues:
+        raise CorporaError(f"reserve cohort {cohort}: {issues[0]}")
+    block = manifest.get("reserve")
+    if manifest.get("split") != f"reserve-{cohort}" or manifest.get("fleursSplit") != "train" \
+            or not isinstance(block, dict) or block.get("cohort") != cohort:
+        raise CorporaError(f"{path} is not reserve cohort {cohort} of a FLEURS train sampling")
+    if manifest.get("derivedFrom") is not None:
+        raise CorporaError(f"reserve cohort {cohort} is itself derived; derive from the sampled cohorts")
+    for take in manifest.get("takes") or ():
+        if not all(isinstance(take.get(key), str) and take[key]
+                   for key in ("takeID", "family", "scriptID", "language", "wavPath", "wavSHA256")):
+            raise CorporaError(f"reserve cohort {cohort}: a take lacks its id, family, script, language or WAV")
+    return manifest
+
+
+def _overlaps(takes: Mapping[int, Sequence[Mapping[str, Any]]]) -> dict[str, dict[str, int]]:
+    """Per cohort pair, the scripts, families and speaker labels both read (FLEURS labels no speaker)."""
+    found = {}
+    for first in sorted(takes):
+        for second in sorted(takes):
+            if first < second:
+                found[f"{first}-{second}"] = {
+                    name: len({take.get(key) for take in takes[first] if take.get(key)}
+                              & {take.get(key) for take in takes[second] if take.get(key)})
+                    for name, key in (("scripts", "scriptID"), ("families", "family"), ("speakers", "speaker"))}
+    return found
+
+
+def derive_disjoint_cohorts(registry: Mapping[str, Any], source: str, *, reserve: str, cohorts: Sequence[int],
+                            seed: str = DISJOINT_SEED, n2_runs: Mapping[int, Path] | None = None,
+                            output: Path | None = None, dry_run: bool = False,
+                            root: Path | None = None) -> dict[str, Any]:
+    """Script-disjoint cohorts from the reserve cohorts of one sampling (`DISJOINT_RULE`), and the matching subsets
+    of their qc-n2 runs (`audio_qc_n2_resynthesis.derive_manifest`). Nothing is resynthesized and no source is
+    written: the N1 manifests go to `output` (default `<reserve>/disjoint/<derivation digest[:12]>/cohort-<k>/`,
+    their WAVs linked beside them) and each N2 manifest beside its run, in `<run>-disjoint-<digest[:12]>/`.
+    `dry_run` checks every source (each kept WAV and each run hashed) and writes nothing."""
+    cohorts = sorted(set(cohorts))
+    n2_runs = dict(n2_runs or {})
+    if len(cohorts) < 2 or any(cohort < 1 for cohort in cohorts):
+        raise CorporaError("name two or more reserve cohorts (1, 2, ...): disjointness holds between cohorts")
+    if set(n2_runs) - set(cohorts):
+        raise CorporaError(f"a qc-n2 run names a cohort outside {cohorts}")
+    directory = reserve_source(registry, source, reserve, root=root)
+    paths = {cohort: directory / f"cohort-{cohort}" / MANIFEST_NAME for cohort in cohorts}
+    sources = {cohort: _source_cohort(paths[cohort], cohort) for cohort in cohorts}
+    if len({str(manifest["reserve"].get("samplingDigest")) for manifest in sources.values()}) != 1:
+        raise CorporaError("the cohorts come from different samplings; derive the cohorts of one sampling together")
+    readers: dict[str, list[int]] = {}
+    for cohort in cohorts:
+        for script in sorted({take["scriptID"] for take in sources[cohort]["takes"]}):
+            readers.setdefault(script, []).append(cohort)
+    owner = {script: disjoint_owner(script, reading, seed=seed) for script, reading in readers.items()}
+    derivation = jsonio.sha256_json({
+        "version": DISJOINT_VERSION, "rule": DISJOINT_RULE, "seed": seed, "cohorts": cohorts,
+        "sources": {str(cohort): sources[cohort]["manifestDigest"] for cohort in cohorts}}, ascii=False)
+    base = Path(output) if output is not None else directory / DISJOINT_DIRECTORY / derivation[:12]
+    rule = {"version": DISJOINT_VERSION, "rule": DISJOINT_RULE, "seed": seed, "cohorts": cohorts,
+            "derivationDigest": derivation}
+    derived: dict[int, dict[str, Any]] = {}
+    written: dict[int, bytes] = {}
+    report: list[dict[str, Any]] = []
+    # Everything is derived and checked before anything is written.
+    for cohort in cohorts:
+        manifest = sources[cohort]
+        kept = [take for take in manifest["takes"] if owner[take["scriptID"]] == cohort]
+        if not kept:
+            raise CorporaError(f"reserve cohort {cohort} keeps no recording")
+        scripts = {take["scriptID"] for take in manifest["takes"]}
+        value = {key: item for key, item in manifest.items() if key != "manifestDigest"}
+        value.update({
+            "languages": [language for language in manifest.get("languages") or ()
+                          if any(take["language"] == language for take in kept)],
+            "counts": n1.cohort_counts(kept), "takes": kept,
+            "derivedFrom": {**rule, "manifestDigest": manifest["manifestDigest"],
+                            "manifestSHA256": jsonio.sha256_file(paths[cohort]), "takes": len(manifest["takes"]),
+                            "droppedScripts": sum(1 for script in scripts if owner[script] != cohort)},
+        })
+        value["manifestDigest"] = self_digest(value, "manifestDigest")
+        data = jsonio.pretty_bytes(value, ascii=False, allow_nan=False)
+        target = base / f"cohort-{cohort}" / MANIFEST_NAME
+        if any(target.resolve() == path.resolve() for path in paths.values()) \
+                or (target.exists() and target.read_bytes() != data):
+            raise CorporaError(f"{target} already holds another manifest; derive into a new --output directory")
+        for take in kept:
+            wav = paths[cohort].parent / take["wavPath"]
+            if wav.is_symlink() or not wav.is_file() or jsonio.sha256_file(wav) != take["wavSHA256"]:
+                raise CorporaError(f"reserve cohort {cohort}: {take['takeID']} is missing or differs from its "
+                                   "manifest")
+        derived[cohort], written[cohort] = value, data
+        report.append({
+            "cohort": cohort, "split": manifest["split"], "manifest": str(target),
+            "manifestSHA256": jsonio.sha256_bytes(data), "manifestDigest": value["manifestDigest"],
+            "sourceRecordings": len(manifest["takes"]), "recordings": len(kept),
+            "scripts": len({take["scriptID"] for take in kept}),
+            "droppedScripts": value["derivedFrom"]["droppedScripts"],
+            "byLanguage": {language: item["recordings"] for language, item in value["counts"]["byLanguage"].items()},
+        })
+    overlaps = _overlaps({cohort: value["takes"] for cohort, value in derived.items()})
+    if any(pair["scripts"] or pair["families"] for pair in overlaps.values()):
+        raise CorporaError("the derived cohorts still share a script or family")  # the rule leaves none; a guard
+    if not dry_run:
+        for item in report:
+            cohort = item["cohort"]
+            target = Path(item["manifest"])
+            for take in derived[cohort]["takes"]:
+                n1._place(paths[cohort].parent / take["wavPath"], target.parent / take["wavPath"], take["wavSHA256"])
+            jsonio.atomic_write_bytes(target, written[cohort])
+    for item in report:
+        cohort = item["cohort"]
+        run = n2_runs.get(cohort)
+        if run is None:
+            continue
+        run = Path(run)
+        manifest_path = run / N2_MANIFEST_NAME if run.is_dir() else run
+        target = manifest_path.parent.parent / f"{manifest_path.parent.name}-{DISJOINT_DIRECTORY}-{derivation[:12]}" \
+            / manifest_path.name
+        value = n2.derive_manifest(source=manifest_path, n1_manifest=derived[cohort],
+                                   n1_manifest_sha256=item["manifestSHA256"], output=target,
+                                   derived_from={**rule, "cohort": cohort}, dry_run=dry_run)
+        item["n2"] = {"manifest": str(target), "runID": value.get("runID"), "manifestDigest": value["manifestDigest"],
+                      "sourceTakes": value["derivedFrom"]["takes"], "takes": value["counts"]["takes"]}
+    return {"status": "dry-run" if dry_run else "derived", "derivationDigest": derivation, "seed": seed,
+            "cohorts": cohorts, "reserve": str(directory), "output": str(base),
+            "sharedScripts": sum(1 for reading in readers.values() if len(reading) > 1),
+            "sourceOverlaps": _overlaps({cohort: manifest["takes"] for cohort, manifest in sources.items()}),
+            "overlaps": overlaps, "derived": report}
 
 
 def extract(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path | None = None,
@@ -2606,6 +2826,7 @@ def verify(registry: Mapping[str, Any], selected: Sequence[str], *, root: Path |
             notes.append(f"{pruned} pinned files pruned after a verified extraction; `fetch` restores them")
         if entry["extract"]["format"] == "fleurs-reserve":
             extraction = reserve_problems(registry, source, root=root, n1_sources=n1_sources)
+            notes += earlier_reserves(registry, source, root=root)
         else:
             extraction = extraction_problems(directory / EXTRACTED_DIRECTORY, extraction_identity(registry, source))
         problems += [f"extraction: {problem}" for problem in extraction]
@@ -2867,6 +3088,23 @@ def pin_file_bytes(pins: Iterable[Pin]) -> bytes:
 # CLI
 # --------------------------------------------------------------------------- #
 
+def _cohort_list(value: str) -> list[int]:
+    try:
+        cohorts = [int(item) for item in value.split(",") if item.strip()]
+    except ValueError:
+        raise argparse.ArgumentTypeError("comma-separated cohort numbers, e.g. 1,2") from None
+    if len(set(cohorts)) < 2 or min(cohorts) < 1:
+        raise argparse.ArgumentTypeError("two or more distinct cohort numbers from 1, e.g. 1,2")
+    return sorted(set(cohorts))
+
+
+def _n2_run(value: str) -> tuple[int, Path]:
+    cohort, separator, path = value.partition("=")
+    if not separator or not cohort.isdigit() or not path:
+        raise argparse.ArgumentTypeError("K=RUN: a cohort number and its qc-n2 run directory")
+    return int(cohort), Path(path)
+
+
 def _selection(registry: Mapping[str, Any], args: argparse.Namespace, *, default_lean: bool) -> list[str]:
     explicit = bool(args.set or args.group or args.source)
     if not explicit and not default_lean:
@@ -2887,8 +3125,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                                           "them)"),
                        ("validate", "check the committed registry (no network)"),
                        ("resolve-subset", "the AISHELL-3 subset pins from a Hub tree listing"),
-                       ("cohort", "one speaker-disjoint split of a labelled corpus as an N1 cohort manifest")):
+                       ("cohort", "one speaker-disjoint split of a labelled corpus as an N1 cohort manifest"),
+                       ("reserve-disjoint", "script-disjoint cohorts derived from the reserve cohorts of one "
+                                            "sampling, and the matching subsets of their qc-n2 runs")):
         command = commands.add_parser(name, help=text)
+        if name == "reserve-disjoint":
+            command.add_argument("--reserve", required=True,
+                                 help="the sampling's directory name under fleurs/<revision>/reserve (12 hex digits), "
+                                      "or its path")
+            command.add_argument("--cohorts", required=True, type=_cohort_list, help="the cohorts, e.g. 1,2 or 1,2,3")
+            command.add_argument("--seed", default=DISJOINT_SEED, help=f"the rule's seed (default {DISJOINT_SEED})")
+            command.add_argument("--n2", action="append", type=_n2_run, default=[], metavar="K=RUN",
+                                 help="cohort K's qc-n2 run directory (or its n2-manifest.json); repeatable")
+            command.add_argument("--output", type=Path,
+                                 help="where the derived N1 cohorts go (default <reserve>/disjoint/<derivation "
+                                      "digest[:12]>); each N2 manifest goes beside its run")
+            command.add_argument("--dry-run", action="store_true",
+                                 help="check every source and print the counts; write nothing")
         if name == "cohort":
             command.add_argument("--source", required=True, choices=(*LABELLED_COHORTS, SPEAKER_COHORT),
                                  help="a labelled corpus, or `speaker`: the class E cohort over the speaker group")
@@ -2932,6 +3185,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                               "sha256": hashlib.sha256(data).hexdigest()}, sort_keys=True), file=sys.stderr)
             return 0
         registry = load_valid_registry()
+        if args.command == "reserve-disjoint":
+            source = next(name for name, entry in registry["sources"].items()
+                          if entry["extract"]["format"] == "fleurs-reserve")
+            runs = dict(args.n2)
+            if len(runs) != len(args.n2):
+                raise CorporaError("one --n2 run per cohort")
+            value = derive_disjoint_cohorts(registry, source, reserve=args.reserve, cohorts=args.cohorts,
+                                            seed=args.seed, n2_runs=runs, output=args.output, dry_run=args.dry_run)
+            print(json.dumps(value, indent=2, sort_keys=True))
+            return 0
         if args.command == "cohort" and args.source == SPEAKER_COHORT:
             manifest = speaker_cohort(registry, split=args.split, share=args.confirmation_share, output=args.output)
             output = args.output or speaker_cohort_path(registry, split=args.split, share=args.confirmation_share)
@@ -2983,13 +3246,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(results, indent=2, sort_keys=True))
         else:
             for item in results:
-                detail = f": {'; '.join((item['problems'] or item['notes'])[:3])}" \
+                detail = f": {'; '.join(item['problems'][:3] + item['notes'])}" \
                     if item["problems"] or item["notes"] else ""
                 pruned = f", {item['prunedFiles']} pruned" if item["prunedFiles"] else ""
                 print(f"{item['status']:5s} {item['source']} ({item['verifiedFiles']} files verified{pruned})"
                       f"{detail}")
         return 0 if all(item["status"] == "PASS" for item in results) else 1
-    except (CorporaError, n1.N1Error, acquire.AcquisitionError, JudgeRegistryError, OSError, KeyError,
+    except (CorporaError, n1.N1Error, n2.N2Error, acquire.AcquisitionError, JudgeRegistryError, OSError, KeyError,
             clips.CorpusAudioError) as error:
         print(f"audio-qc-corpora: FAIL\n{error}", file=sys.stderr)
         return 1

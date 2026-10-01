@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -829,6 +830,179 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         # Routine and aggressive-free cleanup leave confirmation roots to their own mode.
         self.run_clean("--routine")
         self.assertTrue(paths["old"].exists())
+
+    # --qc-v1: the one-time removal of the retired v1 audio QC data (qcV1Cleanup).
+
+    BEFORE_CUTOFF = time.mktime((2026, 9, 20, 12, 0, 0, 0, 0, -1))
+
+    @staticmethod
+    def stamp(path: Path, epoch: float) -> None:
+        for parent, directories, files in os.walk(path, topdown=False):
+            for name in (*files, *directories):
+                os.utime(Path(parent) / name, (epoch, epoch), follow_symlinks=False)
+        os.utime(path, (epoch, epoch), follow_symlinks=False)
+
+    def qc_v1_fixture(self) -> dict[str, Path]:
+        build = self.root / "build"
+        models = self.analysis_cache / "external-models"
+        corpora = build / "cache" / "audio-qc-corpora"
+        runs = build / "artifacts" / "macos" / "audio-qc"
+        diagnostics = build / "artifacts" / "diagnostics"
+        qc = build / "cache" / "qc"
+        paths = {
+            "seeded": self.write(models / "qwen3-asr" / "model.safetensors", b"weights"),
+            "old-judge": self.write(models / "old-judge" / "model.bin", b"judge").parent,
+            "interpreter": self.write(models / "audio-qc-python-3.14.4" / "bin" / "python3", b"py").parents[1],
+            "venv-home": self.write(models / "runtime-py314" / "bin" / "python3", b"py").parents[1],
+            "audio": self.write(self.analysis_cache / "audio" / "ab" / "canonical.pcm", b"pcm").parents[1],
+            "layers": self.write(self.analysis_cache / "layers" / "ab" / "l1.json", "{}").parents[1],
+            "confirmation": self.write(self.analysis_cache / "confirmation" / "cohort" / "l2.json", "{}").parents[1],
+            "adapter-config": self.write(self.analysis_cache / "whisper-small-mlx.json", "{}"),
+            "fleurs": self.write(corpora / "fleurs" / "rev" / "corpora-fetch-receipt.json", "{}").parents[1],
+            "libritts": self.write(corpora / "libritts-r" / "rev" / "corpora-fetch-receipt.json", "{}").parents[1],
+            "cohorts": self.write(corpora / "speaker-cohorts" / "id" / "share-0.5" / "x.wav", b"wav").parents[2],
+            "registry-receipt": self.write(corpora / "registry-receipt.json", "{}"),
+            "qc-n2": self.write(runs / "qc-n2-mac-qc-n2-20260930-1" / "takes" / "a.wav", b"wav").parents[1],
+            "acquire-log": self.write(runs / "acquire-all.log", "log"),
+            "qc-takes": self.write(runs / "qc-takes-mac-qc-takes-20260930-2" / "wav" / "a.wav", b"wav").parents[1],
+            "variation": self.write(runs / "variation-experiment-20261001" / "a.wav", b"wav").parent,
+            "today": self.write(runs / "fresh-run" / "a.wav", b"wav").parent,
+            "ladders": self.write(diagnostics / "audio-qc-oracle-ladders" / "report.json", "{}").parent,
+            "ios-logs": self.write(diagnostics / "ios" / "logs" / "device.log", "log").parent,
+            "python-copy": self.write(qc / "runtimes" / "python" / "bin" / "python3", b"py"),
+        }
+        # QC v2 seeded this model by hard link, and one venv's home is a v1 runtime.
+        paths["v2-link"] = qc / "models" / "asr.qwen3-asr-1.7b" / "model.safetensors"
+        paths["v2-link"].parent.mkdir(parents=True)
+        os.link(paths["seeded"], paths["v2-link"])
+        self.write(qc / "runtimes" / "mlx" / "pyvenv.cfg", f"home = {paths['venv-home'] / 'bin'}\n")
+        # A link is listed, never followed.
+        outside = self.write(Path(self.temporary.name) / "outside" / "weights.bin", b"outside").parent
+        paths["outside"] = outside
+        paths["symlinked"] = models / "linked-judge"
+        paths["symlinked"].symlink_to(outside, target_is_directory=True)
+        for name in ("qc-n2", "acquire-log", "qc-takes", "ladders"):
+            self.stamp(paths[name], self.BEFORE_CUTOFF)
+        return paths
+
+    def test_qc_v1_needs_a_dry_run_or_yes_and_is_its_own_mode(self) -> None:
+        for arguments in (("--qc-v1",), ("--qc-v1", "--routine", "--dry-run"), ("--yes",)):
+            self.run_clean(*arguments, expected=2)
+        # The checked-in contract loads, and a tree without v1 data plans nothing.
+        result = self.run_clean("--qc-v1", "--dry-run")
+        self.assertIn("state=absent", result.stdout)
+        self.assertIn("plannedReclaimBytes=0", result.stdout)
+
+    def test_qc_v1_removes_v1_data_and_keeps_what_qc_v2_and_the_take_generator_use(self) -> None:
+        paths = self.qc_v1_fixture()
+        removed = ("old-judge", "interpreter", "audio", "layers", "confirmation", "fleurs",
+                   "qc-n2", "acquire-log", "ladders")
+        kept = {
+            "seeded": None,
+            "venv-home": "qc-v2-links-into-it",
+            "libritts": "kept-by-name",
+            "cohorts": "kept-by-name",
+            "registry-receipt": "kept-file",
+            "qc-takes": "kept-by-prefix",
+            "variation": "kept-by-prefix",
+            "today": "created-on-or-after-cutoff",
+            "symlinked": "symlink-not-followed",
+        }
+
+        preview = self.run_clean("--qc-v1", "--dry-run")
+        self.assertIn("would-remove: bytes=", preview.stdout)
+        for name in removed:
+            self.assertIn(f"path={self.shown(paths[name])} reason=qc-v1-", preview.stdout, name)
+            self.assertTrue(paths[name].exists(), name)
+        for name, reason in kept.items():
+            if reason is not None:
+                self.assertIn(f"path={self.shown(paths[name])} reason={reason}", preview.stdout, name)
+        self.assertIn(
+            f"path={self.shown(paths['seeded'].parent)} reason=qc-v2-hard-links:1", preview.stdout
+        )
+        self.assertIn("qc-v1-target: id=judge-models", preview.stdout)
+        self.assertIn("dryRun=true", preview.stdout)
+
+        result = self.run_clean("--qc-v1", "--yes")
+        self.assertIn("removed: bytes=", result.stdout)
+        for name in removed:
+            self.assertFalse(paths[name].exists(), name)
+        for name in (*kept, "adapter-config", "ios-logs", "python-copy", "outside"):
+            self.assertTrue(paths[name].exists() or paths[name].is_symlink(), name)
+        self.assertEqual(paths["v2-link"].read_bytes(), b"weights")
+        self.assertTrue((paths["outside"] / "weights.bin").exists())
+
+    def test_qc_v1_keeps_the_pinned_interpreter_until_qc_v2_has_its_copy(self) -> None:
+        paths = self.qc_v1_fixture()
+        shutil.rmtree(self.root / "build" / "cache" / "qc" / "runtimes" / "python")
+        result = self.run_clean("--qc-v1", "--yes")
+        self.assertIn(
+            f"path={self.shown(paths['interpreter'])} "
+            "reason=kept-until-present:build/cache/qc/runtimes/python",
+            result.stdout,
+        )
+        self.assertTrue(paths["interpreter"].exists())
+        self.assertFalse(paths["old-judge"].exists())
+
+    def test_qc_v1_lists_bytes_another_hard_link_keeps_allocated(self) -> None:
+        paths = self.qc_v1_fixture()
+        elsewhere = self.root / "build" / "scratch" / "transient" / "model.bin"
+        elsewhere.parent.mkdir(parents=True)
+        os.link(paths["old-judge"] / "model.bin", elsewhere)
+        result = self.run_clean("--qc-v1", "--dry-run")
+        self.assertIn("qc-v1-shared: sharedBytes=", result.stdout)
+        self.assertIn(f"path={self.shown(paths['old-judge'])}\n", result.stdout)
+        # The summary counts a hard-linked file only when every link goes with the removal.
+        summary = re.search(r"qc-v1-summary: allocatedBytes=(\d+) reclaimableBytes=(\d+)", result.stdout)
+        self.assertIsNotNone(summary)
+        allocated, reclaimable = int(summary.group(1)), int(summary.group(2))
+        self.assertEqual(allocated - reclaimable, (paths["old-judge"] / "model.bin").lstat().st_blocks * 512)
+
+    def test_qc_v1_refuses_while_a_qc_run_or_a_v1_analyzer_holds_its_lock(self) -> None:
+        paths = self.qc_v1_fixture()
+        run_lock = self.root / "build" / "cache" / "qc" / "run.lock"
+        handle = run_lock.open("a+b")
+        self.addCleanup(handle.close)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for arguments in (("--qc-v1", "--dry-run"), ("--qc-v1", "--yes")):
+            result = self.run_clean(*arguments, expected=1)
+            self.assertIn("a qc.py run holds build/cache/qc/run.lock", result.stderr)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+        self.hold_analysis_lock()
+        for arguments in (("--qc-v1", "--dry-run"), ("--qc-v1", "--yes")):
+            result = self.run_clean(*arguments, expected=1)
+            self.assertIn("holds the host analysis lock", result.stderr)
+        for name in ("old-judge", "audio", "fleurs", "qc-n2", "ladders"):
+            self.assertTrue(paths[name].exists(), name)
+
+    def test_qc_v1_refuses_a_symlinked_root_before_removing_anything(self) -> None:
+        paths = self.qc_v1_fixture()
+        runs = self.root / "build" / "artifacts" / "macos" / "audio-qc"
+        outside = Path(self.temporary.name) / "outside-runs"
+        shutil.move(str(runs), str(outside))
+        runs.symlink_to(outside, target_is_directory=True)
+        result = self.run_clean("--qc-v1", "--yes", expected=1)
+        self.assertIn("through a symlink: build/artifacts/macos/audio-qc", result.stderr)
+        self.assertTrue((outside / "acquire-all.log").exists())
+        self.assertTrue(paths["old-judge"].exists())
+        # A registered entry that is itself a link fails the policy before any mode runs.
+        runs.unlink()
+        corpora = self.root / "build" / "cache" / "audio-qc-corpora"
+        shutil.move(str(corpora), str(outside / "corpora"))
+        corpora.symlink_to(outside / "corpora", target_is_directory=True)
+        self.run_clean("--qc-v1", "--yes", expected=1)
+        self.assertTrue((outside / "corpora" / "fleurs").exists())
+
+    @unittest.skipIf(shutil.which("lsof") is None, "lsof is not installed")
+    def test_qc_v1_keeps_a_child_with_an_open_file(self) -> None:
+        paths = self.qc_v1_fixture()
+        handle = (paths["old-judge"] / "model.bin").open("rb")
+        self.addCleanup(handle.close)
+        result = self.run_clean("--qc-v1", "--yes")
+        self.assertIn(f"path={self.shown(paths['old-judge'])} reason=in-use", result.stdout)
+        self.assertTrue(paths["old-judge"].exists())
+        self.assertFalse(paths["audio"].exists())
 
     def test_symlinked_build_root_cannot_escape_repository(self) -> None:
         outside = Path(self.temporary.name) / "outside"

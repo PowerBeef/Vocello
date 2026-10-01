@@ -13,12 +13,14 @@ import argparse
 import contextlib
 import datetime as dt
 import fcntl
+import fnmatch
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import plistlib
 import shutil
+import stat
 import subprocess
 import time
 import sys
@@ -54,6 +56,12 @@ SHIPPED_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice" /
 HOST_ANALYSIS_LOCK_NAME = "delivery-analysis-supervisor.lock"
 CONFIRMATION_ENTRY = "delivery-analysis-cache"
 CONFIRMATION_DIRECTORY = "confirmation"
+# The one-time removal of the retired v1 audio QC data (`--qc-v1`).
+QC_V1_KEY = "qcV1Cleanup"
+QC_V1_TARGET_KEYS = {
+    "id", "root", "names", "onlyPrefixes", "keep", "keepPrefixes", "keepFiles",
+    "keepUntilPresent", "keepCreatedOnOrAfter",
+}
 CACHE_ALIASES = {
     "macos": "xcode-macos-derived-data",
     "macos-optimized": "xcode-macos-optimized-derived-data",
@@ -129,9 +137,10 @@ def load_policy() -> dict[str, Any]:
         >= profile_retention["maximumDiagnosticLogBytes"] >= 1
     ):
         raise CleanupError("build-output policy has no valid profile retention contract")
+    # Optional: the v1 audio QC confirmation caches retire with v1 (`--qc-v1`).
     confirmation = child_retention.get("analysisConfirmation")
     idle_hours = confirmation.get("minimumIdleHours") if isinstance(confirmation, dict) else None
-    if not (
+    if confirmation is not None and not (
         isinstance(confirmation, dict)
         and confirmation.get("entry") == CONFIRMATION_ENTRY
         and confirmation.get("directory") == CONFIRMATION_DIRECTORY
@@ -349,7 +358,7 @@ def inventory(policy: dict[str, Any]) -> None:
             f"owner={json.dumps(entry.get('owner'), ensure_ascii=True)}"
         )
     confirmation = confirmation_directory(policy)
-    if confirmation.is_dir() and not confirmation.is_symlink():
+    if confirmation is not None and confirmation.is_dir() and not confirmation.is_symlink():
         now = time.time()
         for child in sorted(confirmation.iterdir()):
             if child.is_symlink() or not child.is_dir():
@@ -978,7 +987,7 @@ def path_in_use(path: Path) -> bool:
     """Whether any process holds a file open under `path` (lsof, required)."""
     lsof = shutil.which("lsof")
     if lsof is None:
-        raise CleanupError("lsof is required to verify that a confirmation cache root is idle")
+        raise CleanupError("lsof is required to verify that a cleanup target is idle")
     return open_file_holders(lsof, path)
 
 
@@ -1019,8 +1028,10 @@ def exclusive_analysis_lock(policy: dict[str, Any]) -> Iterator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def confirmation_directory(policy: dict[str, Any]) -> Path:
-    contract = policy["childRetention"]["analysisConfirmation"]
+def confirmation_directory(policy: dict[str, Any]) -> Path | None:
+    contract = policy["childRetention"].get("analysisConfirmation")
+    if contract is None:
+        return None
     entries = {entry.get("id"): entry for entry in policy_entries(policy)}
     return managed_path(entries[contract["entry"]]) / contract["directory"]
 
@@ -1038,7 +1049,7 @@ def tree_state(path: Path) -> tuple[int, float]:
 
 
 def prune_confirmation_caches(
-    cleaner: Cleaner, policy: dict[str, Any], *, older_than_hours: float
+    cleaner: Cleaner, policy: dict[str, Any], *, older_than_hours: float | None
 ) -> None:
     """Remove idle per-panel confirmation cache roots, `<analysis cache>/confirmation/<name>`.
 
@@ -1052,6 +1063,10 @@ def prune_confirmation_caches(
     orchestrator while it walks the roots.
     """
     root = confirmation_directory(policy)
+    if root is None:
+        raise CleanupError("build-output policy has no confirmation cache retention contract")
+    if older_than_hours is None:
+        older_than_hours = policy["childRetention"]["analysisConfirmation"]["minimumIdleHours"]
     cache = root.parent
     for path in (cache, root):
         if path.is_symlink():
@@ -1090,6 +1105,299 @@ def prune_confirmation_caches(
                 print(f"confirmation-retained: path={child} reason=in-use")
                 continue
             cleaner.remove(child, reason="idle-confirmation-cache")
+
+
+def _build_path(value: Any, label: str) -> Path:
+    """A repository path under build/: relative, without '.', '..' or a trailing slash."""
+    if not isinstance(value, str) or not value.startswith("build/") or value.endswith("/"):
+        raise CleanupError(f"{label} must be a relative path under build/: {value!r}")
+    if any(part in {".", ".."} for part in PurePosixPath(value).parts):
+        raise CleanupError(f"{label} must not contain '.' or '..': {value!r}")
+    return REPO_ROOT / value
+
+
+def _plain_names(value: Any, label: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(
+        isinstance(name, str) and name and "/" not in name and name not in {".", ".."}
+        for name in value
+    ):
+        raise CleanupError(f"{label} must be a list of plain names")
+    return list(value)
+
+
+def qc_v1_contract(policy: dict[str, Any]) -> dict[str, Any]:
+    """The validated `qcV1Cleanup` contract: its locks, the QC v2 cache it protects and its targets."""
+    contract = policy.get(QC_V1_KEY)
+    if not isinstance(contract, dict) or contract.get("schemaVersion") != 1:
+        raise CleanupError(f"build-output policy has no schema-v1 {QC_V1_KEY} contract")
+    lock = contract.get("analysisLock")
+    if not (
+        isinstance(lock, dict)
+        and isinstance(lock.get("defaultPath"), str)
+        and lock["defaultPath"].startswith("~/Library/Caches/")
+        and ".." not in PurePosixPath(lock["defaultPath"]).parts
+        and isinstance(lock.get("env"), str)
+        and isinstance(lock.get("name"), str)
+        and lock["name"] not in {"", ".", ".."}
+        and "/" not in lock["name"]
+    ):
+        raise CleanupError(f"{QC_V1_KEY}.analysisLock must name one lock file under ~/Library/Caches/")
+    override = os.environ.get(lock["env"], "")
+    lock_root = Path(override) if override and Path(override).is_absolute() else Path(lock["defaultPath"]).expanduser()
+    entry_paths = [managed_path(entry) for entry in policy_entries(policy)]
+    targets = contract.get("targets")
+    if not isinstance(targets, list) or not targets:
+        raise CleanupError(f"{QC_V1_KEY}.targets must be a non-empty list")
+    parsed: list[dict[str, Any]] = []
+    for index, target in enumerate(targets):
+        label = f"{QC_V1_KEY}.targets[{index}]"
+        if not isinstance(target, dict) or not isinstance(target.get("id"), str) or not target["id"]:
+            raise CleanupError(f"{label} must be an object with an id")
+        if any(target["id"] == other["id"] for other in parsed):
+            raise CleanupError(f"duplicate {QC_V1_KEY} target: {target['id']}")
+        unknown = sorted(set(target) - QC_V1_TARGET_KEYS)
+        if unknown:
+            raise CleanupError(f"{label} has unknown keys: {', '.join(unknown)}")
+        root = _build_path(target.get("root"), f"{label}.root")
+        # Stay inside the policy roots: a target is a registered entry or lies inside one.
+        if not any(root == entry or entry in root.parents for entry in entry_paths):
+            raise CleanupError(f"{label}.root is outside every registered build-output entry: {target['root']}")
+        until = target.get("keepUntilPresent") or {}
+        if not isinstance(until, dict):
+            raise CleanupError(f"{label}.keepUntilPresent must map a name to a build path")
+        _plain_names(list(until), f"{label}.keepUntilPresent")
+        cutoff = target.get("keepCreatedOnOrAfter")
+        cutoff_epoch = None
+        if cutoff is not None:
+            try:
+                # Local midnight: the date is the maintainer's calendar day.
+                cutoff_epoch = dt.datetime.combine(dt.date.fromisoformat(str(cutoff)), dt.time()).timestamp()
+            except ValueError as error:
+                raise CleanupError(f"{label}.keepCreatedOnOrAfter must be an ISO date") from error
+        keep_files = _plain_names(target.get("keepFiles"), f"{label}.keepFiles")
+        parsed.append({
+            "id": target["id"],
+            "root": root,
+            "names": _plain_names(target.get("names"), f"{label}.names"),
+            "onlyPrefixes": _plain_names(target.get("onlyPrefixes"), f"{label}.onlyPrefixes"),
+            "keep": set(_plain_names(target.get("keep"), f"{label}.keep")),
+            "keepPrefixes": _plain_names(target.get("keepPrefixes"), f"{label}.keepPrefixes"),
+            "keepFiles": keep_files,
+            "keepUntilPresent": {
+                name: _build_path(path, f"{label}.keepUntilPresent.{name}") for name, path in until.items()
+            },
+            "keepCreatedOnOrAfter": cutoff_epoch,
+        })
+    return {
+        "runLock": _build_path(contract.get("runLock"), f"{QC_V1_KEY}.runLock"),
+        "linkedFrom": _build_path(contract.get("linkedFrom"), f"{QC_V1_KEY}.linkedFrom"),
+        "analysisLock": lock_root / lock["name"],
+        "targets": parsed,
+    }
+
+
+@contextlib.contextmanager
+def exclusive_lock(path: Path, *, hold: bool, busy: str) -> Iterator[None]:
+    """Take `path` exclusively without waiting, then hold it for the block or release it at once.
+
+    An absent lock file has no holder. A probe (`hold=False`) never creates one;
+    a held lock is created only beside an existing parent, so the lock of a tool
+    that never ran on this host is not invented.
+    """
+    if not path.exists() and not path.is_symlink() and (not hold or not path.parent.is_dir()):
+        yield
+        return
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise CleanupError(f"lock is not a regular file: {path}")
+    with path.open("a+b") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise CleanupError(busy) from None
+        if not hold:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        try:
+            yield
+        finally:
+            if hold:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def qc_v2_link_index(root: Path) -> tuple[set[tuple[int, int]], list[Path]]:
+    """What QC v2 still reaches through its cache: hard-linked inodes and resolved link or venv targets.
+
+    `qc.py models fetch --seed-dir` hard-links (or copies) a verified file from
+    the v1 cache; a source that shares an inode with a file under the QC v2
+    cache, or that a symbolic link or a venv `home` there resolves into, is
+    still in use. Nothing is followed while walking.
+    """
+    inodes: set[tuple[int, int]] = set()
+    targets: list[Path] = []
+    if not root.is_dir() or root.is_symlink():
+        return inodes, targets
+    for parent, directories, files in os.walk(root, followlinks=False):
+        parent_path = Path(parent)
+        for name in (*directories, *files):
+            path = parent_path / name
+            try:
+                status = path.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(status.st_mode):
+                targets.append(Path(os.path.realpath(path)))
+            elif stat.S_ISREG(status.st_mode):
+                if status.st_nlink > 1:
+                    inodes.add((status.st_dev, status.st_ino))
+                if name == "pyvenv.cfg":
+                    try:
+                        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                    except OSError:
+                        continue
+                    for line in lines:
+                        key, _, value = line.partition("=")
+                        if key.strip() == "home" and value.strip():
+                            targets.append(Path(os.path.realpath(value.strip())))
+    return inodes, targets
+
+
+def qc_v1_scan(path: Path, inodes: set[tuple[int, int]]) -> dict[str, Any]:
+    """Allocated bytes (as `allocated_bytes` counts them), the multiply-linked files and how many
+    of them QC v2 shares, of a file or a tree, never following a link."""
+    scan: dict[str, Any] = {"bytes": 0, "sharedBytes": 0, "qcV2Files": 0, "linked": {}}
+    walked = [path]
+    if path.is_dir() and not path.is_symlink():
+        walked = []
+        for parent, directories, files in os.walk(path, followlinks=False):
+            walked.extend(Path(parent) / name for name in (*directories, *files))
+    for item in walked:
+        try:
+            status = item.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISDIR(status.st_mode):
+            continue
+        blocks = status.st_blocks * 512
+        scan["bytes"] += blocks
+        if stat.S_ISREG(status.st_mode) and status.st_nlink > 1:
+            key = (status.st_dev, status.st_ino)
+            scan["sharedBytes"] += blocks
+            scan["qcV2Files"] += key in inodes
+            found = scan["linked"].setdefault(key, [0, status.st_nlink, blocks])
+            found[0] += 1
+    return scan
+
+
+def created_at(path: Path) -> float:
+    """When a path was created (its birth time where the filesystem records one, else its own mtime)."""
+    status = path.lstat()
+    return float(getattr(status, "st_birthtime", status.st_mtime))
+
+
+def qc_v1_keep_reason(
+    target: dict[str, Any], child: Path, scan: dict[str, Any], link_targets: list[Path]
+) -> str | None:
+    name = child.name
+    if name in target["keep"]:
+        return "kept-by-name"
+    if any(name.startswith(prefix) for prefix in target["keepPrefixes"]):
+        return "kept-by-prefix"
+    if child.is_file() and any(fnmatch.fnmatchcase(name, pattern) for pattern in target["keepFiles"]):
+        return "kept-file"
+    until = target["keepUntilPresent"].get(name)
+    if until is not None and not (until.exists() or until.is_symlink()):
+        return f"kept-until-present:{until.relative_to(REPO_ROOT).as_posix()}"
+    cutoff = target["keepCreatedOnOrAfter"]
+    if cutoff is not None and created_at(child) >= cutoff:
+        return "created-on-or-after-cutoff"
+    if scan["qcV2Files"]:
+        return f"qc-v2-hard-links:{scan['qcV2Files']}"
+    resolved = Path(os.path.realpath(child))
+    if any(link == resolved or resolved in link.parents for link in link_targets):
+        return "qc-v2-links-into-it"
+    return None
+
+
+def remove_qc_v1(cleaner: Cleaner, policy: dict[str, Any]) -> None:
+    """Remove the retired v1 audio QC data that `qcV1Cleanup` names, keeping what QC v2 still uses.
+
+    Refuses while a `qc.py` run holds the QC v2 run lock or a v1 orchestrator,
+    generator or analyzer holds the analysis lock; a real run holds both for its
+    whole length, so neither starts meanwhile. A dry run only probes them. Every
+    candidate is a direct child of a target root: symbolic links are kept, never
+    followed, and a child with a file open (lsof), on a keep rule or still linked
+    from the QC v2 cache is kept and listed.
+    """
+    contract = qc_v1_contract(policy)
+    # Every root is checked before anything goes, so one bad root removes nothing.
+    for target in contract["targets"]:
+        root = target["root"]
+        relative_root = root.relative_to(REPO_ROOT).as_posix()
+        if any(path.is_symlink() for path in (root, *root.parents) if REPO_ROOT in path.parents):
+            raise CleanupError(f"refusing to clean through a symlink: {relative_root}")
+        if root.exists() and not root.is_dir():
+            raise CleanupError(f"qc-v1 target root is not a directory: {relative_root}")
+    hold = not cleaner.dry_run
+    with exclusive_lock(
+        contract["runLock"], hold=hold,
+        busy=f"a qc.py run holds {contract['runLock'].relative_to(REPO_ROOT)}; retry once it has finished",
+    ), exclusive_lock(
+        contract["analysisLock"], hold=hold,
+        busy="a v1 audio QC orchestrator, generator or analyzer holds the host analysis lock; "
+        "retry once it has finished",
+    ):
+        inodes, link_targets = qc_v2_link_index(contract["linkedFrom"])
+        # Bytes the removal frees: a file with other hard links counts once, and only when
+        # every one of its links goes with it.
+        reclaimable = 0
+        linked: dict[tuple[int, int], list[int]] = {}
+        for target in contract["targets"]:
+            root = target["root"]
+            relative_root = root.relative_to(REPO_ROOT).as_posix()
+            if not root.is_dir():
+                print(f"qc-v1-target: id={target['id']} root={relative_root} state=absent")
+                continue
+            removed = kept = 0
+            for child in sorted(root.iterdir(), key=lambda item: item.name):
+                if target["names"] and child.name not in target["names"]:
+                    continue
+                if target["onlyPrefixes"] and not any(
+                    child.name.startswith(prefix) for prefix in target["onlyPrefixes"]
+                ):
+                    continue
+                if child.is_symlink():
+                    print(f"qc-v1-kept: bytes=0 path={child} reason=symlink-not-followed")
+                    continue
+                scan = qc_v1_scan(child, inodes)
+                reason = qc_v1_keep_reason(target, child, scan, link_targets)
+                if reason is None and path_in_use(child):
+                    reason = "in-use"
+                if reason is not None:
+                    kept += scan["bytes"]
+                    print(
+                        f"qc-v1-kept: bytes={scan['bytes']} human={human_bytes(scan['bytes'])} "
+                        f"path={child} reason={reason}"
+                    )
+                    continue
+                if scan["sharedBytes"]:
+                    # Bytes in hard-linked files: freed only if every link goes too (summary).
+                    print(f"qc-v1-shared: sharedBytes={scan['sharedBytes']} path={child}")
+                removed += scan["bytes"]
+                reclaimable += scan["bytes"] - scan["sharedBytes"]
+                for key, (count, links, blocks) in scan["linked"].items():
+                    linked.setdefault(key, [0, links, blocks])[0] += count
+                cleaner.remove(child, reason=f"qc-v1-{target['id']}")
+            print(
+                f"qc-v1-target: id={target['id']} root={relative_root} "
+                f"removeBytes={removed} removeHuman={human_bytes(removed)} "
+                f"keptBytes={kept} keptHuman={human_bytes(kept)}"
+            )
+        reclaimable += sum(blocks for count, links, blocks in linked.values() if count >= links)
+        print(
+            f"qc-v1-summary: allocatedBytes={cleaner.planned} reclaimableBytes={reclaimable} "
+            f"reclaimableHuman={human_bytes(reclaimable)}"
+        )
 
 
 def remove_external_xcode(cleaner: Cleaner, policy: dict[str, Any]) -> None:
@@ -1133,6 +1441,12 @@ def parse_arguments() -> argparse.Namespace:
         help="remove idle audio QC confirmation cache roots (build/cache/delivery-analysis/confirmation/<name>) "
         "while no orchestrator, generator or analyzer runs",
     )
+    modes.add_argument(
+        "--qc-v1",
+        action="store_true",
+        help="remove the retired v1 audio QC models, caches, corpora and evidence that the policy's "
+        "qcV1Cleanup names, keeping what QC v2 still links to; --dry-run prints the plan, removal requires --yes",
+    )
     modes.add_argument("--external-xcode", action="store_true")
     modes.add_argument("--clobber", action="store_true")
     parser.add_argument("--ui-keep", type=int, default=1)
@@ -1158,7 +1472,7 @@ def parse_arguments() -> argparse.Namespace:
         for value in (
             args.routine, args.aggressive, args.prune_ui_results, args.dist,
             args.models, bool(args.cache), bool(args.compact_profile_failure),
-            args.prune_confirmation_caches, args.external_xcode, args.clobber,
+            args.prune_confirmation_caches, args.qc_v1, args.external_xcode, args.clobber,
         )
     )
     if args.aggressive and args.routine:
@@ -1169,8 +1483,10 @@ def parse_arguments() -> argparse.Namespace:
         parser.error("--ui-keep is valid only with --prune-ui-results")
     if (args.external_xcode or args.clobber) and not args.yes:
         parser.error("--external-xcode and --clobber require --yes")
-    if args.yes and not (args.external_xcode or args.clobber):
-        parser.error("--yes is valid only with --external-xcode or --clobber")
+    if args.qc_v1 and not (args.dry_run or args.yes):
+        parser.error("--qc-v1 requires --dry-run to print the plan or --yes to remove")
+    if args.yes and not (args.external_xcode or args.clobber or args.qc_v1):
+        parser.error("--yes is valid only with --external-xcode, --clobber or --qc-v1")
     return args
 
 
@@ -1184,7 +1500,7 @@ def main() -> int:
             (
                 args.routine, args.aggressive, args.prune_ui_results, args.dist,
                 args.models, bool(args.cache), bool(args.compact_profile_failure),
-                args.prune_confirmation_caches, args.external_xcode, args.clobber,
+                args.prune_confirmation_caches, args.qc_v1, args.external_xcode, args.clobber,
             )
         )
         if not any_mode:
@@ -1254,15 +1570,9 @@ def main() -> int:
                 args.compact_profile_failure,
             )
         elif args.prune_confirmation_caches:
-            prune_confirmation_caches(
-                cleaner,
-                policy,
-                older_than_hours=(
-                    args.older_than_hours
-                    if args.older_than_hours is not None
-                    else policy["childRetention"]["analysisConfirmation"]["minimumIdleHours"]
-                ),
-            )
+            prune_confirmation_caches(cleaner, policy, older_than_hours=args.older_than_hours)
+        elif args.qc_v1:
+            remove_qc_v1(cleaner, policy)
         elif args.external_xcode:
             remove_external_xcode(cleaner, policy)
         elif args.clobber:

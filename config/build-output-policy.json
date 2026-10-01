@@ -442,6 +442,67 @@
     ],
     "policy": "report-only"
   },
+  "qcV1Cleanup": {
+    "schemaVersion": 1,
+    "purpose": "One-time removal of the v1 audio QC data retired on 2026-10-01 (QC-05): scripts/clean_build_caches.sh --qc-v1 --dry-run prints every path with its bytes and reason, --qc-v1 --yes removes them. It refuses while a qc.py run holds runLock or a v1 orchestrator, generator or analyzer holds analysisLock (a removal holds both throughout), stays inside the registered entries, never follows a symbolic link, and keeps every direct child that QC v2 still hard-links, symlinks or venv-homes into from linkedFrom, a child with an open file, and each target's keep rules.",
+    "runLock": "build/cache/qc/run.lock",
+    "analysisLock": {
+      "defaultPath": "~/Library/Caches/Vocello/delivery-analysis-lock",
+      "env": "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT",
+      "name": "delivery-analysis-supervisor.lock"
+    },
+    "linkedFrom": "build/cache/qc",
+    "targets": [
+      {
+        "id": "judge-models",
+        "root": "build/cache/delivery-analysis/external-models",
+        "keepUntilPresent": {
+          "audio-qc-python-3.14.4": "build/cache/qc/runtimes/python"
+        }
+      },
+      {
+        "id": "analysis-caches",
+        "root": "build/cache/delivery-analysis",
+        "names": [
+          "audio",
+          "layers",
+          "confirmation"
+        ]
+      },
+      {
+        "id": "corpora",
+        "root": "build/cache/audio-qc-corpora",
+        "keep": [
+          "aishell3-subset",
+          "common-voice-sentences",
+          "emozionalmente",
+          "libritts-r",
+          "mls",
+          "speaker-cohorts",
+          "zeroth-korean"
+        ],
+        "keepFiles": [
+          "*.json"
+        ]
+      },
+      {
+        "id": "evidence-runs",
+        "root": "build/artifacts/macos/audio-qc",
+        "keepPrefixes": [
+          "qc-takes-",
+          "variation-experiment-"
+        ],
+        "keepCreatedOnOrAfter": "2026-10-01"
+      },
+      {
+        "id": "diagnostics",
+        "root": "build/artifacts/diagnostics",
+        "onlyPrefixes": [
+          "audio-qc-"
+        ]
+      }
+    ]
+  },
   "migrations": [
     {
       "id": "legacy-macos-source-packages",

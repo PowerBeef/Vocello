@@ -16,8 +16,8 @@
 # prints the numbers either way. It also refuses while parallel work is active:
 # another process holds the host-wide native lock ($QVOICE_NATIVE_LOCK), or a
 # Claude Code agent worktree is locked (an agent is still running). Evidence
-# lanes run alone. A non-timing model lane (audio-QC calibration: `qc-takes`,
-# `qc-n2`) passes `agents-allowed`: it measures outputs, not timing, so
+# lanes run alone. A non-timing model lane (audio-QC calibration takes:
+# `qc-takes`) passes `agents-allowed`: it measures outputs, not timing, so
 # code-only agents may work beside it (maintainer decision, 2026-09-29); they
 # are recorded, and load, memory pressure and a held native lock still refuse.
 # `QVOICE_ALLOW_BUSY_HOST=1` records the numbers

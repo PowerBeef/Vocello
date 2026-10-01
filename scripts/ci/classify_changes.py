@@ -125,12 +125,15 @@ IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_
                      "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh")
 RESEARCH_PREFIXES = (
     "delivery_", "prosody_", "analyze_", "audio_", "ios_control_audit", "ios_startup_reliability",
-    "check_language", "clone_", "emotion_", "mos_", "bench_", "run_local_delivery", "qualify_delivery",
-    "prepare_delivery", "build_emotion", "voice_identity",
-    "language_bench", "angry_bilingual", "custom_delivery", "independent_asr",
+    "check_language", "clone_", "bench_", "run_local_delivery", "prepare_delivery", "voice_identity",
+    "language_bench", "independent_asr",
 )
-RESEARCH_CONFIG = ("delivery-", "prosody-", "ios-control-audit", "ios-startup-reliability", "language-bench",
+RESEARCH_CONFIG = ("delivery-", "ios-control-audit", "ios-startup-reliability", "language-bench",
                    "voice-identity", "ui-perf-thresholds")
+# QC v2, the audio QC harness: its CLI, modules, runners and registries are
+# Python-lane inputs on every push (path-keyed, whatever the file type), never
+# research-only, so a change to them always runs their tests.
+QC_PATHS = ("scripts/qc.py", "scripts/qc/", "config/qc/")
 
 
 def _match(path: str, patterns: tuple[str, ...]) -> bool:
@@ -236,6 +239,8 @@ def _is_python(path: str) -> bool:
     # and wiring tests even when no script changed.
     if path.startswith(".claude/"):
         return path.endswith(CLAUDE_CONFIG_SUFFIXES)
+    if path.startswith(QC_PATHS):
+        return True
     if path.startswith("scripts/"):
         return not path.endswith(".md")
     if path.startswith("Packages/"):

@@ -162,7 +162,7 @@ class PythonSelectionTests(unittest.TestCase):
         selection = MODULE.python_test_selection(["scripts/analyze_prosody.py"])
         self.assertEqual(selection["mode"], "selected")
         self.assertIn("scripts/tests/test_analyze_prosody.py", selection["tests"])
-        self.assertIn("scripts/tests/test_delivery_temporal_features.py", selection["tests"])
+        self.assertIn("scripts/tests/test_prosody_quality_gate.py", selection["tests"])
 
     def test_benchmark_contracts_select_the_registry_tests(self) -> None:
         for path in ("benchmarks/schema-v3.json", "benchmarks/hardware-profiles.json"):

@@ -3484,8 +3484,8 @@ public enum PersistedWAVAudioQCAnalyzer {
 /// block in Korean. The text's own script picks the band, so it also holds
 /// when the request language is Auto.
 ///
-/// Warn-only. A failing bound belongs to the threshold-change authority in
-/// docs/reference/audio-qc-engineering.md.
+/// Warn-only. Its bands are Stage 0 constants: a change edits Swift, the Python
+/// mirror and config/audio-qc-stage0-calibration.json together.
 enum AudioSpeakingRateQC {
     enum ScriptClass: String, Sendable {
         case alphabetic

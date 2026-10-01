@@ -72,13 +72,6 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         stale_markers=("third_party_attributions.json is stale",),
     ),
     DerivedArtifact(
-        artifact_id="audio-qc-docs",
-        description="docs/reference/audio-qc/ (generated blocks and meta-evaluation-report.md)",
-        check=("python3", "scripts/audio_qc_docs.py", "regen", "--check"),
-        rebuild=("python3", "scripts/audio_qc_docs.py", "regen"),
-        stale_markers=("audio-qc docs are stale",),
-    ),
-    DerivedArtifact(
         artifact_id="roadmap-render",
         description="docs/ROADMAP.md",
         check=("python3", "scripts/roadmap.py", "render", "--check"),

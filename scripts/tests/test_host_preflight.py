@@ -109,7 +109,7 @@ class HostPreflightTests(unittest.TestCase):
             self.assertEqual(allowed.returncode, 0, allowed.stderr)
 
     def test_a_non_timing_model_lane_runs_beside_code_only_agents(self) -> None:
-        # qc-takes and qc-n2 measure outputs, not timing: a locked agent worktree is recorded, not refused.
+        # qc-takes measures outputs, not timing: a locked agent worktree is recorded, not refused.
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary) / "repo"
             git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]

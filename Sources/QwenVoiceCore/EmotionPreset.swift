@@ -505,7 +505,8 @@ public struct EmotionPreset: Identifiable, Sendable {
     // This is an attributed production-copy decision, not a measured improvement
     // claim; DP-30 through DP-32 retain the source-bound and blinded confirmation.
     // A candidate still needs enough seeds to clear the measured noise floor.
-    // Verify with scripts/delivery_matrix_report.py, never by reading text back.
+    // Verify with seeded audio from the delivery bench (scripts/bench_delivery_prosody.py),
+    // never by reading text back.
     //
     // REMOVED 2026-08-03, maintainer decision on DP-10 (18 seeds x 10 shipped
     // cells, one cell per preset since the intensity control was retired):

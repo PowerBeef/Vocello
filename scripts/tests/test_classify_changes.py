@@ -256,7 +256,14 @@ class ClassificationTests(unittest.TestCase):
             "project.yml": {"swift", "ios", "python"},
             "QwenVoice.xcodeproj/project.pbxproj": {"swift", "ios"},
             "scripts/build_foundation_targets.sh": {"ios", "python"},
-            "scripts/delivery_experiment_runner.py": {"python", "research"},
+            "scripts/delivery_quality_gate.py": {"python", "research"},
+            # QC v2 routes to the Python lane by path, never research-only.
+            "scripts/qc.py": {"python"},
+            "scripts/qc/store.py": {"python"},
+            "scripts/qc/runners/audiobox.py": {"python"},
+            "config/qc/models.json": {"python"},
+            "config/qc/runtimes/onnx.txt": {"python"},
+            "scripts/tests/test_qc_core.py": {"python"},
         }
         for path, lanes in expected.items():
             self.assertEqual(self.lanes(path), lanes, path)

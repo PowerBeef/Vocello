@@ -19,10 +19,7 @@ import VocelloQwen3Core
 /// limiter, then (in the CLI) the publication marking.
 ///
 /// The recipe's catalog (which variant repeats how many frames) belongs to the
-/// Python builder (`scripts/lib/qc_qualification/codec_trace.py`), which
-/// replays every recipe on the source trace and requires the mutated trace
-/// this replay wrote to match byte for byte; here a recipe is only checked for
-/// shape and bounds.
+/// job's author; here a recipe is only checked for shape and bounds.
 public enum CodecLoopMutationEvidence {
     public static let jobKind = "audio-qc-codec-loop-job"
     public static let resultKind = "audio-qc-codec-loop-result"

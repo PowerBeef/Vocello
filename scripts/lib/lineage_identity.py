@@ -124,7 +124,6 @@ DELIVERY_ANALYSIS = (
     "scripts/bench_delivery_prosody.py",
     "scripts/clone_prosody_fidelity.py",
     "scripts/delivery_quality_gate.py",
-    "scripts/delivery_separability.py",
     "scripts/prosody_profile.py",
     "scripts/prosody_quality_gate.py",
 )
@@ -219,7 +218,6 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
     # Calibration analyzes a labeled corpus; it builds and launches nothing.
     ("prosody-calibration", "macos"): (
         "scripts/analyze_prosody.py",
-        "scripts/prosody_calibration.py",
         "scripts/prosody_profile.py",
         "scripts/publish_benchmark_history.py",
     ),

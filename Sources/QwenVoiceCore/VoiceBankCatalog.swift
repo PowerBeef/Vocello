@@ -1,8 +1,7 @@
 import Foundation
 
 /// Groups saved voices into emotion reference banks by the naming convention
-/// the bank builder emits (`scripts/build_emotion_reference_bank.py`,
-/// `docs/reference/emotion-reference-banks.md`): a persona's neutral anchor
+/// of `docs/reference/emotion-reference-banks.md`: a persona's neutral anchor
 /// is enrolled under the bare persona name, and each curated emotion
 /// reference as "<Persona> (<Emotion>)". Grouping is resolved from names
 /// alone — no persistence changes — so banks built by the pipeline, or

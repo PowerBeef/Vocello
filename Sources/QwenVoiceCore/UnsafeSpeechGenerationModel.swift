@@ -19,15 +19,15 @@ enum Qwen3TalkerSamplingOverride {
     static let envRepetitionPenalty: Float? = floatValue("QWENVOICE_TALKER_REPPEN")
     /// Audio QC controlled generation GEN-NOEOS (audit 2026-09-25 section 5.2):
     /// hold back the talker's first sampled EOS for this many codec frames. It
-    /// exists only for the class I positives (`vocello batch` in the
-    /// `qc-introspection` lane); 0 arms the hold at zero frames (the sham).
+    /// exists only for controlled-generation QC experiments under
+    /// `vocello batch`; 0 arms the hold at zero frames (the sham).
     static let envEOSSuppressionFrames: Int? = eosSuppressionFrames(
         RuntimeDebugGate.value(for: "QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES")
     )
 
     /// A whole number of codec frames within the facade's bound; anything else
-    /// leaves the hold unset (the production path), and the qc-introspection
-    /// builder refuses a take whose engine row does not record the hold.
+    /// leaves the hold unset (the production path), so a take whose engine row
+    /// does not record the hold was not held.
     static func eosSuppressionFrames(_ raw: String?) -> Int? {
         guard let raw,
               let value = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)),

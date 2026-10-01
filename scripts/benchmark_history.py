@@ -1266,7 +1266,6 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "scripts" / "macos_test.sh",
         REPO_ROOT / "scripts" / "ios_device.sh",
         REPO_ROOT / "scripts" / "telemetry_overhead.py",
-        REPO_ROOT / "scripts" / "prosody_calibration.py",
         REPO_ROOT / "scripts" / "analyze_prosody.py",
         REPO_ROOT / "scripts" / "bench_delivery_prosody.py",
         REPO_ROOT / "scripts" / "prosody_profile.py",
@@ -1275,7 +1274,6 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         # as much as the prosody gate does; before this they could change
         # without invalidating inputs.analysisProfileHash.
         REPO_ROOT / "scripts" / "delivery_quality_gate.py",
-        REPO_ROOT / "scripts" / "delivery_separability.py",
         REPO_ROOT / "scripts" / "clone_prosody_fidelity.py",
         REPO_ROOT / "scripts" / "check_language_hints.py",
         REPO_ROOT / "scripts" / "check_language_output.py",

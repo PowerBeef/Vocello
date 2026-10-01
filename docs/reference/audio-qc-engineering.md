@@ -2992,6 +2992,8 @@ $Q derive --detector signal.dropout@2 --calibration-scores $D/calibration/signal
 git add config/audio-qc-preregistrations/<the 17 plan files> && git commit -F -   # on main
 ```
 
+An N3 or long-form set needs `--embed-text`: its entries then carry their text, which the positives panel
+manifest requires (`orchestrator manifest` refuses an entry without it; N1 and N2 sets always carry it).
 The N3 and long-form plans take a nonzero `--injection-sample-per-cell` because a set built with the
 N3 default of 0 records no sample seed for the plan to bind. Their sets hold every family anyway when
 the pool is smaller than 150.
@@ -3031,7 +3033,7 @@ $O run --manifest $T2/panel-manifest.json --judge pitch.pyin@1 --cache-root $K/c
 $S raw-outputs --takes $T2/takes-manifest.json --bundle $T2/panel-bundle --judge pitch.pyin@1 \
   --cache-root $K/confirmation/n3 --output $T2/pyin-raw.json
 $S inject --takes $T2/takes-manifest.json --output $T2/injection-set --catalog-seed 7 --sample-seed 1 \
-  --sample-per-cell 150 --classes F
+  --sample-per-cell 150 --classes F --embed-text
 $S verify --set $T2/injection-set/injection-set.json --takes $T2/takes-manifest.json
 $O manifest --from-calibration-takes $T2/injection-set/injection-set.json --output $T2/injection-panel-manifest.json
 $O run --manifest $T2/injection-panel-manifest.json --judge pitch.pyin@1 --cache-root $K/confirmation/n3-positives \
@@ -3039,7 +3041,7 @@ $O run --manifest $T2/injection-panel-manifest.json --judge pitch.pyin@1 --cache
 $S raw-outputs --takes $T2/injection-set/injection-set.json --bundle $T2/injection-panel-bundle \
   --judge pitch.pyin@1 --cache-root $K/confirmation/n3-positives --output $T2/injection-pyin-raw.json
 $S inject --takes $L2/takes-manifest.json --output $L2/injection-set --catalog-seed 7 --sample-seed 1 \
-  --sample-per-cell 150 --classes J
+  --sample-per-cell 150 --classes J --embed-text
 $S verify --set $L2/injection-set/injection-set.json --takes $L2/takes-manifest.json
 $S score --takes $L2/takes-manifest.json --set $L2/injection-set/injection-set.json --output $L2/stage0
 $O manifest --from-calibration-takes $L2/takes-manifest.json --output $L2/panel-manifest.json

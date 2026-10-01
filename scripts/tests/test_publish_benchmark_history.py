@@ -367,50 +367,62 @@ def language_sentinel(
     }
 
 
-def independent_recognition(*, audio_sha256: str, script: str, transcript: str | None = None,
-                            language: str = "french", detected: str | None = None,
-                            duration: float = 2.0, provenance: dict | None = None) -> dict:
-    """One whisper-family recognition as `scripts/independent_asr.py` emits it."""
+QC_RECOGNIZERS = {
+    "qwen3-asr": {"role": "asrA", "modelID": "asr.qwen3-asr-1.7b", "runtimeSHA256": "1" * 64,
+                  "modelIdentitySHA256": "2" * 64, "configSHA256": "3" * 64},
+    "whisper": {"role": "asrB", "modelID": "asr.whisper-large-v3", "runtimeSHA256": "4" * 64,
+                "modelIdentitySHA256": "5" * 64, "configSHA256": "6" * 64},
+}
+
+
+def qc_recognition(*, family: str, audio_sha256: str, script: str, transcript: str | None = None,
+                   language: str = "french", detected: str | None = None, duration: float = 2.0,
+                   recognizer: dict | None = None) -> dict:
+    """One QC v2 family's recognition as `qc.py language-bench evidence` emits it."""
+    recognizer = recognizer or QC_RECOGNIZERS[family]
     return {
-        "schemaVersion": 1,
-        "algorithmVersion": publisher.INDEPENDENT_ASR_ALGORITHM,
-        "modelFamily": "whisper",
+        "schemaVersion": publisher.QC_RECOGNITION_SCHEMA,
+        "algorithmVersion": publisher.QC_ASR_ALGORITHM,
+        "modelFamily": family,
+        "modelID": recognizer["modelID"],
         "audioSHA256": audio_sha256,
         "inputTextSHA256": publisher.text_sha256(script),
         "status": "complete",
         "outputLanguage": language,
-        "decodeLanguage": "fr",
         "detectedLanguage": detected or language,
         "languageMatchScore": 0.97,
         "detectedLanguageProbability": 0.97,
         "fullFileProcessed": True,
         "processedDurationSeconds": duration,
-        "segmentCount": 1,
-        "firstSegmentStartSeconds": 0.0,
-        "lastSegmentEndSeconds": duration,
-        "recognitionDurationSeconds": 0.4,
-        "maximumNoSpeechProbability": 0.02,
-        "meanAverageLogProbability": -0.25,
+        "languageWindows": None,
         "transcript": script if transcript is None else transcript,
-        "provenance": provenance or {
-            "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "3" * 64,
-        },
+        "provenance": {key: recognizer[key] for key in ("runtimeSHA256", "modelIdentitySHA256", "configSHA256")},
     }
 
 
-def independent_evidence(path: Path, *, run_id: str, platform: str, cells: dict) -> Path:
+def qc_recognitions(*, audio_sha256: str, script: str, overrides: dict | None = None, **common) -> list[dict]:
+    """Both QC v2 families' recognitions; `overrides` maps a family to its own keyword arguments."""
+    return [
+        qc_recognition(family=family, audio_sha256=audio_sha256, script=script,
+                       **{**common, **(overrides or {}).get(family, {})})
+        for family in ("qwen3-asr", "whisper")
+    ]
+
+
+def qc_evidence(path: Path, *, run_id: str, platform: str, cells: dict) -> Path:
     path.write_text(json.dumps({
-        "schemaVersion": 1,
-        "kind": "independent-asr-language-evidence",
+        "schema": "vocello.qc.language-evidence/1",
+        "kind": "qc-language-evidence",
         "runID": run_id,
         "platform": platform,
+        "qcRun": "language-bench-20261001-000000-abcd",
+        "lane": "language-bench",
         "generationProcessExited": True,
-        "families": ["whisper"],
-        "producer": {
-            "adapterID": "whisper-small-mlx", "algorithmVersion": publisher.INDEPENDENT_ASR_ALGORITHM,
-            "modelLaunches": 1, "cacheHits": 0, "rowCount": len(cells),
-            "resourceEnvelope": {"qualified": True, "peakRSSBytes": 900 * 1024**2},
-        },
+        "recognitionAlgorithm": publisher.QC_ASR_ALGORITHM,
+        "families": ["qwen3-asr", "whisper"],
+        "recognizers": QC_RECOGNIZERS,
+        "status": "pass",
+        "missing": [],
         "cells": cells,
     }))
     return path
@@ -1999,9 +2011,9 @@ class PublisherTests(unittest.TestCase):
             json.dumps(manifest, sort_keys=True),
         )
 
-    def _publish_two_language_cells(self, *, english_provenance: dict | None = None,
+    def _publish_two_language_cells(self, *, english_recognizer: dict | None = None,
                                     english_expected_outcome: str = "pass",
-                                    english_transcript: str | None = None) -> dict:
+                                    english_detected: str | None = None) -> dict:
         french = "un deux trois quatre cinq six sept huit"
         english = "one two three four five six seven eight"
         matrix, corpus, plan_path, plan = planned_language_run(
@@ -2015,24 +2027,26 @@ class PublisherTests(unittest.TestCase):
         )
         rows = []
         cells = {}
-        for planned, (cell_id, digest, language, script, provenance) in zip(plan["takes"], (
-            ("fr", "a" * 64, "french", french, None),
-            ("en", "b" * 64, "english", english, english_provenance),
+        for planned, (cell_id, digest, language, script) in zip(plan["takes"], (
+            ("fr", "a" * 64, "french", french),
+            ("en", "b" * 64, "english", english),
         )):
             row = engine_row(f"{cell_id}-id", run_id="lang-run", cell=cell_id)
             row["notes"]["languageHint"] = language
             row["notes"]["samplingWAVDigest"] = digest
             rows.append(bind_row_to_plan(row, planned))
-            cells[cell_id] = {
-                "generationID": f"{cell_id}-id", "audioSHA256": digest, "expectedLanguage": language,
-                "expectedOutcome": "pass",
-                "recognitions": [independent_recognition(
-                    audio_sha256=digest, script=script, language=language, provenance=provenance,
-                    transcript=english_transcript if cell_id == "en" else None,
-                )],
+            english_cell = cell_id == "en"
+            cells[planned["childRunID"]] = {
+                "cellID": cell_id, "generationID": f"{cell_id}-id", "audioSHA256": digest,
+                "expectedLanguage": language, "expectedOutcome": "pass",
+                "recognitions": qc_recognitions(
+                    audio_sha256=digest, script=script, language=language,
+                    detected=english_detected if english_cell else None,
+                    overrides={"qwen3-asr": {"recognizer": english_recognizer}} if english_cell else None,
+                ),
             }
-        recognitions = independent_evidence(
-            self.root / "independent-asr.json", run_id="lang-run", platform="macos", cells=cells,
+        recognitions = qc_evidence(
+            self.root / "qc-language-evidence.json", run_id="lang-run", platform="macos", cells=cells,
         )
         args = SimpleNamespace(
             matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root, plan=plan_path,
@@ -2056,37 +2070,42 @@ class PublisherTests(unittest.TestCase):
             publisher.language_command(args)
         return captured["manifest"]["historyRecord"]
 
-    def test_cells_of_different_languages_share_one_recognizer_identity(self) -> None:
-        # The producer locks the decode language per row, so configSHA256 differs
-        # between a French and an English cell while the runtime and model do not.
-        record = self._publish_two_language_cells(english_provenance={
-            "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "4" * 64,
-        })
+    def test_every_cell_names_the_run_recognizer_of_each_family(self) -> None:
+        record = self._publish_two_language_cells()
         verification = record["evidence"]["languageVerification"]
-        self.assertEqual(verification["independentModelIdentitySHA256"], "2" * 64)
+        self.assertEqual(verification["qcRecognitionAlgorithm"], publisher.QC_ASR_ALGORITHM)
+        self.assertEqual(verification["qcRecognizers"], {
+            family: {key: recognizer[key] for key in ("modelID", "modelIdentitySHA256", "runtimeSHA256")}
+            for family, recognizer in QC_RECOGNIZERS.items()
+        })
         self.assertEqual(verification["outputCellsPassed"], 2)
 
-    def test_a_negative_control_take_is_stamped_with_its_expected_failure(self) -> None:
-        record = self._publish_two_language_cells(
-            english_expected_outcome="fail",
-            english_transcript="nine ten eleven twelve thirteen fourteen fifteen sixteen",
-        )
+    def test_a_negative_control_take_is_a_language_control(self) -> None:
+        """QC v2: both free-decoding families must hear another language than the pinned one."""
+        record = self._publish_two_language_cells(english_expected_outcome="fail", english_detected="french")
         verification = record["evidence"]["languageVerification"]
         self.assertEqual(verification["negativeControlsConfirmed"], 1)
+        self.assertEqual(verification["negativeControlKind"], "language-control")
         self.assertEqual(verification["outputCellsPassed"], 2)
         by_cell = {take["cell"]: take for take in record["takes"]}
         self.assertEqual(by_cell["en"]["expectedOutcome"], "fail")
         self.assertNotIn("expectedOutcome", by_cell["fr"])
-        self.assertEqual(by_cell["en"]["metrics"]["independentAccuracyPass"], 0.0)
+        self.assertEqual(by_cell["en"]["metrics"]["qcQwen3AsrLanguagePass"], 0.0)
+        self.assertEqual(by_cell["en"]["metrics"]["qcWhisperLanguagePass"], 0.0)
+        self.assertEqual(by_cell["en"]["channelConsensus"], {"language": "fail", "accuracy": "pass"})
+        self.assertEqual(verification["channelVerdicts"], {"language": "pass", "accuracy": "pass"})
+        # A control both families heard in the pinned language is not confirmed.
+        with self.assertRaisesRegex(publisher.PublicationError, "language=pass"):
+            self._publish_two_language_cells(english_expected_outcome="fail")
 
-    def test_two_recognizer_models_in_one_run_refuse_publication(self) -> None:
+    def test_a_recognition_from_another_recognizer_refuses_publication(self) -> None:
         with self.assertRaises(publisher.PublicationError) as raised:
-            self._publish_two_language_cells(english_provenance={
-                "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "9" * 64, "configSHA256": "3" * 64,
+            self._publish_two_language_cells(english_recognizer={
+                **QC_RECOGNIZERS["qwen3-asr"], "modelIdentitySHA256": "9" * 64,
             })
-        self.assertIn("more than one recognizer identity", str(raised.exception))
+        self.assertIn("does not come from the run's recognizer", str(raised.exception))
 
-    def test_macos_language_publishes_a_single_whisper_witness_as_focused(self) -> None:
+    def test_macos_language_publishes_the_two_qc_families_as_focused(self) -> None:
         reference_script = "un deux trois quatre cinq six sept huit"
         matrix, corpus, plan_path, plan = planned_language_run(
             self.root, run_id="lang-run",
@@ -2096,15 +2115,16 @@ class PublisherTests(unittest.TestCase):
         fr = bind_row_to_plan(engine_row("fr-id", run_id="lang-run", cell="fr"), plan["takes"][0])
         fr["notes"]["languageHint"] = "french"
         fr["notes"]["samplingWAVDigest"] = "a" * 64
-        recognitions = independent_evidence(
-            self.root / "independent-asr.json", run_id="lang-run", platform="macos",
-            cells={"fr": {
-                "generationID": "fr-id", "audioSHA256": "a" * 64, "expectedLanguage": "french",
+        child = plan["takes"][0]["childRunID"]
+        recognitions = qc_evidence(
+            self.root / "qc-language-evidence.json", run_id="lang-run", platform="macos",
+            cells={child: {
+                "cellID": "fr", "generationID": "fr-id", "audioSHA256": "a" * 64, "expectedLanguage": "french",
                 "expectedOutcome": "pass",
-                "recognitions": [independent_recognition(
+                "recognitions": qc_recognitions(
                     audio_sha256="a" * 64, script=reference_script,
-                    transcript="un deux trois quatre cinq six sept neuf",
-                )],
+                    overrides={"whisper": {"transcript": "un deux trois quatre cinq six sept neuf"}},
+                ),
             }},
         )
         args = SimpleNamespace(
@@ -2129,24 +2149,28 @@ class PublisherTests(unittest.TestCase):
         record = captured["manifest"]["historyRecord"]
         self.assertEqual(record["run"]["matrixScope"], "focused")
         verification = record["evidence"]["languageVerification"]
-        self.assertEqual(verification["families"], ["whisper"])
-        self.assertEqual(verification["recognitionAlgorithm"], publisher.INDEPENDENT_ASR_ALGORITHM)
-        self.assertEqual(verification["outputAlgorithm"], publisher.INDEPENDENT_OUTPUT_ALGORITHM)
+        self.assertEqual(verification["families"], ["qwen3-asr", "whisper"])
+        self.assertEqual(verification["recognitionAlgorithm"], publisher.QC_ASR_ALGORITHM)
+        self.assertEqual(verification["outputAlgorithm"], publisher.QC_OUTPUT_ALGORITHM)
         self.assertEqual(verification["requiredPassCount"], 1)
-        self.assertEqual(verification["independentModelIdentitySHA256"], "2" * 64)
+        self.assertEqual(verification["qcRecognizers"]["whisper"]["modelID"], "asr.whisper-large-v3")
         self.assertEqual(verification["outputCellsPassed"], 1)
         take = record["takes"][0]
         self.assertEqual(take["accuracyMetric"], "wordErrorRate")
-        self.assertEqual(take["metrics"]["independentWordErrorRate"], 0.125)
-        self.assertEqual(take["metrics"]["independentPrimaryAccuracyScore"], 0.125)
-        self.assertEqual(take["metrics"]["independentLanguagePass"], 1.0)
-        self.assertEqual(take["detectedLanguages"], {"whisper": "french"})
+        self.assertEqual(take["metrics"]["qcWhisperWordErrorRate"], 0.125)
+        self.assertEqual(take["metrics"]["qcWhisperPrimaryAccuracyScore"], 0.125)
+        self.assertEqual(take["metrics"]["qcQwen3AsrWordErrorRate"], 0.0)
+        self.assertEqual(take["metrics"]["qcWhisperLanguagePass"], 1.0)
+        self.assertEqual(take["detectedLanguages"], {"qwen3-asr": "french", "whisper": "french"})
+        # The two families vote each channel.
+        self.assertEqual(take["channelConsensus"], {"language": "pass", "accuracy": "pass"})
+        self.assertEqual(verification["channelConsensusAlgorithm"], "qc-v2-family-consensus-v1")
+        self.assertEqual(verification["channelVerdicts"], {"language": "pass", "accuracy": "pass"})
         # Audit #86: the macOS take names its audio by the engine's WAV digest.
         self.assertEqual(take["output"]["fileDigest"], "a" * 64)
-        self.assertEqual(verification["languageCheckKinds"], {"whisper": "audio-language-identification"})
-        # Whisper's confidence is published beside its verdict (audit #89).
-        self.assertEqual(take["metrics"]["independentMaximumNoSpeechProbability"], 0.02)
-        self.assertEqual(take["metrics"]["independentMeanAverageLogProbability"], -0.25)
+        self.assertEqual(verification["languageCheckKinds"], {
+            "qwen3-asr": "audio-language-identification", "whisper": "audio-language-identification"})
+        self.assertFalse([key for key in take["metrics"] if key.startswith("independent")])
         self.assertNotIn("wordErrorRate", take["metrics"])
         self.assertNotIn("recognitionPassCount", take["metrics"])
         self.assertEqual(captured["manifest"]["historyRecord"]["inputs"].get("analysisProfileHash") is not None, True)
@@ -2183,18 +2207,22 @@ class PublisherTests(unittest.TestCase):
             ):
                 publisher.language_command(drift_args)
 
-        # A failing transcript, a wrong detected language, or audio bound to
-        # other bytes each refuses publication; a supplied score never helps.
+        # A failing transcript or a wrong detected language in one family (the
+        # families then disagree), audio bound to other bytes, a missing family
+        # or a truncated decode each refuses publication; a supplied score never helps.
         for label, mutate in (
-            ("failed", lambda c: c["recognitions"][0].__setitem__("transcript", "neuf huit sept six cinq quatre trois deux")),
-            ("failed", lambda c: c["recognitions"][0].__setitem__("detectedLanguage", "english")),
+            ("did not agree.*accuracy=inconclusive", lambda c: c["recognitions"][0].__setitem__(
+                "transcript", "neuf huit sept six cinq quatre trois deux")),
+            ("did not agree.*language=inconclusive",
+             lambda c: c["recognitions"][0].__setitem__("detectedLanguage", "english")),
             ("other audio", lambda c: c.__setitem__("audioSHA256", "b" * 64)),
             ("unqualified", lambda c: c["recognitions"][0].__setitem__("audioSHA256", "b" * 64)),
             ("unqualified", lambda c: c["recognitions"][0].__setitem__("fullFileProcessed", False)),
+            ("unqualified.*whisper: missing", lambda c: c["recognitions"].pop()),
         ):
             payload = json.loads(recognitions.read_text())
-            mutate(payload["cells"]["fr"])
-            payload["cells"]["fr"]["recognitions"][0]["errorRate"] = 0.0
+            mutate(payload["cells"][child])
+            payload["cells"][child]["recognitions"][0]["errorRate"] = 0.0
             bad = self.root / "bad.json"
             bad.write_text(json.dumps(payload))
             args.recognitions = bad
@@ -2279,58 +2307,57 @@ class PublisherTests(unittest.TestCase):
              for take, digest in zip(takes, ("c" * 64, "d" * 64))],
         )
 
-    def test_the_negative_control_is_an_accuracy_control_voted_per_channel(self) -> None:
-        """Audit #42: the control must fail on accuracy by two-family consensus;
-        its language channel is reported only."""
+    def test_the_negative_control_is_a_language_control_voted_by_the_qc_families(self) -> None:
+        """QC v2: free decoding transcribes the control's French correctly, so the
+        two families must fail it on language by consensus; accuracy is reported."""
         script = "un deux trois quatre cinq six sept huit neuf dix onze douze"
-        english = "one two three four five six seven eight nine ten eleven twelve"
 
-        def evidence(apple: dict, *, transcript: str = english) -> dict:
-            return publisher.sanitized_independent_evidence(
+        def evidence(*, qwen: str = "french", whisper: str = "french") -> dict:
+            return publisher.sanitized_qc_evidence(
                 cell={"id": "control", "expectedHint": "english", "expectedOutcome": "fail"},
                 engine_row={"generationID": "control-id"},
-                entry={"generationID": "control-id", "audioSHA256": "a" * 64, "recognitions": [
-                    independent_recognition(audio_sha256="a" * 64, script=script, transcript=transcript,
-                                            language="english"),
-                ]},
+                entry={"generationID": "control-id", "audioSHA256": "a" * 64, "recognitions": qc_recognitions(
+                    audio_sha256="a" * 64, script=script, language="english",
+                    overrides={"qwen3-asr": {"detected": qwen}, "whisper": {"detected": whisper}},
+                )},
                 reference_script=script, expected_audio_sha256="a" * 64, duration_seconds=2.0,
-                apple_evidence=apple,
+                recognizers=QC_RECOGNIZERS,
             )
 
-        # Whisper hears English (language passes); Apple's locked check fails;
-        # both fail on accuracy: the accuracy channel agrees on the failure.
-        confirmed = evidence({"languagePass": False, "accuracyPass": False, "pass": False})
-        self.assertEqual(confirmed["channelConsensus"], {"language": "inconclusive", "accuracy": "fail"})
-        # A control Apple failed only on its language check is no longer confirmed.
-        with self.assertRaisesRegex(publisher.PublicationError, "per channel: accuracy=inconclusive"):
-            evidence({"languagePass": False, "accuracyPass": True, "pass": False})
-        # Nor one whose words both families recognized as the script.
-        with self.assertRaisesRegex(publisher.PublicationError, "accuracy=pass"):
-            evidence({"languagePass": True, "accuracyPass": True, "pass": True}, transcript=script)
-        # One witness: the accuracy failure alone confirms it; the channels are unpublished.
-        self.assertIsNone(evidence(None)["channelConsensus"])
+        confirmed = evidence()
+        self.assertEqual(confirmed["channelConsensus"], {"language": "fail", "accuracy": "pass"})
+        self.assertEqual(confirmed["consensus"]["expected"], {"language": "fail"})
+        # One family hearing the pinned language leaves the language channel inconclusive.
+        with self.assertRaisesRegex(publisher.PublicationError, "per channel: language=inconclusive"):
+            evidence(whisper="english")
+        # Both families hearing it contradicts the control.
+        with self.assertRaisesRegex(publisher.PublicationError, "language=pass"):
+            evidence(qwen="english", whisper="english")
 
     def test_a_skipped_phrase_under_the_gate_warns_but_never_fails(self) -> None:
         """Audit #84: two consecutive deleted words on a 17-word script pass the
-        15 % gate; the take is published with the run and a warning."""
+        15 % gate; the take is published with the run and a warning per family."""
         script = ("chaque matin le jardin calme ouvre ses portes et le vieux jardinier "
                   "arrose chaque rose avant midi")
         transcript = script.replace("le jardin ", "")
-        evidence = publisher.sanitized_independent_evidence(
+        evidence = publisher.sanitized_qc_evidence(
             cell={"id": "fr", "expectedHint": "french"},
             engine_row={"generationID": "fr-id"},
-            entry={"generationID": "fr-id", "audioSHA256": "a" * 64, "recognitions": [
-                independent_recognition(audio_sha256="a" * 64, script=script, transcript=transcript),
-            ]},
+            entry={"generationID": "fr-id", "audioSHA256": "a" * 64, "recognitions": qc_recognitions(
+                audio_sha256="a" * 64, script=script, transcript=transcript,
+            )},
             reference_script=script, expected_audio_sha256="a" * 64, duration_seconds=2.0,
-            apple_evidence=None,
+            recognizers=QC_RECOGNIZERS,
         )
-        self.assertTrue(evidence["pass"])
-        self.assertEqual(evidence["longestDeletionRun"], 2)
+        self.assertEqual(evidence["channelConsensus"], {"language": "pass", "accuracy": "pass"})
+        self.assertEqual(evidence["families"]["whisper"]["longestDeletionRun"], 2)
+        metrics = publisher.qc_take_metrics(evidence)
+        self.assertEqual(metrics["qcQwen3AsrLongestDeletionRun"], 2.0)
         take = {"warnings": []}
-        publisher.flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
-                                    negative_control=False)
-        self.assertEqual(take["warnings"], ["language.deletion_run:whisper"])
+        for family in ("qwen3-asr", "whisper"):
+            publisher.flag_deletion_run(take, evidence["families"][family]["longestDeletionRun"], family=family,
+                                        negative_control=False)
+        self.assertEqual(take["warnings"], ["language.deletion_run:qwen3-asr", "language.deletion_run:whisper"])
         for run, control in ((1, False), (4, True)):
             quiet = {"warnings": []}
             publisher.flag_deletion_run(quiet, run, family="whisper", negative_control=control)
@@ -2363,14 +2390,12 @@ class PublisherTests(unittest.TestCase):
         with wave.open(str(output_path), "rb") as stream:
             duration = stream.getnframes() / stream.getframerate()
         wav_digest = publisher.digest_file(output_path)
-        recognitions = independent_evidence(
-            self.root / "independent-asr.json", run_id="lang-ios", platform="ios",
-            cells={"fr": {
-                "generationID": "fr-generation", "audioSHA256": wav_digest, "expectedLanguage": "french",
-                "expectedOutcome": "pass",
-                "recognitions": [independent_recognition(
-                    audio_sha256=wav_digest, script=reference_script, duration=duration,
-                )],
+        recognitions = qc_evidence(
+            self.root / "qc-language-evidence.json", run_id="lang-ios", platform="ios",
+            cells={"lang-ios--fr": {
+                "cellID": "fr", "generationID": "fr-generation", "audioSHA256": wav_digest,
+                "expectedLanguage": "french", "expectedOutcome": "pass",
+                "recognitions": qc_recognitions(audio_sha256=wav_digest, script=reference_script, duration=duration),
             }},
         )
         args = SimpleNamespace(
@@ -2397,31 +2422,35 @@ class PublisherTests(unittest.TestCase):
             publisher.language_command(args)
         record = captured["manifest"]["historyRecord"]
         verification = record["evidence"]["languageVerification"]
-        self.assertEqual(verification["families"], ["apple-speech", "whisper"])
+        self.assertEqual(verification["families"], ["apple-speech", "qwen3-asr", "whisper"])
         self.assertEqual(verification["recognitionAlgorithm"], "apple-speech-file-consensus-v2")
-        self.assertEqual(verification["independentRecognitionAlgorithm"], publisher.INDEPENDENT_ASR_ALGORITHM)
+        self.assertEqual(verification["qcRecognitionAlgorithm"], publisher.QC_ASR_ALGORITHM)
         metrics = record["takes"][0]["metrics"]
         self.assertEqual(metrics["wordErrorRate"], 0.125)
-        self.assertEqual(metrics["independentWordErrorRate"], 0.0)
+        self.assertEqual(metrics["qcWhisperWordErrorRate"], 0.0)
+        self.assertEqual(metrics["qcQwen3AsrWordErrorRate"], 0.0)
         self.assertEqual(metrics["recognitionPassCount"], 3.0)
         # Audit #42: each family's check is declared for what it observes, and
         # each family's detected language is published per take.
         self.assertEqual(verification["languageCheckKinds"], {
             "apple-speech": "transcript-language-consistency",
+            "qwen3-asr": "audio-language-identification",
             "whisper": "audio-language-identification",
         })
-        self.assertEqual(set(record["takes"][0]["detectedLanguages"]), {"apple-speech", "whisper"})
+        self.assertEqual(set(record["takes"][0]["detectedLanguages"]), {"apple-speech", "qwen3-asr", "whisper"})
         self.assertEqual(record["takes"][0]["detectedLanguages"]["whisper"], "french")
-        # Per-channel consensus (audit #42): each channel voted by both families.
+        # Per-channel consensus: each channel voted by the two QC v2 families
+        # beside Apple Speech's own in-app gate.
         self.assertEqual(record["takes"][0]["channelConsensus"], {"language": "pass", "accuracy": "pass"})
-        self.assertEqual(verification["channelConsensusAlgorithm"], "per-channel-family-consensus-v1")
+        self.assertEqual(verification["channelConsensusAlgorithm"], "qc-v2-family-consensus-v1")
         self.assertEqual(verification["channelVerdicts"], {"language": "pass", "accuracy": "pass"})
         self.assertNotIn("negativeControlKind", verification)
         profile_takes = captured["manifest"]["historyRecord"]["inputs"]
         self.assertRegex(profile_takes["analysisProfileHash"], r"^[0-9a-f]{64}$")
 
         payload = json.loads(recognitions.read_text())
-        payload["cells"]["fr"]["recognitions"][0]["transcript"] = "des mots entièrement différents ici présents"
+        payload["cells"]["lang-ios--fr"]["recognitions"][0]["transcript"] = (
+            "des mots entièrement différents ici présents")
         disagreeing = self.root / "disagree.json"
         disagreeing.write_text(json.dumps(payload))
         args.recognitions = disagreeing

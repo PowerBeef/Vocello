@@ -53,7 +53,17 @@ from lib.language_metrics import (  # noqa: E402
     CHANNEL_STATUSES,
     LANGUAGE_CHANNELS,
     LANGUAGE_CHECK_KINDS,
+    LANGUAGE_CONTROL_KIND,
     NEGATIVE_CONTROL_KIND,
+    QC_ASR_ALGORITHM,
+    QC_CHANNEL_CONSENSUS_ALGORITHM,
+    QC_FAMILY_METRIC_PREFIXES,
+    QC_FAMILY_METRIC_SUFFIXES,
+    QC_OUTPUT_ALGORITHM,
+    QC_OUTPUT_SCHEMA,
+    QC_RECOGNITION_FAMILIES,
+    QC_RECOGNITION_SCHEMA,
+    QC_REQUIRED_PASS_COUNT,
     SEGMENTATION_AWARE_METRIC_VERSIONS,
     TEXT_NORMALIZATION_V1,
     channel_consensus,
@@ -264,13 +274,39 @@ LANGUAGE_VERIFICATION_KEYS = {
     # Per-channel consensus and the accuracy control (records since
     # 2026-09-25, audit #42): lib.language_metrics.channel_consensus.
     "negativeControlKind", "channelConsensusAlgorithm", "channelVerdicts",
+    # The QC v2 recognizers (language measurement version 6, records since
+    # 2026-10-01): the algorithm and, per family, the registry model id, its
+    # pinned-files identity and its runner identity.
+    "qcRecognitionAlgorithm", "qcRecognizers",
 }
-# The per-family take metrics each verdict channel reads (audit #42).
+# The per-family take metrics each verdict channel reads (audit #42). The
+# whisper keys are the legacy whisper-small family's (`independent*`); QC v2
+# records vote with QC_FAMILY_CHANNEL_METRICS instead.
 FAMILY_CHANNEL_METRICS = {
     "apple-speech": {"language": "outputLanguagePass", "accuracy": "outputAccuracyPass"},
     "whisper": {"language": "independentLanguagePass", "accuracy": "independentAccuracyPass"},
 }
-RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
+RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice", "qwen3-asr")
+# QC v2 records (2026-10-01): each QC family's take metrics,
+# `<QC_FAMILY_METRIC_PREFIXES[family]><suffix>`, and the two its channels read.
+QC_FAMILY_METRIC_KEYS = {
+    family: tuple(f"{prefix}{suffix}" for suffix in QC_FAMILY_METRIC_SUFFIXES)
+    for family, prefix in QC_FAMILY_METRIC_PREFIXES.items()
+}
+QC_ALL_METRIC_KEYS = frozenset(key for keys in QC_FAMILY_METRIC_KEYS.values() for key in keys)
+QC_FAMILY_CHANNEL_METRICS = {
+    family: {"language": f"{prefix}LanguagePass", "accuracy": f"{prefix}AccuracyPass"}
+    for family, prefix in QC_FAMILY_METRIC_PREFIXES.items()
+}
+QC_VERIFICATION_IDENTITY = {
+    "outputSchemaVersion": QC_OUTPUT_SCHEMA,
+    "outputAlgorithm": QC_OUTPUT_ALGORITHM,
+    "recognitionSchemaVersion": QC_RECOGNITION_SCHEMA,
+    "recognitionAlgorithm": QC_ASR_ALGORITHM,
+    "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+    "requiredPassCount": QC_REQUIRED_PASS_COUNT,
+}
+SAFE_QC_MODEL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 # Records before 2026-09-12 carry no `families`; every one of them was verified
 # by the in-app Apple Speech consensus.
 LEGACY_LANGUAGE_FAMILIES = ["apple-speech"]
@@ -299,11 +335,17 @@ LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
 }
-DELETION_RUN_METRIC_KEYS = ("longestDeletionRun", "independentLongestDeletionRun")
+DELETION_RUN_METRIC_KEYS = (
+    "longestDeletionRun", "independentLongestDeletionRun",
+    *(f"{prefix}LongestDeletionRun" for prefix in QC_FAMILY_METRIC_PREFIXES.values()),
+)
 # Fillers each family's transcript holds beyond the script's (records scored
 # under text normalization v2 or later, accuracy metric v3 or later, AQ-02):
 # counted, never erased and never gated.
-FILLER_COUNT_METRIC_KEYS = ("excessFillerCount", "independentExcessFillerCount")
+FILLER_COUNT_METRIC_KEYS = (
+    "excessFillerCount", "independentExcessFillerCount",
+    *(f"{prefix}ExcessFillerCount" for prefix in QC_FAMILY_METRIC_PREFIXES.values()),
+)
 # WER v2 (records since 2026-09-25, audit #43): each family's segmentation-aware
 # word rate and the word-boundary edits it credited; v2 records gate on it.
 SEGMENTATION_AWARE_METRIC_KEYS = {
@@ -554,6 +596,9 @@ METRIC_KEYS = {
     *(key for keys in SEGMENTATION_AWARE_METRIC_KEYS.values() for key in keys),
     # Excess fillers per family (text normalization v2 or later, AQ-02).
     *FILLER_COUNT_METRIC_KEYS,
+    # The QC v2 families' recognition of language takes (records since
+    # 2026-10-01): Qwen3-ASR (`qcQwen3Asr*`) and Whisper large-v3 (`qcWhisper*`).
+    *(key for keys in QC_FAMILY_METRIC_KEYS.values() for key in keys),
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
     "outputCellsPassed", "outputCellsExpected", "medianRTF", "medianTTFCMS",
@@ -2352,48 +2397,119 @@ def validate_segmentation_aware_metrics(
             raise HistoryError("segmentation-aware word rate does not match its credited edits")
 
 
+def validate_qc_take_metrics(take: dict[str, Any]) -> None:
+    """Each QC v2 family's take metrics are complete and consistent with the take's gate.
+
+    The gated score is the family's segmentation-aware word rate (WER v2) or its
+    character rate, under the take's primary metric; the channel verdicts
+    themselves are voted by `validate_channel_consensus`."""
+    metrics = take["metrics"]
+    if independent := sorted(key for key in metrics if key.startswith("independent")):
+        raise HistoryError("legacy independent recognition metrics on a QC v2 take: " + ", ".join(independent))
+    metric = take["accuracyMetric"]
+    for family in QC_RECOGNITION_FAMILIES:
+        prefix = QC_FAMILY_METRIC_PREFIXES[family]
+        if missing := sorted(set(QC_FAMILY_METRIC_KEYS[family]) - set(metrics)):
+            raise HistoryError("QC v2 recognition metrics are incomplete: " + ", ".join(missing))
+        aware_key = f"{prefix}SegmentationAwareWordErrorRate"
+        validate_segmentation_aware_metrics(
+            metrics, aware_key, f"{prefix}WordBoundaryOnlyEdits",
+            plain_rate=float(metrics[f"{prefix}WordErrorRate"]),
+        )
+        score = metrics[aware_key] if metric == "wordErrorRate" else metrics[f"{prefix}CharacterErrorRate"]
+        if (
+            not math.isclose(float(metrics[f"{prefix}PrimaryAccuracyScore"]), float(score),
+                             rel_tol=1e-9, abs_tol=1e-12)
+            or (metrics[f"{prefix}AccuracyPass"] == 1.0) != (float(score) <= float(take["accuracyThreshold"]))
+            or metrics[f"{prefix}AccuracyPass"] not in (0.0, 1.0)
+            or metrics[f"{prefix}LanguagePass"] not in (0.0, 1.0)
+            or not 0.0 <= float(metrics[f"{prefix}LanguageMatchScore"]) <= 1.0
+            or float(metrics[f"{prefix}WordErrorRate"]) < 0 or float(metrics[f"{prefix}CharacterErrorRate"]) < 0
+        ):
+            raise HistoryError(f"QC v2 {family} recognition gate metrics are inconsistent")
+
+
+def qc_language_verification(language_verification: Any) -> bool:
+    """True for a QC v2 language record (measurement version 6, since 2026-10-01): its Mac-side
+    witnesses are the two QC v2 families, which vote the channels and whose control is a
+    language control."""
+    return isinstance(language_verification, dict) and "qcRecognitionAlgorithm" in language_verification
+
+
+def validate_qc_recognizers(language_verification: dict[str, Any], families: list[str]) -> None:
+    """The QC v2 recognizer provenance: both QC families cited, each with its registry model id,
+    pinned-files identity and runner identity."""
+    recognizers = language_verification.get("qcRecognizers")
+    if (
+        language_verification.get("qcRecognitionAlgorithm") != QC_ASR_ALGORITHM
+        or not set(QC_RECOGNITION_FAMILIES) <= set(families)
+        or not set(families) <= {"apple-speech", *QC_RECOGNITION_FAMILIES}
+        or not isinstance(recognizers, dict) or set(recognizers) != set(QC_RECOGNITION_FAMILIES)
+        or any(
+            not isinstance(recognizers[family], dict)
+            or set(recognizers[family]) != {"modelID", "modelIdentitySHA256", "runtimeSHA256"}
+            or not SAFE_QC_MODEL_ID_RE.fullmatch(str(recognizers[family]["modelID"]))
+            or not HEX_64.fullmatch(str(recognizers[family]["modelIdentitySHA256"]))
+            or not HEX_64.fullmatch(str(recognizers[family]["runtimeSHA256"]))
+            for family in QC_RECOGNITION_FAMILIES
+        )
+    ):
+        raise HistoryError("QC v2 recognizer provenance does not match the declared families")
+    if language_verification.get("accuracyMetricVersion") != QC_VERIFICATION_IDENTITY["accuracyMetricVersion"]:
+        raise HistoryError("QC v2 language records score under the current accuracy metric version")
+
+
 def validate_channel_consensus(
     takes: list[dict[str, Any]],
     language_verification: dict[str, Any] | None,
     families: list[str],
     negative_control_count: int,
 ) -> None:
-    """Per-channel two-family consensus and the accuracy control (audit #42).
+    """Per-channel two-family consensus and the negative control (audit #42).
 
     A take's `channelConsensus` must be the family rule applied to the
     per-family verdicts it publishes, channel by channel, and must meet the
     take's declared outcome; the run's `channelVerdicts` must follow from them.
+    Legacy records vote every cited family and their control is an accuracy
+    control; QC v2 records vote the two QC families on every scored take, and
+    their control is a language control.
     """
     verification = language_verification if isinstance(language_verification, dict) else {}
+    qc = qc_language_verification(verification)
+    control_kind = LANGUAGE_CONTROL_KIND if qc else NEGATIVE_CONTROL_KIND
     if "negativeControlKind" in verification and (
-        verification["negativeControlKind"] != NEGATIVE_CONTROL_KIND or negative_control_count == 0
+        verification["negativeControlKind"] != control_kind or negative_control_count == 0
     ):
-        raise HistoryError("negativeControlKind must declare the accuracy control of a run that has one")
+        raise HistoryError("negativeControlKind must declare the control kind of a run that has one")
+    voting = [family for family in families if family in QC_RECOGNITION_FAMILIES] if qc else list(families)
+    channel_metrics = QC_FAMILY_CHANNEL_METRICS if qc else FAMILY_CHANNEL_METRICS
     voted: list[tuple[dict[str, str], bool]] = []
     for take in takes:
         statuses = take.get("channelConsensus")
         if statuses is None:
+            if qc and "accuracyMetric" in take:
+                raise HistoryError("a QC v2 language take needs its two families' channel consensus")
             continue
         if (
             not isinstance(statuses, dict) or set(statuses) != set(LANGUAGE_CHANNELS)
             or any(value not in CHANNEL_STATUSES for value in statuses.values())
         ):
             raise HistoryError("take.channelConsensus must give each channel a consensus status")
-        if "accuracyMetric" not in take or len(families) < 2 or any(
-            family not in FAMILY_CHANNEL_METRICS for family in families
+        if "accuracyMetric" not in take or len(voting) < 2 or any(
+            family not in channel_metrics for family in voting
         ):
             raise HistoryError("take.channelConsensus requires two cited families that scored the take")
         metrics = take.get("metrics") or {}
         family_channels: dict[str, dict[str, bool]] = {}
-        for family in families:
-            keys = FAMILY_CHANNEL_METRICS[family]
+        for family in voting:
+            keys = channel_metrics[family]
             if any(metrics.get(keys[channel]) not in (0.0, 1.0) for channel in LANGUAGE_CHANNELS):
                 raise HistoryError("take.channelConsensus lacks a family's channel verdicts")
             family_channels[family] = {
                 channel: metrics[keys[channel]] == 1.0 for channel in LANGUAGE_CHANNELS
             }
         expect_failure = take.get("expectedOutcome") == "fail"
-        agreement = channel_consensus(family_channels, expect_failure=expect_failure)
+        agreement = channel_consensus(family_channels, expect_failure=expect_failure, control_kind=control_kind)
         if agreement["statuses"] != statuses:
             raise HistoryError("take.channelConsensus does not follow from its families' verdicts")
         if agreement["outcome"] != "met":
@@ -2405,10 +2521,11 @@ def validate_channel_consensus(
             raise HistoryError("take.channelConsensus requires the run's channelVerdicts")
         return
     if (
-        verification.get("channelConsensusAlgorithm") != CHANNEL_CONSENSUS_ALGORITHM
+        verification.get("channelConsensusAlgorithm")
+        != (QC_CHANNEL_CONSENSUS_ALGORITHM if qc else CHANNEL_CONSENSUS_ALGORITHM)
         or not voted
         or len(voted) != sum(1 for take in takes if "accuracyMetric" in take)
-        or verification.get("channelVerdicts") != run_channel_verdicts(voted)
+        or verification.get("channelVerdicts") != run_channel_verdicts(voted, control_kind)
     ):
         raise HistoryError("channelVerdicts must follow from every scored take's channel consensus")
 
@@ -3091,6 +3208,9 @@ def validate_record(
     seen_generations: set[str] = set()
     negative_control_count = 0
     declared_verification = record["evidence"].get("languageVerification")
+    # QC v2 language records (2026-10-01): the Mac-side families are QC v2's
+    # Qwen3-ASR and Whisper large-v3, with their own take metrics.
+    qc_language = qc_language_verification(declared_verification)
     # The gated word score under the record's accuracy metric version (v2 to
     # v4: segmentation-aware, audit #43); v1 records keep the plain rate. Each
     # version is validated under its own rules, so legacy records keep theirs.
@@ -3255,7 +3375,11 @@ def validate_record(
                 raise HistoryError(f"take metric {key} must be a nonnegative count")
         if not counts_fillers and any(key in take["metrics"] for key in FILLER_COUNT_METRIC_KEYS):
             raise HistoryError("filler counts require text normalization v2 or later (accuracy metric v3 or later)")
-        if "accuracyMetric" in take and "whisper" in language_families(record):
+        if not qc_language and (present := sorted(QC_ALL_METRIC_KEYS & set(take["metrics"]))):
+            raise HistoryError("QC v2 recognition metrics without the QC v2 recognizers: " + ", ".join(present))
+        if "accuracyMetric" in take and qc_language:
+            validate_qc_take_metrics(take)
+        if "accuracyMetric" in take and "whisper" in language_families(record) and not qc_language:
             metrics = take["metrics"]
             if missing := sorted(INDEPENDENT_ACCURACY_METRIC_KEYS - set(metrics)):
                 raise HistoryError(
@@ -3404,11 +3528,12 @@ def validate_record(
     families = language_families(record)
     expected_language_verification = dict(
         APPLE_SPEECH_VERIFICATION_IDENTITY if "apple-speech" in families
+        else QC_VERIFICATION_IDENTITY if qc_language
         else INDEPENDENT_VERIFICATION_IDENTITY
     )
     if isinstance(language_verification, dict) and language_verification.get(
         "accuracyMetricVersion"
-    ) in ACCURACY_METRIC_VERSIONS:
+    ) in ACCURACY_METRIC_VERSIONS and not (qc_language and "apple-speech" not in families):
         # Every record keeps the version it declares: v1, WER v2 (records since
         # 2026-09-25, audit #43), v3 (text normalization v2, AQ-02) or v4 (text
         # normalization v3, the Chinese Traditional-to-Simplified fold, AQ-02 P2b).
@@ -3421,12 +3546,16 @@ def validate_record(
         raise HistoryError("language accuracy takes require exact verifier provenance")
     if language_verification is not None:
         has_independent = "independentRecognitionAlgorithm" in language_verification
-        if has_independent != ("whisper" in families) or (has_independent and (
+        if has_independent != ("whisper" in families and not qc_language) or (has_independent and (
             language_verification["independentRecognitionAlgorithm"]
             != INDEPENDENT_VERIFICATION_IDENTITY["recognitionAlgorithm"]
             or not re.fullmatch(r"[0-9a-f]{64}", str(language_verification.get("independentModelIdentitySHA256")))
         )):
             raise HistoryError("independent recognizer provenance does not match the declared families")
+        if qc_language:
+            validate_qc_recognizers(language_verification, families)
+        elif "qcRecognizers" in language_verification or "qwen3-asr" in families:
+            raise HistoryError("QC v2 recognizers belong only to records that declare qcRecognitionAlgorithm")
     if language_verification is not None and run["kind"] != "language":
         raise HistoryError("language verifier provenance belongs only to language records")
     if (

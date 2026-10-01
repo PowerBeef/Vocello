@@ -40,10 +40,10 @@ import test_check_macos_ui_perf as mac_perf  # noqa: E402
 from test_publish_benchmark_history import (  # noqa: E402
     bind_row_to_plan,
     engine_row,
-    independent_evidence,
-    independent_recognition,
     ios_benchmark_app_row,
     planned_language_run,
+    qc_evidence,
+    qc_recognitions,
     source_fixture,
     upgrade_language_memory_row,
 )
@@ -638,15 +638,15 @@ class PublisherRoundTripTests(unittest.TestCase):
             row["notes"]["samplingWAVDigest"] = "a" * 64
 
         self.v8_engine_rows(diagnostics, run_id, [("fr-id", "fr")], ios=False, mutate=language_notes)
-        recognitions = independent_evidence(
-            self.root / "independent-asr.json", run_id=run_id, platform="macos",
-            cells={"fr": {
-                "generationID": "fr-id", "audioSHA256": "a" * 64, "expectedLanguage": "french",
+        recognitions = qc_evidence(
+            self.root / "qc-language-evidence.json", run_id=run_id, platform="macos",
+            cells={plan["takes"][0]["childRunID"]: {
+                "cellID": "fr", "generationID": "fr-id", "audioSHA256": "a" * 64, "expectedLanguage": "french",
                 "expectedOutcome": "pass",
-                "recognitions": [independent_recognition(
+                "recognitions": qc_recognitions(
                     audio_sha256="a" * 64, script=script,
-                    transcript="un deux trois quatre cinq six sept neuf",
-                )],
+                    overrides={"whisper": {"transcript": "un deux trois quatre cinq six sept neuf"}},
+                ),
             }},
         )
         args = SimpleNamespace(
@@ -658,7 +658,11 @@ class PublisherRoundTripTests(unittest.TestCase):
         manifest = self.captured_manifest(publisher.language_command, args)
         record, _size = publish_through_registry(manifest)
         self.assertEqual(record["run"]["kind"], "language")
-        self.assertEqual(record["evidence"]["languageVerification"]["families"], ["whisper"])
+        verification = record["evidence"]["languageVerification"]
+        self.assertEqual(verification["families"], ["qwen3-asr", "whisper"])
+        self.assertEqual(verification["qcRecognitionAlgorithm"], publisher.QC_ASR_ALGORITHM)
+        self.assertEqual(verification["channelVerdicts"], {"language": "pass", "accuracy": "pass"})
+        self.assertEqual(record["takes"][0]["metrics"]["qcWhisperWordErrorRate"], 0.125)
 
     def test_prosody_calibration_manifest_publishes(self) -> None:
         profile = self.root / "profile.json"

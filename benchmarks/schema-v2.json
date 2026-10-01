@@ -229,13 +229,15 @@
             "outputSchemaVersion": {
               "enum": [
                 3,
-                1
+                1,
+                2
               ]
             },
             "outputAlgorithm": {
               "enum": [
                 "language-output-verifier-v3",
-                "independent-asr-output-v1"
+                "independent-asr-output-v1",
+                "qc-v2-language-output-v1"
               ]
             },
             "recognitionSchemaVersion": {
@@ -245,9 +247,11 @@
               ]
             },
             "recognitionAlgorithm": {
+              "description": "apple-speech-file-consensus-v2: the iPhone app's locked Apple Speech; mlx-whisper-locked-decode-v1: the legacy whisper-small Mac witness (language measurement version 5 and earlier); qc-v2-free-decode-asr-v1: QC v2's Qwen3-ASR and Whisper large-v3 (records since 2026-10-01).",
               "enum": [
                 "apple-speech-file-consensus-v2",
-                "mlx-whisper-locked-decode-v1"
+                "mlx-whisper-locked-decode-v1",
+                "qc-v2-free-decode-asr-v1"
               ]
             },
             "accuracyMetricVersion": {
@@ -293,7 +297,8 @@
                 "enum": [
                   "apple-speech",
                   "whisper",
-                  "sensevoice"
+                  "sensevoice",
+                  "qwen3-asr"
                 ]
               }
             },
@@ -304,17 +309,31 @@
               "type": "string",
               "pattern": "^[0-9a-f]{64}$"
             },
+            "qcRecognitionAlgorithm": {
+              "description": "Records since 2026-10-01 (language measurement version 6): the Mac-side families are QC v2's Qwen3-ASR (qwen3-asr) and Whisper large-v3 (whisper), which decode without the script or the language; their take metrics are qcQwen3Asr* and qcWhisper*.",
+              "const": "qc-v2-free-decode-asr-v1"
+            },
+            "qcRecognizers": {
+              "description": "Records since 2026-10-01: per QC v2 family, its config/qc/models.json model id, the digest of its pinned files and its runner identity.",
+              "type": "object"
+            },
             "languageCheckKinds": {
-              "description": "Records since 2026-09-25: what each cited family's language check observes (apple-speech: transcript-language consistency on its locked transcript; whisper: audio language identification).",
+              "description": "Records since 2026-09-25: what each cited family's language check observes (apple-speech: transcript-language consistency on its locked transcript; whisper and qwen3-asr: audio language identification).",
               "type": "object"
             },
             "negativeControlKind": {
-              "description": "Records since 2026-09-25 (audit #42): the negative control is an accuracy control; it must fail on accuracy and its language check is reported only.",
-              "const": "accuracy-control"
+              "description": "Records since 2026-09-25 (audit #42): accuracy-control, the control must fail on accuracy and its language check is reported only. QC v2 records (since 2026-10-01): language-control, both QC families must identify another language; accuracy is reported only.",
+              "enum": [
+                "accuracy-control",
+                "language-control"
+              ]
             },
             "channelConsensusAlgorithm": {
-              "description": "Records since 2026-09-25 (audit #42): each verdict channel (language, accuracy) is voted separately by two recognizer families.",
-              "const": "per-channel-family-consensus-v1"
+              "description": "Records since 2026-09-25 (audit #42): each verdict channel (language, accuracy) is voted separately by two recognizer families; qc-v2-family-consensus-v1 (records since 2026-10-01) votes the two QC v2 families.",
+              "enum": [
+                "per-channel-family-consensus-v1",
+                "qc-v2-family-consensus-v1"
+              ]
             },
             "channelVerdicts": {
               "description": "Records since 2026-09-25 (audit #42): the run's verdict per channel, derived from every scored take's channelConsensus.",

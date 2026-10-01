@@ -927,6 +927,116 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(history.HistoryError):
                 self.publish(record, f"audited-invalid-{index}")
 
+    @staticmethod
+    def _qc_family_metrics(prefix: str, *, language_pass: float = 1.0, rate: float = 0.125) -> dict:
+        return {
+            f"{prefix}WordErrorRate": rate, f"{prefix}CharacterErrorRate": 0.05,
+            f"{prefix}PrimaryAccuracyScore": rate, f"{prefix}LanguageMatchScore": 0.97 if language_pass else 0.02,
+            f"{prefix}LanguagePass": language_pass, f"{prefix}AccuracyPass": 1.0,
+            f"{prefix}LongestDeletionRun": 1.0, f"{prefix}SegmentationAwareWordErrorRate": rate,
+            f"{prefix}WordBoundaryOnlyEdits": 0.0, f"{prefix}ExcessFillerCount": 0.0,
+        }
+
+    def test_qc_v2_language_records_vote_the_two_qc_families(self) -> None:
+        """Language measurement version 6 (2026-10-01): Qwen3-ASR and Whisper large-v3
+        vote each channel, the control is a language control, and legacy records keep
+        their own identity."""
+        valid = self._schema_v3_language_record("qc-language-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.QC_VERIFICATION_IDENTITY,
+            "families": ["qwen3-asr", "whisper"],
+            "qcRecognitionAlgorithm": "qc-v2-free-decode-asr-v1",
+            "qcRecognizers": {
+                "qwen3-asr": {"modelID": "asr.qwen3-asr-1.7b", "modelIdentitySHA256": "2" * 64,
+                              "runtimeSHA256": "1" * 64},
+                "whisper": {"modelID": "asr.whisper-large-v3", "modelIdentitySHA256": "5" * 64,
+                            "runtimeSHA256": "4" * 64},
+            },
+            "languageCheckKinds": {"qwen3-asr": "audio-language-identification",
+                                   "whisper": "audio-language-identification"},
+            "hintCellsPassed": 1, "hintCellsExpected": 1,
+            "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 1,
+            "negativeControlKind": "language-control",
+            "channelConsensusAlgorithm": "qc-v2-family-consensus-v1",
+            "channelVerdicts": {"language": "pass", "accuracy": "inconclusive"},
+        }
+        # The control: both families hear French under a pinned English hint.
+        valid["takes"][0].update({
+            "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15, "expectedOutcome": "fail",
+            "channelConsensus": {"language": "fail", "accuracy": "pass"},
+            "detectedLanguages": {"qwen3-asr": "french", "whisper": "french"},
+        })
+        valid["takes"][0]["metrics"].update({
+            **self._qc_family_metrics("qcQwen3Asr", language_pass=0.0),
+            **self._qc_family_metrics("qcWhisper", language_pass=0.0),
+        })
+        self.publish(valid, "qc-language-valid")
+
+        verification = lambda record: record["evidence"]["languageVerification"]  # noqa: E731
+        metrics = lambda record: record["takes"][0]["metrics"]  # noqa: E731
+        mutations = {
+            "an accuracy control kind": lambda record: verification(record).__setitem__(
+                "negativeControlKind", "accuracy-control"),
+            "the legacy consensus algorithm": lambda record: verification(record).__setitem__(
+                "channelConsensusAlgorithm", "per-channel-family-consensus-v1"),
+            "one family heard the pinned language": lambda record: metrics(record).update(
+                self._qc_family_metrics("qcWhisper", language_pass=1.0)),
+            "a missing family metric": lambda record: metrics(record).pop("qcQwen3AsrLanguagePass"),
+            "a gate score that does not follow its rate": lambda record: metrics(record).__setitem__(
+                "qcWhisperPrimaryAccuracyScore", 0.5),
+            "a take without its channel consensus": lambda record: record["takes"][0].pop("channelConsensus"),
+            "legacy whisper metrics": lambda record: metrics(record).__setitem__(
+                "independentWordErrorRate", 0.125),
+            "a single QC family": lambda record: (
+                verification(record).__setitem__("families", ["whisper"]),
+                verification(record).__setitem__("languageCheckKinds",
+                                                 {"whisper": "audio-language-identification"})),
+            "a recognizer without its runner identity": lambda record: verification(record)["qcRecognizers"][
+                "whisper"].pop("runtimeSHA256"),
+            "an older accuracy metric version": lambda record: verification(record).__setitem__(
+                "accuracyMetricVersion", "normalization-v2-edit-rate-v3"),
+            "the legacy whisper identity": lambda record: verification(record).update(
+                history.INDEPENDENT_VERIFICATION_IDENTITY),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"qc-language-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"qc-language-invalid-{index}")
+
+        # The QC families and their metrics belong only to records that declare them.
+        legacy = copy.deepcopy(valid)
+        legacy["run"]["id"] = "qc-language-undeclared"
+        verification(legacy).pop("qcRecognitionAlgorithm")
+        verification(legacy).pop("qcRecognizers")
+        with self.assertRaises(history.HistoryError):
+            self.publish(legacy, "qc-language-undeclared")
+
+        # On the iPhone, Apple Speech keeps its in-app gate beside the two QC families.
+        iphone = copy.deepcopy(valid)
+        iphone["run"]["id"] = "qc-language-iphone"
+        verification(iphone).update({
+            **history.APPLE_SPEECH_VERIFICATION_IDENTITY,
+            "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+            "families": ["apple-speech", "qwen3-asr", "whisper"],
+            "languageCheckKinds": {"apple-speech": "transcript-language-consistency",
+                                   "qwen3-asr": "audio-language-identification",
+                                   "whisper": "audio-language-identification"},
+        })
+        metrics(iphone).update({
+            "wordErrorRate": 0.5, "characterErrorRate": 0.5, "primaryAccuracyScore": 0.5,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.4, "outputLanguagePass": 0.0,
+            "outputAccuracyPass": 0.0, "referenceTokenCount": 8.0, "hypothesisTokenCount": 8.0,
+            "referenceCharacterCount": 32.0, "hypothesisCharacterCount": 32.0, "substitutions": 4.0,
+            "insertions": 0.0, "deletions": 0.0, "characterSubstitutions": 16.0,
+            "characterInsertions": 0.0, "characterDeletions": 0.0, "recognitionPassCount": 3.0,
+            "recognitionDurationSeconds": 0.3, "segmentationAwareWordErrorRate": 0.5,
+            "wordBoundaryOnlyEdits": 0.0,
+        })
+        iphone["takes"][0]["detectedLanguages"]["apple-speech"] = "english"
+        self.publish(iphone, "qc-language-iphone")
+
     def test_language_take_accuracy_gate_is_bounded_and_paired(self) -> None:
         valid = record_fixture(run_id="accuracy-valid", kind="language")
         provenance = {

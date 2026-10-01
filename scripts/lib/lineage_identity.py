@@ -130,8 +130,14 @@ DELIVERY_ANALYSIS = (
 LANGUAGE_VERIFICATION = (
     "scripts/check_language_hints.py",
     "scripts/check_language_output.py",
-    "scripts/independent_asr.py",
-    "scripts/independent_asr_worker.py",
+    # The Mac-side families since language version 6 (QC v2): the takes and
+    # evidence of a language run, the two ASR runners and their shared speech
+    # helpers, and the registry that pins their models.
+    "scripts/qc/language.py",
+    "scripts/qc/runners/qwen3_asr.py",
+    "scripts/qc/runners/whisper.py",
+    "scripts/qc/runners/speech_common.py",
+    "config/qc/models.json",
     # The run plan, which refuses scripts that fail the corpus lint (AQ-02).
     "scripts/language_bench_evidence.py",
     "scripts/lib/language_metrics.py",
@@ -288,7 +294,12 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # normalization v3 (accuracy metric normalization-v3-edit-rate-v4), which
     # folds a Chinese script and transcript from Traditional to Simplified
     # characters with the committed hant-hans-v1 table before scoring.
-    ("language", "macos"): 5,
+    # 6 (2026-10-01, QC v2): the whisper-small witness, locked to the expected
+    # language, gives way to QC v2's two families, Qwen3-ASR 1.7B and Whisper
+    # large-v3, which decode with neither the script nor the language. The two
+    # vote each channel (qc-v2-family-consensus-v1), and the negative control
+    # becomes a language control.
+    ("language", "macos"): 6,
     # 3 (2026-09-25, audit #87, #42/#43 and the sampler change): the iPhone lang-bench
     # probes each take's sentinel first at its predicted end, then every 3 s,
     # instead of every 10 s from the launch, so fewer device copies overlap the
@@ -298,7 +309,10 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 5 (2026-09-26, AQ-02 P2b): the in-app verifier (languageASR gate 7) and the
     # Mac rescoring move to text normalization v3, the Chinese
     # Traditional-to-Simplified fold, as on the Mac.
-    ("language", "ios"): 5,
+    # 6 (2026-10-01, QC v2): the Mac-side whisper-small witness gives way to QC
+    # v2's Qwen3-ASR and Whisper large-v3, as on the Mac; they vote the channels
+    # beside Apple Speech's own in-app gate.
+    ("language", "ios"): 6,
     # 2 (2026-09-25, audit #51/#52/#97 and the sampler change): the iPhone
     # memory profile records through the Allocations template (no automatic VM
     # snapshots, which suspended the target), every iPhone profile stops

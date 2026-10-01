@@ -11,7 +11,8 @@
 #                                                    # opt-in: QWENVOICE_ENABLE_TSAN=1
 #   scripts/macos_test.sh tsan                      # core TSan subset (push CI blocking job + nightly cold run)
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
-#                                                 # headless macOS language-hint matrix (vocello CLI)
+#                                                 # headless macOS language-hint matrix (vocello CLI),
+#                                                 # spoken content and gate on QC v2 (scripts/qc.py)
 #   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b]
 #                                  [--cells standard,clone,cross-lingual|long-form] [--label L]
 #                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
@@ -995,7 +996,7 @@ PY
   export QWENVOICE_DEBUG=1
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   note "lang-bench: runID=$run_id subset=$subset (macOS in-process CLI)"
-  # Every take is written to a run-owned path so the independent recognizer can
+  # Every take is written to a run-owned path so the QC v2 takes manifest can
   # bind each cell's bytes to the digest the engine published in telemetry.
   local wav_dir="$artifacts/wav"
   mkdir -p "$wav_dir"
@@ -1078,60 +1079,65 @@ PY
     --run-id "$run_id" --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
     | tee "$artifacts/hint-gate.txt" || hint_st=$?
 
-  # Independent spoken-content verification. The CLI process has exited for
-  # every cell, so the pinned whisper-small model may load now: one supervised
-  # subprocess, model loaded once, results cached by audio and model identity.
-  # A single family is one witness; the record says so (families: [whisper]).
-  local asr_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
-  python3 "$SCRIPT_DIR/prepare_delivery_compact_model_config.py" whisper-small-mlx \
-    --output "$asr_config" >/dev/null \
-    || die "lang-bench: the pinned whisper-small MLX recognizer is not prepared on this host (nothing is downloaded automatically)"
-  python3 "$SCRIPT_DIR/independent_asr.py" manifest --platform macos \
-    --diagnostics "$diag_root" --run-id "$run_id" --matrix "$matrix" --corpus "$corpus" \
-    --subset "$subset" --wav-dir "$wav_dir" --generation-process-exited \
-    --output "$artifacts/independent-asr-manifest.json" >/dev/null || asr_st=$?
-  if (( asr_st == 0 )); then
-    python3 "$SCRIPT_DIR/independent_asr.py" transcribe \
-      --manifest "$artifacts/independent-asr-manifest.json" --adapter-config "$asr_config" \
-      --output "$artifacts/independent-asr.json" \
-      | tee "$artifacts/independent-asr.txt" || asr_st=$?
+  # Spoken content and audio QC on QC v2 (docs/reference/qc.md), once the CLI
+  # process has exited for every cell. The takes manifest binds each cell's WAV
+  # to the digest the engine published; `qc.py run` scores it with the lane's
+  # models (config/qc/detectors.json, lane language-bench), one model process at
+  # a time and cached by audio digest. Qwen3-ASR and Whisper large-v3 are the two
+  # spoken-content families: each transcribes the take without its script or
+  # language, and both must meet the cell's outcome per channel (the negative
+  # control is a language control). The gate exits 0 pass, 3 warn, 1 fail, 2 not
+  # computed; until an evaluated thresholds file gives a detector a level, every
+  # flag is report-only and the gate passes. A warn gate, or one that could not
+  # be computed, reports and never fails the lane; spoken content must pass.
+  local qc_takes="$artifacts/qc-takes.json" recognitions="$artifacts/qc-language-evidence.json"
+  local qc_run="" takes_st=0 run_st=0 content_st=2 gates_st=2
+  python3 "$SCRIPT_DIR/qc.py" language-bench takes --platform macos --run-id "$run_id" \
+    --plan "$plan" --corpus "$corpus" --diagnostics "$diag_root" --wav-dir "$wav_dir" \
+    --output "$qc_takes" || takes_st=$?
+  if (( takes_st == 0 )); then
+    qc_run="$(python3 "$SCRIPT_DIR/qc.py" run --takes "$qc_takes" --lane language-bench)" || run_st=$?
   fi
-
-  # The lane's audio QC gates (config/audio-qc-lane-gates.json, AQ-07), once every CLI process and the
-  # recognizer have exited: the panel judges its gating detectors read and Stage 0 score each take bound
-  # by the independent-ASR manifest, on the run's own cache root, against each detector's qualified
-  # record (audio-qc/gates.json). Exit 0 pass, 3 warn, 1 fail, 2 not computed. A warn gate reports and
-  # never fails the lane.
-  local gates_st=0 gates_verdict=SKIPPED
-  if [[ -f "$artifacts/independent-asr-manifest.json" ]]; then
-    python3 "$SCRIPT_DIR/audio_qc_lane_gates.py" run --lane language-bench --run-dir "$artifacts" \
+  if (( takes_st == 0 && run_st == 0 )) && [[ -n "$qc_run" ]]; then
+    content_st=0
+    python3 "$SCRIPT_DIR/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
+      | tee "$artifacts/spoken-content.txt" || content_st=$?
+    gates_st=0
+    python3 "$SCRIPT_DIR/qc.py" gate --lane language-bench --run "$qc_run" \
       | tee "$artifacts/audio-qc-gates.txt" || gates_st=$?
-    case "$gates_st" in
-      0) gates_verdict=PASS ;;
-      3) gates_verdict=WARN ;;
-      1) gates_verdict=FAIL ;;
-      *) gates_verdict=ERROR ;;
-    esac
   fi
+  local content_verdict gates_verdict
+  case "$content_st" in
+    0) content_verdict=PASS ;;
+    1) content_verdict=FAIL ;;
+    *) content_verdict=ERROR ;;
+  esac
+  case "$gates_st" in
+    0) gates_verdict=PASS ;;
+    3) gates_verdict=WARN ;;
+    1) gates_verdict=FAIL ;;
+    *) gates_verdict=ERROR ;;
+  esac
 
   {
     echo "lang-bench runID=$run_id subset=$subset cells=$cell_count generate_fail=$cell_fail"
     echo "hint_gate=$([[ $hint_st -eq 0 ]] && echo PASS || echo FAIL)"
-    echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "spoken_content=$content_verdict"
     echo "audio_qc_gates=$gates_verdict"
+    echo "qc_run=${qc_run:-none}"
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || hint_st != 0 || asr_st != 0 )) || [[ "$gates_verdict" == FAIL ]]; then
+  if (( cell_fail > 0 || hint_st != 0 )) || [[ "$content_verdict" != PASS || "$gates_verdict" == FAIL ]]; then
     die "lang-bench FAIL · $artifacts"
   fi
   # The publisher re-qualifies and re-scores every recognition against the
-  # corpus; a cell whose whisper transcript misses the 15 % gate or whose
-  # detected language differs from the expected one refuses publication.
+  # corpus; a cell where the two families do not both meet its outcome on
+  # language and accuracy refuses publication.
   python3 "$SCRIPT_DIR/publish_benchmark_history.py" language \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --platform macos --run-id "$run_id" --diagnostics "$diag_root" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
-    --output-gate independent --recognitions "$artifacts/independent-asr.json" \
+    --output-gate independent --recognitions "$recognitions" \
     --plan "$plan" --started-at "$started_at" --defer-record \
     ${label:+--label "$label"} \
     || die "language benchmark passed but evidence validation failed; artifacts are preserved in $artifacts"

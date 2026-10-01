@@ -1630,38 +1630,46 @@ PY
       | tee "$artifacts/output-gate.txt" || output_st=$?
   fi
 
-  # Second recognizer family on the Mac. The phone generated every take and the
-  # Mac runs no engine, so the pinned whisper-small model may load now: one
-  # supervised subprocess over the collected output.wav files, cached by audio
-  # and model identity. Apple Speech (in-app) plus whisper gives the publisher
-  # two independent witnesses; their agreement is required for a record. A
-  # diagnostic cohort publishes nothing, so the lane reports that agreement
-  # itself (rows are keyed by child run ID, so repeated cells across seeds are
-  # distinct takes): the families must agree on every take, or the result is
-  # labelled as one witness (audit #44).
-  local asr_st=0 witness_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
+  # Spoken content and audio QC on the Mac with QC v2 (docs/reference/qc.md). The
+  # phone generated every take and the Mac runs no engine, so the QC v2 models may
+  # load now, one process at a time over the collected output.wav files, cached by
+  # audio digest (lane ios-language-bench of config/qc/detectors.json). Qwen3-ASR
+  # and Whisper large-v3 transcribe each take without its script or language;
+  # beside Apple Speech's in-app gate, the two must meet each take's outcome per
+  # channel (the negative control is a language control), which also decides a
+  # diagnostic cohort that publishes nothing (takes are keyed by child run ID, so
+  # repeated cells across seeds are distinct takes). The gate reports; only a
+  # fail gate fails the lane.
+  local qc_takes="$artifacts/qc-takes.json" recognitions="$artifacts/qc-language-evidence.json"
+  local qc_run="" takes_st=0 run_st=0 content_st=2 gates_st=2
   if [[ $collect_st -eq 0 ]]; then
-    python3 "$ROOT_DIR/scripts/prepare_delivery_compact_model_config.py" whisper-small-mlx \
-      --output "$asr_config" >/dev/null \
-      || die "lang-bench: the pinned whisper-small MLX recognizer is not prepared on this host (nothing is downloaded automatically)"
-    python3 "$ROOT_DIR/scripts/independent_asr.py" manifest --platform ios \
-      --diagnostics "$diag" --run-id "$run_id" --plan "$plan" --corpus "$corpus" \
-      --generation-process-exited \
-      --output "$artifacts/independent-asr-manifest.json" >/dev/null || asr_st=$?
-    if (( asr_st == 0 )); then
-      python3 "$ROOT_DIR/scripts/independent_asr.py" transcribe \
-        --manifest "$artifacts/independent-asr-manifest.json" --adapter-config "$asr_config" \
-        --output "$artifacts/independent-asr.json" \
-        | tee "$artifacts/independent-asr.txt" || asr_st=$?
+    python3 "$ROOT_DIR/scripts/qc.py" language-bench takes --platform ios --run-id "$run_id" \
+      --plan "$plan" --corpus "$corpus" --diagnostics "$diag" --output "$qc_takes" || takes_st=$?
+    if (( takes_st == 0 )); then
+      qc_run="$(python3 "$ROOT_DIR/scripts/qc.py" run --takes "$qc_takes" --lane ios-language-bench)" \
+        || run_st=$?
     fi
-    if [[ -n "$cohort" ]] && (( asr_st == 0 )); then
-      python3 "$ROOT_DIR/scripts/independent_asr.py" verdict \
-        --manifest "$artifacts/independent-asr-manifest.json" \
-        --evidence "$artifacts/independent-asr.json" \
-        --output "$artifacts/witness-verdict.json" \
-        | tee "$artifacts/witness-verdict.txt" || witness_st=$?
+    if (( takes_st == 0 && run_st == 0 )) && [[ -n "$qc_run" ]]; then
+      content_st=0
+      python3 "$ROOT_DIR/scripts/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
+        | tee "$artifacts/spoken-content.txt" || content_st=$?
+      gates_st=0
+      python3 "$ROOT_DIR/scripts/qc.py" gate --lane ios-language-bench --run "$qc_run" \
+        | tee "$artifacts/audio-qc-gates.txt" || gates_st=$?
     fi
   fi
+  local content_verdict gates_verdict
+  case "$content_st" in
+    0) content_verdict=PASS ;;
+    1) content_verdict=FAIL ;;
+    *) content_verdict=ERROR ;;
+  esac
+  case "$gates_st" in
+    0) gates_verdict=PASS ;;
+    3) gates_verdict=WARN ;;
+    1) gates_verdict=FAIL ;;
+    *) gates_verdict=ERROR ;;
+  esac
 
   {
     echo "lang-bench runID=$run_id subset=$subset takes=$cell_count diagnostics_fail=$cell_fail"
@@ -1673,29 +1681,29 @@ PY
     else
       echo "output_gate=SKIPPED"
     fi
-    echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
-    if [[ -n "$cohort" ]]; then
-      echo "witness_verdict=$(tail -n 1 "$artifacts/witness-verdict.txt" 2>/dev/null || echo unavailable)"
-    fi
+    echo "spoken_content=$content_verdict"
+    echo "audio_qc_gates=$gates_verdict"
+    echo "qc_run=${qc_run:-none}"
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 || asr_st != 0 || witness_st != 0 )); then
+  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 )) \
+      || [[ "$content_verdict" != PASS || "$gates_verdict" == FAIL ]]; then
     die "lang-bench FAIL · $artifacts"
   fi
   if [[ -n "$cohort" ]]; then
-    note "lang-bench diagnostic cohort $(tail -n 1 "$artifacts/witness-verdict.txt")"
+    note "lang-bench diagnostic cohort $(tail -n 1 "$artifacts/spoken-content.txt")"
     note "lang-bench diagnostic cohort PASS · all $cell_count predeclared takes passed · no history record created"
     return 0
   fi
-  # Apple Speech verified in-app plus whisper on the Mac: two families. When the
-  # in-app pass was skipped, whisper alone publishes an explicit one-witness record.
+  # Apple Speech verified in-app plus the two QC v2 families on the Mac. When the
+  # in-app pass was skipped, the QC v2 families alone publish the record.
   local output_gate="pass"
   [[ "${QVOICE_LANG_BENCH_SKIP_OUTPUT:-0}" == "1" ]] && output_gate="independent"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" language \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --platform ios --run-id "$run_id" --diagnostics "$diag" --crash-diagnostics "$dest" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
-    --plan "$plan" --recognitions "$artifacts/independent-asr.json" \
+    --plan "$plan" --recognitions "$recognitions" \
     --output-gate "$output_gate" --started-at "$started_at" --defer-record \
     ${label:+--label "$label"} \
     || die "language benchmark passed but evidence validation failed; artifacts are preserved in $artifacts"

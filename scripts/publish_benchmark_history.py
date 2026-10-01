@@ -68,27 +68,28 @@ from language_bench_evidence import (  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
     ACCURACY_METRIC_NORMALIZATIONS,
     ACCURACY_METRIC_VERSION,
-    CHANNEL_CONSENSUS_ALGORITHM,
     DELETION_RUN_WARNING_LENGTH,
     LANGUAGE_CHECK_KINDS,
-    INDEPENDENT_ASR_ALGORITHM,
-    INDEPENDENT_OUTPUT_ALGORITHM,
-    INDEPENDENT_OUTPUT_SCHEMA,
-    INDEPENDENT_RECOGNITION_SCHEMA,
-    INDEPENDENT_REQUIRED_PASS_COUNT,
+    LANGUAGE_CONTROL_KIND,
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
     NEGATIVE_CONTROL_KIND,
-    channel_consensus,
+    QC_ASR_ALGORITHM,
+    QC_CHANNEL_CONSENSUS_ALGORITHM,
+    QC_FAMILY_METRIC_PREFIXES,
+    QC_OUTPUT_ALGORITHM,
+    QC_OUTPUT_SCHEMA,
+    QC_RECOGNITION_FAMILIES,
+    QC_RECOGNITION_SCHEMA,
+    QC_REQUIRED_PASS_COUNT,
     filler_counts,
     is_sha256,
     locale_matches_expected_language,
     primary_accuracy_metric,
     primary_accuracy_score,
-    recognition_issues,
+    qc_take_verdict,
     recomputed_accuracy,
     run_channel_verdicts,
-    score_recognition,
     single_family_meets_expectation,
     text_sha256,
 )
@@ -108,6 +109,8 @@ ASR_REQUIRED_PASS_COUNT = 3
 # version.
 LANGUAGE_ACCURACY_METRIC_VERSION = ACCURACY_METRIC_VERSION
 LANGUAGE_SAMPLING_VARIATION = "expressive"
+# A QC v2 registry model id (config/qc/models.json), published as recognizer provenance.
+SAFE_QC_MODEL_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,95}$")
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
 SAFE_CUSTOM_SPEAKER = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 SAFE_DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -2862,28 +2865,38 @@ def language_output_evidence(
     }
 
 
-def load_independent_recognitions(path: Path, *, run_id: str, platform: str) -> dict[str, Any]:
-    """The producer's untracked evidence file, checked for identity and structure only.
+QC_LANGUAGE_EVIDENCE_SCHEMA = "vocello.qc.language-evidence/1"
+QC_RECOGNIZER_KEYS = ("modelID", "runtimeSHA256", "modelIdentitySHA256", "configSHA256")
+
+
+def load_qc_recognitions(path: Path, *, run_id: str, platform: str) -> dict[str, Any]:
+    """The QC v2 language evidence (`qc.py language-bench evidence`), checked for identity and shape only.
 
     Every recognition is re-qualified and re-scored per cell by
-    `sanitized_independent_evidence`; nothing in this file is trusted as a verdict.
+    `sanitized_qc_evidence`; the producer's own verdicts are never read.
     """
     payload = load_json(path)
     if (
-        payload.get("schemaVersion") != 1
-        or payload.get("kind") != "independent-asr-language-evidence"
+        payload.get("schema") != QC_LANGUAGE_EVIDENCE_SCHEMA
         or payload.get("runID") != run_id
         or payload.get("platform") != platform
         or payload.get("generationProcessExited") is not True
         or not isinstance(payload.get("cells"), dict)
     ):
-        raise PublicationError("independent recognition evidence does not belong to this run")
-    producer = payload.get("producer")
-    if not isinstance(producer, dict) or producer.get("algorithmVersion") != INDEPENDENT_ASR_ALGORITHM:
-        raise PublicationError("independent recognition evidence names an unsupported recognizer")
-    envelope = producer.get("resourceEnvelope")
-    if producer.get("modelLaunches", 0) and (not isinstance(envelope, dict) or envelope.get("qualified") is not True):
-        raise PublicationError("independent recognizer ran outside a qualified resource envelope")
+        raise PublicationError("QC v2 recognition evidence does not belong to this run")
+    recognizers = payload.get("recognizers")
+    if (
+        payload.get("recognitionAlgorithm") != QC_ASR_ALGORITHM
+        or payload.get("families") != list(QC_RECOGNITION_FAMILIES)
+        or not isinstance(recognizers, dict) or set(recognizers) != set(QC_RECOGNITION_FAMILIES)
+        or any(
+            not isinstance(recognizers[family], dict)
+            or not SAFE_QC_MODEL_ID.fullmatch(str(recognizers[family].get("modelID")))
+            or not all(is_sha256(recognizers[family].get(key)) for key in QC_RECOGNIZER_KEYS[1:])
+            for family in QC_RECOGNITION_FAMILIES
+        )
+    ):
+        raise PublicationError("QC v2 recognition evidence names an unsupported recognizer")
     return payload
 
 
@@ -2903,17 +2916,7 @@ def flag_deletion_run(take: dict[str, Any], run: int, *, family: str, negative_c
     take["warnings"] = sorted(set(take.get("warnings", [])) | {f"language.deletion_run:{family}"})
 
 
-def _unit_interval(value: Any) -> float | None:
-    number = finite_number(value)
-    return number if number is not None and 0.0 <= number <= 1.0 else None
-
-
-def _nonpositive(value: Any) -> float | None:
-    number = finite_number(value)
-    return number if number is not None and number <= 0.0 else None
-
-
-def sanitized_independent_evidence(
+def sanitized_qc_evidence(
     *,
     cell: dict[str, Any],
     engine_row: dict[str, Any],
@@ -2921,14 +2924,16 @@ def sanitized_independent_evidence(
     reference_script: str,
     expected_audio_sha256: Any,
     duration_seconds: Any,
-    apple_evidence: dict[str, Any] | None,
+    recognizers: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    """Re-qualify and re-score one whisper-family recognition for one cell.
+    """Re-qualify, re-score and vote one cell's two QC v2 recognitions (Qwen3-ASR and Whisper large-v3).
 
     The audio digest must be the digest the engine published (macOS engine row)
-    or the digest the sentinel bound (iOS output evidence); WER/CER are
-    recomputed from the transcript; and the verdict is combined with the Apple
-    Speech verdict through the family-consensus rule when both exist.
+    or the sentinel bound (iOS output evidence); each recognition must come from
+    the run's one recognizer per family; WER/CER are recomputed from each
+    transcript; and the two families must meet the take's declared outcome per
+    channel (`lib.language_metrics.qc_take_verdict`: the negative control is a
+    language control).
     """
     cell_id = str(cell.get("id"))
     expected_language = str(cell.get("expectedHint"))
@@ -2938,93 +2943,90 @@ def sanitized_independent_evidence(
     if duration is None or duration <= 0:
         raise PublicationError(f"language cell {cell_id} has no output duration to bind recognitions to")
     if entry.get("generationID") != engine_row.get("generationID") or entry.get("audioSHA256") != expected_audio_sha256:
-        raise PublicationError(f"language cell {cell_id} independent recognition belongs to other audio")
+        raise PublicationError(f"language cell {cell_id} QC v2 recognitions belong to other audio")
     recognitions = entry.get("recognitions")
-    if not isinstance(recognitions, list) or len(recognitions) != 1:
-        raise PublicationError(f"language cell {cell_id} needs exactly one independent recognition")
-    recognition = recognitions[0]
-    issues = recognition_issues(
-        recognition, audio_sha256=expected_audio_sha256, script=reference_script,
-        script_sha256=text_sha256(reference_script), language=expected_language,
-        duration_seconds=duration,
-    )
-    if recognition.get("modelFamily") != "whisper" or recognition.get("algorithmVersion") != INDEPENDENT_ASR_ALGORITHM:
-        issues.append("unexpected-family")
-    language_score = finite_number(recognition.get("languageMatchScore"))
-    if language_score is None or not 0.0 <= language_score <= 1.0:
-        issues.append("language-score-invalid")
-    recognition_duration = finite_number(recognition.get("recognitionDurationSeconds"))
-    if recognition_duration is None or recognition_duration <= 0:
-        issues.append("recognition-duration-invalid")
-    if issues:
-        raise PublicationError(
-            f"language cell {cell_id} independent recognition is unqualified: " + ", ".join(sorted(set(issues)))
-        )
-    verdict = score_recognition(
-        recognition, script=reference_script, language=expected_language,
+    for recognition in recognitions if isinstance(recognitions, list) else []:
+        family = recognition.get("modelFamily") if isinstance(recognition, dict) else None
+        recognizer = recognizers.get(family) if isinstance(family, str) else None
+        if recognizer is None or recognition.get("modelID") != recognizer["modelID"] or recognition.get(
+            "provenance"
+        ) != {key: recognizer[key] for key in QC_RECOGNIZER_KEYS[1:]}:
+            raise PublicationError(
+                f"language cell {cell_id} QC v2 recognition does not come from the run's recognizer"
+            )
+    expect_failure = cell.get("expectedOutcome") == "fail"
+    verdict = qc_take_verdict(
+        recognitions, audio_sha256=expected_audio_sha256, script=reference_script,
+        language=expected_language, duration_seconds=duration, expect_failure=expect_failure,
         accuracy_metric_version=LANGUAGE_ACCURACY_METRIC_VERSION,
     )
-    expect_failure = cell.get("expectedOutcome") == "fail"
-    # Per-channel consensus (audit #42): each family votes its language and its
-    # accuracy verdict separately; the accuracy control constrains accuracy only.
-    family_channels: dict[str, dict[str, bool]] = {
-        "whisper": {"language": bool(verdict["languagePass"]), "accuracy": bool(verdict["accuracyPass"])},
-    }
-    if apple_evidence is not None:
-        family_channels["apple-speech"] = {
-            "language": bool(apple_evidence.get("languagePass")),
-            "accuracy": bool(apple_evidence.get("accuracyPass")),
-        }
-    agreement = channel_consensus(family_channels, expect_failure=expect_failure)
-    if len(family_channels) >= 2:
-        if agreement["outcome"] != "met":
-            detail = ", ".join(
-                f"{channel}={agreement['statuses'][channel]}" for channel in agreement["expected"]
-            )
-            raise PublicationError(
-                f"language cell {cell_id} recognizer families did not agree on "
-                + ("the accuracy control's failure" if expect_failure else "a pass")
-                + f" per channel: {detail}"
-            )
-    elif not single_family_meets_expectation(
-        verdict["languagePass"], verdict["accuracyPass"], expect_failure=expect_failure,
-    ):
-        raise PublicationError(
-            f"language cell {cell_id} independent recognition "
-            + ("did not fail the accuracy control" if expect_failure else
-               f"failed: {verdict['accuracyMetric']}={verdict['errorRate']:.3f} "
-               f"detected={recognition.get('detectedLanguage')}")
+    if verdict["status"] == "unqualified":
+        detail = "; ".join(f"{family}: {', '.join(sorted(set(issues)))}"
+                           for family, issues in sorted(verdict["issues"].items()))
+        raise PublicationError(f"language cell {cell_id} QC v2 recognition is unqualified: {detail}")
+    agreement = verdict["consensus"]
+    if agreement["outcome"] != "met":
+        detail = ", ".join(f"{channel}={agreement['statuses'][channel]}" for channel in agreement["expected"])
+        detected = ", ".join(
+            f"{family}={recognition.get('detectedLanguage')}" for family, recognition in sorted(
+                (item["modelFamily"], item) for item in recognitions)
         )
+        raise PublicationError(
+            f"language cell {cell_id} QC v2 recognizer families did not agree on "
+            + ("the language control's failure" if expect_failure else "a pass")
+            + f" per channel: {detail} (detected {detected})"
+        )
+    families: dict[str, dict[str, Any]] = {}
+    for recognition in recognitions:
+        family = recognition["modelFamily"]
+        scored = verdict["verdicts"][family]
+        families[family] = {
+            "detectedLanguage": str(recognition.get("detectedLanguage")),
+            "languageMatchScore": float(recognition["languageMatchScore"]),
+            "wordErrorRate": scored["wordErrorRate"],
+            "segmentationAwareWordErrorRate": scored["segmentationAwareWordErrorRate"],
+            "wordBoundaryOnlyEdits": int(scored["wordBoundaryOnlyEdits"]),
+            "excessFillerCount": int(scored["excessFillerCount"]),
+            "characterErrorRate": scored["characterErrorRate"],
+            "accuracyMetric": scored["accuracyMetric"],
+            "accuracyThreshold": scored["accuracyThreshold"],
+            "primaryAccuracyScore": scored["errorRate"],
+            "languagePass": scored["languagePass"],
+            "accuracyPass": scored["accuracyPass"],
+            "longestDeletionRun": int(scored["longestDeletionRun"]),
+            "provenance": dict(recognition["provenance"]),
+        }
+    first = families[QC_RECOGNITION_FAMILIES[0]]
     return {
         "cell": cell_id,
         "generationID": str(engine_row.get("generationID")),
-        "family": "whisper",
         "expectedLanguage": expected_language,
-        "detectedLanguage": str(recognition.get("detectedLanguage")),
-        "languageMatchScore": language_score,
-        "wordErrorRate": verdict["wordErrorRate"],
-        "segmentationAwareWordErrorRate": verdict["segmentationAwareWordErrorRate"],
-        "wordBoundaryOnlyEdits": int(verdict["wordBoundaryOnlyEdits"]),
-        "excessFillerCount": int(verdict["excessFillerCount"]),
-        "characterErrorRate": verdict["characterErrorRate"],
-        "accuracyMetric": verdict["accuracyMetric"],
-        "accuracyThreshold": verdict["accuracyThreshold"],
-        "primaryAccuracyScore": verdict["errorRate"],
-        "languagePass": verdict["languagePass"],
-        "accuracyPass": verdict["accuracyPass"],
-        "pass": verdict["passed"],
-        "longestDeletionRun": int(verdict["longestDeletionRun"]),
-        "fullFileProcessed": True,
-        "recognitionDurationSeconds": recognition_duration,
-        # Whisper's own confidence (audit #89); absent from evidence that
-        # predates it, and never part of the verdict.
-        "maximumNoSpeechProbability": _unit_interval(recognition.get("maximumNoSpeechProbability")),
-        "meanAverageLogProbability": _nonpositive(recognition.get("meanAverageLogProbability")),
+        "accuracyMetric": first["accuracyMetric"],
+        "accuracyThreshold": first["accuracyThreshold"],
+        "families": families,
         "consensus": agreement,
-        # Published per take only when two families voted (audit #42).
-        "channelConsensus": dict(agreement["statuses"]) if len(family_channels) >= 2 else None,
-        "provenance": dict(recognition["provenance"]),
+        "channelConsensus": dict(agreement["statuses"]),
     }
+
+
+def qc_take_metrics(evidence: dict[str, Any]) -> dict[str, float]:
+    """Each QC family's per-take metrics, `<prefix><Metric>` (`QC_FAMILY_METRIC_PREFIXES`)."""
+    metrics: dict[str, float] = {}
+    for family, values in evidence["families"].items():
+        prefix = QC_FAMILY_METRIC_PREFIXES[family]
+        metrics.update({
+            f"{prefix}WordErrorRate": values["wordErrorRate"],
+            f"{prefix}CharacterErrorRate": values["characterErrorRate"],
+            f"{prefix}PrimaryAccuracyScore": values["primaryAccuracyScore"],
+            f"{prefix}LanguageMatchScore": values["languageMatchScore"],
+            f"{prefix}LanguagePass": 1.0 if values["languagePass"] else 0.0,
+            f"{prefix}AccuracyPass": 1.0 if values["accuracyPass"] else 0.0,
+            f"{prefix}LongestDeletionRun": float(values["longestDeletionRun"]),
+            f"{prefix}SegmentationAwareWordErrorRate": values["segmentationAwareWordErrorRate"],
+            f"{prefix}WordBoundaryOnlyEdits": float(values["wordBoundaryOnlyEdits"]),
+            f"{prefix}ExcessFillerCount": float(values["excessFillerCount"]),
+        })
+    return metrics
 
 
 def language_command(args: argparse.Namespace) -> Path:
@@ -3273,15 +3275,20 @@ def language_command(args: argparse.Namespace) -> Path:
             record_detected_language(take, "apple-speech", evidence.get("detectedLanguage"))
             flag_deletion_run(take, evidence["longestDeletionRun"], family="apple-speech",
                               negative_control=cell.get("expectedOutcome") == "fail")
-    independent_evidence: list[dict[str, Any]] = []
-    independent_provenance: dict[str, str] | None = None
+    qc_evidence: list[dict[str, Any]] = []
+    qc_recognizers: dict[str, dict[str, Any]] | None = None
     if recognitions_path is not None:
-        recognitions = load_independent_recognitions(
+        recognitions = load_qc_recognitions(
             recognitions_path, run_id=args.run_id, platform=args.platform,
         )
-        apple_by_cell = {evidence["cell"]: evidence for evidence in asr_evidence}
-        # Planned (iOS) rows are keyed by the take's child run ID since audit
-        # #44; macOS rows, and evidence from before it, by the cell ID.
+        # One recognizer per family for the whole run: every cell's recognitions
+        # must name the producer's recognizer identity for its family.
+        qc_recognizers = {
+            family: {key: recognitions["recognizers"][family][key] for key in QC_RECOGNIZER_KEYS}
+            for family in QC_RECOGNITION_FAMILIES
+        }
+        # Takes are keyed by the take's child run ID (both platforms run a plan);
+        # a cell ID is accepted for a plan-free run.
         child_by_cell = {
             str(planned.get("cellID")): str(planned.get("childRunID")) for planned in (planned_takes or [])
         }
@@ -3294,61 +3301,33 @@ def language_command(args: argparse.Namespace) -> Path:
             if entry is None:
                 entry = recognitions["cells"].get(cell_id)
             if entry is None:
-                raise PublicationError(f"language cell {cell_id} lacks independent recognition evidence")
+                raise PublicationError(f"language cell {cell_id} lacks QC v2 recognition evidence")
             if entry.get("cellID", cell_id) != cell_id:
-                raise PublicationError(f"language cell {cell_id} independent recognition names another cell")
+                raise PublicationError(f"language cell {cell_id} QC v2 recognition names another cell")
             output = take.get("output") or {}
             expected_digest = output.get("fileDigest") or (row.get("notes") or {}).get("samplingWAVDigest")
-            duration = output.get("durationSeconds")
-            evidence = sanitized_independent_evidence(
+            evidence = sanitized_qc_evidence(
                 cell=cell, engine_row=row, entry=entry,
                 reference_script=corpus_scripts[str(cell["scriptLang"])],
-                expected_audio_sha256=expected_digest, duration_seconds=duration,
-                apple_evidence=apple_by_cell.get(cell_id),
+                expected_audio_sha256=expected_digest, duration_seconds=output.get("durationSeconds"),
+                recognizers=qc_recognizers,
             )
-            # One recognizer for the whole run: the runtime and model digests must
-            # agree across cells. `configSHA256` is per row by design (it binds the
-            # locked decode language), so cells of different languages differ there.
-            recognizer_identity = {
-                key: evidence["provenance"][key] for key in ("runtimeSHA256", "modelIdentitySHA256")
-            }
-            if independent_provenance is None:
-                independent_provenance = recognizer_identity
-            elif independent_provenance != recognizer_identity:
-                raise PublicationError("independent recognitions come from more than one recognizer identity")
-            independent_evidence.append(evidence)
-            if cell.get("expectedOutcome") == "fail":
-                # The history validator inverts the accuracy gate for a negative
-                # control: the take is evidence only if its verification failed.
+            qc_evidence.append(evidence)
+            negative_control = cell.get("expectedOutcome") == "fail"
+            if negative_control:
+                # The history validator inverts the gate for a negative control:
+                # the take is evidence only if its verification failed.
                 take["expectedOutcome"] = "fail"
             take.setdefault("accuracyMetric", evidence["accuracyMetric"])
             take.setdefault("accuracyThreshold", evidence["accuracyThreshold"])
-            take["metrics"].update({
-                "independentWordErrorRate": evidence["wordErrorRate"],
-                "independentCharacterErrorRate": evidence["characterErrorRate"],
-                "independentPrimaryAccuracyScore": evidence["primaryAccuracyScore"],
-                "independentLanguageMatchScore": evidence["languageMatchScore"],
-                "independentLanguagePass": 1.0 if evidence["languagePass"] else 0.0,
-                "independentAccuracyPass": 1.0 if evidence["accuracyPass"] else 0.0,
-                "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
-                "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
-                "independentSegmentationAwareWordErrorRate": evidence["segmentationAwareWordErrorRate"],
-                "independentWordBoundaryOnlyEdits": float(evidence["wordBoundaryOnlyEdits"]),
-                "independentExcessFillerCount": float(evidence["excessFillerCount"]),
-            })
-            record_detected_language(take, "whisper", evidence.get("detectedLanguage"))
-            if evidence.get("channelConsensus") is not None:
-                take["channelConsensus"] = evidence["channelConsensus"]
-            flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
-                              negative_control=cell.get("expectedOutcome") == "fail")
-            for source, target in (
-                ("maximumNoSpeechProbability", "independentMaximumNoSpeechProbability"),
-                ("meanAverageLogProbability", "independentMeanAverageLogProbability"),
-            ):
-                if evidence.get(source) is not None:
-                    take["metrics"][target] = evidence[source]
+            take["metrics"].update(qc_take_metrics(evidence))
+            for family, values in sorted(evidence["families"].items()):
+                record_detected_language(take, family, values["detectedLanguage"])
+                flag_deletion_run(take, values["longestDeletionRun"], family=family,
+                                  negative_control=negative_control)
+            take["channelConsensus"] = evidence["channelConsensus"]
     families = sorted(
-        ({"apple-speech"} if asr_evidence else set()) | ({"whisper"} if independent_evidence else set())
+        ({"apple-speech"} if asr_evidence else set()) | (set(QC_RECOGNITION_FAMILIES) if qc_evidence else set())
     )
     # Run-level counts live once in evidence.languageVerification (see
     # record_shell below); per-take metrics carry only that take's verdicts.
@@ -3407,9 +3386,9 @@ def language_command(args: argparse.Namespace) -> Path:
         fixture_digests["design"] = args.design_fixture_digest
     require_fixture_cross_check(takes, fixture_digests, source=f"{args.platform} language runner")
     analysis_profile: dict[str, Any] | None = None
-    if asr_evidence or independent_evidence:
+    if asr_evidence or qc_evidence:
         evidence_by_cell = {evidence["cell"]: evidence for evidence in asr_evidence}
-        independent_by_cell = {evidence["cell"]: evidence for evidence in independent_evidence}
+        qc_by_cell = {evidence["cell"]: evidence for evidence in qc_evidence}
         analysis_takes: list[dict[str, Any]] = []
         planned_by_cell = {
             str(planned.get("cellID")): planned for planned in (planned_takes or [])
@@ -3440,22 +3419,24 @@ def language_command(args: argparse.Namespace) -> Path:
                     "recognitionAlgorithm": evidence["recognitionAlgorithm"],
                     "requiredPassCount": evidence["recognitionPassCount"],
                 })
-            independent = independent_by_cell.get(cell_id)
-            if independent is not None:
-                entry["independentRecognition"] = {
-                    "family": "whisper",
-                    "algorithm": INDEPENDENT_ASR_ALGORITHM,
-                    "provenance": independent["provenance"],
-                    "accuracyMetric": independent["accuracyMetric"],
-                    "accuracyThreshold": independent["accuracyThreshold"],
+            qc_cell = qc_by_cell.get(cell_id)
+            if qc_cell is not None:
+                entry["qcRecognition"] = {
+                    "algorithm": QC_ASR_ALGORITHM,
+                    "families": {
+                        family: {"modelID": qc_recognizers[family]["modelID"], "provenance": values["provenance"]}
+                        for family, values in sorted(qc_cell["families"].items())
+                    },
+                    "accuracyMetric": qc_cell["accuracyMetric"],
+                    "accuracyThreshold": qc_cell["accuracyThreshold"],
                 }
             analysis_takes.append(entry)
         analysis_profile = {
-            "contract": "autonomous-language-output-v3" if asr_evidence else INDEPENDENT_OUTPUT_ALGORITHM,
+            "contract": "autonomous-language-output-v3" if asr_evidence else QC_OUTPUT_ALGORITHM,
             "seedPolicy": plan.get("seedPolicy") if isinstance(plan, dict) else LANGUAGE_SEED_POLICY,
             "takes": analysis_takes,
         }
-        if independent_evidence:
+        if qc_evidence:
             analysis_profile["families"] = families
     selected_digest_payload: dict[str, Any] = {
         "telemetry": selected,
@@ -3464,8 +3445,8 @@ def language_command(args: argparse.Namespace) -> Path:
     }
     if selected_app:
         selected_digest_payload["appTelemetry"] = selected_app
-    if independent_evidence:
-        selected_digest_payload["independentRecognition"] = independent_evidence
+    if qc_evidence:
+        selected_digest_payload["qcRecognition"] = qc_evidence
     if analysis_profile is not None:
         selected_digest_payload["analysisProfile"] = analysis_profile
     inputs = {"matrixHash": digest_file(args.matrix), "corpusHash": digest_file(args.corpus)}
@@ -3508,15 +3489,15 @@ def language_command(args: argparse.Namespace) -> Path:
             "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
             "requiredPassCount": ASR_REQUIRED_PASS_COUNT,
         })
-    elif independent_evidence:
-        # Single independent family: an honest one-witness record, never consensus.
+    elif qc_evidence:
+        # The two QC v2 families on the Mac (language measurement version 6).
         language_verification.update({
-            "outputSchemaVersion": INDEPENDENT_OUTPUT_SCHEMA,
-            "outputAlgorithm": INDEPENDENT_OUTPUT_ALGORITHM,
-            "recognitionSchemaVersion": INDEPENDENT_RECOGNITION_SCHEMA,
-            "recognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,
+            "outputSchemaVersion": QC_OUTPUT_SCHEMA,
+            "outputAlgorithm": QC_OUTPUT_ALGORITHM,
+            "recognitionSchemaVersion": QC_RECOGNITION_SCHEMA,
+            "recognitionAlgorithm": QC_ASR_ALGORITHM,
             "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
-            "requiredPassCount": INDEPENDENT_REQUIRED_PASS_COUNT,
+            "requiredPassCount": QC_REQUIRED_PASS_COUNT,
         })
     if families:
         language_verification["families"] = families
@@ -3525,21 +3506,28 @@ def language_command(args: argparse.Namespace) -> Path:
             family: LANGUAGE_CHECK_KINDS[family] for family in families
         }
     if language_verification_counts["negativeControlsConfirmed"]:
-        # The control is an accuracy control (audit #42, 2026-09-25).
-        language_verification["negativeControlKind"] = NEGATIVE_CONTROL_KIND
+        # The control is an accuracy control (audit #42, 2026-09-25) for Apple
+        # Speech alone, and a language control when the QC v2 families vote.
+        language_verification["negativeControlKind"] = (
+            LANGUAGE_CONTROL_KIND if qc_evidence else NEGATIVE_CONTROL_KIND
+        )
     channel_takes = [
         (take["channelConsensus"], take.get("expectedOutcome") == "fail")
         for take in takes if isinstance(take.get("channelConsensus"), dict)
     ]
-    if len(families) >= 2 and channel_takes:
-        # Two families voted every scored take per channel: publish the run's
-        # verdict per channel beside the per-take statuses.
-        language_verification["channelConsensusAlgorithm"] = CHANNEL_CONSENSUS_ALGORITHM
-        language_verification["channelVerdicts"] = run_channel_verdicts(channel_takes)
-    if independent_evidence and independent_provenance is not None:
+    if qc_evidence and channel_takes:
+        # The two QC v2 families voted every scored take per channel: publish
+        # the run's verdict per channel beside the per-take statuses.
+        language_verification["channelConsensusAlgorithm"] = QC_CHANNEL_CONSENSUS_ALGORITHM
+        language_verification["channelVerdicts"] = run_channel_verdicts(channel_takes, LANGUAGE_CONTROL_KIND)
+    if qc_evidence and qc_recognizers is not None:
         language_verification.update({
-            "independentRecognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,
-            "independentModelIdentitySHA256": independent_provenance["modelIdentitySHA256"],
+            "qcRecognitionAlgorithm": QC_ASR_ALGORITHM,
+            "qcRecognizers": {
+                family: {key: qc_recognizers[family][key]
+                         for key in ("modelID", "modelIdentitySHA256", "runtimeSHA256")}
+                for family in QC_RECOGNITION_FAMILIES
+            },
         })
     manifest["historyRecord"]["evidence"]["languageVerification"] = language_verification
     return write_and_record(
@@ -4789,11 +4777,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     language.add_argument("--subset", choices=("quick", "full"), required=True)
     language.add_argument(
         "--output-gate", choices=("pass", "independent", "not-performed"), required=True,
-        help="pass: in-app Apple Speech verification; independent: whisper-family recognitions only",
+        help="pass: in-app Apple Speech verification; independent: the Mac's QC v2 recognizer families only",
     )
     language.add_argument(
         "--recognitions", type=Path,
-        help="untracked independent-asr language evidence (required for independent, optional with pass)",
+        help="untracked QC v2 language evidence from `qc.py language-bench evidence` "
+             "(required for independent, optional with pass)",
     )
     language.add_argument("--started-at", required=True)
     language.add_argument("--finished-at")

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "audio-qc-audit-2026-09",
+  "primaryPlan": "qc-v2-2026-10",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
     {
@@ -123,11 +123,20 @@
     {
       "id": "audio-qc-audit-2026-09",
       "title": "Autonomous, self-validating audio QC",
-      "status": "active",
+      "status": "superseded",
       "owner": "backend-mlx",
       "adopted": "2026-09-25",
       "goal": "Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.",
       "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md"
+    },
+    {
+      "id": "qc-v2-2026-10",
+      "title": "Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels",
+      "status": "active",
+      "owner": "backend-mlx",
+      "adopted": "2026-10-01",
+      "goal": "Replace the v1 audio QC stack with a lean harness of a few strong commercial-weight models (Qwen3-ASR, the Qwen3 aligner, Whisper large-v3, a phone recognizer with G2P, RMVPE and SwiftF0, ReDimNet2+, UTMOSv2 with Audiobox Aesthetics, and an audio-LLM voter). Its detectors are fit on the maintainer's listening labels, with thresholds frozen before held-out scoring. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.",
+      "authority": "docs/reference/qc.md"
     }
   ],
   "items": [
@@ -1526,7 +1535,7 @@
     {
       "id": "AQ-07",
       "title": "Detector qualification and lane gating sets",
-      "status": "in-flight",
+      "status": "superseded",
       "gate": "Calibration records meeting A8 for detector classes A-D (then E, I, J) in declared scopes; correlated-failure audits recorded; the language bench gates on B, C and D and publishes two-family records; the clone lane gates on E.",
       "sourceOfTruth": [
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
@@ -1545,12 +1554,13 @@
       ],
       "legacyIds": [
         "AV-07"
-      ]
+      ],
+      "supersededBy": "QC-03"
     },
     {
       "id": "AQ-08",
       "title": "Prosody, delivery and advisory quality rebuild",
-      "status": "in-flight",
+      "status": "superseded",
       "gate": "pYIN and HNR pass the oracle ladders; prosody flags are replaced by class F detectors; class H warns at cell level only; the Audiobox and DNSMOS composite passes its ladder test; the DP-31/DP-32 guardrails cite only qualified judges.",
       "sourceOfTruth": [
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
@@ -1566,12 +1576,13 @@
       ],
       "legacyIds": [
         "DP-28"
-      ]
+      ],
+      "supersededBy": "QC-03"
     },
     {
       "id": "AQ-09",
       "title": "Audio QC documentation and generated accuracy report",
-      "status": "in-flight",
+      "status": "superseded",
       "gate": "The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; audio-qc-engineering.md is historical; release.md is updated per decision 7.",
       "sourceOfTruth": [
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
@@ -1584,7 +1595,8 @@
       "blockedBy": [
         "AQ-01",
         "AQ-03"
-      ]
+      ],
+      "supersededBy": "QC-05"
     },
     {
       "id": "PA-33",
@@ -1598,6 +1610,99 @@
       ],
       "notes": "Found by the PA-26 B3 review on 2026-09-26. MacModelDeletionSequence unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation.",
       "updated": "2026-09-26"
+    },
+    {
+      "id": "QC-01",
+      "plan": "qc-v2-2026-10",
+      "title": "Models and runtimes",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "config/qc/models.json pins every model by revision and SHA-256 with a commercial-use weight license; qc.py fetches and verifies them; each runner passes a 3-take smoke run on the M6 within its memory budget.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "Qwen3-ASR-1.7B, Qwen3-ForcedAligner-0.6B, Whisper large-v3, ZIPA (fallback wav2vec2-xlsr-espeak) with CharsiuG2P, RMVPE and SwiftF0, ReDimNet2+, UTMOSv2, Audiobox Aesthetics, Gemma 4 12B (fallback Qwen2.5-Omni-7B)."
+    },
+    {
+      "id": "QC-02",
+      "plan": "qc-v2-2026-10",
+      "title": "Maintainer labels",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "qc.py label sample/serve/export runs locally; batch 1 (160 fr/en takes, family-split 60/40, 10% blind repeats) is labelled; labels stay under build/private/qc; intra-rater kappa is reported.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "fr-0101--dylan (stutter and missing syllables) is the first heard positive. Acoustic-only labels cover the languages the maintainer can't judge linguistically."
+    },
+    {
+      "id": "QC-03",
+      "plan": "qc-v2-2026-10",
+      "title": "Detectors, thresholds and evaluation",
+      "status": "planned",
+      "blockedBy": [
+        "QC-01",
+        "QC-02"
+      ],
+      "gate": "Detectors for content and phonemes, cut-off, wrong language, accent, pitch and register, tonal collapse, identity drift, artifacts, naturalness and the LLM rubric are fit on the train labels; thresholds-v<N> is committed before eval-v<N> scores the held-out labels; levels follow the plan's precision, recall and false-alarm rules.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train."
+    },
+    {
+      "id": "QC-04",
+      "plan": "qc-v2-2026-10",
+      "title": "Lanes on QC v2",
+      "status": "planned",
+      "blockedBy": [
+        "QC-03"
+      ],
+      "gate": "lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "Replaces whisper-small and the v1 lane gates. Language records take a new measurement version."
+    },
+    {
+      "id": "QC-05",
+      "plan": "qc-v2-2026-10",
+      "title": "Retire the v1 stack",
+      "status": "planned",
+      "blockedBy": [
+        "QC-04"
+      ],
+      "gate": "The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "Frees about 45 GB."
+    },
+    {
+      "id": "QC-06",
+      "plan": "qc-v2-2026-10",
+      "title": "Product follow-ups surfaced by QC",
+      "status": "planned",
+      "blockedBy": [
+        "QC-03"
+      ],
+      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual stutter, clone pitch, tonal collapse.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-01",
+      "unparkWhen": null,
+      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. The 804-take sampling-variation experiment awaits analysis with RMVPE."
     }
   ]
 }

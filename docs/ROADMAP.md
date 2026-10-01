@@ -4,7 +4,7 @@
 > Open work lives in `config/roadmap.json`; finished items and completed plans are in
 > `config/roadmap-archive.json` and only count toward progress here.
 
-**Current execution plan: Autonomous, self-validating audio QC** (`audio-qc-audit-2026-09`).
+**Current execution plan: Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels** (`qc-v2-2026-10`).
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `audio-qc-audit-2026-09` | active | backend-mlx | 6/9 (67%) |
+| `qc-v2-2026-10` | active | backend-mlx | 0/6 (0%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
@@ -26,31 +26,44 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
+| `audio-qc-audit-2026-09` | superseded | backend-mlx | 9/9 (100%) |
 
-## Autonomous, self-validating audio QC
+## Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels
 
-`audio-qc-audit-2026-09` · **active** · backend-mlx · adopted 2026-09-25
+`qc-v2-2026-10` · **active** · backend-mlx · adopted 2026-10-01
 
-Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.
+Replace the v1 audio QC stack with a lean harness of a few strong commercial-weight models (Qwen3-ASR, the Qwen3 aligner, Whisper large-v3, a phone recognizer with G2P, RMVPE and SwiftF0, ReDimNet2+, UTMOSv2 with Audiobox Aesthetics, and an audio-LLM voter). Its detectors are fit on the maintainer's listening labels, with thresholds frozen before held-out scoring. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
 
-Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`](audits/2026-09-25-audio-qc-speech-analysis-audit.md)
+Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `AQ-07` | in-flight | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
-| `AQ-08` | in-flight | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
-| `AQ-09` | in-flight | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |
+| `QC-01` | in-flight | Models and runtimes | — |
+| `QC-02` | in-flight | Maintainer labels | — |
+| `QC-03` | planned | Detectors, thresholds and evaluation | `QC-01`, `QC-02` |
+| `QC-04` | planned | Lanes on QC v2 | `QC-03` |
+| `QC-05` | planned | Retire the v1 stack | `QC-04` |
+| `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
 
 ### Open items in detail
 
-- **`AQ-07`** (in-flight) — Detector qualification and lane gating sets.
-  gate: Calibration records meeting A8 for detector classes A-D (then E, I, J) in declared scopes; correlated-failure audits recorded; the language bench gates on B, C and D and publishes two-family records; the clone lane gates on E.
+- **`QC-01`** (in-flight) — Models and runtimes.
+  gate: config/qc/models.json pins every model by revision and SHA-256 with a commercial-use weight license; qc.py fetches and verifies them; each runner passes a 3-take smoke run on the M6 within its memory budget.
 
-- **`AQ-08`** (in-flight) — Prosody, delivery and advisory quality rebuild.
-  gate: pYIN and HNR pass the oracle ladders; prosody flags are replaced by class F detectors; class H warns at cell level only; the Audiobox and DNSMOS composite passes its ladder test; the DP-31/DP-32 guardrails cite only qualified judges.
+- **`QC-02`** (in-flight) — Maintainer labels.
+  gate: qc.py label sample/serve/export runs locally; batch 1 (160 fr/en takes, family-split 60/40, 10% blind repeats) is labelled; labels stay under build/private/qc; intra-rater kappa is reported.
 
-- **`AQ-09`** (in-flight) — Audio QC documentation and generated accuracy report.
-  gate: The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; audio-qc-engineering.md is historical; release.md is updated per decision 7.
+- **`QC-03`** (planned) — Detectors, thresholds and evaluation.
+  gate: Detectors for content and phonemes, cut-off, wrong language, accent, pitch and register, tonal collapse, identity drift, artifacts, naturalness and the LLM rubric are fit on the train labels; thresholds-v<N> is committed before eval-v<N> scores the held-out labels; levels follow the plan's precision, recall and false-alarm rules.
+
+- **`QC-04`** (planned) — Lanes on QC v2.
+  gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
+
+- **`QC-05`** (planned) — Retire the v1 stack.
+  gate: The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.
+
+- **`QC-06`** (planned) — Product follow-ups surfaced by QC.
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual stutter, clone pitch, tonal collapse.
 
 ## Specialist-audit remediation
 
@@ -556,3 +569,17 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 - **`VLR-07`** (parked) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked. Before RF-09 freeze, new live verification must refuse absent, unreadable, zero or non-finite source duration instead of silently bypassing timing checks. Preserve legacy evidence decoding separately. Describe the current min-start/max-end predicate as edge coverage only, add an interior-omission counterexample alongside WER checks, and do not claim complete speech-interval coverage without independent evidence.
   unparkWhen: The paired iPhone is available for two consecutive 14-row closure passes with the post-051f7e30 classifier.
+
+## Autonomous, self-validating audio QC
+
+`audio-qc-audit-2026-09` · **superseded** · backend-mlx · adopted 2026-09-25
+
+Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.
+
+Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`](audits/2026-09-25-audio-qc-speech-analysis-audit.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `AQ-07` | superseded | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
+| `AQ-08` | superseded | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
+| `AQ-09` | superseded | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |

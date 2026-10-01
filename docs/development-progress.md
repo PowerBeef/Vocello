@@ -17,6 +17,51 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 1 — the batched AQ-07 round is confirmed: 11 more detectors qualify at warn
+
+All 23 batched-round plans ran on fresh cache roots: the FLEURS reserve set, classes E, F, I and J, and
+seam-identity. The records, ledgers and generated docs are committed.
+
+**Qualified at warn (11):**
+- signal dropout, terminal silence, DC offset and clipping v2 (severe cells 1.0);
+- band-limit (0.97);
+- content v2 (0.80-0.86, no Japanese or Korean: it needs two families);
+- run-on v2 (0.98);
+- clone-similarity and onset-drift;
+- token-loop (1.0) and eos-overrun (0.94).
+
+**Refused (12):**
+- **Class F, by an injector defect.** pitch-instability, pitch-break and octave-jump. The catalog-3 shifter
+  (resample plus a plain overlap-add) left most voices near their own pitch. Catalog 4 (WSOLA, 15929f31)
+  now reaches the labelled pitch within 0.1 st under pYIN.
+- **Real limitations:**
+  - nativeness: 0.18 on speechocean762 severe learner accents;
+  - window-drift: 0.44;
+  - high-entropy: 0.06;
+  - the three long-form seam detectors: 75 takes cannot meet the per-language false-alarm bound, and
+    detection is weak.
+
+**Tooling and judges.**
+- `recite` (6f7def34) re-cites a shadow judge's canary after a worker-source change. Every shadow judge's
+  identity moved with da775e44.
+- CAM++ was re-cited and recalibrated from a 348 MB to a 1.09 GB ceiling. The long-form panel now scores
+  all 75 families.
+- Lane gates are declared and validated (language bench: truncation, run-on, consensus LID; clone lane:
+  clone-similarity, onset-drift). No lane computes or enforces them yet.
+
+**Finding.** Across five takes of one voice, Built-in and Design voices' median F0 ranges 6.8-8 st (90th
+percentile 12-15 st); clones range 2.6 st. A take-register consistency detector is the candidate.
+
+**Next.**
+1. The lanes compute and enforce their gates.
+2. Class F v2 on catalog 4 and unscored cohorts. pYIN tracks the subharmonic on short up-spans, so the
+   detector design must allow for it.
+3. The register-consistency detector.
+4. Nativeness, window-drift and seam v2 (about 40 long-form takes per language).
+5. The fail level, on a fresh FLEURS reserve.
+6. Re-cite the other 11 shadow judges.
+7. Prune the raw evidence and corpora (about 70 GB) with maintainer approval.
+
 ### September 30, later — the whole harness is built; the batched round waits on data
 
 Parallel worktree agents built the rest of the plan, and the lead integrated it with reviews and CI.

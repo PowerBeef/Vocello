@@ -1535,9 +1535,9 @@
         "scripts/audio_qc_calibration_takes.py",
         "scripts/audio_qc_calibration_set.py"
       ],
-      "notes": "Audit P9-P10. Decision 5: warn 60/60/60; fail FAR <= 1% pooled, <= 5% per language on N2. Maintainer 2026-09-29: finish the whole harness first (heard: clone pitch instability, cut-offs, English-accented French from Design). v1 warn confirmed 2026-09-30 on FLEURS test N2: 8 qualified, 3 refused (content, run-on, clipping); N3 census: DC/dropout/silence flags were FLEURS per-locale artifacts; clicks, language/accent (es 57%, fr 34%), content (fr, ja) and cut-offs (fr, en) are real. Since landed: classes E/F/I/J (12 detectors), injector catalog v3, the generalized driver (speaker/N3 role sets, P2/P3, fail level, raw outputs), v2 of DC/dropout/silence (pooled), clipping (flat tops), content (two-family mean, warn only, maintainer 2026-09-30), run-on, and language.nativeness@1 (speechocean762 T4 positives, English, maintainer exception), the lean corpora fetcher (~29 GB) and take plan v2 (clone, cross-lingual, long-form; app-default delivery). Next: reserve-cohort role sets and run sheet, maintainer corpora fetch, qc-n2/qc-takes runs, one batched confirmation.",
+      "notes": "Audit P9-P10; decision 5. Maintainer 2026-09-29: finish the harness first (heard: clone pitch, cut-offs, accented French). Warn records in benchmarks/audio-qc-calibration/: round 1 (2026-09-30) 8 qualified; round 2 (2026-10-01) 11 more: signal v2 (dropout, terminal silence, DC, clipping), band-limit, content v2 (no ja/ko), run-on v2, clone-similarity, onset-drift, token-loop, eos-overrun. Refused: the class F three (catalog-3 shifter missed its pitch), nativeness (0.18 on speechocean762), window-drift, high-entropy, the long-form seam three (75 takes cannot meet the per-language FAR bound). Lane gates declared (language bench: truncation, run-on, consensus LID; clone lane: clone-similarity, onset-drift). Next: lanes compute and enforce their gates; class F v2 on catalog 4 and unscored cohorts; a take-register consistency detector (Built-in/Design median F0 ranges 6.8-8 st over five takes, clones 2.6); nativeness, window-drift and seam v2 (~40 long-form takes per language); the fail level; re-cite the other 11 shadow judges.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-30",
+      "updated": "2026-10-01",
       "blockedBy": [
         "AQ-02",
         "AQ-03",
@@ -1557,9 +1557,9 @@
         "scripts/analyze_prosody.py",
         "config/prosody-holdout-policy.json"
       ],
-      "notes": "Audit AQ-F16, F18, F19 (sections 4.4-4.7). Oracle ladders landed 2026-09-29 (scripts/audio_qc_oracle_ladders.py): the prosody@3 HNR proxy fails (0.5-13 dB on noiseless sines), the window-corrected HNR is pass-provisional in-process; the pYIN and Audiobox/DNSMOS quality ladders need their model runs; Parselmouth reference pending. Class F prosody detectors (pitch break, octave jump, pitch instability) are registered at warn. Remaining: run the pYIN and quality ladders, promote the window-corrected HNR, class H delivery (CREMA-D, Thorsten, EmoDB, JVNV, emoUERJ, RESD in the corpora registry), DP-31/DP-32 guardrails on qualified judges only. Neural MOS stays advisory.",
+      "notes": "Audit AQ-F16, F18, F19 (sections 4.4-4.7). Oracle ladders landed 2026-09-29 (scripts/audio_qc_oracle_ladders.py): the prosody@3 HNR proxy fails (0.5-13 dB on noiseless sines), the window-corrected HNR is pass-provisional in-process; the pYIN ladder passed every criterion (pass-provisional, 2026-09-30). Injector catalog 4 (2026-10-01) replaces the shifter and stretch that left most voices near their own pitch (WSOLA; pYIN within 0.1 st of target). The three class F detectors were refused on catalog-3 positives and need v2 on catalog 4. Remaining: the Audiobox/DNSMOS quality ladder run, promote the window-corrected HNR, class F v2, class H delivery (CREMA-D, Thorsten, EmoDB, JVNV, emoUERJ, RESD in the corpora registry), DP-31/DP-32 guardrails on qualified judges only. Neural MOS stays advisory.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-30",
+      "updated": "2026-10-01",
       "blockedBy": [
         "AQ-03",
         "AQ-06"
@@ -1578,9 +1578,9 @@
         "docs/reference/audio-qc-engineering.md",
         ".claude/rules/release.md"
       ],
-      "notes": "Audit AQ-F50, F51 (P6). Landed 2026-09-29/30: the generated docs/reference/audio-qc/ tree (a page per judge, detector and corpus source; generated meta-evaluation report; scripts/audio_qc_docs.py registered in refresh_derived_artifacts), and the lane-gating contract (config/audio-qc-lane-gates.json, scripts/audio_qc_lane_gates.py; gates empty until the batched round qualifies what the lanes need). Remaining: fill the gates, make audio-qc-engineering.md historical, and the release.md rewrite (decision 7).",
+      "notes": "Audit AQ-F50, F51 (P6). Landed 2026-09-29/30: the generated docs/reference/audio-qc/ tree (a page per judge, detector and corpus source; generated meta-evaluation report; scripts/audio_qc_docs.py registered in refresh_derived_artifacts), and the lane-gating contract (config/audio-qc-lane-gates.json, scripts/audio_qc_lane_gates.py). 2026-10-01: five gates declared and validated from the round-2 records (enforcement inside the lanes is AQ-07). Remaining: make audio-qc-engineering.md historical, and the release.md rewrite (decision 7).",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-30",
+      "updated": "2026-10-01",
       "blockedBy": [
         "AQ-01",
         "AQ-03"

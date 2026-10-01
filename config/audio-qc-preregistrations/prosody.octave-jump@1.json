@@ -1,0 +1,69 @@
+{
+  "alpha": 0.05,
+  "bindings": {
+    "calibrationScoresSHA256": "8c11d1058b3236e37fe3191997e6b62b82681e8fb9084fe8362674c0fc1030a0",
+    "detectorDefinitionSHA256": "e4949fdeb868fda4be245bdaa233e5659fabe3651d2bad7b5a4e801518d10b13",
+    "evidenceIdentitySHA256": "ea25656aff89cc67cb7ac820d907fa6a9d1e0911f78b877deb78012ced4c714f",
+    "injectionCatalogSeed": "7",
+    "injectionClasses": "A,B,C,F",
+    "injectionSamplePerCell": "150",
+    "injectionSampleSeed": "1",
+    "injectionSchedule": "2",
+    "injectorCatalogVersion": "3",
+    "operatingPoint": "warn",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "confidence": 0.95,
+  "detector": "prosody.octave-jump@1",
+  "direction": "above",
+  "grid": [],
+  "population": "N2",
+  "rule": "split-conformal",
+  "schema": "vocello.audioqc.preregistration/1",
+  "split": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "de5491c5ecb55042cd1140a2410458c4154d7bf92ebd64098d2970f50d56778e",
+      "source": "fleurs-reserve-1"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "64b667943e2e4bbf6b1a52bc5251072cac6bec11ddb39ced32c98e45bbb08fdc",
+      "source": "fleurs-reserve-2"
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "limitations": [
+      {
+        "id": "fleurs-reserve-no-speaker-ids",
+        "statement": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured."
+      },
+      {
+        "id": "fleurs-speaker-lower-bound",
+        "statement": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages."
+      },
+      {
+        "id": "n2-one-codec",
+        "statement": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn)."
+      },
+      {
+        "id": "n2-read-speech",
+        "statement": "FLEURS is read speech, while the audit's class F negatives are expressive N1 (section 5.7): expressive speech moves F0 further and faster, so a threshold fitted on N2 read speech may flag expressive takes; natural Vocello takes (N3, whose expressive variation is the product default) stay informational at warn."
+      }
+    ],
+    "method": "declared-cohorts",
+    "speakers": {
+      "claim": "lower-bound",
+      "unit": "language:fleurs-unidentified"
+    }
+  },
+  "strata": [
+    {
+      "name": "language",
+      "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."
+    }
+  ]
+}

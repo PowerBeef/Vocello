@@ -1,0 +1,73 @@
+{
+  "alpha": 0.03,
+  "bindings": {
+    "calibrationScoresSHA256": "e995daf4ed81be467d375f6fd0a267c37a5f60b9b10fbca04def696ad2d9dd03",
+    "detectorDefinitionSHA256": "34d64f97e90537b46b8447249e991ab27bebd9334ffdefd121d631b742088221",
+    "evidenceIdentitySHA256": "191a18fdcd607367f5735672fa39a53c05f142645c45e8e0666b144192db3840",
+    "injectionCatalogSeed": "7",
+    "injectionClasses": "A,B,C,F",
+    "injectionSamplePerCell": "150",
+    "injectionSampleSeed": "1",
+    "injectionSchedule": "2",
+    "injectorCatalogVersion": "3",
+    "operatingPoint": "warn",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "confidence": 0.95,
+  "detector": "content.consensus-error@2",
+  "direction": "above",
+  "grid": [],
+  "population": "N2",
+  "rule": "split-conformal",
+  "schema": "vocello.audioqc.preregistration/1",
+  "split": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "de5491c5ecb55042cd1140a2410458c4154d7bf92ebd64098d2970f50d56778e",
+      "source": "fleurs-reserve-1"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "64b667943e2e4bbf6b1a52bc5251072cac6bec11ddb39ced32c98e45bbb08fdc",
+      "source": "fleurs-reserve-2"
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "limitations": [
+      {
+        "id": "fleurs-reserve-no-speaker-ids",
+        "statement": "FLEURS publishes no speaker ids; its TSVs give only a gender per recording. The reserve cohorts are drawn from the one train split (config/audio-qc-corpora.json fleurs-train), disjoint by FLoRes sentence from each other and from dev and test, so family and script disjointness hold; but they are grouped by sentence, not by speaker, so a train speaker who read sentences of two cohorts speaks in both: the calibration (reserve-1) and confirmation (reserve-2) cohorts likely share speakers, and neither that nor a speaker count can be measured."
+      },
+      {
+        "id": "fleurs-speaker-lower-bound",
+        "statement": "Units carry the speaker '<language>:fleurs-unidentified', a lower bound on the speaker count: FLEURS collects each locale separately, so recordings of different languages cannot share a speaker. The policy minimum of 3 speakers is therefore met only by covering at least 3 languages."
+      },
+      {
+        "id": "n2-one-codec",
+        "statement": "N2 is one production codec round trip (the pro_clone speed variant at full codebooks) of FLEURS read speech; FAR on it is in the codec's domain, not on natural Vocello takes (N3, informational at warn)."
+      },
+      {
+        "id": "substitutions-not-scored",
+        "statement": "A substitution (a unit heard as another) does not count, so a mispronounced or wrong word leaves the score unchanged unless it changes the number of units heard: substitution defects stay outside this detector, which the audit keeps warn-only anyway (section 5.7)."
+      },
+      {
+        "id": "mean-consensus-warn-only",
+        "statement": "A two-family mean (consensus-mean) qualifies at warn only, by the maintainer's decision of 2026-09-30 (the policy's decisions): Whisper large-v3 silently drops repeated words, so a strict consensus cannot see what one family never transcribes, but a fail level keeps strict two-family consensus (consensus-min or consensus-max). The policy's fail operating points refuse the combination (refusedCombinations), so plan refuses a fail plan of this version and validate refuses any fail plan or record of it; a fail bound needs a new version with a strict consensus."
+      }
+    ],
+    "method": "declared-cohorts",
+    "speakers": {
+      "claim": "lower-bound",
+      "unit": "language:fleurs-unidentified"
+    }
+  },
+  "strata": [
+    {
+      "name": "language",
+      "reason": "Word against character units and each recognizer's hearing per language (spent AQ-07 dev N2, 95th percentile of the two families' mean: 0.021 in it to 0.059 in de)."
+    }
+  ]
+}

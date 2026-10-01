@@ -416,18 +416,24 @@ class CalibrationSetTests(unittest.TestCase):
 
 
 class ScheduleTests(unittest.TestCase):
-    """Schedule version 2 draws every extra catalog variant of a severity an unplanned (successor) detector
-    targets, or leaves it out with the reason it is no target of that detector."""
+    """Schedule version 2 draws every extra catalog variant of a severity a successor detector (any not planned on
+    schedule 1) targets, or leaves it out with the reason it is no target of that detector."""
 
     def test_every_successor_target_variant_is_drawn_or_excluded_with_a_reason(self) -> None:
         repo = Path(__file__).resolve().parents[2]
         registry = json.loads((repo / "config/audio-qc-detectors.json").read_text(encoding="utf-8"))
-        planned = {path.name.split(".json")[0].split(".fail")[0]
-                   for path in (repo / "config/audio-qc-preregistrations").glob("*.json")
-                   if not path.name.startswith("confirmation-")}
+        # A detector planned on schedule 1 (an injection plan without the binding) is no successor; one planned on
+        # schedule 2, or not yet planned, is.
+        schedule_one = set()
+        for path in (repo / "config/audio-qc-preregistrations").glob("*.json"):
+            if path.name.startswith("confirmation-"):
+                continue
+            bindings = json.loads(path.read_text(encoding="utf-8"))["bindings"]
+            if "injectorCatalogVersion" in bindings and bindings.get("injectionSchedule", 1) == 1:
+                schedule_one.add(path.name.split(".json")[0].split(".fail")[0])
         found = set()
         for entry in registry["detectors"]:
-            if entry["id"] in planned:
+            if entry["id"] in schedule_one:
                 continue
             for target in entry["targets"]:
                 injector = injectors.CATALOG.get(target["injectorID"])

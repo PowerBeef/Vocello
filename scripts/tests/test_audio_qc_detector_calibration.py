@@ -2175,12 +2175,20 @@ class ReserveCohortTests(unittest.TestCase):
                              ["reserve-1", "reserve-2", "reserve-3", "reserve-3"], name)
         # FLEURS dev and test keep their role set, whose plans are all confirmed; every other FLEURS detector plans
         # on the reserve cohorts.
-        planned = {path.stem.split(".fail")[0] for path in (REPO / "config/audio-qc-preregistrations").glob("*.json")
-                   if not path.name.startswith("confirmation-")}
+        plans: dict[str, list[dict]] = {}
+        for path in (REPO / "config/audio-qc-preregistrations").glob("*.json"):
+            if not path.name.startswith("confirmation-"):
+                plans.setdefault(path.stem.split(".fail")[0], []).append(json.loads(path.read_text(encoding="utf-8")))
         for entry in registry["detectors"]:
-            fleurs = entry["populations"] in ("fleurs-n2", "fleurs-reserve-n2")
-            if fleurs:
-                self.assertEqual(entry["populations"] == "fleurs-n2", entry["id"] in planned, entry["id"])
+            sources = {"fleurs-n2": ("fleurs-dev", "fleurs-test"),
+                       "fleurs-reserve-n2": ("fleurs-reserve-1", "fleurs-reserve-2")}.get(entry["populations"])
+            if sources is None:
+                continue
+            if entry["populations"] == "fleurs-n2":
+                self.assertIn(entry["id"], plans)
+            for plan in plans.get(entry["id"], []):
+                self.assertEqual((plan["split"]["calibration"]["source"], plan["split"]["confirmation"]["source"]),
+                                 sources, entry["id"])
         self.assertEqual(registry["roleSets"]["fleurs-n2"]["confirmNegatives"],
                          {"population": "N2", "cohort": "confirmation", "corpus": "fleurs-test"})
         self.assertEqual([calibration.is_confirmation_split(split) for split in

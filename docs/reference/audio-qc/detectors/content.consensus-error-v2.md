@@ -52,9 +52,12 @@ Excludes korean: The ja and ko content pair is Whisper and SenseVoice, and Sense
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; no plan.
+**Status.** Not qualified; planned, not confirmed.
 
-**Plan.** None committed under [config/audio-qc-preregistrations/](../../../../config/audio-qc-preregistrations).
+**Plan.** [config/audio-qc-preregistrations/content.consensus-error@2.json](../../../../config/audio-qc-preregistrations/content.consensus-error@2.json): digest `7040bc8738b6ab5f`, rule split-conformal, alpha 0.03, confidence 0.95, operating point warn, population N2; injector catalog 3, classes A,B,C,F, 150 per cell.
+Calibration cohort audio-qc-n2-cohort (fleurs-reserve-1, manifest `de5491c5ecb55042`); confirmation cohort audio-qc-n2-cohort (fleurs-reserve-2, manifest `64b667943e2e4bbf`).
+
+**Confirmation.** Not run: no ledger entry.
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
 <!-- END GENERATED audio-qc-docs:qualification -->

@@ -12,11 +12,11 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `qc-v2-2026-10` | active | backend-mlx | 0/6 (0%) |
+| `qc-v2-2026-10` | active | backend-mlx | 0/7 (0%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
-| `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
-| `delivery-prompting-2026-08` | active | backend-mlx | 30/34 (88%) |
+| `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 2/6 (33%) |
+| `delivery-prompting-2026-08` | active | backend-mlx | 33/34 (97%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
@@ -32,7 +32,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 `qc-v2-2026-10` · **active** · backend-mlx · adopted 2026-10-01
 
-Replace the v1 audio QC stack with a lean harness of a few strong commercial-weight models (Qwen3-ASR, the Qwen3 aligner, Whisper large-v3, a phone recognizer with G2P, RMVPE and SwiftF0, ReDimNet2+, UTMOSv2 with Audiobox Aesthetics, and an audio-LLM voter). Its detectors are fit on the maintainer's listening labels, with thresholds frozen before held-out scoring. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
+Replace the v1 audio QC stack with a lean harness of a few strong commercial-weight models (Qwen3-ASR, the Qwen3 aligner, Whisper large-v3, a phone recognizer with G2P, FCPE and SwiftF0, ReDimNet2+, UTMOSv2 with Audiobox Aesthetics, and an audio-LLM voter). Its detectors are fit on the maintainer's listening labels, with thresholds frozen before held-out scoring. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
 
 Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
@@ -44,6 +44,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 | `QC-04` | planned | Lanes on QC v2 | `QC-03` |
 | `QC-05` | planned | Retire the v1 stack | `QC-04` |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
+| `QC-07` | planned | Move the delivery bench and voice-reliability analysis onto QC v2 | `QC-04` |
 
 ### Open items in detail
 
@@ -63,7 +64,10 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
   gate: The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.
 
 - **`QC-06`** (planned) — Product follow-ups surfaced by QC.
-  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual stutter, clone pitch, tonal collapse.
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual spelling pronunciation (the heard stutter), clone pitch, tonal collapse.
+
+- **`QC-07`** (planned) — Move the delivery bench and voice-reliability analysis onto QC v2.
+  gate: scripts/bench_delivery_prosody.py, scripts/analyze_prosody.py and scripts/prosody_profile.py measure delivery cells with the QC v2 pitch, speaker and naturalness runners, and scripts/voice_identity_language_reliability.py scores clone identity, pitch and language with QC v2; a delivery-copy or prompt change is promoted only on that evidence, and production prompts stay unchanged otherwise.
 
 ## Specialist-audit remediation
 
@@ -131,7 +135,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `AV-07` | superseded | P2 — independently validate prosody thresholds | — |
-| `AV-08` | parked | P2 — qualify multilingual output beyond a single cohort | — |
+| `AV-08` | parked | P2 — qualify multilingual output beyond a single cohort | `QC-04` |
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
@@ -140,8 +144,8 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 ### Open items in detail
 
 - **`AV-08`** (parked) — P2 — qualify multilingual output beyond a single cohort.
-  gate: Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell. Second recognizer family: qualify the whisper-small MLX producer (scripts/independent_asr.py) with two clean 8 GB host runs (peak RSS and footprint under its 2.5 GiB ceiling, post-exit memory recovery, no swap growth) and publish the first two-family iOS language records; until then macOS language records are explicitly single-family (`languageVerification.families: ["whisper"]`) and never consensus.
-  unparkWhen: The paired iPhone is available for the first two-family iOS language record (the whisper producer is qualified on macOS).
+  gate: Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell. Recognizer families: the Mac takes QC v2's two ASR families (QC-04, a new language measurement version); publish the first two-family iOS language records (Apple Speech in the app plus a QC v2 family); a single-family record is never consensus.
+  unparkWhen: QC-04 has moved lang-bench onto QC v2 and the paired iPhone is available for the first two-family iOS language record.
 
 - **`AV-09`** (parked) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes. The controllable-clock clause moved to AV-15 on 2026-09-13.
@@ -171,7 +175,7 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 | `BT-01` | in-flight | Trustworthy memory evidence | — |
 | `BT-03` | in-flight | UI benchmark and ui-perf lanes ready for the M6 | — |
 | `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
-| `BT-05` | in-flight | Audio, language and delivery QC accuracy | — |
+| `BT-05` | superseded | Audio, language and delivery QC accuracy | — |
 | `BT-06` | in-flight | Timing attribution, profiles and device-lane observers | — |
 
 ### Open items in detail
@@ -184,9 +188,6 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 
 - **`BT-04`** (in-flight) — Lineage identity, history and CI evidence tests.
   gate: Offline key replay links the canonical macOS UI records that measured the same thing (7 of 16 today; the rest changed screen recording or lost their source commit) with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.
-
-- **`BT-05`** (in-flight) — Audio, language and delivery QC accuracy.
-  gate: Offline replay flags the known run-on takes and reproduces the paired prosody effects from the deliveryD* deltas exactly, a supervised run under fr_CA returns qualified, and the next lang-bench publishes a per-channel verdict from two families.
 
 - **`BT-06`** (in-flight) — Timing attribution, profiles and device-lane observers.
   gate: The token read has its own timer and signpost, a kept-trace macOS profile publishes per-take interval statistics that pass the 36x(tokens+1) completeness check, the iOS memory profile passes the VM auto-snapshot guard, and the iOS memory, clone-conditioning and gate waits poll only the sentinel and check that the process is alive.
@@ -203,25 +204,15 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | --- | --- | --- | --- |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-28` | superseded | Calibrate the layered local delivery evaluator | — |
-| `DP-29` | parked | Qualify the native-language delivery corpus and cross-language sentinels | — |
-| `DP-31` | planned | Confirm Speed and Quality candidates with a frozen automated holdout | `AQ-07`, `AQ-08` |
-| `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | `DP-31`, `AQ-07`, `AQ-08` |
+| `DP-29` | superseded | Qualify the native-language delivery corpus and cross-language sentinels | — |
+| `DP-31` | superseded | Confirm Speed and Quality candidates with a frozen automated holdout | `AQ-07`, `AQ-08` |
+| `DP-32` | superseded | Promote only qualifying delivery changes and revalidate all modes | `DP-31`, `AQ-07`, `AQ-08` |
 
 ### Open items in detail
 
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
   gate: Re-verify the R8 watch list against primary sources; if a lever runs on-device at the 8 GB floor, open a measured DP item with a pre-registered holdout comparison, else re-park with the reason.
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
-
-- **`DP-29`** (parked) — Qualify the native-language delivery corpus and cross-language sentinels.
-  gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
-  unparkWhen: Fluent Mandarin, Japanese and Korean reviewers are available to review every gated script with immutable provenance (the maintainer arranges them); AQ-02's corpus lint and CC0 script pool feed that review.
-
-- **`DP-31`** (planned) — Confirm Speed and Quality candidates with a frozen automated holdout.
-  gate: Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, memory, cancellation, seed and receipt guardrails; the quality guardrail is the qualified advisory composite of AQ-08 (UTMOS retired by AQ-01). Listening is optional; automatic metric qualification is not listener-proven semantic improvement.
-
-- **`DP-32`** (planned) — Promote only qualifying delivery changes and revalidate all modes.
-  gate: A global or per-preset prompt/compiler change requires DP-31 automated measured-claim qualification: positive paired metric improvement lower bound, corrected above-chance comparison, distributed speaker/script improvement, no corrected preset regression, zero new hard PCM failures, WER/CER delta <= 0.01, median speaker-similarity delta >= -0.02, no significant regression on the qualified quality composite of AQ-08 (UTMOS retired by AQ-01) and valid runtime identities. Human listening is optional. Revalidate CustomVoice, VoiceDesign identity/delivery and clone reference banks separately. Preserve prompts if no candidate qualifies. No hidden best-of-N, cloud/app-bundled evaluator or automatic publication.
 
 ## 2026-08 engineering review remediation
 
@@ -558,7 +549,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 Causally localize the reported saved-reference pitch/fidelity variance, typed enrollment-transcription failure, and French Voice Design regression with source-bound private diagnostics; separate target language from reference metadata; and apply only tokenizer, reference-quality, or prompt remediation proven by fixed-seed evidence without weakening QC or exposing personal audio and transcript data.
 
-Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-harness.md)
+Narrative authority: [`docs/reference/ios-device-testing.md#model-readiness`](reference/ios-device-testing.md#model-readiness)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
@@ -576,7 +567,7 @@ Narrative authority: [`docs/reference/delivery-harness.md`](reference/delivery-h
 
 Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.
 
-Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`](audits/2026-09-25-audio-qc-speech-analysis-audit.md)
+Narrative authority: [`docs/reference/qc.md#why-v2`](reference/qc.md#why-v2)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |

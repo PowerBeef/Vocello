@@ -12,12 +12,11 @@ each one of the product's generation paths:
   next voice. It is the version 1 layout: its batch ids, take ids and seed
   identity are unchanged, so a batch whose voice is unchanged keeps its seed.
 - `clone`: Voice Clone takes conditioned on human reference clips of the
-  pinned speaker corpora (`config/audio-qc-corpora.json`, extracted by
-  `scripts/audio_qc_corpora.py extract`), same-language and cross-language,
-  chosen by a seeded rule. Each clone take records its `reference` (the copied
-  clip's WAV path relative to the manifest, digest, corpus, speaker), which
-  `audio_qc_orchestrator.py manifest --from-calibration-takes` passes to the
-  speaker judges.
+  pinned speaker corpora (`config/audio-qc-corpora.json`, read from their
+  extractions in the corpora cache by `scripts/qc/corpora.py`), same-language
+  and cross-language, chosen by a seeded rule. Each clone take records its
+  `reference` (the copied clip's WAV path relative to the manifest, digest,
+  corpus, speaker), the clip QC v2's identity checks compare it with.
 - `cross-lingual`: every Built-in speaker of the split and Voice Design briefs
   written in English and in the target language speaking each language; each
   take records its voice's language (`voiceLanguage`) beside its target
@@ -73,9 +72,7 @@ log cap, so a long run keeps them. A long-form take carries `longForm`
 maximum segment-boundary jump and each seam's output frame, from its
 `LongFormAssemblyEvidence`, whose output digest must be the take's WAV digest;
 its segments' introspection summaries are bound by each segment WAV's digest
-(`longFormSegments`). `audio_qc_calibration_set.py score` copies both into
-measurements.json, the Stage 0 evidence the `introspection` and `longform`
-detector sources read.
+(`longFormSegments`), so the QC detectors can read both beside the audio.
 """
 
 from __future__ import annotations
@@ -97,6 +94,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib import jsonio  # noqa: E402
+from qc import corpora  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
     LANGUAGE_LOCALE_CODES,
     MAX_TEXT_CHARACTERS,
@@ -728,12 +726,11 @@ def _gender_order(candidates: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return _interleave([by_gender["female"], by_gender["male"]]) + unlabelled
 
 
-def _corpus_manifest(corpora: Any, registry: Mapping[str, Any], source: str, root: Path) -> tuple[Path, dict]:
+def _corpus_manifest(registry: Mapping[str, Any], source: str, root: Path) -> tuple[Path, dict]:
     directory = corpora.source_directory(registry, source, root) / corpora.EXTRACTED_DIRECTORY
     path = directory / corpora.MANIFEST_NAME
     if not path.is_file():
-        raise TakeError(f"clone references: {source} is not extracted "
-                        f"(python3 scripts/audio_qc_corpora.py extract --source {source})")
+        raise TakeError(f"clone references: {source} is not extracted in the corpora cache")
     manifest = load_json(path)
     if issues := corpora.manifest_issues(manifest, corpora.extraction_identity(registry, source)):
         raise TakeError(f"clone references: the {source} extraction is unusable: {issues[0]}")
@@ -743,8 +740,6 @@ def _corpus_manifest(corpora: Any, registry: Mapping[str, Any], source: str, roo
 def reference_candidates(policy: Mapping[str, Any], split: str, *, corpora_root: Path | None = None,
                          registry: Mapping[str, Any] | None = None) -> tuple[dict[str, list[dict]], dict[str, dict]]:
     """Each reference language's candidate references of a split, in allocation order, and the corpora read."""
-    import audio_qc_corpora as corpora  # deferred: it imports this module, and numpy
-
     registry = registry if registry is not None else corpora.load_registry()
     root = corpora_root if corpora_root is not None else corpora.cache_root()
     config = policy["cells"][CLONE]
@@ -756,7 +751,7 @@ def reference_candidates(policy: Mapping[str, Any], split: str, *, corpora_root:
         per_source = []
         for source in config["referenceSources"][language]:
             if source not in manifests:
-                manifests[source] = _corpus_manifest(corpora, registry, source, root)
+                manifests[source] = _corpus_manifest(registry, source, root)
                 directory, manifest = manifests[source]
                 read[source] = {"manifestDigest": manifest["manifestDigest"],
                                 "extractionSHA256": manifest["extractionSHA256"]}
@@ -1187,8 +1182,8 @@ def _copy_reference(reference: Mapping[str, Any], corpora_root: Path, references
         return destination
     source = corpora_root / PurePosixPath(reference["corpusPath"])
     if not source.is_file():
-        raise TakeError(f"clone reference {reference['referenceKey']}: its corpus clip is missing "
-                        "(python3 scripts/audio_qc_corpora.py extract)")
+        raise TakeError(f"clone reference {reference['referenceKey']}: its corpus clip is missing from the "
+                        "corpora cache")
     references_dir.mkdir(parents=True, exist_ok=True)
     staging = destination.with_suffix(".partial")
     shutil.copyfile(source, staging)
@@ -1208,8 +1203,6 @@ def write_batch_files(plan: dict[str, Any], out_dir: Path, *, references_dir: Pa
     out_dir.mkdir(parents=True, exist_ok=True)
     references_dir = references_dir if references_dir is not None else out_dir.parent / "references"
     if corpora_root is None and any(batch["mode"] == "clone" for batch in plan["batches"]):
-        import audio_qc_corpora as corpora  # deferred: it imports this module, and numpy
-
         corpora_root = corpora.cache_root()
     rows = []
     for batch in plan["batches"]:
@@ -1740,9 +1733,9 @@ def _reduced_generation(value: Mapping[str, Any]) -> dict[str, Any] | None:
     """An engine telemetry row reduced to what the manifest binds: its generation id, the WAV digest and Fast
     QC flag names of its notes, and its introspection summary. No message, text or path survives.
 
-    The class I positives (`audio_qc_introspection_positives.py`) also read the codec trace a take recorded
-    (`vocello batch --capture-codec-trace`: its digest, frame count and completeness), the speech tokenizer
-    that generated it, and a controlled generation's EOS hold (its `timingsMS`)."""
+    It also keeps the codec trace a take recorded (`vocello batch --capture-codec-trace`: its digest, frame
+    count and completeness), the speech tokenizer that generated it, and a controlled generation's EOS hold
+    (its `timingsMS`)."""
     generation_id = value.get("generationID")
     if not isinstance(generation_id, str) or not GENERATION_ID.fullmatch(generation_id):
         return None
@@ -2012,7 +2005,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                       help=f"cells ({', '.join(CELLS)}), space or comma separated (default: the policy's "
                            "defaultCells); long-form is planned alone")
     plan.add_argument("--corpora-root", type=Path,
-                      help="the extracted speaker corpora (default: audio_qc_corpora.py's cache root); clone only")
+                      help="the extracted speaker corpora (default: the corpora cache of scripts/qc/corpora.py); "
+                           "clone only")
     plan.add_argument("--run-id", required=True)
     plan.add_argument("--output", type=Path, required=True)
     files = commands.add_parser("batch-files", help="write one line file per batch")

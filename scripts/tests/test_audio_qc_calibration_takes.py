@@ -5,7 +5,7 @@ No model runs: the batch outputs are the `vocello batch --json` shapes of
 `Sources/VocelloCLI/BatchCommand.swift` (BatchJSON, the schemaVersion 2
 FailedBatchJSON and their `--long-form` forms), written by the tests beside
 placeholder WAV bytes; the clone cell reads fixture speaker-corpus manifests
-built in the `audio_qc_corpora.py extract` layout.
+in the extraction layout `scripts/qc/corpora.py` reads.
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ from audio_qc_calibration_takes import (  # noqa: E402
     validate_plan,
     write_batch_files,
 )
+from qc import corpora  # noqa: E402
 
 LANGUAGES = {
     "english": ("en", "The quiet garden opens early every morning number {i}."),
@@ -144,7 +145,6 @@ class PolicyTests(Fixture):
              "different design briefs"),
             (lambda p: p["cells"]["clone"]["referenceSources"]["english"].append("mls"), "does not cover english"),
             (lambda p: p["cells"]["clone"]["referenceSources"]["english"].append("resd"), "not a registered speaker"),
-            (lambda p: p["cells"]["clone"]["referenceSources"]["english"].append("crema-d"), "labels no speaker"),
             (lambda p: p["cells"]["clone"].update(primaryReferencesPerLanguage=11), "one primary take"),
             (lambda p: p["cells"]["clone"]["referenceWindowSeconds"].update(minimum=40.0), "0 < minimum"),
             (lambda p: p["cells"]["long-form"]["estimateWindow"].update(minimum=300), "runtimeTokenLimit < minimum"),
@@ -155,6 +155,11 @@ class PolicyTests(Fixture):
         for change, fragment in cases:
             found = issues(change)
             self.assertTrue(any(fragment in issue for issue in found), (fragment, found))
+        # A registered speaker corpus without transcripts cannot give a reference.
+        registry = corpora.load_registry()
+        registry["sources"]["libritts-r"]["labels"]["text"] = None
+        found = policy_issues(copy.deepcopy(self.policy), speakers=contract_speakers(), registry=registry)
+        self.assertTrue(any("labels no speaker or no transcript" in issue for issue in found), found)
 
     def test_every_built_in_speaker_speaks_every_language_across_the_two_splits(self) -> None:
         natives = takes_module.contract_speaker_languages()
@@ -301,7 +306,7 @@ class PlanTests(Fixture):
 
 
 def speakers_of(plan: dict) -> set[str]:
-    """The qualification driver's speaker units: a take's voice key (audio_qc_detector_calibration)."""
+    """The plan's speaker units: each take's voice key."""
     return {takes_module.voice_key(take["voice"]) for take in plan["takes"]}
 
 
@@ -765,10 +770,17 @@ CLONE_SOURCES = {"libritts-r": ["english"], "mls": ["french", "german", "spanish
 GENDERED = frozenset({"emozionalmente", "aishell3-subset"})
 
 
-def build_corpora(root: Path, speakers: int = 60) -> None:
-    """Extracted speaker-corpus manifests in the `audio_qc_corpora.py extract` layout, with placeholder WAVs."""
-    import audio_qc_corpora as corpora
+def corpus_manifest(registry: dict, source: str, records: list[dict]) -> dict:
+    """An extraction manifest of `source` as the corpora cache holds it: the fields the clone cell checks."""
+    manifest = {"schemaVersion": corpora.SCHEMA_VERSION, "kind": corpora.MANIFEST_KIND,
+                "extractor": corpora.EXTRACTOR, "source": source,
+                "extractionSHA256": corpora.extraction_identity(registry, source), "clips": records}
+    manifest["manifestDigest"] = corpora.self_digest(manifest, "manifestDigest")
+    return manifest
 
+
+def build_corpora(root: Path, speakers: int = 60) -> None:
+    """Extracted speaker-corpus manifests in the corpora cache layout, with placeholder WAVs."""
     registry = corpora.load_registry()
     for source, languages in CLONE_SOURCES.items():
         directory = corpora.source_directory(registry, source, root) / corpora.EXTRACTED_DIRECTORY
@@ -802,7 +814,7 @@ def build_corpora(root: Path, speakers: int = 60) -> None:
                         "wavSHA256": hashlib.sha256(data).hexdigest(), "wavBytes": len(data), "resampled": False,
                         "clippedSamples": 0, "source": {"origin": clip_id}, "duplicates": [],
                     })
-        manifest = corpora.build_manifest(registry, source, records, [], metadata={}, members={})
+        manifest = corpus_manifest(registry, source, records)
         (directory / corpora.MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
 
 
@@ -885,8 +897,6 @@ class CloneTests(unittest.TestCase):
         with self.assertRaisesRegex(TakeError, "not extracted"):
             build_plan(pool_path=takes_module.DEFAULT_POOL, policy_path=DEFAULT_POLICY, split="calibration",
                        run_id="run-clone", cells=["clone"], corpora_root=self.base / "empty")
-        import audio_qc_corpora as corpora
-
         stale = self.base / "stale"
         shutil.copytree(self.corpora, stale)
         path = corpora.source_directory(corpora.load_registry(), "libritts-r", stale) / "extracted" / "manifest.json"
@@ -923,13 +933,8 @@ class CloneTests(unittest.TestCase):
             self.assertNotIn("Reference sentence", json.dumps(manifest), "no reference transcript")
             report = validate_manifest(manifest, plan, manifest_dir=run)
             self.assertEqual(report["status"], "PASS", report)
-            # The orchestrator hands the declared reference to the speaker judges.
-            import audio_qc_orchestrator as orchestrator
-
-            lane = orchestrator.manifest_from_calibration_takes(manifest, source_sha256="c" * 64, base_dir=run)
-            first = lane["takes"][0]
-            self.assertEqual(first["referenceAudioSHA256"], take["reference"]["wavSHA256"])
-            self.assertEqual(Path(first["referenceAudioPath"]), (run / take["reference"]["wavPath"]).resolve())
+            self.assertEqual(hashlib.sha256((run / take["reference"]["wavPath"]).read_bytes()).hexdigest(),
+                             take["reference"]["wavSHA256"])
             (run / take["reference"]["wavPath"]).write_bytes(b"RIFF other speaker")
             report = validate_manifest(manifest, plan, manifest_dir=run)
             self.assertTrue(any("reference copy" in error for error in report["errors"]), report)

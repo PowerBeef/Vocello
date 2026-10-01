@@ -44,7 +44,7 @@
   "speakerPartition": {
     "calibration": ["aiden", "serena", "vivian", "uncle_fu", "ono_anna", "sohee"],
     "confirmation": ["ryan", "dylan", "eric"],
-    "rule": "The qualification driver (scripts/audio_qc_detector_calibration.py, role sets n3-*) refuses two cohorts that share a speaker in any language, so a Built-in speaker belongs to one split. Version 1 gave a language's two splits different speakers but let vivian and serena serve calibration in some languages and confirmation in others; its confirmation split was never generated. Calibration keeps the six speakers of the 2026-09-27 calibration cohort, so that cohort can stand beside a confirmation cohort; confirmation has the other three, all male, and its female voices are the Voice Design briefs (its brief is female) and clone references."
+    "rule": "A held-out split shares no speaker with the other in any language, so a Built-in speaker belongs to one split. Version 1 gave a language's two splits different speakers but let vivian and serena serve calibration in some languages and confirmation in others; its confirmation split was never generated. Calibration keeps the six speakers of the 2026-09-27 calibration cohort, so that cohort can stand beside a confirmation cohort; confirmation has the other three, all male, and its female voices are the Voice Design briefs (its brief is female) and clone references."
   },
   "designBriefs": {
     "calm-narrator": {
@@ -130,9 +130,6 @@
         "chinese": ["aishell3-subset"],
         "japanese": [],
         "korean": ["zeroth-korean"]
-      },
-      "excludedSources": {
-        "crema-d": "Its clips carry a sentence code but no transcript, and last 2-3 s of acted emotion: a transcript-backed reference needs its text."
       },
       "referenceWindowSeconds": {"minimum": 5.0, "preferredMinimum": 10.0, "maximum": 30.0},
       "referenceEmotions": ["neutral"],

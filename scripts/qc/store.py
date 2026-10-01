@@ -84,6 +84,12 @@ class Layout:
         return self.cache / "results"
 
     @property
+    def work(self) -> Path:
+        """Derived audio (muted variants for the pause mute test), content-addressed by name."""
+
+        return self.cache / "work"
+
+    @property
     def run_lock(self) -> Path:
         return self.cache / "run.lock"
 

@@ -400,6 +400,12 @@ class RunnerHostTests(unittest.TestCase):
         identity = runtime.runner_identity(self.layout, model_entry())
         with_dependency = model_entry(dependencies=[{"name": "ssl", "source": model_entry()["source"]}])
         self.assertNotEqual(runtime.runner_identity(self.layout, with_dependency), identity)
+        # A shared helper (the LLM prompts live in runners/_llama.py) or qc/pitch.py changes it too.
+        (self.root / "scripts/qc/runners/_kit.py").write_text("PROMPT = 'v1'\n")
+        with_helper = runtime.runner_identity(self.layout, model_entry())
+        self.assertNotEqual(with_helper, identity)
+        (self.root / "scripts/qc/pitch.py").write_text("# pitch helpers\n")
+        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_helper)
 
     def test_variant_models_key_results_by_text_language_and_reference(self):
         aligner = model_entry(id="align.fixture", kind="align")
@@ -649,7 +655,7 @@ class RepositoryTests(unittest.TestCase):
     def test_protocol_matches_the_contract(self):
         protocol = json.loads((ROOT / "config/qc/protocol.json").read_text())
         self.assertEqual([item["id"] for item in protocol["classes"]], [
-            "stutter", "mispronunciation", "wrong-language", "cutoff", "pitch", "tonal-collapse",
+            "stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "pitch", "tonal-collapse",
             "voice-change", "artifact", "unnatural", "other"])
         self.assertEqual(protocol["severities"], ["none", "mild", "moderate", "severe"])
         self.assertEqual(protocol["verdicts"], ["acceptable", "objectionable", "uncertain"])
@@ -671,11 +677,12 @@ class RepositoryTests(unittest.TestCase):
             result = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", path], check=False)
             self.assertEqual(result.returncode, 0, path)
 
-    def test_cli_stubs_and_listing(self):
-        result = subprocess.run([sys.executable, str(SCRIPTS / "qc.py"), "gate", "--lane", "lang-bench"],
-                                capture_output=True, text=True, check=False)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("not implemented yet", result.stderr)
+    def test_cli_listing_and_gate_without_a_run(self):
+        result = subprocess.run([sys.executable, str(SCRIPTS / "qc.py"), "--help"], capture_output=True, text=True,
+                                check=False)
+        self.assertEqual(result.returncode, 0)
+        for command in ("models", "runtimes", "label", "run", "gate", "queue", "fit", "eval"):
+            self.assertIn(command, result.stdout)
         with tempfile.TemporaryDirectory() as directory:
             layout = Layout(Path(directory))
             layout.config.mkdir(parents=True)
@@ -689,6 +696,8 @@ class RepositoryTests(unittest.TestCase):
             self.assertEqual(json.loads(printed)[0]["fetched"], False)
             with mock.patch("sys.stdout"):
                 self.assertEqual(cli.main(["models", "verify"], layout=layout), 1)
+            with mock.patch("sys.stderr"):
+                self.assertEqual(cli.main(["gate", "--lane", "lang-bench"], layout=layout), 2)
 
 
 if __name__ == "__main__":

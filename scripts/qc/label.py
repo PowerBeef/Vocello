@@ -662,11 +662,12 @@ button.on{border-color:var(--accent);color:var(--accent)}button.primary{backgrou
 <div class="card" id="classes"></div>
 <div class="card verdicts" id="verdicts"></div>
 <div class="row"><button id="prev">&larr; Previous</button><button id="next">Next &rarr;</button><button id="unlabelled">Next unlabelled</button><button class="primary" id="save">Save &amp; next (Enter)</button><span id="message"></span></div>
-<p class="muted" style="font-size:13px"><kbd>Space</kbd> play/pause &middot; <kbd>a</kbd> acceptable, save &amp; next &middot; <kbd>o</kbd> objectionable &middot; <kbd>u</kbd> uncertain &middot; <kbd>1</kbd>&ndash;<kbd>0</kbd> toggle a class &middot; <kbd>Enter</kbd> save &amp; next &middot; <kbd>l</kbd> loop &middot; <kbd>s</kbd> 0.5&times; &middot; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> previous/next</p>
+<p class="muted" style="font-size:13px"><kbd>Space</kbd> play/pause &middot; <kbd>a</kbd> acceptable, save &amp; next &middot; <kbd>o</kbd> objectionable &middot; <kbd>u</kbd> uncertain &middot; <kbd>1</kbd>&ndash;<kbd>0</kbd>, <kbd>-</kbd> toggle a class &middot; <kbd>Enter</kbd> save &amp; next &middot; <kbd>l</kbd> loop &middot; <kbd>s</kbd> 0.5&times; &middot; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> previous/next</p>
 </main>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
 let state = null, index = 0, draft = null, shownAt = Date.now(), durations = [];
 const audio = $("take"), ref = $("ref");
 
@@ -699,7 +700,7 @@ function render(){
   if (item.hasReference) ref.src = `/reference/${item.token}`;
   const box = $("classes"); box.innerHTML = "";
   visibleClasses(item).forEach((c, i) => {
-    const key = i < 9 ? String(i + 1) : (i === 9 ? "0" : "");
+    const key = KEYS[i] || "";
     const entry = draft.classes[c.id];
     const div = document.createElement("div");
     div.className = "cls" + (entry ? " checked" : ""); div.dataset.id = c.id;
@@ -776,9 +777,8 @@ document.addEventListener("keydown", (e) => {
   else if (k === "s") $("slow").click();
   else if (k === "ArrowLeft") go(index - 1);
   else if (k === "ArrowRight") go(index + 1);
-  else if (/^[0-9]$/.test(k)) {
-    const n = k === "0" ? 9 : Number(k) - 1;
-    const c = visibleClasses(item)[n];
+  else if (KEYS.includes(k)) {
+    const c = visibleClasses(item)[KEYS.indexOf(k)];
     if (c) toggleClass(c.id, !draft.classes[c.id]);
   }
 });

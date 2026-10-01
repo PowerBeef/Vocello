@@ -48,14 +48,16 @@ CLASSES: tuple[tuple[str, str], ...] = (
     ("mispronunciation", "a mispronounced word or a foreign accent: a word said wrongly for the "
                          "language, or the language spoken with another language's accent"),
     ("wrong-language", "speech, or part of it, in a language other than the expected one"),
-    ("cutoff", "speech that stops abruptly or is cut off mid-word or mid-sentence"),
+    ("cutoff", "a cut-off or abrupt ending: speech cut off mid-word or mid-sentence, or a last word "
+               "that stops dead instead of fading out naturally"),
+    ("pause", "an unnatural pause or non-speech noise mid-sentence: a gap far longer than a natural "
+              "phrase pause, or breath, hiss or other non-speech sound between words"),
     ("pitch", "pitch instability: pitch jumping, wobbling or swinging unnaturally, or an abrupt "
               "register jump"),
     ("tonal-collapse", "the voice collapsing into a sustained tone, hum or buzz instead of speech"),
     ("voice-change", "the speaker's identity, gender, age or timbre changing within the clip"),
     ("artifact", "clicks, pops, glitches, metallic or robotic distortion, or noise bursts"),
-    ("unnatural", "unnatural delivery: robotic or monotone, wrong rhythm or stress, odd pauses or "
-                  "breathing"),
+    ("unnatural", "unnatural delivery: robotic or monotone, or wrong rhythm or stress"),
     ("other", "any other defect a careful listener would object to"),
 )
 

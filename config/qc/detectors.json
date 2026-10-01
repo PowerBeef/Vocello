@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "version": 1,
+  "models": {
+    "asrA": "asr.qwen3-asr-1.7b",
+    "asrB": "asr.whisper-large-v3",
+    "align": "align.qwen3-forcedaligner-0.6b",
+    "phones": "phones.zipa-large-crctc-500k",
+    "pitchA": "pitch.fcpe",
+    "pitchB": "pitch.swiftf0",
+    "speaker": "speaker.redimnet2-plus",
+    "mos": "mos.utmosv2",
+    "aesthetics": "aesthetics.audiobox-aesthetics",
+    "llm": "llm.gemma-4-12b-it-qat"
+  },
+  "params": {
+    "gopLow": -2.0,
+    "loudnessTarget": -23.0,
+    "muteTestMinGapSeconds": 0.4,
+    "muteTestMaxDistance": 0.1,
+    "pitchAgreeCents": 50,
+    "silenceAmplitude": 0.0005,
+    "clickSigma": 12.0,
+    "l1Substitutions": {
+      "french": [["y", "u"], ["ʁ", "ɹ"], ["ʁ", "r"], ["ɑ̃", "ɑ"], ["ɔ̃", "ɔ"], ["ɛ̃", "ɛ"], ["œ̃", "œ"], ["ø", "o"]],
+      "english": [["θ", "s"], ["ð", "z"], ["ɹ", "ʁ"], ["ɪ", "i"], ["æ", "ɛ"]]
+    }
+  },
+  "fit": {
+    "l2": 1.0,
+    "perLanguageMinClean": 60,
+    "perLanguageMinPositive": 20,
+    "llmKappaGate": 0.6
+  },
+  "levels": {
+    "warn": {"precisionLower": 0.6, "recall": 0.6},
+    "fail": {"precisionLower": 0.8, "cleanFalseAlarmUpper": 0.05}
+  },
+  "detectors": [
+    {"id": "pause.anomalous", "class": "pause", "method": "logistic", "features": [
+      {"name": "pause.longest_gap_seconds", "direction": "higher"},
+      {"name": "pause.nonspeech_level_db", "direction": "higher"},
+      {"name": "pause.voiced_blips", "direction": "higher"},
+      {"name": "pause.mute_confirmed", "direction": "higher"}],
+     "provisional": {"all": [{"feature": "pause.longest_gap_seconds", "op": ">", "value": 0.5}],
+                     "none": [{"feature": "pause.mute_confirmed", "op": "==", "value": 0}]}},
+    {"id": "boundary.abrupt-end", "class": "cutoff", "method": "logistic", "features": [
+      {"name": "end.drop_db_60ms", "direction": "higher"},
+      {"name": "end.tail_seconds", "direction": "lower"},
+      {"name": "end.decay_db_per_ms", "direction": "higher"},
+      {"name": "engine.finish_not_eos", "direction": "higher"}],
+     "provisional": {"all": [{"feature": "end.drop_db_60ms", "op": ">", "value": 30},
+                             {"feature": "end.tail_seconds", "op": "<", "value": 0.05}]}},
+    {"id": "level.loudness", "class": null, "advisory": true, "method": "logistic", "features": [
+      {"name": "level.lufs_deviation", "direction": "higher"},
+      {"name": "level.true_peak_dbtp", "direction": "higher"},
+      {"name": "level.lufs", "direction": "lower"}],
+     "provisional": {"any": [{"feature": "level.lufs_deviation", "op": ">", "value": 4},
+                             {"feature": "level.true_peak_dbtp", "op": ">", "value": -1}]}},
+    {"id": "content.phoneme", "class": "stutter", "method": "logistic", "features": [
+      {"name": "phones.deletion_rate", "direction": "higher"},
+      {"name": "phones.repeat_runs", "direction": "higher"},
+      {"name": "phones.low_gop_run", "direction": "higher"},
+      {"name": "asr.edit_rate_min", "direction": "higher"}]},
+    {"id": "boundary.cutoff", "class": "cutoff", "method": "logistic", "features": [
+      {"name": "phones.last_word_coverage", "direction": "lower"},
+      {"name": "align.last_word_ratio", "direction": "lower"},
+      {"name": "signal.abrupt_offset_db", "direction": "higher"},
+      {"name": "engine.finish_not_eos", "direction": "higher"}]},
+    {"id": "language.wrong", "class": "wrong-language", "method": "logistic", "features": [
+      {"name": "asr.language_mismatch_min", "direction": "higher"},
+      {"name": "asr.script_mismatch_min", "direction": "higher"}]},
+    {"id": "language.accent", "class": "mispronunciation", "method": "logistic", "features": [
+      {"name": "phones.gop_mean", "direction": "lower"},
+      {"name": "phones.substitution_rate", "direction": "higher"},
+      {"name": "phones.l1_substitutions", "direction": "higher"},
+      {"name": "llm.mispronunciation", "direction": "higher"}]},
+    {"id": "prosody.pitch", "class": "pitch", "method": "logistic", "features": [
+      {"name": "pitch.sustained_shift_st", "direction": "higher"},
+      {"name": "pitch.octave_jumps", "direction": "higher"},
+      {"name": "pitch.register_offset_st", "direction": "higher"},
+      {"name": "pitch.tracker_disagreement", "direction": "higher"}]},
+    {"id": "prosody.tonal-collapse", "class": "tonal-collapse", "method": "logistic", "features": [
+      {"name": "pitch.tone_run_seconds", "direction": "higher"},
+      {"name": "pitch.tone_flatness", "direction": "lower"},
+      {"name": "pitch.tone_hnr_db", "direction": "higher"}]},
+    {"id": "identity.drift", "class": "voice-change", "method": "logistic", "features": [
+      {"name": "speaker.max_window_distance", "direction": "higher"},
+      {"name": "speaker.whole_distance", "direction": "higher"},
+      {"name": "speaker.window_range", "direction": "higher"}]},
+    {"id": "signal.artifacts", "class": "artifact", "method": "logistic", "features": [
+      {"name": "signal.clicks", "direction": "higher"},
+      {"name": "signal.dropout_seconds", "direction": "higher"},
+      {"name": "signal.clipping_fraction", "direction": "higher"},
+      {"name": "signal.terminal_silence_seconds", "direction": "higher"}]},
+    {"id": "quality.naturalness", "class": "unnatural", "method": "logistic", "features": [
+      {"name": "mos.whole", "direction": "lower"},
+      {"name": "mos.worst_window", "direction": "lower"},
+      {"name": "aesthetics.pq_delta", "direction": "lower"},
+      {"name": "aesthetics.ce_delta", "direction": "lower"}]},
+    {"id": "judge.llm.stutter", "class": "stutter", "method": "threshold", "llm": true, "features": [{"name": "llm.stutter", "direction": "higher"}]},
+    {"id": "judge.llm.mispronunciation", "class": "mispronunciation", "method": "threshold", "llm": true, "features": [{"name": "llm.mispronunciation", "direction": "higher"}]},
+    {"id": "judge.llm.wrong-language", "class": "wrong-language", "method": "threshold", "llm": true, "features": [{"name": "llm.wrong-language", "direction": "higher"}]},
+    {"id": "judge.llm.cutoff", "class": "cutoff", "method": "threshold", "llm": true, "features": [{"name": "llm.cutoff", "direction": "higher"}]},
+    {"id": "judge.llm.pause", "class": "pause", "method": "threshold", "llm": true, "features": [{"name": "llm.pause", "direction": "higher"}]},
+    {"id": "judge.llm.pitch", "class": "pitch", "method": "threshold", "llm": true, "features": [{"name": "llm.pitch", "direction": "higher"}]},
+    {"id": "judge.llm.tonal-collapse", "class": "tonal-collapse", "method": "threshold", "llm": true, "features": [{"name": "llm.tonal-collapse", "direction": "higher"}]},
+    {"id": "judge.llm.voice-change", "class": "voice-change", "method": "threshold", "llm": true, "features": [{"name": "llm.voice-change", "direction": "higher"}]},
+    {"id": "judge.llm.artifact", "class": "artifact", "method": "threshold", "llm": true, "features": [{"name": "llm.artifact", "direction": "higher"}]},
+    {"id": "judge.llm.unnatural", "class": "unnatural", "method": "threshold", "llm": true, "features": [{"name": "llm.unnatural", "direction": "higher"}]}
+  ]
+}

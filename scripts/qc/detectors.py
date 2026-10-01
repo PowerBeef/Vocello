@@ -1,0 +1,241 @@
+"""Detectors: `config/qc/detectors.json`, feature normalization and scoring.
+
+Each detector reads at most four features and maps them to one score:
+
+- `logistic`: an L2 logistic over the features' per-language z-scores (oriented so
+  that higher means more defective), fitted per language when the labels allow,
+  else pooled (`*`);
+- `threshold`: one feature's oriented raw value (the LLM judges' pYes).
+
+A fitted detector flags a take when its score reaches the fitted cut. Before a
+fit (or for a detector the labels could not train) the score is uncalibrated:
+the largest oriented z-score among its features, which ranks the listening
+queue but never flags.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Any, Iterable
+
+from qc import store
+from qc.store import Layout
+
+METHODS = ("logistic", "threshold")
+DIRECTIONS = ("higher", "lower")
+ROLES = ("asrA", "asrB", "align", "phones", "pitchA", "pitchB", "speaker", "mos", "aesthetics", "llm")
+# Which runner roles a feature family reads (signal and engine features read only the WAV and the take).
+FEATURE_ROLES = {
+    "asr": ("asrA", "asrB"), "align": ("align",), "phones": ("phones",), "pitch": ("pitchA", "pitchB"),
+    "speaker": ("speaker",), "mos": ("mos",), "aesthetics": ("aesthetics",), "llm": ("llm",),
+    "signal": (), "engine": (), "pause": (), "end": (), "level": (),
+}
+LEVELS = ("report-only", "warn", "fail")
+RULE_OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a < b,
+            "<=": lambda a, b: a <= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}
+
+
+class ConfigError(ValueError):
+    """`config/qc/detectors.json` is invalid."""
+
+
+def load_config(layout: Layout = Layout()) -> dict[str, Any]:
+    path = layout.config / "detectors.json"
+    config = store.read_json(path)
+    validate_config(config, class_ids=_protocol_classes(layout))
+    return config
+
+
+def _protocol_classes(layout: Layout) -> set[str] | None:
+    try:
+        return {item["id"] for item in store.read_json(layout.protocol)["classes"]}
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+            raise ConfigError(message)
+
+    require(isinstance(config, dict) and config.get("schemaVersion") == 1, "unsupported detectors schemaVersion")
+    require(isinstance(config.get("version"), int) and config["version"] >= 1, "version must be a positive integer")
+    roles = config.get("models")
+    require(isinstance(roles, dict) and set(roles) <= set(ROLES), f"models must map roles among {', '.join(ROLES)}")
+    seen: set[str] = set()
+    for detector in config.get("detectors", []):
+        label = f"detector {detector.get('id')!r}"
+        require(isinstance(detector.get("id"), str) and detector["id"] not in seen, f"{label}: duplicate or missing id")
+        seen.add(detector["id"])
+        if detector.get("advisory"):
+            require(detector.get("class") is None or class_ids is None or detector["class"] in class_ids,
+                    f"{label}: unknown class")
+        else:
+            require(class_ids is None or detector.get("class") in class_ids, f"{label}: unknown class")
+        rule = detector.get("provisional")
+        if rule is not None:
+            require(isinstance(rule, dict) and rule and set(rule) <= {"all", "any", "none"},
+                    f"{label}: provisional takes all, any and none lists")
+            for conditions in rule.values():
+                for condition in conditions:
+                    require(condition.get("op") in RULE_OPS and isinstance(condition.get("value"), (int, float))
+                            and str(condition.get("feature", "")).split(".", 1)[0] in FEATURE_ROLES,
+                            f"{label}: bad provisional condition {condition!r}")
+        require(detector.get("method") in METHODS, f"{label}: method must be logistic or threshold")
+        features = detector.get("features")
+        require(isinstance(features, list) and 1 <= len(features) <= 4, f"{label}: one to four features")
+        require(detector["method"] != "threshold" or len(features) == 1, f"{label}: a threshold reads one feature")
+        for item in features:
+            require(item.get("direction") in DIRECTIONS, f"{label}: direction must be higher or lower")
+            family = str(item.get("name", "")).split(".", 1)[0]
+            require(family in FEATURE_ROLES, f"{label}: unknown feature family in {item.get('name')!r}")
+    for name in ("warn", "fail"):
+        require(isinstance(config.get("levels", {}).get(name), dict), f"levels.{name} is required")
+
+
+def config_digest(layout: Layout = Layout()) -> str:
+    return store.sha256_file(layout.config / "detectors.json")
+
+
+def detector_roles(detector: dict[str, Any]) -> set[str]:
+    roles: set[str] = set()
+    for item in detector["features"]:
+        roles.update(FEATURE_ROLES[item["name"].split(".", 1)[0]])
+    return roles
+
+
+def feature_names(config: dict[str, Any]) -> list[str]:
+    return sorted({item["name"] for detector in config["detectors"] for item in detector["features"]})
+
+
+# --- normalization ----------------------------------------------------------------
+
+def normalization(rows: Iterable[dict[str, Any]], names: Iterable[str]) -> dict[str, dict[str, dict[str, float]]]:
+    """Per language and feature: mean, standard deviation and median of the present values."""
+
+    values: dict[str, dict[str, list[float]]] = {}
+    names = list(names)
+    for row in rows:
+        bucket = values.setdefault(row.get("language") or "unknown", {})
+        for name in names:
+            value = (row["features"].get(name) or {}).get("value")
+            if value is not None:
+                bucket.setdefault(name, []).append(float(value))
+    stats: dict[str, dict[str, dict[str, float]]] = {}
+    for language, by_name in values.items():
+        stats[language] = {}
+        for name, items in by_name.items():
+            items = sorted(items)
+            mean = sum(items) / len(items)
+            variance = sum((item - mean) ** 2 for item in items) / len(items)
+            middle = len(items) // 2
+            median = items[middle] if len(items) % 2 else (items[middle - 1] + items[middle]) / 2
+            stats[language][name] = {"mean": mean, "std": math.sqrt(variance), "median": median, "n": len(items)}
+    return stats
+
+
+def oriented(value: float, direction: str) -> float:
+    return value if direction == "higher" else -value
+
+
+def zscore(value: float | None, stats: dict[str, float] | None) -> float | None:
+    if value is None or not stats:
+        return None
+    std = stats["std"]
+    return 0.0 if std <= 1e-12 else (value - stats["mean"]) / std
+
+
+def vector(detector: dict[str, Any], features: dict[str, Any], language: str,
+           norm: dict[str, dict[str, dict[str, float]]]) -> tuple[list[float], int]:
+    """Oriented z-scores of a detector's features; a missing value takes its language median
+    (z close to 0). Returns the vector and how many features were present."""
+
+    stats = norm.get(language, {})
+    out, present = [], 0
+    for item in detector["features"]:
+        value = (features.get(item["name"]) or {}).get("value")
+        column = stats.get(item["name"])
+        if value is not None:
+            present += 1
+        elif column:
+            value = column["median"]
+        z = zscore(value, column)
+        out.append(0.0 if z is None else oriented(z, item["direction"]))
+    return out, present
+
+
+def sigmoid(value: float) -> float:
+    if value >= 0:
+        return 1.0 / (1.0 + math.exp(-value))
+    exp = math.exp(value)
+    return exp / (1.0 + exp)
+
+
+def uncalibrated(detector: dict[str, Any], features: dict[str, Any], language: str,
+                 norm: dict[str, dict[str, dict[str, float]]]) -> float | None:
+    stats = norm.get(language, {})
+    scores = []
+    for item in detector["features"]:
+        z = zscore((features.get(item["name"]) or {}).get("value"), stats.get(item["name"]))
+        if z is not None:
+            scores.append(oriented(z, item["direction"]))
+    return max(scores) if scores else None
+
+
+def _condition(condition: dict[str, Any], features: dict[str, Any]) -> bool:
+    value = (features.get(condition["feature"]) or {}).get("value")
+    return value is not None and RULE_OPS[condition["op"]](value, condition["value"])
+
+
+def rule_holds(rule: dict[str, Any], features: dict[str, Any]) -> bool | None:
+    """A provisional rule: every `all`, at least one `any` (when given), no `none` condition.
+    None when a feature an `all` or `any` condition needs is missing."""
+
+    def missing(condition: dict[str, Any]) -> bool:
+        return (features.get(condition["feature"]) or {}).get("value") is None
+
+    if any(missing(condition) for condition in rule.get("all", [])):
+        return None
+    if rule.get("any") and all(missing(condition) for condition in rule["any"]):
+        return None
+    holds = all(_condition(condition, features) for condition in rule.get("all", []))
+    if rule.get("any"):
+        holds = holds and any(_condition(condition, features) for condition in rule["any"])
+    return holds and not any(_condition(condition, features) for condition in rule.get("none", []))
+
+
+def score(detector: dict[str, Any], features: dict[str, Any], language: str,
+          fitted: dict[str, Any] | None, norm: dict[str, dict[str, dict[str, float]]]) -> dict[str, Any]:
+    """`{"score", "cut", "scope", "present"}`. A fitted detector scores with its model and cut; an
+    unfitted one with its provisional rule (score 1 or 0, cut 1, scope "provisional") when it has
+    one, else uncalibrated with no cut."""
+
+    names = [item["name"] for item in detector["features"]]
+    present = sum(1 for name in names if (features.get(name) or {}).get("value") is not None)
+    models = (fitted or {}).get("models") or {}
+    model = models.get(language) or models.get("*")
+    if not fitted or not model or present == 0:
+        rule = detector.get("provisional")
+        holds = rule_holds(rule, features) if rule else None
+        if holds is not None:
+            return {"score": 1.0 if holds else 0.0, "cut": 1.0, "scope": "provisional", "present": present}
+        return {"score": uncalibrated(detector, features, language, norm) if present else None,
+                "cut": None, "scope": None, "present": present}
+    scope = language if language in models else "*"
+    if detector["method"] == "threshold":
+        item = detector["features"][0]
+        value = oriented(features[item["name"]]["value"], item["direction"])
+        return {"score": value, "cut": model["cut"], "scope": scope, "present": present}
+    values, _ = vector(detector, features, language, norm)
+    logit = model["intercept"] + sum(weight * value for weight, value in zip(model["weights"], values))
+    return {"score": sigmoid(logit), "cut": model["cut"], "scope": scope, "present": present}
+
+
+def evidence(detector: dict[str, Any], features: dict[str, Any]) -> list[dict[str, Any]]:
+    out = []
+    for item in detector["features"]:
+        entry = features.get(item["name"]) or {}
+        if entry.get("value") is not None:
+            out.append({"feature": item["name"], "value": entry["value"], "start": entry.get("start"),
+                        "end": entry.get("end")})
+    return out

@@ -166,11 +166,69 @@ def cmd_label(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
-# --- phase 2 ------------------------------------------------------------------------
+# --- lanes and calibration ------------------------------------------------------------
 
-def cmd_not_implemented(args: argparse.Namespace, layout: Layout) -> int:
-    print(f"qc {args.command}: not implemented yet", file=sys.stderr)
-    return EXIT_ERROR
+def cmd_run(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import detectors, lanes, runtime
+
+    try:
+        roles = lanes.parse_roles(args.models, detectors.load_config(layout))
+        directory = lanes.run(layout, args.takes, args.lane, roles=roles)
+    except runtime.LockBusy as error:
+        print(f"qc run: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    except (ValueError, OSError) as error:
+        print(f"qc run: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    print(directory.name)
+    return EXIT_OK
+
+
+def cmd_gate(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import lanes
+
+    try:
+        return lanes.gate(layout, args.lane, args.run)
+    except (ValueError, OSError) as error:
+        print(f"qc gate: {error}", file=sys.stderr)
+        return EXIT_ERROR
+
+
+def cmd_queue(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import lanes
+
+    try:
+        path = lanes.queue(layout, args.top, run_id=args.run, name=args.batch)
+    except (ValueError, OSError) as error:
+        print(f"qc queue: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"qc queue: wrote batch {path.stem}; open it with: python3 scripts/qc.py label serve --batch {path.stem}")
+    return EXIT_OK
+
+
+def cmd_fit(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import fit
+
+    try:
+        path = fit.fit(layout, batches=args.batches, runs=args.runs)
+    except (fit.FitError, ValueError, OSError) as error:
+        print(f"qc fit: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"qc fit: wrote {path.relative_to(layout.root)}; commit it before qc.py eval")
+    return EXIT_OK
+
+
+def cmd_eval(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import fit
+
+    try:
+        path = fit.evaluate(layout, thresholds=Path(args.thresholds) if args.thresholds else None,
+                            batches=args.batches, runs=args.runs)
+    except (fit.FitError, ValueError, OSError) as error:
+        print(f"qc eval: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"qc eval: wrote {path.relative_to(layout.root)}")
+    return EXIT_OK
 
 
 # --- parser ---------------------------------------------------------------------------
@@ -226,30 +284,32 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="run the models and detectors over a takes manifest")
     run.add_argument("--takes", required=True, help="takes manifest or qc-takes run directory")
-    run.add_argument("--lane", required=True)
-    run.add_argument("--models", help="comma-separated model ids (default every model the detectors read)")
-    run.add_argument("--thresholds", help="thresholds file (default the newest config/qc/thresholds-v<N>.json)")
-    run.set_defaults(handler=cmd_not_implemented)
+    run.add_argument("--lane", required=True, help="lane name (pool, lang-bench, qc-takes, clone, ios)")
+    run.add_argument("--models", help="comma-separated roles or model ids to run now (default every detector "
+                                      "model); the others are read from the cache")
+    run.set_defaults(handler=cmd_run)
 
     gate = commands.add_parser("gate", help="exit 0 pass, 3 warn, 1 fail, 2 error for a lane run")
     gate.add_argument("--lane", required=True)
     gate.add_argument("--run", help="run id (default the lane's newest)")
-    gate.set_defaults(handler=cmd_not_implemented)
+    gate.set_defaults(handler=cmd_gate)
 
     queue = commands.add_parser("queue", help="write a listening queue the label tool opens as a batch")
     queue.add_argument("--top", type=int, default=40)
     queue.add_argument("--run", help="run id (default the newest)")
-    queue.add_argument("--batch", help="batch name for the queue")
-    queue.set_defaults(handler=cmd_not_implemented)
+    queue.add_argument("--batch", help="batch name for the queue (default queue-<run id>)")
+    queue.set_defaults(handler=cmd_queue)
 
     fit = commands.add_parser("fit", help="fit detector thresholds from the train-split labels")
     fit.add_argument("--batches", nargs="+", help="label batches (default every batch)")
-    fit.set_defaults(handler=cmd_not_implemented)
+    fit.add_argument("--runs", nargs="+", help="run ids whose features to use (default every run)")
+    fit.set_defaults(handler=cmd_fit)
 
     evaluate = commands.add_parser("eval", help="score the held-out split once against committed thresholds")
     evaluate.add_argument("--thresholds", help="thresholds file (default the newest)")
     evaluate.add_argument("--batches", nargs="+")
-    evaluate.set_defaults(handler=cmd_not_implemented)
+    evaluate.add_argument("--runs", nargs="+")
+    evaluate.set_defaults(handler=cmd_eval)
     return parser
 
 

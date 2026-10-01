@@ -1,0 +1,403 @@
+{
+  "canarySet": {
+    "sha256": "98c3fa0be9295e13bea7f46e3ff2b20e64be1f33ae867e5b6e2973cff2074c9d",
+    "takes": 9
+  },
+  "determinism": {
+    "class": "D0",
+    "discreteMismatches": 0,
+    "maxAbsoluteDifference": 0.0,
+    "maxRelativeDifference": 0.0,
+    "numericDifferences": 0,
+    "rowsBitExact": 2,
+    "rowsCompared": 2,
+    "rowsWithDiscreteMismatch": 0
+  },
+  "identityComponents": {
+    "engine": "sensevoice-llamacpp",
+    "hostProfileSHA256": "094976dd04adaf0542a13a28addbc11e2994b770d5bb2ecd8ca5a76e7fea7931",
+    "panelJobVersion": "panel-job-v1",
+    "registryEntrySHA256": "8c6faa986a21c816eeda550242cf87da5234be6d26d7153eb5ae1edf92adefd7",
+    "runtime": {
+      "archiveSHA256": "2d5786784ad09d8f4def1d942f678728638fe601d00acf0dad7cf094a9328363",
+      "binarySHA256": "49d66b2f79d439e2db7933627e1deb9eb7f3ebf0d708473757828130f3619435",
+      "family": "sensevoice-llamacpp",
+      "interpreterSHA256": "8b7865e511b17093e090449bf71eb52933c17d45ad5257ddeacaffbb2c7239df",
+      "kind": "native"
+    },
+    "threads": 2,
+    "workerSourceSHA256": {
+      "scripts/audio_qc_worker.py": "89c6d281ad7c337258142834419509da5c95a8e6b43b58b4873173cdd028439e",
+      "scripts/lib/qc_pipeline/panel_engines.py": "390ef8d539a7b751ba79186ba7155c963cf694c747e7d9420f3cfaff219788ca",
+      "scripts/lib/qc_pipeline/panel_jobs.py": "24a0360f3bdad7111dc4f9ed99c4795da65f06401a6efb872f266dcec719e2b6"
+    }
+  },
+  "judge": "asr.sensevoice-small-f16@1",
+  "outputIdentity": "60dd465a89773f48db20339e67057d2a0d7182dda67e92d1d4be110bb4dc97c0",
+  "qualification": {
+    "passed": true,
+    "reasons": []
+  },
+  "registrySHA256": "e35ef688b434a58958694726a6e81e2da8266015eab24f25312d3687dd4f423e",
+  "resources": {
+    "admissionCeilingBytes": 625901568,
+    "canonicalHostPeakBytes": 521584640,
+    "fitsBudget": true,
+    "runPeakBytes": [
+      521535488,
+      521584640
+    ]
+  },
+  "runs": [
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "calibrated-canonical-host-peak-x1.2",
+          "ceilingBytes": 683822285,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 503661912,
+          "descendantPeakRSSBytes": 500350976,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 503661912,
+          "peakRSSBytes": 521535488,
+          "waitMaxRSSBytes": 500350976
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": null,
+      "peakBytes": 521535488,
+      "peakChildAttributedBytes": 503661912,
+      "peakDescendantRSSBytes": 500350976,
+      "peakPhysicalFootprintBytes": 503661912,
+      "peakRSSBytes": 521535488,
+      "peakWaitMaxRSSBytes": 500350976,
+      "rowsAccepted": 2,
+      "rowsUnavailable": 0,
+      "run": 1,
+      "sessionIDs": [
+        "c6795ee6ebbc4ef7b009f99e90be643e"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 0.608,
+      "warmupSeconds": null
+    },
+    {
+      "clean": true,
+      "failures": [],
+      "launchEnvelopes": [
+        {
+          "ceilingBasis": "calibrated-canonical-host-peak-x1.2",
+          "ceilingBytes": 683822285,
+          "childPeakBasis": "physical-footprint",
+          "childPeakBytes": 503711064,
+          "descendantPeakRSSBytes": 500367360,
+          "failures": [],
+          "kind": "job",
+          "launch": 1,
+          "peakPhysicalFootprintBytes": 503711064,
+          "peakRSSBytes": 521584640,
+          "waitMaxRSSBytes": 500367360
+        }
+      ],
+      "launches": 1,
+      "modelLoadSeconds": null,
+      "peakBytes": 521584640,
+      "peakChildAttributedBytes": 503711064,
+      "peakDescendantRSSBytes": 500367360,
+      "peakPhysicalFootprintBytes": 503711064,
+      "peakRSSBytes": 521584640,
+      "peakWaitMaxRSSBytes": 500367360,
+      "rowsAccepted": 2,
+      "rowsUnavailable": 0,
+      "run": 2,
+      "sessionIDs": [
+        "c691e181a7bb46eba4307083804ccebe"
+      ],
+      "swapDeltaBytes": 0,
+      "threads": 2,
+      "wallSeconds": 0.601,
+      "warmupSeconds": null
+    }
+  ],
+  "schema": "vocello.audioqc.qc-canary/1",
+  "session": {
+    "date": "2026-10-01",
+    "hostProfileID": "mac-mini-m6-16gb",
+    "id": "20261001-505107fc"
+  },
+  "takes": [
+    {
+      "audioSHA256": "28993e8ecc62f1fc36783c2705eb4b018322db3e351cf50e99698fa61f57be3a",
+      "canonicalPCMSHA256": "3b9909b4aba5bce051ab8dd82ebdf1e4a83cfbd392f54d17da23f45ad033fa44",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-modal-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "2411ac5e2a3b45491afb86c4b71809342a5c78dc846db6c6abe13167eaab5f78",
+      "canonicalPCMSHA256": "9eb00cfe8aed414f589894d0ee28a69f1adc00e3d9a59a21258fab27a91474cc",
+      "language": "chinese",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-breathy-chinese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "5a317cb2a14ffdcf70a5cd5608f0e7fd362f03d50e4b856ad59a6fec30a7a3a0",
+      "canonicalPCMSHA256": "a23e5cb24046e632a6b16958b5e34d476b9c191d4024a571db59f3758d7d1cf2",
+      "language": "japanese",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 42,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 0,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 42,
+        "character.referenceCount": 42,
+        "character.substitutions": 0,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": "nospeech",
+        "emotionTag": "EMO_UNKNOWN",
+        "errorRate": 1.0,
+        "eventTag": null,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "languageTag": "nospeech",
+        "longestDeletionRun": 42,
+        "metric": "CER",
+        "outputParsed": true,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "textNormalizationTag": null,
+        "transcriptCharacters": 0,
+        "transcriptEmpty": true,
+        "word.deletions": 7,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 0,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 7,
+        "word.referenceCount": 7,
+        "word.segmentationAwareEditDistance": 7,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 0,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "10ac2d6b81549d1643019940c29db1378cf99313117d8f17bc2e9bfc8583128a",
+        "10ac2d6b81549d1643019940c29db1378cf99313117d8f17bc2e9bfc8583128a"
+      ],
+      "rawSHA256": [
+        "73acb9b5c2285186557dca5b6d0bbfa06376a25fb2e36f6671ed684b59891c21",
+        "73acb9b5c2285186557dca5b6d0bbfa06376a25fb2e36f6671ed684b59891c21"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-high-f0-japanese",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "c4e4fe190f7c33e004fe761697ff1a1634ee8d2580ae49946a2a676307efc63d",
+      "canonicalPCMSHA256": "4869a2ee8106b1df130f249985071ec33568554fe498367353256c209fe99830",
+      "language": "korean",
+      "metrics": {
+        "accuracyMetric": "characterErrorRate",
+        "accuracyMetricVersion": "normalization-v3-edit-rate-v4",
+        "character.deletions": 39,
+        "character.errorRate": 1.0,
+        "character.hypothesisCount": 1,
+        "character.insertions": 0,
+        "character.longestDeletionRun": 39,
+        "character.referenceCount": 40,
+        "character.substitutions": 1,
+        "characterErrorRate": 1.0,
+        "detectedLanguage": "japanese",
+        "diagnostics.jamoCharacterErrorRate": 1.0,
+        "emotionTag": "EMO_UNKNOWN",
+        "errorRate": 1.0,
+        "eventTag": null,
+        "excessFillerCount": 0,
+        "hypothesisFillerCount": 0,
+        "languageTag": "ja",
+        "longestDeletionRun": 39,
+        "metric": "CER",
+        "outputParsed": true,
+        "referenceFillerCount": 0,
+        "segmentationAwareWordErrorRate": 1.0,
+        "textNormalization": "text-normalization-v3",
+        "textNormalizationTag": null,
+        "transcriptCharacters": 1,
+        "transcriptEmpty": false,
+        "word.deletions": 4,
+        "word.errorRate": 1.0,
+        "word.hypothesisCount": 1,
+        "word.insertions": 0,
+        "word.longestDeletionRun": 4,
+        "word.referenceCount": 5,
+        "word.segmentationAwareEditDistance": 5,
+        "word.segmentationAwareErrorRate": 1.0,
+        "word.substitutions": 1,
+        "word.wordBoundaryOnlyEdits": 0,
+        "wordBoundaryOnlyEdits": 0,
+        "wordErrorRate": 1.0
+      },
+      "metricsSHA256": [
+        "5acf91663448c42fa7e34e5f0716cd0c12ba1bd679034b326bdbafedcf9e6896",
+        "5acf91663448c42fa7e34e5f0716cd0c12ba1bd679034b326bdbafedcf9e6896"
+      ],
+      "rawSHA256": [
+        "1118bc15af880e6b42105e76fe2445390671fd737cfef1d8345a0558c4dced39",
+        "1118bc15af880e6b42105e76fe2445390671fd737cfef1d8345a0558c4dced39"
+      ],
+      "role": "canary",
+      "status": "complete",
+      "takeID": "canary-quiet-korean",
+      "transcriptSHA256": [
+        "afafbae591c156ee7f019d48ea7a74beb639f38112cda9fa29c06bd5dd77f5c8",
+        "afafbae591c156ee7f019d48ea7a74beb639f38112cda9fa29c06bd5dd77f5c8"
+      ]
+    },
+    {
+      "audioSHA256": "4e5aae29e417782eae093b1366d70b57b89c1200f695c38dba98607fdb0e76de",
+      "canonicalPCMSHA256": "8657efbe9b49baa56a0a982a13a86b5af828923b1fe30d76eed572fe31d0e0be",
+      "language": "french",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-long-pause-french",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "b7235cefab1b52ef0c2ba1c9ed15e7ea2e7c0d01bf18aa8278bf267efbb78caa",
+      "canonicalPCMSHA256": "96b27551586e7572ee16a202a3507502f4b34f7dd0404eedb2c4c4a56ad58369",
+      "language": "german",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-modal-german",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+      "canonicalPCMSHA256": "55873fecc61a79e87ca550c7072e38ccdd7ecb600ace286fe4717952a97c42b0",
+      "language": "english",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-silence-english",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "7e8d4d0bbd1c9efe72d27c2c93f964c3a511f7321096a0fc4dc83859149e14cd",
+      "canonicalPCMSHA256": "270fa4b4a1d29c5bdf295386a3b66b815ba64e967630fddf745137543e198433",
+      "language": "spanish",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-noise-spanish",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    },
+    {
+      "audioSHA256": "8844254e7b5748d9a8baa05ecec316965f2622e0a03fdd1fd19944c068fc6cb8",
+      "canonicalPCMSHA256": "25922ea8ea9c2166f04de80c6511e22170e5aba907199d38aa11c740f57954c5",
+      "language": "italian",
+      "metrics": {},
+      "metricsSHA256": [
+        null,
+        null
+      ],
+      "rawSHA256": [
+        null,
+        null
+      ],
+      "role": "canary",
+      "status": "out-of-scope",
+      "takeID": "canary-music-italian",
+      "transcriptSHA256": [
+        null,
+        null
+      ]
+    }
+  ]
+}

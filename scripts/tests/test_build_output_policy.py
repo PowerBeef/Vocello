@@ -38,6 +38,8 @@ REQUIRED_EXPORTS = {
     "QVOICE_SWIFTPM_RUNTIME_CACHE",
     "QVOICE_DELIVERY_ANALYSIS_CACHE",
     "QVOICE_AUDIO_QC_CORPORA_CACHE",
+    "QVOICE_QC_CACHE",
+    "QVOICE_QC_PRIVATE",
     "QVOICE_SCRATCH_FOUNDATION",
     "QVOICE_SCRATCH_PACKAGE_RESOLUTION",
     "QVOICE_SCRATCH_TRANSIENT",
@@ -117,6 +119,10 @@ class BuildOutputPolicyTests(unittest.TestCase):
         self.assertIn("build/cache/xcode/ios-device", paths)
         self.assertIn("build/scratch/derived-data/release-ios", paths)
         self.assertIn("build/dist/macos", paths)
+        # QC v2: a re-creatable cache, and private labels no cleanup removes.
+        self.assertEqual(policy.entries_by_id["qc-cache"]["path"], "build/cache/qc")
+        self.assertEqual(policy.entries_by_id["qc-private"]["path"], "build/private/qc")
+        self.assertEqual(policy.entries_by_id["qc-private"]["cleanup"], "preserve")
         self.assertIn(
             "ui-control-audit",
             self.document["heavyLanePreflight"]["lanes"],

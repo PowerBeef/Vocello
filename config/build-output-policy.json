@@ -221,6 +221,24 @@
       "env": "QVOICE_AUDIO_QC_CORPORA_CACHE"
     },
     {
+      "id": "qc-cache",
+      "path": "build/cache/qc",
+      "class": "cache",
+      "owner": "Audio QC v2 (scripts/qc.py models fetch, runtimes setup, run)",
+      "cleanup": "aggressive",
+      "retention": "Re-creatable from the checked-in registry and pins: the digest-verified model files under models/<model-id>, the pinned runner venvs, interpreter and llama.cpp release under runtimes, and the content-addressed runner results under results/<model-id>/<audioSHA256>[.<variantKey>].json, keyed to each runner's identity; never evidence by itself",
+      "env": "QVOICE_QC_CACHE"
+    },
+    {
+      "id": "qc-private",
+      "path": "build/private/qc",
+      "class": "artifact",
+      "owner": "Audio QC v2 private store (scripts/qc.py label, run, queue)",
+      "cleanup": "preserve",
+      "retention": "The maintainer's labels (labels/<batch>.jsonl, append-only), the label batches, listening queues, runner jobs and per-take run flags: take paths, scripts and judgements that never enter Git; only aggregates and digests are committed; preserved until the maintainer retires them",
+      "env": "QVOICE_QC_PRIVATE"
+    },
+    {
       "id": "scratch-foundation",
       "path": "build/scratch/derived-data/foundation",
       "class": "scratch",

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "rater": "maintainer",
+  "classes": [
+    {"id": "stutter", "label": "Stutter or missing syllable", "linguistic": true},
+    {"id": "mispronunciation", "label": "Mispronunciation or accent", "linguistic": true},
+    {"id": "wrong-language", "label": "Wrong language", "linguistic": true},
+    {"id": "cutoff", "label": "Cut-off", "linguistic": false},
+    {"id": "pitch", "label": "Pitch instability", "linguistic": false},
+    {"id": "tonal-collapse", "label": "Tonal collapse", "linguistic": false},
+    {"id": "voice-change", "label": "Voice change", "linguistic": false},
+    {"id": "artifact", "label": "Artifact or click", "linguistic": false},
+    {"id": "unnatural", "label": "Unnatural", "linguistic": false},
+    {"id": "other", "label": "Other", "linguistic": false}
+  ],
+  "severities": ["none", "mild", "moderate", "severe"],
+  "verdicts": ["acceptable", "objectionable", "uncertain"],
+  "acousticOnly": "Hides the script and every linguistic class (stutter, mispronunciation, wrong-language) for languages the rater cannot judge linguistically."
+}

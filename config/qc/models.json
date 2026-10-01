@@ -1,0 +1,807 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "asr.qwen3-asr-1.7b",
+      "kind": "asr",
+      "role": "primary",
+      "runner": "qc.runners.qwen3_asr",
+      "runtime": "mlx",
+      "source": {
+        "host": "huggingface",
+        "repo": "mlx-community/Qwen3-ASR-1.7B-bf16",
+        "revision": "e1f6c266914abc5a46e8756e02580f834a6cf8a7",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "62fe9a2ba2de536820229e126fdfb35f9910b9a337dc46d3737c3b1ac0a9caa9",
+            "bytes": 6983
+          },
+          "generation_config.json": {
+            "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+            "bytes": 142
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model.safetensors": {
+            "sha256": "2f080a3b769ae469aeaaa2dcb9e13a94141e54c9e6d5a7aa63392e0dc5a51789",
+            "bytes": 4076186653
+          },
+          "model.safetensors.index.json": {
+            "sha256": "a3ee6037ec82e95dc8577216ac84cf0b3c92cfefc099cf20b2296571f2fb3fc0",
+            "bytes": 51384
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+            "bytes": 12487
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The model card front matter at this revision says 'license: apache-2.0' (https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16/blob/e1f6c266914abc5a46e8756e02580f834a6cf8a7/README.md). It was converted from Qwen/Qwen3-ASR-1.7B@7278e1e70fe206f11671096ffdd38061171dd6e5, whose card also says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ASR-1.7B/blob/7278e1e70fe206f11671096ffdd38061171dd6e5/README.md). The upstream code, github.com/QwenLM/Qwen3-ASR, is Apache-2.0. Neither HF repo has a LICENSE file, so the card metadata is the grant.",
+      "memoryGB": 6.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "align.qwen3-forcedaligner-0.6b",
+      "kind": "align",
+      "role": "primary",
+      "runner": "qc.runners.qwen3_aligner",
+      "runtime": "mlx",
+      "source": {
+        "host": "huggingface",
+        "repo": "mlx-community/Qwen3-ForcedAligner-0.6B-bf16",
+        "revision": "53c8c0e46733eec430e4b53dd6471d0e5dee45f8",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "dffdf2e17fa13effca4b165540c8eeea6d3f3211dcdb6c21978e68578460858d",
+            "bytes": 6735
+          },
+          "generation_config.json": {
+            "sha256": "948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c",
+            "bytes": 115
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model.safetensors": {
+            "sha256": "9d0728e17e28ee122c366bfaa9748ccbbb8fc3df4c0ce09dd8a5eac8202989e8",
+            "bytes": 1835539240
+          },
+          "model.safetensors.index.json": {
+            "sha256": "1c4a2d1a86f216ac10c8eb15f9a5aef80a89b3526f3589d47482eb035ec0eeae",
+            "bytes": 51430
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c",
+            "bytes": 12666
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/mlx-community/Qwen3-ForcedAligner-0.6B-bf16/blob/53c8c0e46733eec430e4b53dd6471d0e5dee45f8/README.md). It was converted from Qwen/Qwen3-ForcedAligner-0.6B@c7cbfc2048c462b0d63a45797104fc9db3ad62b7, whose card says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/blob/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/README.md).",
+      "memoryGB": 3.0,
+      "languages": [
+        "chinese",
+        "english",
+        "french",
+        "german",
+        "italian",
+        "japanese",
+        "korean",
+        "portuguese",
+        "russian",
+        "spanish"
+      ],
+      "version": 1
+    },
+    {
+      "id": "asr.whisper-large-v3",
+      "kind": "asr",
+      "role": "primary",
+      "runner": "qc.runners.whisper",
+      "runtime": "mlx",
+      "source": {
+        "host": "huggingface",
+        "repo": "mlx-community/whisper-large-v3-mlx",
+        "revision": "49e6aa286ad60c14352c404340ded53710378a11",
+        "files": {
+          "config.json": {
+            "sha256": "34982ce6ae286095000f82ae9583b3431639e8b092bf60c961f203745e6500e3",
+            "bytes": 269
+          },
+          "weights.npz": {
+            "sha256": "05ff791ce3630fae47e7c51004e9666204d786246ec07cac6110af768099b40d",
+            "bytes": 3083520416
+          }
+        }
+      },
+      "license": "MIT",
+      "notice": "MIT: include 'Copyright (c) 2022 OpenAI' and the MIT text in third-party notices.",
+      "licenseEvidence": "The card front matter at this revision says 'license: mit' (https://huggingface.co/mlx-community/whisper-large-v3-mlx/blob/49e6aa286ad60c14352c404340ded53710378a11/README.md). The OpenAI README says: 'Whisper's code and model weights are released under the MIT License.' (https://github.com/openai/whisper/blob/main/README.md; LICENSE 'Copyright (c) 2022 OpenAI'). Note that the HF card openai/whisper-large-v3@06f233fe06e710322aca913c1bc4249a0d71fce1 says 'license: apache-2.0'. Both licenses permit commercial use.",
+      "memoryGB": 5.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "phones.zipa-large-crctc-500k",
+      "kind": "phones",
+      "role": "primary",
+      "runner": "qc.runners.zipa",
+      "runtime": "onnx",
+      "source": {
+        "host": "huggingface",
+        "repo": "anyspeech/zipa-large-crctc-500k",
+        "revision": "11062858ff289381bfae43cca48cef5784bd9cdb",
+        "files": {
+          "model.onnx": {
+            "sha256": "1ea7ea3d0fd85863f5121cd1b729fbb4c41cb804431e780776c48caba3fecdd3",
+            "bytes": 1204541420
+          },
+          "tokens.txt": {
+            "sha256": "f8e042a0c9130532b22d03ec7cae2f75a23fbec70c450c31a8efb51787b2b8fe",
+            "bytes": 769
+          }
+        }
+      },
+      "code": {
+        "host": "github-raw",
+        "repo": "lingjzhu/zipa",
+        "revision": "d6f7cbc74b29ab7cb0248a5cf2d93f116d79721d",
+        "license": "MIT",
+        "files": {
+          "LICENSE": {
+            "sha256": "8a17e1829b1e8c410ecb6bb3941b87a4e2e0f0ce50bd2ebf19fbb1a71c35746a",
+            "bytes": 1061
+          },
+          "inference/batch_inference.py": {
+            "sha256": "3a499b693efae4d25373e499106fb38c7e2acdc41d85efc240305fd78f64b71c",
+            "bytes": 6159
+          },
+          "inference/inference.py": {
+            "sha256": "87d10c06a26c7ee5a38d385258ef963c4b41d0af254a01cef5bf4df4f2cb2308",
+            "bytes": 3825
+          },
+          "inference/utils.py": {
+            "sha256": "02e69b797543854e472acf7ae007b4cc02e1349b2ae176afe68d10cdf822cc4b",
+            "bytes": 4841
+          }
+        }
+      },
+      "license": "CC-BY-4.0",
+      "notice": "CC BY 4.0 attribution: 'ZIPA (Zhu et al., ACL 2025), anyspeech/zipa-large-crctc-500k'.",
+      "licenseEvidence": "The same README line applies: 'All model weights are distributed under CC BY 4.0 license.' (https://github.com/lingjzhu/zipa/blob/d6f7cbc74b29ab7cb0248a5cf2d93f116d79721d/README.md#pretrained-models). Its raw checkpoints, anyspeech/zipa-cr-l@b26ebd7139cd275901a7049d425ca6a6db9ff468 (checkpoint-464000 to 500000), carry 'license: apache-2.0' in the card (https://huggingface.co/anyspeech/zipa-cr-l/blob/b26ebd7139cd275901a7049d425ca6a6db9ff468/README.md). Every statement is commercial-OK.",
+      "memoryGB": 3.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "pitch.rmvpe",
+      "kind": "pitch",
+      "role": "primary",
+      "runner": "qc.runners.rmvpe",
+      "runtime": "onnx",
+      "source": {
+        "host": "huggingface",
+        "repo": "lj1995/VoiceConversionWebUI",
+        "revision": "e6d0c1a17da07c33557852f9dfa2bd44cc75737d",
+        "files": {
+          "rmvpe.onnx": {
+            "sha256": "5370e71ac80af8b4b7c793d27efd51fd8bf962de3a7ede0766dac0befa3660fd",
+            "bytes": 361688443
+          }
+        }
+      },
+      "license": "MIT",
+      "notice": "MIT: include the RVC-Project copyright line and the MIT text. rmvpe-onnx cites 'VoiceConversionWebUI (MIT License) ... Copyright (c) 2022 lj1995'.",
+      "licenseEvidence": "The repo card at this revision is exactly '---\\nlicense: mit\\n---' (https://huggingface.co/lj1995/VoiceConversionWebUI/blob/e6d0c1a17da07c33557852f9dfa2bd44cc75737d/README.md, README.md sha256 3e0e15fa0c5cc81675bd69af8eb469d128a725c1a7bfc71f03b7877b7b650567). The RVC WebUI code (github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) is MIT, 'Copyright (c) 2023 liujing04 / 源文雨 / ...'. The RMVPE reference code (github.com/Dream-High/RMVPE) is Apache-2.0.",
+      "memoryGB": 1.5,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "pitch.swiftf0",
+      "kind": "pitch",
+      "role": "primary",
+      "runner": "qc.runners.swiftf0",
+      "runtime": "onnx",
+      "source": {
+        "host": "github-raw",
+        "repo": "lars76/swift-f0",
+        "revision": "d1ba77fe5331310b778ebe126b6cb3656d41d24f",
+        "files": {
+          "swift_f0/model.onnx": {
+            "sha256": "6385e8c2ebc3872e82c9ff5946228de44cd3be77a750ea53698b7dbfe94b0a22",
+            "bytes": 135090
+          }
+        }
+      },
+      "options": {
+        "modelFile": "swift_f0/model.onnx"
+      },
+      "license": "MIT",
+      "notice": "MIT: include 'Copyright (c) 2025-2026 Lars Nieradzik' and the MIT text.",
+      "licenseEvidence": "The PyPI metadata gives license_expression 'MIT'. The wheel ships swift_f0-0.3.0.dist-info/licenses/LICENSE. GitHub LICENSE at v0.3.0 (https://github.com/lars76/swift-f0/blob/d1ba77fe5331310b778ebe126b6cb3656d41d24f/LICENSE) reads 'MIT License, Copyright (c) 2025-2026 Lars Nieradzik'. The README '## License' section says 'MIT'.",
+      "memoryGB": 0.5,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "speaker.redimnet2-plus",
+      "kind": "speaker",
+      "role": "primary",
+      "runner": "qc.runners.redimnet",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "lab260/redimnet2-plus",
+        "revision": "fd45d1968c0ea91b62ad0d2469eee4607756bb07",
+        "files": {
+          "config.json": {
+            "sha256": "e6a0e07a52244ac2100fdd94f71650a9097c8bf9bb788565a54144d7990cfffd",
+            "bytes": 554
+          },
+          "pytorch_model_fsdp.bin": {
+            "sha256": "57056ea3ff1afcf6d825f0f44abc0a4c68fcdd6738ec36e23017df060712f02b",
+            "bytes": 100531990
+          }
+        }
+      },
+      "code": {
+        "host": "github-raw",
+        "repo": "lab260ru/redimnet2-plus",
+        "revision": "2a8d6dbd6d85e337a20b1d74ed3323c44bff86c5",
+        "license": "MIT",
+        "files": {
+          "LICENSE": {
+            "sha256": "0be8cd26e66ab887bca5615c5bd6aa9b40614094ba8f89afdd9181a98788b7dd",
+            "bytes": 1064
+          },
+          "asv/models/redimnet2.py": {
+            "sha256": "31449c0887e5b7ace96f15f759b5906bfa6e44762571f18cd04efc343c66975b",
+            "bytes": 5235
+          },
+          "asv/models/redimnet2_vendor/__init__.py": {
+            "sha256": "3b4d31e9980d6fde3df91ff6f1cccd9c7acdcbb344b1742f464523fa573dd15b",
+            "bytes": 1108
+          },
+          "asv/models/redimnet2_vendor/layers/attention.py": {
+            "sha256": "dcfb82870e66af8ca3c33dcf6d7d5c8aa5d6596d5f71f2543b8868308618f67f",
+            "bytes": 9786
+          },
+          "asv/models/redimnet2_vendor/layers/blocks.py": {
+            "sha256": "b634524a65255b7c44f72e22931b256c8be2a50c7d434655dfd7feac0d378fc5",
+            "bytes": 4343
+          },
+          "asv/models/redimnet2_vendor/layers/convnext.py": {
+            "sha256": "beaf94aa2c3661951b0b1ef1e6d65f77901f35fa7e19bd30469eee716496c5e1",
+            "bytes": 2756
+          },
+          "asv/models/redimnet2_vendor/layers/features.py": {
+            "sha256": "5ef8dfb33c3330bddb3c65f693bfe0df597056a287ced99450550e4f5ba34979",
+            "bytes": 5503
+          },
+          "asv/models/redimnet2_vendor/layers/features_tf.py": {
+            "sha256": "ccde8320f6449eff3e6e3fdb40417c0ce5da6d655bd2e34872c47ab042af151f",
+            "bytes": 17555
+          },
+          "asv/models/redimnet2_vendor/layers/layernorm.py": {
+            "sha256": "23900399027f6cae34b260e5778e076e0942ef886204b401221fe7c0c21bcabc",
+            "bytes": 2833
+          },
+          "asv/models/redimnet2_vendor/layers/poolings.py": {
+            "sha256": "f03849e5944e9fa6a7392b60cf3722e3e537a3e5cfd2988bd992c92ffc39a6a6",
+            "bytes": 11893
+          },
+          "asv/models/redimnet2_vendor/layers/redim_structural.py": {
+            "sha256": "93bae419bfdf11868c9e52dfb95578762b9c0a81e27a32ce930adcaefe457738",
+            "bytes": 3306
+          },
+          "asv/models/redimnet2_vendor/layers/resblocks.py": {
+            "sha256": "f79fbc2c7a6d88e9aa5efc4f5764ad137eafe1f5481b33ff7ed8811ee6a80778",
+            "bytes": 3965
+          },
+          "asv/models/redimnet2_vendor/redimnet2.py": {
+            "sha256": "56ff4d3f5e6b440d0186c977909fa4bdc1ecfa9e46014c917db1a8d0dc1e24d2",
+            "bytes": 12244
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0 weights: credit 'ReDimNet2+ (Borodin, Kudryavtsev, Mkrchian; LAB260)'. MIT code: keep the LAB260 and PalabraAI copyright lines if the code is vendored.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0', and the card's '## License' section says 'This model is released under the Apache 2.0 license.' (https://huggingface.co/lab260/redimnet2-plus/blob/fd45d1968c0ea91b62ad0d2469eee4607756bb07/README.md). The code is MIT: github.com/lab260ru/redimnet2-plus LICENSE 'Copyright (c) 2026 LAB260', and the vendored upstream github.com/PalabraAI/redimnet2 is MIT.",
+      "memoryGB": 1.5,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "mos.utmosv2",
+      "kind": "mos",
+      "role": "primary",
+      "runner": "qc.runners.utmosv2",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "sarulab-speech/UTMOSv2",
+        "revision": "506474f2b33dc77c234d668cc419be1861899cad",
+        "files": {
+          "fold0_s42_best_model.pth": {
+            "sha256": "c8149d988e4bbf3f347e6966b5d769de347a5f8c59ffca1dc4bd4bf5b8585e57",
+            "bytes": 818531314
+          },
+          "fold1_s42_best_model.pth": {
+            "sha256": "b25a27b8ce23d722395f76a2fff7c259421950458ffb240066edd01d3f28cd1f",
+            "bytes": 818531314
+          },
+          "fold2_s42_best_model.pth": {
+            "sha256": "c0beedbbed7ceef760adc556b925bf760639f281b20f75103b23fcdbdc5568f2",
+            "bytes": 818531314
+          },
+          "fold3_s42_best_model.pth": {
+            "sha256": "ec4b56921617c762428195daef9449855798bfdd651c95933afa9a29212b8567",
+            "bytes": 818531314
+          },
+          "fold4_s42_best_model.pth": {
+            "sha256": "f5176ac65f92653a14b3aea1878575a44ebe94ff7eaac4e9057029c19f52c720",
+            "bytes": 818531314
+          }
+        }
+      },
+      "dependencies": [
+        {
+          "name": "wav2vec2-base",
+          "license": "Apache-2.0",
+          "source": {
+            "host": "huggingface",
+            "repo": "facebook/wav2vec2-base",
+            "revision": "0b5b8e868dd84f03fd87d01f9c4ff0f080fecfe8",
+            "files": {
+              "config.json": {
+                "sha256": "4937977e24d12d1bba70cdce8709c3c04807a8e4ae8ddac4229c48c436ae99ae",
+                "bytes": 1842
+              },
+              "preprocessor_config.json": {
+                "sha256": "b225d617c025463b9e157e06afea8b90dc7078fc70b013c533328423e0486b4a",
+                "bytes": 159
+              },
+              "pytorch_model.bin": {
+                "sha256": "3249fe98bfc62fcbc26067f724716a6ec49d12c4728a2af1df659013905dff21",
+                "bytes": 380267417
+              }
+            }
+          }
+        },
+        {
+          "name": "efficientnetv2-s",
+          "license": "Apache-2.0",
+          "source": {
+            "host": "huggingface",
+            "repo": "timm/tf_efficientnetv2_s.in21k_ft_in1k",
+            "revision": "ea9abc143ea2b9d8e1ec1de277bce02149b9cf0e",
+            "files": {
+              "config.json": {
+                "sha256": "dc47b5c54ec8021e3ef2e02972d8c80ba91ec2fa6bf6b8e76566bf1a4f398c23",
+                "bytes": 638
+              },
+              "model.safetensors": {
+                "sha256": "6f1933fb6c0d760eae03863ad0110570393e16c0610f8fe94dc9f978e52ec59c",
+                "bytes": 86523256
+              }
+            }
+          }
+        }
+      ],
+      "license": "MIT",
+      "notice": "MIT: include 'Copyright (c) 2024 sarulab-speech'. Cite Baba et al., SLT 2024. The dependencies below are Apache-2.0.",
+      "licenseEvidence": "The model card front matter says 'license: mit' (https://huggingface.co/sarulab-speech/UTMOSv2/blob/506474f2b33dc77c234d668cc419be1861899cad/README.md). The GitHub LICENSE at cc2700db57bb83ee13dc31ebe1b868c254e15d09 is 'MIT License, Copyright (c) 2024 sarulab-speech'.",
+      "memoryGB": 3.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "aesthetics.audiobox-aesthetics",
+      "kind": "aesthetics",
+      "role": "primary",
+      "runner": "qc.runners.audiobox",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "facebook/audiobox-aesthetics",
+        "revision": "9b1dd8e5df9af7216e836a98974fe3b82c56ded6",
+        "files": {
+          "config.json": {
+            "sha256": "0b8eabc5ced92cefed116a3aca8f1e59d2a33dc4d376b9e86dfb9c072e1d280d",
+            "bytes": 492
+          },
+          "model.safetensors": {
+            "sha256": "a5a3c2412649cc2384ec525ffd5180ce6c4778f43bed6108e0a1303de04d014e",
+            "bytes": 415472992
+          }
+        }
+      },
+      "license": "CC-BY-4.0",
+      "notice": "CC BY 4.0 requires attribution: 'Meta Audiobox Aesthetics (Tjandra et al., 2025), facebook/audiobox-aesthetics, CC BY 4.0', with links. The WavLM-derived parts come from microsoft/unilm under MIT.",
+      "licenseEvidence": "The card front matter says 'license: cc-by-4.0'. The card's '## License' section reads: 'The majority of audiobox-aesthetics is licensed under CC-BY 4.0, as found in the LICENSE file. However, portions of the project are available under separate license terms: https://github.com/microsoft/unilm is licensed under MIT license.' (https://huggingface.co/facebook/audiobox-aesthetics/blob/9b1dd8e5df9af7216e836a98974fe3b82c56ded6/README.md). The GitHub repo facebookresearch/audiobox-aesthetics is CC-BY-4.0, as is the audiobox_aesthetics 0.0.4 package on PyPI.",
+      "memoryGB": 2.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "llm.gemma-4-12b-it-qat",
+      "kind": "llm",
+      "role": "primary",
+      "runner": "qc.runners.gemma",
+      "runtime": "llamacpp",
+      "source": {
+        "host": "huggingface",
+        "repo": "google/gemma-4-12B-it-qat-q4_0-gguf",
+        "revision": "29d097773436b69ff9feafd636ab4cf873786537",
+        "files": {
+          "gemma-4-12b-it-qat-q4_0.gguf": {
+            "sha256": "93567e57a8fe10b23569b9d9ec38cd005deedf71e29477c421a4b83f418a538b",
+            "bytes": 6975879296
+          },
+          "mmproj-gemma-4-12b-it-qat-q4_0.gguf": {
+            "sha256": "cb018338a7538a9814d994bfe54644c71eb7ed54e31eae2f721e45fd3c260da7",
+            "bytes": 175115616
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0: keep the license text and credit 'Gemma 4 by Google DeepMind'. No NOTICE file is shipped.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' and 'license_link: https://ai.google.dev/gemma/docs/gemma_4_license', and the card header reads '**License**: Apache 2.0' (https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/blob/29d097773436b69ff9feafd636ab4cf873786537/README.md). The license_link page, titled 'Apache License 2.0 | Gemma' and last updated 2026-04-01, contains only the Apache License 2.0 text. 'Terms of use' and 'Prohibited use' appear only as site navigation links. The repo is not gated, unlike Gemma 3 (license:gemma, gated 'manual'). The GGUF metadata in the mmproj sets general.license=apache-2.0. Gemma 4 is therefore Apache-2.0, not the Gemma Terms of Use.",
+      "memoryGB": 9.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "runtime.llamacpp",
+      "kind": "runtime",
+      "role": "primary",
+      "runner": null,
+      "runtime": "llamacpp",
+      "source": {
+        "host": "github-release",
+        "repo": "ggml-org/llama.cpp",
+        "tag": "b11146",
+        "revision": "7fe450e19305b828c199d602c23a8337aaa1f03b",
+        "files": {
+          "llama-b11146-bin-macos-arm64.tar.gz": {
+            "sha256": "1ad3f9eff80edb9dbef4259ad564d1720612ef7eea48fa4afed0e54f5f3d5711",
+            "bytes": 11189714,
+            "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11146/llama-b11146-bin-macos-arm64.tar.gz"
+          }
+        }
+      },
+      "license": "MIT",
+      "notice": "MIT: include 'Copyright (c) 2023-2026 The ggml authors'.",
+      "licenseEvidence": "The LICENSE at 7fe450e19305b828c199d602c23a8337aaa1f03b reads 'MIT License, Copyright (c) 2023-2026 The ggml authors' (https://github.com/ggml-org/llama.cpp/blob/7fe450e19305b828c199d602c23a8337aaa1f03b/LICENSE).",
+      "version": 1
+    },
+    {
+      "id": "phones.wav2vec2-xlsr-53-espeak-cv-ft",
+      "kind": "phones",
+      "role": "fallback",
+      "runner": "qc.runners.wav2vec2_phones",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "facebook/wav2vec2-xlsr-53-espeak-cv-ft",
+        "revision": "2c733782da5604684829819a5eb744c193fe9398",
+        "files": {
+          "config.json": {
+            "sha256": "4609fb49b7e1d28aecb2840da1926c40bd915bc6f1120a940afacf7159bbfb13",
+            "bytes": 1856
+          },
+          "preprocessor_config.json": {
+            "sha256": "a2254a5b58f72cd4de3632f8eee64f3f098b7c1402128d2f419e7d00ae13e335",
+            "bytes": 212
+          },
+          "pytorch_model.bin": {
+            "sha256": "04366b6c8d24099ef313cf02f0e58d26f5dddfda16edbfc8eb2c713d94a9f551",
+            "bytes": 1263535127
+          },
+          "special_tokens_map.json": {
+            "sha256": "bb7068de1150661a10b55f9e4b12a0e77af8bf91f5e45e1b58afaf1d0e17f675",
+            "bytes": 85
+          },
+          "tokenizer_config.json": {
+            "sha256": "d663833dacef7d29f563e23029d448fe41415dbe5e8e6d5a98b598a5258c18d8",
+            "bytes": 412
+          },
+          "vocab.json": {
+            "sha256": "d732ab2456c0c017930001dc9af0b41b3b93d25b2eb9740bf9d925508d7d87d0",
+            "bytes": 4637
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Credit 'wav2vec2-xlsr-53-espeak-cv-ft, Meta AI (Xu, Baevski, Auli 2021)'.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/facebook/wav2vec2-xlsr-53-espeak-cv-ft/blob/2c733782da5604684829819a5eb744c193fe9398/README.md).",
+      "memoryGB": 3.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "llm.qwen2.5-omni-7b",
+      "kind": "llm",
+      "role": "fallback",
+      "runner": "qc.runners.qwen_omni",
+      "runtime": "llamacpp",
+      "source": {
+        "host": "huggingface",
+        "repo": "ggml-org/Qwen2.5-Omni-7B-GGUF",
+        "revision": "89b785438c8901d4635e42f50480ba5985a1bbf1",
+        "files": {
+          "Qwen2.5-Omni-7B-Q4_K_M.gguf": {
+            "sha256": "09883dff531dc56923a041c9c99c7c779e26ffde32caa83adeeb7502ec3b50fe",
+            "bytes": 4683072384
+          },
+          "mmproj-Qwen2.5-Omni-7B-f16.gguf": {
+            "sha256": "7ed062b35f15f3c4cacdac72d5291db2f908f178ba4fb19e210b555f233e069d",
+            "bytes": 2643656480
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0: credit 'Qwen2.5-Omni by Alibaba Cloud Qwen team'.",
+      "licenseEvidence": "The upstream weights are Apache-2.0. Qwen/Qwen2.5-Omni-7B@ae9e1690543ffd5c0221dc27f79834d0294cba00 has a LICENSE file with the Apache License 2.0 text, ending 'Copyright 2025 Alibaba Cloud ... Licensed under the Apache License, Version 2.0' (https://huggingface.co/Qwen/Qwen2.5-Omni-7B/blob/ae9e1690543ffd5c0221dc27f79834d0294cba00/LICENSE), and its card says license_name 'apache-2.0'. The GGUF's own metadata (mmproj header) sets general.license.name=apache-2.0 and links that LICENSE. MISLABEL: the ggml-org README front matter says 'license: other / license_name: qwen-research', which is the license of Qwen2.5-Omni-3B, while pointing to the 7B Apache LICENSE.",
+      "memoryGB": 9.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "asr.qwen3-asr-1.7b-8bit",
+      "kind": "asr",
+      "role": "alternate",
+      "runner": "qc.runners.qwen3_asr",
+      "runtime": "mlx",
+      "source": {
+        "host": "huggingface",
+        "repo": "mlx-community/Qwen3-ASR-1.7B-8bit",
+        "revision": "a8379a2e2f9e313c9292cdf1af4055ab56d50d55",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "1b76b3b6c655fc54595da025f7a96474ad9fa86363303fbdd61a7d8483ccfaf7",
+            "bytes": 7188
+          },
+          "generation_config.json": {
+            "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+            "bytes": 142
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model.safetensors": {
+            "sha256": "bf304b009cc7eca79283056f787b44c952d24ac22cec787b39732bba3c23c13c",
+            "bytes": 2463307541
+          },
+          "model.safetensors.index.json": {
+            "sha256": "0a5d0ec11188602242ff81a9969883d0fdeb98cd5d85cd1413089d897c201af5",
+            "bytes": 78968
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+            "bytes": 12487
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit/blob/a8379a2e2f9e313c9292cdf1af4055ab56d50d55/README.md). Upstream as for asr.qwen3-asr-1.7b.",
+      "memoryGB": 4.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "asr.qwen3-asr-1.7b-upstream",
+      "kind": "asr",
+      "role": "alternate",
+      "runner": "qc.runners.qwen3_asr",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "Qwen/Qwen3-ASR-1.7B",
+        "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "2e74a751548b8ad7d7526d29365ad8144c345d8b412b1152d25dc6698452712f",
+            "bytes": 6194
+          },
+          "generation_config.json": {
+            "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+            "bytes": 142
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model-00001-of-00002.safetensors": {
+            "sha256": "a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6",
+            "bytes": 4220320824
+          },
+          "model-00002-of-00002.safetensors": {
+            "sha256": "6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc",
+            "bytes": 478200688
+          },
+          "model.safetensors.index.json": {
+            "sha256": "f994739fe38e5210b9e3e8ce6c6307315e2ceac3cb630e7b7414d69dce520f60",
+            "bytes": 64821
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+            "bytes": 12487
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ASR-1.7B/blob/7278e1e70fe206f11671096ffdd38061171dd6e5/README.md). There is no LICENSE file in the repo. Code at github.com/QwenLM/Qwen3-ASR is Apache-2.0.",
+      "memoryGB": 7.0,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "align.qwen3-forcedaligner-0.6b-8bit",
+      "kind": "align",
+      "role": "alternate",
+      "runner": "qc.runners.qwen3_aligner",
+      "runtime": "mlx",
+      "source": {
+        "host": "huggingface",
+        "repo": "mlx-community/Qwen3-ForcedAligner-0.6B-8bit",
+        "revision": "0e1a68e91d815300c7c9754b2a7639378b23db15",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "8dc126e1a4ac001acb02f3a9ca6277c8a20a25485fde293bc99eeab3aedc604d",
+            "bytes": 6940
+          },
+          "generation_config.json": {
+            "sha256": "948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c",
+            "bytes": 115
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model.safetensors": {
+            "sha256": "be19ef8ac4326d032e7673342930b14c2df30bd68c1632493b0f563e30829f91",
+            "bytes": 1271924386
+          },
+          "model.safetensors.index.json": {
+            "sha256": "766eb50873855eeb4d95ab92def358cfd173bfc8c7aabd8635ababa1edf6db79",
+            "bytes": 79108
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c",
+            "bytes": 12666
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/mlx-community/Qwen3-ForcedAligner-0.6B-8bit/blob/0e1a68e91d815300c7c9754b2a7639378b23db15/README.md).",
+      "memoryGB": 2.5,
+      "languages": "any",
+      "version": 1
+    },
+    {
+      "id": "align.qwen3-forcedaligner-0.6b-upstream",
+      "kind": "align",
+      "role": "alternate",
+      "runner": "qc.runners.qwen3_aligner",
+      "runtime": "torch",
+      "source": {
+        "host": "huggingface",
+        "repo": "Qwen/Qwen3-ForcedAligner-0.6B",
+        "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+        "files": {
+          "chat_template.json": {
+            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+            "bytes": 1161
+          },
+          "config.json": {
+            "sha256": "d616c65d46c4b90bdc651b0a0963ea932732241140f337f9bb6b0335a9c8ef09",
+            "bytes": 5982
+          },
+          "generation_config.json": {
+            "sha256": "948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c",
+            "bytes": 115
+          },
+          "merges.txt": {
+            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            "bytes": 1671853
+          },
+          "model.safetensors": {
+            "sha256": "47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7",
+            "bytes": 1835544544
+          },
+          "preprocessor_config.json": {
+            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+            "bytes": 330
+          },
+          "tokenizer_config.json": {
+            "sha256": "3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c",
+            "bytes": 12666
+          },
+          "vocab.json": {
+            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            "bytes": 2776833
+          }
+        }
+      },
+      "license": "Apache-2.0",
+      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
+      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/blob/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/README.md).",
+      "memoryGB": 3.5,
+      "languages": "any",
+      "version": 1
+    }
+  ]
+}

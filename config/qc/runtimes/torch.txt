@@ -1,0 +1,4 @@
+# Vocello QC v2 runtime "torch": PyTorch runners (ReDimNet2+, UTMOSv2, Audiobox Aesthetics).
+# One requirement per line, each pinned with == (or an https direct reference).
+# Installed by: python3 scripts/qc.py runtimes setup --runtime torch
+# into build/cache/qc/runtimes/torch; a change here makes the venv stale until setup re-runs.

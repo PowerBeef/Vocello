@@ -307,9 +307,11 @@ def queue(layout: Layout, top: int, *, run_id: str | None = None, name: str | No
         labelled.update(item["takeToken"] for item in batch["items"] if item["token"] in labels)
 
     def rank(entry: dict[str, Any]) -> tuple:
-        level = max((LEVEL_RANK[flag["level"]] for flag in entry["flags"]), default=-1)
+        # Advisory flags (loudness) never rank a take for listening.
+        flags = [flag for flag in entry["flags"] if flag.get("class")]
+        level = max((LEVEL_RANK[flag["level"]] for flag in flags), default=-1)
         raw = max((value for value in entry["rawScores"].values() if value is not None), default=float("-inf"))
-        return (level, len(entry["flags"]), raw)
+        return (level, len(flags), raw)
 
     candidates = [entry for entry in flags["takes"] if entry["token"] not in labelled and entry["token"] in takes]
     chosen = sorted(candidates, key=rank, reverse=True)[:top]

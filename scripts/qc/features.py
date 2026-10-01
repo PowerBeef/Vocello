@@ -226,23 +226,60 @@ def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | Non
     indices = np.flatnonzero(voiced)
     if indices.size < 2 or speech_median is None:
         return out
+    # Periodicity flickers around its threshold: bridge holes of 30 ms or less, so one voiced
+    # sound is one run (the fr-0101--dylan blip otherwise splits into three 10 ms runs).
+    voiced = voiced.copy()
+    for start, end in _runs(~voiced):
+        if start > 0 and end < voiced.size and (end - start) * hop <= 0.03 + 1e-9:
+            voiced[start:end] = True
     runs = _runs(voiced)
     blip_frames = int(round(0.12 / hop))
     margin = int(round(0.15 / hop))
+    quiet = profile["level"] < speech_median - 20.0
+    quiet_frames = int(round(0.10 / hop))
+
+    def quiet_run(index: int, step: int) -> int:
+        count = 0
+        while 0 <= index < quiet.size and quiet[index]:
+            count += 1
+            index += step
+        return count
+
     speech = voiced.copy()
     blips: list[tuple[int, int]] = []
     for position, (start, end) in enumerate(runs):
         before = start - runs[position - 1][1] if position > 0 else None
         after = runs[position + 1][0] - end if position + 1 < len(runs) else None
-        if end - start < blip_frames and before is not None and after is not None and before >= margin and after >= margin:
+        # A blip is a short voiced sound isolated in non-speech and next to quiet: a short vowel
+        # between unvoiced consonants (the "o" of "obstruaient" before /pstʁ/) is speech.
+        isolated = before is not None and after is not None and before >= margin and after >= margin
+        # Skip the frames whose 25 ms window still overlaps the run itself.
+        overlap = int(math.ceil(float(profile["window"]) / hop)) - 1
+        beside = max(quiet_run(start - 1 - overlap, -1), quiet_run(end + overlap, 1))
+        if end - start < blip_frames and isolated and beside >= quiet_frames:
             speech[start:end] = False
             blips.append((start, end))
     inside = np.flatnonzero(speech)
     if inside.size < 2:
         return out
     first, last = int(inside[0]), int(inside[-1])
-    gaps = [(first + start, first + end) for start, end in _runs(~speech[first:last + 1])]
+    edge = int(round(0.12 / hop))
+
+    def trimmed(start: int, end: int) -> tuple[int, int]:
+        # The unvoiced consonants that end and start words (a final /s/, a /t/ burst) are speech:
+        # trim up to 120 ms of loud unvoiced frames at each edge of the gap.
+        lo = start
+        while lo < end and lo - start < edge and not quiet[lo]:
+            lo += 1
+        hi = end
+        while hi > lo and end - hi < edge and not quiet[hi - 1]:
+            hi -= 1
+        return (lo, hi) if hi > lo else (start, start)
+
+    gaps = [trimmed(first + start, first + end) for start, end in _runs(~speech[first:last + 1])]
     best = max(gaps, key=lambda gap: gap[1] - gap[0], default=None)
+    if best and best[1] <= best[0]:
+        best = None
     gap_seconds, gap_start, gap_end = 0.0, None, None
     if best:
         gap_start, gap_end = float(profile["time"][best[0]]), float(profile["time"][best[1] - 1]) + hop
@@ -263,7 +300,13 @@ def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | Non
     for start, end in blips:
         in_blip[start:end] = True
     nonspeech = frames & ~in_blip & ~voiced
-    loudest = float(profile["level"][nonspeech].max()) if nonspeech.any() else None
+    # Sustained noise, not a transient: the loudest 100 ms median of the gap's non-speech frames.
+    levels = profile["level"][nonspeech]
+    width = max(1, int(round(0.10 / hop)))
+    if levels.size >= width:
+        loudest = float(np.median(np.lib.stride_tricks.sliding_window_view(levels, width), axis=1).max())
+    else:
+        loudest = float(np.median(levels)) if levels.size else None
     out["pause.nonspeech_level_db"] = feature(None if loudest is None else loudest - speech_median, gap_start, gap_end)
     inside_blips = [(start, end) for start, end in blips
                     if profile["time"][start] >= gap_start - 1e-9 and profile["time"][end - 1] < gap_end]

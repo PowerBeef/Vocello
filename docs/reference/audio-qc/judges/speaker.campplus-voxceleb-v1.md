@@ -59,12 +59,10 @@ Its accuracy is claimed only through the detectors that consume it:
 
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
-| [`identity.clone-similarity@1`](../detectors/identity.clone-similarity-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine` | not qualified |
-| [`identity.window-drift@1`](../detectors/identity.window-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `windowCosineMinimum` | not qualified |
-| [`identity.onset-drift@1`](../detectors/identity.onset-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `onsetWindowCosine` | not qualified |
+| [`identity.clone-similarity@1`](../detectors/identity.clone-similarity-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine` | qualified (warn) |
+| [`identity.window-drift@1`](../detectors/identity.window-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `windowCosineMinimum` | refused |
+| [`identity.onset-drift@1`](../detectors/identity.onset-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `onsetWindowCosine` | qualified (warn) |
 | [`long-form.seam-identity@1`](../detectors/long-form.seam-identity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `seamWindowCosineMinimum` | not qualified |
-
-**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

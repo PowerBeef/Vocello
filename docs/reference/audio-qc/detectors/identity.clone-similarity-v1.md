@@ -47,12 +47,44 @@ Excludes russian: The speaker group of config/audio-qc-corpora.json has no corpu
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Qualified (warn); confirmed (qualified).
 
 **Plan.** [config/audio-qc-preregistrations/identity.clone-similarity@1.json](../../../../config/audio-qc-preregistrations/identity.clone-similarity@1.json): digest `720ee2ad12359417`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N2; injector catalog 3, classes E, 150 per cell.
 Calibration cohort audio-qc-n2-cohort (speaker-corpora-v1-calibration, manifest `efc0efc2306671e6`); confirmation cohort audio-qc-n2-cohort (speaker-corpora-v1-confirmation, manifest `02ccee35215e5844`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry qualified.
 
-**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+### Record [record-720ee2ad12359417.json](../../../../benchmarks/audio-qc-calibration/identity.clone-similarity@1/record-720ee2ad12359417.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `720ee2ad12359417`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.640969 | 2/167 (0.012), upper 0.053 | 0.2 | yes |
+| english | 0.515217 | 14/339 (0.041), upper 0.076 | 0.2 | yes |
+| french | 0.652362 | 14/325 (0.043), upper 0.080 | 0.2 | yes |
+| german | 0.688542 | 27/441 (0.061), upper 0.096 | 0.2 | yes |
+| italian | 0.682851 | 19/242 (0.079), upper 0.132 | 0.2 | yes |
+| korean | 0.692457 | 32/580 (0.055), upper 0.083 | 0.2 | yes |
+| portuguese | 0.654755 | 5/219 (0.023), upper 0.062 | 0.2 | yes |
+| spanish | 0.668489 | 13/340 (0.038), upper 0.072 | 0.2 | yes |
+| pooled | - | 126/2653 (0.047), upper 0.055 | 0.1 | yes |
+
+Per-language bounds at confidence 0.99375 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2653 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-parallel-corpus | IDN-IMPOSTOR/severe | 149/150 (0.993), lower 0.969 | 0.7 | yes |
+| T1-pcm-construction | IDN-SHIFT/severe | 150/150 (1.000), lower 0.980 | 0.7 | yes |
+
+Mechanisms meeting: T1-parallel-corpus, T1-pcm-construction (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| IDN-IMPOSTOR | 8/150 (0.053), upper 0.094 | yes | yes |
+| IDN-SHIFT | 5/150 (0.033), upper 0.069 | yes | no |
+
+Counts: calibration 2674 clips, 2674 families, 0 abstained; confirmation N2 2653 clips, 2653 families, 0 abstained; P1 300 clips, 289 families, 0 abstained; S 300 clips, 290 families, 0 abstained. Speakers: 285 (identified, unit `corpus-speaker`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `speaker-corpora-v1`, `speaker-reference-clip`, `speaker-reference-n2`, `speaker-gender-unlabelled`; risks: `resnet293-not-voting`.
 <!-- END GENERATED audio-qc-docs:qualification -->

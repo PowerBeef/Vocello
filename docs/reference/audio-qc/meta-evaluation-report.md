@@ -27,12 +27,12 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | confirmed (qualified) | qualified (warn) | 200/3718 (0.054), upper 0.060 | english 19/236 (0.081), upper 0.137 | 150/150 (1.000), lower 0.980 | 0/3718 (0.000), upper 0.001 | 3718 / 150 / 150 | [record-67b4358cc9d3e121.json](../../../benchmarks/audio-qc-calibration/language.consensus-lid@1/record-67b4358cc9d3e121.json) |
 | [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | confirmed (qualified) | qualified (warn) | 126/2653 (0.047), upper 0.055 | italian 19/242 (0.079), upper 0.132 | 149/150 (0.993), lower 0.969 | 0/2653 (0.000), upper 0.001 | 2653 / 289 / 290 | [record-720ee2ad12359417.json](../../../benchmarks/audio-qc-calibration/identity.clone-similarity@1/record-720ee2ad12359417.json) |
+| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | confirmed (refused) | refused | 145/2653 (0.055), upper 0.062 | chinese 10/167 (0.060), upper 0.122 | 66/150 (0.440), lower 0.371 | 0/2653 (0.000), upper 0.001 | 2653 / 150 / 150 | [record-dd56165e2339406c.json](../../../benchmarks/audio-qc-calibration/identity.window-drift@1/record-dd56165e2339406c.json) |
+| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | confirmed (qualified) | qualified (warn) | 146/2653 (0.055), upper 0.063 | chinese 16/167 (0.096), upper 0.167 | 124/150 (0.827), lower 0.768 | 0/2653 (0.000), upper 0.001 | 2653 / 150 / 150 | [record-48a8ea0ff03938b2.json](../../../benchmarks/audio-qc-calibration/identity.onset-drift@1/record-48a8ea0ff03938b2.json) |
 | [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | confirmed (refused) | refused | 88/2366 (0.037), upper 0.044 | chinese 17/235 (0.072), upper 0.127 | 10/150 (0.067), lower 0.037 | 15/2381 (0.006), upper 0.010 | - / 150 / 150 | [record-c679ae3740eb5101.json](../../../benchmarks/audio-qc-calibration/prosody.pitch-instability@1/record-c679ae3740eb5101.json) |
 | [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
@@ -516,6 +516,158 @@ Counts: calibration 1888 clips, 1888 families, 0 abstained; confirmation N2 3718
 N3 (report-only): flag rate 119/791 (0.150), upper 0.173; FAR bound pi 0.05: 0.158361, pi 0.1: 0.167158, pi 0.2: 0.188053.
 
 Judge output identities: `asr.whisper-large-v3@1` `0bdd27ea106e2512`, `lid.voxlingua107-ecapa@1` `49294258d799b54d`. Record limitations: `fleurs-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`; risks: `voxlingua-weak-german-russian`.
+
+### `identity.clone-similarity@1`
+
+Qualified (warn); confirmed (qualified). Definition: [identity.clone-similarity-v1.md](detectors/identity.clone-similarity-v1.md).
+
+#### Record [record-720ee2ad12359417.json](../../../benchmarks/audio-qc-calibration/identity.clone-similarity@1/record-720ee2ad12359417.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `720ee2ad12359417`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.640969 | 2/167 (0.012), upper 0.053 | 0.2 | yes |
+| english | 0.515217 | 14/339 (0.041), upper 0.076 | 0.2 | yes |
+| french | 0.652362 | 14/325 (0.043), upper 0.080 | 0.2 | yes |
+| german | 0.688542 | 27/441 (0.061), upper 0.096 | 0.2 | yes |
+| italian | 0.682851 | 19/242 (0.079), upper 0.132 | 0.2 | yes |
+| korean | 0.692457 | 32/580 (0.055), upper 0.083 | 0.2 | yes |
+| portuguese | 0.654755 | 5/219 (0.023), upper 0.062 | 0.2 | yes |
+| spanish | 0.668489 | 13/340 (0.038), upper 0.072 | 0.2 | yes |
+| pooled | - | 126/2653 (0.047), upper 0.055 | 0.1 | yes |
+
+Per-language bounds at confidence 0.99375 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2653 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-parallel-corpus | IDN-IMPOSTOR/severe | 149/150 (0.993), lower 0.969 | 0.7 | yes |
+| T1-pcm-construction | IDN-SHIFT/severe | 150/150 (1.000), lower 0.980 | 0.7 | yes |
+
+Mechanisms meeting: T1-parallel-corpus, T1-pcm-construction (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| IDN-IMPOSTOR | 8/150 (0.053), upper 0.094 | yes | yes |
+| IDN-SHIFT | 5/150 (0.033), upper 0.069 | yes | no |
+
+Counts: calibration 2674 clips, 2674 families, 0 abstained; confirmation N2 2653 clips, 2653 families, 0 abstained; P1 300 clips, 289 families, 0 abstained; S 300 clips, 290 families, 0 abstained. Speakers: 285 (identified, unit `corpus-speaker`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `speaker-corpora-v1`, `speaker-reference-clip`, `speaker-reference-n2`, `speaker-gender-unlabelled`; risks: `resnet293-not-voting`.
+
+### `identity.window-drift@1`
+
+Refused; confirmed (refused). Definition: [identity.window-drift-v1.md](detectors/identity.window-drift-v1.md).
+
+**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+#### Record [record-dd56165e2339406c.json](../../../benchmarks/audio-qc-calibration/identity.window-drift@1/record-dd56165e2339406c.json): refused (cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `dd56165e2339406c`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.295287 | 10/167 (0.060), upper 0.122 | 0.2 | yes |
+| english | 0.355626 | 14/339 (0.041), upper 0.076 | 0.2 | yes |
+| french | 0.732943 | 21/325 (0.065), upper 0.107 | 0.2 | yes |
+| german | 0.672082 | 23/441 (0.052), upper 0.085 | 0.2 | yes |
+| italian | 0.531379 | 10/242 (0.041), upper 0.085 | 0.2 | yes |
+| korean | 0.551318 | 37/580 (0.064), upper 0.094 | 0.2 | yes |
+| portuguese | 0.665491 | 14/219 (0.064), upper 0.117 | 0.2 | yes |
+| spanish | 0.708361 | 16/340 (0.047), upper 0.084 | 0.2 | yes |
+| pooled | - | 145/2653 (0.055), upper 0.062 | 0.1 | yes |
+
+Per-language bounds at confidence 0.99375 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2653 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | IDN-SWAP/severe | 66/150 (0.440), lower 0.371 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| IDN-SWAP | 8/150 (0.053), upper 0.094 | yes | yes |
+
+Counts: calibration 2674 clips, 2674 families, 0 abstained; confirmation N2 2653 clips, 2653 families, 0 abstained; P1 150 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 285 (identified, unit `corpus-speaker`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `speaker-corpora-v1`, `speaker-reference-clip`, `speaker-reference-n2`, `speaker-gender-unlabelled`; risks: `resnet293-not-voting`, `short-window-embeddings`.
+
+### `identity.onset-drift@1`
+
+Qualified (warn); confirmed (qualified). Definition: [identity.onset-drift-v1.md](detectors/identity.onset-drift-v1.md).
+
+#### Record [record-48a8ea0ff03938b2.json](../../../benchmarks/audio-qc-calibration/identity.onset-drift@1/record-48a8ea0ff03938b2.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `48a8ea0ff03938b2`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.229214 | 16/167 (0.096), upper 0.167 | 0.2 | yes |
+| english | 0.248371 | 16/339 (0.047), upper 0.084 | 0.2 | yes |
+| french | 0.45959 | 8/325 (0.025), upper 0.055 | 0.2 | yes |
+| german | 0.396356 | 25/441 (0.057), upper 0.090 | 0.2 | yes |
+| italian | 0.379684 | 14/242 (0.058), upper 0.106 | 0.2 | yes |
+| korean | 0.373334 | 27/580 (0.047), upper 0.073 | 0.2 | yes |
+| portuguese | 0.405976 | 17/219 (0.078), upper 0.134 | 0.2 | yes |
+| spanish | 0.375066 | 23/340 (0.068), upper 0.109 | 0.2 | yes |
+| pooled | - | 146/2653 (0.055), upper 0.063 | 0.1 | yes |
+
+Per-language bounds at confidence 0.99375 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2653 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | IDN-ONSET/severe | 124/150 (0.827), lower 0.768 | 0.7 | yes |
+
+Mechanisms meeting: T1-pcm-construction (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| IDN-ONSET | 8/150 (0.053), upper 0.094 | yes | yes |
+
+Counts: calibration 2674 clips, 2674 families, 0 abstained; confirmation N2 2653 clips, 2653 families, 0 abstained; P1 150 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 285 (identified, unit `corpus-speaker`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `speaker-corpora-v1`, `speaker-reference-clip`, `speaker-reference-n2`, `speaker-gender-unlabelled`; risks: `resnet293-not-voting`, `short-window-embeddings`, `onset-joint-rule-pending`.
+
+### `prosody.pitch-instability@1`
+
+Refused; confirmed (refused). Definition: [prosody.pitch-instability-v1.md](detectors/prosody.pitch-instability-v1.md).
+
+**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+#### Record [record-c679ae3740eb5101.json](../../../benchmarks/audio-qc-calibration/prosody.pitch-instability@1/record-c679ae3740eb5101.json): refused (cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `c679ae3740eb5101`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 2.65487 | 17/235 (0.072), upper 0.127 | 0.2 | yes |
+| english | 2.45399 | 11/237 (0.046), upper 0.094 | 0.2 | yes |
+| french | 2.42215 | 14/236 (0.059), upper 0.111 | 0.2 | yes |
+| german | 2.58303 | 9/236 (0.038), upper 0.083 | 0.2 | yes |
+| italian | 2.98507 | 2/237 (0.008), upper 0.039 | 0.2 | yes |
+| japanese | 2.24439 | 6/239 (0.025), upper 0.064 | 0.2 | yes |
+| korean | 2.20441 | 7/232 (0.030), upper 0.072 | 0.2 | yes |
+| portuguese | 2.30415 | 8/238 (0.034), upper 0.076 | 0.2 | yes |
+| russian | 2.46575 | 7/238 (0.029), upper 0.070 | 0.2 | yes |
+| spanish | 2.71003 | 7/238 (0.029), upper 0.070 | 0.2 | yes |
+| pooled | - | 88/2366 (0.037), upper 0.044 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 15/2381 (0.006), upper 0.010 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | PRS-ERRATIC/severe | 10/150 (0.067), lower 0.037 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| PRS-ERRATIC | 8/150 (0.053), upper 0.094 | yes | no |
+
+Counts: calibration 2370 clips, 2370 families, 24 abstained; confirmation N3 2381 clips, 2381 families, 15 abstained; P1 150 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 175 (identified, unit `vocello-voice`).
+
+Judge output identities: `pitch.pyin@1` `a12f12f5cf71a807`. Record limitations: `n3-expressive-negatives`, `n3-clone-takes`; risks: `pyin-tracker-unvalidated`, `pyin-raw-track-export`.
 
 ## Judge canaries
 

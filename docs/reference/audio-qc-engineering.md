@@ -3156,6 +3156,30 @@ the N3 calibration split, or the 2026-09-27 cohort the v1 records reported on. A
 its informational N3 cohort as spent, so a later fail plan cannot bound its N3 flag rate on that
 cohort.
 
+**Class E and F confirmations (2026-10-01).** Two of the four confirmations qualified:
+
+- `identity.clone-similarity@1` qualified, with IDN-IMPOSTOR severe at 0.993 and IDN-SHIFT severe at 1.0.
+- `identity.onset-drift@1` qualified, with IDN-ONSET severe at 0.827.
+- `identity.window-drift@1` was refused: IDN-SWAP severe reached 0.44. This is a real signal below
+  the 0.70 bar.
+- `prosody.pitch-instability@1` was refused: PRS-ERRATIC severe reached 0.067, against a sham rate of
+  0.053.
+
+The pitch refusal measured the injector, not the detector. `pitch_shift` (sinc resampling, then a plain
+overlap-add stretch on a fixed 10 ms hop) leaves most speaking voices near their original pitch. pYIN
+reads a synthetic 140 Hz voice shifted +7 st at 124 Hz (expected 210 Hz) and shifted -7 st at 176 Hz
+(expected 93 Hz). Only an upward shift of a voice at about 220 Hz lands where intended. On the
+confirmation takes, the PRS-ERRATIC spans shifted up read +7.7 st, but the spans shifted down read
++1.1 st, so most of the planned 14 st steps never formed. PRS-OCT, PRS-BRK and IDN-SHIFT share the
+shifter, and PRS-RATE shares the stretch.
+
+The committed catalog-3 plans stay as registered, which includes the reserve plans of
+`prosody.pitch-break@1` and `prosody.octave-jump@1`. A changed plan needs a new detector version, and
+the one reserve-2 set that every reserve plan binds is built from catalog 3. Corrected injector
+versions come in a later catalog, under new versions of the pitch detectors, on cohorts that have
+not been scored. IDN-SHIFT's distorted output explains its 1.0, so clone-similarity's qualification
+rests on its corpus impostors.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

@@ -1,0 +1,414 @@
+{
+  "a4": {
+    "cells": [
+      "IDN-IMPOSTOR",
+      "IDN-SHIFT"
+    ],
+    "uninformative": {
+      "IDN-SHIFT": "sham-audio-is-clean-cohort-audio"
+    },
+    "unit": "injector"
+  },
+  "class": "E",
+  "cohorts": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "efc0efc2306671e65b222917cbd831d14d58152e57e346829f17f990d38ae09d",
+      "scoresSHA256": "72d2b6fb21bdacdc30c2c2a64a2806a07f245f166840f0d31599ac0419b97467",
+      "source": "speaker-corpora-v1-calibration"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "02ccee35215e5844c1f46e39b3b4f40d31635321a94ee2ce7a6e09e09c506079",
+      "scoresSHA256": "c3d620d71cb6cb58810dfd7b7dc05bc87154fde964acc57ac2067b020a2e7cd8",
+      "source": "speaker-corpora-v1-confirmation"
+    }
+  },
+  "combination": "single",
+  "counts": {
+    "calibration": {
+      "abstainedClips": 0,
+      "clips": 2674,
+      "families": 2674
+    },
+    "confirmation": {
+      "N2": {
+        "abstainedClips": 0,
+        "clips": 2653,
+        "families": 2653
+      },
+      "P1": {
+        "abstainedClips": 0,
+        "clips": 300,
+        "families": 289
+      },
+      "S": {
+        "abstainedClips": 0,
+        "clips": 300,
+        "families": 290
+      }
+    }
+  },
+  "detector": "identity.clone-similarity@1",
+  "detectorDefinitionSHA256": "fc04484fe3045b4f79bdefd3240d6effae3625c4a5123024a9a14cf4cd2f2ec5",
+  "direction": "below",
+  "evidence": {
+    "confirmationPanels": [
+      {
+        "bundleDigest": "4f31a62da673581898818b257a8e8e7f4b4789b87ae510f62365dab05e949173",
+        "cohort": "N2",
+        "startedAt": "2026-10-01T01:59:50.374409Z"
+      },
+      {
+        "bundleDigest": "e91391400cc4443ccc1b947a92c74545077d4671aa778aebaaf94c46020506a8",
+        "cohort": "P1+S",
+        "startedAt": "2026-10-01T02:13:14.673247Z"
+      }
+    ],
+    "evidenceIdentitySHA256": "12312d32c5d13dfa52d88eb2182b2005b0c32a1e8acf00695d8a957f54376667",
+    "injectionSet": {
+      "construction": {
+        "catalogSeed": 7,
+        "catalogVersion": 3,
+        "classes": [
+          "E"
+        ],
+        "entryCatalogVersions": [
+          3
+        ],
+        "samplePerCell": 150,
+        "sampleSeed": 1,
+        "schedule": 2
+      },
+      "entriesSHA256": "b2535fe5d45557f7044cc2215407b6d79b7f1cdc7e30b5d86e1fc922e788a21c"
+    },
+    "judgeMetrics": {
+      "speaker.campplus-voxceleb@1": [
+        {
+          "definition": "panel-metrics-v1:speaker",
+          "sourcesSHA256": "0b993e6c0a34a8fb61f7ca1d82c475a023d934d54dcf90a31e0cad18d0caa171"
+        }
+      ]
+    },
+    "metricVersions": {},
+    "orchestratorSHA256": [
+      "9471e737deae9bfbbb90869e47132a09bce31bbb5ecf044469e5a32cbed14376"
+    ],
+    "planCommittedAt": "2026-10-01T01:00:51Z",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "informational": null,
+  "judges": [
+    {
+      "judge": "speaker.campplus-voxceleb@1",
+      "outputIdentities": [
+        "e9531c63646f0192e6f2a1f7e45022f0759e810d4e1c3c61b37f4224cb34b2c4"
+      ]
+    }
+  ],
+  "kind": "audio-qc-calibration-record",
+  "ledgerOutcomeSHA256": "9977db33df204b1d08f7362e24e54fad91a036da3368cab4178e1493bd2d7fad",
+  "level": "warn",
+  "limitations": [
+    "speaker-corpora-v1",
+    "speaker-reference-clip",
+    "speaker-reference-n2",
+    "speaker-gender-unlabelled"
+  ],
+  "operatingPoint": "warn",
+  "phiAudit": [],
+  "planSHA256": "720ee2ad12359417cc6a9e04b5ead92a8e8ee8b0a12145843821fdd1bc1236f0",
+  "rates": {
+    "cleanAbstention": {
+      "confidence": 0.95,
+      "events": 0,
+      "limit": 0.1,
+      "lower": 0.0,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": null,
+      "rate": 0.0,
+      "units": 2653,
+      "upper": 0.001129
+    },
+    "farPerLanguage": {
+      "confidence": 0.99375,
+      "languages": {
+        "chinese": {
+          "confidence": 0.99375,
+          "events": 2,
+          "limit": 0.2,
+          "lower": 0.000698,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.011976,
+          "units": 167,
+          "upper": 0.052755
+        },
+        "english": {
+          "confidence": 0.99375,
+          "events": 14,
+          "limit": 0.2,
+          "lower": 0.019066,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.041298,
+          "units": 339,
+          "upper": 0.076443
+        },
+        "french": {
+          "confidence": 0.99375,
+          "events": 14,
+          "limit": 0.2,
+          "lower": 0.019895,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.043077,
+          "units": 325,
+          "upper": 0.079672
+        },
+        "german": {
+          "confidence": 0.99375,
+          "events": 27,
+          "limit": 0.2,
+          "lower": 0.036186,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.061224,
+          "units": 441,
+          "upper": 0.09562
+        },
+        "italian": {
+          "confidence": 0.99375,
+          "events": 19,
+          "limit": 0.2,
+          "lower": 0.041453,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.078512,
+          "units": 242,
+          "upper": 0.132033
+        },
+        "korean": {
+          "confidence": 0.99375,
+          "events": 32,
+          "limit": 0.2,
+          "lower": 0.034167,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.055172,
+          "units": 580,
+          "upper": 0.083371
+        },
+        "portuguese": {
+          "confidence": 0.99375,
+          "events": 5,
+          "limit": 0.2,
+          "lower": 0.005231,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.022831,
+          "units": 219,
+          "upper": 0.061837
+        },
+        "spanish": {
+          "confidence": 0.99375,
+          "events": 13,
+          "limit": 0.2,
+          "lower": 0.017038,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.038235,
+          "units": 340,
+          "upper": 0.07242
+        }
+      }
+    },
+    "farPooled": {
+      "confidence": 0.95,
+      "events": 126,
+      "limit": 0.1,
+      "lower": 0.040886,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "rate": 0.047493,
+      "units": 2653,
+      "upper": 0.054855
+    },
+    "mechanisms": {
+      "T1-parallel-corpus": {
+        "cells": {
+          "IDN-IMPOSTOR/severe": {
+            "confidence": 0.95,
+            "events": 149,
+            "limit": 0.7,
+            "lower": 0.968766,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.993333,
+            "units": 150,
+            "upper": 0.999658
+          }
+        },
+        "meets": true
+      },
+      "T1-pcm-construction": {
+        "cells": {
+          "IDN-SHIFT/severe": {
+            "confidence": 0.95,
+            "events": 150,
+            "limit": 0.7,
+            "lower": 0.980227,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 1.0,
+            "units": 150,
+            "upper": 1.0
+          }
+        },
+        "meets": true
+      }
+    },
+    "mechanismsMeeting": [
+      "T1-parallel-corpus",
+      "T1-pcm-construction"
+    ],
+    "mechanismsMin": 1,
+    "shams": {
+      "IDN-IMPOSTOR": {
+        "confidence": 0.95,
+        "events": 8,
+        "informative": true,
+        "lower": 0.026812,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.053333,
+        "units": 150,
+        "upper": 0.094171
+      },
+      "IDN-SHIFT": {
+        "confidence": 0.95,
+        "events": 5,
+        "informative": false,
+        "lower": 0.013224,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.033333,
+        "units": 150,
+        "upper": 0.068805
+      }
+    }
+  },
+  "reasons": [],
+  "registries": {
+    "detectorsSHA256": "14585f1e3b77e4fa5f9d3f894d221e952f34a9ab1b52e4ba664ea552ee44388d",
+    "judgesSHA256": "ad21dd21aaa8a6e493c2cd6218c8f15330a2bccaeb882edbc4ea9aa204f77462",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514"
+  },
+  "risks": [
+    "resnet293-not-voting"
+  ],
+  "schema": "vocello.audioqc.qc-calibration/1",
+  "scope": {
+    "exclusions": [
+      {
+        "language": "japanese",
+        "reason": "no-speaker-corpus"
+      },
+      {
+        "language": "russian",
+        "reason": "no-speaker-corpus"
+      }
+    ],
+    "languages": [
+      "chinese",
+      "english",
+      "french",
+      "german",
+      "italian",
+      "korean",
+      "portuguese",
+      "spanish"
+    ]
+  },
+  "speakers": {
+    "claim": "identified",
+    "count": 285,
+    "unit": "corpus-speaker"
+  },
+  "split": {
+    "counts": {
+      "families": {
+        "calibration": 2674,
+        "confirmation": 2653
+      },
+      "scripts": {
+        "calibration": 2614,
+        "confirmation": 2588
+      },
+      "speakers": {
+        "calibration": 284,
+        "confirmation": 285
+      }
+    },
+    "disjointBy": [
+      "family",
+      "script",
+      "speaker"
+    ],
+    "method": "declared-cohorts"
+  },
+  "stage": 2,
+  "threshold": {
+    "alpha": 0.05,
+    "calibrationUnits": {
+      "chinese": 218,
+      "english": 324,
+      "french": 322,
+      "german": 450,
+      "italian": 231,
+      "korean": 563,
+      "portuguese": 219,
+      "spanish": 347
+    },
+    "ranks": {
+      "chinese": 209,
+      "english": 309,
+      "french": 307,
+      "german": 429,
+      "italian": 221,
+      "korean": 536,
+      "portuguese": 209,
+      "spanish": 331
+    },
+    "rule": "split-conformal",
+    "strata": "language",
+    "unit": "source-family",
+    "values": {
+      "chinese": 0.640969,
+      "english": 0.515217,
+      "french": 0.652362,
+      "german": 0.688542,
+      "italian": 0.682851,
+      "korean": 0.692457,
+      "portuguese": 0.654755,
+      "spanish": 0.668489
+    }
+  },
+  "verdict": "qualified"
+}

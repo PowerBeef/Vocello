@@ -605,103 +605,102 @@ def align_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, F
 
 # --- phones ----------------------------------------------------------------------
 
-_OPS = {"match": "match", "equal": "match", "ok": "match", "sub": "sub", "substitute": "sub",
-        "substitution": "sub", "ins": "ins", "insert": "ins", "insertion": "ins", "del": "del",
-        "delete": "del", "deletion": "del"}
+PHONE_FEATURES = ("phones.deletion_rate", "phones.repeat_runs", "phones.low_gop_run", "phones.last_word_coverage",
+                  "phones.gop_mean", "phones.substitution_rate", "phones.l1_substitutions")
 
 
-def _op(name: Any) -> str:
-    return _OPS.get(str(name).lower(), str(name).lower())
+def expected_phones(take: dict[str, Any], results: dict[str, Any], layout: store.Layout,
+                    model_ids: dict[str, str]) -> tuple[list[str] | None, list[dict[str, Any]]]:
+    """The script's phones and words: the take's G2P result, else the G2P text cache."""
+
+    g2p_out = outputs(results, "g2p")
+    if g2p_out and g2p_out.get("phones"):
+        return list(g2p_out["phones"]), list(g2p_out.get("words") or [])
+    if phones is None or not take.get("text"):
+        return None, []
+    for cache_dir in (layout.results_dir(model_ids.get("g2p", "g2p.espeak-ng")), None):
+        try:
+            record = phones.g2p_record(take["text"], take.get("language"), cache_dir=cache_dir, compute=False)
+            return list(record["phones"]), list(record.get("words") or [])
+        except Exception:  # noqa: BLE001 - a cache miss or an unsupported language
+            continue
+    return None, []
+
+
+def _op_span(ops: Iterable[dict[str, Any]]) -> tuple[float | None, float | None]:
+    ops = list(ops)
+    starts = [op["start"] for op in ops if op.get("start") is not None]
+    ends = [op["end"] for op in ops if op.get("end") is not None]
+    return (min(starts) if starts else None, max(ends) if ends else None)
 
 
 def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.Layout,
                    model_ids: dict[str, str], params: dict[str, Any]) -> dict[str, Feature]:
-    names = ("phones.deletion_rate", "phones.repeat_runs", "phones.low_gop_run", "phones.last_word_coverage",
-             "phones.gop_mean", "phones.substitution_rate", "phones.l1_substitutions")
-    empty = {name: feature() for name in names}
+    """Expected (G2P) against recognized phones through `qc.phones.compare`: PanPhon-weighted
+    alignment, GOP-SF on the posteriors, and its stutter features."""
+
+    out = {name: feature() for name in PHONE_FEATURES}
     recognized_out = outputs(results, "phones")
-    if phones is None or recognized_out is None or not take.get("text"):
-        return empty
-    language = take.get("language")
-    try:
-        expected = list(phones.g2p(take["text"], language))
-    except Exception:  # noqa: BLE001 - a G2P gap leaves the features unavailable
-        return empty
-    recognized = recognized_out.get("phones") or []
+    if phones is None or recognized_out is None:
+        return out
+    expected, words = expected_phones(take, results, layout, model_ids)
     if not expected:
-        return empty
-    ops = [(_op(op), exp, rec, start, end) for op, exp, rec, start, end in phones.align(expected, recognized)]
-    out = dict(empty)
-    deletions = [op for op in ops if op[0] == "del"]
-    out["phones.deletion_rate"] = feature(len(deletions) / len(expected), *_span(deletions))
-    substitutions = [op for op in ops if op[0] == "sub"]
-    out["phones.substitution_rate"] = feature(len(substitutions) / len(expected), *_span(substitutions))
-    pairs = {tuple(pair) for pair in params.get("l1Substitutions", {}).get(language, [])}
-    l1 = [op for op in ops if (op[0] == "sub" and (op[1], op[2]) in pairs) or (op[0] == "del" and (op[1], "") in pairs)]
-    out["phones.l1_substitutions"] = feature(len(l1), *_span(l1)) if pairs else feature()
-    repeats = _repeat_runs(ops)
-    longest = max(repeats, key=lambda run: len(run), default=[])
-    out["phones.repeat_runs"] = feature(len(repeats), *_span(longest))
-
-    last_word = normalize_text(take["text"], language)[-1:] if language not in CJK_LANGUAGES else []
-    tail_length = len(phones.g2p(last_word[0], language)) if last_word else max(1, len(expected) // 10)
-    tail = _expected_ops(ops)[-tail_length:]
-    covered = [op for op in tail if op[0] in ("match", "sub")]
-    out["phones.last_word_coverage"] = feature(len(covered) / max(1, len(tail)), *_span(tail))
-
-    posteriors = recognized_out.get("posteriors")
-    if posteriors and hasattr(phones, "gop"):
-        path = layout.results_dir(model_ids["phones"]) / Path(posteriors).name
+        return out
+    logprobs = vocab = None
+    frame_seconds = recognized_out.get("frameSeconds")
+    if recognized_out.get("posteriors"):
+        path = layout.results_dir(model_ids.get("phones", "")) / Path(recognized_out["posteriors"]).name
         try:
             with np.load(path, allow_pickle=False) as arrays:
-                scores = [float(score) for score in phones.gop(arrays["logprobs"], list(arrays["vocab"]), expected)]
+                logprobs = arrays["logprobs"].astype(np.float32)
+                vocab = [str(item) for item in arrays["vocab"]]
+                if "frameSeconds" in arrays:
+                    frame_seconds = float(arrays["frameSeconds"])
         except (OSError, KeyError, ValueError):
-            scores = []
-        if scores:
-            out["phones.gop_mean"] = feature(float(np.mean(scores)))
-            low = np.array([score < params.get("gopLow", -2.0) for score in scores])
-            runs = _runs(low)
-            if runs:
-                start, end = max(runs, key=lambda run: run[1] - run[0])
-                expected_ops = _expected_ops(ops)
-                span = _span(expected_ops[start:end]) if len(expected_ops) == len(scores) else (None, None)
-                out["phones.low_gop_run"] = feature(end - start, *span)
-            else:
-                out["phones.low_gop_run"] = feature(0)
+            logprobs = vocab = None
+    try:
+        compared = phones.compare(expected, recognized_out.get("phones") or [], logprobs=logprobs, vocab=vocab,
+                                  frame_seconds=frame_seconds,
+                                  model_dir=layout.model_dir(model_ids.get("g2p", "g2p.espeak-ng")))
+    except Exception:  # noqa: BLE001 - a malformed result leaves the features unavailable
+        return out
+    found, ops = compared["features"], compared["ops"]
+
+    deletion_runs = found.get("deletionRuns") or []
+    deleted = [op for op in ops if op["op"] == "del"]
+    span = max(deletion_runs, key=lambda run: run["count"]) if deletion_runs else None
+    out["phones.deletion_rate"] = feature(found.get("deletionRate"), *(
+        (span["start"], span["end"]) if span else _op_span(deleted[:1])))
+    out["phones.substitution_rate"] = feature(found.get("substitutionRate"),
+                                              *_op_span(op for op in ops if op["op"] == "sub"))
+    repeats = found.get("repeatRuns") or []
+    longest = max(repeats, key=lambda run: run.get("n", 1) * run.get("copies", 2), default=None)
+    out["phones.repeat_runs"] = feature(found.get("repeatCount", len(repeats)),
+                                        longest.get("start") if longest else None, longest.get("end") if longest else None)
+    if found.get("meanGop") is not None:
+        out["phones.gop_mean"] = feature(found["meanGop"])
+        spans = found.get("lowGopSpans") or []
+        worst = max(spans, key=lambda item: item["count"], default=None)
+        out["phones.low_gop_run"] = feature(worst["count"] if worst else 0, worst.get("start") if worst else None,
+                                            worst.get("end") if worst else None)
+
+    def broad(phone: str) -> str:
+        return "".join(phones.normalize_phone(phone)) if phone else ""
+
+    pairs = {(broad(a), broad(b)) for a, b in params.get("l1Substitutions", {}).get(take.get("language"), [])}
+    pairs = {pair for pair in pairs if pair[0] and pair[0] != pair[1]}
+    if pairs:
+        l1 = [op for op in ops if (op["op"] == "sub" and (op["expected"], op["recognized"]) in pairs)
+              or (op["op"] == "del" and (op["expected"], "") in pairs)]
+        out["phones.l1_substitutions"] = feature(len(l1), *_op_span(l1))
+
+    expected_ops = [op for op in ops if op["op"] in ("match", "sub", "del")]
+    last = len(phones.normalize(words[-1]["phones"])) if words and words[-1].get("phones") else max(1, len(expected_ops) // 10)
+    tail = expected_ops[-last:]
+    if tail:
+        covered = sum(1 for op in tail if op["op"] in ("match", "sub"))
+        out["phones.last_word_coverage"] = feature(covered / len(tail), *_op_span(tail))
     return out
-
-
-def _expected_ops(ops: list[tuple]) -> list[tuple]:
-    return [op for op in ops if op[0] in ("match", "sub", "del")]
-
-
-def _span(ops: list[tuple]) -> tuple[float | None, float | None]:
-    starts = [op[3] for op in ops if op[3] is not None]
-    ends = [op[4] for op in ops if op[4] is not None]
-    return (min(starts) if starts else None, max(ends) if ends else None)
-
-
-def _repeat_runs(ops: list[tuple]) -> list[list[tuple]]:
-    """Runs of inserted phones that repeat the recognized phones right after or before them."""
-
-    recognized = [(index, op) for index, op in enumerate(ops) if op[0] in ("match", "sub", "ins")]
-    runs: list[list[tuple]] = []
-    position = 0
-    while position < len(recognized):
-        index, op = recognized[position]
-        if op[0] != "ins":
-            position += 1
-            continue
-        end = position
-        while end < len(recognized) and recognized[end][1][0] == "ins":
-            end += 1
-        inserted = [item[1][2] for item in recognized[position:end]]
-        after = [item[1][2] for item in recognized[end:end + len(inserted)]]
-        before = [item[1][2] for item in recognized[max(0, position - len(inserted)):position]]
-        if inserted and (inserted == after or inserted == before):
-            runs.append([item[1] for item in recognized[position:end]])
-        position = end
-    return runs
 
 
 # --- pitch -------------------------------------------------------------------------

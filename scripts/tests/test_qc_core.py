@@ -405,7 +405,14 @@ class RunnerHostTests(unittest.TestCase):
         with_helper = runtime.runner_identity(self.layout, model_entry())
         self.assertNotEqual(with_helper, identity)
         (self.root / "scripts/qc/pitch.py").write_text("# pitch helpers\n")
-        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_helper)
+        with_pitch = runtime.runner_identity(self.layout, model_entry())
+        self.assertNotEqual(with_pitch, with_helper)
+        # Imported shared modules count, whatever their name (the fake runner imports qc.store).
+        store_copy = self.root / "scripts/qc/store.py"
+        store_copy.write_text(store_copy.read_text() + "\n# changed\n")
+        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_pitch)
+        sources = {path.name for path in runtime.runner_sources(self.layout, model_entry())}
+        self.assertEqual(sources, {"_kit.py", "fake.py", "pitch.py", "store.py"})
 
     def test_variant_models_key_results_by_text_language_and_reference(self):
         aligner = model_entry(id="align.fixture", kind="align")

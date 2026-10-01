@@ -6,6 +6,7 @@
     "asrB": "asr.whisper-large-v3",
     "align": "align.qwen3-forcedaligner-0.6b",
     "phones": "phones.zipa-large-crctc-500k",
+    "g2p": "g2p.espeak-ng",
     "pitchA": "pitch.fcpe",
     "pitchB": "pitch.swiftf0",
     "speaker": "speaker.redimnet2-plus",

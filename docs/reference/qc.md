@@ -77,6 +77,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `asrA`, `asrB` | Two ASR families. |
 | `align` | The forced aligner. |
 | `phones` | The phone recognizer. |
+| `g2p` | espeak-ng G2P: the script's expected phones, run as a job in the onnx venv. |
 | `pitchA`, `pitchB` | Two pitch trackers. |
 | `speaker` | Speaker embeddings. |
 | `mos` | The MOS predictor. |
@@ -90,7 +91,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `pause.anomalous` | pause | The longest stretch without voiced speech between the first and last speech frames, or between two aligned words. Up to 120 ms of loud unvoiced frames is trimmed at each edge, since word-edge consonants are speech. Also: the loudest 100 ms median of its non-speech frames relative to the speech median (sustained hiss or breath, not a transient); the voiced blips inside it (under 120 ms, isolated and next to quiet); and the mute test. |
 | `boundary.abrupt-end` | cutoff | From 10 ms levels: the drop within 60 ms of the final peak; the tail from 10 dB below the peak down to −60 dBFS; the decay slope; and `finishReason`. |
 | `level.loudness` | (advisory) | BS.1770-4 integrated loudness (K-weighted, gated), its distance from −23 LUFS, and the 4× oversampled true peak. LRA is reported too. |
-| `content.phoneme` | stutter | Phone deletions and repeated-syllable insertions (`qc.phones` G2P and alignment), the longest low-GOP run, and the smaller of the two ASR families' insertion and deletion rates against the script. |
+| `content.phoneme` | stutter | From `qc.phones.compare` on the G2P phones against the recognized phones (PanPhon-weighted alignment, GOP-SF on the posteriors): the phone deletion rate, repeated-syllable runs and the longest low-GOP span. Also the smaller of the two ASR families' insertion and deletion rates against the script. |
 | `boundary.cutoff` | cutoff | Phone coverage of the last word, the aligner's last-word duration ratio, the level of the last 50 ms, and `finishReason`. |
 | `language.wrong` | wrong-language | Both ASR families' language-ID mismatch and transcript-script mismatch (the smaller of the two). |
 | `language.accent` | mispronunciation | Mean GOP, substitution rate, L1 substitutions (for example French /y/→/u/, /ʁ/→/ɹ/, denasalization), and the LLM's vote. |

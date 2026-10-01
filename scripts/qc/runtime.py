@@ -17,6 +17,7 @@ Only one `qc.py` run holds `build/cache/qc/run.lock` at a time.
 
 from __future__ import annotations
 
+import ast
 import fcntl
 import hashlib
 import json
@@ -368,14 +369,38 @@ def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
 
 
 def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
-    """The runner file plus the shared code it can import, sorted."""
+    """The runner file and the shared code it can run, sorted: every `qc.*` module it imports,
+    transitively (also inside functions, such as `runners/speech_common.py`), plus every
+    `runners/_*.py` helper and `qc/phones.py` and `qc/pitch.py`."""
 
     source = runner_source(layout, model)
     if not source.is_file():
         raise RunnerError(f"{model['id']}: runner source is missing ({model['runner']})")
+    found: set[Path] = set()
+    pending = [source]
+    while pending:
+        path = pending.pop()
+        if path in found:
+            continue
+        found.add(path)
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, ValueError):
+            continue
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                names = [node.module] + [f"{node.module}.{alias.name}" for alias in node.names]
+            for name in names:
+                if name.split(".")[0] == "qc":
+                    candidate = layout.scripts.joinpath(*name.split(".")).with_suffix(".py")
+                    if candidate.is_file():
+                        pending.append(candidate)
     helpers = {path for path in source.parent.glob("_*.py") if path.name != "__init__.py"}
     shared = {layout.scripts / "qc/phones.py", layout.scripts / "qc/pitch.py"}
-    return sorted({source} | helpers | {path for path in shared if path.is_file()})
+    return sorted(found | helpers | {path for path in shared if path.is_file()})
 
 
 @dataclass
@@ -437,8 +462,8 @@ def run_runner(
 ) -> RunnerReport:
     """Score `takes` with one model, reusing cached results; one model at a time."""
 
-    if model.get("kind") in ("runtime", "g2p"):
-        raise RunnerError(f"{model['id']}: kind {model['kind']} has no audio runner")
+    if model.get("kind") == "runtime":
+        raise RunnerError(f"{model['id']}: a runtime artifact has no runner")
     echo = echo or (lambda line: print(line, file=sys.stderr, flush=True))
     runner_sha = runner_identity(layout, model)
     report = RunnerReport(model=model["id"], runner_sha=runner_sha)

@@ -197,23 +197,47 @@ class ModelFeatureTests(unittest.TestCase):
         self.assertEqual(values["asr.language_mismatch_min"]["value"], 1.0)
         self.assertIsNone(features.asr_features(self.take(), {"asrA": cyrillic["asrA"]})["asr.edit_rate_min"]["value"])
 
-    def test_phone_features_with_a_stubbed_phones_module(self):
-        stub = types.SimpleNamespace(
-            g2p=lambda text, language: ["l", "ə", "ʃ", "a"] if "ici" not in text else ["i", "s", "i"],
-            # "lə lə ʃa" heard as "lə lə u": a repeated syllable, a lost /ʃ/ and /a/ heard as /u/.
-            align=lambda expected, recognized: [
-                ("ins", None, "l", 0.1, 0.15), ("ins", None, "ə", 0.15, 0.2), ("match", "l", "l", 0.2, 0.25),
-                ("match", "ə", "ə", 0.25, 0.3), ("del", "ʃ", None, None, None), ("sub", "a", "u", 0.4, 0.5)],
-        )
-        results = {"phones": self.result({"phones": [{"phone": "l", "start": 0, "end": 0.1, "prob": 0.9}]})}
-        with mock.patch.object(features, "phones", stub):
-            values = features.phone_features(self.take(text="Le chat."), results, Layout(), {}, config()["params"])
-        self.assertEqual(values["phones.deletion_rate"]["value"], 0.25)
-        self.assertEqual(values["phones.repeat_runs"]["value"], 1)
-        self.assertEqual((values["phones.repeat_runs"]["start"], values["phones.repeat_runs"]["end"]), (0.1, 0.2))
-        self.assertEqual(values["phones.substitution_rate"]["value"], 0.25)
+    def heard(self, *items):
+        return [{"phone": phone, "start": start, "end": start + 0.05, "prob": 0.9} for phone, start in items]
+
+    def test_phone_features_through_qc_phones(self):
+        if features.phones is None:
+            self.skipTest("qc.phones is not available")
+        # "les branches de" (l e b ʁ ɑ̃ ʃ d e): a repeated syllable "bran-branches", then a lost /ʃ/.
+        g2p = self.result({"phones": ["l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d", "e"],
+                           "words": [{"ipa": "le", "phones": ["l", "e"]}, {"ipa": "bʁɑ̃ʃ", "phones": ["b", "ʁ", "ɑ̃", "ʃ"]},
+                                     {"ipa": "de", "phones": ["d", "e"]}]})
+
+        def run(*phones_heard):
+            results = {"g2p": g2p, "phones": self.result({"phones": self.heard(
+                *((phone, 0.1 * index) for index, phone in enumerate(phones_heard)))})}
+            return features.phone_features(self.take(text="Les branches de."), results, Layout(), {}, config()["params"])
+
+        stutter = run("l", "e", "b", "ʁ", "ɑ̃", "b", "ʁ", "ɑ̃", "ʃ", "d", "e")
+        self.assertEqual(stutter["phones.repeat_runs"]["value"], 1)
+        self.assertEqual(stutter["phones.repeat_runs"]["start"], 0.2)
+        self.assertEqual(stutter["phones.deletion_rate"]["value"], 0.0)
+        self.assertIsNone(stutter["phones.gop_mean"]["value"])  # no posteriors
+        missing = run("l", "e", "b", "ʁ", "ɑ̃", "d", "e")
+        self.assertEqual(missing["phones.deletion_rate"]["value"], 0.125)
+        self.assertEqual(missing["phones.repeat_runs"]["value"], 0)
+        clean = run("l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d", "e")
+        self.assertEqual((clean["phones.deletion_rate"]["value"], clean["phones.repeat_runs"]["value"]), (0.0, 0))
+        self.assertEqual(clean["phones.last_word_coverage"]["value"], 1.0)
+        cut = run("l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d")
+        self.assertEqual(cut["phones.last_word_coverage"]["value"], 0.5)  # the last word lost its /e/
+
+    def test_phone_features_need_both_inputs(self):
+        results = {"phones": self.result({"phones": self.heard(("l", 0.1))})}
+        # No G2P result and no G2P cache entry: the phone features stay unavailable.
+        self.assertIsNone(features.phone_features(self.take(), results, Layout(Path(tempfile.gettempdir())), {},
+                                                  {})["phones.deletion_rate"]["value"])
         with mock.patch.object(features, "phones", None):
             self.assertIsNone(features.phone_features(self.take(), results, Layout(), {}, {})["phones.deletion_rate"]["value"])
+        stub = types.SimpleNamespace(compare=mock.Mock(side_effect=ValueError("bad")))
+        with mock.patch.object(features, "phones", stub):
+            self.assertIsNone(features.phone_features(self.take(), {**results, "g2p": self.result({"phones": ["l"]})},
+                                                      Layout(), {}, {})["phones.deletion_rate"]["value"])
 
     def test_pitch_features_from_two_agreeing_trackers(self):
         if features.pitch is None:

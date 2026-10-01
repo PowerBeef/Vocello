@@ -225,7 +225,7 @@ class CalibrationSetTests(unittest.TestCase):
             for severity in m2.SEVERITY_SWEEP:
                 self.assertIn((injector_id, severity), applied)
         # Word-level prosody edits are not applicable on every take, with their reason.
-        for key in ("PRS-OCT@1", "PRS-BRK@1"):
+        for key in (injectors.CATALOG["PRS-OCT"].key, injectors.CATALOG["PRS-BRK"].key):
             skipped = summary["notApplicable"][key]
             self.assertEqual(skipped["count"], 6 * 4)
             (reason,) = {reason for reasons in skipped["byVariant"].values() for reason in reasons}

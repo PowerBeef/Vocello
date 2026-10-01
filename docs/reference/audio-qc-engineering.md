@@ -1097,6 +1097,38 @@ A set records its catalog version, and `verify` refuses a set of any other versi
 The 11 AQ-07 warn plans bind injector catalog version 2, so their confirmation set stays the one
 built with version 2, verified by the code of that version.
 
+**Catalog version 4 (2026-10-01)** replaces the pitch shifter and the tempo stretch. Up to catalog 3,
+`pitch_shift` resampled by the pitch ratio and restored the length with a plain overlap-add (a
+960-sample Hann window on a fixed 10 ms hop, no alignment). The misaligned overlaps cancelled and
+imposed the 100 Hz frame rate, so most speaking voices never reached the requested pitch. pYIN (fmin
+50 Hz, fmax 1 kHz, 16 kHz, frame 1024, hop 160) on synthetic harmonic voices with 1% vibrato:
+
+| Source F0 | Shift | Expected | Catalog 3 | Catalog 4 |
+|---|---|---|---|---|
+| 110 Hz | +7 st | 164.8 Hz | 106.6 Hz | 165.3 Hz |
+| 110 Hz | -7 st | 73.4 Hz | 115.5 Hz | 73.6 Hz |
+| 140 Hz | +7 st | 209.8 Hz | 123.8 Hz | 209.5 Hz |
+| 140 Hz | -7 st | 93.4 Hz | 175.1 Hz | 93.3 Hz |
+| 220 Hz | +7 st | 329.6 Hz | 326.8 Hz | 328.7 Hz |
+| 220 Hz | -7 st | 146.8 Hz | 115.5 Hz | 147.3 Hz |
+
+On real takes PRS-ERRATIC's -7 st spans read +1.1 st, so the 14 st steps it labels almost never
+formed, and `prosody.pitch-instability@1` was refused on positives that did not carry the defect
+(the class E and F confirmations, below). Catalog 4's `wsola_stretch` is a waveform-similarity
+overlap-add: 30 ms Hann frames every 15 ms, each read within ±12.5 ms of its nominal position at the
+offset that best continues the frame before, by normalized cross-correlation rounded before the
+arg-max. `pitch_shift` stretches by the pitch ratio and resamples back by it. PRS-OCT, PRS-BRK,
+PRS-ERRATIC, IDN-SHIFT and PRS-RATE become version 2; every other output is byte-identical.
+`scripts/tests/test_qc_qualification_pitch.py` measures them with a NumPy YIN: shifts of ±2, ±4, ±7
+and ±12 st on voices of 85-280 Hz land within 0.5 st, the tempo variants keep the pitch within
+0.3 st, each PRS-ERRATIC span reads its labelled ±7 st within 1 st, and the PRS-OCT spans read
+±12 st. pYIN under the configuration above agrees within 0.1 st, except for 42.5 Hz, below its fmin.
+One caveat for the next pitch-instability version: on a short +7 st span after a -7 st span, pYIN
+often tracks the subharmonic (165 Hz for 330 Hz). It does so on the injected output and on an
+ideal phase-continuous stepped voice alike, so the cause is its tracker, not the construction.
+Committed catalog-3 plans and sets keep their binding: scoring never re-verifies a set, and `verify`
+replays only its own catalog version.
+
 The composer is pure and never cached. It emits `pass`, `warn`, `fail`, `inconclusive` (a gating
 abstention), `uncalibrated` or `unavailable`, in that corrected precedence: fail, unavailable,
 abstain, warn, uncalibrated, pass. A verdict with no calibration record composes as `uncalibrated`,
@@ -3211,10 +3243,10 @@ shifter, and PRS-RATE shares the stretch.
 
 The committed catalog-3 plans stay as registered, which includes the reserve plans of
 `prosody.pitch-break@1` and `prosody.octave-jump@1`. A changed plan needs a new detector version, and
-the one reserve-2 set that every reserve plan binds is built from catalog 3. Corrected injector
-versions come in a later catalog, under new versions of the pitch detectors, on cohorts that have
-not been scored. IDN-SHIFT's distorted output explains its 1.0, so clone-similarity's qualification
-rests on its corpus impostors.
+the one reserve-2 set that every reserve plan binds is built from catalog 3. The corrected injector
+versions are catalog 4 (in the qualification engine section above); they serve new versions of the
+pitch detectors, on cohorts that have not been scored. IDN-SHIFT's distorted output explains its
+1.0, so clone-similarity's qualification rests on its corpus impostors.
 
 **FLEURS reserve confirmations (2026-10-01).** Derived reserve-1 calibrated and derived reserve-2
 confirmed. Seven of the ten plans qualified at warn:

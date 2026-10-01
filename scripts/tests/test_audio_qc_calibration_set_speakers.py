@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import audio_qc_calibration_set as m2  # noqa: E402
 import audio_qc_n2_resynthesis as n2  # noqa: E402
 import audio_qc_orchestrator as orchestrator  # noqa: E402
-from lib.qc_qualification import fixtures, pcm, recordings, speaker_donors  # noqa: E402
+from lib.qc_qualification import fixtures, injectors, pcm, recordings, speaker_donors  # noqa: E402
 
 RATE = 24_000
 LANGUAGES = ("english", "french")
@@ -155,7 +155,7 @@ class DonorPoolTests(unittest.TestCase):
 class SpeakerInjectionTests(SpeakerCohort):
     def test_the_plan_schedules_donor_splices_impostors_and_seams(self) -> None:
         summary = self.summary
-        self.assertEqual(summary["catalogVersion"], 3)
+        self.assertEqual(summary["catalogVersion"], injectors.CATALOG_VERSION)
         plan = {(row["injectorID"], row["severity"]): row for row in summary["plan"]}
         for injector_id in ("IDN-SWAP", "IDN-ONSET", "SEAM-VOICE"):
             self.assertEqual(plan[(injector_id, "severe")]["variant"], "take-severe", injector_id)

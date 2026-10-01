@@ -85,7 +85,7 @@ class MetaEvaluationTests(unittest.TestCase):
         self.assertEqual(rows[("SIG-CLICK@1", "severe")]["target"]["events"], 3)
         self.assertEqual(rows[("SIG-SIL@1", "severe")]["target"]["events"], 3)
         # Amplitude-only: truncation, deletions and identity swaps are invisible to v8.
-        for key in ("BND-TRUNC@1", "CNT-DEL@1", "IDN-SWAP@1", "PRS-OCT@1"):
+        for key in ("BND-TRUNC@1", "CNT-DEL@1", "IDN-SWAP@1", injectors.CATALOG["PRS-OCT"].key):
             self.assertEqual(rows[(key, "severe")]["alarm"]["events"], 0, key)
             self.assertIsNone(rows[(key, "severe")]["target"])
         shams = {(row["injector"], row["variant"]): row for row in self.report["procedural"]["shams"]}

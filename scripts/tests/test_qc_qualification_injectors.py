@@ -23,6 +23,7 @@ SEED = 7
 # Source 1 declares one punctuation pause, which the natural-pause control needs.
 SOURCE_INDEX = 1
 SOURCE_DIGEST = "d0f9db35ba8a45aa0e8ff6d2802c71bb20ab4d41b5db0a4f5f34cf1b78b2964f"
+# Catalog version 2 on source 1 (the injectors that catalog 4 replaced have their goldens in GOLDENS_V4).
 GOLDENS = {
     ("SIG-CLICK@1", "sham"): SOURCE_DIGEST,
     ("SIG-CLICK@1", "mild"): "72c6e432ba6e42ed19b58bdf98f1ed497c5fe9cc856f00c2d876e2a369154534",
@@ -82,24 +83,6 @@ GOLDENS = {
     ("CNT-INS@1", "mild"): "b94bf6bdb29d72677dc1c3369974685b0923e8ca7792e0478c2d6f855fb82591",
     ("CNT-INS@1", "moderate"): "38991ceba8e51495e0aea6aef1018c38707f84e859064fa085c3b76c0defb156",
     ("CNT-INS@1", "severe"): "a85a75bb2e72316ca9ba41c539f79a9c4c0c3780d6a584b182c8758b1f76bbb6",
-    ("PRS-OCT@1", "sham"): SOURCE_DIGEST,
-    ("PRS-OCT@1", "mild"): "a22e2f675fbf86bf78c8e8d0125f9d789f2a70a601b96dd685f946579693c25c",
-    ("PRS-OCT@1", "moderate"): "78bc9bf35273af92a1a4f28220f9136f42cbb5d590e1be5e6db663b61ba4c3ca",
-    ("PRS-OCT@1", "severe"): "b0f7e8deece07848a5a53a7bf6feb499f314fcd71b934d089137af94d9bcf2ae",
-    ("PRS-OCT@1", "down-moderate"): "871c3e89d5c5e265cdb38162348658ff509b3fcb4e8b845912bb33aab1e8781b",
-    ("PRS-BRK@1", "sham"): SOURCE_DIGEST,
-    ("PRS-BRK@1", "mild"): "2953b3e51d8d596de4be25853a113ef2bbaa6c8cd493abe0b8c383d0deecd520",
-    ("PRS-BRK@1", "moderate"): "442f915e417c7ce022503610bee618399f8401890d417a27a9e3c238d8665894",
-    ("PRS-BRK@1", "severe"): "7e278f2dfcc2ddcc428bbd0d0cb47051f62c3254bcd8f77553e8bfdc97d137a4",
-    ("PRS-RATE@1", "sham"): SOURCE_DIGEST,
-    ("PRS-RATE@1", "mild"): "d76661056e7d5b3f4cef1eefe13353653c56b25ed42648ec1f6ba013773b90b9",
-    ("PRS-RATE@1", "moderate"): "b2875618a6335de60363f122ba1a5a2ecaa8d0a04fdd60f6bbc1d2dfe87bd838",
-    ("PRS-RATE@1", "severe"): "984444c12049306d25f129c1bca9aaa736b1beaaae9a5dd1c5b185e7da5427d7",
-    ("PRS-RATE@1", "fast-severe"): "f802899d67d6be5d0e18c64a53175e9bfa8827310f80f7fef266768878cbad72",
-    ("IDN-SHIFT@1", "sham"): SOURCE_DIGEST,
-    ("IDN-SHIFT@1", "mild"): "a953b1d33cc911ca7f02d6982aad7f7de87388e10d8348457fb8b4b4f0fe6b2c",
-    ("IDN-SHIFT@1", "moderate"): "b4bdeda2056d87cd60b9208b27d2e74048ebceb0d55d014977579a20b228eb7b",
-    ("IDN-SHIFT@1", "severe"): "f85290cf9092ea9f6887ab4234874434de1213839d383928df3f4716f1009800",
     ("IDN-SWAP@1", "sham"): SOURCE_DIGEST,
     ("IDN-SWAP@1", "control-same-speaker"): "865000434717bdd6137c627b03483a5b27bef1b79b54257c9a64fc3696e32bcd",
     ("IDN-SWAP@1", "mild"): "41700d37903aed530175e39e53350da8a0b419511556a8098ba96d692f752aa7",
@@ -114,10 +97,6 @@ GOLDENS_V3 = {
     ("SIG-BAND@1", "mild"): "a6b1cf81f2310f7cf7d1f036634e524d0b6fab69355c1abd8f73eca2dc97f20e",
     ("SIG-BAND@1", "moderate"): "aa94b4dbe909ab0b0153622130e8aca7403dc7196ff489b149ba472bec667d2b",
     ("SIG-BAND@1", "severe"): "23c0be79ef2a73a5b110438f6b4553677c3a6ab2136313afcb3c3ede7c680a1b",
-    ("PRS-ERRATIC@1", "sham"): SOURCE_DIGEST,
-    ("PRS-ERRATIC@1", "mild"): "e5f6966a4db849fc990894400b97d6ce2194fca38336dcc74aabbdc984a7c9fa",
-    ("PRS-ERRATIC@1", "moderate"): "ea20a5acfdb1734c528c235ad711c4ae35af0d4fad06ca73acb65502e223d635",
-    ("PRS-ERRATIC@1", "severe"): "cd7f7fd56d713be1a88a8ce2adc5cd2cbf6cf5266b21c5cf8e57994ced8d41ad",
     ("IDN-ONSET@1", "sham"): SOURCE_DIGEST,
     ("IDN-ONSET@1", "control-same-speaker"): "994cdef62699e682fd6724bb135aa15a23bcade68bcea58105d123a546c6ed43",
     ("IDN-ONSET@1", "mild"): "ee2b54196d70f25eb3495c71b83f7663c8e2304cb28077027c4445b1092232a1",
@@ -133,6 +112,34 @@ GOLDENS_V3 = {
     ("SEAM-VOICE@1", "moderate"): "056c0ddd1ee1a0f895f53eaaf9364cd59e6299ecb627047ef22efa4b059fa1b4",
     ("SEAM-VOICE@1", "severe"): "2d214993222fa19add3b1f883efc5482ed72eacf53d0120901d6a45dc7781679",
 }
+# Catalog version 4 (every golden above is unchanged): the WSOLA shifter and stretch, version 2 of the five
+# injectors that use them, on source 1. Each sham is still the source.
+GOLDENS_V4 = {
+    ("PRS-OCT@2", "sham"): SOURCE_DIGEST,
+    ("PRS-OCT@2", "mild"): "acf047e67d6442439658b1bbc57cbccd9c8587a029a4d83849231b4fc99d7d7a",
+    ("PRS-OCT@2", "moderate"): "104baa21d667911c7d97e1803551fc8e7bc9ea5e6d2b8b6caceff52d993762ca",
+    ("PRS-OCT@2", "severe"): "99fcee1596c87b8de924ff03e97a0b6581887dddb4e2187bb8a6cc88d519422a",
+    ("PRS-OCT@2", "down-moderate"): "5704b7d0357122af57d6296e04da8f0ecb0639e0fed2a20c21e8a68de66f9e6e",
+    ("PRS-BRK@2", "sham"): SOURCE_DIGEST,
+    ("PRS-BRK@2", "mild"): "5dc3f3df4f8baab6c29443b683b95670584a8bd90dc498268f21a0386b9b447e",
+    ("PRS-BRK@2", "moderate"): "2638a8e3b0985182881461aef4792db52e4660b289d5f81c9b3bd101a1497e6c",
+    ("PRS-BRK@2", "severe"): "4b2e0696b4a0201204c3721e2d2d01471e53d699c834ff85920b525ad73dc272",
+    ("PRS-RATE@2", "sham"): SOURCE_DIGEST,
+    ("PRS-RATE@2", "mild"): "8fc38b3827de60aa4382820d21338fbd06f379cb3fb37d80a1ebded0c9ff4551",
+    ("PRS-RATE@2", "moderate"): "866c7de7632059ac14b14cee1c6bf3ecc237407552e4a798d26be19d2dd848d6",
+    ("PRS-RATE@2", "severe"): "966ba127ad9ab65e35a68f0730883b355bc3701d84b4fd550c054d41e6fe1496",
+    ("PRS-RATE@2", "fast-severe"): "33eefce854fafe565975faf208523da326a1622331b7cec42a2b471a76e21ebb",
+    ("IDN-SHIFT@2", "sham"): SOURCE_DIGEST,
+    ("IDN-SHIFT@2", "mild"): "854e204306716431f686aad5e2bae3fbb9e09f9602644fa69dc03855f9db75ab",
+    ("IDN-SHIFT@2", "moderate"): "fc4a62e18be08f1527c623642ac9572ef4e28c90f92cfe5ec5ba3265d4949cf3",
+    ("IDN-SHIFT@2", "severe"): "2d97bf56f26872e48b6a23b5f138b00dc6974fea635c7c1d2930efd93a57977e",
+    ("PRS-ERRATIC@2", "sham"): SOURCE_DIGEST,
+    ("PRS-ERRATIC@2", "mild"): "33c9301c577960a3f89e7e417dac8aadaef232ef178817337bc78fdb4ce36aed",
+    ("PRS-ERRATIC@2", "moderate"): "441d4c3f5355f1ff5e528d649d887158733d3f7a1a25539c0330353de3143bf4",
+    ("PRS-ERRATIC@2", "severe"): "7b008337cef7f41d80a78036869e4335405de46c83e5b6f66c06d6ca2fc04ed1",
+}
+# The catalog-variant goldens by the catalog version that introduced them: the newest are the current catalog's.
+CATALOG_GOLDENS = {2: GOLDENS, 3: GOLDENS_V3, 4: GOLDENS_V4}
 # The donor splices of speaker-labelled recordings, on the procedural sources above with procedural donors:
 # modal source 2 as another speaker, and source 1's voice reading script 3 as the same speaker.
 DONOR_GOLDENS = {
@@ -216,7 +223,9 @@ class InjectorTests(unittest.TestCase):
 
     def test_the_catalog_covers_the_defect_families(self) -> None:
         self.assertTrue(REQUIRED_FAMILIES <= set(injectors.CATALOG))
-        self.assertEqual(injectors.CATALOG_VERSION, 3)
+        # A changed output needs a new injector version, its goldens and a new catalog version: the newest
+        # goldens are the current catalog's.
+        self.assertEqual(injectors.CATALOG_VERSION, max(CATALOG_GOLDENS))
         for injector in injectors.CATALOG.values():
             severities = {variant.severity for variant in injector.variants}
             self.assertEqual(injector.variants[0].name, "sham", injector.key)
@@ -224,10 +233,10 @@ class InjectorTests(unittest.TestCase):
             self.assertTrue(set(injector.classes) <= set("ABCDEFGHIJ"), injector.key)
             names = [variant.name for variant in injector.variants]
             self.assertEqual(len(names), len(set(names)), injector.key)
-        self.assertFalse(set(GOLDENS) & set(GOLDENS_V3))
-        self.assertEqual(set(GOLDENS) | set(GOLDENS_V3),
-                         {(injector.key, variant.name) for injector in injectors.CATALOG.values()
-                          for variant in injector.variants})
+        keys = [key for goldens in CATALOG_GOLDENS.values() for key in goldens]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(set(keys), {(injector.key, variant.name) for injector in injectors.CATALOG.values()
+                                     for variant in injector.variants})
         self.assertFalse(set(DONOR_GOLDENS) & set(VOICE_DONOR_GOLDENS))
         self.assertEqual(set(DONOR_GOLDENS) | set(VOICE_DONOR_GOLDENS),
                          {(injector.key, variant.name) for injector in injectors.CATALOG.values()
@@ -253,6 +262,11 @@ class InjectorTests(unittest.TestCase):
                                          donor=self.donor_for(chosen))
             self.assertEqual(injection.digest, expected, f"{key} {variant}")
             self.assertEqual(injection.recipe()["donorPCMSHA256"], self.donor_for(chosen).digest)
+
+    def test_every_catalog_4_variant_matches_its_golden_digest(self) -> None:
+        for (key, variant), expected in GOLDENS_V4.items():
+            injection = injectors.inject(key.split("@")[0], variant, self.source, SEED)
+            self.assertEqual(injection.digest, expected, f"{key} {variant}")
 
     def test_same_input_seed_and_parameters_are_byte_identical(self) -> None:
         for injector in injectors.CATALOG.values():
@@ -400,7 +414,8 @@ class InjectorTests(unittest.TestCase):
         recipe = injection.recipe()
         self.assertEqual(recipe["sourcePCMSHA256"], SOURCE_DIGEST)
         self.assertEqual(recipe["outputPCMSHA256"], GOLDENS[("SIG-NOISE@1", "moderate")])
-        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]), ("SIG-NOISE@1", 3, SEED))
+        self.assertEqual((recipe["injector"], recipe["catalogVersion"], recipe["seed"]),
+                         ("SIG-NOISE@1", injectors.CATALOG_VERSION, SEED))
         self.assertEqual(recipe["mechanism"], "T1-pcm-construction")
         self.assertNotIn("donorPCMSHA256", recipe)
         description = injectors.catalog_description()

@@ -27,8 +27,9 @@ its end. They are declared constructions with their own parameters, never a
 silent substitute, and leave every catalog variant's output unchanged. Identity
 swaps splice a second voice rendering the same script, so the splice is
 time-aligned and only the voice changes. Pitch and rate changes use a
-windowed-sinc resampler and plain overlap-add (no correlation search, whose
-arg-max could differ between hosts), so they are signal-level constructions,
+windowed-sinc resampler and a WSOLA time stretch whose correlation scores are
+rounded before the arg-max, so the choice does not rest on last-place
+floating-point differences between hosts; they are signal-level constructions,
 not natural prosody.
 
 Catalog version 3 adds a band-limit ladder relative to the source's measured
@@ -54,6 +55,17 @@ segments, level-matched and crossfaded inside the replaced span, so the label
 covers exactly the replaced samples and the seams after it move by the length
 change (`_voice_splice`). They leave every other variant's output unchanged.
 
+Catalog version 4 replaces the shifter and the stretch. Up to version 3 the
+stretch, which the shifter also used, was a plain overlap-add on a fixed 10 ms
+hop with no alignment: the misaligned overlaps cancelled and imposed the 100 Hz
+frame rate, so most speaking voices never reached the requested pitch (pYIN
+read a 140 Hz voice shifted +7 st near 124 Hz and shifted -7 st near 175 Hz,
+where 210 and 93 Hz were asked). `wsola_stretch` places each frame where it
+best continues the frame before, so the overlaps add in phase and the input's
+periods survive; `pitch_shift` stretches by the pitch ratio and resamples back
+by it. PRS-OCT, PRS-BRK, PRS-ERRATIC, IDN-SHIFT and PRS-RATE are version 2;
+every other output is byte-identical to version 3.
+
 NumPy only. The catalog version and each injector's version are part of every
 recipe; changing an injector's output needs a new version and a new golden.
 """
@@ -69,13 +81,27 @@ import numpy as np
 from .fixtures import ROOM_TONE_RMS, Fixture, donor_voice, rerender
 from .pcm import SeededStream, pcm_digest
 
-CATALOG_VERSION = 3
+CATALOG_VERSION = 4
 MECHANISM = "T1-pcm-construction"
 SEVERITIES = ("sham", "control", "mild", "moderate", "severe")
 NON_DEFECT_SEVERITIES = frozenset({"sham", "control"})
 SPLICE_FADE_MS = 5.0
-OLA_WINDOW = 960
-OLA_HOP = 240
+# The WSOLA time stretch, in 24 kHz samples: 30 ms periodic-Hann frames every 15 ms of output (half a
+# frame, where the windows sum to one). Each frame is read within ±WSOLA_TOLERANCE samples (±12.5 ms)
+# of its nominal input position, at the offset whose frame best continues the frame before it: 601
+# candidates over 25 ms, a whole period of a voice down to 40 Hz, below the 50-60 Hz floor of speech.
+WSOLA_WINDOW = 720
+WSOLA_HOP = 360
+WSOLA_TOLERANCE = 300
+# The match is the normalized cross-correlation, rounded to this many decimals before the arg-max (a tie
+# goes to the offset nearest the nominal position, then to the earlier), so the choice does not rest on
+# last-place floating-point differences between hosts.
+WSOLA_SCORE_DECIMALS = 6
+# A frame below this mean square (-100 dBFS) compares as silence: every offset ties, and the nominal wins.
+WSOLA_SILENCE_MEAN_SQUARE = 1e-10
+# A pitch-shifted span is cut from the source with this much context on each side, so the stretch's edges
+# and the offsets of its frames stay clear of the span.
+PITCH_CONTEXT = WSOLA_WINDOW + WSOLA_TOLERANCE
 SINC_HALF_WIDTH = 16
 # Soft-knee clipping: samples above the knee are squashed by tanh toward an
 # asymptote this far above it (about +1 dB), so the output never exceeds it.
@@ -280,34 +306,73 @@ def resample(samples: np.ndarray, ratio: float) -> np.ndarray:
     return output
 
 
-def ola_stretch(samples: np.ndarray, factor: float) -> np.ndarray:
-    """Overlap-add time stretch by `factor` (output length ~ input x factor), pitch kept."""
+def wsola_stretch(samples: np.ndarray, factor: float) -> np.ndarray:
+    """WSOLA time stretch by `factor` (output length: the input's x factor, rounded), pitch kept.
+
+    Output frame k, WSOLA_HOP after frame k - 1, is read near its nominal input
+    position k x WSOLA_HOP / factor: at the offset within ±WSOLA_TOLERANCE whose
+    frame best matches the natural continuation of frame k - 1 (the input that
+    follows the frame it read), by normalized cross-correlation. The overlaps
+    therefore add in phase and the input's periods survive the stretch. Frame 0
+    sits at the input's start, and at factor 1 every nominal frame is its own
+    predecessor's continuation, so the stretch is the identity.
+    """
     if factor <= 0:
         raise ValueError("factor must be positive")
+    samples = np.asarray(samples, dtype=np.float64)
     length = int(round(samples.size * factor))
-    half = OLA_WINDOW // 2
-    frames = (length + OLA_WINDOW) // OLA_HOP + 1
-    synthesis = np.arange(frames) * OLA_HOP
-    analysis = np.round(synthesis / factor).astype(np.int64)
-    padded = np.concatenate([np.zeros(half), samples, np.zeros(int(analysis[-1]) + OLA_WINDOW)])
-    window = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(OLA_WINDOW) / OLA_WINDOW)
-    output = np.zeros(int(synthesis[-1]) + OLA_WINDOW)
+    window, hop, tolerance = WSOLA_WINDOW, WSOLA_HOP, WSOLA_TOLERANCE
+    half = window // 2
+    frames = (length + window) // hop + 1
+    nominal = np.round(np.arange(frames) * hop / factor).astype(np.int64)
+    # The frame at position p reads input samples [p - half, p + half), centred on sample p, from
+    # padded[p + tolerance:]; the zeros around the input give every search and continuation its room.
+    lead = half + tolerance
+    padded = np.zeros(max(lead + samples.size, int(nominal[-1]) + 2 * tolerance + hop + window))
+    padded[lead:lead + samples.size] = samples
+    span = 2 * tolerance + 1
+    size = 1 << (window + 2 * tolerance - 1).bit_length()  # no circular wrap over the searched offsets
+    distance = np.abs(np.arange(span) - tolerance)
+    silence = WSOLA_SILENCE_MEAN_SQUARE * window
+    taper = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(window) / window)
+    output = np.zeros((frames - 1) * hop + window)
     weight = np.zeros_like(output)
-    offsets = np.arange(OLA_WINDOW)
-    np.add.at(output, synthesis[:, None] + offsets[None, :], padded[analysis[:, None] + offsets[None, :]] * window)
-    np.add.at(weight, synthesis[:, None] + offsets[None, :], np.broadcast_to(window, (frames, OLA_WINDOW)))
+    position = 0
+    for frame in range(frames):
+        if frame:
+            start = int(nominal[frame])  # padded index of the offset -tolerance
+            region = padded[start:start + window + 2 * tolerance]
+            follow = position + hop + tolerance
+            template = padded[follow:follow + window]
+            correlation = np.fft.irfft(np.fft.rfft(region, size) * np.conj(np.fft.rfft(template, size)), size)[:span]
+            energy = np.cumsum(np.concatenate([[0.0], region * region]))
+            energy = np.maximum(energy[window:window + span] - energy[:span], silence)
+            score = correlation / np.sqrt(energy * max(float(template @ template), silence))
+            score = np.round(score, WSOLA_SCORE_DECIMALS)
+            tied = np.flatnonzero(score == score.max())
+            position = start - tolerance + int(tied[np.argmin(distance[tied])])
+        at = frame * hop
+        output[at:at + window] += taper * padded[position + tolerance:position + tolerance + window]
+        weight[at:at + window] += taper
     stretched = np.where(weight > 1e-6, output / np.maximum(weight, 1e-6), 0.0)
     return stretched[half:half + length]
 
 
 def pitch_shift(samples: np.ndarray, semitones: float) -> np.ndarray:
-    """Shift pitch and formants together by `semitones`, keeping the length."""
+    """Shift pitch and formants together by `semitones`, keeping the length.
+
+    A WSOLA stretch by the pitch ratio keeps the source's periods while it
+    lengthens (or shortens) the take; reading it back at that ratio with the
+    windowed-sinc resampler restores the length and scales every period, and so
+    the pitch and the formants, by exactly the ratio. The stretch acts on the
+    source's own periods, so its search covers the lowest voice whatever the
+    shift.
+    """
     ratio = 2.0 ** (semitones / 12.0)
-    moved = resample(samples, ratio)
-    stretched = ola_stretch(moved, samples.size / max(moved.size, 1))
-    if stretched.size < samples.size:
-        stretched = np.concatenate([stretched, np.zeros(samples.size - stretched.size)])
-    return stretched[:samples.size]
+    shifted = resample(wsola_stretch(samples, ratio), ratio)
+    if shifted.size < samples.size:
+        shifted = np.concatenate([shifted, np.zeros(samples.size - shifted.size)])
+    return shifted[:samples.size]
 
 
 def _longest_word(source: Fixture) -> tuple[int, int]:
@@ -668,9 +733,8 @@ def _insert(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.nd
 
 
 def _pitch_segment(source: Fixture, start: int, length: int, semitones: float) -> np.ndarray:
-    context = OLA_WINDOW
-    low = max(0, start - context)
-    high = min(source.samples.size, start + length + context)
+    low = max(0, start - PITCH_CONTEXT)
+    high = min(source.samples.size, start + length + PITCH_CONTEXT)
     shifted = pitch_shift(source.samples[low:high], semitones)
     piece = shifted[start - low:start - low + length]
     return replace_span(source.samples, piece, start, _fade(source.sample_rate))
@@ -698,7 +762,7 @@ def _pitch_break(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[
 
 def _rate(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.ndarray, list[dict]]:
     speed = parameters["speed"]
-    output = ola_stretch(source.samples, 1.0 / speed)
+    output = wsola_stretch(source.samples, 1.0 / speed)
     labels = [{"kind": "rate", "startSample": 0, "endSample": output.size}] if speed != 1.0 else []
     return output, labels
 
@@ -824,7 +888,7 @@ def _erratic(source: Fixture, parameters: dict, rng: SeededStream) -> tuple[np.n
         # Each span reaches half a fade into its neighbours; the two ramps there sum to one.
         first = start - lead if index else 0
         final = end + lag if index < last else size
-        low, high = max(0, first - OLA_WINDOW), min(size, final + OLA_WINDOW)
+        low, high = max(0, first - PITCH_CONTEXT), min(size, final + PITCH_CONTEXT)
         shifted = pitch_shift(source.samples[low:high], semitones)
         weights = np.ones(final - first)
         if index:
@@ -1206,27 +1270,32 @@ def _catalog() -> dict[str, Injector]:
                             "moderate": {"words": 2, "position": "middle"},
                             "severe": {"words": 4, "position": "middle"}}),
                  _insert),
-        Injector("PRS-OCT", 1, "octave jump", ("F",),
-                 "A span inside the longest word shifted by an octave; sham: 0 st through the same shifter.",
+        Injector("PRS-OCT", 2, "octave jump", ("F",),
+                 "A span inside the longest word shifted by an octave through the WSOLA shifter (a "
+                 "waveform-similarity overlap-add stretch by the pitch ratio, resampled back by it), which "
+                 "reaches the requested pitch; sham: 0 st through the same shifter.",
                  _variants({"semitones": 0.0, "durationMS": 200.0},
                            {"mild": {"semitones": 12.0, "durationMS": 80.0},
                             "moderate": {"semitones": 12.0, "durationMS": 200.0},
                             "severe": {"semitones": 12.0, "durationMS": 400.0}},
                            extra={"down-moderate": ("moderate", {"semitones": -12.0, "durationMS": 200.0})}),
                  _octave),
-        Injector("PRS-BRK", 1, "pitch break", ("F",),
-                 "A pitch step from the middle of the longest word to its end; sham: 0 st.",
+        Injector("PRS-BRK", 2, "pitch break", ("F",),
+                 "A pitch step from the middle of the longest word to its end, through PRS-OCT's WSOLA "
+                 "shifter; sham: 0 st.",
                  _variants({"semitones": 0.0}, {"mild": {"semitones": 3.0}, "moderate": {"semitones": 5.0},
                                                "severe": {"semitones": 7.0}}),
                  _pitch_break),
-        Injector("PRS-RATE", 1, "speed change", ("F", "C"),
-                 "Overlap-add tempo change of the whole take, pitch kept; sham: 1.0x through the same path.",
+        Injector("PRS-RATE", 2, "speed change", ("F", "C"),
+                 "WSOLA tempo change of the whole take (frames aligned by waveform similarity, so the "
+                 "pitch is kept); sham: 1.0x through the same path.",
                  _variants({"speed": 1.0}, {"mild": {"speed": 1.1}, "moderate": {"speed": 0.8},
                                            "severe": {"speed": 0.7}},
                            extra={"fast-severe": ("severe", {"speed": 1.3})}),
                  _rate),
-        Injector("IDN-SHIFT", 1, "pitch and formant shift", ("E",),
-                 "The whole take's pitch and formants shifted, length kept; sham: 0 st.",
+        Injector("IDN-SHIFT", 2, "pitch and formant shift", ("E",),
+                 "The whole take's pitch and formants shifted through PRS-OCT's WSOLA shifter, length "
+                 "kept; sham: 0 st.",
                  _variants({"semitones": 0.0}, {"mild": {"semitones": 2.0}, "moderate": {"semitones": 4.0},
                                                "severe": {"semitones": -4.0}}),
                  _shift),
@@ -1260,10 +1329,11 @@ def _catalog() -> dict[str, Injector]:
                             "moderate": {**band, "bandwidthFraction": 0.5},
                             "severe": {**band, "bandwidthFraction": 0.3}}),
                  _band_limit),
-        Injector("PRS-ERRATIC", 1, "erratic pitch", ("F",),
+        Injector("PRS-ERRATIC", 2, "erratic pitch", ("F",),
                  "The take cut into seeded 150-300 ms spans, each shifted by a seeded sign of 2, 4 or 7 "
-                 "semitones through the shifter of PRS-OCT, length kept and neighbours crossfaded over 5 ms; "
-                 "needs no word interval; sham: 0 st through the same path.",
+                 "semitones through PRS-OCT's WSOLA shifter, length kept and neighbours crossfaded over 5 ms, "
+                 "so a sign change is a step of 4, 8 or 14 semitones; needs no word interval; sham: 0 st "
+                 "through the same path.",
                  _variants({**erratic, "semitones": 0.0},
                            {"mild": {**erratic, "semitones": 2.0}, "moderate": {**erratic, "semitones": 4.0},
                             "severe": {**erratic, "semitones": 7.0}}),

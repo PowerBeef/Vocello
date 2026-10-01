@@ -349,22 +349,33 @@ def utc_now() -> str:
 
 
 def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
-    """`runnerSHA256`: the digest of the runner source, the model version and every pin.
+    """`runnerSHA256`: the digest of the runner sources, the model version and every pin.
 
-    Any change to the runner file, the registry `version` or a pinned model,
-    dependency or code file gives a new identity, so cached results of the old
-    one are re-run.
+    The sources are the runner file, the shared runner helpers (`runners/_*.py`:
+    the job kit, the LLM prompts and class definitions) and `qc/phones.py` and
+    `qc/pitch.py`. Any change to them, to the registry `version` or to a pinned
+    model, dependency or code file gives a new identity, so cached results of
+    the old one are re-run.
     """
+
+    payload = store.canonical_json({
+        "pins": pins_digest(model),
+        "sources": {path.relative_to(layout.scripts).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                    for path in runner_sources(layout, model)},
+        "version": model["version"],
+    })
+    return store.sha256_text(payload)
+
+
+def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
+    """The runner file plus the shared code it can import, sorted."""
 
     source = runner_source(layout, model)
     if not source.is_file():
         raise RunnerError(f"{model['id']}: runner source is missing ({model['runner']})")
-    payload = store.canonical_json({
-        "pins": pins_digest(model),
-        "runner": hashlib.sha256(source.read_bytes()).hexdigest(),
-        "version": model["version"],
-    })
-    return store.sha256_text(payload)
+    helpers = {path for path in source.parent.glob("_*.py") if path.name != "__init__.py"}
+    shared = {layout.scripts / "qc/phones.py", layout.scripts / "qc/pitch.py"}
+    return sorted({source} | helpers | {path for path in shared if path.is_file()})
 
 
 @dataclass

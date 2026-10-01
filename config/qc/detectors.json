@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": 2,
+  "version": 3,
   "models": {
     "asrA": "asr.qwen3-asr-1.7b",
     "asrB": "asr.whisper-large-v3",
@@ -101,8 +101,7 @@
     {"id": "language.accent", "class": "mispronunciation", "method": "logistic", "features": [
       {"name": "phones.gop_mean", "direction": "lower"},
       {"name": "phones.substitution_rate", "direction": "higher"},
-      {"name": "phones.l1_substitutions", "direction": "higher"},
-      {"name": "llm.mispronunciation", "direction": "higher"}]},
+      {"name": "phones.l1_substitutions", "direction": "higher"}]},
     {"id": "prosody.pitch", "class": "pitch", "method": "logistic", "features": [
       {"name": "pitch.sustained_shift_st", "direction": "higher"},
       {"name": "pitch.octave_jumps", "direction": "higher"},

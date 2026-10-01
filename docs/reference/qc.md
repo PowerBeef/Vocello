@@ -102,14 +102,14 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `content.asr` | stutter | The smaller of the two ASR families' sound-level phone error rates against the script (`asr.phonetic_error_min`, primary), then their word insertion and deletion rate (characters for Chinese and Japanese). |
 | `boundary.cutoff` | cutoff | Phone coverage of the last word, the aligner's last-word duration ratio, the level of the last 50 ms, and `finishReason`. |
 | `language.wrong` | wrong-language | Both ASR families' language-ID mismatch and transcript-script mismatch (the smaller of the two). |
-| `language.accent` | mispronunciation | Mean GOP, substitution rate, L1 substitutions (for example French /y/→/u/, /ʁ/→/ɹ/, denasalization), and the LLM's vote. |
+| `language.accent` | mispronunciation | Mean GOP, substitution rate and L1 substitutions (for example French /y/→/u/, /ʁ/→/ɹ/, denasalization). It reads no LLM vote: the lanes do not run the judge, so a vote seen in training would be missing in every lane. |
 | `prosody.pitch` | pitch | On frames where both trackers agree (`qc.pitch`): the sustained shift, octave jumps, the register offset from the voice's or clone reference's median, and tracker disagreement. |
 | `prosody.rate` | unnatural | The script's G2P phones per second over the speech span (first to last speech frame), and its reciprocal, so a fit can weigh both tails. |
 | `prosody.tonal-collapse` | tonal-collapse | The longest steady-F0 run, its spectral flatness and its harmonic-to-noise ratio. |
 | `identity.drift` | voice-change | The worst 3 s window's distance from the clone reference, the Built-in voice centroid or the take's own embedding; the whole take's distance; and the window range. |
 | `signal.artifacts` | artifact | Click clusters, internal digital dropouts, clipping and terminal silence. |
 | `quality.naturalness` | unnatural | UTMOSv2 on the whole take and its worst 3 s window, and Audiobox PQ and CE relative to the cell median. |
-| `judge.llm.<class>` | each class | The audio LLM's `pYes`. It stays report-only unless its train kappa is at least 0.6. |
+| `judge.llm.<class>` | each class | The audio LLM's `pYes`. It stays report-only unless its train kappa is at least 0.6. Gemma 4 documents its audio for speech recognition and translation only, and audio LLMs lean on the words more than the voice, so the prosody, accent and naturalness votes are expected to miss the gate. Its transcript can fill in words it expects, so no content feature reads it. |
 
 **Provisional rules.** A detector the labels have not fitted yet scores with its `provisional` rule, when it has one, and flags at report-only. A rule reads the take's language's percentiles from the newest `config/qc/norms-v<N>.json` and falls back to its fixed value when there is no norms file, or the file lacks that language:
 - `pause.anomalous`: the gap is over the language's p99 of every within-sentence pause, and at least 0.5 s (0.5 s without norms); and the mute test did not find words in it.

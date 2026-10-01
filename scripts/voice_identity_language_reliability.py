@@ -31,6 +31,22 @@ DEFAULT_CONTRACT = REPO / "config/voice-identity-language-reliability.json"
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 SAFE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,95}\Z")
 TERMINAL_STATUSES = {"PASS", "HARD_FAILURE", "BLOCKED_PREREQUISITE"}
+# The Mac-side Clone fidelity analysis (`analyze`). 2 (2026-10-01, QC v2): FCPE and
+# SwiftF0 pitch through `qc.pitch.summarize` and ReDimNet2+ similarity to the
+# reference (`qc.fidelity`, lane `voice-reliability`) replace the pYIN prosody
+# distances and the ECAPA similarity; flags are QC v2 detector flags.
+ANALYSIS_SCHEMA_VERSION = 2
+ANALYSIS_LANE = "voice-reliability"
+ANALYSIS_SOURCE_FILES = (
+    "scripts/voice_identity_language_reliability.py",
+    "scripts/qc/fidelity.py",
+    "scripts/qc/pitch.py",
+    "scripts/qc/lanes.py",
+    "config/qc/detectors.json",
+    "config/qc/models.json",
+)
+# The QC v2 detectors whose flags speak to reference-output fidelity.
+FIDELITY_DETECTORS = ("identity.drift", "prosody.pitch", "prosody.tonal-collapse")
 
 
 class ReliabilityError(ValueError):
@@ -1286,42 +1302,44 @@ def build_analysis_manifest(
         })
     if not rows:
         raise ReliabilityError("no passing Clone rows are available for analysis")
-    source_files = [
-        "scripts/voice_identity_language_reliability.py",
-        "scripts/analyze_prosody.py",
-        "scripts/clone_prosody_fidelity.py",
-        "scripts/clone_speaker_similarity.py",
-    ]
     body = {
-        "schemaVersion": 1,
+        "schemaVersion": ANALYSIS_SCHEMA_VERSION,
         "kind": "source-bound-clone-fidelity-input",
         "generationProcessExited": True,
         "executionPlanDigest": plan["planDigest"],
-        "sourceDigests": {path: file_digest(REPO / path) for path in source_files},
+        "sourceDigests": {path: file_digest(REPO / path) for path in ANALYSIS_SOURCE_FILES},
         "rows": rows,
     }
     return {**body, "manifestDigest": canonical_digest(body)}
 
 
-def _distribution(values: list[float]) -> dict[str, float] | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    middle = len(ordered) // 2
-    median = (
-        ordered[middle]
-        if len(ordered) % 2
-        else (ordered[middle - 1] + ordered[middle]) / 2
-    )
-    mean = sum(values) / len(values)
-    variance = sum((value - mean) ** 2 for value in values) / len(values)
-    return {
-        "minimum": round(ordered[0], 4),
-        "median": round(median, 4),
-        "maximum": round(ordered[-1], 4),
-        "mean": round(mean, 4),
-        "standardDeviation": round(variance ** 0.5, 4),
-    }
+def qc_takes(manifest: dict[str, Any]) -> dict[str, Any]:
+    """The analysis rows as a QC v2 takes manifest: each Clone take against its reference clip.
+
+    It names private audio paths, so it stays below the run's private directory."""
+    from qc import store
+
+    takes = []
+    for row in manifest["rows"]:
+        takes.append({
+            "takeID": row["generationID"],
+            "token": store.take_token(manifest["executionPlanDigest"], row["generationID"]),
+            "audio": row["instructedWAV"],
+            "audioSHA256": row["instructedSHA256"],
+            "language": row["outputLanguage"],
+            "text": None,
+            "mode": "clone",
+            "voice": f"clone-{row['speakerID']}",
+            "cell": "clone",
+            "reference": row["neutralWAV"],
+            "referenceSHA256": row["neutralSHA256"],
+            "referenceText": None,
+            "finishReason": None,
+            "seed": row["seed"],
+            "family": row["scriptID"],
+        })
+    return {"schema": store.TAKES_SCHEMA, "source": manifest["manifestDigest"][:16], "kind": "voice-reliability",
+            "takes": takes}
 
 
 def _fidelity_diagnosis(
@@ -1361,14 +1379,17 @@ def _fidelity_diagnosis(
         })
 
     for alias, report in sorted(fidelity_by_alias.items()):
-        flags = report["aggregate"]["flagCounts"]
+        flags = {
+            detector: count for detector, count in report["aggregate"]["flagCounts"].items()
+            if detector in FIDELITY_DETECTORS
+        }
         diagnoses.append({
-            "layer": "reference-output-prosody",
+            "layer": "reference-output-fidelity",
             "referenceAlias": alias,
             "status": "divergent" if flags else "consistent",
             "takeCount": report["aggregate"]["count"],
             "flagCounts": flags,
-            "scope": "advisory-uncalibrated-clone-fidelity-bounds",
+            "scope": "qc-v2-pitch-and-identity-flags",
         })
 
     design_rows = [row for row in plan["takes"] if row["mode"] == "design"]
@@ -1390,83 +1411,79 @@ def _fidelity_diagnosis(
 
 def run_analysis(
     *, plan: dict[str, Any], bundle_root: Path, run_dir: Path,
-    output: Path, include_speaker_similarity: bool,
+    output: Path, include_speaker_similarity: bool, layout: Any = None, qc_run: Any = None,
 ) -> dict[str, Any]:
+    """QC v2 fidelity of every passing Clone take against its reference clip.
+
+    The QC v2 models (lane `voice-reliability`: FCPE and SwiftF0 pitch, and
+    ReDimNet2+ only with `include_speaker_similarity`) run one at a time after
+    the generator exited; `qc.fidelity` reads their cached results per take."""
     summary = load_json(run_dir / "execution-summary.json")
     if summary.get("generationProcessExited") is not True:
         raise ReliabilityError("analysis cannot overlap a generator process")
     manifest = build_analysis_manifest(plan=plan, bundle_root=bundle_root, run_dir=run_dir)
     rows = manifest["rows"]
     sys.path.insert(0, str(REPO / "scripts"))
-    from analyze_prosody import analyze as analyze_wav
-    from clone_prosody_fidelity import evaluate_takes
+    from qc import fidelity, lanes, runtime, store
+    from qc.store import Layout
+
+    layout = layout or Layout()
+    takes_path = run_dir / "private/qc-takes.json"
+    store.write_json_atomic(takes_path, qc_takes(manifest))
+    roles = ["pitchA", "pitchB"] + (["speaker"] if include_speaker_similarity else [])
+    try:
+        directory = (qc_run or lanes.run)(layout, str(takes_path), ANALYSIS_LANE, roles=roles)
+    except (runtime.LockBusy, ValueError, OSError) as error:
+        raise ReliabilityError(f"the QC v2 analysis could not run: {type(error).__name__}") from error
+    by_generation = {row["takeID"]: row for row in fidelity.take_fidelity(layout, directory.name)}
 
     by_alias: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        by_alias.setdefault(row["speakerID"], []).append(row)
-    fidelity: dict[str, dict[str, Any]] = {}
+        take = dict(by_generation[row["generationID"]])
+        take["take"] = take.pop("takeID")
+        by_alias.setdefault(row["speakerID"], []).append(take)
+    fidelity_by_alias: dict[str, dict[str, Any]] = {}
     feature_distributions: dict[str, dict[str, Any]] = {}
     speaker_similarity: dict[str, Any] = {"status": "not-requested"}
-
     for alias, alias_rows in sorted(by_alias.items()):
-        reference_path = alias_rows[0]["neutralWAV"]
-        reference_metrics = analyze_wav(reference_path)
-        take_metrics = [analyze_wav(row["instructedWAV"]) for row in alias_rows]
-        alias_report = evaluate_takes(reference_metrics, take_metrics)
-        for verdict, row in zip(alias_report["takes"], alias_rows):
-            verdict["clip"] = row["generationID"]
-        fidelity[alias] = alias_report
-        metric_names = sorted({
-            key for verdict in alias_report["takes"] for key in verdict["metrics"]
-        })
+        aggregate = fidelity.aggregate(alias_rows)
+        fidelity_by_alias[alias] = {"aggregate": aggregate, "takes": alias_rows}
         feature_distributions[alias] = {
-            metric: _distribution([
-                verdict["metrics"][metric]
-                for verdict in alias_report["takes"] if metric in verdict["metrics"]
-            ])
-            for metric in metric_names
+            metric: aggregate[metric]
+            for metric in ("registerShiftSemitones", "sustainedShiftSemitones", "similarity",
+                           "worstWindowSimilarity")
         }
-
     if include_speaker_similarity:
-        try:
-            from clone_speaker_similarity import analyze_takes, ecapa_embedder, load_similarity_profile
-            embed = ecapa_embedder()
-            profile = load_similarity_profile(None)
-            speaker_similarity = {"status": "complete", "references": {}}
-            for alias, alias_rows in sorted(by_alias.items()):
-                result = analyze_takes(
-                    alias_rows[0]["neutralWAV"],
-                    [row["instructedWAV"] for row in alias_rows],
-                    embed,
-                    profile,
-                )
-                for take, row in zip(result["takes"], alias_rows):
-                    take["take"] = row["generationID"]
-                result["reference"] = alias
-                speaker_similarity["references"][alias] = result
-        except Exception as error:
-            speaker_similarity = {
-                "status": "unavailable",
-                "reasonType": type(error).__name__,
-            }
+        measured = all(take["identity"].get("available") for takes in by_alias.values() for take in takes)
+        speaker_similarity = {
+            "status": "complete" if measured else "incomplete",
+            "metric": "redimnet2-plus-cosine-to-reference",
+            "references": {
+                alias: {"reference": alias, "similarity": fidelity_by_alias[alias]["aggregate"]["similarity"],
+                        "worstWindowSimilarity": fidelity_by_alias[alias]["aggregate"]["worstWindowSimilarity"]}
+                for alias in sorted(by_alias)
+            },
+        }
 
     observations = {
         row["takeID"]: row for row in read_jsonl(run_dir / "observations.jsonl")
     }
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": ANALYSIS_SCHEMA_VERSION,
         "reliabilityPlanDigest": plan["planDigest"],
         "analysisManifestDigest": manifest["manifestDigest"],
         "rowCount": len(rows),
         "generatorProcessExitedBeforeAnalysis": True,
-        "prosodyFidelity": fidelity,
+        "qcRun": directory.name,
+        "qcModels": fidelity.run_models(layout, directory.name),
+        "fidelity": fidelity_by_alias,
         "acrossTakeDistributions": feature_distributions,
         "speakerSimilarity": speaker_similarity,
-        "diagnoses": _fidelity_diagnosis(plan, observations, fidelity),
+        "diagnoses": _fidelity_diagnosis(plan, observations, fidelity_by_alias),
         "semanticPromotionAuthority": False,
         "limitations": [
-            "clone prosody bounds remain advisory until AV-07 calibration closes",
-            "speaker similarity is advisory and omitted unless explicitly requested",
+            "QC v2 flags stay report-only until an evaluated thresholds file gives a detector a level",
+            "speaker similarity is omitted unless explicitly requested",
             "French semantic correctness requires the physical-device ASR campaign",
         ],
     }

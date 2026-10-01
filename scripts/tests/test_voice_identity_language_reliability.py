@@ -3,12 +3,16 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+import unittest.mock
 import wave
 
 
 REPO = Path(__file__).resolve().parents[2]
+if str(REPO / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO / "scripts"))
 MODULE_PATH = REPO / "scripts/voice_identity_language_reliability.py"
 SPEC = importlib.util.spec_from_file_location("voice_identity_language_reliability", MODULE_PATH)
 VLR = importlib.util.module_from_spec(SPEC)
@@ -207,6 +211,63 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         self.assertEqual(len(manifest["rows"]), 1)
         self.assertEqual(manifest["rows"][0]["generationID"], "generation-1")
         self.assertFalse(manifest.get("promotionAuthority", False))
+
+    def test_analysis_scores_clone_takes_against_their_reference_with_qc_v2(self):
+        plan = VLR.build_plan(
+            contract=self.contract, bundle=self.bundle, source_identity="e" * 64
+        )
+        passing = [row for row in plan["takes"] if row["mode"] == "clone"][0]
+        run_dir = self.root / "analysis-run"
+        audio_root = run_dir / "private/audio"
+        audio_root.mkdir(parents=True)
+        output = audio_root / "take.wav"
+        self._write_wav(output, value=250)
+        VLR.append_jsonl(run_dir / "observations.jsonl", {
+            "takeID": passing["takeID"], "planDigest": plan["planDigest"],
+            "status": "PASS", "generationID": "generation-1",
+            "audioFileName": output.name, "audioSHA256": VLR.file_digest(output),
+        })
+        (run_dir / "execution-summary.json").write_text(json.dumps({"generationProcessExited": True}))
+        calls = []
+
+        def qc_run(layout, takes_path, lane, roles):
+            calls.append((lane, roles))
+            manifest = json.loads(Path(takes_path).read_text(encoding="utf-8"))
+            self.assertEqual(Path(takes_path).parent, run_dir / "private")
+            take = manifest["takes"][0]
+            self.assertEqual((take["takeID"], take["mode"], take["audio"]), ("generation-1", "clone", str(output)))
+            self.assertTrue(take["reference"] and take["referenceSHA256"])
+            return Path(layout.runs) / "voice-reliability-run"
+
+        row = {
+            "takeID": "generation-1", "control": False,
+            "pitch": {"available": True, "registerShiftSemitones": 0.4, "sustainedShiftSemitones": 1.0},
+            "identity": {"available": True, "similarity": 0.81, "worstWindowSimilarity": 0.7},
+            "flags": [{"detector": "identity.drift", "class": "voice-change", "level": "report-only"},
+                      {"detector": "level.loudness", "class": None, "level": "report-only"}],
+        }
+        from qc import fidelity
+        from qc.store import Layout
+
+        with unittest.mock.patch.object(fidelity, "take_fidelity", return_value=[row]), \
+                unittest.mock.patch.object(fidelity, "run_models", return_value={"speaker": {"id": "s"}}):
+            report = VLR.run_analysis(
+                plan=plan, bundle_root=self.bundle_root, run_dir=run_dir, output=self.root / "report.json",
+                include_speaker_similarity=True, layout=Layout(self.root), qc_run=qc_run,
+            )
+        self.assertEqual(calls, [("voice-reliability", ["pitchA", "pitchB", "speaker"])])
+        self.assertEqual(report["schemaVersion"], 2)
+        self.assertEqual(report["qcRun"], "voice-reliability-run")
+        alias = passing["referenceAlias"]
+        self.assertEqual(report["fidelity"][alias]["takes"][0]["take"], "generation-1")
+        self.assertEqual(report["acrossTakeDistributions"][alias]["similarity"]["median"], 0.81)
+        self.assertEqual(report["speakerSimilarity"]["status"], "complete")
+        diagnosis = next(item for item in report["diagnoses"] if item["layer"] == "reference-output-fidelity")
+        # Only pitch and identity flags speak to fidelity; the loudness advisory does not.
+        self.assertEqual((diagnosis["status"], diagnosis["flagCounts"]), ("divergent", {"identity.drift": 1}))
+        self.assertTrue((self.root / "report.json").is_file())
+        manifest = VLR.build_analysis_manifest(plan=plan, bundle_root=self.bundle_root, run_dir=run_dir)
+        self.assertIn("scripts/qc/fidelity.py", manifest["sourceDigests"])
 
     def test_device_plan_is_exact_and_private_map_is_source_bound(self):
         plan = VLR.build_device_plan(

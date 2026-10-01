@@ -1,32 +1,33 @@
 #!/usr/bin/env python3
 """Clone-fidelity lane: reference vs fixed-seed clone takes, plus controls.
 
-Generates N fixed-seed clone takes of a saved voice with the CLI, then runs
-the layered analyzers against the voice's reference clip:
+Generates N fixed-seed clone takes of a saved voice with the CLI, then scores
+every take against the voice's reference clip with QC v2 (`docs/reference/qc.md`),
+lane ``clone-lane`` of ``config/qc/detectors.json`` (roles speaker, pitchA and
+pitchB):
 
-  1. ``clone_prosody_fidelity``   — deterministic delivery/tone distances
-                                    (warn-first bounds from the prosody profile)
-  2. ``clone_speaker_similarity`` — ECAPA identity cosine (advisory bands);
-                                    skipped with a note when torch is absent
-  3. ``audio_qc_lane_gates``      — the clone lane's audio QC gates
-                                    (``config/audio-qc-lane-gates.json``: CAM++
-                                    clone similarity and onset drift against the
-                                    reference clip, at their qualified records'
-                                    thresholds) over the clone takes; the
-                                    controls and cross-clone negatives are
-                                    negative controls, never gated. A warn gate
-                                    reports in the summary and the report's
-                                    ``audioQCGates``; only a fail gate's flag
-                                    fails the lane (exit 1). The result is
-                                    ``<run dir>/audio-qc/gates.json``.
+  1. ``qc.lanes.run``       — ReDimNet2+ speaker embeddings and the FCPE and
+                              SwiftF0 pitch tracks of every take and of the
+                              reference clip, then the QC v2 detectors. The
+                              clone takes gate; the matched controls and
+                              cross-clone negatives are scored against the same
+                              clip as negative controls and never gate.
+  2. ``qc.fidelity``        — per take: the register shift from the reference
+                              (signed semitones, on the frames both trackers
+                              agree on), the largest sustained shift, octave
+                              jumps, and the identity similarity of the whole
+                              take and of its least similar 4 s window.
+  3. ``qc.lanes.gate``      — the lane's gate over the clone takes: exit 0 pass,
+                              3 warn (reported), 1 fail, 2 not computed. Until an
+                              evaluated thresholds file gives a detector a level,
+                              every flag is report-only and the gate passes.
 
-Generates negative controls of the same text so the identity bands can be
-calibrated from measured same-voice vs different-voice separations instead of
-placeholders (audit #103 part 1; the maintainer delegated the decision to the
-audit's recommendation on 2026-09-25): by default eight built-in-speaker takes
-matched to the reference voice's gender (two controls, one cross-gender, were
-too few and too easy to fit a band). Eight negatives is
-`clone_speaker_similarity`'s calibration minimum.
+Generates negative controls of the same text so the identity separation is
+measured from same-voice vs different-voice scores instead of assumed (audit
+#103 part 1; the maintainer delegated the decision to the audit's
+recommendation on 2026-09-25): by default eight built-in-speaker takes matched
+to the reference voice's gender (two controls, one cross-gender, were too few
+and too easy). Eight negatives is the separation's calibration minimum.
 
 Cross-clone negatives, clone takes of other saved voices, share every clone
 artifact and differ only in identity, so they are the hard case. Cloning a voice
@@ -38,9 +39,9 @@ default.
 
 ADVISORY dev lane: not a CI gate, not a packaging prerequisite, never
 publishes benchmark history. Evidence-lane rule: no analyzer beside a resident
-generator — takes are generated one process at a time, and the torch-backed
-analyzers start only after the last generation process has exited; after
-that the canonical host's measured budget governs.
+generator — takes are generated one process at a time, and the QC v2 models
+start only after the last generation process has exited, one at a time, each
+in its own runner process.
 
 Usage:
   python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman \
@@ -54,26 +55,36 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import math
 import os
+import random
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from clone_prosody_fidelity import evaluate_takes
 
 # 2 (audit #103): gender-matched controls by default, and cross-clone negatives.
 # 3 (2026-09-25 review): cross-clone negatives only for voices the operator names;
 # none by default, and no discovery of the other saved voices.
 # 4 (2026-09-25, audit decision 1a): the speech-emotion column is gone with its
 # retired judge (trained on non-commercial corpora).
-LANE_VERSION = 4
+# 5 (2026-10-01, QC v2): ReDimNet2+ identity and FCPE/SwiftF0 pitch against the
+# reference clip, and the QC v2 lane gate, replace the ECAPA similarity, the
+# pYIN prosody distances and the v1 lane gates (CAM++ similarity, onset drift).
+LANE_VERSION = 5
 FIXED_TEXT = (
     "The harbor lights flickered as the evening ferry pulled away, and she "
     "wondered how many more crossings the old captain had left in him."
 )
 FIXED_TEXT_LANGUAGE = "english"
 GATED_LANE = "clone-lane"
+QC_TAKES_FILE = "qc-takes.json"
+GATE_VERDICTS = {0: "pass", 3: "warn", 1: "fail", 2: "error"}
+# Separation of same-voice from different-voice similarity (audit #103): enough
+# negatives to estimate it, and a reproducible bootstrap for its intervals.
+MINIMUM_CALIBRATION_NEGATIVES = 8
+SEPARATION_BOOTSTRAP_RESAMPLES = 2_000
+SEPARATION_BOOTSTRAP_SEED = 20_260_925
 DEFAULT_MATCHED_CONTROLS = 8
 # Cross-clone takes without a named voice: none. Each clone take attests consent.
 DEFAULT_CROSS_CLONES = 0
@@ -239,81 +250,160 @@ def generate_all(plan, out_dir, vocello, run=subprocess.run):
             )
 
 
-def ecapa_section(reference, clone_paths, control_paths, cross_clone_paths=()):
-    """Identity similarity with measured positive/negative separation.
-
-    Negatives are the matched controls plus the cross-clone takes; each kind
-    also reports its own separation, since cross-clone negatives are the hard
-    case (same clone artifacts, different identity)."""
-    try:
-        from clone_speaker_similarity import analyze_takes, ecapa_embedder, load_similarity_profile
-    except Exception as error:  # pragma: no cover - import shape guard
-        return {"skipped": f"clone_speaker_similarity unavailable: {error}"}
-    try:
-        embed = ecapa_embedder()
-    except Exception as error:
-        return {"skipped": f"torch/speechbrain not installed: {error}"}
-    from clone_speaker_similarity import separation
-
-    profile = load_similarity_profile(None)
-    section = {"clones": analyze_takes(reference, clone_paths, embed, profile)}
-    positives = [row["cosineSimilarity"] for row in section["clones"]["takes"]]
-    negatives = []
-    if control_paths:
-        section["controls"] = analyze_takes(reference, control_paths, embed, profile)
-        control_scores = [row["cosineSimilarity"] for row in section["controls"]["takes"]]
-        section["controlSeparation"] = separation(positives, control_scores)
-        negatives.extend(control_scores)
-    if cross_clone_paths:
-        section["crossClones"] = analyze_takes(reference, list(cross_clone_paths), embed, profile)
-        cross_scores = [row["cosineSimilarity"] for row in section["crossClones"]["takes"]]
-        section["crossCloneSeparation"] = separation(positives, cross_scores)
-        negatives.extend(cross_scores)
-    if negatives:
-        # AUC and EER with intervals over every negative, so the bands are
-        # fitted from a measured separation instead of read off two controls.
-        section["separation"] = separation(positives, negatives)
-    return section
+def area_under_curve(positives, negatives):
+    """P(a same-voice score beats a different-voice score); ties count half."""
+    wins = sum(
+        1.0 if positive > negative else 0.5 if positive == negative else 0.0
+        for positive in positives for negative in negatives
+    )
+    return wins / (len(positives) * len(negatives))
 
 
-def gate_takes(plan, run_dir, reference):
-    """The lane's takes as its audio QC gates read them: each clone take of the voice, scored against the
-    voice's reference clip; the controls and cross-clone negatives are negative controls, never gated."""
-    return [
-        {
-            "takeID": os.path.splitext(item["name"])[0],
-            "wav": os.path.join(run_dir, item["name"]),
-            "language": FIXED_TEXT_LANGUAGE,
-            "mode": item["mode"],
-            "text": FIXED_TEXT,
-            "control": item["kind"] != "clone",
-            "reference": reference if item["kind"] == "clone" else None,
-        }
-        for item in plan
-    ]
+def equal_error_rate(positives, negatives):
+    """(EER, threshold): accept a score at or above the threshold; the threshold
+    where the false-accept and false-reject rates meet (their mean at the
+    closest observed crossing)."""
+    best = None
+    for threshold in sorted(set(positives) | set(negatives)) + [math.inf]:
+        false_accept = sum(value >= threshold for value in negatives) / len(negatives)
+        false_reject = sum(value < threshold for value in positives) / len(positives)
+        candidate = (abs(false_accept - false_reject), (false_accept + false_reject) / 2.0, threshold)
+        if best is None or candidate[:2] < best[:2]:
+            best = candidate
+    return best[1], best[2]
 
 
-def audio_qc_gates(plan, run_dir, reference, run_gates=None):
-    """The clone lane's audio QC gates, after every take was generated and every analyzer ran.
+def _percentile_interval(values):
+    ordered = sorted(values)
+    low = ordered[int(0.025 * (len(ordered) - 1))]
+    high = ordered[int(math.ceil(0.975 * (len(ordered) - 1)))]
+    return [round(low, 4), round(high, 4)]
 
-    Prints the gates' summary and returns what the report keeps: the verdict
-    (pass, warn or fail; `error` when they could not be computed, which fails
-    the lane only when it has a fail gate) and the flagged-take count.
+
+def separation(positives, negatives, *, resamples=SEPARATION_BOOTSTRAP_RESAMPLES,
+               seed=SEPARATION_BOOTSTRAP_SEED):
+    """Same-voice versus different-voice separation with 95% intervals.
+
+    Positives (clone takes) and negatives (controls) are resampled separately
+    with a fixed seed, so an interval is reproducible. ``bandCalibrationReady``
+    says only whether enough negatives exist to read a band off the scores.
     """
-    import audio_qc_lane_gates as lane_gates
+    if not positives or not negatives:
+        return None
+    generator = random.Random(seed)
+    aucs, eers = [], []
+    for _ in range(resamples):
+        sample_positive = [generator.choice(positives) for _ in positives]
+        sample_negative = [generator.choice(negatives) for _ in negatives]
+        aucs.append(area_under_curve(sample_positive, sample_negative))
+        eers.append(equal_error_rate(sample_positive, sample_negative)[0])
+    eer, threshold = equal_error_rate(positives, negatives)
+    return {
+        "positives": len(positives),
+        "negatives": len(negatives),
+        "auc": round(area_under_curve(positives, negatives), 4),
+        "aucInterval95": _percentile_interval(aucs),
+        "equalErrorRate": round(eer, 4),
+        "equalErrorRateThreshold": None if math.isinf(threshold) else round(threshold, 4),
+        "equalErrorRateInterval95": _percentile_interval(eers),
+        "bootstrap": {"method": "stratified-percentile", "resamples": resamples, "seed": seed},
+        "minimumCalibrationNegatives": MINIMUM_CALIBRATION_NEGATIVES,
+        "bandCalibrationReady": len(negatives) >= MINIMUM_CALIBRATION_NEGATIVES,
+    }
 
-    run = run_gates or lane_gates.run_gates
+
+def qc_takes(plan, run_dir, reference, label):
+    """The lane's takes as a QC v2 takes manifest: every take against the voice's reference clip.
+
+    The clone takes gate; the matched controls and cross-clone negatives are
+    negative controls (``control``), scored against the same clip for the
+    identity separation and never gated."""
+    from qc import store
+
+    takes = []
+    reference_sha = store.audio_sha256(reference)
+    for item in plan:
+        take_id = os.path.splitext(item["name"])[0]
+        audio = os.path.join(run_dir, item["name"])
+        takes.append({
+            "takeID": take_id,
+            "token": store.take_token(label, take_id),
+            "audio": audio,
+            "audioSHA256": store.audio_sha256(audio),
+            "language": FIXED_TEXT_LANGUAGE,
+            "text": FIXED_TEXT,
+            "mode": item["mode"],
+            "voice": f"clone-{item['voice']}" if item["mode"] == "clone" else item["speaker"],
+            "cell": "clone" if item["kind"] != "control" else "standard",
+            "reference": reference,
+            "referenceSHA256": reference_sha,
+            "referenceText": None,
+            "finishReason": None,
+            "seed": item["seed"],
+            "family": "clone-fidelity-fixed-text",
+            "control": item["kind"] != "clone",
+            "kind": item["kind"],
+        })
+    return {"schema": store.TAKES_SCHEMA, "source": label, "kind": "clone-fidelity", "takes": takes}
+
+
+def score_takes(plan, run_dir, reference, label, *, layout=None, run=None, gate=None):
+    """Score every take with QC v2 after the last generation, then gate the clone takes.
+
+    Returns ``(run_id, verdict, exit_code)``: the gate's verdict (pass, warn,
+    fail; ``error`` when it could not be computed) and its exit code.
+    """
+    from qc import lanes, runtime, store
+    from qc.store import Layout
+
+    layout = layout or Layout()
+    manifest_path = os.path.join(run_dir, QC_TAKES_FILE)
+    store.write_json_atomic(manifest_path, qc_takes(plan, run_dir, reference, label))
     try:
-        result, path = run(GATED_LANE, run_dir, takes=gate_takes(plan, run_dir, reference),
-                           run_id=os.path.basename(os.path.normpath(run_dir)))
-    except lane_gates.GateError as error:
-        verdict = "fail" if lane_gates.lane_has_fail_gate(lane_gates.REPO, GATED_LANE) else "error"
-        print(f"audio-qc gates · {GATED_LANE}: {verdict.upper()} · not computed: {error}", file=sys.stderr)
-        return {"verdict": verdict}
-    for line in lane_gates.summary_lines(result, path):
-        print(line, file=sys.stderr)
-    return {"verdict": result["verdict"], "flaggedTakes": result["counts"]["flagged"],
-            "result": f"{lane_gates.OUTPUT_DIRECTORY}/{lane_gates.RESULT_FILE}"}
+        directory = (run or lanes.run)(layout, manifest_path, GATED_LANE)
+    except (runtime.LockBusy, ValueError, OSError) as error:
+        print(f"qc · {GATED_LANE}: ERROR · not computed: {error}", file=sys.stderr)
+        return None, "error", 2
+    code = (gate or lanes.gate)(layout, GATED_LANE, directory.name)
+    return directory.name, GATE_VERDICTS.get(code, "error"), code
+
+
+def fidelity_report(plan, run_id, *, layout=None):
+    """Per-kind fidelity sections and the identity separation, from the QC run's cached results."""
+    from qc import fidelity
+    from qc.store import Layout
+
+    layout = layout or Layout()
+    rows = fidelity.take_fidelity(layout, run_id)
+    kinds = {os.path.splitext(item["name"])[0]: item["kind"] for item in plan}
+    by_kind = {"clone": [], "control": [], "cross-clone": []}
+    for row in rows:
+        by_kind[kinds[row["takeID"]]].append(row)
+    sections = {
+        "clones": {"aggregate": fidelity.aggregate(by_kind["clone"]), "takes": by_kind["clone"]},
+    }
+    if by_kind["control"]:
+        sections["controls"] = {"aggregate": fidelity.aggregate(by_kind["control"]), "takes": by_kind["control"]}
+    if by_kind["cross-clone"]:
+        sections["crossClones"] = {"aggregate": fidelity.aggregate(by_kind["cross-clone"]),
+                                   "takes": by_kind["cross-clone"]}
+
+    def scores(kind):
+        return [row["identity"]["similarity"] for row in by_kind[kind]
+                if row["identity"].get("similarity") is not None]
+
+    positives = scores("clone")
+    similarity = {"metric": "redimnet2-plus-cosine-to-reference"}
+    negatives = []
+    for kind, key in (("control", "controlSeparation"), ("cross-clone", "crossCloneSeparation")):
+        if by_kind[kind]:
+            similarity[key] = separation(positives, scores(kind))
+            negatives.extend(scores(kind))
+    if negatives:
+        # AUC and EER with intervals over every negative, measured rather than
+        # read off two controls.
+        similarity["separation"] = separation(positives, negatives)
+    return sections, similarity, fidelity.run_models(layout, run_id)
 
 
 def main():
@@ -376,54 +466,48 @@ def main():
                 raise SystemExit(f"named cross-clone voice has no saved reference: {name}")
         generate_all(plan, run_dir, vocello)
 
-    clone_paths = [os.path.join(run_dir, item["name"]) for item in plan if item["kind"] == "clone"]
-    control_paths = [os.path.join(run_dir, item["name"]) for item in plan if item["kind"] == "control"]
-    cross_clone_paths = [
-        os.path.join(run_dir, item["name"]) for item in plan if item["kind"] == "cross-clone"
-    ]
-    for path in clone_paths + control_paths + cross_clone_paths:
+    for item in plan:
+        path = os.path.join(run_dir, item["name"])
         if not os.path.isfile(path):
             raise SystemExit(f"expected take missing: {path}")
 
-    from analyze_prosody import analyze as analyze_wav
-
-    reference_metrics = analyze_wav(reference)
-    fidelity = evaluate_takes(
-        reference_metrics, [analyze_wav(path) for path in clone_paths]
-    )
+    # Evidence-lane rule: the QC v2 models start only after the last generation
+    # process has exited.
+    run_id, verdict, code = score_takes(plan, run_dir, reference, os.path.basename(os.path.normpath(run_dir)))
     report = {
         "laneVersion": LANE_VERSION,
         "label": args.label,
         "voice": args.voice,
         "referenceClip": os.path.basename(reference),
         "seedBase": args.base_seed,
-        "prosodyFidelity": fidelity,
         "referenceGender": reference_gender,
         "controlPlan": {
-            "matchedControls": len(control_paths),
-            "crossCloneNegatives": len(cross_clone_paths),
+            "matchedControls": sum(1 for item in plan if item["kind"] == "control"),
+            "crossCloneNegatives": sum(1 for item in plan if item["kind"] == "cross-clone"),
             # Operator-named only: each one attested consent for its clone takes.
             "crossCloneVoicesNamed": len(cross_clone_voices),
         },
-        "speakerSimilarity": ecapa_section(reference, clone_paths, control_paths, cross_clone_paths),
+        "qcGate": {"lane": GATED_LANE, "run": run_id, "verdict": verdict, "exitCode": code},
     }
-    # Evidence-lane rule: the gates' judges start only after the last generation process has exited and the
-    # in-process analyzers have finished.
-    report["audioQCGates"] = audio_qc_gates(plan, run_dir, reference)
+    if run_id is not None:
+        report["fidelity"], report["speakerSimilarity"], report["qcModels"] = fidelity_report(plan, run_id)
     report_path = os.path.join(run_dir, "clone-fidelity-report.json")
     with open(report_path, "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, sort_keys=True)
         handle.write("\n")
+    clones = (report.get("fidelity") or {}).get("clones", {}).get("aggregate", {})
     print(json.dumps({
         "report": report_path,
-        "prosody": fidelity["aggregate"],
-        "similarity": report["speakerSimilarity"].get("clones", {}).get("aggregate")
-        if isinstance(report["speakerSimilarity"], dict) else None,
-        "audioQCGates": report["audioQCGates"]["verdict"],
+        "qcRun": run_id,
+        "registerShiftSemitones": clones.get("registerShiftSemitones"),
+        "similarity": clones.get("similarity"),
+        "separation": (report.get("speakerSimilarity") or {}).get("separation"),
+        "qcGate": verdict,
     }, indent=2))
-    if report["audioQCGates"]["verdict"] == "fail":
-        # Only a fail gate fails the lane; a warn gate's flags report above.
-        raise SystemExit(1)
+    if verdict in ("fail", "error"):
+        # A warn gate's flags report above; a fail gate or a gate that could not
+        # be computed fails the lane.
+        raise SystemExit(1 if verdict == "fail" else 2)
 
 
 if __name__ == "__main__":

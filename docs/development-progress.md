@@ -17,50 +17,34 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 1 — the batched AQ-07 round is confirmed: 11 more detectors qualify at warn
+### October 1, evening — QC v2 replaces the v1 audio QC harness
 
-All 23 batched-round plans ran on fresh cache roots: the FLEURS reserve set, classes E, F, I and J, and
-seam-identity. The records, ledgers and generated docs are committed.
+The v1 harness missed defects the maintainer heard: clone pitch, cut-offs, accented French from a
+Design voice, and the stutter in `fr-0101--dylan`. It is deleted (c44d0205, efe548d8, 45421df2).
+QC v2 (`scripts/qc.py`, `scripts/qc/`, `config/qc/`, `docs/reference/qc.md`) uses fewer, stronger
+local models, all with commercial-use weights. It is calibrated on the maintainer's own labels.
 
-**Qualified at warn (11):**
-- signal dropout, terminal silence, DC offset and clipping v2 (severe cells 1.0);
-- band-limit (0.97);
-- content v2 (0.80-0.86, no Japanese or Korean: it needs two families);
-- run-on v2 (0.98);
-- clone-similarity and onset-drift;
-- token-loop (1.0) and eos-overrun (0.94).
-
-**Refused (12):**
-- **Class F, by an injector defect.** pitch-instability, pitch-break and octave-jump. The catalog-3 shifter
-  (resample plus a plain overlap-add) left most voices near their own pitch. Catalog 4 (WSOLA, 15929f31)
-  now reaches the labelled pitch within 0.1 st under pYIN.
-- **Real limitations:**
-  - nativeness: 0.18 on speechocean762 severe learner accents;
-  - window-drift: 0.44;
-  - high-entropy: 0.06;
-  - the three long-form seam detectors: 75 takes cannot meet the per-language false-alarm bound, and
-    detection is weak.
-
-**Tooling and judges.**
-- `recite` (6f7def34) re-cites a shadow judge's canary after a worker-source change. Every shadow judge's
-  identity moved with da775e44.
-- CAM++ was re-cited and recalibrated from a 348 MB to a 1.09 GB ceiling. The long-form panel now scores
-  all 75 families.
-- Lane gates are declared and validated (language bench: truncation, run-on, consensus LID; clone lane:
-  clone-similarity, onset-drift). No lane computes or enforces them yet.
-
-**Finding.** Across five takes of one voice, Built-in and Design voices' median F0 ranges 6.8-8 st (90th
-percentile 12-15 st); clones range 2.6 st. A take-register consistency detector is the candidate.
+**Built and pushed (CI green on 45421df2):**
+- Models: Qwen3-ASR-1.7B, Whisper large-v3, Qwen3-ForcedAligner, ZIPA phones with espeak-ng G2P,
+  FCPE and SwiftF0, ReDimNet2+, UTMOSv2, Audiobox Aesthetics, Gemma 4 12B (llama.cpp).
+- Detectors run report-only until labels exist. They cover phone-level stutter, sound-level ASR
+  error, anomalous pauses, abrupt ends, loudness, pitch and register, tonal collapse, identity drift,
+  artifacts, naturalness and the LLM rubric.
+- On `fr-0101--dylan`, ZIPA hears silent letters pronounced (phone error 0.48, four repeated runs).
+  The pause detector flags the 1.2 s gap; the boundary detector flags the abrupt end.
+- Lanes: lang-bench (language version 6, two ASR families), qc-takes (scores and queues) and the
+  clone lane (version 5). The qc-n2 and qc-introspection lanes are gone.
+- The label tool's batch-1 is 106 takes (French and English, 10 blind repeats). It lives under
+  `build/private/qc/`.
 
 **Next.**
-1. The lanes compute and enforce their gates.
-2. Class F v2 on catalog 4 and unscored cohorts. pYIN tracks the subharmonic on short up-spans, so the
-   detector design must allow for it.
-3. The register-consistency detector.
-4. Nativeness, window-drift and seam v2 (about 40 long-form takes per language).
-5. The fail level, on a fresh FLEURS reserve.
-6. Re-cite the other 11 shadow judges.
-7. Prune the raw evidence and corpora (about 70 GB) with maintainer approval.
+1. Finish the pool run over both qc-takes runs, then commit `config/qc/norms-v1.json`
+   (`qc.py norms`).
+2. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`).
+3. Run `qc.py fit`, commit `thresholds-v1`, then `qc.py eval` once and commit the report.
+4. One real run each of lang-bench quick, qc-takes and the clone lane.
+5. Dry-run `build_cleanup.py --qc-v1` (about 38 GiB), then delete on the maintainer's go-ahead.
+6. Score the 804-take variation experiment with FCPE and SwiftF0.
 
 ### September 30, later — the whole harness is built; the batched round waits on data
 

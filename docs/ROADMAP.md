@@ -42,7 +42,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 | `QC-02` | in-flight | Maintainer labels | — |
 | `QC-03` | planned | Detectors, thresholds and evaluation | `QC-01`, `QC-02` |
 | `QC-04` | planned | Lanes on QC v2 | `QC-03` |
-| `QC-05` | planned | Retire the v1 stack | `QC-04` |
+| `QC-05` | in-flight | Retire the v1 stack | — |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
 | `QC-07` | planned | Move the delivery bench and voice-reliability analysis onto QC v2 | `QC-04` |
 
@@ -60,7 +60,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 - **`QC-04`** (planned) — Lanes on QC v2.
   gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
 
-- **`QC-05`** (planned) — Retire the v1 stack.
+- **`QC-05`** (in-flight) — Retire the v1 stack.
   gate: The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.
 
 - **`QC-06`** (planned) — Product follow-ups surfaced by QC.

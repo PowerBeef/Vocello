@@ -1575,7 +1575,7 @@
       ],
       "updated": "2026-10-01",
       "unparkWhen": null,
-      "notes": "Qwen3-ASR-1.7B, Qwen3-ForcedAligner-0.6B, Whisper large-v3, ZIPA (fallback wav2vec2-xlsr-espeak) with espeak-ng G2P, FCPE and SwiftF0, ReDimNet2+, UTMOSv2, Audiobox Aesthetics, Gemma 4 12B (fallback Qwen2.5-Omni-7B)."
+      "notes": "Fetched and verified: Qwen3-ASR-1.7B, Qwen3-ForcedAligner-0.6B, Whisper large-v3, ZIPA with espeak-ng G2P (fallback wav2vec2-xlsr-espeak), FCPE and SwiftF0, ReDimNet2+, Audiobox Aesthetics, Gemma 4 12B (fallback Qwen2.5-Omni-7B). The UTMOSv2 smoke run is pending."
     },
     {
       "id": "QC-02",
@@ -1606,7 +1606,7 @@
       ],
       "updated": "2026-10-01",
       "unparkWhen": null,
-      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train.",
+      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train. Detectors, fit and eval are built and run report-only with provisional per-language rules; thresholds-v1 waits on the batch-1 labels.",
       "legacyIds": [
         "AQ-07",
         "AQ-08",
@@ -1627,7 +1627,7 @@
       ],
       "updated": "2026-10-01",
       "unparkWhen": null,
-      "notes": "Replaces whisper-small and the v1 lane gates. Language records take a new measurement version.",
+      "notes": "Wired: lang-bench on Qwen3-ASR and Whisper large-v3 (language version 6), qc-takes scoring and queueing, the clone lane (version 5). The one real run of each waits on thresholds-v1.",
       "legacyIds": [
         "BT-05"
       ]
@@ -1636,17 +1636,15 @@
       "id": "QC-05",
       "plan": "qc-v2-2026-10",
       "title": "Retire the v1 stack",
-      "status": "planned",
-      "blockedBy": [
-        "QC-04"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
       "updated": "2026-10-01",
       "unparkWhen": null,
-      "notes": "Frees about 45 GB.",
+      "notes": "The v1 code, configs, records, docs, tests and CI routes are deleted (45421df2). build_cleanup.py --qc-v1 (about 38 GiB) waits on a reviewed dry run and the maintainer's go-ahead.",
       "legacyIds": [
         "AQ-09"
       ]
@@ -1689,7 +1687,7 @@
         "DP-31",
         "DP-32"
       ],
-      "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2."
+      "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2. Emotion adherence (the maintainer's 2026-10-01 emotion and intent analysis of fr-0101--dylan): the qc-takes pool has no instructed takes, so nothing yet checks that a requested emotion is heard. Candidates: emotion2vec+ large (FunASR model license: commercial use with attribution) as an emotion vote, plus the acoustic cues that separated emotions best in that analysis: pitch level against the voice's neutral take (every acted emotion sat more than 5 st above neutral), energy, alpha ratio and Hammarberg index, computed in NumPy (openSMILE needs a commercial license). Excluded: audeering's wav2vec2 emotion model and the CaFE reference set (both CC BY-NC-SA). Emotion models score 15-50% on synthetic speech, so the measure is calibrated on maintainer labels of instructed takes and starts report-only."
     }
   ]
 }

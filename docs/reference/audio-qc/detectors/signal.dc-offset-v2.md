@@ -41,12 +41,44 @@ Registry entry `signal.dc-offset@2` in [config/audio-qc-detectors.json](../../..
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Qualified (warn); confirmed (qualified).
 
 **Plan.** [config/audio-qc-preregistrations/signal.dc-offset@2.json](../../../../config/audio-qc-preregistrations/signal.dc-offset@2.json): digest `ebfcea42ad9e6045`, rule split-conformal, alpha 0.01, confidence 0.95, operating point warn, population N2; injector catalog 3, classes A,B,C,F, 150 per cell.
 Calibration cohort audio-qc-n2-cohort (fleurs-reserve-1, manifest `de5491c5ecb55042`); confirmation cohort audio-qc-n2-cohort (fleurs-reserve-2, manifest `64b667943e2e4bbf`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry qualified.
 
-**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+### Record [record-ebfcea42ad9e6045.json](../../../../benchmarks/audio-qc-calibration/signal.dc-offset@2/record-ebfcea42ad9e6045.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.01, thresholds per pooled; plan `ebfcea42ad9e6045`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.00218448 | 0/257 (0.000), upper 0.020 | 0.2 | yes |
+| english | 0.00218448 | 17/213 (0.080), upper 0.140 | 0.2 | yes |
+| french | 0.00218448 | 0/237 (0.000), upper 0.022 | 0.2 | yes |
+| german | 0.00218448 | 0/245 (0.000), upper 0.021 | 0.2 | yes |
+| italian | 0.00218448 | 0/218 (0.000), upper 0.024 | 0.2 | yes |
+| japanese | 0.00218448 | 0/238 (0.000), upper 0.022 | 0.2 | yes |
+| korean | 0.00218448 | 12/254 (0.047), upper 0.093 | 0.2 | yes |
+| portuguese | 0.00218448 | 0/231 (0.000), upper 0.023 | 0.2 | yes |
+| russian | 0.00218448 | 0/227 (0.000), upper 0.023 | 0.2 | yes |
+| spanish | 0.00218448 | 1/228 (0.004), upper 0.032 | 0.2 | yes |
+| pooled | 0.00218448 | 30/2348 (0.013), upper 0.017 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2348 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | SIG-DC/severe | 150/150 (1.000), lower 0.980 | 0.7 | yes |
+
+Mechanisms meeting: T1-pcm-construction (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| SIG-DC | 2/150 (0.013), upper 0.041 | yes | no |
+
+Counts: calibration 2262 clips, 2262 families, 0 abstained; confirmation N2 2348 clips, 2348 families, 0 abstained; P1 300 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 10 (lower-bound, unit `language:fleurs-unidentified`).
+
+Judge output identities: `fastqc@8` `072d385c65e95361`. Record limitations: `fleurs-reserve-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`; risks: `pooled-fleurs-locale-concentration`.
 <!-- END GENERATED audio-qc-docs:qualification -->

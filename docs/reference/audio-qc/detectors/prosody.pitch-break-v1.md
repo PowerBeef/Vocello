@@ -47,12 +47,46 @@ Registry entry `prosody.pitch-break@1` in [config/audio-qc-detectors.json](../..
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Refused; confirmed (refused).
 
 **Plan.** [config/audio-qc-preregistrations/prosody.pitch-break@1.json](../../../../config/audio-qc-preregistrations/prosody.pitch-break@1.json): digest `ca4eddec1e3eed07`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N2; injector catalog 3, classes A,B,C,F, 150 per cell.
 Calibration cohort audio-qc-n2-cohort (fleurs-reserve-1, manifest `de5491c5ecb55042`); confirmation cohort audio-qc-n2-cohort (fleurs-reserve-2, manifest `64b667943e2e4bbf`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry refused (cross-mechanism-detection-not-met).
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+### Record [record-ca4eddec1e3eed07.json](../../../../benchmarks/audio-qc-calibration/prosody.pitch-break@1/record-ca4eddec1e3eed07.json): refused (cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `ca4eddec1e3eed07`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 8 | 18/257 (0.070), upper 0.121 | 0.2 | yes |
+| english | 7.6 | 7/213 (0.033), upper 0.079 | 0.2 | yes |
+| french | 7.3 | 5/237 (0.021), upper 0.059 | 0.2 | yes |
+| german | 6.5 | 12/245 (0.049), upper 0.096 | 0.2 | yes |
+| italian | 6.9 | 6/218 (0.028), upper 0.070 | 0.2 | yes |
+| japanese | 7.6 | 7/238 (0.029), upper 0.070 | 0.2 | yes |
+| korean | 7.4 | 6/254 (0.024), upper 0.060 | 0.2 | yes |
+| portuguese | 7.1 | 7/231 (0.030), upper 0.073 | 0.2 | yes |
+| russian | 7.8 | 13/227 (0.057), upper 0.109 | 0.2 | yes |
+| spanish | 7.7 | 4/202 (0.020), upper 0.061 | 0.2 | yes |
+| pooled | - | 85/2322 (0.037), upper 0.044 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 26/2348 (0.011), upper 0.015 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | PRS-BRK/severe | 32/150 (0.213), lower 0.160 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| PRS-BRK | 6/150 (0.040), upper 0.077 | yes | no |
+
+Counts: calibration 2262 clips, 2262 families, 39 abstained; confirmation N2 2348 clips, 2348 families, 26 abstained; P1 150 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 10 (lower-bound, unit `language:fleurs-unidentified`).
+
+Judge output identities: `pitch.pyin@1` `a12f12f5cf71a807`. Record limitations: `fleurs-reserve-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`, `n2-read-speech`; risks: `pyin-tracker-unvalidated`, `pyin-raw-track-export`, `pyin-transition-limit`, `korean-no-word-positives`.
 <!-- END GENERATED audio-qc-docs:qualification -->

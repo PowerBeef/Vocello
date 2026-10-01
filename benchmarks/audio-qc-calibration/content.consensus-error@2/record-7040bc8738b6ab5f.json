@@ -1,0 +1,603 @@
+{
+  "a4": {
+    "cells": [
+      "CNT-DEL",
+      "CNT-INS",
+      "CNT-REP"
+    ],
+    "uninformative": {},
+    "unit": "injector"
+  },
+  "class": "B",
+  "cohorts": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "de5491c5ecb55042cd1140a2410458c4154d7bf92ebd64098d2970f50d56778e",
+      "scoresSHA256": "e995daf4ed81be467d375f6fd0a267c37a5f60b9b10fbca04def696ad2d9dd03",
+      "source": "fleurs-reserve-1"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "64b667943e2e4bbf6b1a52bc5251072cac6bec11ddb39ced32c98e45bbb08fdc",
+      "scoresSHA256": "fcc491ed68e5d20669b15e07ae5ace52bcc91955eb6049e3e86eff5af5442d1e",
+      "source": "fleurs-reserve-2"
+    }
+  },
+  "combination": "consensus-mean",
+  "counts": {
+    "calibration": {
+      "abstainedClips": 0,
+      "clips": 1797,
+      "families": 1797
+    },
+    "confirmation": {
+      "N2": {
+        "abstainedClips": 0,
+        "clips": 1856,
+        "families": 1856
+      },
+      "P1": {
+        "abstainedClips": 0,
+        "clips": 401,
+        "families": 379
+      },
+      "S": {
+        "abstainedClips": 0,
+        "clips": 401,
+        "families": 379
+      }
+    }
+  },
+  "detector": "content.consensus-error@2",
+  "detectorDefinitionSHA256": "34d64f97e90537b46b8447249e991ab27bebd9334ffdefd121d631b742088221",
+  "direction": "above",
+  "evidence": {
+    "confirmationPanels": [
+      {
+        "bundleDigest": "9f5dbd6916062528a1acacb875700e8c5894bcced1ce4fe1cd014ae932856777",
+        "cohort": "N2",
+        "startedAt": "2026-10-01T02:38:51.984385Z"
+      },
+      {
+        "bundleDigest": "e57deb0f57d0dd2e96a17d213a67b4a23b490f2bb942b41d87d557d2f1341e19",
+        "cohort": "P1+S",
+        "startedAt": "2026-10-01T04:07:10.541284Z"
+      }
+    ],
+    "evidenceIdentitySHA256": "191a18fdcd607367f5735672fa39a53c05f142645c45e8e0666b144192db3840",
+    "injectionSet": {
+      "construction": {
+        "catalogSeed": 7,
+        "catalogVersion": 3,
+        "classes": [
+          "A",
+          "B",
+          "C",
+          "F"
+        ],
+        "entryCatalogVersions": [
+          3
+        ],
+        "samplePerCell": 150,
+        "sampleSeed": 1,
+        "schedule": 2
+      },
+      "entriesSHA256": "829a06c8dd9e62b8b792f1d60d6d6fbc502dbf5b57b8e23a79c6ed35c352125b"
+    },
+    "judgeMetrics": {
+      "asr.paraformer-zh@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.parakeet-tdt-0.6b-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ],
+      "asr.whisper-large-v3@1": [
+        {
+          "definition": "panel-metrics-v1:asr:normalization-v3-edit-rate-v4",
+          "sourcesSHA256": "a53d2acf7d1a7463e0c2ca9bcf9953f0b075299ae76da89d7b1e63dc85b5a1a9"
+        }
+      ]
+    },
+    "metricVersions": {
+      "asr.paraformer-zh@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.parakeet-tdt-0.6b-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      },
+      "asr.whisper-large-v3@1": {
+        "accuracyMetricVersion": [
+          "normalization-v3-edit-rate-v4"
+        ],
+        "textNormalization": [
+          "text-normalization-v3"
+        ]
+      }
+    },
+    "orchestratorSHA256": [
+      "9471e737deae9bfbbb90869e47132a09bce31bbb5ecf044469e5a32cbed14376"
+    ],
+    "planCommittedAt": "2026-10-01T01:52:17Z",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "informational": null,
+  "judges": [
+    {
+      "judge": "asr.paraformer-zh@1",
+      "outputIdentities": [
+        "cd3aec442e0fd17fd49a0315d0f7a187e8fa3a7135b88552deadea151bb6ea96"
+      ]
+    },
+    {
+      "judge": "asr.parakeet-tdt-0.6b-v3@1",
+      "outputIdentities": [
+        "cf1534c3855670ab67645b6c4dc0fae9b51df050c3106e550a15b5ca5b6f7e34"
+      ]
+    },
+    {
+      "judge": "asr.whisper-large-v3@1",
+      "outputIdentities": [
+        "0bdd27ea106e2512c9c9286183700b63e56da50b46eb879e2c448729fe0585b3"
+      ]
+    }
+  ],
+  "kind": "audio-qc-calibration-record",
+  "ledgerOutcomeSHA256": "4cb36447b13ed676e253a5ef5ba91c2722fb2834e00cf5336e29a696d0ac8878",
+  "level": "warn",
+  "limitations": [
+    "fleurs-reserve-no-speaker-ids",
+    "fleurs-speaker-lower-bound",
+    "n2-one-codec",
+    "substitutions-not-scored",
+    "mean-consensus-warn-only"
+  ],
+  "operatingPoint": "warn",
+  "phiAudit": [
+    {
+      "conditionalFailureRate": {
+        "asr.parakeet-tdt-0.6b-v3@1|asr.whisper-large-v3@1Failed": 0.396624,
+        "asr.parakeet-tdt-0.6b-v3@1|asr.whisper-large-v3@1Passed": 0.032107,
+        "asr.whisper-large-v3@1|asr.parakeet-tdt-0.6b-v3@1Failed": 0.630872,
+        "asr.whisper-large-v3@1|asr.parakeet-tdt-0.6b-v3@1Passed": 0.0794
+      },
+      "failureRate": {
+        "asr.parakeet-tdt-0.6b-v3@1": 0.07641,
+        "asr.whisper-large-v3@1": 0.121538
+      },
+      "families": 1599,
+      "jointFailure": {
+        "confidence": 0.95,
+        "events": 92,
+        "lower": 0.048254,
+        "method": "clopper-pearson-one-sided",
+        "rate": 0.057536,
+        "unit": "source-family",
+        "units": 1599,
+        "upper": 0.068048
+      },
+      "jointFailurePerUnit": {
+        "ifIndependent": 0.009287,
+        "lift": 5.190723,
+        "rate": 0.048205
+      },
+      "judges": [
+        "asr.whisper-large-v3@1",
+        "asr.parakeet-tdt-0.6b-v3@1"
+      ],
+      "labeledUnits": {
+        "negatives": 1599,
+        "positives": 351
+      },
+      "languages": [
+        "english",
+        "french",
+        "german",
+        "italian",
+        "portuguese",
+        "russian",
+        "spanish"
+      ],
+      "phi": 0.448354,
+      "phiClusterBootstrap": {
+        "defined": 2000,
+        "families": 1599,
+        "lower": 0.376469,
+        "resamples": 2000,
+        "seed": 20260925,
+        "upper": 0.511505
+      },
+      "table": {
+        "bothFailed": 94,
+        "neitherFailed": 1658,
+        "onlyFirstFailed": 143,
+        "onlySecondFailed": 55
+      },
+      "units": 1950
+    },
+    {
+      "conditionalFailureRate": {
+        "asr.paraformer-zh@1|asr.whisper-large-v3@1Failed": 0.333333,
+        "asr.paraformer-zh@1|asr.whisper-large-v3@1Passed": 0.041958,
+        "asr.whisper-large-v3@1|asr.paraformer-zh@1Failed": 0.368421,
+        "asr.whisper-large-v3@1|asr.paraformer-zh@1Passed": 0.048611
+      },
+      "failureRate": {
+        "asr.paraformer-zh@1": 0.061889,
+        "asr.whisper-large-v3@1": 0.068404
+      },
+      "families": 257,
+      "jointFailure": {
+        "confidence": 0.95,
+        "events": 7,
+        "lower": 0.012852,
+        "method": "clopper-pearson-one-sided",
+        "rate": 0.027237,
+        "unit": "source-family",
+        "units": 257,
+        "upper": 0.050549
+      },
+      "jointFailurePerUnit": {
+        "ifIndependent": 0.004233,
+        "lift": 5.385965,
+        "rate": 0.022801
+      },
+      "judges": [
+        "asr.whisper-large-v3@1",
+        "asr.paraformer-zh@1"
+      ],
+      "labeledUnits": {
+        "negatives": 257,
+        "positives": 50
+      },
+      "languages": [
+        "chinese"
+      ],
+      "phi": 0.305262,
+      "phiClusterBootstrap": {
+        "defined": 2000,
+        "families": 257,
+        "lower": 0.091837,
+        "resamples": 2000,
+        "seed": 20260925,
+        "upper": 0.504105
+      },
+      "table": {
+        "bothFailed": 7,
+        "neitherFailed": 274,
+        "onlyFirstFailed": 14,
+        "onlySecondFailed": 12
+      },
+      "units": 307
+    }
+  ],
+  "planSHA256": "7040bc8738b6ab5f470580a8fb193c5de87dcccaa84efdf4bcdf0778cb66aa6d",
+  "rates": {
+    "cleanAbstention": {
+      "confidence": 0.95,
+      "events": 0,
+      "limit": 0.1,
+      "lower": 0.0,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": null,
+      "rate": 0.0,
+      "units": 1856,
+      "upper": 0.001613
+    },
+    "farPerLanguage": {
+      "confidence": 0.99375,
+      "languages": {
+        "chinese": {
+          "confidence": 0.99375,
+          "events": 10,
+          "limit": 0.2,
+          "lower": 0.015106,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.038911,
+          "units": 257,
+          "upper": 0.079973
+        },
+        "english": {
+          "confidence": 0.99375,
+          "events": 4,
+          "limit": 0.2,
+          "lower": 0.003384,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.018779,
+          "units": 213,
+          "upper": 0.056536
+        },
+        "french": {
+          "confidence": 0.99375,
+          "events": 6,
+          "limit": 0.2,
+          "lower": 0.00685,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.025316,
+          "units": 237,
+          "upper": 0.063353
+        },
+        "german": {
+          "confidence": 0.99375,
+          "events": 7,
+          "limit": 0.2,
+          "lower": 0.008747,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.028571,
+          "units": 245,
+          "upper": 0.067106
+        },
+        "italian": {
+          "confidence": 0.99375,
+          "events": 9,
+          "limit": 0.2,
+          "lower": 0.015058,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.041284,
+          "units": 218,
+          "upper": 0.087791
+        },
+        "portuguese": {
+          "confidence": 0.99375,
+          "events": 16,
+          "limit": 0.2,
+          "lower": 0.034116,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.069264,
+          "units": 231,
+          "upper": 0.122104
+        },
+        "russian": {
+          "confidence": 0.99375,
+          "events": 4,
+          "limit": 0.2,
+          "lower": 0.003175,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.017621,
+          "units": 227,
+          "upper": 0.053113
+        },
+        "spanish": {
+          "confidence": 0.99375,
+          "events": 0,
+          "limit": 0.2,
+          "lower": 0.0,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.0,
+          "units": 228,
+          "upper": 0.022014
+        }
+      }
+    },
+    "farPooled": {
+      "confidence": 0.95,
+      "events": 56,
+      "limit": 0.1,
+      "lower": 0.02393,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "rate": 0.030172,
+      "units": 1856,
+      "upper": 0.037552
+    },
+    "mechanisms": {
+      "T1-pcm-construction": {
+        "cells": {
+          "CNT-DEL/severe": {
+            "confidence": 0.95,
+            "events": 115,
+            "limit": 0.7,
+            "lower": 0.798923,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.858209,
+            "units": 134,
+            "upper": 0.905117
+          },
+          "CNT-INS/severe": {
+            "confidence": 0.95,
+            "events": 107,
+            "limit": 0.7,
+            "lower": 0.733009,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.798507,
+            "units": 134,
+            "upper": 0.853801
+          },
+          "CNT-REP/severe": {
+            "confidence": 0.95,
+            "events": 110,
+            "limit": 0.7,
+            "lower": 0.763989,
+            "meets": true,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.827068,
+            "units": 133,
+            "upper": 0.878829
+          }
+        },
+        "meets": true
+      }
+    },
+    "mechanismsMeeting": [
+      "T1-pcm-construction"
+    ],
+    "mechanismsMin": 1,
+    "shams": {
+      "CNT-DEL": {
+        "confidence": 0.95,
+        "events": 5,
+        "informative": true,
+        "lower": 0.014816,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.037313,
+        "units": 134,
+        "upper": 0.07685
+      },
+      "CNT-INS": {
+        "confidence": 0.95,
+        "events": 7,
+        "informative": true,
+        "lower": 0.024771,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.052239,
+        "units": 134,
+        "upper": 0.095877
+      },
+      "CNT-REP": {
+        "confidence": 0.95,
+        "events": 2,
+        "informative": true,
+        "lower": 0.002678,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.015038,
+        "units": 133,
+        "upper": 0.046578
+      }
+    }
+  },
+  "reasons": [],
+  "registries": {
+    "detectorsSHA256": "14585f1e3b77e4fa5f9d3f894d221e952f34a9ab1b52e4ba664ea552ee44388d",
+    "judgesSHA256": "ad21dd21aaa8a6e493c2cd6218c8f15330a2bccaeb882edbc4ea9aa204f77462",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514"
+  },
+  "risks": [
+    "parakeet-whisper-label-lineage",
+    "one-family-alarm",
+    "splice-sham-content-errors"
+  ],
+  "schema": "vocello.audioqc.qc-calibration/1",
+  "scope": {
+    "exclusions": [
+      {
+        "language": "japanese",
+        "reason": "sensevoice-codec-failures"
+      },
+      {
+        "language": "korean",
+        "reason": "sensevoice-codec-failures"
+      }
+    ],
+    "languages": [
+      "chinese",
+      "english",
+      "french",
+      "german",
+      "italian",
+      "portuguese",
+      "russian",
+      "spanish"
+    ]
+  },
+  "speakers": {
+    "claim": "lower-bound",
+    "count": 8,
+    "unit": "language:fleurs-unidentified"
+  },
+  "split": {
+    "counts": {
+      "families": {
+        "calibration": 2262,
+        "confirmation": 2348
+      },
+      "scripts": {
+        "calibration": 507,
+        "confirmation": 532
+      },
+      "speakers": {
+        "calibration": 10,
+        "confirmation": 10
+      }
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "method": "declared-cohorts"
+  },
+  "stage": 2,
+  "threshold": {
+    "alpha": 0.03,
+    "calibrationUnits": {
+      "chinese": 233,
+      "english": 204,
+      "french": 226,
+      "german": 259,
+      "italian": 223,
+      "portuguese": 210,
+      "russian": 212,
+      "spanish": 230
+    },
+    "ranks": {
+      "chinese": 227,
+      "english": 199,
+      "french": 221,
+      "german": 253,
+      "italian": 218,
+      "portuguese": 205,
+      "russian": 207,
+      "spanish": 225
+    },
+    "rule": "split-conformal",
+    "strata": "language",
+    "unit": "source-family",
+    "values": {
+      "chinese": 0.05,
+      "english": 0.052631579,
+      "french": 0.038461538,
+      "german": 0.0625,
+      "italian": 0.041666666,
+      "portuguese": 0.041666666,
+      "russian": 0.0625,
+      "spanish": 0.986842106
+    }
+  },
+  "verdict": "qualified"
+}

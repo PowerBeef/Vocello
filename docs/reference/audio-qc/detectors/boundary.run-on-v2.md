@@ -49,12 +49,43 @@ Excludes korean: The forced aligner is out of scope for Korean: mlx-audio tokeni
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Qualified (warn); confirmed (qualified).
 
 **Plan.** [config/audio-qc-preregistrations/boundary.run-on@2.json](../../../../config/audio-qc-preregistrations/boundary.run-on@2.json): digest `a131182003553bfa`, rule split-conformal, alpha 0.02, confidence 0.95, operating point warn, population N2; injector catalog 3, classes A,B,C,F, 150 per cell.
 Calibration cohort audio-qc-n2-cohort (fleurs-reserve-1, manifest `de5491c5ecb55042`); confirmation cohort audio-qc-n2-cohort (fleurs-reserve-2, manifest `64b667943e2e4bbf`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry qualified.
 
-**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+### Record [record-a131182003553bfa.json](../../../../benchmarks/audio-qc-calibration/boundary.run-on@2/record-a131182003553bfa.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.02, thresholds per language; plan `a131182003553bfa`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 2.16 | 7/257 (0.027), upper 0.065 | 0.2 | yes |
+| english | 2.31 | 4/213 (0.019), upper 0.057 | 0.2 | yes |
+| french | 1.54 | 2/237 (0.008), upper 0.038 | 0.2 | yes |
+| german | 1.7 | 3/245 (0.012), upper 0.044 | 0.2 | yes |
+| italian | 0.44 | 6/218 (0.028), upper 0.070 | 0.2 | yes |
+| japanese | 1.41 | 5/238 (0.021), upper 0.058 | 0.2 | yes |
+| portuguese | 1.92 | 4/231 (0.017), upper 0.053 | 0.2 | yes |
+| russian | 1.62 | 2/227 (0.009), upper 0.040 | 0.2 | yes |
+| spanish | 2.1 | 2/195 (0.010), upper 0.046 | 0.2 | yes |
+| pooled | - | 35/2061 (0.017), upper 0.022 | 0.1 | yes |
+
+Per-language bounds at confidence 0.994444 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 33/2094 (0.016), upper 0.021 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | BND-RUNON/severe | 132/135 (0.978), lower 0.944 | 0.7 | yes |
+
+Mechanisms meeting: T1-pcm-construction (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| BND-RUNON | 6/135 (0.044), upper 0.086 | yes | yes |
+
+Counts: calibration 2024 clips, 2024 families, 50 abstained; confirmation N2 2094 clips, 2094 families, 33 abstained; P1 403 clips, 135 families, 2 abstained; S 135 clips, 135 families, 0 abstained. Speakers: 9 (lower-bound, unit `language:fleurs-unidentified`).
+
+Judge output identities: `align.qwen3-forcedaligner-0.6b@1` `bf244e4c8e9bf049`, `asr.paraformer-zh@1` `cd3aec442e0fd17f`, `asr.parakeet-tdt-0.6b-v3@1` `cf1534c3855670ab`, `asr.sensevoice-small-f16@1` `60dd465a89773f48`, `asr.whisper-large-v3@1` `0bdd27ea106e2512`, `fastqc@8` `072d385c65e95361`. Record limitations: `fleurs-reserve-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`, `pcm-measures-python-only`; risks: `aligner-anchoring`, `runon-quiet-span`, `noisy-tail-activity`.
 <!-- END GENERATED audio-qc-docs:qualification -->

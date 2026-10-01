@@ -1,0 +1,200 @@
+{
+  "cleanAbstention": {
+    "confidence": 0.95,
+    "events": 0,
+    "limit": 0.1,
+    "lower": 0.0,
+    "meets": true,
+    "method": "clopper-pearson-one-sided",
+    "minimumUnits": null,
+    "rate": 0.0,
+    "units": 2348,
+    "upper": 0.001275
+  },
+  "detector": "signal.dropout@2",
+  "farPerLanguage": {
+    "confidence": 0.995,
+    "languages": {
+      "chinese": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 257,
+        "upper": 0.020405
+      },
+      "english": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 213,
+        "upper": 0.024568
+      },
+      "french": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 237,
+        "upper": 0.022108
+      },
+      "german": {
+        "confidence": 0.995,
+        "events": 5,
+        "limit": 0.2,
+        "lower": 0.004426,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.020408,
+        "units": 245,
+        "upper": 0.056684
+      },
+      "italian": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 218,
+        "upper": 0.024011
+      },
+      "japanese": {
+        "confidence": 0.995,
+        "events": 1,
+        "limit": 0.2,
+        "lower": 2.1e-05,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.004202,
+        "units": 238,
+        "upper": 0.030801
+      },
+      "korean": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 254,
+        "upper": 0.020643
+      },
+      "portuguese": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 231,
+        "upper": 0.022675
+      },
+      "russian": {
+        "confidence": 0.995,
+        "events": 0,
+        "limit": 0.2,
+        "lower": 0.0,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.0,
+        "units": 227,
+        "upper": 0.02307
+      },
+      "spanish": {
+        "confidence": 0.995,
+        "events": 11,
+        "limit": 0.2,
+        "lower": 0.019194,
+        "meets": true,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": null,
+        "rate": 0.048246,
+        "units": 228,
+        "upper": 0.097343
+      }
+    }
+  },
+  "farPooled": {
+    "confidence": 0.95,
+    "events": 17,
+    "limit": 0.1,
+    "lower": 0.004618,
+    "meets": true,
+    "method": "clopper-pearson-one-sided",
+    "minimumUnits": 60,
+    "rate": 0.00724,
+    "units": 2348,
+    "upper": 0.01084
+  },
+  "mechanisms": {
+    "T1-pcm-construction": {
+      "cells": {
+        "SIG-DROP/severe": {
+          "confidence": 0.95,
+          "events": 150,
+          "limit": 0.7,
+          "lower": 0.980227,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": 60,
+          "rate": 1.0,
+          "units": 150,
+          "upper": 1.0
+        }
+      },
+      "meets": true
+    }
+  },
+  "mechanismsMeeting": [
+    "T1-pcm-construction"
+  ],
+  "mechanismsMin": 1,
+  "n3": null,
+  "operatingPoint": "warn",
+  "plan": "0bf7e453b1e427028f7b7e79eba92bd303a36f45f63a2514726ce53c71cecbe0",
+  "reasons": [],
+  "schema": "vocello.audioqc.confirmation/1",
+  "shams": {
+    "SIG-DROP": {
+      "confidence": 0.95,
+      "events": 2,
+      "informative": false,
+      "lower": 0.002374,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "overlaps": true,
+      "present": true,
+      "rate": 0.013333,
+      "units": 150,
+      "upper": 0.041375
+    }
+  },
+  "status": "qualified",
+  "threshold": {
+    "pooled": 380.625
+  },
+  "unit": "source-family"
+}

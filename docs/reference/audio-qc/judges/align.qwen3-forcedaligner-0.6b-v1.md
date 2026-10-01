@@ -73,9 +73,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
 | [`boundary.run-on@1`](../detectors/boundary.run-on-v1.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese | panel `spanEndSeconds` | refused |
-| [`boundary.run-on@2`](../detectors/boundary.run-on-v2.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese | panel `spanEndSeconds` | not qualified |
-
-**UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.
+| [`boundary.run-on@2`](../detectors/boundary.run-on-v2.md) | C (boundary) | english, french, german, italian, portuguese, russian, spanish, chinese, japanese | panel `spanEndSeconds` | qualified (warn) |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

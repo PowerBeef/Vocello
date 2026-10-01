@@ -3180,6 +3180,30 @@ versions come in a later catalog, under new versions of the pitch detectors, on 
 not been scored. IDN-SHIFT's distorted output explains its 1.0, so clone-similarity's qualification
 rests on its corpus impostors.
 
+**FLEURS reserve confirmations (2026-10-01).** Derived reserve-1 calibrated and derived reserve-2
+confirmed. Seven of the ten plans qualified at warn:
+
+| Detector | Severe-cell detection | Clean false-alarm rate |
+|---|---|---|
+| `signal.dropout@2` | 1.0 | 0.007 |
+| `signal.terminal-silence@2` | 1.0 | 0.007 |
+| `signal.dc-offset@2` | 1.0 | 0.013 |
+| `signal.clipping@2` | 1.0 | 0.0 |
+| `signal.band-limit@1` | 0.973 | 0.041 |
+| `content.consensus-error@2` | 0.80-0.86 (CNT-DEL, CNT-INS, CNT-REP) | 0.030 |
+| `boundary.run-on@2` | 0.978 | 0.017 |
+
+Three plans were refused:
+
+- `prosody.pitch-break@1` reached 0.21 on PRS-BRK severe, and `prosody.octave-jump@1` reached 0.073 on
+  PRS-OCT severe. Both read catalog-3 positives built by the defective shifter above.
+- `language.nativeness@1` reached 0.18 on 191 speechocean762 clips that its experts scored severe
+  (Mandarin-L1 learners reading English). Its clean false-alarm rate was 0.049. This refusal is a
+  real limitation of the detector, not of its positives: the two families' confidence separates native
+  speech, but not most learner accents. Heavy accents such as the N3 French takes (VoxLingua median
+  0.39 against 0.999 native) lie far below that range, but nothing here qualifies the detector for
+  them.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

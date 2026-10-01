@@ -50,8 +50,8 @@ Its accuracy is claimed only through the detectors that consume it:
 
 | Detector | Class | Languages | Reads | Qualification |
 |---|---|---|---|---|
-| [`prosody.pitch-break@1`](../detectors/prosody.pitch-break-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `maxPitchStepSemitones` | not qualified |
-| [`prosody.octave-jump@1`](../detectors/prosody.octave-jump-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `longestOctaveDisplacementSeconds` | not qualified |
+| [`prosody.pitch-break@1`](../detectors/prosody.pitch-break-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `maxPitchStepSemitones` | refused |
+| [`prosody.octave-jump@1`](../detectors/prosody.octave-jump-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `longestOctaveDisplacementSeconds` | refused |
 | [`prosody.pitch-instability@1`](../detectors/prosody.pitch-instability-v1.md) | F (prosody) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `pitchJumpsPerVoicedSecond` | refused |
 
 **UNQUALIFIED.** No committed calibration record qualifies a detector that consumes this judge, so every verdict built on it composes as `uncalibrated`.

@@ -1,0 +1,410 @@
+{
+  "a4": {
+    "cells": [
+      "PRS-BRK"
+    ],
+    "uninformative": {
+      "PRS-BRK": "sham-audio-is-clean-cohort-audio"
+    },
+    "unit": "injector"
+  },
+  "class": "F",
+  "cohorts": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "de5491c5ecb55042cd1140a2410458c4154d7bf92ebd64098d2970f50d56778e",
+      "scoresSHA256": "7aaeb9e63ad6f12c45f97296d2eeb95102376d0864ca85168689fa318c3a7316",
+      "source": "fleurs-reserve-1"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "64b667943e2e4bbf6b1a52bc5251072cac6bec11ddb39ced32c98e45bbb08fdc",
+      "scoresSHA256": "da613a1762be41f7bd8dd2ea272219c9dae34f5522d43134376e06feae57533e",
+      "source": "fleurs-reserve-2"
+    }
+  },
+  "combination": "single",
+  "counts": {
+    "calibration": {
+      "abstainedClips": 39,
+      "clips": 2262,
+      "families": 2262
+    },
+    "confirmation": {
+      "N2": {
+        "abstainedClips": 26,
+        "clips": 2348,
+        "families": 2348
+      },
+      "P1": {
+        "abstainedClips": 0,
+        "clips": 150,
+        "families": 150
+      },
+      "S": {
+        "abstainedClips": 0,
+        "clips": 150,
+        "families": 150
+      }
+    }
+  },
+  "detector": "prosody.pitch-break@1",
+  "detectorDefinitionSHA256": "3f23d482238ee98b355681c2981a1386c59098af2252e773aafd025431a10a2e",
+  "direction": "above",
+  "evidence": {
+    "confirmationPanels": [
+      {
+        "bundleDigest": "9f5dbd6916062528a1acacb875700e8c5894bcced1ce4fe1cd014ae932856777",
+        "cohort": "N2",
+        "startedAt": "2026-10-01T02:38:51.984385Z"
+      },
+      {
+        "bundleDigest": "e57deb0f57d0dd2e96a17d213a67b4a23b490f2bb942b41d87d557d2f1341e19",
+        "cohort": "P1+S",
+        "startedAt": "2026-10-01T04:07:10.541284Z"
+      }
+    ],
+    "evidenceIdentitySHA256": "ea25656aff89cc67cb7ac820d907fa6a9d1e0911f78b877deb78012ced4c714f",
+    "injectionSet": {
+      "construction": {
+        "catalogSeed": 7,
+        "catalogVersion": 3,
+        "classes": [
+          "A",
+          "B",
+          "C",
+          "F"
+        ],
+        "entryCatalogVersions": [
+          3
+        ],
+        "samplePerCell": 150,
+        "sampleSeed": 1,
+        "schedule": 2
+      },
+      "entriesSHA256": "829a06c8dd9e62b8b792f1d60d6d6fbc502dbf5b57b8e23a79c6ed35c352125b"
+    },
+    "judgeMetrics": {
+      "pitch.pyin@1": [
+        {
+          "definition": "panel-metrics-v1:pitch",
+          "sourcesSHA256": "0b993e6c0a34a8fb61f7ca1d82c475a023d934d54dcf90a31e0cad18d0caa171"
+        }
+      ]
+    },
+    "metricVersions": {},
+    "orchestratorSHA256": [
+      "9471e737deae9bfbbb90869e47132a09bce31bbb5ecf044469e5a32cbed14376"
+    ],
+    "planCommittedAt": "2026-10-01T01:52:17Z",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "informational": null,
+  "judges": [
+    {
+      "judge": "pitch.pyin@1",
+      "outputIdentities": [
+        "a12f12f5cf71a807a101248870e080512dab86f00fa2eb47dbd48549192f7d87"
+      ]
+    }
+  ],
+  "kind": "audio-qc-calibration-record",
+  "ledgerOutcomeSHA256": "0cd2ae05ead3a5946f169bc1c37371f6ed7b84ffd7e1bf5b385e72230d4c7b9e",
+  "level": null,
+  "limitations": [
+    "fleurs-reserve-no-speaker-ids",
+    "fleurs-speaker-lower-bound",
+    "n2-one-codec",
+    "n2-read-speech"
+  ],
+  "operatingPoint": "warn",
+  "phiAudit": [],
+  "planSHA256": "ca4eddec1e3eed077cb9f29f52bc0f7c6fd6c6ba558411d0be9145f33a9e410d",
+  "rates": {
+    "cleanAbstention": {
+      "confidence": 0.95,
+      "events": 26,
+      "limit": 0.1,
+      "lower": 0.00777,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": null,
+      "rate": 0.011073,
+      "units": 2348,
+      "upper": 0.015332
+    },
+    "farPerLanguage": {
+      "confidence": 0.995,
+      "languages": {
+        "chinese": {
+          "confidence": 0.995,
+          "events": 18,
+          "limit": 0.2,
+          "lower": 0.035361,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.070039,
+          "units": 257,
+          "upper": 0.121448
+        },
+        "english": {
+          "confidence": 0.995,
+          "events": 7,
+          "limit": 0.2,
+          "lower": 0.009655,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.032864,
+          "units": 213,
+          "upper": 0.078541
+        },
+        "french": {
+          "confidence": 0.995,
+          "events": 5,
+          "limit": 0.2,
+          "lower": 0.004577,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.021097,
+          "units": 237,
+          "upper": 0.05856
+        },
+        "german": {
+          "confidence": 0.995,
+          "events": 12,
+          "limit": 0.2,
+          "lower": 0.020431,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.04898,
+          "units": 245,
+          "upper": 0.09612
+        },
+        "italian": {
+          "confidence": 0.995,
+          "events": 6,
+          "limit": 0.2,
+          "lower": 0.007107,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.027523,
+          "units": 218,
+          "upper": 0.070255
+        },
+        "japanese": {
+          "confidence": 0.995,
+          "events": 7,
+          "limit": 0.2,
+          "lower": 0.008632,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.029412,
+          "units": 238,
+          "upper": 0.070468
+        },
+        "korean": {
+          "confidence": 0.995,
+          "events": 6,
+          "limit": 0.2,
+          "lower": 0.006093,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.023622,
+          "units": 254,
+          "upper": 0.060488
+        },
+        "portuguese": {
+          "confidence": 0.995,
+          "events": 7,
+          "limit": 0.2,
+          "lower": 0.008896,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.030303,
+          "units": 231,
+          "upper": 0.072557
+        },
+        "russian": {
+          "confidence": 0.995,
+          "events": 13,
+          "limit": 0.2,
+          "lower": 0.024938,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.057269,
+          "units": 227,
+          "upper": 0.109243
+        },
+        "spanish": {
+          "confidence": 0.995,
+          "events": 4,
+          "limit": 0.2,
+          "lower": 0.003347,
+          "meets": true,
+          "method": "clopper-pearson-one-sided",
+          "minimumUnits": null,
+          "rate": 0.019802,
+          "units": 202,
+          "upper": 0.061033
+        }
+      }
+    },
+    "farPooled": {
+      "confidence": 0.95,
+      "events": 85,
+      "limit": 0.1,
+      "lower": 0.030419,
+      "meets": true,
+      "method": "clopper-pearson-one-sided",
+      "minimumUnits": 60,
+      "rate": 0.036606,
+      "units": 2322,
+      "upper": 0.043682
+    },
+    "mechanisms": {
+      "T1-pcm-construction": {
+        "cells": {
+          "PRS-BRK/severe": {
+            "confidence": 0.95,
+            "events": 32,
+            "limit": 0.7,
+            "lower": 0.159633,
+            "meets": false,
+            "method": "clopper-pearson-one-sided",
+            "minimumUnits": 60,
+            "rate": 0.213333,
+            "units": 150,
+            "upper": 0.275748
+          }
+        },
+        "meets": false
+      }
+    },
+    "mechanismsMeeting": [],
+    "mechanismsMin": 1,
+    "shams": {
+      "PRS-BRK": {
+        "confidence": 0.95,
+        "events": 6,
+        "informative": false,
+        "lower": 0.017561,
+        "method": "clopper-pearson-one-sided",
+        "minimumUnits": 60,
+        "overlaps": true,
+        "present": true,
+        "rate": 0.04,
+        "units": 150,
+        "upper": 0.077418
+      }
+    }
+  },
+  "reasons": [
+    "cross-mechanism-detection-not-met"
+  ],
+  "registries": {
+    "detectorsSHA256": "14585f1e3b77e4fa5f9d3f894d221e952f34a9ab1b52e4ba664ea552ee44388d",
+    "judgesSHA256": "ad21dd21aaa8a6e493c2cd6218c8f15330a2bccaeb882edbc4ea9aa204f77462",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514"
+  },
+  "risks": [
+    "pyin-tracker-unvalidated",
+    "pyin-raw-track-export",
+    "pyin-transition-limit",
+    "korean-no-word-positives"
+  ],
+  "schema": "vocello.audioqc.qc-calibration/1",
+  "scope": {
+    "exclusions": [],
+    "languages": [
+      "chinese",
+      "english",
+      "french",
+      "german",
+      "italian",
+      "japanese",
+      "korean",
+      "portuguese",
+      "russian",
+      "spanish"
+    ]
+  },
+  "speakers": {
+    "claim": "lower-bound",
+    "count": 10,
+    "unit": "language:fleurs-unidentified"
+  },
+  "split": {
+    "counts": {
+      "families": {
+        "calibration": 2262,
+        "confirmation": 2348
+      },
+      "scripts": {
+        "calibration": 507,
+        "confirmation": 532
+      },
+      "speakers": {
+        "calibration": 10,
+        "confirmation": 10
+      }
+    },
+    "disjointBy": [
+      "family",
+      "script"
+    ],
+    "method": "declared-cohorts"
+  },
+  "stage": 1,
+  "threshold": {
+    "alpha": 0.05,
+    "calibrationUnits": {
+      "chinese": 233,
+      "english": 204,
+      "french": 226,
+      "german": 259,
+      "italian": 223,
+      "japanese": 227,
+      "korean": 238,
+      "portuguese": 210,
+      "russian": 212,
+      "spanish": 191
+    },
+    "ranks": {
+      "chinese": 223,
+      "english": 195,
+      "french": 216,
+      "german": 247,
+      "italian": 213,
+      "japanese": 217,
+      "korean": 228,
+      "portuguese": 201,
+      "russian": 203,
+      "spanish": 183
+    },
+    "rule": "split-conformal",
+    "strata": "language",
+    "unit": "source-family",
+    "values": {
+      "chinese": 8.0,
+      "english": 7.6,
+      "french": 7.3,
+      "german": 6.5,
+      "italian": 6.9,
+      "japanese": 7.6,
+      "korean": 7.4,
+      "portuguese": 7.1,
+      "russian": 7.8,
+      "spanish": 7.7
+    }
+  },
+  "verdict": "refused"
+}

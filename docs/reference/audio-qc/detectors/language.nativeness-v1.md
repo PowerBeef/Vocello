@@ -49,12 +49,49 @@ Registry entry `language.nativeness@1` in [config/audio-qc-detectors.json](../..
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Refused; confirmed (refused).
 
 **Plan.** [config/audio-qc-preregistrations/language.nativeness@1.json](../../../../config/audio-qc-preregistrations/language.nativeness@1.json): digest `d0d8fe2899a115e0`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N2; injector catalog -, classes -, - per cell.
 Calibration cohort audio-qc-n2-cohort (fleurs-reserve-1, manifest `de5491c5ecb55042`); confirmation cohort audio-qc-n2-cohort (fleurs-reserve-2, manifest `64b667943e2e4bbf`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry refused (cross-mechanism-detection-not-met).
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+### Record [record-d0d8fe2899a115e0.json](../../../../benchmarks/audio-qc-calibration/language.nativeness@1/record-d0d8fe2899a115e0.json): refused (cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `d0d8fe2899a115e0`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N2 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.977876 | 16/257 (0.062), upper 0.112 | 0.2 | yes |
+| english | 0.0758358 | 10/213 (0.047), upper 0.098 | 0.2 | yes |
+| french | 0.96179 | 16/237 (0.068), upper 0.121 | 0.2 | yes |
+| german | 0.965922 | 18/245 (0.073), upper 0.127 | 0.2 | yes |
+| italian | 0.755974 | 11/218 (0.050), upper 0.102 | 0.2 | yes |
+| japanese | 0.991195 | 16/238 (0.067), upper 0.120 | 0.2 | yes |
+| korean | 0.992538 | 8/254 (0.031), upper 0.072 | 0.2 | yes |
+| portuguese | 0.931988 | 10/231 (0.043), upper 0.090 | 0.2 | yes |
+| russian | 0.518494 | 4/227 (0.018), upper 0.054 | 0.2 | yes |
+| spanish | 0.00824762 | 6/228 (0.026), upper 0.067 | 0.2 | yes |
+| pooled | - | 115/2348 (0.049), upper 0.057 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2348 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T4-natural-labelled | NAT-ACCENT/severe | 35/191 (0.183), lower 0.139 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+
+Counts: calibration 2262 clips, 2262 families, 0 abstained; confirmation N2 2348 clips, 2348 families, 0 abstained; P4 191 clips, 191 families, 0 abstained; S 0 clips, 0 families, 0 abstained. Speakers: 10 (lower-bound, unit `language:fleurs-unidentified`).
+
+| Consensus languages | Judges | Units | Phi | Joint failure |
+|---|---|---|---|---|
+| chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | asr.whisper-large-v3@1, lid.voxlingua107-ecapa@1 | 2539 | 0.150901 | 63/2539 (0.025), upper 0.031 |
+
+Judge output identities: `asr.whisper-large-v3@1` `0bdd27ea106e2512`, `lid.voxlingua107-ecapa@1` `49294258d799b54d`. Record limitations: `fleurs-reserve-no-speaker-ids`, `fleurs-speaker-lower-bound`, `n2-one-codec`, `accent-positives-english-only`, `accent-labels-exception`, `accent-single-l1`, `mean-consensus-warn-only`; risks: `voxlingua-weak-native-de-ru`, `one-classifier-alarm`, `accent-by-voice`.
 <!-- END GENERATED audio-qc-docs:qualification -->

@@ -127,28 +127,28 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 |---|---|---|---|---|---|---|
 | [`signal.clicks@1`](detectors/signal.clicks-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.dropout@1`](detectors/signal.dropout-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
-| [`signal.dropout@2`](detectors/signal.dropout-v2.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.dropout@2`](detectors/signal.dropout-v2.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.terminal-silence@1`](detectors/signal.terminal-silence-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
-| [`signal.terminal-silence@2`](detectors/signal.terminal-silence-v2.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.terminal-silence@2`](detectors/signal.terminal-silence-v2.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.dc-offset@1`](detectors/signal.dc-offset-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
-| [`signal.dc-offset@2`](detectors/signal.dc-offset-v2.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.dc-offset@2`](detectors/signal.dc-offset-v2.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.level@1`](detectors/signal.level-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.clipping@1`](detectors/signal.clipping-v1.md) | A (signal) | 0 | single | confirmed (refused) | refused | - |
-| [`signal.clipping@2`](detectors/signal.clipping-v2.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.clipping@2`](detectors/signal.clipping-v2.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`signal.noise@1`](detectors/signal.noise-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
-| [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | planned, not confirmed | not qualified | - |
+| [`signal.band-limit@1`](detectors/signal.band-limit-v1.md) | A (signal) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`content.consensus-error@1`](detectors/content.consensus-error-v1.md) | B (content) | 2 | consensus-min | confirmed (refused) | refused | - |
-| [`content.consensus-error@2`](detectors/content.consensus-error-v2.md) | B (content) | 2 | consensus-mean | planned, not confirmed | not qualified | - |
+| [`content.consensus-error@2`](detectors/content.consensus-error-v2.md) | B (content) | 2 | consensus-mean | confirmed (qualified) | qualified (warn) | - |
 | [`boundary.truncation@1`](detectors/boundary.truncation-v1.md) | C (boundary) | 2 | consensus-min | confirmed (qualified) | qualified (warn) | - |
 | [`boundary.run-on@1`](detectors/boundary.run-on-v1.md) | C (boundary) | 2 | difference | confirmed (refused) | refused | - |
-| [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | 2 | difference | planned, not confirmed | not qualified | - |
+| [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | 2 | difference | confirmed (qualified) | qualified (warn) | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | 2 | consensus-max | confirmed (qualified) | qualified (warn) | - |
-| [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | 2 | consensus-mean | planned, not confirmed | not qualified | - |
+| [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | 2 | consensus-mean | confirmed (refused) | refused | - |
 | [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | 2 | single | confirmed (qualified) | qualified (warn) | - |
 | [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | 2 | difference | confirmed (refused) | refused | - |
 | [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | 2 | difference | confirmed (qualified) | qualified (warn) | - |
-| [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | 1 | single | planned, not confirmed | not qualified | - |
-| [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | 1 | single | planned, not confirmed | not qualified | - |
+| [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
+| [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | 0 | single | planned, not confirmed | not qualified | - |
 | [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | 0 | single | planned, not confirmed | not qualified | - |

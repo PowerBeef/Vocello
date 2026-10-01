@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": 1,
+  "version": 2,
   "models": {
     "asrA": "asr.qwen3-asr-1.7b",
     "asrB": "asr.whisper-large-v3",
@@ -65,7 +65,7 @@
       {"name": "pause.nonspeech_level_db", "direction": "higher"},
       {"name": "pause.voiced_blips", "direction": "higher"},
       {"name": "pause.mute_confirmed", "direction": "higher"}],
-     "provisional": {"all": [{"feature": "pause.longest_gap_seconds", "op": ">", "value": 0.5}],
+     "provisional": {"all": [{"feature": "pause.longest_gap_seconds", "op": ">", "value": 0.5, "norm": "p99", "normFeature": "pause.gap_seconds", "atLeast": 0.5}],
                      "none": [{"feature": "pause.mute_confirmed", "op": "==", "value": 0}]}},
     {"id": "boundary.abrupt-end", "class": "cutoff", "method": "logistic", "features": [
       {"name": "end.drop_db_60ms", "direction": "higher"},
@@ -73,7 +73,7 @@
       {"name": "end.decay_db_per_ms", "direction": "higher"},
       {"name": "engine.finish_not_eos", "direction": "higher"}],
      "provisional": {"all": [{"feature": "end.drop_db_60ms", "op": ">", "value": 30},
-                             {"feature": "end.tail_seconds", "op": "<", "value": 0.05}]}},
+                             {"feature": "end.tail_seconds", "op": "<", "value": 0.05, "norm": "p1", "atLeast": 0.05}]}},
     {"id": "level.loudness", "class": null, "advisory": true, "method": "logistic", "features": [
       {"name": "level.lufs_deviation", "direction": "higher"},
       {"name": "level.true_peak_dbtp", "direction": "higher"},
@@ -84,9 +84,12 @@
       {"name": "phones.deletion_rate", "direction": "higher"},
       {"name": "phones.repeat_runs", "direction": "higher"},
       {"name": "phones.low_gop_run", "direction": "higher"},
-      {"name": "asr.edit_rate_min", "direction": "higher"}],
+      {"name": "phones.insertion_rate", "direction": "higher"}],
      "provisional": {"any": [{"feature": "phones.repeat_runs", "op": ">=", "value": 2},
                              {"feature": "phones.insertion_rate", "op": ">=", "value": 0.2}]}},
+    {"id": "content.asr", "class": "stutter", "method": "logistic", "features": [
+      {"name": "asr.phonetic_error_min", "direction": "higher"},
+      {"name": "asr.edit_rate_min", "direction": "higher"}]},
     {"id": "boundary.cutoff", "class": "cutoff", "method": "logistic", "features": [
       {"name": "phones.last_word_coverage", "direction": "lower"},
       {"name": "align.last_word_ratio", "direction": "lower"},
@@ -105,6 +108,11 @@
       {"name": "pitch.octave_jumps", "direction": "higher"},
       {"name": "pitch.register_offset_st", "direction": "higher"},
       {"name": "pitch.tracker_disagreement", "direction": "higher"}]},
+    {"id": "prosody.rate", "class": "unnatural", "method": "logistic", "features": [
+      {"name": "rate.phones_per_second", "direction": "higher"},
+      {"name": "rate.seconds_per_phone", "direction": "higher"}],
+     "provisional": {"any": [{"feature": "rate.phones_per_second", "op": "<", "norm": "p1"},
+                             {"feature": "rate.phones_per_second", "op": ">", "norm": "p99"}]}},
     {"id": "prosody.tonal-collapse", "class": "tonal-collapse", "method": "logistic", "features": [
       {"name": "pitch.tone_run_seconds", "direction": "higher"},
       {"name": "pitch.tone_flatness", "direction": "lower"},

@@ -3,12 +3,14 @@
 A feature is `{"value": float or None, "start": seconds or None, "end": seconds or None}`;
 None means the inputs were unavailable (a model not run, a take it failed on).
 `extract(take, results, context, params)` reads the cached results by role (the
-`models` map of `config/qc/detectors.json`: asrA, asrB, align, phones, pitchA,
-pitchB, speaker, mos, aesthetics, llm) and returns every feature the detectors
-name. `build_context` computes the lane-level references: voice pitch and speaker
-centroids, clone-reference pitch, and per-cell aesthetics baselines.
+`models` map of `config/qc/detectors.json`: asrA, asrB, align, phones, g2p,
+pitchA, pitchB, speaker, mos, aesthetics, llm) and returns every feature the
+detectors name. `build_context` computes the lane-level references: voice pitch
+and speaker centroids, clone-reference pitch, and per-cell aesthetics baselines.
 
-Phones come from `qc.phones` (G2P, alignment, GOP) and pitch from `qc.pitch`;
+Transcripts are also compared at the sound level (`asr_phonetic_features`): the
+script and each ASR transcript go through the same cached G2P, so homophones cost
+nothing. Phones come from `qc.phones` (G2P, alignment, GOP) and pitch from `qc.pitch`;
 both are imported guardedly, so a missing module only leaves its features None
 (and tests can substitute stubs).
 """
@@ -207,25 +209,19 @@ def _speech_frames(profile: dict[str, np.ndarray]) -> tuple[np.ndarray, float | 
     return voiced, (float(np.median(level[voiced])) if voiced.any() else None)
 
 
-def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | None) -> dict[str, Feature]:
-    """The longest non-speech stretch inside the sentence.
+def _speech_mask(profile: dict[str, np.ndarray]) -> dict[str, Any] | None:
+    """Speech frames: the voiced frames, with their short holes bridged and their blips removed.
 
-    Voiced speech is periodic and near speech level; a voiced run under 120 ms with at
-    least 150 ms of non-speech on both sides is a blip, not speech. A gap is any stretch
-    between the first and last speech frames without speech, or between two aligned words.
-    Features: its length, its loudest non-speech frame relative to the speech median (a
-    breath-like hiss at speech level is not a pause), and the blips inside it.
+    Voiced speech is periodic and near speech level; a voiced run under 120 ms with at least
+    150 ms of non-speech on both sides, next to quiet, is a blip, not speech. Returns
+    `{voiced, speech, blips, quiet, median}`, or None with fewer than two voiced frames.
     """
 
-    names = ("pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips")
-    out = {name: feature() for name in names}
-    out["pause.mute_confirmed"] = feature()
-    profile = frame_profile(samples, rate)
     hop = float(profile["hop"])
     voiced, speech_median = _speech_frames(profile)
     indices = np.flatnonzero(voiced)
     if indices.size < 2 or speech_median is None:
-        return out
+        return None
     # Periodicity flickers around its threshold: bridge holes of 30 ms or less, so one voiced
     # sound is one run (the fr-0101--dylan blip otherwise splits into three 10 ms runs).
     voiced = voiced.copy()
@@ -259,15 +255,36 @@ def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | Non
         if end - start < blip_frames and isolated and beside >= quiet_frames:
             speech[start:end] = False
             blips.append((start, end))
+    return {"voiced": voiced, "speech": speech, "blips": blips, "quiet": quiet, "median": speech_median}
+
+
+def speech_span(samples: np.ndarray, rate: int, *, profile: dict[str, np.ndarray] | None = None
+                ) -> tuple[float, float] | None:
+    """From the start of the first to the end of the last speech frame (blips excluded), or None."""
+
+    profile = frame_profile(samples, rate) if profile is None else profile
+    mask = _speech_mask(profile)
+    inside = np.flatnonzero(mask["speech"]) if mask else np.array([], dtype=int)
+    if inside.size < 2:
+        return None
+    return float(profile["time"][inside[0]]), float(profile["time"][inside[-1]]) + float(profile["hop"])
+
+
+def _gap_frames(profile: dict[str, np.ndarray], mask: dict[str, Any]) -> list[tuple[int, int]]:
+    """Every stretch without speech between the first and last speech frames, as frame ranges.
+
+    The unvoiced consonants that end and start words (a final /s/, a /t/ burst) are speech: up to
+    120 ms of loud unvoiced frames is trimmed at each edge, which can leave a gap empty.
+    """
+
+    speech, quiet = mask["speech"], mask["quiet"]
     inside = np.flatnonzero(speech)
     if inside.size < 2:
-        return out
+        return []
     first, last = int(inside[0]), int(inside[-1])
-    edge = int(round(0.12 / hop))
+    edge = int(round(0.12 / float(profile["hop"])))
 
     def trimmed(start: int, end: int) -> tuple[int, int]:
-        # The unvoiced consonants that end and start words (a final /s/, a /t/ burst) are speech:
-        # trim up to 120 ms of loud unvoiced frames at each edge of the gap.
         lo = start
         while lo < end and lo - start < edge and not quiet[lo]:
             lo += 1
@@ -276,7 +293,45 @@ def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | Non
             hi -= 1
         return (lo, hi) if hi > lo else (start, start)
 
-    gaps = [trimmed(first + start, first + end) for start, end in _runs(~speech[first:last + 1])]
+    return [trimmed(first + start, first + end) for start, end in _runs(~speech[first:last + 1])]
+
+
+def pause_gaps(samples: np.ndarray, rate: int, *, profile: dict[str, np.ndarray] | None = None,
+               minimum: float = 0.0) -> list[float]:
+    """The length of every within-sentence pause, as `pause_features` measures the longest, in
+    seconds: those of at least `minimum` (the language norms count pauses of 100 ms or more)."""
+
+    profile = frame_profile(samples, rate) if profile is None else profile
+    mask = _speech_mask(profile)
+    if mask is None:
+        return []
+    hop = float(profile["hop"])
+    lengths = [(end - start) * hop for start, end in _gap_frames(profile, mask) if end > start]
+    return [round(length, 6) for length in lengths if length >= minimum - 1e-9]
+
+
+def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | None, *,
+                   profile: dict[str, np.ndarray] | None = None) -> dict[str, Feature]:
+    """The longest non-speech stretch inside the sentence.
+
+    Speech frames come from `_speech_mask` (voiced, blips removed). A gap is any stretch between
+    the first and last speech frames without speech (`_gap_frames`), or between two aligned words.
+    Features: its length, its loudest non-speech frame relative to the speech median (a breath-like
+    hiss at speech level is not a pause), and the blips inside it.
+    """
+
+    names = ("pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips")
+    out = {name: feature() for name in names}
+    out["pause.mute_confirmed"] = feature()
+    profile = frame_profile(samples, rate) if profile is None else profile
+    hop = float(profile["hop"])
+    mask = _speech_mask(profile)
+    if mask is None:
+        return out
+    voiced, speech, blips, speech_median = mask["voiced"], mask["speech"], mask["blips"], mask["median"]
+    if np.flatnonzero(speech).size < 2:
+        return out
+    gaps = _gap_frames(profile, mask)
     best = max(gaps, key=lambda gap: gap[1] - gap[0], default=None)
     if best and best[1] <= best[0]:
         best = None
@@ -576,6 +631,9 @@ def _min(values: Iterable[float | None]) -> float | None:
 
 
 def asr_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Feature]:
+    """Word (character, for Chinese and Japanese) insertion and deletion rates, language ID and
+    script against the script. The sound-level rate is `asr_phonetic_features`."""
+
     asrs = [outputs(results, "asrA"), outputs(results, "asrB")]
     edits = [_asr_edit(take, asr) for asr in asrs]
     present = [edit for edit in edits if edit is not None]
@@ -589,6 +647,158 @@ def asr_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Fea
         "asr.script_mismatch_min": feature(_min(script_mismatch(asr.get("text") or "", language) for asr in asrs)
                                            if all(asr is not None for asr in asrs) else None),
     }
+
+
+# --- sound-level transcript comparison ------------------------------------------------
+#
+# Word error rates count homophones as errors: "la voie" heard as "la voix" is one wrong word but
+# the same sound (/vwa/), and Chinese and Japanese have no spaces and many homophones. Both the
+# script and each ASR transcript go through the same G2P (espeak-ng, with a kana reading first for
+# Japanese) into broad phones, aligned with the PanPhon feature distance, so a homophone costs
+# nothing and a near-identical sound counts as a match.
+
+ASR_FAMILIES = (("asrA", "a"), ("asrB", "b"))
+PHONETIC_FEATURES = ("asr.phonetic_error_a", "asr.phonetic_error_b", "asr.phonetic_error_min")
+
+
+def g2p_cached(text: str | None, language: str | None, layout: store.Layout,
+               model_ids: dict[str, str]) -> dict[str, Any] | None:
+    """The cached G2P record of a text (the G2P role's cache, else the shared one), or None."""
+
+    if phones is None or not text:
+        return None
+    for cache_dir in (layout.results_dir(model_ids.get("g2p", "g2p.espeak-ng")), None):
+        try:
+            return phones.g2p_record(text, language, cache_dir=cache_dir, compute=False)
+        except Exception:  # noqa: BLE001 - a cache miss or an unsupported language
+            continue
+    return None
+
+
+def transcript(asr: dict[str, Any] | None) -> str:
+    """An ASR family's transcript as the G2P reads it."""
+
+    return ((asr or {}).get("text") or "").strip()
+
+
+def phonetic_error(expected: list[str], heard: list[str], distance: Callable[[str, str], float],
+                   near: float = 0.0) -> float | None:
+    """The phone error rate of `heard` against `expected` (broad phones): deletions, insertions and
+    substitutions over the expected phones, after a PanPhon-weighted alignment.
+
+    Identical sounds cost nothing whatever their spelling (voie and voix are both /vwa/). A
+    substitution within `near` of its phone (the near-identity scale of `qc.phones`: /e/ for /ɛ/,
+    a voicing pair) counts as a match, as the ASR's language model makes those choices.
+    """
+
+    if not expected or phones is None:
+        return None
+    ops = phones.align(expected, heard, distance=distance)
+    errors = sum(1 for op in ops if op["op"] in ("del", "ins") or (op["op"] == "sub" and float(op["cost"]) > near))
+    return errors / len(expected)
+
+
+def asr_phonetic_features(take: dict[str, Any], results: dict[str, Any], layout: store.Layout,
+                          model_ids: dict[str, str]) -> dict[str, Feature]:
+    """Sound-level transcript errors: the script and each family's transcript through the same G2P.
+
+    `asr.phonetic_error_a` and `_b` are the families' rates; `asr.phonetic_error_min`, the smaller,
+    needs both (both families must hear the error). A transcript the G2P job has not read yet, or a
+    language without G2P (Japanese without its kana reader), leaves them unavailable.
+    """
+
+    out = {name: feature() for name in PHONETIC_FEATURES}
+    if phones is None or not take.get("text"):
+        return out
+    language = take.get("language")
+    script = g2p_cached(take["text"], language, layout, model_ids)
+    expected = phones.normalize(script["phones"]) if script and script.get("phones") else []
+    if not expected:
+        return out
+    distance, source = phones.default_distance(layout.model_dir(model_ids.get("g2p", "g2p.espeak-ng")))
+    near = getattr(phones, "PANPHON_NEAR" if source == "panphon" else "COARSE_NEAR", 0.0)
+    values = []
+    for role, suffix in ASR_FAMILIES:
+        asr = outputs(results, role)
+        if asr is None:
+            continue
+        text = transcript(asr)
+        record = g2p_cached(text, language, layout, model_ids) if text else {"phones": []}
+        if record is None:
+            continue
+        value = phonetic_error(expected, phones.normalize(record.get("phones") or []), distance, near)
+        out[f"asr.phonetic_error_{suffix}"] = feature(value)
+        values.append(value)
+    if len(values) == len(ASR_FAMILIES) and None not in values:
+        out["asr.phonetic_error_min"] = feature(min(values))
+    return out
+
+
+def transcript_g2p_takes(takes: list[dict[str, Any]], results_by_token: dict[str, dict[str, Any]],
+                         layout: store.Layout, model_ids: dict[str, str]) -> list[dict[str, Any]]:
+    """Pseudo-takes that make the G2P job read every ASR transcript not in its cache yet.
+
+    The G2P cache is keyed by text, so a transcript equal to its script costs nothing. G2P reads no
+    audio: each pseudo-take's `audioSHA256` is the digest of its language and text, which keys its
+    per-take G2P result apart from every real take's.
+    """
+
+    if phones is None:
+        return []
+    pending: dict[str, dict[str, Any]] = {}
+    for take in takes:
+        language = take.get("language")
+        if language not in getattr(phones, "ESPEAK_VOICES", {}):
+            continue
+        for role, _ in ASR_FAMILIES:
+            text = transcript(outputs(results_by_token.get(take["token"], {}), role))
+            if not text or g2p_cached(text, language, layout, model_ids) is not None:
+                continue
+            digest = store.sha256_text(store.canonical_json({"g2pTranscript": text, "language": language}))
+            pending.setdefault(digest, {"token": f"asr{digest[:13]}", "audio": take["audio"], "audioSHA256": digest,
+                                        "language": language, "text": text, "reference": None,
+                                        "referenceSHA256": None})
+    return list(pending.values())
+
+
+# --- pace -------------------------------------------------------------------------------
+
+RATE_FEATURES = ("rate.phones_per_second", "rate.seconds_per_phone", "rate.syllables_per_second")
+
+
+def rate_features(expected: list[str] | None, span: tuple[float, float] | None) -> dict[str, Feature]:
+    """The speaking rate over the speech span (first to last speech frame, pauses included).
+
+    Phones are the script's broad G2P phones; syllables are their vowel runs (a diphthong is one
+    nucleus). Norms are per language, since phone inventories and syllable shapes differ.
+    `rate.seconds_per_phone` is the reciprocal, so a fitted detector can weigh both tails.
+    """
+
+    out = {name: feature() for name in RATE_FEATURES}
+    if phones is None or not expected or span is None:
+        return out
+    start, end = span
+    seconds = end - start
+    broad = phones.normalize(expected)
+    if seconds < 0.3 or not broad:
+        return out
+    vowels = getattr(phones, "VOWELS", frozenset())
+    nuclei = sum(1 for index, phone in enumerate(broad)
+                 if phone[:1] in vowels and (index == 0 or broad[index - 1][:1] not in vowels))
+    out["rate.phones_per_second"] = feature(len(broad) / seconds, start, end)
+    out["rate.seconds_per_phone"] = feature(seconds / len(broad), start, end)
+    if nuclei:
+        out["rate.syllables_per_second"] = feature(nuclei / seconds, start, end)
+    return out
+
+
+def word_gaps(aligned: dict[str, Any] | None) -> list[float]:
+    """The silences between consecutive aligned words, in seconds (only the positive ones)."""
+
+    words = [word for word in (aligned or {}).get("words") or []
+             if word.get("start") is not None and word.get("end") is not None]
+    gaps = [float(current["start"]) - float(previous["end"]) for previous, current in zip(words, words[1:])]
+    return [gap for gap in gaps if gap > 0]
 
 
 def align_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Feature]:
@@ -617,15 +827,10 @@ def expected_phones(take: dict[str, Any], results: dict[str, Any], layout: store
     g2p_out = outputs(results, "g2p")
     if g2p_out and g2p_out.get("phones"):
         return list(g2p_out["phones"]), list(g2p_out.get("words") or [])
-    if phones is None or not take.get("text"):
+    record = g2p_cached(take.get("text"), take.get("language"), layout, model_ids)
+    if record is None:
         return None, []
-    for cache_dir in (layout.results_dir(model_ids.get("g2p", "g2p.espeak-ng")), None):
-        try:
-            record = phones.g2p_record(take["text"], take.get("language"), cache_dir=cache_dir, compute=False)
-            return list(record["phones"]), list(record.get("words") or [])
-        except Exception:  # noqa: BLE001 - a cache miss or an unsupported language
-            continue
-    return None, []
+    return list(record["phones"]), list(record.get("words") or [])
 
 
 def _op_span(ops: Iterable[dict[str, Any]]) -> tuple[float | None, float | None]:
@@ -835,18 +1040,23 @@ def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, An
     except (OSError, ValueError):
         audio = None
     out: dict[str, Feature] = {}
+    span = None
     if audio is not None:
+        profile = frame_profile(audio[0], audio[1])
         out.update(signal_features(audio[0], audio[1], params))
-        out.update(pause_features(audio[0], audio[1], outputs(results, "align")))
+        out.update(pause_features(audio[0], audio[1], outputs(results, "align"), profile=profile))
         out.update(end_features(audio[0], audio[1]))
         out.update(loudness_features(audio[0], audio[1], params.get("loudnessTarget", -23.0)))
+        span = speech_span(audio[0], audio[1], profile=profile)
     else:
         out.update({name: feature() for name in AUDIO_FEATURES})
     finish = take.get("finishReason")
     out["engine.finish_not_eos"] = feature(None if finish is None else float(finish != "eos"))
     out.update(asr_features(take, results))
+    out.update(asr_phonetic_features(take, results, layout, model_ids))
     out.update(align_features(take, results))
     out.update(phone_features(take, results, layout, model_ids, params))
+    out.update(rate_features(expected_phones(take, results, layout, model_ids)[0], span))
     out.update(pitch_features(take, results, context, audio, params))
     out.update(speaker_features(take, results, context))
     out.update(quality_features(take, results, context))

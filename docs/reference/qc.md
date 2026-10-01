@@ -32,6 +32,7 @@ All commands go through `python3 scripts/qc.py`.
 | `queue --top N [--run ID] [--batch NAME]` | Writes the most suspicious unlabelled takes of a run as a label batch, which `label serve --batch NAME` opens. |
 | `fit [--batches …] [--runs …]` | Fits the detectors on the train-split labels and writes `config/qc/thresholds-v<N>.json`. |
 | `eval [--thresholds FILE]` | Scores the held-out split once against a committed thresholds file and writes `benchmarks/qc/eval-v<N>.json`. |
+| `norms --takes <qc-takes runs…> [--min-count 100] [--dry-run]` | Measures per-language pause, pace and ending percentiles from the pool's audio and cached results, and writes `config/qc/norms-v<N>.json` (see [Per-language norms](#per-language-norms)). |
 
 ## Models and runtimes
 
@@ -72,7 +73,7 @@ The venvs are built from v2's own copy of the pinned standalone CPython (`cpytho
 
 Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].json`.
 - **Variant key:** alignment, LLM and speaker results also depend on the take's text, language and reference clip. `qc.store.variant_key` hashes those three into the variant key, and the job hands it to the runner as `variantKey`.
-- **Runner identity:** `runnerSHA256` digests the runner file, the shared runner helpers (`runners/_*.py`, which hold the LLM prompts and class definitions), `qc/phones.py` and `qc/pitch.py`, the registry `version` and every pin. Changing any of them re-scores every take.
+- **Runner identity:** `runnerSHA256` digests the runner file and the `qc` modules it imports (transitively), the shared runner helpers (`runners/_*.py`, which hold the LLM prompts and class definitions), `qc/phones.py` and `qc/pitch.py`, the registry `version` and every pin. Changing any of them re-scores every take. A package name (`from qc import phones`) adds no file, so editing the command line, features, detectors or lanes re-scores nothing.
 
 ## Detectors
 
@@ -83,7 +84,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `asrA`, `asrB` | Two ASR families. |
 | `align` | The forced aligner. |
 | `phones` | The phone recognizer. |
-| `g2p` | espeak-ng G2P: the script's expected phones, run as a job in the onnx venv. |
+| `g2p` | espeak-ng G2P, run as a job in the onnx venv: the script's expected phones, then, in a second pass after every role, the phones of each ASR transcript not yet in its cache. Japanese is read into kana first (see [Sound-level transcript scoring](#sound-level-transcript-scoring)). |
 | `pitchA`, `pitchB` | Two pitch trackers. |
 | `speaker` | Speaker embeddings. |
 | `mos` | The MOS predictor. |
@@ -97,24 +98,27 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `pause.anomalous` | pause | The longest stretch without voiced speech between the first and last speech frames, or between two aligned words. Up to 120 ms of loud unvoiced frames is trimmed at each edge, since word-edge consonants are speech. Also: the loudest 100 ms median of its non-speech frames relative to the speech median (sustained hiss or breath, not a transient); the voiced blips inside it (under 120 ms, isolated and next to quiet); and the mute test. |
 | `boundary.abrupt-end` | cutoff | From 10 ms levels: the drop within 60 ms of the final peak; the tail from 10 dB below the peak down to −60 dBFS; the decay slope; and `finishReason`. |
 | `level.loudness` | (advisory) | BS.1770-4 integrated loudness (K-weighted, gated), its distance from −23 LUFS, and the 4× oversampled true peak. LRA is reported too. |
-| `content.phoneme` | stutter | From `qc.phones.compare` on the G2P phones against the recognized phones (PanPhon-weighted alignment, GOP-SF on the posteriors): the phone deletion rate, repeated-syllable runs and the longest low-GOP span. Also the smaller of the two ASR families' insertion and deletion rates against the script. |
+| `content.phoneme` | stutter | From `qc.phones.compare` on the G2P phones against the recognized phones (PanPhon-weighted alignment, GOP-SF on the posteriors): the phone deletion rate, repeated-syllable runs, the longest low-GOP span and the phone insertion rate. |
+| `content.asr` | stutter | The smaller of the two ASR families' sound-level phone error rates against the script (`asr.phonetic_error_min`, primary), then their word insertion and deletion rate (characters for Chinese and Japanese). |
 | `boundary.cutoff` | cutoff | Phone coverage of the last word, the aligner's last-word duration ratio, the level of the last 50 ms, and `finishReason`. |
 | `language.wrong` | wrong-language | Both ASR families' language-ID mismatch and transcript-script mismatch (the smaller of the two). |
 | `language.accent` | mispronunciation | Mean GOP, substitution rate, L1 substitutions (for example French /y/→/u/, /ʁ/→/ɹ/, denasalization), and the LLM's vote. |
 | `prosody.pitch` | pitch | On frames where both trackers agree (`qc.pitch`): the sustained shift, octave jumps, the register offset from the voice's or clone reference's median, and tracker disagreement. |
+| `prosody.rate` | unnatural | The script's G2P phones per second over the speech span (first to last speech frame), and its reciprocal, so a fit can weigh both tails. |
 | `prosody.tonal-collapse` | tonal-collapse | The longest steady-F0 run, its spectral flatness and its harmonic-to-noise ratio. |
 | `identity.drift` | voice-change | The worst 3 s window's distance from the clone reference, the Built-in voice centroid or the take's own embedding; the whole take's distance; and the window range. |
 | `signal.artifacts` | artifact | Click clusters, internal digital dropouts, clipping and terminal silence. |
 | `quality.naturalness` | unnatural | UTMOSv2 on the whole take and its worst 3 s window, and Audiobox PQ and CE relative to the cell median. |
 | `judge.llm.<class>` | each class | The audio LLM's `pYes`. It stays report-only unless its train kappa is at least 0.6. |
 
-**Provisional rules.** A detector the labels have not fitted yet scores with its `provisional` rule, when it has one, and flags at report-only:
-- `pause.anomalous`: the gap is over 0.5 s, and the mute test did not find words in it.
-- `boundary.abrupt-end`: the drop is over 30 dB within 60 ms, with a tail under 50 ms.
+**Provisional rules.** A detector the labels have not fitted yet scores with its `provisional` rule, when it has one, and flags at report-only. A rule reads the take's language's percentiles from the newest `config/qc/norms-v<N>.json` and falls back to its fixed value when there is no norms file, or the file lacks that language:
+- `pause.anomalous`: the gap is over the language's p99 of every within-sentence pause, and at least 0.5 s (0.5 s without norms); and the mute test did not find words in it.
+- `boundary.abrupt-end`: the drop is over 30 dB within 60 ms, with a tail under the language's p1 decay time, and at least 50 ms (50 ms without norms).
+- `prosody.rate`: the phones per second are under the language's p1 or over its p99. Without norms it has no rule.
 - `level.loudness`: the loudness is more than 4 LU from −23 LUFS, or the true peak is above −1 dBTP.
 - `content.phoneme`: at least 2 repeated-syllable runs, or a phone insertion rate of at least 0.2. Against espeak-ng, ZIPA measured fr-0101--dylan at 4 runs and 0.275, and a clean en-0008--ryan at 0 and 0.
 
-The rules live in `detectors.json`, not in a thresholds file, so a fit never has to carry them.
+The rules live in `detectors.json`, not in a thresholds file, so a fit never has to carry them. A condition names its `norm` percentile (of its own feature or of `normFeature`) and bounds it with `atLeast` or `atMost`; each flag records the threshold it met and the norm behind it. `fit` replaces the rules once labels exist.
 
 **The mute test.**
 1. For every take whose gap reaches 0.4 s, `run` silences the gap into `build/cache/qc/work/muted/<audioSHA256>-<startMs>-<endMs>.wav`.
@@ -130,6 +134,40 @@ The synthetic test case reproduces fr-0101--dylan: a 1.1 s hiss, blip and silenc
 - an abrupt ending: about 36 dB of drop in 40 ms, with a 20 ms tail.
 
 QC v2's phone check found what the ASR families hid: the voice pronounces silent letters. "fait" is read as /fɛt/, "les" as /lɛs/, "vieux" as /vjœks/ and "ormes" as /ɔʁmɛs/. The take's phone error rate is 0.48, with 11 insertions, against 0.10 on a clean take. The heard stutter is therefore spelling pronunciation, a cross-lingual defect of a Built-in voice reading French; QC-06 tracks the product side. `pause.anomalous`, `boundary.abrupt-end` and `content.phoneme` cover the three defects.
+
+## Sound-level transcript scoring
+
+A word error rate counts homophones: on fr-0101--dylan, Whisper heard *voie* as *voix* and *abattus* as *abattues*, two wrong words in twelve for the same sounds. Chinese and Japanese have no spaces and many homophones, so their word (character) errors mislead too. QC v2 therefore compares the transcripts at the sound level:
+1. The script and each ASR transcript go through the same G2P (espeak-ng, cached by text) into broad phones.
+2. `qc.phones.align` aligns them with the PanPhon feature distance.
+3. `asr.phonetic_error_a` and `_b` count deletions, insertions and substitutions over the script's phones. A substitution within the phone tools' near-identity scale (PanPhon distance 0.06: /e/ for /ɛ/, a voicing pair) counts as a match, since the ASR's language model makes those choices.
+4. `asr.phonetic_error_min` is the smaller of the two; like the word rates, it needs both families.
+
+On the three cached reference takes, fr-0101--dylan scores 0 for Qwen3-ASR and 0.025 for Whisper, against a word error rate of 0.17: espeak-ng reads a liaison /z/ after the feminine *abattues*, one phone in forty. fr-0003's *faim* heard as *fin* scores 0 (word error 0.125), and en-0008--ryan scores 0. A real substitution counts: *le chat dort* heard as *le rat dort* scores 1/7.
+
+Per language:
+- **Chinese:** espeak-ng `cmn` reads Hanzi, Simplified or Traditional, with one reading per polyphone. Both sides get the same reading, so a polyphone costs nothing.
+- **Japanese:** espeak-ng reads kana only; a kanji comes out as the English words "Chinese letter". The G2P job therefore first reads Japanese into katakana pronunciation (UniDic `pron`, one space between words) with MeCab and the UniDic-lite dictionary through fugashi. fugashi is MIT, MeCab BSD-3-Clause, and UniDic is used under the BSD-3-Clause option of its GPL/LGPL/BSD license; both are pinned in `config/qc/runtimes/onnx.txt`. The reader's versions key the Japanese G2P records. Without the reader (an onnx venv set up before the pins), the job writes no Japanese result and every Japanese phone feature abstains, instead of scoring against "Chinese letter".
+- **Korean:** espeak-ng's own rules.
+
+**Future work:** tone and pitch-accent checks for Mandarin and Japanese, per syllable. Broad phones drop tones, so a wrong tone or accent is invisible to the sound-level comparison.
+
+## Per-language norms
+
+A fixed "natural pause" of 0.2-0.3 s is French- and English-centric. Over the pool's 4,751 generated takes (measured from the audio on 2026-10-01), the fixed 0.5 s pause rule flagged 15% of English takes, 25% of French ones and 50% of Chinese ones. `qc.py norms --takes <qc-takes runs…>` measures, per language, from each take's audio and its cached aligner and G2P results:
+- `pause.gap_seconds`: every within-sentence pause of at least 100 ms, measured as `pause.anomalous` measures the longest one;
+- `pause.longest_gap_seconds` and `pause.word_gap_seconds` (the silences between aligned words), both descriptive;
+- `rate.phones_per_second` and `rate.syllables_per_second` (vowel runs of the script's G2P phones);
+- `end.tail_seconds`, `end.decay_db_per_ms` and `end.drop_db_60ms`.
+
+It writes `config/qc/norms-v<N>.json` with aggregates only: per language and feature, `n`, the mean and p1, p3, p10, p50, p90, p97 and p99, plus counts, the model identities and one digest of the pool's audio digests. It never holds a take id, path or text. Takes the engine did not finish are left out, and a language gets a feature only from at least `--min-count` values (100).
+
+The pool's own defects shape these choices:
+- **Pauses:** the pause rule reads the p99 of every pause, not of each take's longest one. A take has several pauses, so a defect rate above 1% barely moves it, while it pushes the take-level p99 past the defects (1.27 s in French, above fr-0101--dylan's 1.21 s). The per-pause p99 runs from 1.12 s (Portuguese) to 1.56 s (Chinese); 1.19 s in French still flags fr-0101--dylan. It flags 1.3% to 2.8% of each language's takes.
+- **Endings:** 2% to 13% of takes end with no decay at all, so the p1 decay time is 0 s in every language, and 50 ms stays the floor. The abrupt-end signature (over 30 dB within 60 ms, under 50 ms of tail) matches 20% to 40% of the pool, and drops over 60 dB 5% to 19%: that rule needs labels.
+- **Rate:** the p1 and p99 flag about 2% of takes, by construction.
+
+Run `norms` after the pool's G2P role (and its aligner, for the descriptive word gaps), with the onnx runtime set up from the current pins, so Japanese has its reading. Any later run writes the next version, and the rules read the newest.
 
 ## Calibration and levels
 
@@ -228,6 +266,7 @@ Re-labelling appends a new line, and the latest line per token wins.
 | `build/private/qc/runs/<run-id>/` | `takes.json`, `features.json` and `flags.json` of each `qc.py run`. |
 | `build/private/qc/queues/` | The listening queues `queue` writes. |
 | `config/qc/thresholds-v<N>.json`, `benchmarks/qc/eval-v<N>.json` | Fitted thresholds and their one held-out evaluation, both committed. |
+| `config/qc/norms-v<N>.json` | Per-language percentiles for the provisional rules, committed; aggregates only. |
 
 `build/cache/qc` (`qc-cache`) is re-creatable from the registry and pins. `build/private/qc` (`qc-private`) is preserved by every cleanup. Both are registered in `config/build-output-policy.json` and git-ignored under `build/`. Labels, transcripts and take paths never enter Git; only aggregates and digests are committed.
 

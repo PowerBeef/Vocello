@@ -37,6 +37,7 @@ import numpy as np
 
 from qc import detectors as detector_lib
 from qc import label, store
+from qc import norms as norms_lib
 from qc.store import Layout
 
 THRESHOLDS_SCHEMA = "vocello.qc.thresholds/1"
@@ -395,6 +396,7 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
     if not heldout:
         raise FitError("no labelled held-out takes with features")
     norm = document["normalization"]
+    pool_norms = norms_lib.load(layout)  # a report-only detector scores with its provisional rule, as in runs
     rules = config["levels"]
     results: dict[str, Any] = {}
     for detector in config["detectors"]:
@@ -411,7 +413,7 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
             scored = []
             for row in subset:
                 outcome = detector_lib.score(detector, features[row["token"]]["features"], row["language"],
-                                             None if fitted.get("reportOnly") else fitted, norm)
+                                             None if fitted.get("reportOnly") else fitted, norm, norms=pool_norms)
                 flagged = outcome["cut"] is not None and outcome["score"] is not None \
                     and outcome["score"] >= outcome["cut"]
                 scored.append((row, flagged))
@@ -439,7 +441,7 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
         "schema": EVAL_SCHEMA, "version": version, "createdAt": utc_now(),
         "thresholds": thresholds.name, "thresholdsSHA256": store.sha256_file(thresholds),
         "commit": _head(layout.root), "labelSet": {"heldoutTakes": len(heldout), "digest": label_set_digest(heldout)},
-        "detectors": results, "intraRater": intra,
+        "norms": (pool_norms or {}).get("file"), "detectors": results, "intraRater": intra,
     }
     store.write_json_atomic(output, evaluation)
     return output

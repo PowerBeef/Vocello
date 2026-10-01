@@ -793,8 +793,8 @@
           }
         }
       },
-      "license": "GPL-3.0-or-later (espeak-ng 1.52 in the espeakng-loader 0.2.4 wheel, MIT loader); MIT (PanPhon feature data)",
-      "notice": "G2P runs libespeak-ng in-process from the espeakng-loader wheel inside the QC onnx runtime only; nothing ships with the product. The pinned files are PanPhon's articulatory feature table and weights (Copyright (c) 2015 Carnegie Mellon University, MIT), read by qc.phones for the phone-alignment distance; the PanPhon package itself is not installed.",
+      "license": "GPL-3.0-or-later (espeak-ng 1.52 in the espeakng-loader 0.2.4 wheel, MIT loader); MIT (PanPhon feature data); MIT and BSD-3-Clause (fugashi 1.5.2 with MeCab), BSD-3-Clause (UniDic 2.1.2 in unidic-lite 1.0.8, MIT wrapper) for the Japanese reading",
+      "notice": "G2P runs libespeak-ng in-process from the espeakng-loader wheel inside the QC onnx runtime only; nothing ships with the product. The pinned files are PanPhon's articulatory feature table and weights (Copyright (c) 2015 Carnegie Mellon University, MIT), read by qc.phones for the phone-alignment distance; the PanPhon package itself is not installed. Japanese text is read into kana first by MeCab (Copyright (c) 2001-2008 Taku Kudo and Nippon Telegraph and Telephone Corporation, BSD-3-Clause) with UniDic-lite (UniDic Copyright (c) 2011-2017 The UniDic Consortium, tri-licensed GPL/LGPL/BSD; used under BSD-3-Clause) through fugashi (MIT), pinned in config/qc/runtimes/onnx.txt.",
       "memoryGB": 0.5,
       "languages": [
         "chinese",

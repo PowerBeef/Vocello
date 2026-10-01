@@ -23,3 +23,10 @@ kaldi-native-fbank==1.22.3
 espeakng-loader==0.2.4
 # numpy==2.5.3 and soundfile==0.14.0 come from agent C's block.
 # --- end agent B ---
+
+# The Japanese reading before espeak-ng (qc.runners.espeak_g2p.JapaneseReader): espeak-ng reads
+# kana only. fugashi (MIT, a cp314 macOS arm64 wheel) bundles MeCab (BSD-3-Clause); unidic-lite
+# (MIT wrapper, sdist only, pure data) ships UniDic 2.1.2, used under the BSD-3-Clause option of
+# its GPL/LGPL/BSD tri-license. Their versions key the Japanese G2P records (JAPANESE_READER).
+fugashi==1.5.2
+unidic-lite==1.0.8

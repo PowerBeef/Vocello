@@ -1,7 +1,10 @@
 """Lane runs: score a takes manifest, gate on its flags, queue takes worth hearing.
 
 `run` scores the takes with each detector model, one model at a time and from
-the cache when it can. Then it computes the features and detector scores, and
+the cache when it can. After every role (the G2P role reads the scripts), a
+second G2P pass reads the ASR transcripts not yet in the G2P cache, for the
+sound-level transcript features. Then it computes the features and detector
+scores (the provisional rules read the newest `config/qc/norms-v<N>.json`), and
 writes these files under `build/private/qc/runs/<run-id>/`:
 - `takes.json`: the manifest;
 - `features.json`: the features, with the model identities;
@@ -35,6 +38,7 @@ from qc import detectors as detector_lib
 from qc import features as feature_lib
 from qc import fit as fit_lib
 from qc import label, models, runtime, store
+from qc import norms as norms_lib
 from qc.store import Layout
 
 FEATURES_SCHEMA = "vocello.qc.features/1"
@@ -132,6 +136,17 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
                     if result is not None:
                         reference_results[reference["audioSHA256"]][role] = result
             identities[role] = {"id": model["id"], "runnerSHA256": identity, "available": found > 0, "results": found}
+
+        # A second G2P pass, after the ASR roles ran (or were read from the cache): the transcripts'
+        # phones for asr.phonetic_error_*. The cache is keyed by text, so only new transcripts run.
+        if role_models.get("g2p") is not None and {"g2p", "asrA", "asrB"} & set(selected):
+            transcripts = feature_lib.transcript_g2p_takes(takes, results_by_token, layout, dict(config["models"]))
+            if transcripts:
+                try:
+                    runner(role_models["g2p"], transcripts, layout=layout, echo=echo)
+                except runtime.RunnerError as error:
+                    echo(f"qc run: transcript G2P: {error}")
+            model_report["g2pTranscripts"] = {"texts": len(transcripts)}
 
         params = config.get("params", {})
         context = feature_lib.build_context(takes, results_by_token, reference_results, params)
@@ -231,6 +246,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     run_norm = detector_lib.normalization(rows, names)
     norm = thresholds["normalization"] if applicable else run_norm
     gated = detector_lib.gated_detectors(config, lane)
+    pool_norms = norms_lib.load(layout)  # the provisional rules' per-language percentiles
     out_takes, errors = [], []
     summary = {level: 0 for level in LEVEL_RANK}
     for row in rows:
@@ -240,7 +256,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
             fitted = thresholds["detectors"].get(detector["id"]) if applicable else None
             if fitted and fitted.get("reportOnly"):
                 fitted = None
-            outcome = detector_lib.score(detector, row["features"], row["language"], fitted, norm)
+            outcome = detector_lib.score(detector, row["features"], row["language"], fitted, norm, norms=pool_norms)
             raw[detector["id"]] = detector_lib.uncalibrated(detector, row["features"], row["language"], run_norm)
             scores[detector["id"]] = outcome["score"]
             level = levels.get(detector["id"], {}).get(row["language"], "report-only")
@@ -251,9 +267,12 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
                     errors.append({"token": row["token"], "detector": detector["id"], "reason": "missing-inputs"})
                 continue
             if outcome["cut"] is not None and outcome["score"] >= outcome["cut"]:
-                flags.append({"detector": detector["id"], "class": detector["class"], "level": level,
-                              "score": round(outcome["score"], 6), "cut": outcome["cut"], "scope": outcome["scope"],
-                              "evidence": detector_lib.evidence(detector, row["features"])})
+                flag = {"detector": detector["id"], "class": detector["class"], "level": level,
+                        "score": round(outcome["score"], 6), "cut": outcome["cut"], "scope": outcome["scope"],
+                        "evidence": detector_lib.evidence(detector, row["features"])}
+                if outcome.get("rule"):
+                    flag["rule"] = outcome["rule"]
+                flags.append(flag)
         if flags:
             summary[max((flag["level"] for flag in flags), key=LEVEL_RANK.__getitem__)] += 1
         entry = {"token": row["token"], "takeID": row.get("takeID"), "language": row["language"],
@@ -264,6 +283,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     return {
         "schema": FLAGS_SCHEMA, "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "thresholds": thresholds_path.name if thresholds_path else None, "thresholdsApplied": applicable,
+        "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
     }
 

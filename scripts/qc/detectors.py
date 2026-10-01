@@ -8,9 +8,15 @@ Each detector reads at most four features and maps them to one score:
 - `threshold`: one feature's oriented raw value (the LLM judges' pYes).
 
 A fitted detector flags a take when its score reaches the fitted cut. Before a
-fit (or for a detector the labels could not train) the score is uncalibrated:
-the largest oriented z-score among its features, which ranks the listening
-queue but never flags.
+fit (or for a detector the labels could not train) a detector with a
+`provisional` rule scores with it, at report-only; one without scores
+uncalibrated: the largest oriented z-score among its features, which ranks the
+listening queue but never flags.
+
+A rule condition compares a feature with a fixed `value`, or with a percentile
+of the take's language from the newest `config/qc/norms-v<N>.json` (`norm`, of
+the condition's feature or of `normFeature`, bounded by `atLeast` and
+`atMost`), falling back to `value` when the norms lack that language or feature.
 """
 
 from __future__ import annotations
@@ -27,14 +33,16 @@ DIRECTIONS = ("higher", "lower")
 ROLES = ("asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics", "llm")
 # Which runner roles a feature family reads (signal and engine features read only the WAV and the take).
 FEATURE_ROLES = {
-    "asr": ("asrA", "asrB"), "align": ("align",), "phones": ("phones", "g2p"), "pitch": ("pitchA", "pitchB"),
+    "asr": ("asrA", "asrB", "g2p"), "align": ("align",), "phones": ("phones", "g2p"), "pitch": ("pitchA", "pitchB"),
     "speaker": ("speaker",), "mos": ("mos",), "aesthetics": ("aesthetics",), "llm": ("llm",),
-    "signal": (), "engine": (), "pause": (), "end": (), "level": (),
+    "signal": (), "engine": (), "pause": (), "end": (), "level": (), "rate": ("g2p",),
 }
 LEVELS = ("report-only", "warn", "fail")
 LANE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 RULE_OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a < b,
             "<=": lambda a, b: a <= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}
+# The percentiles a norms file holds for each language and feature (`qc.norms`).
+NORM_PERCENTILES = ("p1", "p3", "p10", "p50", "p90", "p97", "p99")
 
 
 class ConfigError(ValueError):
@@ -80,9 +88,7 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
                     f"{label}: provisional takes all, any and none lists")
             for conditions in rule.values():
                 for condition in conditions:
-                    require(condition.get("op") in RULE_OPS and isinstance(condition.get("value"), (int, float))
-                            and str(condition.get("feature", "")).split(".", 1)[0] in FEATURE_ROLES,
-                            f"{label}: bad provisional condition {condition!r}")
+                    require(_valid_condition(condition), f"{label}: bad provisional condition {condition!r}")
         require(detector.get("method") in METHODS, f"{label}: method must be logistic or threshold")
         features = detector.get("features")
         require(isinstance(features, list) and 1 <= len(features) <= 4, f"{label}: one to four features")
@@ -123,6 +129,26 @@ def gated_detectors(config: dict[str, Any], lane: str | None) -> set[str]:
         if any(set(FEATURE_ROLES[family]) <= roles for family in families):
             gated.add(detector["id"])
     return gated
+
+
+def _valid_condition(condition: Any) -> bool:
+    """`{feature, op}` with a numeric `value`, a `norm` percentile, or both (the value is then the
+    fallback); `normFeature` names another feature's norm, and `atLeast` and `atMost` bound it."""
+
+    if not isinstance(condition, dict):
+        return False
+
+    def number(key: str) -> bool:
+        value = condition.get(key)
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    norm = condition.get("norm")
+    return (condition.get("op") in RULE_OPS
+            and str(condition.get("feature", "")).split(".", 1)[0] in FEATURE_ROLES
+            and (norm is None or norm in NORM_PERCENTILES)
+            and ("normFeature" not in condition or (norm is not None and isinstance(condition["normFeature"], str)))
+            and (number("value") if "value" in condition else norm is not None)
+            and all(number(key) for key in ("atLeast", "atMost") if key in condition))
 
 
 def config_digest(layout: Layout = Layout()) -> str:
@@ -214,33 +240,81 @@ def uncalibrated(detector: dict[str, Any], features: dict[str, Any], language: s
     return max(scores) if scores else None
 
 
-def _condition(condition: dict[str, Any], features: dict[str, Any]) -> bool:
+def language_norms(norms: dict[str, Any] | None, language: str | None) -> dict[str, Any]:
+    """One language's percentiles from a norms document (`qc.norms`), keyed by feature."""
+
+    return ((norms or {}).get("languages") or {}).get(language or "", {}) or {}
+
+
+def condition_threshold(condition: dict[str, Any], norms: dict[str, Any] | None = None) -> float | None:
+    """What a condition compares against: its language's `norm` percentile (of `normFeature`, else
+    of its own feature) when `norms` (one language's) hold it, bounded by `atLeast` and `atMost`;
+    else its fixed `value`; else None."""
+
+    key = condition.get("norm")
+    stats = _norm_stats(condition, norms) if key else {}
+    if key and stats.get(key) is not None:
+        value = float(stats[key])
+        if "atLeast" in condition:
+            value = max(value, float(condition["atLeast"]))
+        if "atMost" in condition:
+            value = min(value, float(condition["atMost"]))
+        return value
+    return None if condition.get("value") is None else float(condition["value"])
+
+
+def _norm_stats(condition: dict[str, Any], norms: dict[str, Any] | None) -> dict[str, Any]:
+    return (norms or {}).get(condition.get("normFeature") or condition["feature"]) or {}
+
+
+def _condition(condition: dict[str, Any], features: dict[str, Any], norms: dict[str, Any] | None) -> bool:
     value = (features.get(condition["feature"]) or {}).get("value")
-    return value is not None and RULE_OPS[condition["op"]](value, condition["value"])
+    threshold = condition_threshold(condition, norms)
+    return value is not None and threshold is not None and RULE_OPS[condition["op"]](value, threshold)
 
 
-def rule_holds(rule: dict[str, Any], features: dict[str, Any]) -> bool | None:
+def rule_holds(rule: dict[str, Any], features: dict[str, Any], norms: dict[str, Any] | None = None) -> bool | None:
     """A provisional rule: every `all`, at least one `any` (when given), no `none` condition.
-    None when a feature an `all` or `any` condition needs is missing."""
+    `norms` are the take's language's (`language_norms`). None when an `all` condition, or every
+    `any` condition, lacks its feature or its threshold (a norm-only condition without norms)."""
 
     def missing(condition: dict[str, Any]) -> bool:
-        return (features.get(condition["feature"]) or {}).get("value") is None
+        return ((features.get(condition["feature"]) or {}).get("value") is None
+                or condition_threshold(condition, norms) is None)
 
     if any(missing(condition) for condition in rule.get("all", [])):
         return None
     if rule.get("any") and all(missing(condition) for condition in rule["any"]):
         return None
-    holds = all(_condition(condition, features) for condition in rule.get("all", []))
+    holds = all(_condition(condition, features, norms) for condition in rule.get("all", []))
     if rule.get("any"):
-        holds = holds and any(_condition(condition, features) for condition in rule["any"])
-    return holds and not any(_condition(condition, features) for condition in rule.get("none", []))
+        holds = holds and any(_condition(condition, features, norms) for condition in rule["any"])
+    return holds and not any(_condition(condition, features, norms) for condition in rule.get("none", []))
+
+
+def rule_thresholds(rule: dict[str, Any], norms: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """The resolved conditions of a rule, for a flag's record: feature, op, threshold, and the norm
+    (`<feature>:<percentile>`) when it set the threshold."""
+
+    resolved = []
+    for kind in ("all", "any", "none"):
+        for condition in rule.get(kind, []):
+            threshold = condition_threshold(condition, norms)
+            key = condition.get("norm")
+            from_norm = bool(key) and _norm_stats(condition, norms).get(key) is not None
+            source = f"{condition.get('normFeature') or condition['feature']}:{key}" if from_norm else None
+            resolved.append({"when": kind, "feature": condition["feature"], "op": condition["op"],
+                             "threshold": None if threshold is None else round(threshold, 6), "norm": source})
+    return resolved
 
 
 def score(detector: dict[str, Any], features: dict[str, Any], language: str,
-          fitted: dict[str, Any] | None, norm: dict[str, dict[str, dict[str, float]]]) -> dict[str, Any]:
+          fitted: dict[str, Any] | None, norm: dict[str, dict[str, dict[str, float]]], *,
+          norms: dict[str, Any] | None = None) -> dict[str, Any]:
     """`{"score", "cut", "scope", "present"}`. A fitted detector scores with its model and cut; an
-    unfitted one with its provisional rule (score 1 or 0, cut 1, scope "provisional") when it has
-    one, else uncalibrated with no cut."""
+    unfitted one with its provisional rule (score 1 or 0, cut 1, scope "provisional", and the
+    resolved `rule`) when it has one, else uncalibrated with no cut. `norm` holds the z-score
+    statistics; `norms` is a norms document whose percentiles the rule conditions may read."""
 
     names = [item["name"] for item in detector["features"]]
     present = sum(1 for name in names if (features.get(name) or {}).get("value") is not None)
@@ -248,9 +322,11 @@ def score(detector: dict[str, Any], features: dict[str, Any], language: str,
     model = models.get(language) or models.get("*")
     if not fitted or not model or present == 0:
         rule = detector.get("provisional")
-        holds = rule_holds(rule, features) if rule else None
+        own = language_norms(norms, language)
+        holds = rule_holds(rule, features, own) if rule else None
         if holds is not None:
-            return {"score": 1.0 if holds else 0.0, "cut": 1.0, "scope": "provisional", "present": present}
+            return {"score": 1.0 if holds else 0.0, "cut": 1.0, "scope": "provisional", "present": present,
+                    "rule": rule_thresholds(rule, own)}
         return {"score": uncalibrated(detector, features, language, norm) if present else None,
                 "cut": None, "scope": None, "present": present}
     scope = language if language in models else "*"

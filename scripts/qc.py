@@ -4,7 +4,7 @@
     python3 scripts/qc.py models list|fetch|verify
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
-    python3 scripts/qc.py run | gate | queue | fit | eval
+    python3 scripts/qc.py run | gate | queue | fit | eval | norms
     python3 scripts/qc.py language-bench takes|evidence
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
@@ -259,6 +259,21 @@ def cmd_eval(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
+def cmd_norms(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import norms
+
+    try:
+        document, path = norms.command(layout, args.takes, min_count=args.min_count, dry_run=args.dry_run)
+    except (ValueError, OSError) as error:
+        print(f"qc norms: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    for line in norms.summary_lines(document):
+        print(line)
+    if path is not None:
+        print(f"qc norms: wrote {path.relative_to(layout.root)}; the provisional rules read the newest norms file")
+    return EXIT_OK
+
+
 # --- parser ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -359,6 +374,13 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--batches", nargs="+")
     evaluate.add_argument("--runs", nargs="+")
     evaluate.set_defaults(handler=cmd_eval)
+
+    norms = commands.add_parser("norms", help="per-language pause, pace and ending percentiles of a takes pool")
+    norms.add_argument("--takes", nargs="+", required=True, help="qc-takes run directories or takes manifests")
+    norms.add_argument("--min-count", type=int, default=100,
+                       help="values a language needs before it gets a feature's norms (default 100)")
+    norms.add_argument("--dry-run", action="store_true", help="print the summary without writing config/qc/norms-v<N>.json")
+    norms.set_defaults(handler=cmd_norms)
     return parser
 
 

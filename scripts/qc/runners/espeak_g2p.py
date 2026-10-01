@@ -8,11 +8,20 @@ separators or ties); `qc.phones.segment_ipa` splits it into phones.
 
 Records are cached by text under `build/cache/qc/results/g2p/<g2p_key>.json`, so the repository's
 python reads them through `qc.phones.g2p` without espeak-ng. The job (`--job`, the runner
-protocol) fills the cache for its takes and writes each take's result, `outputs = {phones, ipa,
-words, g2p}`, so `qc.py run` treats G2P like any runner.
+protocol) fills the cache for its takes and its `texts` and writes each take's result, `outputs =
+{phones, ipa, words, g2p}`, so `qc.py run` treats G2P like any runner. `qc.py run` also sends the
+ASR transcripts as pseudo-takes, for the sound-level transcript comparison.
 
-Limits: espeak-ng reads Japanese kana only (kanji get no reading), gives Chinese polyphones one
-reading and uses its own Korean rules; ja, zh and ko phone comparisons stay report-only.
+Japanese: espeak-ng reads kana only (a kanji comes out as the words "Chinese letter"), so a
+Japanese text is first read into katakana pronunciation (UniDic `pron`, one space between words)
+by MeCab with the UniDic-lite dictionary through fugashi (fugashi MIT, MeCab BSD-3-Clause, UniDic
+BSD-3-Clause of its GPL/LGPL/BSD choice), pinned in the onnx runtime. The reader's versions key the
+Japanese records. Without the reader, Japanese G2P is unavailable: the job writes no result for
+those takes (an environment gap, retried by the next run), and every Japanese phone feature
+abstains instead of comparing against "Chinese letter".
+
+Limits: espeak-ng gives Chinese polyphones one reading (the same on both sides of a comparison) and
+uses its own Korean rules; ja, zh and ko phone comparisons stay report-only.
 """
 
 from __future__ import annotations
@@ -20,9 +29,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -33,6 +44,8 @@ G2P_CACHE_DIR = REPO_ROOT / "build/cache/qc/results/g2p"
 G2P_SCHEMA = "vocello.qc.g2p/1"
 # Bump when the G2P output for the same text changes (engine options, cleaning): it keys the cache.
 G2P_VERSION = 1
+# The Japanese reader's pinned packages (config/qc/runtimes/onnx.txt); they key Japanese records.
+JAPANESE_READER = "fugashi-1.5.2+unidic-lite-1.0.8"
 
 AUDIO_OUTPUT_SYNCHRONOUS = 0x02
 INITIALIZE_DONT_EXIT = 0x8000
@@ -105,6 +118,43 @@ class EspeakBinary:
         return " ".join(completed.stdout.split())
 
 
+class JapaneseReader:
+    """Japanese text as katakana pronunciation for espeak-ng: MeCab with UniDic-lite, via fugashi.
+
+    Each word becomes its UniDic `pron` (the particle は as ワ, long vowels as ー); a word without
+    one (Latin letters, digits) keeps its surface. Words are joined by spaces, so espeak-ng keeps
+    the word boundaries and reads ー as length. Text is NFKC-normalized first (full-width digits).
+    """
+
+    def __init__(self) -> None:
+        try:
+            from importlib import metadata
+
+            import fugashi
+            import unidic_lite
+        except ImportError as error:
+            raise G2PUnavailable("Japanese G2P needs fugashi and unidic-lite "
+                                 "(qc.py runtimes setup --runtime onnx)") from error
+        self.name = f"fugashi-{metadata.version('fugashi')}+unidic-lite-{metadata.version('unidic-lite')}"
+        if self.name != JAPANESE_READER:
+            raise G2PUnavailable(f"the Japanese reader is {self.name}, pinned {JAPANESE_READER}")
+        dictionary = unidic_lite.DICDIR
+        self._tagger = fugashi.Tagger(f'-r "{os.path.join(dictionary, "mecabrc")}" -d "{dictionary}"')
+
+    def read(self, text: str) -> str:
+        words = []
+        for word in self._tagger(unicodedata.normalize("NFKC", text)):
+            pron = getattr(word.feature, "pron", None)
+            reading = (pron if pron and pron != "*" else word.surface).strip()
+            if reading:
+                words.append(reading)
+        return " ".join(words)
+
+
+def default_reader() -> JapaneseReader:
+    return JapaneseReader()
+
+
 def default_engine() -> EspeakLibrary | EspeakBinary:
     try:
         return EspeakLibrary()
@@ -117,11 +167,24 @@ def default_engine() -> EspeakLibrary | EspeakBinary:
 
 
 def g2p_key(text: str, language: str) -> str:
-    """The cache file stem: SHA-256 of the G2P model, version, language and text."""
+    """The cache file stem: SHA-256 of the G2P model, version, language and text (and, for
+    Japanese, the reader)."""
 
-    payload = common.canonical_json({"language": language, "model": G2P_MODEL_ID, "text": text,
-                                     "version": G2P_VERSION})
+    fields = {"language": language, "model": G2P_MODEL_ID, "text": text, "version": G2P_VERSION}
+    if language == "japanese":
+        fields["reader"] = JAPANESE_READER
+    payload = common.canonical_json(fields)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _reading(text: str, language: str, reader: Any) -> tuple[str | None, Any]:
+    """What espeak-ng reads instead of the text: the reader's kana for Japanese (raises
+    G2PUnavailable without a reader), None for every other language."""
+
+    if language != "japanese":
+        return None, None
+    reader = reader or default_reader()
+    return reader.read(text), reader
 
 
 def _ipa(engine: Any, text: str, language: str) -> str:
@@ -131,7 +194,7 @@ def _ipa(engine: Any, text: str, language: str) -> str:
 
 
 def g2p_record(text: str, language: str, *, cache_dir: Path | str | None = None, engine: Any = None,
-               compute: bool = True) -> dict[str, Any]:
+               compute: bool = True, reader: Any = None) -> dict[str, Any]:
     """The cached G2P record for (text, language), computing and caching it when allowed."""
 
     if language not in ESPEAK_VOICES:
@@ -145,32 +208,40 @@ def g2p_record(text: str, language: str, *, cache_dir: Path | str | None = None,
         pass
     if not compute:
         raise G2PCacheMiss(language)
+    reading, reader = _reading(text, language, reader)
     engine = engine or default_engine()
-    ipa = _ipa(engine, text, language)
+    ipa = _ipa(engine, text if reading is None else reading, language)
     words = [{"ipa": word, "phones": segment_ipa(word)} for word in ipa.split(" ") if word]
     words = [word for word in words if word["phones"]]
     record = {"schema": G2P_SCHEMA, "model": G2P_MODEL_ID, "g2pVersion": G2P_VERSION, "engine": engine.name,
               "engineVersion": getattr(engine, "version", None), "voice": ESPEAK_VOICES[language],
               "language": language, "text": text, "ipa": ipa, "words": words,
               "phones": [phone for word in words for phone in word["phones"]]}
+    if reading is not None:
+        record.update(reader=reader.name, reading=reading)
     common.write_json_atomic(path, record)
     return record
 
 
 def g2p(text: str, language: str, *, cache_dir: Path | str | None = None, compute: bool = True,
-        engine: Any = None) -> list[str]:
-    return list(g2p_record(text, language, cache_dir=cache_dir, compute=compute, engine=engine)["phones"])
+        engine: Any = None, reader: Any = None) -> list[str]:
+    return list(g2p_record(text, language, cache_dir=cache_dir, compute=compute, engine=engine,
+                           reader=reader)["phones"])
 
 
-def g2p_espeak(text: str, language: str, *, engine: Any = None) -> list[str]:
-    return segment_ipa(_ipa(engine or default_engine(), text, language))
+def g2p_espeak(text: str, language: str, *, engine: Any = None, reader: Any = None) -> list[str]:
+    if language not in ESPEAK_VOICES:
+        raise ValueError(f"unsupported language: {language!r}")
+    reading, _ = _reading(text, language, reader)
+    return segment_ipa(_ipa(engine or default_engine(), text if reading is None else reading, language))
 
 
-def run_g2p_job(job: Mapping[str, Any], *, engine: Any = None) -> int:
+def run_g2p_job(job: Mapping[str, Any], *, engine: Any = None, reader: Any = None) -> int:
     """Fill the G2P cache for a job's takes (and optional `texts`), then write each take's result.
 
-    `outputDir` is the G2P cache. A take without text gets the `text-missing` error; exit 0 when
-    every text and take succeeded, 1 otherwise, 2 when no engine is available.
+    `outputDir` is the G2P cache. A take without text gets the `text-missing` error. A Japanese
+    take without the reader gets no result at all, so the next run retries it. Exit 0 when every
+    text and take succeeded, 1 otherwise, 2 when no engine is available.
     """
 
     output_dir = Path(job["outputDir"])
@@ -184,15 +255,32 @@ def run_g2p_job(job: Mapping[str, Any], *, engine: Any = None) -> int:
         except G2PUnavailable as error:
             print(f"qc g2p: {error}", file=sys.stderr)
             return 2
+    unreadable: str | None = None
+    if reader is None and any(language == "japanese" for language, _ in pending):
+        try:
+            reader = default_reader()
+        except G2PUnavailable as error:
+            unreadable = str(error)
+            print(f"qc g2p: Japanese abstains: {error}", file=sys.stderr)
     failures = 0
+    unavailable: set[tuple[str, str]] = set()
     for count, (language, text) in enumerate(pending, start=1):
         try:
-            g2p_record(text, language, cache_dir=output_dir, engine=engine)
-        except (G2PUnavailable, ValueError, OSError, subprocess.SubprocessError) as error:
+            if language == "japanese" and unreadable:
+                raise G2PUnavailable(unreadable)
+            g2p_record(text, language, cache_dir=output_dir, engine=engine, reader=reader)
+        except G2PUnavailable as error:
+            failures += 1
+            unavailable.add((language, text))
+            if not (language == "japanese" and unreadable):
+                print(f"qc g2p: text {count} unavailable ({error})", file=sys.stderr)
+        except (ValueError, OSError, subprocess.SubprocessError) as error:
             failures += 1
             print(f"qc g2p: text {count} failed ({type(error).__name__})", file=sys.stderr)
         print(f"progress {count}/{len(pending)}", flush=True)
     for take in takes:
+        if (take.get("language"), take.get("text")) in unavailable:
+            continue  # an environment gap, not the take's result: nothing is cached
         variant = common.take_variant(take, depends=False)
         try:
             if not take.get("text"):

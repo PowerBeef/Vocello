@@ -15,7 +15,7 @@
 #                                                 # spoken content and gate on QC v2 (scripts/qc.py)
 #   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b]
 #                                  [--cells standard,clone,cross-lingual|long-form] [--label L]
-#                                                 # AQ-07 natural calibration takes (audio QC N3; vocello batch)
+#                                                 # QC v2 take pool (vocello batch), then qc.py run and queue
 #   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
@@ -1150,15 +1150,17 @@ PY
   note "lang-bench PASS · $artifacts"
 }
 
-# qc-takes: the AQ-07 natural calibration takes (audio QC population N3). One
-# `vocello batch` per planned (cell, language, voice, seed) batch over one split
-# of the committed CC0 script pool; the takes are calibration data, not a
-# benchmark, so nothing is published and no history record is written. The
+# qc-takes: the QC v2 take pool (natural takes for labelling and the listening
+# queue). One `vocello batch` per planned (cell, language, voice, seed) batch over
+# one split of the committed CC0 script pool; the takes are calibration data, not
+# a benchmark, so nothing is published and no history record is written. The
 # cells (config/audio-qc-calibration-takes.json) are standard (the default),
 # clone (Voice Clone on the extracted speaker corpora's reference clips),
 # cross-lingual and long-form (`vocello batch --long-form`, planned alone). A
 # failed batch stops only itself; every planned take without output is recorded
 # as missing, and the lane then exits non-zero with its artifacts preserved.
+# After generation, `qc.py run --lane qc-takes` scores the takes and `qc.py queue`
+# writes the listening queue; their summary joins the verdict.
 cmd_qc_takes() {
   local split="calibration" languages="" cells="" label=""
   while [[ $# -gt 0 ]]; do
@@ -1233,10 +1235,10 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
   python3 "$takes_tool" collect-diagnostics --diagnostics "$diag_root" --into "$run_diagnostics" --baseline \
     >/dev/null || die "qc-takes: the engine diagnostics baseline could not be recorded"
 
-  # Each short-form take keeps its codec trace (`vocello batch --capture-codec-trace`), the source of the
-  # class I COD-LOOP positives (qc-introspection). The engine writes it under the registered run id beside
-  # its diagnostics, and its row records the trace digest; the lane moves the run's traces into its own
-  # artifacts after the batches. Capture changes no sampled code or published sample.
+  # Each short-form take keeps its codec trace (`vocello batch --capture-codec-trace`) for engine
+  # introspection of a take the listening queue turns up. The engine writes it under the registered run
+  # id beside its diagnostics, and its row records the trace digest; the lane moves the run's traces into
+  # its own artifacts after the batches. Capture changes no sampled code or published sample.
   local trace_root="$diag_root/startup-reliability-evidence/$run_id"
   # The debug data context holds the benchmark models `require_mac_benchmark_models` checked.
   export QWENVOICE_DEBUG=1
@@ -1322,7 +1324,7 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
   unset QWENVOICE_DEBUG QWENVOICE_DIAGNOSTICS_MAX_MB QVOICE_MAC_BENCH_RUN_ID
   (( collect_fail == 0 )) \
     || warn "qc-takes: $collect_fail diagnostics collection(s) failed; their takes may carry no introspection"
-  # <generation id>/codec-trace-v1.bin per short-form take; the collected row binds each trace to its take
+  # <generation id>/codec-trace-v1.bin per short-form take; the collected row binds each to its take
   # (WAV digest -> generation id and trace digest).
   local traces_kept=0
   if [[ -d "$trace_root" ]]; then
@@ -1356,6 +1358,29 @@ limit = sum(1 for take in manifest["takes"] if take.get("status") == "failed"
 print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"],
       "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)), limit)' "$manifest")
   fi
+
+  # QC v2 over the generated takes (docs/reference/qc.md, lane qc-takes: every role
+  # but the LLM judge), then the listening queue of the 50 takes most worth hearing,
+  # which `qc.py label serve --batch <queue>` opens. The models run one at a time,
+  # cached by audio digest, so a rerun scores only new takes. QC v2 reports here; a
+  # failure to compute it never fails the generation verdict.
+  local qc_status="SKIPPED" qc_run="" qc_gate="none" qc_queue="none"
+  if (( manifest_st == 0 && validate_st == 0 )); then
+    qc_status="ERROR"
+    if qc_run="$(python3 "$SCRIPT_DIR/qc.py" run --takes "$artifacts" --lane qc-takes \
+        2> >(tee "$artifacts/logs/qc-run.log" >&2))" && [[ -n "$qc_run" ]]; then
+      qc_status="PASS"
+      qc_gate="$(python3 "$SCRIPT_DIR/qc.py" gate --lane qc-takes --run "$qc_run" 2>&1 | tail -n 1)" || true
+      if python3 "$SCRIPT_DIR/qc.py" queue --top 50 --run "$qc_run" --batch "queue-$qc_run" \
+          >"$artifacts/logs/qc-queue.log" 2>&1; then
+        qc_queue="queue-$qc_run"
+      else
+        warn "qc-takes: the QC v2 listening queue could not be written (see $artifacts/logs/qc-queue.log)"
+      fi
+    else
+      warn "qc-takes: QC v2 could not score the takes (see $artifacts/logs/qc-run.log)"
+    fi
+  fi
   {
     echo "qc-takes runID=$run_id split=$split${cells:+ cells=$cells}${label:+ label=$label}"
     echo "planned=$planned_count generated=$generated rejected=$rejected failed=$failed missing=$missing generation_limit=$limit"
@@ -1363,6 +1388,9 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
     echo "batches=$batch_total batch_fail=$batch_fail resumes=$batch_resumes"
     echo "manifest=$([[ $manifest_st -eq 0 ]] && echo PASS || echo FAIL)"
     echo "manifest_validation=$([[ $manifest_st -eq 0 && $validate_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "qc_v2=$qc_status run=${qc_run:-none}"
+    echo "qc_gate=$qc_gate"
+    echo "qc_queue=$qc_queue"
   } | tee "$artifacts/verdict.txt"
 
   if (( manifest_st != 0 || validate_st != 0 )); then

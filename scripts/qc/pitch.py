@@ -5,7 +5,7 @@ Pure numpy. Every function takes a pitch track as the runner `outputs` mapping o
 consensus track is used). Frame `i` of a track sits at `i * hopSeconds`; `None`, NaN and non-positive
 values are unvoiced.
 
-The two trackers (RMVPE and SwiftF0) are combined first: a frame counts only where both are voiced
+The two trackers (FCPE and SwiftF0) are combined first: a frame counts only where both are voiced
 and within 50 cents of each other. That removes the single-tracker octave errors and voicing drops
 that made pYIN report pitch "all over the place", while a real pitch change, seen by both trackers,
 survives. Semitones are relative to 100 Hz throughout.
@@ -491,11 +491,11 @@ def tone_runs(
     return ToneRun(start, end, median_hz, std, flatness, hnr, bool(detected), tone_like)
 
 
-def summarize(a: Any, b: Any, audio: np.ndarray | None = None, sr: int | None = None) -> dict[str, Any]:
-    """Every pitch feature of one take from its two tracks (RMVPE and SwiftF0 outputs), JSON-ready:
-    the agreement, the take median, the largest sustained shift, the octave jumps and the longest
-    tone run, all on the agreeing frames. The register offset needs the voice's other takes."""
-    agreement = agreeing_frames(a, b)
+def summarize(fcpe: Any, swiftf0: Any, audio: np.ndarray | None = None, sr: int | None = None) -> dict[str, Any]:
+    """Every pitch feature of one take from its two tracks (the FCPE and SwiftF0 runner outputs),
+    JSON-ready: the agreement, the take median, the largest sustained shift, the octave jumps and the
+    longest tone run, all on the agreeing frames. The register offset needs the voice's other takes."""
+    agreement = agreeing_frames(fcpe, swiftf0)
     return {
         "agreement": agreement.summary(),
         "takeMedianSt": take_median_semitones(agreement),

@@ -173,10 +173,10 @@ class ToneRunTests(unittest.TestCase):
 class SummaryTests(unittest.TestCase):
     def test_summary_of_two_runner_outputs_is_json_ready(self) -> None:
         f0 = intonation(1.0) + [730.0] * 60 + intonation(1.0)
-        rmvpe = {"hopSeconds": HOP, "f0Hz": f0, "confidence": [0.9] * len(f0)}
+        fcpe = {"hopSeconds": HOP, "f0Hz": f0, "confidence": [0.9] * len(f0)}
         swift = {"hopSeconds": 0.016, "f0Hz": [f0[int(round(i * 1.6))] for i in range(int(len(f0) / 1.6))]}
         audio = harmonic_voice(np.array(f0), SR, HOP)
-        summary = pitch.summarize(rmvpe, swift, audio, SR)
+        summary = pitch.summarize(fcpe, swift, audio, SR)
         json.dumps(summary, allow_nan=False)
         self.assertGreater(summary["agreement"]["agreeRatio"], 0.9)
         self.assertTrue(summary["toneRun"]["detected"])

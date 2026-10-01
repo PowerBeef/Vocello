@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""QC v2 signal and judge runners with stubbed models: the result schema each writes, RMVPE's numpy
-front end and decoding, and the llama.cpp judge's requests and parsing against a fake server."""
+"""QC v2 signal and judge runners with stubbed models: the result schema each writes, FCPE's
+decoding, and the llama.cpp judge's requests and parsing against a fake server."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import numpy as np
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
-from qc.runners import _kit, _llama, audiobox, redimnet, rmvpe, swiftf0, utmosv2  # noqa: E402
+from qc.runners import _kit, _llama, audiobox, fcpe, redimnet, swiftf0, utmosv2  # noqa: E402
 
 ROOT = SCRIPTS.parent
 SR = 24_000
@@ -161,83 +161,75 @@ class KitTests(RunnerCase):
             _kit.unit(np.zeros(4))
 
 
-class RmvpeTests(RunnerCase):
-    def test_mel_filterbank_matches_librosa_htk_slaney_shape(self) -> None:
-        basis = rmvpe.mel_filterbank()
-        self.assertEqual(basis.shape, (128, 513))
-        self.assertTrue((basis >= 0).all())
-        peaks = basis.argmax(axis=1)
-        self.assertTrue((np.diff(peaks) >= 0).all())
-        freqs = np.fft.rfftfreq(1024, 1 / 16_000)
-        self.assertGreaterEqual(freqs[peaks[0]], 25.0)
-        self.assertLessEqual(freqs[peaks[-1]], 8000.0)
-        # Slaney normalization: each triangle's area in Hz is about 1 (2 / band width * band width / 2).
-        areas = basis.sum(axis=1) * (16_000 / 1024)
-        self.assertTrue(np.allclose(areas, 1.0, atol=0.12))
-        self.assertAlmostEqual(float(areas[40:].mean()), 1.0, delta=0.01)
+FCPE_BINS = 360
+FCPE_TABLE = np.linspace(1200 * math.log2(32.70 / 10), 1200 * math.log2(1975.5 / 10), FCPE_BINS)
 
-    def test_log_mel_frames_and_padding(self) -> None:
-        audio = sine(1.0, 1000.0, 16_000)
-        mel = rmvpe.log_mel(audio)
-        self.assertEqual(mel.shape, (128, 16_000 // 160 + 1))
-        self.assertAlmostEqual(float(mel.min()), math.log(1e-5), places=3) if mel.min() < -11 else None
-        peak_band = int(mel[:, 50].argmax())
-        centers = rmvpe._mel_to_hz_htk(np.linspace(rmvpe._hz_to_mel_htk(30.0), rmvpe._hz_to_mel_htk(8000.0), 130))[1:-1]
-        self.assertLess(abs(centers[peak_band] - 1000.0), 60.0)
-        padded = rmvpe.pad_frames(mel)
-        self.assertEqual(padded.shape[1] % 32, 0)
-        self.assertTrue((padded[:, mel.shape[1]:] == 0).all())
 
-    def test_decode_uses_the_local_average_and_threshold(self) -> None:
-        hidden = np.zeros((3, 360), dtype=np.float32)
-        hidden[0, 100] = 0.9
-        hidden[1, 200] = 0.5
-        hidden[1, 201] = 0.5
-        hidden[2, 50] = 0.02  # below RVC's 0.03
-        f0, peak = rmvpe.decode(hidden)
-        self.assertAlmostEqual(f0[0], 10 * 2 ** ((20 * 100 + rmvpe.CENTS_OFFSET) / 1200), places=3)
-        self.assertAlmostEqual(f0[1], 10 * 2 ** ((20 * 200.5 + rmvpe.CENTS_OFFSET) / 1200), places=3)
+def fcpe_bin(hz: float) -> int:
+    return int(np.argmin(np.abs(FCPE_TABLE - 1200 * math.log2(hz / 10))))
+
+
+class StubFcpe:
+    """torchfcpe's salience for a steady `hz`, with the first `silent` frames below the threshold."""
+
+    def __init__(self, hz: float, silent: int = 10) -> None:
+        self.cent_table = FCPE_TABLE
+        self.threshold = fcpe.THRESHOLD
+        self.hz = hz
+        self.silent = silent
+        self.sizes: list[int] = []
+
+    def salience(self, audio: np.ndarray) -> np.ndarray:
+        self.sizes.append(audio.size)
+        frames = audio.size // fcpe.HOP + 2  # torchfcpe may return a frame more; the runner trims
+        latent = np.full((frames, FCPE_BINS), 0.001)
+        latent[:, fcpe_bin(self.hz)] = 0.8
+        latent[: self.silent, :] = 0.002
+        return latent
+
+
+class FcpeTests(RunnerCase):
+    def test_decode_follows_the_local_argmax_decoder_and_threshold(self) -> None:
+        latent = np.zeros((4, FCPE_BINS))
+        latent[0, 100] = 0.9
+        latent[1, 200] = latent[1, 201] = 0.5
+        latent[2, 50] = 0.005  # below torchfcpe's 0.006
+        latent[3, 0] = latent[3, 1] = 0.3  # the window clamps at the table's start
+        f0, peak = fcpe.decode(latent, FCPE_TABLE)
+        self.assertAlmostEqual(f0[0], 10 * 2 ** (FCPE_TABLE[100] / 1200), places=6)
+        self.assertAlmostEqual(f0[1], 10 * 2 ** ((FCPE_TABLE[200] + FCPE_TABLE[201]) / 2 / 1200), places=6)
         self.assertEqual(f0[2], 0.0)
-        self.assertAlmostEqual(float(peak[0]), 0.9, places=6)
+        clamped = (0.3 * FCPE_TABLE[0] * 5 + 0.3 * FCPE_TABLE[1]) / (0.3 * 6)
+        self.assertAlmostEqual(f0[3], 10 * 2 ** (clamped / 1200), places=6)
+        self.assertAlmostEqual(float(peak[0]), 0.9)
 
-    def test_runner_writes_the_pitch_schema_with_a_stub_session(self) -> None:
-        class Port:
-            def __init__(self, name: str) -> None:
-                self.name = name
-
-        class Session:
-            def __init__(self) -> None:
-                self.shapes = []
-
-            def get_inputs(self):
-                return [Port("input")]
-
-            def get_outputs(self):
-                return [Port("output")]
-
-            def run(self, names, feed):
-                mel = feed["input"]
-                self.shapes.append(mel.shape)
-                hidden = np.zeros((1, mel.shape[2], 360), dtype=np.float32)
-                bin_200hz = int(round((1200 * math.log2(200 / 10) - rmvpe.CENTS_OFFSET) / 20))
-                hidden[0, :, bin_200hz] = 0.8
-                hidden[0, :10, :] = 0.0  # silence first
-                return [hidden]
-
-        session = Session()
+    def test_runner_writes_the_pitch_schema_with_a_stub_model(self) -> None:
+        stub = StubFcpe(200.0)
         take = self.take("tone", sine(0.5, 200.0))
-        code = _kit.run_job(self.job("pitch.rmvpe", [take]), rmvpe.Model(session, rmvpe.THRESHOLD), rmvpe.process)
-        self.assertEqual(code, 0)
-        record = self.result(take)
-        outputs = record["outputs"]
+        self.assertEqual(_kit.run_job(self.job("pitch.fcpe", [take]), stub, fcpe.process), 0)
+        self.assertEqual(stub.sizes, [8_000])  # resampled to 16 kHz
+        outputs = self.result(take)["outputs"]
         self.assert_pitch_schema(outputs, 0.01)
-        self.assertEqual(len(outputs["f0Hz"]), 16_000 // 2 // 160 + 1)
-        self.assertEqual(session.shapes[0][1], 128)
-        self.assertEqual(session.shapes[0][2] % 32, 0)
+        self.assertEqual(len(outputs["f0Hz"]), 8_000 // 160 + 1)
         self.assertIsNone(outputs["f0Hz"][0])
-        self.assertAlmostEqual(outputs["f0Hz"][20], 200.0, delta=3.0)
-        self.assertEqual(outputs["threshold"], 0.03)
-        self.assertAlmostEqual(record["durationSeconds"], 0.5, places=3)
+        self.assertAlmostEqual(outputs["f0Hz"][20], 200.0, delta=6.0)
+        self.assertEqual(outputs["confidence"][20], 0.8)
+        self.assertEqual((outputs["threshold"], outputs["fminHz"], outputs["fmaxHz"]), (0.006, 40.0, 1100.0))
+
+    def test_frames_outside_40_to_1100_hz_are_unvoiced(self) -> None:
+        for hz in (35.0, 1500.0):
+            outputs = fcpe.pitch_outputs(np.array([hz, 730.0]), np.array([0.9, 0.9]))
+            self.assertEqual(outputs["f0Hz"], [None, 730.0])
+
+    def test_checkpoint_is_found_in_the_model_directory_first(self) -> None:
+        model_dir = self.root / "model"
+        fetched = model_dir / "torchfcpe/assets/fcpe_c_v001.pt"
+        fetched.parent.mkdir(parents=True)
+        fetched.write_bytes(b"")
+        self.assertEqual(fcpe.find_checkpoint(model_dir, {}), fetched)
+        other = model_dir / "custom.pt"
+        other.write_bytes(b"")
+        self.assertEqual(fcpe.find_checkpoint(model_dir, {"modelFile": "custom.pt"}), other)
 
 
 class SwiftF0Tests(RunnerCase):

@@ -1,12 +1,13 @@
 """SwiftF0 pitch on onnxruntime (CPU): `<onnx python> -m qc.runners.swiftf0 --job <job.json>`.
 
 SwiftF0 (`lars76/swift-f0`, MIT; PyPI `swift-f0` 0.3 with its `model.onnx` bundled) makes the fewest
-octave errors of the trackers benchmarked with RMVPE. The 0.3 API is `SwiftF0(threads=...).detect(audio,
-sample_rate, fmin, fmax)`; it works at 16 kHz with a 256-sample hop, frame `k` centered on sample
-`k * 256` (16 ms), and a frame is voiced when its confidence is at least 0.5. The runner resamples to
-16 kHz itself (the package needs the LGPL `soxr` extra otherwise), asks for the full supported range
-46.875-2093.75 Hz, and reports `confidence` with unvoiced frames as null. A `model.onnx` fetched
-into the model directory (hash-verified by `qc.py models verify`) replaces the bundled copy.
+octave errors of the trackers benchmarked; FCPE is its partner tracker. The 0.3 API is
+`SwiftF0(threads=...).detect(audio, sample_rate, fmin, fmax)`; it works at 16 kHz with a 256-sample
+hop, frame `k` centered on sample `k * 256` (16 ms), and a frame is voiced when its confidence is at
+least 0.5. The runner resamples to 16 kHz itself (the package needs the LGPL `soxr` extra
+otherwise), asks for the full supported range 46.875-2093.75 Hz, and reports `confidence` with
+unvoiced frames as null. A `model.onnx` fetched into the model directory (hash-verified by
+`qc.py models verify`) replaces the bundled copy.
 """
 from __future__ import annotations
 

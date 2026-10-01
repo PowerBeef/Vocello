@@ -1,4 +1,4 @@
-"""Shared plumbing for the QC v2 signal and judge runners (RMVPE, SwiftF0, ReDimNet, UTMOSv2,
+"""Shared plumbing for the QC v2 signal and judge runners (FCPE, SwiftF0, ReDimNet, UTMOSv2,
 Audiobox, the llama.cpp judges): the job file, WAV input, resampling, the variant key and atomic
 result writes, as the runner protocol in the QC v2 contract defines them.
 

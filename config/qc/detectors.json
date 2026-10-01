@@ -62,7 +62,9 @@
       {"name": "phones.deletion_rate", "direction": "higher"},
       {"name": "phones.repeat_runs", "direction": "higher"},
       {"name": "phones.low_gop_run", "direction": "higher"},
-      {"name": "asr.edit_rate_min", "direction": "higher"}]},
+      {"name": "asr.edit_rate_min", "direction": "higher"}],
+     "provisional": {"any": [{"feature": "phones.repeat_runs", "op": ">=", "value": 2},
+                             {"feature": "phones.insertion_rate", "op": ">=", "value": 0.2}]}},
     {"id": "boundary.cutoff", "class": "cutoff", "method": "logistic", "features": [
       {"name": "phones.last_word_coverage", "direction": "lower"},
       {"name": "align.last_word_ratio", "direction": "lower"},

@@ -606,7 +606,8 @@ def align_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, F
 # --- phones ----------------------------------------------------------------------
 
 PHONE_FEATURES = ("phones.deletion_rate", "phones.repeat_runs", "phones.low_gop_run", "phones.last_word_coverage",
-                  "phones.gop_mean", "phones.substitution_rate", "phones.l1_substitutions")
+                  "phones.gop_mean", "phones.substitution_rate", "phones.l1_substitutions", "phones.per",
+                  "phones.insertion_rate")
 
 
 def expected_phones(take: dict[str, Any], results: dict[str, Any], layout: store.Layout,
@@ -673,6 +674,11 @@ def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.
         (span["start"], span["end"]) if span else _op_span(deleted[:1])))
     out["phones.substitution_rate"] = feature(found.get("substitutionRate"),
                                               *_op_span(op for op in ops if op["op"] == "sub"))
+    out["phones.per"] = feature(found.get("per"))
+    bursts = found.get("insertionBursts") or []
+    burst = max(bursts, key=lambda run: run["count"], default=None)
+    out["phones.insertion_rate"] = feature(found.get("insertionRate"), burst.get("start") if burst else None,
+                                           burst.get("end") if burst else None)
     repeats = found.get("repeatRuns") or []
     longest = max(repeats, key=lambda run: run.get("n", 1) * run.get("copies", 2), default=None)
     out["phones.repeat_runs"] = feature(found.get("repeatCount", len(repeats)),

@@ -106,6 +106,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 - `pause.anomalous`: the gap is over 0.5 s, and the mute test did not find words in it.
 - `boundary.abrupt-end`: the drop is over 30 dB within 60 ms, with a tail under 50 ms.
 - `level.loudness`: the loudness is more than 4 LU from −23 LUFS, or the true peak is above −1 dBTP.
+- `content.phoneme`: at least 2 repeated-syllable runs, or a phone insertion rate of at least 0.2. Against espeak-ng, ZIPA measured fr-0101--dylan at 4 runs and 0.275, and a clean en-0008--ryan at 0 and 0.
 
 The rules live in `detectors.json`, not in a thresholds file, so a fit never has to carry them.
 

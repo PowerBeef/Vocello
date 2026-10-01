@@ -227,6 +227,29 @@ class ModelFeatureTests(unittest.TestCase):
         cut = run("l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d")
         self.assertEqual(cut["phones.last_word_coverage"]["value"], 0.5)  # the last word lost its /e/
 
+    def test_content_phoneme_flags_dylan_from_the_measured_phone_comparison(self):
+        """The lead's ZIPA-against-espeak measurements on the real takes (2026-10-01)."""
+
+        def measured(per, insertion, repeats):
+            runs = [{"start": 1.0 + index, "end": 1.3 + index, "n": 2, "copies": 2, "phones": ["b", "r"]}
+                    for index in range(repeats)]
+            return {"ops": [], "features": {"per": per, "insertionRate": insertion, "deletionRate": 0.05,
+                                            "substitutionRate": per - insertion - 0.05, "repeatRuns": runs,
+                                            "repeatCount": repeats, "insertionBursts": [], "deletionRuns": [],
+                                            "lowGopSpans": [], "meanGop": None}}
+
+        results = {"g2p": self.result({"phones": ["a"], "words": []}), "phones": self.result({"phones": []})}
+        detector = by_id("content.phoneme")
+        for name, comparison, expected in (("fr-0101--dylan", measured(0.475, 0.275, 4), 1.0),
+                                           ("en-0008--ryan", measured(0.103, 0.0, 0), 0.0)):
+            stub = types.SimpleNamespace(compare=lambda *args, comparison=comparison, **kwargs: comparison,
+                                         normalize_phone=lambda phone: [phone], normalize=lambda items: list(items))
+            with mock.patch.object(features, "phones", stub):
+                values = features.phone_features(self.take(takeID=name), results, Layout(), {}, config()["params"])
+            self.assertEqual(values["phones.repeat_runs"]["value"], comparison["features"]["repeatCount"])
+            self.assertEqual(values["phones.insertion_rate"]["value"], comparison["features"]["insertionRate"])
+            self.assertEqual(detectors.score(detector, values, "french", None, {})["score"], expected, name)
+
     def test_phone_features_need_both_inputs(self):
         results = {"phones": self.result({"phones": self.heard(("l", 0.1))})}
         # No G2P result and no G2P cache entry: the phone features stay unavailable.

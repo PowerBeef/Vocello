@@ -1,0 +1,70 @@
+{
+  "alpha": 0.05,
+  "bindings": {
+    "calibrationScoresSHA256": "504a23afdde11bde5f295c63588bdc7b93032ecee0487f108faf7fcdf84bcdad",
+    "detectorDefinitionSHA256": "87f6d847163f63568357b375622e843617b8e3a0dca2c068ed501304aa13ce9f",
+    "evidenceIdentitySHA256": "12312d32c5d13dfa52d88eb2182b2005b0c32a1e8acf00695d8a957f54376667",
+    "injectionCatalogSeed": "7",
+    "injectionClasses": "E",
+    "injectionSamplePerCell": "150",
+    "injectionSampleSeed": "1",
+    "injectionSchedule": "2",
+    "injectorCatalogVersion": "3",
+    "operatingPoint": "warn",
+    "policySHA256": "811f83494c2573cd7fbfaedfea6260cc172f4c62abadfd89368d5b97e9c31514",
+    "scoringCodeSHA256": "b443b122df31a4aa369f626191023c1831bd25d0db145f828d2af0ac0387e374"
+  },
+  "confidence": 0.95,
+  "detector": "identity.window-drift@1",
+  "direction": "above",
+  "grid": [],
+  "population": "N2",
+  "rule": "split-conformal",
+  "schema": "vocello.audioqc.preregistration/1",
+  "split": {
+    "calibration": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "efc0efc2306671e65b222917cbd831d14d58152e57e346829f17f990d38ae09d",
+      "source": "speaker-corpora-v1-calibration"
+    },
+    "confirmation": {
+      "kind": "audio-qc-n2-cohort",
+      "manifestDigest": "02ccee35215e5844c1f46e39b3b4f40d31635321a94ee2ce7a6e09e09c506079",
+      "source": "speaker-corpora-v1-confirmation"
+    },
+    "disjointBy": [
+      "family",
+      "script",
+      "speaker"
+    ],
+    "limitations": [
+      {
+        "id": "speaker-corpora-v1",
+        "statement": "FLEURS publishes no speaker ids, so class E fits and confirms on the speaker cohort (role set speaker-labeled-n2: speaker-corpora-v1-calibration, then speaker-corpora-v1-confirmation), which audio_qc_corpora.py cohort --source speaker builds from the speaker group of config/audio-qc-corpora.json under the maintainer's decision of 2026-09-30 (anonymous same- and different-speaker trials, outputs never published; never speaker identification). Each language reads one corpus: LibriTTS-R dev.clean and test.clean (English), Multilingual LibriSpeech (German, French, Spanish, Italian, Portuguese), the AISHELL-3 test subset (Chinese) and Zeroth-Korean (Korean), all read speech, resynthesized to N2. A take has a transcript and 4-30 s of audio, at most 10 per speaker; the splits are disjoint by speaker (a seeded split within each corpus) and by script, and on the extraction of 2026-09-30 every language holds 167 to 580 families from 22 to 58 speakers per split, above the warn floors (60 scored families and 3 speakers per language). CREMA-D (no transcript, 1-5 s acted clips) and Emozionalmente (Italian reads Multilingual LibriSpeech, so a donor never differs from its source by recording channel) serve no cohort. The negatives are read speech: FAR on conversational or expressive speech is not measured."
+      },
+      {
+        "id": "speaker-reference-clip",
+        "statement": "The speaker judges score a take only against a reference clip: another utterance of the same speaker for a corpus take, the clone's reference in the clone lane (panel_jobs: needs_reference). The orchestrator embeds it only when the manifest names it (a calibration take's or entry's reference: its WAV path and digest); without one CAM++ reports no similarity and the take abstains (no-value), and the calibration refuses evidence measured against another clip than the declared one."
+      },
+      {
+        "id": "speaker-reference-n2",
+        "statement": "Each cohort take is scored against another take of its speaker in the same split, with another script (the cohort's seeded reference choice), and the N2 manifest names that take's resynthesis, so both sides carry the codec, as an impostor is scored against its N2 source take. The clone lane scores a generated take against the user's raw recording, so its similarity also carries the clone's own shortfall and the codec on one side only: these thresholds bound FAR on pairs of human codec speech, and clone takes stay informational (n3-clone-takes)."
+      },
+      {
+        "id": "speaker-gender-unlabelled",
+        "statement": "IDN-IMPOSTOR and the recorded IDN-SWAP and IDN-ONSET splices draw donors of the source's language and gender, and LibriTTS-R and Zeroth-Korean publish no speaker gender (no pinnable source on the allowed hosts; a gender is never guessed), so English and Korean takes neither receive nor give such a positive (Korean also has no word intervals for a splice: aligner-excludes-korean). Their FAR is bounded like every language's, but those cells are drawn from German, French, Spanish, Italian, Portuguese and Chinese; IDN-SHIFT, which needs no donor, is drawn in every language. English and Korean sensitivity is therefore measured through IDN-SHIFT only (clone-similarity) and not at all for the drift detectors: a lane should read it as report-only there."
+      }
+    ],
+    "method": "declared-cohorts",
+    "speakers": {
+      "claim": "identified",
+      "unit": "corpus-speaker"
+    }
+  },
+  "strata": [
+    {
+      "name": "language",
+      "reason": "Speaker-verification scores shift with language: both speaker families train on VoxCeleb, which is mostly English, and the audit draws impostors from the same language first (section 4.3)."
+    }
+  ]
+}

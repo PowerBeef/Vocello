@@ -27,17 +27,17 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`boundary.run-on@2`](detectors/boundary.run-on-v2.md) | C (boundary) | no plan | not qualified | - | - | - | - | - | - |
 | [`language.consensus-lid@1`](detectors/language.consensus-lid-v1.md) | D (language) | confirmed (qualified) | qualified (warn) | 200/3718 (0.054), upper 0.060 | english 19/236 (0.081), upper 0.137 | 150/150 (1.000), lower 0.980 | 0/3718 (0.000), upper 0.001 | 3718 / 150 / 150 | [record-67b4358cc9d3e121.json](../../../benchmarks/audio-qc-calibration/language.consensus-lid@1/record-67b4358cc9d3e121.json) |
 | [`language.nativeness@1`](detectors/language.nativeness-v1.md) | D (language) | no plan | not qualified | - | - | - | - | - | - |
-| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
-| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
-| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | no plan | not qualified | - | - | - | - | - | - |
+| [`identity.clone-similarity@1`](detectors/identity.clone-similarity-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`identity.window-drift@1`](detectors/identity.window-drift-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`identity.onset-drift@1`](detectors/identity.onset-drift-v1.md) | E (identity) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
 | [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
-| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | no plan | not qualified | - | - | - | - | - | - |
-| [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
-| [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
-| [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | no plan | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
+| [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
 
 ## Lane gates

@@ -43,9 +43,12 @@ Registry entry `prosody.pitch-instability@1` in [config/audio-qc-detectors.json]
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; no plan.
+**Status.** Not qualified; planned, not confirmed.
 
-**Plan.** None committed under [config/audio-qc-preregistrations/](../../../../config/audio-qc-preregistrations).
+**Plan.** [config/audio-qc-preregistrations/prosody.pitch-instability@1.json](../../../../config/audio-qc-preregistrations/prosody.pitch-instability@1.json): digest `c679ae3740eb5101`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N3; injector catalog 3, classes F, 150 per cell.
+Calibration cohort audio-qc-calibration-takes (vocello-takes-calibration, manifest `9482435d54f16582`); confirmation cohort audio-qc-calibration-takes (vocello-takes-confirmation, manifest `20211aeea93a0abd`).
+
+**Confirmation.** Not run: no ledger entry.
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
 <!-- END GENERATED audio-qc-docs:qualification -->

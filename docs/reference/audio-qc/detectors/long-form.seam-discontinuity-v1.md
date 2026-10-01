@@ -41,9 +41,12 @@ Registry entry `long-form.seam-discontinuity@1` in [config/audio-qc-detectors.js
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; no plan.
+**Status.** Not qualified; planned, not confirmed.
 
-**Plan.** None committed under [config/audio-qc-preregistrations/](../../../../config/audio-qc-preregistrations).
+**Plan.** [config/audio-qc-preregistrations/long-form.seam-discontinuity@1.json](../../../../config/audio-qc-preregistrations/long-form.seam-discontinuity@1.json): digest `fafb1f4c5be36ace`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N3; injector catalog 3, classes J, 150 per cell.
+Calibration cohort audio-qc-calibration-takes (vocello-long-form-calibration, manifest `4a141aaae38fc373`); confirmation cohort audio-qc-calibration-takes (vocello-long-form-confirmation, manifest `8366ac9b9b2368d5`).
+
+**Confirmation.** Not run: no ledger entry.
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
 <!-- END GENERATED audio-qc-docs:qualification -->

@@ -48,9 +48,12 @@ Excludes russian: The speaker group of config/audio-qc-corpora.json has no corpu
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; no plan.
+**Status.** Not qualified; planned, not confirmed.
 
-**Plan.** None committed under [config/audio-qc-preregistrations/](../../../../config/audio-qc-preregistrations).
+**Plan.** [config/audio-qc-preregistrations/identity.onset-drift@1.json](../../../../config/audio-qc-preregistrations/identity.onset-drift@1.json): digest `48a8ea0ff03938b2`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N2; injector catalog 3, classes E, 150 per cell.
+Calibration cohort audio-qc-n2-cohort (speaker-corpora-v1-calibration, manifest `efc0efc2306671e6`); confirmation cohort audio-qc-n2-cohort (speaker-corpora-v1-confirmation, manifest `02ccee35215e5844`).
+
+**Confirmation.** Not run: no ledger entry.
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
 <!-- END GENERATED audio-qc-docs:qualification -->

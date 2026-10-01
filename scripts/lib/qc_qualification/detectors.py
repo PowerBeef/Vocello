@@ -19,7 +19,18 @@ names the engine whose output each reads). pYIN's frame track gives
 50 ms apart, `longestOctaveDisplacementSeconds`, the longest run of voiced
 frames an octave's worth (9 semitones or more) from the take's median F0, and
 `pitchJumpsPerVoicedSecond`, the rate of F0 changes faster than a voice moves
-(class F). A speaker judge's 2 s windows give `seamWindowCosineMinimum`, the
+(class F, version 1). Version 2 of class F reads the same track inside the
+speech band (`PITCH_BAND_HZ`: pYIN's floor readings on creak and noise and its
+readings near the ceiling count as unvoiced) and across pYIN's voicing gaps:
+its 64 ms frame straddles both pitches of a large step, so the step shows as
+several unvoiced frames between two level segments, which the v1 reductions,
+comparing voiced frames at most 50 ms apart, rarely bridge.
+`pitchLevelStepsPerVoicedSecond` counts the level steps of 8 semitones or more
+between segments at most 160 ms apart, `longestOctaveRiseSeconds` measures the
+longest chain of frames 9 to 15 semitones above the median of the second around
+them (upward only: pYIN's subharmonic errors read downward), and
+`maxBandPitchStepSemitones` is v1's 50 ms step inside the band. A speaker
+judge's 2 s windows give `seamWindowCosineMinimum`, the
 lowest cosine between the windows either side of a long-form seam, which
 also reads the take's seam times (`score_take(..., seams=...)`; class J).
 A `raw-output` component of a deterministic DSP instrument (a `dsp`
@@ -95,6 +106,7 @@ a later occurrence.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import math
 from pathlib import Path
@@ -137,6 +149,9 @@ RAW_MEASURES = {
     "maxPitchStepSemitones": "pyin-librosa",
     "longestOctaveDisplacementSeconds": "pyin-librosa",
     "pitchJumpsPerVoicedSecond": "pyin-librosa",
+    "pitchLevelStepsPerVoicedSecond": "pyin-librosa",
+    "longestOctaveRiseSeconds": "pyin-librosa",
+    "maxBandPitchStepSemitones": "pyin-librosa",
     "seamWindowCosineMinimum": "wespeaker-onnx",
 }
 # Raw-output measures that also read the take's seam times (`score_take(..., seams=...)`), and the
@@ -153,6 +168,29 @@ OCTAVE_DISPLACEMENT_SEMITONES = 9.0
 # voiced speech than the minimum has no rate.
 PITCH_JUMP_SEMITONES_PER_SECOND = 150.0
 PITCH_JUMP_MINIMUM_VOICED_SECONDS = 1.0
+# Class F version 2. A voiced frame outside the speech band counts as unvoiced: below it, pYIN's readings at
+# its 50 Hz floor on creak and noise; above it, debris near its 1 kHz ceiling on fricatives and breath.
+PITCH_BAND_HZ = (60.0, 800.0)
+# pYIN's HMM moves F0 at most 4.3 semitones per frame, so a step it tracks is a ramp of frames each at least
+# this far from the one before: a level segment ends there and at every unvoiced frame, and a segment
+# shorter than the minimum (a ramp, voicing-edge debris) is dropped.
+PITCH_RAMP_SEMITONES = 1.5
+PITCH_SEGMENT_MINIMUM_FRAMES = 4
+# Two level segments at most this far apart (the frames between them unvoiced, out of band or dropped) meet
+# at a junction, whose step is the median of the later segment's first frames minus the median of the
+# earlier one's last frames: pYIN's 64 ms frame straddles both pitches of a large step and loses voicing over
+# it for 50-120 ms.
+PITCH_JUNCTION_REACH_SECONDS = 0.16
+PITCH_JUNCTION_EDGE_FRAMES = 3
+# A level step: 8 semitones or more, above the 6-7 semitone steps clean read speech shows across short voicing
+# gaps (PRS-ERRATIC steps by 8 at moderate and 14 at severe).
+PITCH_LEVEL_STEP_SEMITONES = 8.0
+# An octave rise: frames this many semitones above the median of the in-band voiced frames within the
+# reference reach on either side, chained across unvoiced gaps up to the chain gap; a voiced frame that does
+# not rise ends the chain.
+OCTAVE_RISE_SEMITONES = (9.0, 15.0)
+OCTAVE_REFERENCE_SECONDS = 1.0
+OCTAVE_CHAIN_GAP_SECONDS = 0.25
 DIRECTIONS = ("above", "below")
 CLASSES = tuple("ABCDEFGHIJ")
 STAGES = (0, 1, 2)
@@ -933,6 +971,121 @@ def pitch_jump_rate(output: Mapping[str, Any]) -> float | None:
     return events / voiced_seconds
 
 
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+def _band_frames(output: Mapping[str, Any]) -> tuple[float, list[tuple[int, float]]] | None:
+    """`_pitch_frames` without the voiced frames outside `PITCH_BAND_HZ` (class F version 2)."""
+    track = _pitch_frames(output)
+    if track is None:
+        return None
+    hop, frames = track
+    low, high = (12.0 * math.log2(hertz) for hertz in PITCH_BAND_HZ)
+    return hop, [(frame, tone) for frame, tone in frames if low <= tone <= high]
+
+
+def _level_segments(frames: Sequence[tuple[int, float]]) -> list[list[tuple[int, float]]]:
+    """Runs of consecutive frames whose frame-to-frame change stays below `PITCH_RAMP_SEMITONES`, at least
+    `PITCH_SEGMENT_MINIMUM_FRAMES` long."""
+    segments: list[list[tuple[int, float]]] = []
+    current: list[tuple[int, float]] = []
+    for frame, tone in frames:
+        if current and (frame != current[-1][0] + 1 or abs(tone - current[-1][1]) >= PITCH_RAMP_SEMITONES):
+            segments.append(current)
+            current = []
+        current.append((frame, tone))
+    if current:
+        segments.append(current)
+    return [segment for segment in segments if len(segment) >= PITCH_SEGMENT_MINIMUM_FRAMES]
+
+
+def pitch_level_step_rate(output: Mapping[str, Any]) -> float | None:
+    """Level steps per voiced second: junctions between in-band level segments at most
+    `PITCH_JUNCTION_REACH_SECONDS` apart whose step is `PITCH_LEVEL_STEP_SEMITONES` or more, over the take's
+    in-band voiced seconds (class F version 2).
+
+    A step is the median of the later segment's first `PITCH_JUNCTION_EDGE_FRAMES` frames minus the median of
+    the earlier one's last frames, so a level shift counts once whether pYIN ramps across it or drops voicing
+    over it, and a frame of voicing-edge debris moves neither median. Intonation glides inside a segment and
+    never makes a junction. None with less than a second of in-band voiced speech.
+    """
+    track = _band_frames(output)
+    if track is None:
+        return None
+    hop, frames = track
+    voiced_seconds = len(frames) * hop
+    if voiced_seconds < PITCH_JUMP_MINIMUM_VOICED_SECONDS:
+        return None
+    reach = int(math.floor(PITCH_JUNCTION_REACH_SECONDS / hop + 1e-9))
+    edge = PITCH_JUNCTION_EDGE_FRAMES
+    segments = _level_segments(frames)
+    steps = 0
+    for earlier, later in zip(segments, segments[1:]):
+        if later[0][0] - earlier[-1][0] - 1 > reach:
+            continue
+        step = _median([tone for _, tone in later[:edge]]) - _median([tone for _, tone in earlier[-edge:]])
+        if abs(step) >= PITCH_LEVEL_STEP_SEMITONES:
+            steps += 1
+    return steps / voiced_seconds
+
+
+def longest_octave_rise(output: Mapping[str, Any]) -> float | None:
+    """The longest chain, in voiced seconds, of in-band frames 9 to 15 semitones above the median of the
+    in-band voiced frames within `OCTAVE_REFERENCE_SECONDS` of each (class F version 2).
+
+    An unvoiced gap of at most `OCTAVE_CHAIN_GAP_SECONDS` continues a chain, a voiced frame that does not rise
+    ends it. The reference includes the frame itself, so a rise that fills most of the voiced frames around it
+    becomes its own reference and no longer rises: the score reads register jumps shorter than about a second,
+    against the take's own register around them. Only upward rises count: pYIN's
+    subharmonic errors on creak and low energy read a frame an octave low, and a rise beyond 15 semitones is
+    tracker debris, not a register. 0.0 when no frame rises; None without an in-band voiced frame.
+    """
+    track = _band_frames(output)
+    if track is None or not track[1]:
+        return None
+    hop, frames = track
+    reach = int(math.floor(OCTAVE_REFERENCE_SECONDS / hop + 1e-9))
+    gap = int(math.floor(OCTAVE_CHAIN_GAP_SECONDS / hop + 1e-9))
+    low, high = OCTAVE_RISE_SEMITONES
+    positions = [frame for frame, _ in frames]
+    tones = [tone for _, tone in frames]
+    longest = run = 0
+    previous = None
+    for frame, tone in frames:
+        first = bisect.bisect_left(positions, frame - reach)
+        last = bisect.bisect_right(positions, frame + reach)
+        if low <= tone - _median(tones[first:last]) <= high:
+            run = run + 1 if previous is not None and frame - previous - 1 <= gap else 1
+            previous = frame
+            longest = max(longest, run)
+        else:
+            run, previous = 0, None
+    return longest * hop
+
+
+def max_band_pitch_step(output: Mapping[str, Any]) -> float | None:
+    """`max_pitch_step` over the in-band voiced frames (class F version 2): the largest F0 change, in
+    semitones, between two in-band voiced frames at most 50 ms apart. None without two such frames that
+    close."""
+    track = _band_frames(output)
+    if track is None:
+        return None
+    hop, frames = track
+    reach = int(math.floor(PITCH_STEP_WINDOW_SECONDS / hop + 1e-9))
+    best = None
+    for position, (frame, tone) in enumerate(frames):
+        earlier = position - 1
+        while earlier >= 0 and frame - frames[earlier][0] <= reach:
+            step = abs(tone - frames[earlier][1])
+            if best is None or step > best:
+                best = step
+            earlier -= 1
+    return best
+
+
 def _cosine(first: Sequence[Any], second: Sequence[Any]) -> float | None:
     a, b = [_finite(value) for value in first], [_finite(value) for value in second]
     if not a or len(a) != len(b) or any(value is None for value in (*a, *b)):
@@ -974,6 +1127,9 @@ RAW_REDUCERS = {
     "maxPitchStepSemitones": max_pitch_step,
     "longestOctaveDisplacementSeconds": longest_octave_displacement,
     "pitchJumpsPerVoicedSecond": pitch_jump_rate,
+    "pitchLevelStepsPerVoicedSecond": pitch_level_step_rate,
+    "longestOctaveRiseSeconds": longest_octave_rise,
+    "maxBandPitchStepSemitones": max_band_pitch_step,
 }
 SEAM_REDUCERS = {"seamWindowCosineMinimum": seam_window_cosine_minimum}
 

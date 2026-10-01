@@ -856,6 +856,36 @@ class NewClassRegistryTests(unittest.TestCase):
         self.assertEqual(detectors.target_injectors(instability), {"PRS-ERRATIC"})
         self.assertEqual(detectors.declared_cells(instability), {"T1-pcm-construction": {"PRS-ERRATIC/severe"}})
 
+    def test_class_f_version_2_reads_the_band_track_and_confirms_on_unscored_cohorts(self) -> None:
+        expected = {
+            "prosody.pitch-instability@2": ("PRS-ERRATIC", "pitchLevelStepsPerVoicedSecond", "n3-takes-fresh", "N3"),
+            "prosody.octave-jump@2": ("PRS-OCT", "longestOctaveRiseSeconds", "fleurs-reserve-4-n2", "N2"),
+            "prosody.pitch-break@2": ("PRS-BRK", "maxBandPitchStepSemitones", "fleurs-reserve-4-n2", "N2"),
+        }
+        for detector, (injector, measure, role_set, population) in expected.items():
+            entry = self.entry(detector)
+            self.assertEqual((entry["class"], entry["stage"], entry["populations"]), ("F", 1, role_set), detector)
+            self.assertEqual(detectors.judges_of(entry), [PYIN])
+            self.assertEqual([component["measure"] for component in detectors.components_of(entry)], [measure])
+            self.assertEqual(detectors.RAW_MEASURES[measure], "pyin-librosa")
+            self.assertTrue(detectors.needs_raw(entry))
+            self.assertEqual(detectors.strata_by(entry), "language")
+            self.assertEqual(detectors.declared_cells(entry), {"T1-pcm-construction": {f"{injector}/severe"}})
+            roles = detectors.role_set(self.registry, entry)
+            self.assertEqual((roles["fit"]["population"], roles["confirmNegatives"]["population"]),
+                             (population, population))
+            # Version 1 fits on the same calibration corpus; its confirmation spent the old confirmation corpus,
+            # so version 2 confirms on a cohort no plan has scored, pending (plan refuses) until it exists.
+            self.assertEqual(roles["fit"], detectors.role_set(self.registry, self.entry(detector[:-1] + "1"))["fit"])
+            self.assertEqual(calibration.pending_corpora(roles),
+                             [f"confirmNegatives ({roles['confirmNegatives']['corpus']})"])
+        # A fourth reserve cohort confirms at warn; reserve-3 stays held back for a fail point.
+        self.assertEqual(self.registry["roleSets"]["fleurs-reserve-4-n2"]["confirmNegatives"]["failCorpus"],
+                         "fleurs-reserve-3")
+
+    def test_every_role_set_has_a_cohort_rule(self) -> None:
+        self.assertLessEqual(set(self.registry["roleSets"]), set(calibration.COHORT_RULES))
+
     def test_a_dsp_instrument_scores_alone_only_through_its_raw_output(self) -> None:
         # pYIN does not vote: its L2 metric through a `panel` component would make it a family's vote.
         def panel_metric(entry, _):
@@ -1076,6 +1106,101 @@ class NewClassScoringTests(unittest.TestCase):
         self.assertEqual(detectors.score_take(entry, "english", measurements={}, raw={PYIN: erratic})["abstain"],
                          "not-measured")
         self.assertEqual(rate(erratic, "dutch")["abstain"], "out-of-scope")
+
+    def test_level_steps_bridge_pyin_voicing_gaps(self) -> None:
+        pitch = {PYIN: {"status": "complete", "metrics": {"voicedFraction": 0.8}}}
+        entry = self.entry("prosody.pitch-instability@2")
+
+        def rate(track: dict) -> dict:
+            return detectors.score_take(entry, "english", measurements=pitch, raw={PYIN: track})
+
+        def tone(semitones: float) -> float:
+            return 200.0 * 2 ** (semitones / 12)
+
+        # Erratic pitch: ten 200 ms spans 14 semitones apart, pYIN unvoiced for 70 ms over every step. Version 1
+        # never compares across the gap; version 2 counts 9 steps over 2 voiced seconds.
+        spans: list = []
+        for index in range(10):
+            spans.extend([(None, 7)] if index else [])
+            spans.append((tone(7) if index % 2 else tone(-7), 20))
+        erratic = self.track(*spans)
+        self.assertEqual(detectors.pitch_jump_rate(erratic), 0.0)
+        self.assertAlmostEqual(rate(erratic)["score"], 9 / 2.0, places=9)
+        self.assertAlmostEqual(detectors.raw_measure("pitchLevelStepsPerVoicedSecond", erratic), rate(erratic)["score"],
+                               places=9)
+        # A level step counts from 8 semitones: a fifth (7) does not, 8.5 does.
+        self.assertEqual(rate(self.track((200.0, 60), (None, 3), (tone(7), 60)))["score"], 0.0)
+        self.assertAlmostEqual(rate(self.track((200.0, 60), (None, 3), (tone(8.5), 60)))["score"], 1 / 1.2,
+                               places=9)
+        # A step pYIN ramps across (3.5 semitones per frame) is one step between the levels it joins.
+        ramped = self.track((200.0, 60), (tone(3.5), 1), (tone(7.0), 1), (tone(10.5), 60))
+        self.assertAlmostEqual(rate(ramped)["score"], 1 / 1.22, places=9)
+        # Intonation glides inside a segment: 12 semitones in 300 ms is no step.
+        glide = self.track((200.0, 50), *[(tone(0.4 * frame), 1) for frame in range(1, 30)], (tone(12.0), 50))
+        self.assertEqual(rate(glide)["score"], 0.0)
+        # An octave error pYIN holds for 150 ms is two steps (into it and out): the per-language thresholds
+        # carry pYIN's own error rate.
+        self.assertAlmostEqual(rate(self.track((200.0, 50), (100.0, 15), (200.0, 50)))["score"], 2 / 1.15, places=9)
+        # Readings at pYIN's 50 Hz floor are out of band: no step, where version 1 counts a jump.
+        floored = self.track((200.0, 60), (52.0, 3), (200.0, 60))
+        self.assertGreater(detectors.pitch_jump_rate(floored), 0.0)
+        self.assertEqual(rate(floored)["score"], 0.0)
+        # Segments more than 160 ms apart never meet.
+        self.assertEqual(rate(self.track((tone(7), 60), (None, 17), (tone(-7), 60)))["score"], 0.0)
+        self.assertAlmostEqual(rate(self.track((tone(7), 60), (None, 16), (tone(-7), 60)))["score"], 1 / 1.2,
+                               places=9)
+        # Less than a second of in-band voiced speech, or only floor readings: abstain.
+        self.assertEqual(rate(self.track((None, 50), (200.0, 99)))["abstain"], "no-value")
+        self.assertEqual(rate(self.track((52.0, 300)))["abstain"], "no-value")
+
+    def test_octave_rise_reads_short_upward_register_jumps(self) -> None:
+        pitch = {PYIN: {"status": "complete", "metrics": {"voicedFraction": 0.8}}}
+        entry = self.entry("prosody.octave-jump@2")
+
+        def rise(track: dict) -> dict:
+            return detectors.score_take(entry, "english", measurements=pitch, raw={PYIN: track})
+
+        # An octave held for 300 ms between unvoiced edges, pYIN's voicing dropping inside it too: the chain
+        # bridges the gaps (0.3 voiced seconds), where version 1's run ends at the first unvoiced frame.
+        jumped = self.track((200.0, 100), (None, 8), (400.0, 15), (None, 5), (400.0, 15), (None, 8), (200.0, 100))
+        self.assertAlmostEqual(rise(jumped)["score"], 0.3, places=9)
+        self.assertAlmostEqual(detectors.longest_octave_displacement(jumped), 0.15, places=9)
+        self.assertAlmostEqual(detectors.raw_measure("longestOctaveRiseSeconds", jumped), rise(jumped)["score"],
+                               places=9)
+        # A subharmonic dip (pYIN's octave-low error), a fifth, and debris 19 semitones up are no rise.
+        for hertz in (100.0, 200.0 * 2 ** (7 / 12), 200.0 * 2 ** (19 / 12)):
+            self.assertEqual(rise(self.track((200.0, 100), (hertz, 30), (200.0, 100)))["score"], 0.0, hertz)
+        # A register that holds becomes its own reference: no rise.
+        self.assertEqual(rise(self.track((200.0, 50), (400.0, 300), (200.0, 50)))["score"], 0.0)
+        # The rise of a 450 Hz voice leaves the speech band (pitch-speech-band).
+        self.assertEqual(rise(self.track((450.0, 100), (900.0, 30), (450.0, 100)))["score"], 0.0)
+        # A voiced frame that does not rise ends the chain; an unvoiced gap over 250 ms ends it too.
+        self.assertAlmostEqual(rise(self.track((200.0, 100), (400.0, 10), (200.0, 1), (400.0, 20),
+                                               (200.0, 100)))["score"], 0.2, places=9)
+        self.assertAlmostEqual(rise(self.track((200.0, 100), (400.0, 10), (None, 26), (400.0, 20),
+                                               (200.0, 100)))["score"], 0.2, places=9)
+        # No in-band voiced frame: abstain.
+        self.assertEqual(rise(self.track((52.0, 100)))["abstain"], "no-value")
+        self.assertEqual(rise(self.track((None, 100)))["abstain"], "no-value")
+
+    def test_band_pitch_step_ignores_pyin_floor_readings(self) -> None:
+        pitch = {PYIN: {"status": "complete", "metrics": {"voicedFraction": 0.8}}}
+        entry = self.entry("prosody.pitch-break@2")
+
+        def step(track: dict) -> dict:
+            return detectors.score_take(entry, "english", measurements=pitch, raw={PYIN: track})
+
+        # Three frames at pYIN's floor inside a steady vowel: version 1 reads a 23 semitone step, version 2 none.
+        floored = self.track((200.0, 50), (52.0, 3), (200.0, 50))
+        self.assertGreater(detectors.max_pitch_step(floored), 23.0)
+        self.assertEqual(step(floored)["score"], 0.0)
+        # A 7 semitone break reached over two frames scores 7 semitones, as in version 1.
+        broken = self.track((200.0, 50), (250.0, 1), (200.0 * 2 ** (7 / 12), 49))
+        self.assertAlmostEqual(step(broken)["score"], 7.0, places=6)
+        self.assertAlmostEqual(detectors.raw_measure("maxBandPitchStepSemitones", broken), step(broken)["score"],
+                               places=9)
+        # Without two in-band voiced frames 50 ms apart: abstain.
+        self.assertEqual(step(self.track((52.0, 100), (200.0, 1)))["abstain"], "no-value")
 
     def test_introspection_scores_and_abstentions(self) -> None:
         loop, entropy, eos = (self.entry(detector) for detector in (

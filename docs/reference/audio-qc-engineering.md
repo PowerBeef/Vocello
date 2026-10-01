@@ -2109,7 +2109,8 @@ of jumps no voice makes (about twice the fastest F0 change a speaker produces), 
 intonation that glides stays a negative. It therefore fits and confirms on natural takes (role set
 `n3-takes`, FLEURS read speech informational) and a construction that shifts many short spans
 (PRS-ERRATIC, catalog version 3); take plan version 2's clone cell brings Voice Clone takes into both
-splits, as negatives (`n3-clone-takes`). Window drift is the identity half of the
+splits, as negatives (`n3-clone-takes`). Version 2 of the three class F detectors (2026-10-01) reads
+pYIN's track across its voicing gaps; see "Class F version 2" below. Window drift is the identity half of the
 same complaint. Creak is not registered: catalog v2 has no
 creak construction (the audit builds one with WORLD, which the catalog lacks), and no voice-quality
 measure has passed its oracle ladder.
@@ -3342,6 +3343,100 @@ python3 scripts/audio_qc_lane_gates.py evaluate --lane language-bench --takes <r
   --bundle <run>/audio-qc/panel-bundle --measurements <run>/audio-qc/stage0/measurements.json \
   --output <run>/audio-qc/gates-replay.json
 ```
+
+### Class F version 2: pitch measures across pYIN's voicing gaps (AQ-07, 2026-10-01)
+
+The three class F refusals of 2026-10-01 measured catalog 3's shifter. With catalog 4's positives the v1
+measures still miss them, for a reason in the tracker. pYIN's 64 ms frame straddles both pitches of a
+large step, so it drops voicing over the step for 50-120 ms instead of ramping across it: on catalog-4
+PRS-ERRATIC severe, a sign change typically shows 6 to 8 unvoiced frames. The v1 reductions compare voiced
+frames at most 50 ms apart, so they never see those steps. The catalog-4 caveat is real but minor. On
+100 severe sources, 127 of 1,154 voiced +7 semitone spans read -5 (the subharmonic), and 20 of 1,163
+voiced -7 spans read +5. Most steps form as labelled.
+
+**Pilot (calibration data only).** No confirmation data exists for v2, and none was read:
+
+- **Sources.** A seeded sample (seed 20261001) of the N3 calibration split of 2026-09-30 (2,370 takes)
+  and the derived FLEURS reserve-1 N2 cohort (2,262 takes; 1,976 have usable aligner intervals,
+  exported read-only from the panel's cache).
+- **Positives.** Built with the catalog-4 injectors (catalog seed 7, the calibration set's per-take
+  seed). PRS-ERRATIC on 150 N3 and 50 N2 sources at severe, with mild, moderate and the sham on a subset;
+  PRS-OCT and PRS-BRK on 100 N2 sources at severe and 40 for each other variant.
+- **pYIN.** The judge's own runtime and configuration on the canonical 16 kHz derivative (800 clips).
+  On spot checks the canonical digests and tracks of clean takes matched the cohort's exports exactly.
+- **Thresholds.** Per-language split-conformal thresholds at alpha 0.05, one score per family. Families
+  are split into two folds by hash; every clean family and every positive is judged against the other
+  fold's thresholds (a positive goes with its source's family). Lower bounds are one-sided
+  Clopper-Pearson at 95%.
+
+The table gives the held-out clean false-alarm rate and detection per cell. PRS-ERRATIC's mild and
+moderate cells count 40 N3 and 20 N2 clips and its sham 20 each; the other cells count 40:
+
+| Detector and measure | Negatives | Clean FAR (worst language) | Severe (lower bound) | Moderate | Mild | Sham |
+|---|---|---|---|---|---|---|
+| `pitch-instability@1` jumps per voiced second | N3 | 107/2346, 0.046 (fr 14/238) | 9/150 (0.03) | 10/40 | 8/40 | 2/20 |
+| `pitch-instability@1` | N2 | 103/2211, 0.047 (fr 15/226) | 4/50 (0.03) | 9/20 | 2/20 | 1/20 |
+| **`pitch-instability@2`** level steps per voiced second | N3 | 92/2341, 0.039 (pt 13/239) | **131/150 (0.82)** | 29/40 | 6/40 | 1/20 |
+| `pitch-instability@2` | N2 | 97/2183, 0.044 (it 12/223) | 49/50 (0.91) | 16/20 | 3/20 | 4/20 |
+| `octave-jump@1` run 9 st from the take's median | N2 | 96/2223, 0.043 (fr 13/226) | 3/100 (0.01) | 1/40 | 1/40 | 1/40 |
+| **`octave-jump@2`** upward octave chain | N2 | 85/2215, 0.038 (pt 13/210) | **61/100 (0.52)** | 11/40 | 2/40 | 2/40 |
+| `pitch-break@1` largest 50 ms step | N2 | 111/2223, 0.050 (de 23/259) | 27/100 (0.20) | 3/40 | 3/40 | 2/40 |
+| **`pitch-break@2`** largest in-band 50 ms step | N2 | 111/2214, 0.050 (de 23/259) | **29/100 (0.22)** | 2/40 | 2/40 | 1/40 |
+
+A sham passes the whole take through the shifter at 0 semitones, and every sham scored exactly what its
+source take scores: the N2 PRS-ERRATIC sham's 4 of 20 are its sources' own clean alarms. Other candidates
+tried on the same data, at their best setting:
+
+| Defect | Candidate | Severe |
+|---|---|---|
+| Erratic pitch | Rate of sustained steps of 3-4 semitones between 3-4 frame medians | 0-4 of 50 per population |
+| Erratic pitch | Level steps after folding octave-displaced segments back (a 14 semitone step folds to 2) | 9-25/50 N3, 19-34/50 N2 |
+| Erratic pitch | Level steps excluding near-octave steps (within 1 semitone of 12) | 32/50 N3: a 14 semitone step often reads 13 |
+| Erratic pitch | Level steps of 10 semitones or more (reach 120-200 ms) | 131-136/150 N3, but 9-14/40 at moderate |
+| Octave jump | Run 9 semitones from a local (±0.5-1 s) median, either direction | 12-21/100 |
+| Octave jump | Plateau entered, or entered and left, by a 7-9 semitone step (reach 80-250 ms), with or without the speech band | 7-35/100 |
+| Octave jump | Plateau against the median of its context (upward only at best); frame chain either direction | 0-59/100; 29-51/100 |
+| Pitch break | Median-smoothed, gap-bridged, trimmed or level-to-level step; opposite-step bump; plateau height; displaced 5-9.5 semitone chain | 3-29/100 |
+
+**Chosen measures.** All three read pYIN's track inside a speech band of 60-800 Hz (`PITCH_BAND_HZ`).
+Below the band lie pYIN's readings at its 50 Hz floor on creak and noise, above it debris near its
+ceiling; in clean takes both formed displaced runs of 0.3 s and more.
+
+- **`prosody.pitch-instability@2`, `pitchLevelStepsPerVoicedSecond`.** The track is cut into level
+  segments at every unvoiced frame and every frame-to-frame change of 1.5 semitones or more, and segments
+  under 40 ms are dropped. Two segments at most 160 ms apart meet at a junction, whose step compares the
+  medians of their facing three frames. The score counts steps of 8 semitones or more per in-band voiced
+  second. Intonation glides inside a segment. The 8 semitone floor lies above the fifths that read speech
+  steps by across short voicing gaps. A held octave error counts twice (in and out); the per-language
+  thresholds carry pYIN's own error rate.
+- **`prosody.octave-jump@2`, `longestOctaveRiseSeconds`.** The longest chain of frames 9 to 15
+  semitones above the median of the voiced frames within 1 s, bridging unvoiced gaps up to 250 ms. A
+  register that holds becomes its own reference. Only upward rises count: pYIN's subharmonic errors read
+  frames an octave low (`octave-rise-upward-only`). The pilot misses the A3 bar. PRS-OCT shifts a fixed
+  span in the middle of the longest word whatever its voicing: 9 of 100 severe spans lie where the source
+  is unvoiced, and pYIN loses voicing over about 15 more. This caps the cell near 0.75
+  (`octave-unvoiced-spans`).
+- **`prosody.pitch-break@2`, `maxBandPitchStepSemitones`.** v1's 50 ms step inside the band; no
+  candidate did better. PRS-BRK's severe step is a fifth (7 semitones), and read speech crosses short
+  voicing gaps by steps that size: FLEURS reserve-1 holds 423 junctions of 6-10.5 semitones across
+  20-40 ms gaps between segments of 60 ms or more. The per-language thresholds therefore sit at 6.5-7.8
+  semitones (`pitch-break-fifth-steps`). The version exists so that a plan can bind catalog 4, and a
+  plan is expected to be refused.
+
+**Cohorts.** Each v1 confirmed on its role set's confirmation corpus, so the v2s name new role sets whose
+confirmation corpus is `pending-` until it exists; `plan` refuses them until then:
+
+- `n3-takes-fresh` fits on the take plan's calibration split again (its pYIN export exists, so the
+  calibration scores need no model) and confirms on a new N3 confirmation split. That split has never
+  been scored and is disjoint by family, speaker and script from both v2 splits, with new scripts and
+  clone reference speakers (`n3-confirmation-renewed`).
+- `fleurs-reserve-4-n2` fits on reserve-1 and confirms on a fourth script-disjoint FLEURS reserve
+  cohort, which the corpora registry does not extract yet; reserve-3 stays held back for a fail point
+  (`fleurs-reserve-4-pending`).
+
+Only `pitch-instability@2` clears the pilot bar. Its confirmation needs the new N3 split
+(`qc-takes`), a pYIN panel over it and over its class F injection set, and the usual plan-first order.
+The registry then names the split in `roleSets.n3-takes-fresh`.
 
 ### Speech/defect calibration: independent references, no required listening
 

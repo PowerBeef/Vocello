@@ -35,7 +35,8 @@ the ids at plan and confirm time:
   a fail point. Every reserve cohort past the first is a confirmation split,
   never scored for calibration or information, and a FLEURS corpus a
   confirmed plan scored is refused as any new plan's confirmation, whichever
-  resynthesis of it the plan names (A5).
+  resynthesis of it the plan names (A5). `fleurs-reserve-4-n2` fits on
+  reserve-1 and confirms on a fourth reserve cohort (pending until extracted).
 - `speaker-labeled-n2`: N2 (or N1) of a speaker-labelled corpus, the N1
   manifest naming its `split` (calibration or confirmation), its `corpus` and
   each recording's `speaker`; disjoint by family, speaker and script. The
@@ -46,7 +47,9 @@ the ids at plan and confirm time:
 - `n3-takes`, `n3-codec-trace`, `n3-controlled-generation`: the two splits of
   the N3 take plan (`audio_qc_calibration_takes.py`), disjoint by family (script
   x voice x seed), speaker (a Built-in speaker or a Voice Design brief, never
-  shared across splits) and script (the pool's split).
+  shared across splits) and script (the pool's split). `n3-takes-fresh` fits on
+  the calibration split and confirms on a new, never-scored confirmation split
+  (pending until generated).
 - `n3-long-form`: long-form N3 takes (the take plan's `long-form` cell), each
   carrying a `longForm` block with at least one seam; disjoint as N3.
 
@@ -272,9 +275,11 @@ TAKES_RULE = CohortRule("vocello-takes", frozenset({N3_KIND}), False, ("family",
 COHORT_RULES = {
     "fleurs-n2": FLEURS_RULE,
     "fleurs-reserve-n2": FLEURS_RULE,
+    "fleurs-reserve-4-n2": FLEURS_RULE,
     "accent-natural-n2": FLEURS_RULE,
     "speaker-labeled-n2": SPEAKER_LABELED_RULE,
     "n3-takes": TAKES_RULE,
+    "n3-takes-fresh": TAKES_RULE,
     "n3-codec-trace": TAKES_RULE,
     "n3-controlled-generation": TAKES_RULE,
     "n3-long-form": replace(TAKES_RULE, name="vocello-long-form", long_form=True),

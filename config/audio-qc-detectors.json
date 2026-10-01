@@ -47,6 +47,20 @@
       "shams": {"population": "S", "cohort": "confirmation"},
       "informational": ["N2"]
     },
+    "n3-takes-fresh": {
+      "fit": {"population": "N3", "cohort": "calibration", "corpus": "vocello-takes-calibration"},
+      "confirmNegatives": {"population": "N3", "cohort": "confirmation", "corpus": "pending-vocello-takes-confirmation-2"},
+      "positives": {"population": "P1", "cohort": "confirmation"},
+      "shams": {"population": "S", "cohort": "confirmation"},
+      "informational": ["N2"]
+    },
+    "fleurs-reserve-4-n2": {
+      "fit": {"population": "N2", "cohort": "calibration", "corpus": "fleurs-reserve-1"},
+      "confirmNegatives": {"population": "N2", "cohort": "confirmation", "corpus": "pending-fleurs-reserve-4", "failCorpus": "fleurs-reserve-3"},
+      "positives": {"population": "P1", "cohort": "confirmation"},
+      "shams": {"population": "S", "cohort": "confirmation"},
+      "informational": ["N3", "N1"]
+    },
     "n3-long-form": {
       "fit": {"population": "N3", "cohort": "calibration", "corpus": "vocello-long-form-calibration"},
       "confirmNegatives": {"population": "N3", "cohort": "confirmation", "corpus": "vocello-long-form-confirmation"},
@@ -77,6 +91,12 @@
     "n3-no-labels": "A measure that exists only on generated takes (the talker's introspection, long-form seams) has no N2 to confirm on: a codec round trip samples no token and joins no segment, so its fit and confirmation negatives are N3 alone (audit section 5.7), the two splits of config/audio-qc-calibration-takes.json disjoint by family, speaker and script. N3 carries no defect labels, so a flag rate f bounds the false-alarm rate only as f / (1 - pi_max), where pi_max is the largest defect prevalence admitted (section 5.1). Each language stratum needs at least 60 scored families in each split (the calibration split plans 80 per language).",
     "n3-expressive-negatives": "The negatives are natural Vocello takes (N3: the product's expressive variation, Built-in and Voice Design voices), so natural expressive speech is a negative, as the maintainer's report of erratic pitch in Voice Clone takes needs; a threshold fitted on FLEURS read speech (N2, informational here) would flag expressive intonation. N3 carries no labels, so the flag rate bounds the false-alarm rate only as f / (1 - pi_max) (audit section 5.1), and a fail bound still needs an expressive N2 corpus (the audit's expressive N1, section 5.7). Each language stratum needs at least 60 scored families in each split of the take plan (the calibration split plans 80 per language).",
     "n3-clone-takes": "Version 2 of the take plan (config/audio-qc-calibration-takes.json) adds a clone cell to both N3 splits: Voice Clone takes on human reference clips of the pinned speaker corpora, 80 per language per split, each reference speaker in one split only. The maintainer hears erratic pitch in exactly those takes, and N3 carries no labels, so the fit counts every clone take as clean: an erratic clone take raises the threshold instead of alarming, and the confirmation split's flag rate bounds the false-alarm rate only as f / (1 - pi_max).",
+    "n3-confirmation-renewed": "The take plan's confirmation split is spent for class F: prosody.pitch-instability@1 confirmed on it on 2026-10-01, with PRS-ERRATIC positives built on its takes. Role set n3-takes-fresh fits on the calibration split again and confirms on a new N3 confirmation split that has never been scored, disjoint by family, speaker and script from both splits of take plan version 2 (a new take plan version with its own scripts and clone reference speakers: regenerating the old split's scripts and seeds would replay spent material). The registry names it pending- until it is generated, so plan refuses the role set until then.",
+    "fleurs-reserve-4-pending": "FLEURS reserve-2 is spent (the reserve plans of 2026-09-30 confirmed on it, prosody.pitch-break@1 and prosody.octave-jump@1 among them) and reserve-3 is held back for a fail point. Role set fleurs-reserve-4-n2 fits on reserve-1 again and confirms on a fourth reserve cohort, script-disjoint from the first three, which config/audio-qc-corpora.json does not extract yet (its fleurs-train extract declares 3 cohorts). The registry names it pending- until the maintainer extracts and resynthesizes it, so plan refuses the role set until then.",
+    "pitch-speech-band": "Class F version 2 reads pYIN's voiced frames between 60 and 800 Hz only (detectors.py PITCH_BAND_HZ); a voiced frame outside the band counts as unvoiced. Below the band lie pYIN's readings at its 50 Hz floor on creak and noise, above it debris near its 1 kHz ceiling on fricatives and breath; on the calibration cohorts (the N3 takes and FLEURS reserve-1 N2) both formed displaced runs of 0.3 s and more in clean takes. A voice outside the band is not measured: an octave rise of a voice above 400 Hz leaves it, and a take with too little in-band voicing abstains (no-value).",
+    "octave-rise-upward-only": "prosody.octave-jump@2 scores rises only. pYIN's subharmonic errors on creak and low energy read clean frames an octave low, and no frame-track measure tells them from a downward jump of the same span, so a downward octave jump (PRS-OCT's down-moderate variant, which is no target) is not scored.",
+    "octave-unvoiced-spans": "PRS-OCT shifts a fixed span in the middle of the longest aligned word, whatever its voicing. In the pilot of 2026-10-01 (100 severe positives built on catalog 4 from FLEURS reserve-1 N2), 9 spans lay where the source track has fewer than 3 voiced frames, and pYIN lost voicing over about 15 more of the shifted spans. About a quarter of the severe cell therefore carries no rise the frame track can read, which bounds its detection near 0.75 whatever the threshold; the pilot reached 0.61 at alpha 0.05 (lower 95% bound 0.52, below A3's 0.70).",
+    "pitch-break-fifth-steps": "PRS-BRK steps 7 semitones at severe, a fifth, and clean read speech steps that far across short voicing gaps: on FLEURS reserve-1 N2, 423 junctions between level segments of 60 ms or more, across gaps of 20-40 ms, step 6 to 10.5 semitones. The per-language thresholds at alpha 0.05 therefore sit at 6.5-7.8 semitones, and the pilot of 2026-10-01 detected 29 of 100 severe positives (v1's measure 27). None of the pilot's candidates separated the cell (median-smoothed, gap-bridged, trimmed, plateau-height and displaced-chain steps: 3 to 29 of 100). This version exists so that a plan can bind catalog 4; such a plan is expected to be refused (A3) until a construction steps further or another instrument reads the break.",
     "n3-long-form-cell": "Class J's negatives are the take plan's long-form cell (version 2): 80 projects per split, 8 per language, pool scripts joined to 330-480 planner units (about 30 to 110 s) so the apps' long-form planner splits each at least once, spoken by the split's standard voices through vocello batch --long-form. Each take carries the assembly as its longForm block (seams and the assembler's boundary jump). One pooled threshold over each split's 80 families (the warn floor is 60), the two splits disjoint by family, speaker and script (role set n3-long-form); a script may recur in a few projects of its split.",
     "digital-silence-only": "The score counts exact digital silence (PCM16 zeros) only: a quiet but nonzero gap or tail (room tone, codec silence tokens, an attenuated span) is not scored, so a generated pause or tail that merely runs long is outside this detector. The legacy Fast QC v8 silence flags keep reporting those (A10), and SIG-DROP's attenuated variant is no target.",
     "pcm-measures-python-only": "The pcmMeasures block is measured by the calibration scorer (scripts/lib/qc_qualification/pcm_measures.py, audio_qc_calibration_set.py score) over the persisted PCM16, not inside the engine: until a Swift mirror joins the Stage 0 observations the app's own takes carry no such field, so the detector serves the evidence lanes that run the scorer. An N1 recording is measured after its resampling, which smooths flat tops and zero runs.",
@@ -108,6 +128,7 @@
     "pyin-raw-track-export": "The panel bundle keeps pYIN's whole-take L2 statistics only; its frame track (f0Hz, voiced, hopSeconds) stays in the orchestrator's L1 cache. audio_qc_calibration_set.py raw-outputs --judge pitch.pyin@1 exports it per take from the panel's cache root, and scores --raw-outputs binds each track to the take's audio and pYIN's output identity and passes it to score_take as raw; a take whose entry the cache no longer holds is an evidence gap. pYIN is not among the six judges the v1 confirmation panels run, so a class F panel adds it and keeps its cache root until the export.",
     "pyin-transition-limit": "pYIN's HMM caps F0 transitions at 35.92 octaves per second (4.3 semitones per 10 ms frame), so a step spreads over two or three frames or loses voicing briefly; the step measure compares voiced frames up to 50 ms apart for that reason, and a break across a longer unvoiced gap is missed.",
     "korean-no-word-positives": "PRS-BRK and PRS-OCT act inside the longest aligned word, and the aligner is out of scope for Korean, so Korean takes carry no positives: the Korean stratum's threshold is fitted and its false alarms bounded on Korean negatives, while its detection rate is the other languages'.",
+    "pyin-voicing-gaps": "pYIN's 64 ms frame straddles both pitches of a large step, so it often drops voicing over the step for 50-120 ms instead of ramping across it (catalog-4 PRS-ERRATIC severe: typically 6 to 8 unvoiced frames at a sign change). Version 1's reductions compare voiced frames at most 50 ms apart and missed most of those steps (pilot of 2026-10-01: 9 of 150 severe N3 positives). The version 2 measures bridge gaps up to 160 ms (level steps) or 250 ms (octave chains): a step across a longer gap is not compared, and a pause shorter than the reach joins two words' levels, which the per-language thresholds absorb.",
     "introspection-rows-kept": "The engine's introspection summary reaches a take through its diagnostics row, which the engine front-trims at its log cap. The qc-takes lane marks the rows present before it starts, raises the cap (QWENVOICE_DIAGNOSTICS_MAX_MB=64), copies each vocello batch's new rows (generation id, WAV digest, Fast QC flag names, failure code and introspection numbers) into its diagnostics/ directory, and audio_qc_calibration_takes.py manifest --diagnostics binds each take to the row whose samplingWAVDigest is its WAV digest; verdict.txt reports the bound count. A take still without its row abstains (no-value); the 2026-09-27 cohort, generated before the lane kept its rows, bound 251 of its 791 takes.",
     "codec-loop-construction": "COD-LOOP@1 (T2, audit section 5.2; construction catalog 1, scripts/lib/qc_qualification/codec_trace.py) repeats 4, 12 or 32 codec frames (0.32, 0.96 or 2.56 s) once, all 16 codebooks, at a seeded start in the middle 60% of a confirmation take's recorded codec trace (the same start for every variant of a take), and vocello bench --codec-loop decodes it on the codec replay's full arm (the production non-streaming 25-frame schedule and window), then the production output limiter and the publication marking; the untouched trace is its sham. The copies are exact in every codebook, while a talker loop repeats codebook 0 and samples the acoustic codebooks anew: codebook 0, which the score reads, is exact in both, but a detector that reads the audio would hear a cleaner loop than a natural one. The qc-takes lane keeps each short-form take's trace since 2026-09-30, so only a confirmation cohort generated since then has sources (scripts/macos_test.sh qc-introspection).",
     "introspection-from-trace": "A T2 positive never runs the talker, so its summary is the Python mirror over the looped codebook-0 trace (audio_qc_observations.introspection_summary, which audio_qc_introspection_positives.py loop-set writes into the entry): the cycle fields are exact, but entropy and EOS need the talker's logits, so the entry records no observed step and only the loop detector reads T2 positives. The negatives' summaries come from the engine; the two sides agree exactly on integers (config/audio-qc-stage0-observations.json), and loop-plan refuses a source trace whose codebook 0 does not reproduce its take's own engine summary.",
@@ -651,6 +672,60 @@
       "populations": "n3-takes",
       "limitations": ["n3-expressive-negatives", "n3-clone-takes"],
       "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export"]
+    },
+    {
+      "id": "prosody.pitch-instability@2",
+      "class": "F",
+      "stage": 1,
+      "measures": "Level steps per voiced second, reduced from pYIN's frame track inside the speech band (60-800 Hz). The track is cut into level segments at every unvoiced frame and every frame-to-frame change of 1.5 semitones or more (pYIN's ramp across a step), segments shorter than 40 ms are dropped, and two segments at most 160 ms apart meet at a junction whose step is the median of the later segment's first three frames minus the median of the earlier one's last three. Junctions that step 8 semitones or more, either way, are counted over the take's in-band voiced seconds. A pitch that jumps from span to span scores high whether pYIN ramps across a jump or drops voicing over it, while intonation glides inside a segment; 8 semitones lies above the 6-7 semitone steps read speech takes across short voicing gaps. A take with less than 1 s of in-band voiced speech abstains.",
+      "score": {"combination": "single", "unit": "events-per-second", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "pitchLevelStepsPerVoicedSecond"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-ERRATIC", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-ERRATIC", "mechanism": "T1-pcm-construction"}],
+      "populations": "n3-takes-fresh",
+      "limitations": ["n3-expressive-negatives", "n3-clone-takes", "n3-confirmation-renewed", "pitch-speech-band"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "pyin-voicing-gaps"]
+    },
+    {
+      "id": "prosody.octave-jump@2",
+      "class": "F",
+      "stage": 1,
+      "measures": "The longest chain, in voiced seconds, of pYIN frames inside the speech band (60-800 Hz) that sit 9 to 15 semitones above the median of the in-band voiced frames within 1 s of each; an unvoiced gap of up to 250 ms continues a chain, and a voiced frame that does not rise ends it. An octave jump lifts a span of speech about 12 semitones above the register around it, whether pYIN's voicing breaks at its edges or inside it. Rises only: pYIN's subharmonic errors read frames an octave low, and a rise beyond 15 semitones is tracker debris. A take without an in-band voiced frame abstains.",
+      "score": {"combination": "single", "unit": "seconds", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "longestOctaveRiseSeconds"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-OCT", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-OCT", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-reserve-4-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech", "fleurs-reserve-4-pending", "pitch-speech-band", "octave-rise-upward-only", "octave-unvoiced-spans"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "pyin-voicing-gaps", "korean-no-word-positives"]
+    },
+    {
+      "id": "prosody.pitch-break@2",
+      "class": "F",
+      "stage": 1,
+      "measures": "The largest F0 change, in semitones, between two pYIN voiced frames inside the speech band (60-800 Hz) at most 50 ms apart: version 1's step without pYIN's floor and ceiling readings, kept because no other candidate of the 2026-10-01 pilot read PRS-BRK's 7 semitone step better. A take without two in-band voiced frames that close abstains.",
+      "score": {"combination": "single", "unit": "semitones", "groups": [
+        {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"],
+         "components": [{"source": "raw-output", "judge": "pitch.pyin@1", "measure": "maxBandPitchStepSemitones"}]}
+      ]},
+      "direction": "above",
+      "strata": {"by": "language", "reason": "Lexical tone (zh) and pitch accent (ja) move F0 faster within a syllable than intonation does in the other languages, so each language is its own clean distribution."},
+      "scope": {"languages": ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"], "exclusions": []},
+      "targets": [{"injectorID": "PRS-BRK", "severities": ["severe"], "mechanism": "T1-pcm-construction"}],
+      "shams": [{"injectorID": "PRS-BRK", "mechanism": "T1-pcm-construction"}],
+      "populations": "fleurs-reserve-4-n2",
+      "limitations": ["fleurs-reserve-no-speaker-ids", "fleurs-speaker-lower-bound", "n2-one-codec", "n2-read-speech", "fleurs-reserve-4-pending", "pitch-speech-band", "pitch-break-fifth-steps"],
+      "risks": ["pyin-tracker-unvalidated", "pyin-raw-track-export", "pyin-transition-limit", "korean-no-word-positives"]
     },
     {
       "id": "introspection.token-loop@1",

@@ -154,6 +154,9 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`prosody.pitch-break@1`](detectors/prosody.pitch-break-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`prosody.octave-jump@1`](detectors/prosody.octave-jump-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
 | [`prosody.pitch-instability@1`](detectors/prosody.pitch-instability-v1.md) | F (prosody) | 1 | single | confirmed (refused) | refused | - |
+| [`prosody.pitch-instability@2`](detectors/prosody.pitch-instability-v2.md) | F (prosody) | 1 | single | no plan | not qualified | - |
+| [`prosody.octave-jump@2`](detectors/prosody.octave-jump-v2.md) | F (prosody) | 1 | single | no plan | not qualified | - |
+| [`prosody.pitch-break@2`](detectors/prosody.pitch-break-v2.md) | F (prosody) | 1 | single | no plan | not qualified | - |
 | [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | 0 | single | confirmed (qualified) | qualified (warn) | - |
 | [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | 0 | single | confirmed (refused) | refused | - |
 | [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | 0 | single | confirmed (qualified) | qualified (warn) | - |

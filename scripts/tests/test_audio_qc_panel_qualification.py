@@ -11,7 +11,11 @@ passing candidates to shadow, and only from committed records, leaving every
 other byte of the registry alone. The recalibration tests run a full-cohort
 session over the promoted fixture panel under the measurement ceiling and prove
 that `recalibrate` raises only shadow ceilings, keeps their history, and
-refuses what it must; they never read the live registry's ceilings.
+refuses what it must; they never read the live registry's ceilings. The
+re-citation tests promote a fixture panel at an old worker identity, measure it
+again at today's, and prove that `recite` moves only the canary (keeping the
+replaced citation), that `recalibrate` then accepts the new identity, and that
+the registry still validates every ceiling the replaced canaries anchor.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,8 +43,10 @@ from audio_qc_judges import (  # noqa: E402
 )
 from acquire_audio_qc_judges import entry_digest, receipt_current  # noqa: E402
 from delivery_resource_supervisor import HostSnapshot, run_supervised  # noqa: E402
+from lib.qc_pipeline import panel_jobs  # noqa: E402
 from lib.qc_pipeline import qualification as q  # noqa: E402
 from lib.qc_pipeline.admission import judge_admission  # noqa: E402
+from lib.qc_pipeline.panel_jobs import runtime_identity, worker_sources  # noqa: E402
 import test_audio_qc_judges as registry_tests  # noqa: E402
 from test_audio_qc_panel_orchestration import (  # noqa: E402
     AUDIOBOX,
@@ -427,13 +434,18 @@ RECALIBRATION_SESSION = "20260929-0123abcd"
 COHORT_FOOTPRINT = 3 * GIB
 
 
-def cohort_supervisor(command, **kwargs):
+def footprint_supervisor(footprint: int):
     """The canonical fixture host, with workers whose footprint a full cohort grows past their canary ceiling."""
-    result = run_supervised(command, snapshotter=lambda: HostSnapshot(50.0, 0, False),
-                            rss_sampler=lambda _pid: 32 * MIB, physical_footprint_sampler=lambda _pid: COHORT_FOOTPRINT,
-                            **kwargs)
-    result.report["hostProfileID"] = CANONICAL_HOST
-    return result
+    def supervisor(command, **kwargs):
+        result = run_supervised(command, snapshotter=lambda: HostSnapshot(50.0, 0, False),
+                                rss_sampler=lambda _pid: 32 * MIB, physical_footprint_sampler=lambda _pid: footprint,
+                                **kwargs)
+        result.report["hostProfileID"] = CANONICAL_HOST
+        return result
+    return supervisor
+
+
+cohort_supervisor = footprint_supervisor(COHORT_FOOTPRINT)
 
 
 def output_identity(judge_id: str) -> str:
@@ -603,6 +615,127 @@ class RecalibrationEditTests(unittest.TestCase):
             self.assertTrue(any(expected in problem for problem in problems), (expected, problems))
 
 
+RECITATION_SESSION = "20260930-0badc0de"
+
+
+def canary_record(registry: dict, judge_id: str, *, identity: str, session: str = RECITATION_SESSION,
+                  host: str = CANONICAL_HOST, failures: tuple[str, ...] = (), second_raw: dict | None = None,
+                  sources: dict | None = None) -> dict:
+    """A canary record of two fixture runs at `identity`, measured at today's worker sources unless `sources` says."""
+    judge = registry["judges"][judge_id]
+    resources = q.run_resources(worker(envelope(hostProfileID=host, qualificationFailures=list(failures))),
+                                canonical_host=CANONICAL_HOST)
+    first = {"resources": resources, "raw": {"t": {"f0Hz": [1.0], "voiced": [True]}},
+             "measurements": {"t": {"status": "complete", "metrics": {"f0MedianHz": 1.0}}}}
+    second = copy.deepcopy(first)
+    if second_raw is not None:
+        second["raw"] = {"t": second_raw}
+    components = {"registryEntrySHA256": acquisition_entry_digest(judge),
+                  "workerSourceSHA256": worker_sources(judge["execution"]["engine"]) if sources is None else sources,
+                  "runtime": runtime_identity(registry, judge_id), "threads": judge["execution"]["threads"],
+                  "hostProfile": HOST}
+    return q.judge_analysis(
+        judge_id, runs=[first, second], identity={"outputIdentity": identity, "components": components},
+        takes=[{"takeID": "t", "language": "english", "audioSHA256": "c" * 64, "canonicalPCMSHA256": "d" * 64}],
+        session={"id": session, "date": q.session_date(session), "hostProfileID": host},
+        canary_set={"sha256": "e" * 64, "takes": 1}, registry_sha256="f" * 64,
+        budget_bytes=registry["admission"]["budgetBytes"],
+        reservation_bytes=registry["admission"]["orchestratorReservationBytes"],
+    )
+
+
+class RecitationEditTests(unittest.TestCase):
+    """`recitation_edits` over fixture shadow judges: which canaries move, which refuse, and why."""
+
+    def setUp(self) -> None:
+        self.registry = shadow_registry()
+        # The record PYIN's canary cites: its canary session, at the output identity the registry names.
+        self.cited = canary_record(self.registry, PYIN, identity=output_identity(PYIN), session=CANARY_SESSION)
+
+    def _edits(self, record: dict | None, *, session: str = RECITATION_SESSION, host: str = CANONICAL_HOST,
+               cited: dict | None = None, entry: dict | None = None,
+               purpose: str = q.QUALIFICATION_PURPOSE) -> tuple[dict, dict, dict]:
+        entry = entry or {"passed": record["qualification"]["passed"], "reasons": record["qualification"]["reasons"],
+                          "record": f"judges/{q.record_file_name(PYIN)}"}
+        session_record = {"schema": q.SESSION_SCHEMA, "purpose": purpose, "judges": {PYIN: entry},
+                          "session": {"id": session, "date": q.session_date(session), "hostProfileID": host}}
+        return q.recitation_edits(
+            self.registry, session_record, {PYIN: record} if record is not None else {},
+            record_paths={PYIN: f"benchmarks/audio-qc-qualification/{session}/judges/{q.record_file_name(PYIN)}"},
+            record_digests={PYIN: "c" * 64}, cited={PYIN: cited or self.cited}, canonical_host=CANONICAL_HOST,
+            root=REPO)
+
+    def test_a_changed_identity_moves_only_the_canary_and_keeps_the_replaced_citation(self) -> None:
+        record = canary_record(self.registry, PYIN, identity="1" * 64)
+        self.assertEqual(q.validate_canary_record(record), [])
+        before = copy.deepcopy(self.registry)
+        edits, changed, refused = self._edits(record)
+        self.assertEqual(refused, {})
+        self.assertEqual(set(edits), {("judges", PYIN, "canary"), ("judges", PYIN, "determinismClass")},
+                         "status and resources never change")
+        replaced = {**before["judges"][PYIN]["canary"], "session": CANARY_SESSION}
+        self.assertEqual(edits[("judges", PYIN, "canary")], {
+            "record": f"benchmarks/audio-qc-qualification/{RECITATION_SESSION}/judges/{q.record_file_name(PYIN)}",
+            "sha256": "c" * 64, "outputIdentity": "1" * 64, "date": "2026-09-30", "history": [replaced]})
+        self.assertEqual(set(replaced), set(q.CANARY_HISTORY_FIELDS))
+        self.assertEqual(edits[("judges", PYIN, "determinismClass")], "D0")
+        self.assertEqual((changed[PYIN]["fromOutputIdentity"], changed[PYIN]["toOutputIdentity"]),
+                         (output_identity(PYIN), "1" * 64))
+        self.assertEqual(self.registry, before, "the edits are computed, never applied in place")
+        # A later re-citation appends, oldest first, and the class follows the new record (D1 here).
+        self.registry["judges"][PYIN]["canary"] = edits[("judges", PYIN, "canary")]
+        later = "20261002-00c0ffee"
+        wobble = canary_record(self.registry, PYIN, identity="2" * 64, session=later,
+                               second_raw={"f0Hz": [1.0000001], "voiced": [True]})
+        edits, _changed, refused = self._edits(wobble, session=later, cited=record)
+        self.assertEqual(refused, {})
+        self.assertEqual([item["session"] for item in edits[("judges", PYIN, "canary")]["history"]],
+                         [CANARY_SESSION, RECITATION_SESSION])
+        self.assertEqual(edits[("judges", PYIN, "determinismClass")], "D1")
+        # The record it cites now, or one it cited before, never re-cites.
+        self.assertEqual(self._edits(record, cited=record)[2], {PYIN: "identity-unchanged"})
+        self.registry["judges"][PYIN]["canary"] = edits[("judges", PYIN, "canary")]
+        self.assertEqual(self._edits(record, cited=wobble)[2], {PYIN: "already-cited"})
+
+    def test_a_candidate_an_unclean_off_host_or_d2_run_and_a_changed_entry_are_refused(self) -> None:
+        cases = {
+            "identity-unchanged": canary_record(self.registry, PYIN, identity=output_identity(PYIN)),
+            "run-1-not-clean": canary_record(self.registry, PYIN, identity="1" * 64,
+                                             failures=("post-exit-memory-recovery-unqualified",)),
+            "not-canonical-host": canary_record(self.registry, PYIN, identity="1" * 64, host="mac-mini-m2-8gb"),
+            "determinism-d2": canary_record(self.registry, PYIN, identity="1" * 64,
+                                            second_raw={"f0Hz": [1.0], "voiced": [False]}),
+            "older-than-its-canary": canary_record(self.registry, PYIN, identity="1" * 64,
+                                                   session="20260927-0badc0de"),
+            "identity-not-current": canary_record(self.registry, PYIN, identity="1" * 64, sources={}),
+        }
+        for reason, record in cases.items():
+            with self.subTest(reason=reason):
+                self.assertEqual(q.validate_canary_record(record), [])
+                edits, _changed, refused = self._edits(record)
+                self.assertEqual(edits, {})
+                self.assertTrue(refused[PYIN].startswith(reason), refused)
+        # A session measured off the canonical host is refused even when its envelopes claim it.
+        record = canary_record(self.registry, PYIN, identity="1" * 64)
+        self.assertEqual(self._edits(record, host="mac-mini-m2-8gb")[2], {PYIN: "not-canonical-host"})
+        # A judge the session failed publishes no record; its session names why.
+        self.assertEqual(self._edits(None, entry={"passed": False, "reasons": ["run-2-not-clean"], "record": None})[2],
+                         {PYIN: "did-not-pass (run-2-not-clean)"})
+        # A candidate is qualified by `promote`, never re-cited.
+        self.registry["judges"][PYIN].update(status="candidate")
+        self.assertTrue(self._edits(record)[2][PYIN].startswith("status-candidate"))
+        # A registry entry that changed after the session, or before it (since the cited record), is
+        # another judge: it returns to candidate and qualifies again.
+        self.registry = shadow_registry()
+        self.registry["judges"][PYIN]["execution"]["threads"] += 1
+        self.assertEqual(self._edits(record)[2], {PYIN: "registry-entry-changed"})
+        rethreaded = canary_record(self.registry, PYIN, identity="1" * 64)
+        self.assertEqual(self._edits(rethreaded)[2], {PYIN: "registry-entry-changed"})
+        # A recalibration session never re-cites.
+        with self.assertRaisesRegex(q.QualificationError, "only a qualification session re-cites"):
+            self._edits(record, purpose=q.RECALIBRATION_PURPOSE)
+
+
 class RecalibrationSessionTests(QualificationFixture):
     """A promoted fixture panel, then a full-cohort recalibration session, its records and `recalibrate`."""
 
@@ -738,6 +871,167 @@ class RecalibrationSessionTests(QualificationFixture):
         record_path = published / "judges" / q.record_file_name(PYIN)
         record_path.write_text(record_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
         self.assertTrue(any("differs from its committed version" in error for error in errors(lambda resources: None)))
+
+
+class RecitationSessionTests(QualificationFixture):
+    """A panel promoted and recalibrated at an old worker identity, a canary at today's, `recite`, `recalibrate`."""
+
+    CONFIGS = {PYIN: {"default": {"hopSeconds": 0.01, "f0Hz": [200.0, 201.0], "voiced": [True, True]}},
+               CAMPPLUS: {"embedFromDigest": True},
+               # Deterministic here: a passing candidate that `recite` must leave to `promote`.
+               PARAKEET: {"default": {"transcript": "the quiet garden"}}}
+
+    def _fixture_judges(self, judge_ids: list[str], *, old_worker: bool = False) -> list:
+        """The fixture judges, at today's worker sources or at the worker host as it read before an edit."""
+        if not old_worker:
+            return [self.panel_judge(judge_id, **self.CONFIGS[judge_id]) for judge_id in judge_ids]
+        current = panel_jobs.worker_sources
+
+        def before_the_edit(engine: str, *, root: Path = REPO) -> dict:
+            # da775e44 changed `audio_qc_worker.py` this way: the entry stays, the output identity moves.
+            return {**current(engine, root=root), "scripts/audio_qc_worker.py": "0" * 64}
+
+        with mock.patch.object(panel_jobs, "worker_sources", before_the_edit):
+            return [self.panel_judge(judge_id, **self.CONFIGS[judge_id]) for judge_id in judge_ids]
+
+    def _published(self, judges: list, registry: dict, *, today: dt.date, purpose: str = q.QUALIFICATION_PURPOSE,
+                   supervisor=quiet_supervisor, cohort: dict | None = None) -> Path:
+        """One session over `judges`, analyzed, published into the fixture repository and committed."""
+        panel = [judge.judge_id for judge in judges]
+        session_dir, manifest = cli.start_session(self.root / "sessions", speech=cohort, panel=panel, legacy=[],
+                                                  today=today, purpose=purpose)
+        cli.run_session(registry=registry, manifest=manifest, judges=judges, resampler="polyphase-kaiser5-v2",
+                        session_dir=session_dir, supervisor=supervisor, lock_root=self.root / "locks",
+                        preflight=lambda: {"loadAverage1M": 1.0, "busy": False}, host=HOST,
+                        host_profile_id=CANONICAL_HOST)
+        summary = cli.analyze_session(session_dir, registry=registry)
+        self.assertEqual({judge: entry["passed"] for judge, entry in summary["judges"].items()},
+                         dict.fromkeys(panel, True), summary["judges"])
+        published = cli.publish(session_dir, self.repository / "benchmarks/audio-qc-qualification")
+        if not (self.repository / ".git").is_dir():
+            registry_tests._git(self.repository, "init", "-q")
+        registry_tests._git(self.repository, "add", "-A", "--", "config", "benchmarks", "scripts")
+        registry_tests._git(self.repository, "commit", "-qm", f"{purpose} records {published.name}")
+        return published
+
+    def _registry(self) -> dict:
+        return json.loads((self.repository / "config/audio-qc-judges.json").read_text(encoding="utf-8"))
+
+    def test_a_changed_identity_is_re_cited_then_recalibrated_and_the_registry_keeps_validating(self) -> None:
+        self.repository = self._repository()
+        registry_path = self.repository / "config/audio-qc-judges.json"
+        panel = [PYIN, CAMPPLUS]
+        cohort = self.manifest([self.take(f"cohort-{index}", self.audio(f"cohort-{index}", 300 + 40 * index),
+                                          "english") for index in range(3)], run_id="cohort")
+        # Promoted at the old worker identity; PYIN's ceiling then recalibrated at that identity too. Every
+        # qualification session runs under the measurement ceiling (the un-promoted registry), as in `_session`.
+        qualification = self._published(self._fixture_judges(panel, old_worker=True), self.registry,
+                                         today=dt.date(2026, 9, 28))
+        self.assertEqual(sorted(cli.promote(qualification, root=self.repository)["promoted"]), sorted(panel))
+        registry_tests._git(self.repository, "commit", "-qam", "promotion")
+        early = self._published(self._fixture_judges([PYIN], old_worker=True), self._registry(),
+                                today=dt.date(2026, 9, 29), purpose=q.RECALIBRATION_PURPOSE,
+                                supervisor=footprint_supervisor(2 * GIB), cohort=cohort)
+        self.assertEqual(list(cli.recalibrate(early, root=self.repository)["recalibrated"]), [PYIN])
+        registry_tests._git(self.repository, "commit", "-qam", "early recalibration")
+        promoted = self._registry()
+        old = {judge_id: promoted["judges"][judge_id]["canary"] for judge_id in panel}
+
+        # The worker host changed: a full cohort measured at today's identity cannot move a ceiling.
+        judges = self._fixture_judges(panel)
+        self.assertTrue(all(judge.identity.output_identity != old[judge.judge_id]["outputIdentity"]
+                            for judge in judges))
+        cohort_session = self._published(judges, promoted, today=dt.date(2026, 9, 30),
+                                         purpose=q.RECALIBRATION_PURPOSE, supervisor=cohort_supervisor, cohort=cohort)
+        refused = cli.recalibrate(cohort_session, root=self.repository)
+        self.assertEqual((refused["written"], refused["refused"]), (False, dict.fromkeys(panel, "identity-mismatch")))
+
+        # A canary session at today's identity, then `recite`.
+        canary = self._published(self._fixture_judges([*panel, PARAKEET]), self.registry, today=dt.date(2026, 10, 1))
+        with self.assertRaisesRegex(cli.QualificationRunError, "only a qualification session re-cites"):
+            cli.recite(cohort_session, root=self.repository)
+        unchanged = cli.recite(qualification, root=self.repository)["refused"]
+        self.assertEqual({judge_id: unchanged[judge_id] for judge_id in panel},
+                         dict.fromkeys(panel, "identity-unchanged"))
+        original = registry_path.read_text(encoding="utf-8")
+        dry = cli.recite(canary, root=self.repository, dry_run=True)
+        self.assertEqual(registry_path.read_text(encoding="utf-8"), original, "a dry run writes nothing")
+        self.assertEqual((sorted(dry["recited"]), dry["refused"], dry["written"]),
+                         (sorted(panel), {PARAKEET: "status-candidate (promote qualifies a candidate)"}, False))
+        self.assertTrue(cli.recite(canary, root=self.repository)["written"])
+        recited = self._registry()
+        relative = canary.relative_to(self.repository).as_posix()
+        for judge_id in panel:
+            before, after = promoted["judges"][judge_id], recited["judges"][judge_id]
+            path = f"{relative}/judges/{q.record_file_name(judge_id)}"
+            record = json.loads((self.repository / path).read_text(encoding="utf-8"))
+            self.assertEqual(after["canary"], {
+                "record": path, "sha256": hashlib.sha256((self.repository / path).read_bytes()).hexdigest(),
+                "outputIdentity": record["outputIdentity"], "date": "2026-10-01",
+                "history": [{**old[judge_id], "session": qualification.name}]})
+            self.assertEqual(after["determinismClass"], record["determinism"]["class"])
+            self.assertEqual({key: value for key, value in after.items() if key not in ("canary", "determinismClass")},
+                             {key: value for key, value in before.items() if key not in ("canary", "determinismClass")},
+                             "status and resources never change")
+        changed = [line for line, new in zip(original.splitlines(), registry_path.read_text().splitlines())
+                   if line != new]
+        self.assertEqual(len(changed), len(panel), "one canary line per re-cited judge")
+        # CAM++ keeps the ceiling its replaced canary measured; PYIN the one recalibrated at its replaced identity.
+        self.assertEqual(recited["judges"][CAMPPLUS]["resources"]["ceilingSession"], qualification.name)
+        self.assertEqual(recited["judges"][PYIN]["resources"]["ceilingSession"], early.name)
+        self.assertEqual(validate_repository(self.repository, recited), [])
+        again = cli.recite(canary, root=self.repository)
+        self.assertEqual((again["written"], {again["refused"][judge_id] for judge_id in panel}),
+                         (False, {"identity-unchanged"}))
+        registry_tests._git(self.repository, "commit", "-qam", "re-citation")
+
+        # Registry integrity: the history is committed, digest-bound evidence that anchors the ceilings.
+        def errors(judge_id: str, mutate, registry: dict = recited) -> list[str]:
+            registry = copy.deepcopy(registry)
+            mutate(registry["judges"][judge_id]["canary"])
+            return [error for error in validate_registry(registry, root=self.repository) if judge_id in error]
+
+        def history(**changes):
+            return lambda canary_: canary_["history"][0].update(**changes)
+
+        for judge_id, expected in (
+            (CAMPPLUS, "records no ceilingHistory"), (PYIN, "ceilingHistory starts at the session of a canary"),
+        ):
+            with self.subTest(judge=judge_id):
+                self.assertEqual(errors(judge_id, lambda canary_: None), [])
+                problems = errors(judge_id, lambda canary_: canary_.pop("history"))
+                self.assertTrue(any(expected in problem for problem in problems), problems)
+        for mutate, expected in (
+            (history(sha256="0" * 64), "does not match its recorded SHA-256"),
+            (history(session="20260101-00000000"), "session and date are not its record's"),
+            (history(note="re-cited"), "records exactly"),
+            (lambda canary_: canary_.update(history=[]), "lists the citations"),
+            (lambda canary_: canary_["history"].append(copy.deepcopy(canary_["history"][0])), "distinct sessions"),
+            (lambda canary_: canary_.update(note="re-cited"), "its canary cites"),
+        ):
+            with self.subTest(expected=expected):
+                problems = errors(CAMPPLUS, mutate)
+                self.assertTrue(any(expected in problem for problem in problems), problems)
+        # A replaced canary measured at another registry entry was another judge.
+        rethreaded = copy.deepcopy(recited)
+        rethreaded["judges"][CAMPPLUS]["execution"]["threads"] += 1
+        problems = validate_registry(rethreaded, root=self.repository)
+        self.assertTrue(any("canary.history[0]" in problem and "never crosses a registry-entry change" in problem
+                            for problem in problems), problems)
+
+        # The full-cohort session now recalibrates: its records measured the re-cited identity.
+        result = cli.recalibrate(cohort_session, root=self.repository)
+        self.assertEqual((sorted(result["recalibrated"]), result["refused"]), (sorted(panel), {}))
+        updated = self._registry()
+        for judge_id, sessions in ((PYIN, [qualification.name, early.name]), (CAMPPLUS, [qualification.name])):
+            self.assertEqual([item["ceilingSession"]
+                              for item in updated["judges"][judge_id]["resources"]["ceilingHistory"]], sessions)
+        for judge_id in panel:
+            self.assertEqual(updated["judges"][judge_id]["resources"]["ceilingSession"], cohort_session.name)
+            self.assertEqual(updated["judges"][judge_id]["canary"], recited["judges"][judge_id]["canary"])
+        self.assertEqual(validate_repository(self.repository, updated), [])
+        self.assertTrue(any("ceilingHistory starts at the session of a canary" in error for error in errors(
+            CAMPPLUS, lambda canary_: canary_.pop("history"), updated)))
 
 
 class RecordValidationTests(unittest.TestCase):

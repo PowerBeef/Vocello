@@ -59,13 +59,22 @@ Commands:
             its session, canary citation); `--bind-recovery-rule` also cites
             the session's two recovery reports and makes the child-attributed
             recovery rule binding when they meet its promotion
+  recite    after a qualification session's records are committed: move each
+            passing shadow-or-later judge whose output identity changed (its
+            worker sources or runtime did, its registry entry did not) to the
+            session's canary record (canary citation and determinism class
+            only; the replaced citation is appended to canary.history); refuses
+            a candidate, an unclean or off-host run, a D2 class, a changed
+            registry entry, an unchanged identity and a record no longer at
+            today's worker sources
   recalibrate
             after a `run --recalibrate` session's records are committed: move each
             shadow-or-later judge's ceiling to the full-cohort measurement
             (resources only: peak, ceiling = peak x 1.2, ceilingSession, and the
             replaced ceiling appended to ceilingHistory); refuses an unclean or
-            off-host run, another output identity, a candidate, a ceiling the
-            admission budget cannot hold and, without --allow-lower, a lower one
+            off-host run, another output identity than its canary cites, a
+            candidate, a ceiling the admission budget cannot hold and, without
+            --allow-lower, a lower one
   validate  every committed record under benchmarks/audio-qc-qualification/
 
 Ceiling recalibration. The canary session's 28 rows under-measure a real
@@ -76,6 +85,14 @@ whose purpose is `ceiling-recalibration`: every judge, calibrated or not, runs
 under the measurement ceiling, the flip analysis is skipped, and each judge
 publishes a ceiling record (digests and metrics only, the take rows as a count
 and a digest), passed or not, for `recalibrate` to read.
+
+Canary re-citation. A judge's output identity includes its worker sources, so
+an edit of `scripts/audio_qc_worker.py`, `panel_engines.py` or `panel_jobs.py`
+leaves every shadow judge's canary naming an identity no worker produces, and
+`recalibrate` refuses each of them. An ordinary `run --judge <id>` measures
+the judge at its current identity (a shadow judge runs under its calibrated
+ceiling); once its records are committed, `recite` moves the canary to that
+record, and `recalibrate` then accepts ceiling records at the same identity.
 """
 
 from __future__ import annotations
@@ -592,6 +609,60 @@ def promote(records_dir: Path, *, root: Path = REPO, registry_path: Path | None 
             "written": not dry_run}
 
 
+def recite(records_dir: Path, *, root: Path = REPO, registry_path: Path | None = None,
+           dry_run: bool = False) -> dict[str, Any]:
+    """Re-cite each shadow-or-later judge whose output identity changed to a committed qualification session's record.
+
+    Only `canary` (with the replaced citation in its `history`) and
+    `determinismClass` change (`q.recitation_edits`); status and ceilings stay.
+    The registry must still validate with the edits, or nothing is written;
+    `dry_run` writes nothing.
+    """
+    registry_path = registry_path or root / "config/audio-qc-judges.json"
+    records_dir = records_dir.resolve()
+    errors = q.validate_session_directory(records_dir)
+    if errors:
+        raise QualificationRunError("the session's records do not validate: " + "; ".join(errors[:3]))
+    session, records = q.session_records(records_dir)
+    if q.session_purpose(session) != q.QUALIFICATION_PURPOSE:
+        raise QualificationRunError(f"{records_dir.name} is a {q.session_purpose(session)} session; "
+                                    "only a qualification session re-cites a canary")
+    relative = records_dir.relative_to(root.resolve()).as_posix()
+    paths = {judge_id: f"{relative}/{entry['record']}" for judge_id, entry in session["judges"].items()
+             if entry.get("record")}
+    uncommitted = q.committed_errors(root, [f"{relative}/session.json", *paths.values()])
+    if uncommitted:
+        raise QualificationRunError("commit the session's records before re-citing: " + "; ".join(uncommitted[:3]))
+    digests = {judge_id: file_sha256(root / path) for judge_id, path in paths.items()}
+    text = registry_path.read_text(encoding="utf-8")
+    registry = json.loads(text)
+    profiles = canonical_profiles(registry, root)
+    canonical = str(profiles[0]["id"]) if len(profiles) == 1 else None
+    cited: dict[str, dict[str, Any]] = {}
+    for judge_id in session["judges"]:
+        canary = (registry["judges"].get(judge_id) or {}).get("canary")
+        if isinstance(canary, dict) and isinstance(canary.get("record"), str):
+            try:
+                cited[judge_id] = json.loads((root / canary["record"]).read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+    edits, changed, refused = q.recitation_edits(registry, session, records, record_paths=paths,
+                                                 record_digests=digests, cited=cited, canonical_host=canonical,
+                                                 root=root)
+    if not edits:
+        return {"recited": {}, "refused": refused, "written": False}
+    updated = q.replace_json_values(text, edits)
+    problems = validate_repository(root, json.loads(updated))
+    if problems:
+        raise QualificationRunError("the re-cited registry would not validate; nothing was written: "
+                                    + "; ".join(problems[:3]))
+    if not dry_run:
+        temporary = registry_path.with_name(f".{registry_path.name}.recite")
+        temporary.write_text(updated, encoding="utf-8")
+        os.replace(temporary, registry_path)
+    return {"recited": changed, "refused": refused, "written": not dry_run}
+
+
 def recalibrate(records_dir: Path, *, root: Path = REPO, registry_path: Path | None = None, dry_run: bool = False,
                 allow_lower: bool = False) -> dict[str, Any]:
     """Move each shadow-or-later judge's ceiling to a committed recalibration session's; write only if valid.
@@ -708,6 +779,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     promoter.add_argument("records", type=Path, help="benchmarks/audio-qc-qualification/<session>")
     promoter.add_argument("--dry-run", action="store_true")
     promoter.add_argument("--bind-recovery-rule", action="store_true")
+    reciter = commands.add_parser("recite")
+    reciter.add_argument("records", type=Path, help="benchmarks/audio-qc-qualification/<qualification session>")
+    reciter.add_argument("--dry-run", action="store_true")
     recalibrator = commands.add_parser("recalibrate")
     recalibrator.add_argument("records", type=Path, help="benchmarks/audio-qc-qualification/<recalibration session>")
     recalibrator.add_argument("--dry-run", action="store_true")
@@ -742,13 +816,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary = analyze_session(args.session, registry=registry)
         elif args.command == "publish":
             destination = publish(args.session, args.records_root)
-            step = "recalibrate" if q.session_purpose(_read(destination / "session.json")) \
-                == q.RECALIBRATION_PURPOSE else "promote"
-            print(json.dumps({"published": str(destination),
-                              "next": f"commit it, then run: {step} {destination}"}, indent=2))
+            step = f"recalibrate {destination}" if q.session_purpose(_read(destination / "session.json")) \
+                == q.RECALIBRATION_PURPOSE else (f"promote {destination} (a candidate), or recite {destination} "
+                                                 "(a shadow-or-later judge whose output identity changed)")
+            print(json.dumps({"published": str(destination), "next": f"commit it, then run: {step}"}, indent=2))
             return 0
-        elif args.command == "recalibrate":
-            result = recalibrate(args.records, dry_run=args.dry_run, allow_lower=args.allow_lower)
+        elif args.command in ("recalibrate", "recite"):
+            result = recalibrate(args.records, dry_run=args.dry_run, allow_lower=args.allow_lower) \
+                if args.command == "recalibrate" else recite(args.records, dry_run=args.dry_run)
             print(json.dumps(result, indent=2, sort_keys=True))
             if result["refused"]:
                 print("audio-qc-panel-qualification: refused " + ", ".join(sorted(result["refused"])),

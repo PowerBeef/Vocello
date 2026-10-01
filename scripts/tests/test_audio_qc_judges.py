@@ -514,23 +514,29 @@ class PanelAcquisitionTests(unittest.TestCase):
                 # the committed canary records of one M6 session (AQ-06 P8).
                 self.assertEqual(judge["status"], "shadow")
                 canary = judge["canary"]
-                self.assertTrue(canary["record"].startswith(records), canary["record"])
+                # `recite` may since have moved the citation to a record at a new output identity; the
+                # promotion's citation is then the first one its history keeps.
+                promotion = (canary.get("history") or [canary])[0]
+                self.assertTrue(promotion["record"].startswith(records), promotion["record"])
+                promoted = json.loads((REPO / promotion["record"]).read_text(encoding="utf-8"))
+                self.assertEqual((promoted["judge"], promoted["outputIdentity"], promoted["session"]["id"]),
+                                 (judge_id, promotion["outputIdentity"], PROMOTION_SESSION))
                 record_path = REPO / canary["record"]
                 self.assertEqual(hashlib.sha256(record_path.read_bytes()).hexdigest(), canary["sha256"])
                 record = json.loads(record_path.read_text(encoding="utf-8"))
-                self.assertEqual((record["judge"], record["outputIdentity"], record["session"]["id"]),
-                                 (judge_id, canary["outputIdentity"], PROMOTION_SESSION))
+                self.assertEqual((record["judge"], record["outputIdentity"]), (judge_id, canary["outputIdentity"]))
                 self.assertIn(judge["determinismClass"], ("D0", "D1"))
                 self.assertEqual(judge["determinismClass"], record["determinism"]["class"])
                 resources = judge["resources"]
                 self.assertEqual(resources["ceilingStatus"], "calibrated")
                 self.assertEqual(resources["ceilingBytes"], -(-resources["canonicalHostPeakBytes"] * 12 // 10))
-                # A full-cohort recalibration may since have moved the ceiling; its history starts at the canary.
+                # A full-cohort recalibration may since have moved the ceiling; its history starts at the
+                # promotion's canary, which a re-citation never moves.
                 history = resources.get("ceilingHistory") or []
                 first = history[0] if history else resources
                 self.assertEqual(first["ceilingSession"], PROMOTION_SESSION)
-                self.assertEqual(first["canonicalHostPeakBytes"], record["resources"]["canonicalHostPeakBytes"])
-                self.assertEqual(first["ceilingBytes"], record["resources"]["admissionCeilingBytes"])
+                self.assertEqual(first["canonicalHostPeakBytes"], promoted["resources"]["canonicalHostPeakBytes"])
+                self.assertEqual(first["ceilingBytes"], promoted["resources"]["admissionCeilingBytes"])
                 self.assertNotIn("plannedExecution", judge)
                 self.assertEqual(judge["execution"]["threadsStatus"], "provisional")
                 self.assertIn("threads", judge["identity"]["output"])

@@ -63,7 +63,7 @@ import platform
 import re
 import subprocess
 import sys
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_REGISTRY = REPO / "config/audio-qc-judges.json"
@@ -507,6 +507,12 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
     replaced ceiling, oldest first from the canary session's. Either way the
     session is published under benchmarks/audio-qc-qualification/ with a record
     for the judge.
+
+    `recite` moves a judge's canary without moving its ceiling, so "the canary"
+    above is any canary record the judge cites or cited (`canary.history`): a
+    ceiling may still be the one a replaced canary measured, a recalibration
+    may have measured a replaced identity, and the history may start at a
+    replaced canary's session.
     """
     from lib.qc_pipeline.qualification import SESSION_ID, admission_ceiling
 
@@ -547,12 +553,16 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
         return errors + [f"{label}: the canary record {relative} behind its calibrated ceiling is not an object"]
     measured = record.get("resources") if isinstance(record.get("resources"), dict) else {}
     recorded = record.get("session") if isinstance(record.get("session"), dict) else {}
-    canary_session = recorded.get("id")
+    # A re-cited judge keeps the ceiling its replaced canary measured until `recalibrate` moves it.
+    replaced = _replaced_canaries(canary)
+    canary_sessions = [*replaced, recorded.get("id")]
     history = resources.get("ceilingHistory")
     errors.extend(_ceiling_session_errors(label, judge_id, session, root))
-    if canary_session == session:
+    if session in canary_sessions:
         if history is not None:
             errors.append(f"{label}: a ceiling still measured by its canary session records no ceilingHistory")
+        if session in replaced:
+            measured = _record_resources(root, replaced[session])
         if measured.get("admissionCeilingBytes") != ceiling or measured.get("canonicalHostPeakBytes") != peak:
             errors.append(f"{label}: its calibrated ceiling is not the one its canary record measured")
         return errors
@@ -561,7 +571,97 @@ def _ceiling_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[st
                       "and records no ceilingHistory of a recalibration")
         return errors
     errors.extend(_recalibrated_ceiling_errors(label, judge_id, judge, session, root))
-    errors.extend(_ceiling_history_errors(label, judge_id, history, session, canary_session, root))
+    errors.extend(_ceiling_history_errors(label, judge_id, history, session, canary_sessions, root))
+    return errors
+
+
+def _replaced_canaries(canary: Any) -> dict[str, str]:
+    """The canary citations a re-cited judge replaced (`canary.history`): each record path by its session."""
+    history = canary.get("history") if isinstance(canary, dict) else None
+    if not isinstance(history, list):
+        return {}
+    return {item["session"]: item["record"] for item in history if isinstance(item, dict)
+            and isinstance(item.get("session"), str) and isinstance(item.get("record"), str)}
+
+
+def _record_resources(root: Path, relative: str) -> dict[str, Any]:
+    """A committed record's measured resources, or nothing when it cannot be read (its own check names why)."""
+    if Path(relative).is_absolute() or ".." in Path(relative).parts:
+        return {}
+    try:
+        record = json.loads((root / relative).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    resources = record.get("resources") if isinstance(record, dict) else None
+    return resources if isinstance(resources, dict) else {}
+
+
+def _canary_history_errors(label: str, judge_id: str, judge: dict[str, Any], current: dict[str, Any],
+                           history: Any, root: Path) -> list[str]:
+    """Each canary citation a re-citation replaced, oldest first (`audio_qc_panel_qualification.py recite`).
+
+    Each names a committed canary record bound by its SHA-256: this judge's
+    passing record, measured at this registry entry (a re-citation never
+    crosses an entry change, which returns the judge to candidate), with the
+    output identity, session and date the record holds. The sessions are
+    distinct and in date order before the current canary's, and every
+    re-citation replaced another output identity.
+    """
+    from lib.qc_pipeline.qualification import CANARY_HISTORY_FIELDS, validate_canary_record
+
+    if not isinstance(history, list) or not history:
+        return [f"{label}: canary.history lists the citations its re-citations replaced, oldest first"]
+    digest = acquisition_entry_digest(judge)
+    errors: list[str] = []
+    sessions, dates, identities = [], [], []
+    for index, item in enumerate(history):
+        where = f"{label}: canary.history[{index}]"
+        if not isinstance(item, dict) or set(item) != set(CANARY_HISTORY_FIELDS):
+            errors.append(f"{where} records exactly {', '.join(CANARY_HISTORY_FIELDS)}")
+            continue
+        relative = item["record"]
+        if not isinstance(relative, str) or not relative or Path(relative).is_absolute() \
+                or ".." in Path(relative).parts:
+            errors.append(f"{where}: its canary record is named by a repository-relative path")
+            continue
+        target = root / relative
+        if not target.is_file():
+            errors.append(f"{where}: canary record {relative} does not exist")
+            continue
+        if not SHA256.match(str(item["sha256"])) or _sha256(target) != item["sha256"]:
+            errors.append(f"{where}: canary record {relative} does not match its recorded SHA-256")
+            continue
+        errors.extend(f"{where}: canary record {relative} {problem}"
+                      for problem in _committed_file_errors(root, relative))
+        try:
+            record = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            errors.append(f"{where}: canary record {relative} is not JSON")
+            continue
+        problems = validate_canary_record(record)
+        if problems:
+            errors.extend(f"{where}: canary record {relative}: {problem}" for problem in problems[:3])
+            continue
+        if record["judge"] != judge_id or record["qualification"].get("passed") is not True:
+            errors.append(f"{where}: canary record {relative} is not this judge's passing record")
+        if record["outputIdentity"] != item["outputIdentity"] or record["session"].get("id") != item["session"] \
+                or record["session"].get("date") != item["date"]:
+            errors.append(f"{where}: its output identity, session and date are not its record's")
+        if record["identityComponents"].get("registryEntrySHA256") != digest:
+            errors.append(f"{where}: its record measured another registry entry; a re-citation never crosses "
+                          "a registry-entry change")
+        sessions.append(item["session"])
+        dates.append(str(item["date"]))
+        identities.append(item["outputIdentity"])
+    if errors:
+        return errors
+    sessions.append(current["session"]["id"])
+    dates.append(str(current["session"]["date"]))
+    identities.append(current["outputIdentity"])
+    if len(set(sessions)) != len(sessions) or dates != sorted(dates):
+        errors.append(f"{label}: canary.history lists distinct sessions in date order, before its canary's")
+    if any(first == second for first, second in zip(identities, identities[1:])):
+        errors.append(f"{label}: each re-citation replaced another output identity")
     return errors
 
 
@@ -619,8 +719,11 @@ def _recalibrated_ceiling_errors(label: str, judge_id: str, judge: dict[str, Any
     if record["recalibration"].get("passed") is not True:
         errors.append(f"{label}: its recalibration record did not pass")
     canary = judge.get("canary") if isinstance(judge.get("canary"), dict) else {}
-    if record.get("outputIdentity") != canary.get("outputIdentity"):
-        errors.append(f"{label}: its recalibration measured another output identity than its canary record")
+    # A ceiling recalibrated before a re-citation stays in force: it measured an identity the judge cited.
+    history = canary.get("history") if isinstance(canary.get("history"), list) else []
+    cited = {canary.get("outputIdentity"), *(item.get("outputIdentity") for item in history if isinstance(item, dict))}
+    if record.get("outputIdentity") not in cited:
+        errors.append(f"{label}: its recalibration measured another output identity than its canary records")
     resources = judge.get("resources") or {}
     if record["resources"].get("canonicalHostPeakBytes") != resources.get("canonicalHostPeakBytes") \
             or record["resources"].get("admissionCeilingBytes") != resources.get("ceilingBytes"):
@@ -657,9 +760,14 @@ def _replaced_ceiling_errors(where: str, judge_id: str, item: dict[str, Any], se
     return errors
 
 
-def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], session: str, canary_session: Any,
-                            root: Path) -> list[str]:
-    """Each replaced ceiling, oldest first from the canary session's, before the current session."""
+def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], session: str,
+                            canary_sessions: Sequence[Any], root: Path) -> list[str]:
+    """Each replaced ceiling, oldest first from a canary session's, before the current session.
+
+    The first is the ceiling a canary record measured: the current canary's, or
+    the one of a citation a re-citation replaced (`canary.history`), since a
+    re-citation never moves the ceiling.
+    """
     from lib.qc_pipeline.qualification import (
         CEILING_HISTORY_FIELDS, SESSION_ID, admission_ceiling, session_date,
     )
@@ -685,8 +793,8 @@ def _ceiling_history_errors(label: str, judge_id: str, history: list[Any], sessi
         errors.extend(session_errors or _replaced_ceiling_errors(where, judge_id, item, entry_session, root))
     if errors:
         return errors
-    if sessions[0] != canary_session:
-        errors.append(f"{label}: ceilingHistory starts at the canary record's session")
+    if sessions[0] not in canary_sessions:
+        errors.append(f"{label}: ceilingHistory starts at the session of a canary record it cites or cited")
     dates = [session_date(item) for item in sessions]
     if len(set(sessions)) != len(sessions) or session in sessions or dates != sorted(dates) \
             or dates[-1] > session_date(session):
@@ -705,6 +813,13 @@ def _canary_errors(judge_id: str, judge: dict[str, Any], registry: dict[str, Any
     runtime, threads) makes the record stale: the judge returns to candidate and
     is qualified again. A warn or gating judge's record must also match today's
     worker sources and runtime lock (the canary rule of audit section 5.8).
+
+    A change of worker sources or runtime alone changes the output identity but
+    not the entry: `recite` then moves the citation to a later record at the
+    new identity and keeps each replaced citation in `canary.history`
+    (`_canary_history_errors`). The ceiling stays the one its session measured,
+    so the peak is checked here only while the ceiling is the current canary
+    record's.
     """
     from lib.qc_pipeline.qualification import (
         CANARY_SCHEMA, identity_freshness_errors, validate_canary_record,
@@ -715,6 +830,8 @@ def _canary_errors(judge_id: str, judge: dict[str, Any], registry: dict[str, Any
     if not isinstance(canary, dict) or any(field not in canary for field in CANARY_FIELDS):
         return [f"{label}: a {judge.get('status')} panel judge cites its canary record "
                 f"({', '.join(CANARY_FIELDS)})"]
+    if not set(canary) <= {*CANARY_FIELDS, "history"}:
+        return [f"{label}: its canary cites {', '.join(CANARY_FIELDS)} and, once re-cited, the history it replaced"]
     relative = canary["record"]
     if not isinstance(relative, str) or not relative or Path(relative).is_absolute() or ".." in Path(relative).parts:
         return [f"{label}: the canary record is named by a repository-relative path"]
@@ -743,11 +860,16 @@ def _canary_errors(judge_id: str, judge: dict[str, Any], registry: dict[str, Any
     determinism = record["determinism"].get("class")
     if determinism not in QUALIFIED_DETERMINISM_CLASSES or judge.get("determinismClass") != determinism:
         errors.append(f"{label}: determinismClass must be the canary's measured D0 or D1 class")
+    if "history" in canary:
+        errors.extend(_canary_history_errors(label, judge_id, judge, record, canary["history"], root))
     resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
-    # A recalibrated judge's peak is its recalibration record's, which `_ceiling_errors` checks.
-    recalibrated = resources.get("ceilingSession") != record["session"].get("id") \
-        and isinstance(resources.get("ceilingHistory"), list) and bool(resources["ceilingHistory"])
-    if not recalibrated \
+    # A recalibrated judge's peak is its recalibration record's, and a re-cited judge's the replaced canary
+    # record's that measured its ceiling; `_ceiling_errors` checks both.
+    replaced = _replaced_canaries(canary)
+    elsewhere = resources.get("ceilingSession") != record["session"].get("id") and (
+        (isinstance(resources.get("ceilingHistory"), list) and bool(resources["ceilingHistory"]))
+        or resources.get("ceilingSession") in replaced)
+    if not elsewhere \
             and resources.get("canonicalHostPeakBytes") != record["resources"].get("canonicalHostPeakBytes"):
         errors.append(f"{label}: canonicalHostPeakBytes must be the peak its canary record measured")
     if judge.get("status") in VERDICT_STATUSES:

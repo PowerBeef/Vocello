@@ -41,6 +41,14 @@ module is the pure half of `scripts/audio_qc_panel_qualification.py`:
   shadow-or-later judge's `canonicalHostPeakBytes`, `ceilingBytes` and
   `ceilingSession` to that record's, appending the replaced ceiling to
   `ceilingHistory`; status, identity and canary never change.
+- **Canary re-citation.** A change of a judge's worker sources (or runtime)
+  changes its output identity while its registry entry stays the same, so its
+  canary no longer names an identity any worker produces and `recalibrate`
+  refuses it. `recitation_edits` moves a shadow-or-later judge's canary
+  citation to a passing record of a later qualification session measured at
+  its current identity, appending the replaced citation, with its session, to
+  `canary.history`; its determinism class follows the new record, and status
+  and resources never change.
 """
 
 from __future__ import annotations
@@ -1020,8 +1028,9 @@ def session_date(session_id: str) -> str:
     return f"{session_id[:4]}-{session_id[4:6]}-{session_id[6:8]}"
 
 
-def _refusal(record: Mapping[str, Any], canonical_host: str | None, session: Mapping[str, Any]) -> str | None:
-    """Why a ceiling record cannot move a ceiling: an unclean run, another host, or a failed verdict."""
+def _refusal(record: Mapping[str, Any], canonical_host: str | None, session: Mapping[str, Any], *,
+             verdict: str = "recalibration") -> str | None:
+    """Why a record cannot edit the registry: an unclean run, another host, or a failed verdict."""
     if canonical_host is None or session.get("hostProfileID") != canonical_host \
             or record["session"].get("hostProfileID") != canonical_host \
             or any("host-not-canonical" in run.get("failures", []) for run in record["runs"]):
@@ -1029,8 +1038,8 @@ def _refusal(record: Mapping[str, Any], canonical_host: str | None, session: Map
     for run in record["runs"]:
         if not run.get("clean"):
             return f"run-{run.get('run')}-not-clean ({', '.join(run.get('failures') or [])})"
-    if not record["recalibration"]["passed"]:
-        return ", ".join(record["recalibration"]["reasons"]) or "did-not-pass"
+    if not record[verdict]["passed"]:
+        return ", ".join(record[verdict]["reasons"]) or "did-not-pass"
     if type(record["resources"].get("canonicalHostPeakBytes")) is not int:
         return "peak-unmeasured"
     return None
@@ -1047,7 +1056,8 @@ def recalibration_edits(registry: Mapping[str, Any], session: Mapping[str, Any],
     `ceilingSession` this session, and `ceilingHistory` gains the replaced
     ceiling, its session and date. A judge is refused when its runs were not
     clean or not on the canonical host, when its output identity is not the
-    one its committed canary record qualified, when it is not yet shadow,
+    one its canary cites (a judge whose worker sources changed is re-cited
+    first, `recitation_edits`), when it is not yet shadow,
     when the new ceiling (with the orchestrator reservation) does not fit the
     admission budget, or when the new ceiling is lower and `allow_lower` is
     not given.
@@ -1114,6 +1124,118 @@ def recalibration_edits(registry: Mapping[str, Any], session: Mapping[str, Any],
         changed[judge_id] = {"fromBytes": previous, "toBytes": ceiling, "peakBytes": peak,
                              "fromSession": old_session, "determinismClass": record["determinism"]["class"],
                              "registryDeterminismClass": judge.get("determinismClass")}
+    return edits, changed, refused
+
+
+# --------------------------------------------------------------------------- #
+# Canary re-citation
+# --------------------------------------------------------------------------- #
+
+RECITATION_STATUSES = RECALIBRATION_STATUSES
+CANARY_HISTORY_FIELDS = ("record", "sha256", "outputIdentity", "session", "date")
+
+
+def recitation_edits(registry: Mapping[str, Any], session: Mapping[str, Any],
+                     records: Mapping[str, Mapping[str, Any]], *, record_paths: Mapping[str, str],
+                     record_digests: Mapping[str, str], cited: Mapping[str, Mapping[str, Any]],
+                     canonical_host: str | None, root: Path = REPO,
+                     ) -> tuple[dict[tuple[str, ...], Any], dict[str, dict[str, Any]], dict[str, str]]:
+    """The registry edits that re-cite each shadow-or-later judge whose output identity changed, and why others refuse.
+
+    A judge's output identity covers its worker sources and runtime, which live
+    outside its registry entry: when they change, its canary names an identity
+    no worker produces any more, and `recalibration_edits` refuses every ceiling
+    record measured since. Re-citation moves the canary citation (`record`,
+    `sha256`, `outputIdentity`, `date`) to the judge's passing record of a
+    committed qualification session, appends the replaced citation with its
+    session to `canary.history` (oldest first), and makes the determinism class
+    the new record's. Status and resources never change: the ceiling stays the
+    one its session measured until `recalibrate` moves it.
+
+    `cited` holds each judge's currently cited canary record. A judge is refused
+    when it is a candidate (`promote` qualifies it), when its session did not
+    pass it, when its runs were not clean or not on the canonical host, when the
+    new class is not D0 or D1, when its registry entry differs from the one
+    either record measured (it returns to candidate and qualifies again), when
+    the new record measured the identity it already cites, when that record is
+    one it cited before or older than its canary, and when the record no longer
+    matches today's worker sources and runtime.
+    """
+    from audio_qc_judges import acquisition_entry_digest
+
+    if session_purpose(session) != QUALIFICATION_PURPOSE:
+        raise QualificationError(f"only a {QUALIFICATION_PURPOSE} session re-cites a canary")
+    edits: dict[tuple[str, ...], Any] = {}
+    changed: dict[str, dict[str, Any]] = {}
+    refused: dict[str, str] = {}
+    judges = registry.get("judges") or {}
+    for judge_id, entry in sorted((session.get("judges") or {}).items()):
+        judge = judges.get(judge_id)
+        record = records.get(judge_id)
+        if not isinstance(judge, Mapping) or "acquisition" not in judge:
+            refused[judge_id] = "not-a-panel-judge"
+            continue
+        if judge.get("status") not in RECITATION_STATUSES:
+            refused[judge_id] = f"status-{judge.get('status')}" + (
+                " (promote qualifies a candidate)" if judge.get("status") == "candidate" else "")
+            continue
+        if record is None:
+            reasons = ", ".join(entry.get("reasons") or [])
+            refused[judge_id] = f"did-not-pass ({reasons})" if reasons else "did-not-pass"
+            continue
+        if record.get("schema") != CANARY_SCHEMA:
+            refused[judge_id] = "no-canary-record"
+            continue
+        reason = _refusal(record, canonical_host, session["session"], verdict="qualification")
+        if reason is not None:
+            refused[judge_id] = reason
+            continue
+        klass = record["determinism"]["class"]
+        if klass not in QUALIFIED_CLASSES:
+            refused[judge_id] = f"determinism-{str(klass).lower()}"
+            continue
+        canary = judge.get("canary") if isinstance(judge.get("canary"), Mapping) else None
+        previous = cited.get(judge_id)
+        if canary is None or not isinstance(previous, Mapping) \
+                or not isinstance(previous.get("identityComponents"), Mapping) \
+                or not isinstance(previous.get("session"), Mapping):
+            refused[judge_id] = "no-cited-canary-record"
+            continue
+        digest = acquisition_entry_digest(dict(judge))
+        if record["identityComponents"].get("registryEntrySHA256") != digest \
+                or previous["identityComponents"].get("registryEntrySHA256") != digest:
+            refused[judge_id] = "registry-entry-changed"
+            continue
+        if record["outputIdentity"] == canary.get("outputIdentity"):
+            refused[judge_id] = "identity-unchanged"
+            continue
+        replaced = canary.get("history")
+        history = [dict(item) for item in replaced if isinstance(item, Mapping)] if isinstance(replaced, list) else []
+        new_session = record["session"]["id"]
+        if record_paths[judge_id] in {item.get("record") for item in history} \
+                or new_session in {item.get("session") for item in history} \
+                or new_session == previous["session"].get("id"):
+            refused[judge_id] = "already-cited"
+            continue
+        if str(record["session"]["date"]) < str(canary.get("date")):
+            refused[judge_id] = "older-than-its-canary"
+            continue
+        stale = identity_freshness_errors(record, judge_id, registry, root=root)
+        if stale:
+            refused[judge_id] = f"identity-not-current ({'; '.join(stale)})"
+            continue
+        history.append({"record": canary.get("record"), "sha256": canary.get("sha256"),
+                        "outputIdentity": canary.get("outputIdentity"), "session": previous["session"].get("id"),
+                        "date": canary.get("date")})
+        base = ("judges", judge_id)
+        edits[(*base, "canary")] = {"record": record_paths[judge_id], "sha256": record_digests[judge_id],
+                                    "outputIdentity": record["outputIdentity"], "date": record["session"]["date"],
+                                    "history": history}
+        edits[(*base, "determinismClass")] = klass
+        changed[judge_id] = {"fromRecord": canary.get("record"), "toRecord": record_paths[judge_id],
+                             "fromOutputIdentity": canary.get("outputIdentity"),
+                             "toOutputIdentity": record["outputIdentity"],
+                             "fromDeterminismClass": judge.get("determinismClass"), "toDeterminismClass": klass}
     return edits, changed, refused
 
 

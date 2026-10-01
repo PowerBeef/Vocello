@@ -96,6 +96,21 @@ class GoldenTests(FixtureCase):
         for identifier in judges:
             self.assertIn(f"Registry entry `{identifier}`", self.read(f"judges/{docs.page_name(identifier)}"))
 
+    def test_a_re_cited_judge_names_its_replaced_canary_records(self) -> None:
+        judge = "asr.whisper-large-v3@1"
+        self.regen()
+        self.assertNotIn("replaced canary records", self.read("judges/asr.whisper-large-v3-v1.md"))
+
+        def recite(value: dict) -> None:
+            canary = value["judges"][judge]["canary"]
+            canary["history"] = [{**canary, "outputIdentity": "b" * 64, "session": "20260831-fixture"}]
+
+        self.edit_json("config/audio-qc-judges.json", recite)
+        self.regen()
+        page = self.read("judges/asr.whisper-large-v3-v1.md")
+        self.assertIn("- Re-cited after its output identity changed; replaced canary records: [benchmarks/", page)
+        self.assertIn("(2026-09-01, output identity `bbbbbbbbbbbbbbbb`).", page)
+
     def test_a_qualified_record_is_reported_with_its_rates(self) -> None:
         self.regen()
         page = self.read("detectors/content.consensus-error-v1.md")

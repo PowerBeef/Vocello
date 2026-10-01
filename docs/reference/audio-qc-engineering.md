@@ -1561,7 +1561,8 @@ the output identity its canary cites:
 It refuses an unclean or off-host run, a candidate, another identity, and a ceiling that the
 admission budget less the orchestrator reservation cannot hold. It also refuses a lower ceiling
 unless `--allow-lower` is given. The registry then requires a recalibrated ceiling to be its
-committed ceiling record's, with the history starting at the canary session. Legacy judges
+committed ceiling record's, with the history starting at the session of a canary record the judge
+cites or once cited (re-citation, below). Legacy judges
 (whisper-small, SenseVoice Q8) are measured but never edited; their provisional ceilings are
 changed by hand. With every judge reserving the measurement ceiling, workers run one at a time. The
 791-take panel's worker time (about 85 minutes), plus chunk reloads, puts each run at about
@@ -1579,6 +1580,41 @@ python3 scripts/audio_qc_panel_qualification.py publish build/artifacts/diagnost
 # review, commit benchmarks/audio-qc-qualification/<session>/, then:
 python3 scripts/audio_qc_panel_qualification.py recalibrate benchmarks/audio-qc-qualification/<session> --dry-run
 python3 scripts/audio_qc_panel_qualification.py recalibrate benchmarks/audio-qc-qualification/<session>
+```
+
+**Canary re-citation (2026-09-30).** A judge's output identity includes the SHA-256 of its worker
+sources (`scripts/audio_qc_worker.py`, `panel_engines.py`, `panel_jobs.py`) and its runtime, which
+its registry entry does not hold. Commit da775e44 changed `audio_qc_worker.py`, so every shadow
+judge's canary now names an identity no worker produces, and `recalibrate` refuses each of their
+ceiling records as `identity-mismatch` (CAM++'s `20260930-a4642521` was refused this way). A canary
+session at the current identity, then `recite`, therefore comes before any recalibration. An
+ordinary `run --judge <id>` measures the judge again; a shadow judge runs under its calibrated
+ceiling there, so a canary-sized session (no `--manifest`, or the original language-bench one)
+stays the safe choice. Once its records are committed, `recite` changes, for each passing
+shadow-or-later judge whose output identity changed:
+
+- `canary` cites the new record, and its `history` gains the replaced citation with its session
+  and date, oldest first;
+- `determinismClass` becomes the new record's class.
+
+Status and resources never change; the ceiling stays the one its session measured until
+`recalibrate` moves it. `recite` refuses a candidate (`promote` qualifies it), an unclean or
+off-host run, a D2 class, a registry entry that differs from either record's (the judge returns to
+candidate), an unchanged identity, a record already cited or older than the canary, and a record
+no longer at today's worker sources and runtime. The registry checks each history entry as a
+committed, digest-bound, passing canary record of the same judge and registry entry, and accepts a
+ceiling, a recalibration identity and a `ceilingHistory` anchored at any canary the judge cites or
+once cited. `recalibrate` then compares a ceiling record with the re-cited identity.
+
+```sh
+python3 scripts/audio_qc_panel_qualification.py plan --judge <id>
+python3 scripts/audio_qc_panel_qualification.py run --judge <id>        # repeat --judge for several
+python3 scripts/audio_qc_panel_qualification.py publish build/artifacts/diagnostics/audio-qc-panel-qualification/<session>
+# review, commit benchmarks/audio-qc-qualification/<session>/, then:
+python3 scripts/audio_qc_panel_qualification.py recite benchmarks/audio-qc-qualification/<session> --dry-run
+python3 scripts/audio_qc_panel_qualification.py recite benchmarks/audio-qc-qualification/<session>
+python3 scripts/audio_qc_docs.py regen
+# commit config/audio-qc-judges.json and docs/reference/audio-qc/, then recalibrate as above
 ```
 
 ### Natural calibration takes (AQ-07 N3, 2026-09-27)

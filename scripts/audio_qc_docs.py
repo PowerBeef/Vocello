@@ -526,6 +526,13 @@ def canary_lines(sources: Sources, page: PurePosixPath, canary: Any) -> list[str
     path = canary.get("record")
     lines = [f"- Canary record: {link(page, path, path) if path else '-'} ({canary.get('date', '-')}), output "
              f"identity {short(canary.get('outputIdentity'))}."]
+    history = canary.get("history")
+    replaced = [item for item in history if isinstance(item, Mapping)] if isinstance(history, list) else []
+    if replaced:
+        lines.append("- Re-cited after its output identity changed; replaced canary records: " + "; ".join(
+            f"{link(page, item.get('record'), item.get('record')) if item.get('record') else '-'} "
+            f"({item.get('date', '-')}, output identity {short(item.get('outputIdentity'))})" for item in replaced)
+            + ".")
     file = sources.root / path if isinstance(path, str) else None
     if file is None or not file.is_file():
         return lines + ["- The canary record file is missing from the tree."]

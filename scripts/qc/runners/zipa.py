@@ -4,7 +4,8 @@ ZIPA (Zhu et al., ACL 2025) is a Zipformer trained with CR-CTC on IPA-Pack++ ove
 (`tokens.txt`: `<blk>` 0, the word-start token `▁`, letters, and diacritics such as `̃`, `ʰ` and
 `ː` as tokens of their own). The ONNX export takes `x` [1, T, 80] float32 fbank and `x_lens` [1]
 int64 and returns `log_probs` [1, T', 127] (log-softmax) and `log_probs_len` [1]; the encoder
-subsamples 4x, so one output frame is 40 ms of 10 ms feature frames.
+subsamples its 10 ms feature frames; the output frame step is measured per take from the ratio of
+feature frames to output frames (2x, 20 ms, for the large CR-CTC export), not assumed.
 
 The front end is the icefall/lhotse 80-bin Kaldi fbank the model was trained on, computed with
 kaldi-native-fbank (no torch, lhotse or k2): 25 ms povey window, 10 ms shift, dither 0,
@@ -15,7 +16,8 @@ options of ZIPA's own `onnx_pretrained_ctc.py` (kaldifeat).
 Output: greedy CTC phones with frame times, and `<stem>.npz` holding `logprobs` [frames x vocab]
 float16, `vocab` and `frameSeconds` for GOP. Runtime `onnx`. Options: `modelFile` (`model.onnx`,
 the FP32 export; `model.fp16.onnx` and `model.int8.onnx` are lighter and slightly less accurate),
-`threads` (ONNX Runtime intra-op threads, 0 = its default), `frameSeconds` (0.04).
+`threads` (ONNX Runtime intra-op threads, 0 = its default), `frameSeconds` (an override; default
+measured).
 """
 
 from __future__ import annotations
@@ -29,7 +31,8 @@ import numpy as np
 from qc import phones as phone_tools
 from qc.runners import speech_common as common
 
-FRAME_SECONDS = 0.04
+FRAME_SECONDS = 0.02
+FEATURE_SHIFT_SECONDS = 0.01
 FBANK_BINS = 80
 
 
@@ -73,7 +76,8 @@ class ZipaEngine:
             providers=["CPUExecutionProvider"])
         self.inputs = [item.name for item in self.session.get_inputs()]
         self.vocab = read_tokens(directory / "tokens.txt")
-        self.frame_seconds = float(options.get("frameSeconds", FRAME_SECONDS))
+        self.frame_override = options.get("frameSeconds")
+        self.frame_seconds = float(self.frame_override or FRAME_SECONDS)
         self.fbank = kaldi_native_fbank
 
     def features(self, audio: np.ndarray) -> np.ndarray:
@@ -106,6 +110,10 @@ class ZipaEngine:
             scores = scores[:int(np.asarray(outputs[1]).reshape(-1)[0])]
         if scores.shape[-1] != len(self.vocab):
             raise RuntimeError("ZIPA output width does not match tokens.txt")
+        if not self.frame_override and scores.shape[0]:
+            # The encoder's subsampling, measured: feature frames per output frame, as a whole number.
+            ratio = max(1, int(round(features.shape[0] / scores.shape[0])))
+            self.frame_seconds = FEATURE_SHIFT_SECONDS * ratio
         return scores
 
 

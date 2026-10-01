@@ -57,8 +57,9 @@ Registry entry `speaker.resnet293-voxceleb@1` in [config/audio-qc-judges.json](.
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json) (2026-09-27), output identity `91f85e1da05aedc0`.
-- Canary qualification passed: yes; determinism D0 over 31 rows (31 bit-exact, 0 discrete mismatches); peak 1.14 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/speaker.resnet293-voxceleb-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/speaker.resnet293-voxceleb-v1.json) (2026-10-01), output identity `afc541ed3ee2ff54`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json) (2026-09-27, output identity `91f85e1da05aedc0`).
+- Canary qualification passed: yes; determinism D0 over 12 rows (12 bit-exact, 0 discrete mismatches); peak 0.37 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 **UNQUALIFIED.** No registered detector consumes this judge, so no accuracy is claimed for it.
 <!-- END GENERATED audio-qc-docs:accuracy -->

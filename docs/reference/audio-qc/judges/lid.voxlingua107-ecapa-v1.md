@@ -61,8 +61,9 @@ Registry entry `lid.voxlingua107-ecapa@1` in [config/audio-qc-judges.json](../..
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json) (2026-09-27), output identity `587770eaaebb9e9d`.
-- Canary qualification passed: yes; determinism D0 over 28 rows (28 bit-exact, 0 discrete mismatches); peak 1.32 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/lid.voxlingua107-ecapa-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/lid.voxlingua107-ecapa-v1.json) (2026-10-01), output identity `49294258d799b54d`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json) (2026-09-27, output identity `587770eaaebb9e9d`).
+- Canary qualification passed: yes; determinism D0 over 9 rows (9 bit-exact, 0 discrete mismatches); peak 0.59 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 Its accuracy is claimed only through the detectors that consume it:
 

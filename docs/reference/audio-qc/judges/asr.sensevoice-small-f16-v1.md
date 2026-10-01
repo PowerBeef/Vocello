@@ -56,8 +56,9 @@ Registry entry `asr.sensevoice-small-f16@1` in [config/audio-qc-judges.json](../
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json) (2026-09-27), output identity `4002df42e2a6ed63`.
-- Canary qualification passed: yes; determinism D0 over 5 rows (5 bit-exact, 0 discrete mismatches); peak 0.49 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.sensevoice-small-f16-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.sensevoice-small-f16-v1.json) (2026-10-01), output identity `60dd465a89773f48`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json) (2026-09-27, output identity `4002df42e2a6ed63`).
+- Canary qualification passed: yes; determinism D0 over 2 rows (2 bit-exact, 0 discrete mismatches); peak 0.49 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 Its accuracy is claimed only through the detectors that consume it:
 

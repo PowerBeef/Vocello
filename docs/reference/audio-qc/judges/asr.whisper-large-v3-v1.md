@@ -55,8 +55,9 @@ Registry entry `asr.whisper-large-v3@1` in [config/audio-qc-judges.json](../../.
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json) (2026-09-27), output identity `815045ab8a6a740b`.
-- Canary qualification passed: yes; determinism D0 over 28 rows (28 bit-exact, 0 discrete mismatches); peak 5.70 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.whisper-large-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.whisper-large-v3-v1.json) (2026-10-01), output identity `0bdd27ea106e2512`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json) (2026-09-27, output identity `815045ab8a6a740b`).
+- Canary qualification passed: yes; determinism D0 over 9 rows (9 bit-exact, 0 discrete mismatches); peak 5.33 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 Its accuracy is claimed only through the detectors that consume it:
 

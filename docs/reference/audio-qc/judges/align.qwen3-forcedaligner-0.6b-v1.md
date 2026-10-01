@@ -65,8 +65,9 @@ Registry entry `align.qwen3-forcedaligner-0.6b@1` in [config/audio-qc-judges.jso
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json) (2026-09-27), output identity `b50cc9cd7a8adf9a`.
-- Canary qualification passed: yes; determinism D0 over 24 rows (24 bit-exact, 0 discrete mismatches); peak 3.91 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/align.qwen3-forcedaligner-0.6b-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/align.qwen3-forcedaligner-0.6b-v1.json) (2026-10-01), output identity `bf244e4c8e9bf049`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json) (2026-09-27, output identity `b50cc9cd7a8adf9a`).
+- Canary qualification passed: yes; determinism D0 over 5 rows (5 bit-exact, 0 discrete mismatches); peak 3.05 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 Its accuracy is claimed only through the detectors that consume it:
 

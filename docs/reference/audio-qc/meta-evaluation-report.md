@@ -1318,15 +1318,15 @@ Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Recor
 | [`quality.nisqa-v2@1`](judges/quality.nisqa-v2-v1.md) | `retired` | none | unmeasured | - |
 | [`quality.utmosv2@1`](judges/quality.utmosv2-v1.md) | `retired` | none | unmeasured | - |
 | [`emotion.ser-wav2vec2-xlsr@2`](judges/emotion.ser-wav2vec2-xlsr-v2.md) | `retired` | none | unmeasured | - |
-| [`asr.whisper-large-v3@1`](judges/asr.whisper-large-v3-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json) | D0 | 5.70 GiB |
-| [`asr.parakeet-tdt-0.6b-v3@1`](judges/asr.parakeet-tdt-0.6b-v3-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json) | D0 | 5.44 GiB |
-| [`asr.paraformer-zh@1`](judges/asr.paraformer-zh-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.paraformer-zh-v1.json) | D0 | 3.02 GiB |
-| [`asr.sensevoice-small-f16@1`](judges/asr.sensevoice-small-f16-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json) | D0 | 0.53 GiB |
-| [`asr.qwen3-asr-1.7b@1`](judges/asr.qwen3-asr-1.7b-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.qwen3-asr-1.7b-v1.json) | D0 | 5.43 GiB |
-| [`align.qwen3-forcedaligner-0.6b@1`](judges/align.qwen3-forcedaligner-0.6b-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json) | D0 | 3.91 GiB |
-| [`lid.voxlingua107-ecapa@1`](judges/lid.voxlingua107-ecapa-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json) | D0 | 1.33 GiB |
+| [`asr.whisper-large-v3@1`](judges/asr.whisper-large-v3-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.whisper-large-v3-v1.json) | D0 | 5.70 GiB |
+| [`asr.parakeet-tdt-0.6b-v3@1`](judges/asr.parakeet-tdt-0.6b-v3-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.parakeet-tdt-0.6b-v3-v1.json) | D0 | 5.44 GiB |
+| [`asr.paraformer-zh@1`](judges/asr.paraformer-zh-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.paraformer-zh-v1.json) | D0 | 3.02 GiB |
+| [`asr.sensevoice-small-f16@1`](judges/asr.sensevoice-small-f16-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.sensevoice-small-f16-v1.json) | D0 | 0.53 GiB |
+| [`asr.qwen3-asr-1.7b@1`](judges/asr.qwen3-asr-1.7b-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.qwen3-asr-1.7b-v1.json) | D0 | 5.43 GiB |
+| [`align.qwen3-forcedaligner-0.6b@1`](judges/align.qwen3-forcedaligner-0.6b-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/align.qwen3-forcedaligner-0.6b-v1.json) | D0 | 3.91 GiB |
+| [`lid.voxlingua107-ecapa@1`](judges/lid.voxlingua107-ecapa-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/lid.voxlingua107-ecapa-v1.json) | D0 | 1.33 GiB |
 | [`speaker.campplus-voxceleb@1`](judges/speaker.campplus-voxceleb-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-72a97eab/judges/speaker.campplus-voxceleb-v1.json) | D0 | 0.84 GiB |
-| [`speaker.resnet293-voxceleb@1`](judges/speaker.resnet293-voxceleb-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json) | D0 | 1.14 GiB |
-| [`pitch.pyin@1`](judges/pitch.pyin-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json) | D0 | 0.49 GiB |
-| [`quality.audiobox-aesthetics@1`](judges/quality.audiobox-aesthetics-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.audiobox-aesthetics-v1.json) | D0 | 2.99 GiB |
-| [`quality.dnsmos-p835@1`](judges/quality.dnsmos-p835-v1.md) | `shadow` | [2026-09-27](../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.dnsmos-p835-v1.json) | D0 | 0.47 GiB |
+| [`speaker.resnet293-voxceleb@1`](judges/speaker.resnet293-voxceleb-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/speaker.resnet293-voxceleb-v1.json) | D0 | 1.14 GiB |
+| [`pitch.pyin@1`](judges/pitch.pyin-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/pitch.pyin-v1.json) | D0 | 0.49 GiB |
+| [`quality.audiobox-aesthetics@1`](judges/quality.audiobox-aesthetics-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/quality.audiobox-aesthetics-v1.json) | D0 | 2.99 GiB |
+| [`quality.dnsmos-p835@1`](judges/quality.dnsmos-p835-v1.md) | `shadow` | [2026-10-01](../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/quality.dnsmos-p835-v1.json) | D0 | 0.47 GiB |

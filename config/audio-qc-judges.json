@@ -656,7 +656,7 @@
       "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (about 4-4.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 6124622480, "ceilingBytes": 7349546976, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json", "sha256": "9b37e19760c4c1dc78509462709d10d7591956b93e5059165c897b569a11aca3", "outputIdentity": "815045ab8a6a740b6c9a13007fcf9d1cf8a430b61e8fe7a1f588b3b77a8693ef", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.whisper-large-v3-v1.json", "sha256": "96ebe11d87264ebaa7e6ff9f9f47aaf44640a0f914a06ab224d7b26e8d01beaa", "outputIdentity": "0bdd27ea106e2512c9c9286183700b63e56da50b46eb879e2c448729fe0585b3", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.whisper-large-v3-v1.json", "sha256": "9b37e19760c4c1dc78509462709d10d7591956b93e5059165c897b569a11aca3", "outputIdentity": "815045ab8a6a740b6c9a13007fcf9d1cf8a430b61e8fe7a1f588b3b77a8693ef", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "whisper-large-v3-mlx", "stage": 1, "runtime": "whisper-mlx"}
     },
     "asr.parakeet-tdt-0.6b-v3@1": {
@@ -714,7 +714,7 @@
       "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (1.5-2.5 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 5835787120, "ceilingBytes": 7002944544, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 4507699696, "ceilingBytes": 5409239636}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json", "sha256": "cce97f99ed5f6f14ef96cf0994395eb810367a35701771543490c058d98e7fef", "outputIdentity": "c42785b420fbb3fc3936cd15a6103c23414795f3e0a1c862571c8041d44fb0d1", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.parakeet-tdt-0.6b-v3-v1.json", "sha256": "2f1022c54f372ca3b3bf0c88491ddfbcdc1ef6107be19eeb2533c8d91fa77f99", "outputIdentity": "cf1534c3855670ab67645b6c4dc0fae9b51df050c3106e550a15b5ca5b6f7e34", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json", "sha256": "cce97f99ed5f6f14ef96cf0994395eb810367a35701771543490c058d98e7fef", "outputIdentity": "c42785b420fbb3fc3936cd15a6103c23414795f3e0a1c862571c8041d44fb0d1", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "parakeet-tdt-0.6b-v3-mlx", "stage": 1, "runtime": "parakeet-mlx"}
     },
     "asr.paraformer-zh@1": {
@@ -774,7 +774,7 @@
       "resources": {"provisionalCeilingBytes": 2684354560, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (1.2-1.8 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 3245916160, "ceilingBytes": 3895099392, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.paraformer-zh-v1.json", "sha256": "db0d12b46148e101b223e7e9c5c96c9eaa62f6377074273680a0072e459b4413", "outputIdentity": "de8bd7fd3c9cffdb3736654b9e214d7d25cc9d8b2f32ef729215e1dc1d328373", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.paraformer-zh-v1.json", "sha256": "e49d104be0af473dcf62eef564e147b232dd92fe93b332f254d55daf8dc569b5", "outputIdentity": "cd3aec442e0fd17fd49a0315d0f7a187e8fa3a7135b88552deadea151bb6ea96", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.paraformer-zh-v1.json", "sha256": "db0d12b46148e101b223e7e9c5c96c9eaa62f6377074273680a0072e459b4413", "outputIdentity": "de8bd7fd3c9cffdb3736654b9e214d7d25cc9d8b2f32ef729215e1dc1d328373", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "paraformer-zh", "stage": 1, "runtime": "funasr-torch"}
     },
     "asr.sensevoice-small-f16@1": {
@@ -826,7 +826,7 @@
       "resources": {"provisionalCeilingBytes": 1610612736, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (under 1 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 569851904, "ceilingBytes": 683822285, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 523239424, "ceilingBytes": 627887309}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json", "sha256": "193ebdf73e817947d4dc51f1cca0373b216729800dc900eb707373ecca8797ef", "outputIdentity": "4002df42e2a6ed63265ad5164acc79736112e279380bf86b9e405120359a38f9", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.sensevoice-small-f16-v1.json", "sha256": "75b184b31679f69bbaaf9e53106c08bb4e46be7fcda89c2fa9e0539ec66626b8", "outputIdentity": "60dd465a89773f48db20339e67057d2a0d7182dda67e92d1d4be110bb4dc97c0", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.sensevoice-small-f16-v1.json", "sha256": "193ebdf73e817947d4dc51f1cca0373b216729800dc900eb707373ecca8797ef", "outputIdentity": "4002df42e2a6ed63265ad5164acc79736112e279380bf86b9e405120359a38f9", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "sensevoice-small-f16-gguf", "stage": 1, "runtime": "sensevoice-llamacpp"}
     },
     "asr.qwen3-asr-1.7b@1": {
@@ -887,7 +887,7 @@
       "resources": {"provisionalCeilingBytes": 6442450944, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (3.5-4 GB resident, section 4.1); admitted only beside CPU judges of 2.5 GB or less; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 5830758672, "ceilingBytes": 6996910407, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.qwen3-asr-1.7b-v1.json", "sha256": "5d4ce2a56c4b33077d33668413b5a8ed5e315823cd4f7b2caaedbfc30e65e532", "outputIdentity": "7a23e1253d6171c9828cfe689806eb03640cd6953fb1b77137b2b138bbd44eea", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.qwen3-asr-1.7b-v1.json", "sha256": "5728fc0652602e51c67dbe7399416c3a10faec8196f926b26c64f84fb2a6c51f", "outputIdentity": "f208db7b42e430aa681e73ed4c0acfcf3bc36a73a67489653ffb7780db5c7c96", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.qwen3-asr-1.7b-v1.json", "sha256": "5d4ce2a56c4b33077d33668413b5a8ed5e315823cd4f7b2caaedbfc30e65e532", "outputIdentity": "7a23e1253d6171c9828cfe689806eb03640cd6953fb1b77137b2b138bbd44eea", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "qwen3-asr-1.7b-bf16-mlx", "stage": 2, "runtime": "mlx-audio"}
     },
     "align.qwen3-forcedaligner-0.6b@1": {
@@ -948,7 +948,7 @@
       "resources": {"provisionalCeilingBytes": 3758096384, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 GPU-lane estimate (2-2.4 GB resident, section 4.1); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 4200352600, "ceilingBytes": 5040423120, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D1",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json", "sha256": "ad296d77db4fdbea055d86f2f71e4d4a0b673bb4181d103aaea6eab09aa7018f", "outputIdentity": "b50cc9cd7a8adf9a230da1d281bb515191fbb69b89d971c9a20d87592fb7aa65", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/align.qwen3-forcedaligner-0.6b-v1.json", "sha256": "8546b98468680b2cf24d0aefb0e80fbfb194668d7e8bb485243cd4e8496a9047", "outputIdentity": "bf244e4c8e9bf04984bc0d90d662c035ca15a11846c509db510c564d4c63081d", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/align.qwen3-forcedaligner-0.6b-v1.json", "sha256": "ad296d77db4fdbea055d86f2f71e4d4a0b673bb4181d103aaea6eab09aa7018f", "outputIdentity": "b50cc9cd7a8adf9a230da1d281bb515191fbb69b89d971c9a20d87592fb7aa65", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "qwen3-forcedaligner-0.6b-bf16-mlx", "stage": 2, "runtime": "mlx-audio-aligner"}
     },
     "lid.voxlingua107-ecapa@1": {
@@ -1006,7 +1006,7 @@
       "resources": {"provisionalCeilingBytes": 1073741824, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.4-0.7 GB resident, section 4.2); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1428455424, "ceilingBytes": 1714146509, "ceilingSession": "20260927-70e86ea6", "ceilingHistory": [{"ceilingSession": "20260927-aaba14fd", "date": "2026-09-27", "canonicalHostPeakBytes": 1418313728, "ceilingBytes": 1701976474}]},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json", "sha256": "1334a67d06825e9e7a18d93d7f0714d9099bf42c2217cdef4427e861053c9abd", "outputIdentity": "587770eaaebb9e9db972004803a8d1651627073b3ef809034f41b79613a99f67", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/lid.voxlingua107-ecapa-v1.json", "sha256": "4799c265b15a2c8b41df0ece334663fe510773582bade42c8f0c06f3ccba6708", "outputIdentity": "49294258d799b54dfd1ab6897362d4a52025cc0bd9c791e68becca1b67c1a861", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/lid.voxlingua107-ecapa-v1.json", "sha256": "1334a67d06825e9e7a18d93d7f0714d9099bf42c2217cdef4427e861053c9abd", "outputIdentity": "587770eaaebb9e9db972004803a8d1651627073b3ef809034f41b79613a99f67", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "lang-id-voxlingua107-ecapa", "stage": 1, "runtime": "speechbrain-torch"}
     },
     "speaker.campplus-voxceleb@1": {
@@ -1121,7 +1121,7 @@
       "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "calibrated", "ceilingBasis": "Audit estimate about 0.3 GB (section 3.4), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 1220476928, "ceilingBytes": 1464572314, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json", "sha256": "d30ff3feffdce284b1cb07a20e2f77411651649923bac06c35f7ebbe4f6dbd67", "outputIdentity": "91f85e1da05aedc03d1409b60a3064f3482fd547f29baa6f4d0cffaa74b16777", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/speaker.resnet293-voxceleb-v1.json", "sha256": "44a5c860810b19d616ffbd72323ad8257b446b75c02a38d1b945ac2f9781dae9", "outputIdentity": "afc541ed3ee2ff549c2e8c4f3a2f9063ab0525b21d2d0a073b1c5fcd59e36db8", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/speaker.resnet293-voxceleb-v1.json", "sha256": "d30ff3feffdce284b1cb07a20e2f77411651649923bac06c35f7ebbe4f6dbd67", "outputIdentity": "91f85e1da05aedc03d1409b60a3064f3482fd547f29baa6f4d0cffaa74b16777", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "wespeaker-voxceleb-resnet293-lm", "stage": 2, "runtime": "onnx-cpu"}
     },
     "pitch.pyin@1": {
@@ -1164,7 +1164,7 @@
       "resources": {"provisionalCeilingBytes": 536870912, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 DSP-pool estimate (0.3 GB), raised to 512 MiB for librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 530219008, "ceilingBytes": 636262810, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json", "sha256": "f35e85af0142dd95c467ee30d3a3bfbf63f8fa46b1461babac6be2981902dfbd", "outputIdentity": "772bcaf2018a0b50452b7153d8433bf23824b6a772788a11404698935dd01d22", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/pitch.pyin-v1.json", "sha256": "4d0af058d719078ebaa95181ce86a2649d659ca44735837a7c90539f1d22df3f", "outputIdentity": "a12f12f5cf71a807a101248870e080512dab86f00fa2eb47dbd48549192f7d87", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/pitch.pyin-v1.json", "sha256": "f35e85af0142dd95c467ee30d3a3bfbf63f8fa46b1461babac6be2981902dfbd", "outputIdentity": "772bcaf2018a0b50452b7153d8433bf23824b6a772788a11404698935dd01d22", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "pitch-pyin", "stage": 1, "runtime": "librosa-dsp"}
     },
     "quality.audiobox-aesthetics@1": {
@@ -1215,7 +1215,7 @@
       "resources": {"provisionalCeilingBytes": 1288490189, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 3.4 CPU-lane estimate (0.8-1.2 GB, section 4.6); provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 3208381976, "ceilingBytes": 3850058372, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.audiobox-aesthetics-v1.json", "sha256": "9a5a77025ada3e6bbcc6e2b28324a5e16bced627e88f08f12006c931cbff7678", "outputIdentity": "68d2d6af4387cb59808b1fd56433529e8afabfe59f8f890f90559d36e2ceb471", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/quality.audiobox-aesthetics-v1.json", "sha256": "44aed3efada837d4217fd8bb2e3cfe4927c66494cdf89a9122625f858cc40fac", "outputIdentity": "7511558af400a943304f1cbffc6632169e45c14d09329f90d2385b9305b3983c", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.audiobox-aesthetics-v1.json", "sha256": "9a5a77025ada3e6bbcc6e2b28324a5e16bced627e88f08f12006c931cbff7678", "outputIdentity": "68d2d6af4387cb59808b1fd56433529e8afabfe59f8f890f90559d36e2ceb471", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "audiobox-aesthetics", "stage": 2, "runtime": "audiobox-torch"}
     },
     "quality.dnsmos-p835@1": {
@@ -1276,7 +1276,7 @@
       "resources": {"provisionalCeilingBytes": 805306368, "ceilingStatus": "calibrated", "ceilingBasis": "Audit section 4.6 estimate (about 0.25 GB), raised to 768 MiB for the interpreter, ONNX Runtime, librosa and numba; provisional until two clean M6 runs measure its peak.", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": 506511360, "ceilingBytes": 607813632, "ceilingSession": "20260927-aaba14fd"},
       "determinismClass": "D0",
       "expectedDeterminismClass": "D0",
-      "canary": {"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.dnsmos-p835-v1.json", "sha256": "e40d1234db97b008c2324dfa76e649cdc1224c6b130bb41f8a2706942370a7d9", "outputIdentity": "461fbe8a780bf3e15a85dd75453c950fe763c0a3302dd911d73d85f505e078ab", "date": "2026-09-27"},
+      "canary": {"record": "benchmarks/audio-qc-qualification/20261001-505107fc/judges/quality.dnsmos-p835-v1.json", "sha256": "bf61127032f7f51e9dc8f83634a1f44b3e02ae508ad78d04a0198ca28e596870", "outputIdentity": "bda9cb3bed22b982c57120afab5e163568376477efc6eac0f243f814959de28a", "date": "2026-10-01", "history": [{"record": "benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/quality.dnsmos-p835-v1.json", "sha256": "e40d1234db97b008c2324dfa76e649cdc1224c6b130bb41f8a2706942370a7d9", "outputIdentity": "461fbe8a780bf3e15a85dd75453c950fe763c0a3302dd911d73d85f505e078ab", "session": "20260927-aaba14fd", "date": "2026-09-27"}]},
       "acquisition": {"directory": "dnsmos-p835", "stage": 2, "runtime": "onnx-librosa"}
     }
   },

@@ -61,8 +61,9 @@ Registry entry `asr.parakeet-tdt-0.6b-v3@1` in [config/audio-qc-judges.json](../
 <!-- BEGIN GENERATED audio-qc-docs:accuracy (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Canary and accuracy
 
-- Canary record: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json) (2026-09-27), output identity `c42785b420fbb3fc`.
-- Canary qualification passed: yes; determinism D0 over 19 rows (19 bit-exact, 0 discrete mismatches); peak 4.20 GiB on mac-mini-m6-16gb (session 20260927-aaba14fd).
+- Canary record: [benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.parakeet-tdt-0.6b-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20261001-505107fc/judges/asr.parakeet-tdt-0.6b-v3-v1.json) (2026-10-01), output identity `cf1534c3855670ab`.
+- Re-cited after its output identity changed; replaced canary records: [benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json](../../../../benchmarks/audio-qc-qualification/20260927-aaba14fd/judges/asr.parakeet-tdt-0.6b-v3-v1.json) (2026-09-27, output identity `c42785b420fbb3fc`).
+- Canary qualification passed: yes; determinism D0 over 6 rows (6 bit-exact, 0 discrete mismatches); peak 2.75 GiB on mac-mini-m6-16gb (session 20261001-505107fc).
 
 Its accuracy is claimed only through the detectors that consume it:
 

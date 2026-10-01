@@ -122,7 +122,6 @@ IOS_ENGINE_LANE = (
 DELIVERY_ANALYSIS = (
     "scripts/analyze_prosody.py",
     "scripts/bench_delivery_prosody.py",
-    "scripts/clone_prosody_fidelity.py",
     "scripts/delivery_quality_gate.py",
     "scripts/prosody_profile.py",
     "scripts/prosody_quality_gate.py",

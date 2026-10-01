@@ -473,7 +473,7 @@
           "scripts/lib/language_metrics.py",
           "config/language-normalization/**",
           "scripts/lib/audio_qc.py",
-          "scripts/independent_asr.py",
+          "scripts/qc/language.py",
           "scripts/*speaker_similarity*.py",
           "scripts/*fidelity*.py",
           "scripts/check_marking_peak_equality.py",

@@ -1319,7 +1319,6 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         # as much as the prosody gate does; before this they could change
         # without invalidating inputs.analysisProfileHash.
         REPO_ROOT / "scripts" / "delivery_quality_gate.py",
-        REPO_ROOT / "scripts" / "clone_prosody_fidelity.py",
         REPO_ROOT / "scripts" / "check_language_hints.py",
         REPO_ROOT / "scripts" / "check_language_output.py",
         REPO_ROOT / "Tests" / "UIAutomationSupport" / "VocelloUIAutomationSupport.swift",

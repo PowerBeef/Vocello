@@ -5,6 +5,7 @@
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
     python3 scripts/qc.py run | gate | queue | fit | eval
+    python3 scripts/qc.py language-bench takes|evidence
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
 3 gate warn. See docs/reference/qc.md.
@@ -206,6 +207,33 @@ def cmd_queue(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
+def cmd_language_bench(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import language
+
+    if args.action == "takes":
+        try:
+            manifest = language.build_takes(
+                platform=args.platform, run_id=args.run_id, plan=Path(args.plan), corpus=Path(args.corpus),
+                diagnostics=Path(args.diagnostics), wav_dir=Path(args.wav_dir) if args.wav_dir else None)
+        except (language.LanguageBenchError, ValueError, OSError) as error:
+            print(f"qc language-bench takes: {error}", file=sys.stderr)
+            return EXIT_FAIL
+        store.write_json_atomic(args.output, manifest)
+        controls = sum(1 for take in manifest["takes"] if take["control"])
+        print(f"qc language-bench takes: {len(manifest['takes'])} takes ({controls} negative controls) "
+              f"for lane {language.LANES[args.platform]}")
+        return EXIT_OK
+    try:
+        evidence = language.build_evidence(layout, args.run)
+    except (language.LanguageBenchError, ValueError, OSError) as error:
+        print(f"qc language-bench evidence: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    store.write_json_atomic(args.output, evidence)
+    for line in language.summary_lines(evidence):
+        print(line)
+    return language.exit_code(evidence)
+
+
 def cmd_fit(args: argparse.Namespace, layout: Layout) -> int:
     from qc import fit
 
@@ -284,10 +312,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="run the models and detectors over a takes manifest")
     run.add_argument("--takes", required=True, help="takes manifest or qc-takes run directory")
-    run.add_argument("--lane", required=True, help="lane name (pool, lang-bench, qc-takes, clone, ios)")
-    run.add_argument("--models", help="comma-separated roles or model ids to run now (default every detector "
-                                      "model); the others are read from the cache")
+    run.add_argument("--lane", required=True,
+                     help="lane name: one of the `lanes` of config/qc/detectors.json (language-bench, "
+                          "ios-language-bench, qc-takes, clone-lane, voice-reliability), or any other "
+                          "name, such as pool, for every role")
+    run.add_argument("--models", help="comma-separated roles or model ids to run now (default the lane's "
+                                      "models); the others are read from the cache")
     run.set_defaults(handler=cmd_run)
+
+    bench = commands.add_parser("language-bench", help="the language lanes: takes manifest and recognitions")
+    bench_actions = bench.add_subparsers(dest="action", required=True)
+    takes = bench_actions.add_parser("takes", help="a lang-bench run's planned takes as a takes manifest")
+    takes.add_argument("--platform", required=True, choices=("macos", "ios"))
+    takes.add_argument("--run-id", required=True)
+    takes.add_argument("--plan", required=True, help="the run's immutable language-run-plan.json")
+    takes.add_argument("--corpus", required=True)
+    takes.add_argument("--diagnostics", required=True,
+                       help="macOS: the engine diagnostics root; iOS: the collected exact evidence tree")
+    takes.add_argument("--wav-dir", help="macOS: the directory of <cell>.wav takes")
+    takes.add_argument("--output", required=True)
+    evidence = bench_actions.add_parser(
+        "evidence", help="the two ASR families' recognitions of a QC run, with each take's verdict "
+                         "(exit 0 every take met its outcome, 1 one did not, 2 a recognition is missing)")
+    evidence.add_argument("--run", required=True, help="the QC run id `qc.py run` printed")
+    evidence.add_argument("--output", required=True)
+    bench.set_defaults(handler=cmd_language_bench)
 
     gate = commands.add_parser("gate", help="exit 0 pass, 3 warn, 1 fail, 2 error for a lane run")
     gate.add_argument("--lane", required=True)

@@ -16,6 +16,7 @@ queue but never flags.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Iterable
 
 from qc import store
@@ -31,6 +32,7 @@ FEATURE_ROLES = {
     "signal": (), "engine": (), "pause": (), "end": (), "level": (),
 }
 LEVELS = ("report-only", "warn", "fail")
+LANE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 RULE_OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a < b,
             "<=": lambda a, b: a <= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}
 
@@ -91,6 +93,36 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
             require(family in FEATURE_ROLES, f"{label}: unknown feature family in {item.get('name')!r}")
     for name in ("warn", "fail"):
         require(isinstance(config.get("levels", {}).get(name), dict), f"levels.{name} is required")
+    lanes = config.get("lanes", {})
+    require(isinstance(lanes, dict), "lanes must map lane names to definitions")
+    for name, lane in lanes.items():
+        require(isinstance(name, str) and LANE_NAME.fullmatch(name) is not None, f"lane {name!r}: invalid name")
+        require(isinstance(lane, dict) and isinstance(lane.get("description"), str) and lane["description"],
+                f"lane {name!r}: a description is required")
+        models = lane.get("models")
+        require(isinstance(models, list) and models and len(set(models)) == len(models)
+                and set(models) <= set(roles), f"lane {name!r}: models must list roles of the models map once")
+
+
+def lane_roles(config: dict[str, Any], lane: str | None) -> list[str]:
+    """The roles a lane runs by default: its `lanes` entry, else every role of the models map."""
+
+    definition = (config.get("lanes") or {}).get(lane or "")
+    return list(definition["models"]) if definition else list(config["models"])
+
+
+def gated_detectors(config: dict[str, Any], lane: str | None) -> set[str]:
+    """The detectors a lane's gate reads: those with a feature the lane can measure, from the WAV
+    and the take alone or from roles the lane runs. The others stay report-only in that lane, so a
+    model it never runs cannot turn a gate into an error."""
+
+    roles = set(lane_roles(config, lane))
+    gated = set()
+    for detector in config["detectors"]:
+        families = {item["name"].split(".", 1)[0] for item in detector["features"]}
+        if any(set(FEATURE_ROLES[family]) <= roles for family in families):
+            gated.add(detector["id"])
+    return gated
 
 
 def config_digest(layout: Layout = Layout()) -> str:

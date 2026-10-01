@@ -37,6 +37,28 @@
     "warn": {"precisionLower": 0.6, "recall": 0.6},
     "fail": {"precisionLower": 0.8, "cleanFalseAlarmUpper": 0.05}
   },
+  "lanes": {
+    "language-bench": {
+      "description": "scripts/macos_test.sh lang-bench: the language matrix's takes from the Mac CLI. asrA and asrB are the two spoken-content families of the language record (scripts/qc/language.py).",
+      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+    },
+    "ios-language-bench": {
+      "description": "scripts/ios_device.sh lang-bench: the iPhone's takes, scored on the Mac once they are collected.",
+      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+    },
+    "qc-takes": {
+      "description": "scripts/macos_test.sh qc-takes: the take pool after generation, then the listening queue. The LLM judge runs only on labelled and queued takes (--models llm).",
+      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+    },
+    "clone-lane": {
+      "description": "scripts/clone_fidelity_lane.py: fixed-seed clone takes against their reference clip (identity and pitch); its controls are scored against the same clip and never gate.",
+      "models": ["speaker", "pitchA", "pitchB"]
+    },
+    "voice-reliability": {
+      "description": "scripts/voice_identity_language_reliability.py analyze: Clone takes against their reference clip; reported, never gated.",
+      "models": ["speaker", "pitchA", "pitchB"]
+    }
+  },
   "detectors": [
     {"id": "pause.anomalous", "class": "pause", "method": "logistic", "features": [
       {"name": "pause.longest_gap_seconds", "direction": "higher"},

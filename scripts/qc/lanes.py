@@ -11,6 +11,13 @@ writes these files under `build/private/qc/runs/<run-id>/`:
 The level comes from the evaluation of the newest thresholds file. Before an
 evaluation exists, every flag is report-only.
 
+A lane named in the `lanes` map of `config/qc/detectors.json` runs its own roles
+by default, and its gate reads only the detectors those roles (or the WAV alone)
+can score; any other lane name runs every role. A take marked `control` (a
+negative control, such as the language bench's pinned hint over a script in
+another language, or the clone lane's other speakers) is scored and flagged,
+but always at report-only: it never gates.
+
 `gate` turns a run's flags into an exit code: 0 pass, 3 warn, 1 fail, 2 error.
 `queue` writes the most suspicious unlabelled takes as a label batch, which
 `label serve` opens.
@@ -18,7 +25,6 @@ evaluation exists, every flag is report-only.
 
 from __future__ import annotations
 
-import re
 import secrets
 import sys
 from datetime import datetime, timezone
@@ -36,7 +42,7 @@ FLAGS_SCHEMA = "vocello.qc.flags/1"
 LEVEL_RANK = {"report-only": 0, "warn": 1, "fail": 2}
 EXIT_PASS, EXIT_FAIL, EXIT_ERROR, EXIT_WARN = 0, 1, 2, 3
 PITCH_ROLES = ("pitchA", "pitchB")
-LANE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
+LANE_RE = detector_lib.LANE_NAME
 
 
 def utc_stamp() -> str:
@@ -78,7 +84,7 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
             take["referenceSHA256"] = store.audio_sha256(take["reference"])
     references = _reference_takes(takes)
     role_models = _role_models(config, models.load_registry(layout))
-    selected = roles or list(config["models"])
+    selected = roles or detector_lib.lane_roles(config, lane)
     model_report: dict[str, Any] = {}
     with runtime.run_lock(layout):
         for role in selected:
@@ -148,7 +154,8 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
         "models": identities, "takes": rows,
     }, indent=None)
-    flags = score_run(layout, config, rows, identities)
+    controls = {take["token"] for take in takes if take.get("control")}
+    flags = score_run(layout, config, rows, identities, lane=lane, controls=controls)
     flags.update(run=run_id, lane=lane, models=model_report,
                  registerSD={key: round(value, 3) for key, value in context.get("voicePitchSD", {}).items()})
     store.write_json_atomic(directory / "flags.json", flags, indent=None)
@@ -210,8 +217,11 @@ def mute_test(layout: Layout, takes: list[dict[str, Any]], rows: list[dict[str, 
 
 
 def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]],
-              identities: dict[str, Any]) -> dict[str, Any]:
-    """Flags for a run's feature rows, with the newest applicable thresholds and levels."""
+              identities: dict[str, Any], *, lane: str | None = None,
+              controls: set[str] | frozenset[str] = frozenset()) -> dict[str, Any]:
+    """Flags for a run's feature rows, with the newest applicable thresholds and levels.
+
+    A detector outside the lane's gated set, and every flag of a control take, stays report-only."""
 
     thresholds_path = fit_lib.latest_thresholds(layout)
     thresholds = store.read_json(thresholds_path) if thresholds_path else None
@@ -220,9 +230,11 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     names = detector_lib.feature_names(config)
     run_norm = detector_lib.normalization(rows, names)
     norm = thresholds["normalization"] if applicable else run_norm
+    gated = detector_lib.gated_detectors(config, lane)
     out_takes, errors = [], []
     summary = {level: 0 for level in LEVEL_RANK}
     for row in rows:
+        control = row["token"] in controls
         flags, scores, raw = [], {}, {}
         for detector in config["detectors"]:
             fitted = thresholds["detectors"].get(detector["id"]) if applicable else None
@@ -232,6 +244,8 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
             raw[detector["id"]] = detector_lib.uncalibrated(detector, row["features"], row["language"], run_norm)
             scores[detector["id"]] = outcome["score"]
             level = levels.get(detector["id"], {}).get(row["language"], "report-only")
+            if control or detector["id"] not in gated:
+                level = "report-only"
             if outcome["score"] is None:
                 if level != "report-only":
                     errors.append({"token": row["token"], "detector": detector["id"], "reason": "missing-inputs"})
@@ -242,8 +256,11 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
                               "evidence": detector_lib.evidence(detector, row["features"])})
         if flags:
             summary[max((flag["level"] for flag in flags), key=LEVEL_RANK.__getitem__)] += 1
-        out_takes.append({"token": row["token"], "takeID": row.get("takeID"), "language": row["language"],
-                          "flags": flags, "scores": scores, "rawScores": raw})
+        entry = {"token": row["token"], "takeID": row.get("takeID"), "language": row["language"],
+                 "flags": flags, "scores": scores, "rawScores": raw}
+        if control:
+            entry["control"] = True
+        out_takes.append(entry)
     return {
         "schema": FLAGS_SCHEMA, "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "thresholds": thresholds_path.name if thresholds_path else None, "thresholdsApplied": applicable,

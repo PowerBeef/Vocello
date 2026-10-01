@@ -1,9 +1,10 @@
 """Language-verification metrics shared by every Python consumer.
 
 One tokenizer, one edit distance, one locale table, one threshold set and one
-family-consensus rule, applied per verdict channel. `check_language_output.py`, `publish_benchmark_history.py`,
-`run_local_delivery_cascade.py` and `independent_asr.py` import from here; the
-Swift `GenerationOutputVerifier` keeps its own implementation as the independent
+family-consensus rule, applied per verdict channel. `check_language_output.py`,
+`publish_benchmark_history.py`, `benchmark_history.py` and `qc/language.py` (the
+QC v2 recognitions of the language lanes) import from here; the Swift
+`GenerationOutputVerifier` keeps its own implementation as the independent
 cross-check. The current text normalization (v3, AQ-02) is pinned to the Swift
 verifier by the shared fixtures in
 `scripts/tests/fixtures/language_normalization.json`, which
@@ -109,26 +110,52 @@ LEGACY_CHARACTER_ERROR_LANGUAGES = frozenset({"chinese", "japanese"})
 
 # Recognizer families a language verdict may cite. One family is one witness;
 # `consensus` needs two independent families for a pass or a fail.
-RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
+RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice", "qwen3-asr")
 # What each family's language check observes (audit #42). Apple Speech runs
 # locked to the expected locale and its languagePass is text language
 # detection over that locked transcript: transcript-language consistency, close
-# to unfalsifiable for an anglicized take. Whisper and SenseVoice identify the
-# language from the audio. Records declare this beside their families.
+# to unfalsifiable for an anglicized take. Whisper, SenseVoice and Qwen3-ASR
+# identify the language from the audio. Records declare this beside their families.
 LANGUAGE_CHECK_KINDS = {
     "apple-speech": "transcript-language-consistency",
     "whisper": "audio-language-identification",
     "sensevoice": "audio-language-identification",
+    "qwen3-asr": "audio-language-identification",
 }
 SENSEVOICE_LANGUAGES = frozenset({"english", "chinese", "japanese", "korean", "cantonese"})
 MAX_TEXT_CHARACTERS = 4096
 
-# Identity of the independent (non-Apple) recognizer evidence in history records.
+# The legacy whisper-small Mac witness (language measurement version 5 and
+# earlier, `mlx-whisper-locked-decode-v1`): records that carry it keep their
+# identity in `benchmark_history.INDEPENDENT_VERIFICATION_IDENTITY`; nothing
+# produces it any more.
 INDEPENDENT_OUTPUT_SCHEMA = 1
 INDEPENDENT_OUTPUT_ALGORITHM = "independent-asr-output-v1"
 INDEPENDENT_RECOGNITION_SCHEMA = 1
 INDEPENDENT_ASR_ALGORITHM = "mlx-whisper-locked-decode-v1"
 INDEPENDENT_REQUIRED_PASS_COUNT = 1
+
+# QC v2 recognitions (language measurement version 6, 2026-10-01). The language
+# lanes' Mac-side witnesses are QC v2's two ASR families (`config/qc/detectors.json`
+# roles asrA and asrB): Qwen3-ASR 1.7B and Whisper large-v3, both on MLX. Each
+# decodes the whole take with neither the expected language nor the script, and
+# identifies the language from the audio, so a take in the wrong language fails
+# the language channel and is transcribed in the language it was spoken in.
+# `qc/language.py` writes the evidence; the publisher re-scores every transcript.
+QC_RECOGNITION_FAMILIES = ("qwen3-asr", "whisper")
+QC_OUTPUT_SCHEMA = 2
+QC_OUTPUT_ALGORITHM = "qc-v2-language-output-v1"
+QC_RECOGNITION_SCHEMA = 2
+QC_ASR_ALGORITHM = "qc-v2-free-decode-asr-v1"
+QC_REQUIRED_PASS_COUNT = 1
+# The take metrics of each QC family: `<prefix>WordErrorRate` and the rest of
+# `QC_FAMILY_METRIC_SUFFIXES`.
+QC_FAMILY_METRIC_PREFIXES = {"qwen3-asr": "qcQwen3Asr", "whisper": "qcWhisper"}
+QC_FAMILY_METRIC_SUFFIXES = (
+    "WordErrorRate", "CharacterErrorRate", "PrimaryAccuracyScore", "LanguageMatchScore",
+    "LanguagePass", "AccuracyPass", "LongestDeletionRun", "SegmentationAwareWordErrorRate",
+    "WordBoundaryOnlyEdits", "ExcessFillerCount",
+)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -953,6 +980,10 @@ def consensus(family_votes: dict[str, list[bool]]) -> dict[str, Any]:
 # a channel leave that channel inconclusive.
 LANGUAGE_CHANNELS = ("language", "accuracy")
 CHANNEL_CONSENSUS_ALGORITHM = "per-channel-family-consensus-v1"
+# QC v2 records (language measurement version 6): the same per-channel family
+# rule, voted by the two QC families (QC_RECOGNITION_FAMILIES) only. On the
+# iPhone, Apple Speech keeps its own in-app gate beside them; it does not vote.
+QC_CHANNEL_CONSENSUS_ALGORITHM = "qc-v2-family-consensus-v1"
 CHANNEL_STATUSES = frozenset({"pass", "fail", "inconclusive"})
 # The negative control (a pinned hint over a script in another language) is an
 # accuracy control: it proves the accuracy channel sees wrong output. It no
@@ -961,27 +992,44 @@ CHANNEL_STATUSES = frozenset({"pass", "fail", "inconclusive"})
 # published beside it (`detectedLanguages`) and its language channel is
 # reported only.
 NEGATIVE_CONTROL_KIND = "accuracy-control"
+# QC v2 records: the control is a language control. Recognizers that decode
+# freely transcribe the control's French correctly, so its accuracy passes and
+# is reported only; the language channel sees it, since both families must
+# identify a language other than the pinned one.
+LANGUAGE_CONTROL_KIND = "language-control"
 
 
-def expected_channel_outcomes(expect_failure: bool) -> dict[str, str]:
+def expected_channel_outcomes(
+    expect_failure: bool, control_kind: str = NEGATIVE_CONTROL_KIND,
+) -> dict[str, str]:
     """The channels a take's declared outcome constrains, and their expected status."""
-    return {"accuracy": "fail"} if expect_failure else {"language": "pass", "accuracy": "pass"}
+    if not expect_failure:
+        return {"language": "pass", "accuracy": "pass"}
+    if control_kind == LANGUAGE_CONTROL_KIND:
+        return {"language": "fail"}
+    if control_kind == NEGATIVE_CONTROL_KIND:
+        return {"accuracy": "fail"}
+    raise ValueError(f"unknown negative control kind {control_kind!r}")
 
 
 def single_family_meets_expectation(
     language_pass: bool, accuracy_pass: bool, *, expect_failure: bool,
+    control_kind: str = NEGATIVE_CONTROL_KIND,
 ) -> bool:
     """One witness against the take's declared outcome, channel by channel.
 
-    The accuracy control must fail on accuracy; its language check is reported
-    only. A take that must pass needs both channels."""
+    The accuracy control must fail on accuracy and the language control on
+    language; the other channel is reported only. A take that must pass needs
+    both channels."""
     if expect_failure:
-        return accuracy_pass is False
+        channel = next(iter(expected_channel_outcomes(True, control_kind)))
+        return (language_pass if channel == "language" else accuracy_pass) is False
     return language_pass is True and accuracy_pass is True
 
 
 def channel_consensus(
     family_channels: dict[str, dict[str, bool]], *, expect_failure: bool,
+    control_kind: str = NEGATIVE_CONTROL_KIND, algorithm: str = CHANNEL_CONSENSUS_ALGORITHM,
 ) -> dict[str, Any]:
     """Vote each channel through the family rule and judge the take's expectation.
 
@@ -997,7 +1045,7 @@ def channel_consensus(
             for family, verdicts in sorted(family_channels.items())
         }
         channels[channel] = consensus(votes)
-    expected = expected_channel_outcomes(expect_failure)
+    expected = expected_channel_outcomes(expect_failure, control_kind)
     statuses = {channel: channels[channel]["status"] for channel in LANGUAGE_CHANNELS}
     if all(statuses[channel] == status for channel, status in expected.items()):
         outcome = "met"
@@ -1006,7 +1054,7 @@ def channel_consensus(
     else:
         outcome = "inconclusive"
     return {
-        "algorithm": CHANNEL_CONSENSUS_ALGORITHM,
+        "algorithm": algorithm,
         "families": sorted(family_channels),
         "channels": channels,
         "statuses": statuses,
@@ -1015,7 +1063,9 @@ def channel_consensus(
     }
 
 
-def run_channel_verdicts(takes: list[tuple[dict[str, str], bool]]) -> dict[str, str]:
+def run_channel_verdicts(
+    takes: list[tuple[dict[str, str], bool]], control_kind: str = NEGATIVE_CONTROL_KIND,
+) -> dict[str, str]:
     """The run's verdict per channel from each take's channel statuses.
 
     `takes` holds `(statuses, expect_failure)` per scored take. A channel is
@@ -1025,9 +1075,9 @@ def run_channel_verdicts(takes: list[tuple[dict[str, str], bool]]) -> dict[str, 
     verdicts: dict[str, str] = {}
     for channel in LANGUAGE_CHANNELS:
         observed = [
-            (statuses.get(channel), expected_channel_outcomes(expect_failure)[channel])
+            (statuses.get(channel), expected_channel_outcomes(expect_failure, control_kind)[channel])
             for statuses, expect_failure in takes
-            if channel in expected_channel_outcomes(expect_failure)
+            if channel in expected_channel_outcomes(expect_failure, control_kind)
         ]
         if observed and all(status == expected for status, expected in observed):
             verdicts[channel] = "pass"
@@ -1036,3 +1086,78 @@ def run_channel_verdicts(takes: list[tuple[dict[str, str], bool]]) -> dict[str, 
         else:
             verdicts[channel] = "inconclusive"
     return verdicts
+
+
+def qc_recognition_issues(
+    recognition: Any, *, family: str, audio_sha256: str, script: Any, script_sha256: Any,
+    language: str, duration_seconds: float,
+) -> list[str]:
+    """Why one QC v2 recognition may not act as its family's witness (empty = qualified).
+
+    `recognition_issues` plus the QC identity: the family's slot, the QC schema
+    and algorithm, and a language-match score in [0, 1]."""
+    issues = recognition_issues(
+        recognition, audio_sha256=audio_sha256, script=script, script_sha256=script_sha256,
+        language=language, duration_seconds=duration_seconds,
+    )
+    if not isinstance(recognition, dict):
+        return issues
+    if recognition.get("modelFamily") != family or family not in QC_RECOGNITION_FAMILIES:
+        issues.append("unexpected-family")
+    if (recognition.get("schemaVersion") != QC_RECOGNITION_SCHEMA
+            or recognition.get("algorithmVersion") != QC_ASR_ALGORITHM):
+        issues.append("unexpected-algorithm")
+    score = recognition.get("languageMatchScore")
+    if (isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score)
+            or not 0.0 <= score <= 1.0):
+        issues.append("language-score-invalid")
+    return issues
+
+
+def qc_take_verdict(
+    recognitions: Any, *, audio_sha256: str, script: str, language: str, duration_seconds: float,
+    expect_failure: bool, accuracy_metric_version: str = ACCURACY_METRIC_VERSION,
+) -> dict[str, Any]:
+    """Re-qualify, re-score and vote one take's QC v2 recognitions.
+
+    `recognitions` must hold exactly one recognition per QC family. Every
+    transcript is scored here (`score_recognition`); nothing the producer wrote
+    is trusted as a verdict. `status` is `pass` when the two families met the
+    take's declared outcome per channel (the control is a language control),
+    `fail` when a channel contradicted it by consensus, `inconclusive` when the
+    families disagreed, and `unqualified` when a recognition is missing or
+    may not witness."""
+    by_family: dict[str, list[dict[str, Any]]] = {}
+    for recognition in recognitions if isinstance(recognitions, list) else []:
+        if isinstance(recognition, dict):
+            by_family.setdefault(str(recognition.get("modelFamily")), []).append(recognition)
+    issues: dict[str, list[str]] = {}
+    verdicts: dict[str, dict[str, Any]] = {}
+    for family in QC_RECOGNITION_FAMILIES:
+        entries = by_family.get(family, [])
+        if len(entries) != 1:
+            issues[family] = ["missing" if not entries else "duplicated"]
+            continue
+        found = qc_recognition_issues(
+            entries[0], family=family, audio_sha256=audio_sha256, script=script,
+            script_sha256=text_sha256(script) if isinstance(script, str) else None,
+            language=language, duration_seconds=duration_seconds,
+        )
+        if found:
+            issues[family] = found
+            continue
+        verdicts[family] = score_recognition(
+            entries[0], script=script, language=language, accuracy_metric_version=accuracy_metric_version,
+        )
+    if set(by_family) - set(QC_RECOGNITION_FAMILIES):
+        issues["*"] = ["unexpected-family"]
+    if issues:
+        return {"status": "unqualified", "issues": issues, "verdicts": verdicts, "consensus": None}
+    agreement = channel_consensus(
+        {family: {"language": bool(verdict["languagePass"]), "accuracy": bool(verdict["accuracyPass"])}
+         for family, verdict in verdicts.items()},
+        expect_failure=expect_failure, control_kind=LANGUAGE_CONTROL_KIND,
+        algorithm=QC_CHANNEL_CONSENSUS_ALGORITHM,
+    )
+    status = {"met": "pass", "contradicted": "fail"}.get(agreement["outcome"], "inconclusive")
+    return {"status": status, "issues": {}, "verdicts": verdicts, "consensus": agreement}

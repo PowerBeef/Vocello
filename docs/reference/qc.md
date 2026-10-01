@@ -25,7 +25,9 @@ All commands go through `python3 scripts/qc.py`.
 | `label sample --runs <qc-takes runs…> --batch NAME` | Draws a listening batch. Defaults: `--size 96 --languages french,english --blind 0.1`, plus `--enrich-file`. |
 | `label serve --batch NAME [--port 8765]` | Serves the listening page on 127.0.0.1. `--acoustic-only-languages zh,ja,ko,ru` hides the script and the linguistic classes for those languages. |
 | `label export --batch NAME` | Summarizes the labels: counts per class, severity and language, and intra-rater kappa from the blind repeats. |
-| `run --takes <manifest or qc-takes run> --lane NAME [--models roles or ids]` | Scores the takes with the detector models, one at a time; `--models` limits which run now, and the rest come from the cache. Then it runs the mute test, the features and the detectors. |
+| `run --takes <manifest or qc-takes run> --lane NAME [--models roles or ids]` | Scores the takes with the lane's models (see [Lanes](#lanes)), one at a time; `--models` limits which run now, and the rest come from the cache. Then it runs the mute test, the features and the detectors, and prints the run id. |
+| `language-bench takes --platform macos\|ios --run-id ID --plan PLAN --corpus CORPUS --diagnostics DIR [--wav-dir DIR] --output FILE` | Writes a lang-bench run's planned takes as a takes manifest, each WAV bound to the digest its generation published. |
+| `language-bench evidence --run QC_RUN --output FILE` | Writes the two ASR families' recognitions of a QC run for the language publisher, with each take's two-family verdict. Exits 0 when every take met its outcome, 1 when one did not, and 2 when a recognition is missing. |
 | `gate --lane NAME [--run ID]` | Exits 0 pass, 3 warn, 1 fail, or 2 error (no run, or a gating detector missing its inputs). |
 | `queue --top N [--run ID] [--batch NAME]` | Writes the most suspicious unlabelled takes of a run as a label batch, which `label serve --batch NAME` opens. |
 | `fit [--batches …] [--runs …]` | Fits the detectors on the train-split labels and writes `config/qc/thresholds-v<N>.json`. |
@@ -150,6 +152,22 @@ Each detector earns a level per language:
 - **report-only:** otherwise.
 
 `run` takes each flag's level from the evaluation of exactly the thresholds file it scored with. Without one, every flag is report-only, so `gate` passes.
+
+## Lanes
+
+The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` runs them by default; a lane the map does not name, such as `pool`, runs every role. A lane's gate reads only the detectors with a feature it can measure, from the WAV alone or from the roles it runs; the others stay report-only in that lane. A take marked `control` (a negative control) is scored and flagged, but always at report-only.
+
+| Lane | Script | Roles | What it does with QC v2 |
+|---|---|---|---|
+| `language-bench` | `scripts/macos_test.sh lang-bench` | every role but `llm` | `language-bench takes`, then `run`, `language-bench evidence` (the verdict line `spoken_content`) and `gate` (`audio_qc_gates`). The evidence feeds `publish_benchmark_history.py language --recognitions`. |
+| `ios-language-bench` | `scripts/ios_device.sh lang-bench` | every role but `llm` | The same, on the Mac over the collected iPhone takes, beside Apple Speech's in-app gate. |
+| `qc-takes` | `scripts/macos_test.sh qc-takes` | every role but `llm` | `run` over the generated take pool, then `queue --top 50`; the summary joins the verdict, and a failure to compute it never fails the generation. |
+| `clone-lane` | `scripts/clone_fidelity_lane.py` | `speaker`, `pitchA`, `pitchB` | Every take against the voice's reference clip; the clone takes gate, the controls measure the identity separation. |
+| `voice-reliability` | `scripts/voice_identity_language_reliability.py analyze` | `speaker`, `pitchA`, `pitchB` | Clone takes against their reference; reported, never gated. |
+
+**Spoken content.** The language lanes' two families are Qwen3-ASR (`asrA`, family `qwen3-asr`) and Whisper large-v3 (`asrB`, family `whisper`). Both transcribe a take with neither its script nor its language, so a take in the wrong language fails the language channel. The two must meet each take's outcome on both channels (`lib.language_metrics.qc_take_verdict`); the negative control, a pinned hint over a script in another language, is a language control. The publisher re-scores every transcript, and language records carry the `qcQwen3Asr*` and `qcWhisper*` take metrics (language measurement version 6).
+
+**Clone fidelity.** `qc.fidelity` reads the run's results per take: the register shift from the reference (signed semitones) on the frames where FCPE and SwiftF0 agree, through `qc.pitch.summarize`, and the ReDimNet2+ similarity of the whole take and of its least similar window to the reference embedding.
 
 ## Labels
 

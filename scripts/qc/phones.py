@@ -42,6 +42,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 G2P_MODEL_ID = "g2p.espeak-ng"
 G2P_MODEL_DIR = REPO_ROOT / "build/cache/qc/models" / G2P_MODEL_ID
 PANPHON_TABLE = "panphon/data/ipa_all.csv"
+# Repeat-run near-identity per distance scale (see stutter_features).
+COARSE_NEAR = 0.25
+PANPHON_NEAR = 0.06
 PANPHON_WEIGHTS = "panphon/data/feature_weights.csv"
 
 LANGUAGES = (
@@ -709,7 +712,7 @@ def _runs(ops: Sequence[Mapping[str, Any]], kind: str, transparent: str, minimum
 
 def stutter_features(ops: Sequence[Mapping[str, Any]], times: Sequence[Mapping[str, Any]] | None = None, *,
                      gop: Mapping[str, Any] | None = None, distance: Callable[[str, str], float] | None = None,
-                     max_repeat: int = 6, near: float = 0.25, inserted_share: float = 2 / 3,
+                     max_repeat: int = 6, near: float | None = None, inserted_share: float = 2 / 3,
                      min_burst: int = 3, min_deletion_run: int = 2, low_gop: float = -2.3) -> dict[str, Any]:
     """Stutter and missing-syllable evidence from an alignment (and optionally GOP).
 
@@ -722,6 +725,10 @@ def stutter_features(ops: Sequence[Mapping[str, Any]], times: Sequence[Mapping[s
 
     `times` (recognized phones with `start`/`end`) fills op times when the ops lack them.
     """
+    if near is None:
+        # Near-identity is on the distance's own scale: PanPhon feature distances put voicing pairs near
+        # 0.02 and l/r near 0.09, while the coarse fallback gives 0.25 to a shared first character.
+        near = COARSE_NEAR if distance in (None, coarse_distance) else PANPHON_NEAR
 
     if distance is None:
         distance = default_distance()[0]

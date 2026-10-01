@@ -290,6 +290,18 @@ class StutterTests(unittest.TestCase):
         ops = phones.align(broad(script), self.heard(heard), distance=phones.coarse_distance)
         return phones.stutter_features(ops, distance=phones.coarse_distance, **options)
 
+    def test_near_identity_follows_the_distance_scale(self):
+        # A PanPhon-scaled distance puts different phones well under the coarse fallback's 0.25 (l/r
+        # near 0.09), so with that cutoff "l e b" would pass for a copy of "r ɑ̃ b". The default cutoff
+        # follows the distance, so only the true repetition counts.
+        def small_scale(a: str, b: str) -> float:
+            return 0.0 if a == b else (0.02 if {a, b} in ({"b", "p"}, {"s", "z"}) else 0.09)
+
+        script = "le bʁɑ̃ʃ de"
+        ops = phones.align(broad(script), self.heard("le bʁɑ̃ bʁɑ̃ʃ de"), distance=small_scale)
+        runs = phones.stutter_features(ops, distance=small_scale)["repeatRuns"]
+        self.assertEqual([(run["phones"], run["start"]) for run in runs], [(["b", "r", nfd("ɑ̃")], 0.16)])
+
     def test_repeated_syllable_is_a_run_and_a_burst(self):
         result = self.features(self.SCRIPT, "le bʁɑ̃ bʁɑ̃ʃ de vjø ɔʁm")
         self.assertEqual(result["repeatCount"], 1)

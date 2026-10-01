@@ -484,8 +484,8 @@
           "config/marking-peak-equality.json",
           "config/audio-qc-*.json",
           "scripts/audio_qc_*.py",
-          "scripts/audio_qc_qualification.py",
-          "scripts/lib/qc_qualification/**"
+          "scripts/qc/**",
+          "config/qc/**"
         ],
         "requiredEvidence": [
           "macos-ui-benchmark",

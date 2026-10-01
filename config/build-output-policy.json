@@ -39,7 +39,7 @@
       "entry": "delivery-analysis-cache",
       "directory": "confirmation",
       "minimumIdleHours": 24,
-      "retention": "Fresh per-panel cache roots of audio QC confirmation runs (scripts/audio_qc_orchestrator.py --cache-root build/cache/delivery-analysis/confirmation/<name>) and of evidence-lane gate panels (scripts/audio_qc_lane_gates.py run, confirmation/lane-<lane>-<run>): replay inputs until the panel's records are committed or its lane run is reviewed, dead weight after. scripts/clean_build_caches.sh --prune-confirmation-caches removes a direct child root only while it holds the host analysis lock exclusively (no orchestrator, generator or analyzer runs or starts), when no process has a file open under it, and when nothing in it changed for minimumIdleHours (--older-than-hours overrides); the cache's own audio, layers and external-models are never touched."
+      "retention": "Fresh per-panel cache roots of the retired v1 audio QC confirmation runs (build/cache/delivery-analysis/confirmation/<name>; removed by build_cleanup.py --qc-v1): replay inputs until the panel's records are committed or its lane run is reviewed, dead weight after. scripts/clean_build_caches.sh --prune-confirmation-caches removes a direct child root only while it holds the host analysis lock exclusively (no orchestrator, generator or analyzer runs or starts), when no process has a file open under it, and when nothing in it changed for minimumIdleHours (--older-than-hours overrides); the cache's own audio, layers and external-models are never touched."
     }
   },
   "heavyLanePreflight": {
@@ -208,7 +208,7 @@
       "class": "cache",
       "owner": "Operator-local delivery evaluator and the audio QC judge panel",
       "cleanup": "aggressive",
-      "retention": "Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (scripts/acquire_audio_qc_judges.py, re-fetchable), and the per-panel confirmation cache roots under confirmation/<name>, which --prune-confirmation-caches removes once idle (childRetention.analysisConfirmation); never promotion evidence by itself",
+      "retention": "Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (retired v1 judges, removed by build_cleanup.py --qc-v1 except the files QC v2 hard-links; re-fetchable), and the per-panel confirmation cache roots under confirmation/<name>, which --prune-confirmation-caches removes once idle (childRetention.analysisConfirmation); never promotion evidence by itself",
       "env": "QVOICE_DELIVERY_ANALYSIS_CACHE"
     },
     {

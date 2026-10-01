@@ -50,9 +50,8 @@ POLICY_PATH = REPO_ROOT / "config" / "build-output-policy.json"
 HISTORY_HELPER = REPO_ROOT / "scripts" / "benchmark_history.py"
 DEBUG_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice-Debug" / "models"
 SHIPPED_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice" / "models"
-# The host lock every generator and analyzer takes exclusively and every audio QC
-# orchestrator run (and each worker it launches) holds shared for its whole run
-# (`delivery_resource_supervisor.HOST_LOCK_NAME`, under `hostAnalysisLock`).
+# The host analysis lock (`hostAnalysisLock`) the retired v1 delivery analysis held;
+# the confirmation-cache prune still takes it exclusively before deleting.
 HOST_ANALYSIS_LOCK_NAME = "delivery-analysis-supervisor.lock"
 CONFIRMATION_ENTRY = "delivery-analysis-cache"
 CONFIRMATION_DIRECTORY = "confirmation"

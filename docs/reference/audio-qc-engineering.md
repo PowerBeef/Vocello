@@ -27,6 +27,7 @@ sourceOfTruth:
   - scripts/lib/qc_qualification/codec_trace.py
   - scripts/lib/qc_qualification/composer.py
   - scripts/audio_qc_orchestrator.py
+  - scripts/audio_qc_lane_gates.py
   - scripts/audio_qc_worker.py
   - scripts/lib/qc_pipeline/admission.py
   - scripts/lib/qc_pipeline/workers.py
@@ -3291,6 +3292,56 @@ The detectors are also weak:
 
 A next class J round needs both new detector versions and a long-form cohort of at least about 40
 takes per language.
+
+### How the evidence lanes gate (AQ-07, 2026-10-01)
+
+`config/audio-qc-lane-gates.json` lists the detectors that gate each lane: truncation, run-on v2
+and consensus LID on the language bench, clone similarity and onset drift on the clone lane, all at
+warn. `scripts/audio_qc_lane_gates.py validate` checks that every gate has a qualified record. Since
+2026-10-01, `run` also computes the gates on every lane run. It starts after the generator, and on
+the language bench after the independent recognizer, has exited:
+
+1. The lane writes its takes as `audio-qc-takes.json` in its run directory. The language bench
+   builds the file from its run plan and its independent-ASR manifest. The clone lane builds it from
+   its take plan, with each clone take bound to the voice's reference clip. The file lists only the
+   takes a gate can score. It records each other take with a reason: a negative control (the
+   French-text English-hint cell, the matched controls, cross-clone takes), a language or mode
+   outside the lane, or a take with no verified output.
+2. The orchestrator runs only the panel judges those gates read in the takes' languages. A full
+   language bench runs Whisper large-v3, Parakeet, Paraformer, SenseVoice, VoxLingua and the
+   aligner. The quick subset runs four of them, and the clone lane runs CAM++ alone. The panel uses
+   the run's own cache root, `build/cache/delivery-analysis/confirmation/lane-<lane>-<run>`, which
+   `--prune-confirmation-caches` removes once it has been idle. Stage 0 runs as well when a gate reads
+   it (run-on's last active span).
+3. `evaluate` scores each take with `build_scores`, the code that scored the detector's
+   confirmation. It compares each score with the threshold that the detector's qualifying record
+   pre-registered for the take's language, in the record's direction. Nothing is derived again. A
+   take abstains, with its reason recorded, when it is outside the lane or the record (language,
+   mode), when the record has no threshold for its stratum, or when evidence is missing: no bundle
+   row, a judge unavailable or out of scope, a content voter incomplete, or no measurement.
+4. A take is `warn` when a warn gate flags it and `fail` when a fail gate does. The lane takes the
+   worst verdict of its takes. The result goes to `<run>/audio-qc/gates.json` and holds detector and
+   take ids, scores, thresholds, reason codes and input digests, but no text, transcript or path.
+
+A warn gate reports and never fails the lane. The language bench adds an `audio_qc_gates` line
+(PASS, WARN, FAIL, ERROR or SKIPPED) to `verdict.txt`. The clone lane adds `audioQCGates` to its
+report and fails (exit 1) only on a fail gate. When the gates cannot be computed, for example because a judge is not
+acquired, the lane reports ERROR and continues. A lane with a fail gate fails instead.
+
+The result also records whether the lane's evidence matches the record's: the judge output
+identities, the metric reductions, the scoring code and the orchestrator. A fail gate whose evidence
+differs from its record's flags at warn only. The result is a lane artifact, not part of the
+published language record, so no record kind's measurement version moves. The two-family language
+record is separate work.
+
+```sh
+# Recompute the gates on a finished language bench run (the panel runs; consent-bound like the lane).
+python3 scripts/audio_qc_lane_gates.py run --lane language-bench --run-dir <lang-bench artifacts>
+# Re-evaluate existing evidence (no model).
+python3 scripts/audio_qc_lane_gates.py evaluate --lane language-bench --takes <run>/audio-qc-takes.json \
+  --bundle <run>/audio-qc/panel-bundle --measurements <run>/audio-qc/stage0/measurements.json \
+  --output <run>/audio-qc/gates-replay.json
+```
 
 ### Speech/defect calibration: independent references, no required listening
 

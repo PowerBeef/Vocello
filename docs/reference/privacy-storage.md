@@ -426,7 +426,8 @@ outputs, publication-repair evidence, and model stores. `--aggressive` additiona
 persistent compilation/package caches and the public aliases. `--prune-ui-results` and `--dist`
 target only their named class; `--clobber --yes` removes ignored repository-local generated state.
 `--prune-confirmation-caches` removes the per-panel audio QC confirmation cache roots,
-`build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`), and
+`build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`; the
+evidence lanes' gate panels use `confirmation/lane-<lane>-<run>` too), and
 nothing else of that cache: a root goes only while the cleanup holds the host analysis lock
 exclusively (it refuses while any orchestrator, generator or analyzer runs, and none can start
 until it finishes), when no process holds a file open under it and when nothing in it changed for

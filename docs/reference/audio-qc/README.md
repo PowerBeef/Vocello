@@ -73,7 +73,11 @@ The policy names the detector classes and stages each lane may gate on;
 `scripts/audio_qc_lane_gates.py validate`, in the contract gate, refuses a listed detector unless a
 committed record qualified its current definition at that level or a stricter one, at an operating
 point that applies to the lane, with a scope that covers the lane's languages, modes and FAR
-population. A lane with no listed detector gates on nothing yet.
+population. A lane with no listed detector gates on nothing yet. `audio_qc_lane_gates.py run`
+enforces the gates on each lane run, after its generator exits. It runs the judges the gates read,
+then scores every take at its record's pre-registered threshold. A take outside the record's scope,
+or without evidence, abstains with its reason. The result goes to `<run>/audio-qc/gates.json`. A
+warn gate reports, and a fail gate fails the lane.
 
 <!-- BEGIN GENERATED audio-qc-docs:lanes (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-policy.json](../../../config/audio-qc-qualification-policy.json); kinds, scopes and gates from [config/audio-qc-lane-gates.json](../../../config/audio-qc-lane-gates.json).

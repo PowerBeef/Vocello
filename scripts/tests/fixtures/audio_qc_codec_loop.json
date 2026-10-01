@@ -46,7 +46,7 @@
     }
   ],
   "frameCount": 40,
-  "note": "COD-LOOP@1 parity: scripts/lib/qc_qualification/codec_trace.py (test_audio_qc_introspection_positives.py) and CodecLoopMutationEvidence (CodecLoopMutationEvidenceTests) make these mutated traces from these frames. Frame f, codebook c holds (7f + 13c + (f * c mod 5)) mod its codebook size (4096 for codebook 0, else 2048).",
+  "note": "COD-LOOP@1 parity: CodecLoopMutationEvidence (CodecLoopMutationEvidenceTests) makes these mutated traces from these frames; QC v1's retired Python builder made the same bytes. Frame f, codebook c holds (7f + 13c + (f * c mod 5)) mod its codebook size (4096 for codebook 0, else 2048).",
   "schemaVersion": 1,
   "sourceTraceSHA256": "76cda6262fe8d1a0633cb7c43810c5644553bb8782c995bf8bbfba57471113f9"
 }

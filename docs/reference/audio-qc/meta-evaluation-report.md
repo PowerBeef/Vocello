@@ -38,7 +38,7 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | no plan | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 
 ## Lane gates
 

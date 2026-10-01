@@ -155,7 +155,7 @@ Classes and stages from `laneGatingSets` in [config/audio-qc-qualification-polic
 | [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | 0 | single | planned, not confirmed | not qualified | - |
 | [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | 0 | single | planned, not confirmed | not qualified | - |
 | [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | 0 | single | planned, not confirmed | not qualified | - |
-| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | 2 | single | no plan | not qualified | - |
+| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | 2 | single | planned, not confirmed | not qualified | - |
 <!-- END GENERATED audio-qc-docs:detectors -->
 
 ## Adding a judge or a detector

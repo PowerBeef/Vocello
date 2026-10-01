@@ -44,8 +44,9 @@ Registry entry `speaker.campplus-voxceleb@1` in [config/audio-qc-judges.json](..
 - Thread control: environment
 - Preprocessing: {"features": "kaldi fbank: 80 mel bins, 25 ms frames, 10 ms shift, hamming window, dither 0, snip edges, int16-scaled samples, per-utterance mean normalization", "windows": {"hopSeconds": 0.5, "seconds": 2.0}}
 - Acquisition: directory="wespeaker-voxceleb-campplus-lm", stage=1, runtime="onnx-cpu"
-- Resources: canonical-host peak 0.27 GiB; admission ceiling 0.32 GiB (calibrated), measured in session 20260927-aaba14fd; policy: measured canonical-host peak x 1.2 (AQ-06).
+- Resources: canonical-host peak 0.84 GiB; admission ceiling 1.01 GiB (calibrated), measured in session 20260930-a4642521; policy: measured canonical-host peak x 1.2 (AQ-06).
 - Ceiling basis: Audit estimate 0.12-0.2 GB resident (section 4.3), raised to 512 MiB for the interpreter and ONNX Runtime; provisional until two clean M6 runs measure its peak.
+- `ceilingHistory`: [{"canonicalHostPeakBytes": 290291712, "ceilingBytes": 348350055, "ceilingSession": "20260927-aaba14fd", "date": "2026-09-27"}]
 - Output identity: repository, revision, snapshotFileDigests, runtimeDependenciesDigest, runtimeVersions, workerSourceSHA256, engine, preprocessing, hostProfile, threads. Envelope identity: resourceSupervisorSHA256, probeAlgorithmVersion, supervisorOptions.
 <!-- END GENERATED audio-qc-docs:facts -->
 

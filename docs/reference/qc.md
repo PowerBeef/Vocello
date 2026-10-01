@@ -7,6 +7,10 @@ QC v2 is the audio QC harness, rebuilt on 2026-10-01. It is calibrated on the ma
 
 Everything runs locally on the Mac, one model at a time, and no model weights enter Git.
 
+## Why v2
+
+The v1 harness missed defects the maintainer heard at once: clone pitch drift, cut-offs, accented French and the broken syllables of `fr-0101--dylan`. Its synthetic injectors often did not carry the defect they were named for, so detectors qualified on positives that were not positive. Its pitch tracker, pYIN, dropped voicing across pitch steps, the very breaks it was meant to find. No judge measured phonemes, so the ASR families turned stutters and mispronunciations into plausible words. And its ground truth never came from the maintainer's ears; v2 fits every detector on his labels instead.
+
 ## Commands
 
 All commands go through `python3 scripts/qc.py`.
@@ -119,6 +123,12 @@ Before any fit, a detector without a rule scores uncalibrated (its largest orien
 
 The synthetic test case reproduces fr-0101--dylan: a 1.1 s hiss, blip and silence gap, and a 40 ms cut ending. The provisional rules must flag it, and a 0.25 s pause with a 200 ms decay must pass (`scripts/tests/test_qc_detectors.py`).
 
+**The first heard positive: `fr-0101--dylan`.** A 5.44 s Built-in Voice take of Dylan reading French. The maintainer's own signal analysis, with two Whisper models, found two defects while every word was recognized:
+- a 1.16 s non-speech gap mid-sentence (hiss, breath noise, a voiced blip and silence), proven word-free by muting it and transcribing again;
+- an abrupt ending: about 36 dB of drop in 40 ms, with a 20 ms tail.
+
+QC v2's phone check found what the ASR families hid: the voice pronounces silent letters. "fait" is read as /fɛt/, "les" as /lɛs/, "vieux" as /vjœks/ and "ormes" as /ɔʁmɛs/. The take's phone error rate is 0.48, with 11 insertions, against 0.10 on a clean take. The heard stutter is therefore spelling pronunciation, a cross-lingual defect of a Built-in voice reading French; QC-06 tracks the product side. `pause.anomalous`, `boundary.abrupt-end` and `content.phoneme` cover the three defects.
+
 ## Calibration and levels
 
 **`fit`** joins the labels to the newest features per take from `build/private/qc/runs/*/features.json`.
@@ -202,3 +212,5 @@ Re-labelling appends a new line, and the latest line per token wins.
 | `config/qc/thresholds-v<N>.json`, `benchmarks/qc/eval-v<N>.json` | Fitted thresholds and their one held-out evaluation, both committed. |
 
 `build/cache/qc` (`qc-cache`) is re-creatable from the registry and pins. `build/private/qc` (`qc-private`) is preserved by every cleanup. Both are registered in `config/build-output-policy.json` and git-ignored under `build/`. Labels, transcripts and take paths never enter Git; only aggregates and digests are committed.
+
+The v1 data (its judge models and runtimes, analysis caches, unused corpora and evidence runs) goes through `scripts/clean_build_caches.sh --qc-v1`: `--dry-run` lists every path with its bytes and reason, and removal needs `--yes`. It keeps every model directory QC v2 still hard-links from, and the policy's `qcV1Cleanup` names the rest of what stays ([privacy-storage.md](privacy-storage.md)).

@@ -57,7 +57,7 @@ Maintained macOS subtrees and preferences:
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and completed-range sidecars while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB. A failure is its typed error summary, so error text, raw URLs and absolute paths are excluded (see [Diagnostics](#diagnostics)).
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder. A take is written to a hidden staging file beside its final name (`.<name>.<UUID>.tmp.wav`) and renamed into place; each engine start removes the staging files a crash left under `outputs/` once untouched for an hour (CORE-15). A user-chosen output folder is not walked.
-- `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
+- `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). WAV, MP3, AIFF, and M4A are kept as they are; any other readable format (FLAC, Ogg, AIF, CAF) is converted to canonical WAV before the candidate is staged, through a transient `cache/normalized_clone_refs/saved-voice-import-<UUID>.wav` removed once the candidate holds its copy (MAC-09). Voices saved by earlier builds are not rewritten. Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
   A saved voice's prepared clone prompts (`<id>.clone_prompt/`) are deleted with it. Prompts derived
   from a one-off reference (speaker embedding and codec tokens) are transient: `voices/.qvoice_clone_prompts/`
@@ -437,6 +437,17 @@ until it finishes), when no process holds a file open under it and when nothing 
 Routine cleanup leaves these roots alone, since they stay replay inputs until the panel's records
 are committed. Every in-use probe reads the process list `lsof` prints, never its exit status,
 which is 1 after any partial error even when it listed a holder.
+`--qc-v1` is the one-time removal of the retired v1 audio QC data that `qcV1Cleanup` in the
+manifest names: the v1 judge models and runtimes in the analysis cache's `external-models`, its
+`audio`, `layers` and `confirmation` caches, the corpora the take generator no longer reads, the v1
+evidence runs under `build/artifacts/macos/audio-qc/` and the `audio-qc-*` diagnostics.
+`--qc-v1 --dry-run` prints every path with its bytes and reason; removal needs `--yes`. It keeps a
+model directory that QC v2 still hard-links, symlinks or venv-homes into (`build/cache/qc`), the
+pinned interpreter until QC v2 holds its copy, the clone cell's speaker corpora, any child with an
+open file and, among the evidence runs, the `qc-takes-*` and `variation-experiment-*` runs and
+anything created on or after 2026-10-01. It refuses while a `qc.py` run holds `build/cache/qc/run.lock` or a v1 analyzer holds
+the host analysis lock, and a removal holds both. Its summary counts a hard-linked file once, and
+only when all its links go.
 `./scripts/build.sh clean` delegates to bounded aggressive cleanup rather than deleting the whole
 tree. Model deletion remains a separate explicit `--models` action. UI pruning includes smoke,
 benchmark, and model-download lanes: it keeps the latest pass, preserves matching benchmark

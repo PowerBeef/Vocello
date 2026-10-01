@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-29
+reviewed: 2026-10-01
 summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
 sourceOfTruth:
   - scripts/check_language_hints.py
@@ -9,7 +9,6 @@ sourceOfTruth:
   - scripts/lib/language_metrics.py
   - config/language-bench-matrix.json
   - scripts/audio_qc_script_pool.py
-  - scripts/audio_qc_n1_corpus.py
 ---
 # Language bench (Phases 2–3)
 
@@ -26,9 +25,8 @@ Headless matrix for the Qwen3 language path:
 | `config/language-bench-corpus.json` | Versioned scripts plus Custom speaker and Design delivery fixtures per language |
 | `config/language-bench-matrix.json` | Cells: mode, `uiHint`, `scriptLang`, `expectedHint` |
 | `config/language-bench-diagnostic-cohort.json` | Fixed cells and five predeclared seeds for autonomous failure diagnosis |
-| `config/audio-qc-script-pool.json` | The AQ-02 CC0 ten-language script pool for audio QC qualification (below); not a bench cell input |
+| `config/audio-qc-script-pool.json` | The AQ-02 CC0 ten-language script pool for the QC take generator (below); not a bench cell input |
 | `config/audio-qc-script-pool-sources.json` | The pinned Common Voice commit and the size and SHA-256 of every file the pool is selected from |
-| `config/audio-qc-n1-sources.json` | The pinned FLEURS revision, license, attribution and file pins of the N1 human recordings (below) |
 
 Cells tagged `"quick": true` form the **quick** subset (English + French + negative control, 7 cells).
 **full** runs all 19 cells (6 languages × Custom pinned/Auto + Design explicit-language + negative).
@@ -51,13 +49,12 @@ language quality.
 
 ### Qualification script pool (AQ-02)
 
-Detector qualification needs many scripts per language, not one, so the audio QC audit (section
-5.3, AQ-F27/F28/F32) adds a separate script pool; the corpus above stays the legacy cohort.
+Detector calibration needs many scripts per language, not one, so a separate script pool sits
+beside the bench corpus; the corpus above stays the bench cohort.
 `config/audio-qc-script-pool.json` holds 120 scripts in each of the ten product languages, split
 60 `calibration` and 60 `confirmation` (disjoint by script). It is the script source for natural
-Vocello calibration takes (population N3) in detector qualification (AQ-07). The human recordings
-(N1) are FLEURS read speech with FLEURS's own transcripts (below), not pool scripts; the pool's
-committed description predates that choice.
+Vocello calibration takes, which `scripts/audio_qc_calibration_takes.py` generates for QC v2
+([qc.md](qc.md)).
 
 - **Source and license.** Common Voice Sentence Collector files
   (`server/data/<locale>/sentence-collector.txt`, human-reviewed submissions) at one pinned commit of
@@ -95,70 +92,10 @@ committed description predates that choice.
   `validate` checks the committed pool without network and runs in the contract gate, and
   `validate --rebuild` also requires a byte-identical rebuild from the fetched files. A rule
   change bumps the rules version and rebuilds the pool.
-- **No audio.** Human recordings (N1) are not in the pool. Common Voice audio comes from the Mozilla
-  Data Collective under its own terms and is never committed; FLEURS is the N1 source (below).
+- **No audio.** Common Voice audio comes from the Mozilla Data Collective under its own terms and is
+  never committed.
 - **Deferred.** A per-language hard-case pool (the seed-tts test-hard design) and a digits and
   abbreviations diagnostic pool.
-
-### Human recordings (N1, AQ-07)
-
-Population N1 of the audio QC audit (sections 5.1 and 5.3) is human originals with verified text;
-N2 is their codec resyntheses. FLEURS read speech (`google/fleurs`; Conneau et al. 2022,
-arXiv 2205.12446; published by Google under CC BY 4.0) is the N1 source for all ten product
-languages. `scripts/audio_qc_n1_corpus.py` fetches, extracts and lists it.
-
-- **Committed: pins only.** `config/audio-qc-n1-sources.json` holds the dataset revision, the
-  license and attribution, and per language its FLEURS config (`en_us`, `fr_fr`, `de_de`, `es_419`,
-  `it_it`, `pt_br`, `ru_ru`, `cmn_hans_cn`, `ja_jp`, `ko_kr`) and per split each file's path, size
-  and pin: the LFS SHA-256 of `data/<config>/audio/<split>.tar.gz` and the git blob SHA-1 of
-  `data/<config>/<split>.tsv`. `validate` checks it without network in the contract gate.
-- **Never committed.** FLEURS audio, transcripts, extracted WAVs and cohort manifests stay in the
-  untracked cache `build/cache/audio-qc-corpora/fleurs/<revision>/` and wherever a manifest is
-  written. The sources file and every manifest carry the attribution.
-- **Transport and extraction.** Downloads come only from the pinned revision on the Hub (redirects
-  only to its CDNs), resume from `.part` files and are kept only once size and pin match. `extract`
-  writes only the `<digits>.wav` members each TSV lists, all from one `<split>/` directory (a path
-  prefix before it is allowed). It refuses links, absolute paths, `..`, device files, other names
-  or directories and a member count other than the TSV's, checks that every WAV is mono at 16 kHz
-  with its TSV sample count, and writes a receipt per language. FLEURS ships 32-bit IEEE float
-  WAVs, and every consumer reads PCM16, so extraction (extractor v2) converts each one
-  deterministically (x 32767, rounded half to even, clipped to +-32767, with the clipped samples
-  counted in the receipt) and refuses a non-finite sample; a PCM16 WAV is kept byte for byte.
-- **Splits.** FLEURS `dev` is the `calibration` cohort and `test` the `confirmation` cohort. They
-  read disjoint FLoRes sentence sets, so the split is disjoint by script, and by family: each
-  recording is its own family and lies in one split. `manifest` marks any sentence id found in
-  both splits ineligible (`sharedScript`).
-- **Declared limitation: speakers.** FLEURS publishes no speaker ids; its TSVs give only a gender
-  per recording. A5 requires calibration and confirmation cohorts disjoint by family, speaker and
-  script. Here speaker disjointness between `dev` and `test` cannot be verified, and neither can a
-  speaker count: it is assumed, not shown. The sources file and every manifest record it.
-- **Manifest.** `manifest` writes one untracked `audio-qc-n1-cohort` manifest per split, in the take
-  shape the calibration tools read. Each recording has its takeID `n1-<code>-<file stem>`, its own
-  family, a `scriptID` of `flores-<sentence id>`, its language, and the raw transcription as `text`.
-  It also has its WAV (hard-linked, or copied, into `wav/` beside the manifest) with digest,
-  duration and gender. Eligibility flags come from `script_lint_issues` (FLEURS spells digits and
-  symbols) and the script pool's per-text proper-name rule. Ineligible recordings stay listed with
-  `ineligibleReasons`. `audio_qc_orchestrator.py manifest --from-calibration-takes` takes eligible
-  recordings only and counts the rest as skipped. `audio_qc_calibration_set.py inject` and `verify`
-  also take eligible recordings only; they resample each 16 kHz recording to the engine's 24 kHz and
-  record that in every recipe.
-- **Commands.** The maintainer runs these. The download is 40 files, 6.74 GB; extraction needs
-  about as much again, computed from the TSV sample counts and checked before anything is written.
-  The TSVs come first: `yield` reports, from them alone, how many recordings and FLoRes sentences
-  each language keeps after the eligibility rules, so the audio is fetched only once FLEURS is known
-  to meet the N1 and N2 minimums of `config/audio-qc-qualification-policy.json`.
-
-  ```sh
-  python3 scripts/audio_qc_n1_corpus.py plan      # files, sizes and local state; no network
-  python3 scripts/audio_qc_n1_corpus.py fetch --tsv-only   # the transcripts alone, about 6 MB
-  python3 scripts/audio_qc_n1_corpus.py yield     # eligible recordings per language and split
-  python3 scripts/audio_qc_n1_corpus.py fetch     # the audio; optionally --languages english french ...
-  python3 scripts/audio_qc_n1_corpus.py extract
-  python3 scripts/audio_qc_n1_corpus.py manifest --split calibration \
-    --output build/artifacts/macos/audio-qc/n1-calibration/n1-manifest.json
-  python3 scripts/audio_qc_n1_corpus.py manifest --split confirmation \
-    --output build/artifacts/macos/audio-qc/n1-confirmation/n1-manifest.json
-  ```
 
 ## iOS (on-device)
 
@@ -517,8 +454,7 @@ compared with the threshold the detector's qualified record pre-registered. The 
 `audio-qc/gates.json` and `audio-qc-gates.txt`, and the verdict adds an `audio_qc_gates` line.
 These gates are at warn, so a flag is reported and never fails the lane. If the gates cannot be
 computed, the verdict line reads ERROR and the lane continues. The gate result is not part of the
-published record. [audio-qc-engineering.md](audio-qc-engineering.md#how-the-evidence-lanes-gate-aq-07-2026-10-01)
-describes the procedure.
+published record.
 
 ## Offline gate tests
 

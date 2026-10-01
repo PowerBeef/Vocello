@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-10-01
 summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app and iOS device paths, expected artifacts, and how to read results.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -334,10 +334,6 @@ Then summarize and confirm non-zero `trims` / `memory_pressure` stage marks.
 
 ### 4.6 Delivery / prosody cells
 
-> Full delivery-measurement reference — tools, multi-seed sweep protocol,
-> instruction-receipt provenance, statistics semantics, and the DP results
-> ledger: [`delivery-harness.md`](delivery-harness.md).
-
 ```sh
 QWENVOICE_DEBUG=1 ./build/vocello bench \
   --modes custom,design \
@@ -354,11 +350,81 @@ Adds instruct-bearing warm takes. The prosody analyzer reads the current run's i
 the delivery comparison; the summarizer then prints that current prosody block. Every delivery take
 also receives the per-preset adherence verdict (`deliveryGate` beside `qualityGate` in
 `bench-prosody.json`; a diagnostic since gate v3) and its cell's verdict (`deliveryCellGate`, the
-adherence verdict; [`delivery-harness.md`](delivery-harness.md) §5.1), and the run composes
+adherence verdict; see **Cell verdict** below), and the run composes
 canonical-depth registry verdicts across all seven gates (`bench-quality-composed.json`; a cell too
 small to judge, and a clean verdict of the uncalibrated prosody gate, compose as `uncalibrated`,
 never as a pass; a gate that abstains composes as `abstained`, which the summary counts and the run
 refuses as inconclusive, though no gate abstains yet).
+
+**Cells and sweeps.**
+
+- Cells are `<preset>.<intensity>`. `vocello deliveries --shipped-only --json` is the
+  machine-readable authority for the eight product-visible cells and their exact instructions; do
+  not reconstruct the shipped-tier policy in a shell script. Each cell generates one instructed
+  warm take.
+- The plain warm take is the neutral reference for every paired delta, so `--warm 0` is rejected
+  with `--delivery`.
+- Clone is excluded: the clone checkpoints have no instruction channel, so delivery cells run for
+  Built-in Voice and Voice Design only.
+- A multi-seed sweep loops one invocation per seed; a fixed seed reproduces its takes exactly. Use
+  zsh brace expansion for seed ranges (`for seed in {20260810..20260827}; do … --seed $seed …;
+  done`): macOS `seq` renders 8-digit integers in scientific notation, which the CLI rejects.
+- Arms (for example two quantizations) are told apart by `--label` and by each take's `modelID` in
+  `bench-results.json`; filter on both when collecting.
+- An ordinary run stays fail-fast when mandatory Fast QC rejects a take. The diagnostic-only
+  `--continue-delivery-failures` (it requires `--delivery` and `--no-summary`) records one typed
+  success or failure for every attempted cell and preserves rejected WAVs, so a failed take stays
+  in the denominator; such a run is never eligible for history publication.
+- `--no-cold` (it requires `--delivery`) skips the Built-in Voice and Voice Design cold take, which
+  no delivery analysis pairs (about 11.5% of sweep time). It loads the model explicitly, runs the
+  cold length's prewarm itself and fails if that prewarm did not run. The 8 GB tier defers the
+  Built-in Voice prewarm into the first generation, so there `--no-cold` refuses a Built-in Voice
+  sweep. The run has no `cold#0` cell and records `coldTakes: false`; it is a delivery sweep, not a
+  timing benchmark.
+
+**Instruction provenance (fail closed).** A delivery measurement is only as good as its proof that
+the instruction entered the engine:
+
+1. The request payload carries the instruction (`GenerationRequest.Payload.deliveryInstructionText`;
+   nil for clone).
+2. The engine stamps a receipt on the take's telemetry row: `notes.instructChars` and
+   `notes.instructDigest`, the SHA-256 of the instruction text
+   (`Sources/QwenVoiceCore/GenerationOutputAdapter.swift`).
+3. `scripts/bench_delivery_prosody.py` fails closed per instructed cell unless the receipt exists,
+   its digest matches the manifest's `deliveryInstruction` echo, and the paired neutral reference
+   carries no receipt (an instruction on the reference would poison every delta).
+
+`notes.promptChars` counts only the script text, which never includes the instruction, so it proves
+nothing about delivery. Exercise every new fail-closed check live in the change that lands it: a
+check proven only on synthetic fixtures can be fixture-true and live-false.
+
+**Cell verdict.** Since delivery gate v3 the per-take adherence flags are diagnostics: the record
+publishes their count, `deliveryTakeFlagCount`, never a warning. The adherence verdict judges every
+take of one cell (mode, model, speaker, length, preset and intensity) together. A required feature
+flags `cell_direction_miss_<feature>` when the cell's median signed effect is not positive and
+`cell_effect_weak_<feature>` when it sits below the floor; a supporting feature flags
+`cell_supporting_miss_<feature>` only when the median moves past the floor the opposite way. A cell
+with fewer than five takes is `insufficient`, so a single-seed run's cells compose as
+`uncalibrated`, never `pass`, and the history publisher warns `delivery_cell:<flag>` only for a cell
+that was judged. The floors were measured before the 2026-08-25 instruction rewrite, so they are
+provisional: the verdict warns and never fails.
+
+**Analyzer boundary.** `scripts/analyze_prosody.py` is deterministic, bounded-memory PCM analysis.
+Its synthetic contracts cover silence and noise rejection, pause placement, voiced-harmonic and
+spectral behavior, repeatability, and an 80–390 Hz harmonic F0 sweep with at most 1% error. That
+establishes implementation correctness, not perceptual ground truth: the built-in profile
+(`scripts/prosody_profile.py`) was calibrated on earlier generated takes, not on an independently
+labelled holdout. A delivery effect shows that presets reach different acoustic regions, not that
+they sound like the named delivery. Moving the delivery bench onto the QC v2 runners
+([`qc.md`](qc.md)) is roadmap item QC-07.
+
+**Evidence.** Every delivery run keeps a durable copy under
+`~/Library/Application Support/QwenVoice-Debug/outputs/bench-archive/<runID>/`: all take WAVs plus
+`bench-results.json` (the immutable manifest), `bench-prosody.json` (the paired-delta sidecar) and
+`bench-quality-composed.json`. Archiving is fail-closed for required files and happens before the
+sidecar analysis, so an analysis-failed run keeps its audio; the archive is unbounded, so prune it
+manually. A successful run's `diagnostics/benchmark-runs/` directory is removed after publication,
+so multi-seed scoring reads from the bench archive. Compact PASS records go to `benchmarks/runs/`.
 
 ### 4.6b Fidelity lanes (engine/artifact promotion battery)
 
@@ -409,8 +475,7 @@ only. After the analyzers, the lane computes its audio QC gates (`config/audio-q
 CAM++ clone similarity and onset drift of each clone take against the reference clip, at the
 thresholds of their qualified records. The controls and cross-clone takes are not gated. The gates
 are at warn, so a flag shows in the summary and in the report's `audioQCGates` and does not fail the
-lane; only a fail gate would. The result is `<run>/audio-qc/gates.json`
-([audio-qc-engineering.md](audio-qc-engineering.md#how-the-evidence-lanes-gate-aq-07-2026-10-01)).
+lane; only a fail gate would. The result is `<run>/audio-qc/gates.json`.
 
 ### 4.7 iOS on-device bench
 
@@ -1192,7 +1257,7 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | `…/generations-merged.jsonl` | Joined layers (macOS) |
 | `…/engine/samples-<UUID>.jsonl` | Verbose per-sample series |
 | `QwenVoice-Debug/outputs/bench/*.wav` | Bench WAV outputs (fixed per-cell filenames — overwritten across seeds) |
-| `…/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive ([`delivery-harness.md`](delivery-harness.md) §3) |
+| `…/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive (§4.6) |
 | `<run-artifact-dir>/benchmark-evidence.json` | Atomic run-scoped validator selection and verdict used for publication |
 | `build/**/*.xcresult`, screenshots | UI evidence retained locally under bounded lane retention |
 | `build/**/profiles/` | Compact local profile summaries; a CPU profile's raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit, a memory profile's is kept by default (prune manually) |

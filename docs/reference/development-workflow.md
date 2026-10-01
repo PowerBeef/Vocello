@@ -277,9 +277,10 @@ while another process holds the native lock or an agent worktree is locked
 (`QVOICE_ALLOW_BUSY_HOST=1` records the reason and continues for an exploratory run).
 
 **Non-timing audio-QC model runs may share the host with code-only agents** (maintainer decision,
-2026-09-29). `macos_test.sh qc-takes` and `qc-n2` and orchestrator panel runs measure outputs, not
-timing, so editing agents may work beside them. The agents only edit Python and run module-targeted
-pytest: no native builds, no full `pytest -n auto` and no second model run. The lanes call
+2026-09-29). `macos_test.sh qc-takes` and the QC v2 model runs (`scripts/qc.py run`, one model at a
+time under `build/cache/qc/run.lock`) measure outputs, not timing, so editing agents may work beside
+them. The agents only edit Python and run module-targeted pytest: no native builds, no full
+`pytest -n auto` and no second model run. `qc-takes` calls
 `require_quiet_host <lane> agents-allowed`, which records the agents and still refuses on load,
 memory pressure or a held native lock. Memory contention can still cost a worker chunk a
 host-condition retry. Timing benchmarks, memory qualification, UI, device and release lanes keep

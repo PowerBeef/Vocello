@@ -20,9 +20,9 @@ starter becomes the actual editable input; fixed delivery presets retain their c
 instructions. Existing drafts are never translated on a language change. This is an accessibility
 and usability decision, not a new comparative audio-quality finding. See [localization](localization.md).
 
-**Subsequent experiment, September 21:** the [216-clip pilot](french-delivery-pilot-2026-09-21.md)
-is complete. French instructions scored higher on generic clip quality, while English instructions
-passed more delivery acoustic checks. No universal language winner or production promotion was
+**Subsequent experiment, September 21:** a 216-clip pilot (192 paired treatments and 24 shared
+Neutral controls) completed with no terminal failure. French instructions scored higher on generic
+clip quality, while English instructions passed more delivery acoustic checks. No universal language winner or production promotion was
 established. The source research and proposed experiment below predate that run.
 
 ## 1. Decision and confidence
@@ -180,8 +180,8 @@ The production catalog uses 1.7B variants with Speed/Quality quantization choice
 0.6B, a 25Hz model, a fine-tuned community checkpoint, or a hosted Flash service does not qualify
 those exact assets. The frozen model/artifact digest and runtime matter more than a display name.
 
-The existing [bilingual safety matrix record](delivery-harness.md#29-angry-bilingual-hard-safety-checkpoint-2026-08-26)
-documents 36/36 Speed takes without hard generation/audio-QC failure. That is historical recorded
+The angry bilingual safety checkpoint of 2026-08-26 recorded 36/36 Speed takes without hard
+generation/audio-QC failure. That is historical recorded
 evidence, not a rerun in this review. It establishes a narrow routing/safety checkpoint, not improved
 anger perception or the best language for French instructions. DP-31 and DP-32 remain open in the
 existing roadmap; this research does not close either.
@@ -252,8 +252,9 @@ new inference service, UI restriction, sampling adjustment or preset rewrite.
 ## 10. The experiment that would resolve the uncertainty
 
 **Proposed only. No generation, benchmark, device run or paid evaluator call was performed.** Reuse
-the existing delivery corpus, experiment runner, receipts and promotion decision tooling described
-in [the delivery harness](delivery-harness.md). Do not build another evaluation framework.
+the delivery bench and its instruction receipts
+([benchmarking-procedure.md §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)) and the
+QC v2 audio checks ([qc.md](qc.md)). Do not build another evaluation framework.
 
 ### 10.1 Start with a narrow, answerable question
 

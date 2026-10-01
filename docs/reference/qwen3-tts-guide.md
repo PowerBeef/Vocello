@@ -290,11 +290,12 @@ preset therefore initially shipped its strong copy. The later measured shipped-t
 use the exact raw instruction they stored. Since 2026-08-04 the eight presets also carry the
 measured recognizability split (`EmotionPreset.distinctDeliveryIDs`): Neutral, Calm,
 Whisper, and Sad present as distinct deliveries, while Happy, Angry, Fearful, and
-Surprised present as directional hints with advisory copy — the measurement program and
-its results are consolidated in [`delivery-harness.md`](delivery-harness.md).
+Surprised present as directional hints with advisory copy — the measured results are in
+[`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) and the measurement protocol in
+[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
 
-`EmotionIntensity` survives internally, addressing both texts, so the delivery matrix harness can
-keep running the queued experiments and drafts saved before the change resolve to exactly what they
+`EmotionIntensity` survives internally, addressing both texts, so the delivery bench can
+keep measuring both tiers and drafts saved before the change resolve to exactly what they
 stored. The table below is that internal pair; the second column is what ships.
 
 | Preset | normal | strong |

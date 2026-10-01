@@ -85,9 +85,8 @@ python3 -m pip install --user --break-system-packages $(python3 -c 'import json;
 Homebrew marks its Python as externally managed; `--user` installs the pins into your user
 site-packages without touching Homebrew's files (CI passes the same flag). The scripts always run
 `python3 -m pytest`, so the user `bin` directory does not need to be on `PATH`. After a Homebrew Python
-upgrade to a new minor version, run the command again. The research-only `.venv` for advisory
-speaker-identity scoring is optional and never part of the ordinary loop; see
-[`delivery-harness.md`](delivery-harness.md) and [`emotion-reference-banks.md`](emotion-reference-banks.md).
+upgrade to a new minor version, run the command again. Audio QC models run in their own pinned
+venvs under `build/cache/qc/runtimes/`, never in this interpreter; see [`qc.md`](qc.md).
 
 ## 4. Website
 

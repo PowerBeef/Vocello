@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-12
+reviewed: 2026-10-01
 summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -663,6 +663,51 @@ French Design cells across short/medium/long, Neutral/no-delivery/Calm, Auto cor
 parity, and Expressive sentinels. It remains below the 128-take runner bound. The append-only launch
 ledger prevents `--resume` from retrying either a terminal failure or a prior launch that exited
 without a sentinel. A new run ID is required to repeat evidence.
+
+**Mac/CLI localization matrix.** The same diagnostic runs first through the CLI. Its tracked
+contract (`config/voice-identity-language-reliability.json`) freezes eight seeds, the current and
+archived tokenizer identities, language-matched scripts, transcript arms, variation sentinels and
+Design delivery-isolation arms. The operator supplies the two real references and clean
+French/English controls only through an untracked input specification. The bundle builder copies
+audio and transcript bytes below `private/`, exposes only aliases, digests and counts in the public
+manifest, and refuses a reused output directory:
+
+```sh
+python3 scripts/voice_identity_language_reliability.py prepare-bundle \
+  --input-spec /private/tmp/vlr-input.json \
+  --output build/artifacts/diagnostics/vlr/<run-id>
+python3 scripts/voice_identity_language_reliability.py plan \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --output build/artifacts/diagnostics/vlr/<run-id>/plan.json
+python3 scripts/voice_identity_language_reliability.py execute \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --plan build/artifacts/diagnostics/vlr/<run-id>/plan.json \
+  --run-dir build/artifacts/diagnostics/vlr/<run-id>/takes
+python3 scripts/voice_identity_language_reliability.py analyze \
+  --bundle-root build/artifacts/diagnostics/vlr/<run-id> \
+  --plan build/artifacts/diagnostics/vlr/<run-id>/plan.json \
+  --run-dir build/artifacts/diagnostics/vlr/<run-id>/takes \
+  --output build/artifacts/diagnostics/vlr/<run-id>/analysis.json
+```
+
+The plan holds 734 immutable rows. A row whose tokenizer runtime is unavailable is recorded as an
+explicit prerequisite block (`<tokenizer>-runtime-unavailable`), never run on a substitute runtime,
+and no row retries. The analyzer records mandatory audio QC, reference-to-output prosody fidelity
+and optional speaker similarity. It cannot establish semantic emotion or French correctness from
+acoustics alone; French correctness rests on locale-locked ASR, and the speaker and prosody metrics
+are advisory. Moving this analysis onto the QC v2 runners ([`qc.md`](qc.md)) is roadmap item QC-07.
+
+**Receipts and coverage.** The schema-2 generation receipt is assembled from the exact native actor
+request: stored UI language, target-text detection, reference-transcript language, final
+model-facing language, think/no-think mode, transcript-backed versus audio-only conditioning, target
+and reference digests, full instruction identity, tokenizer and model identity, seed, variation,
+retry and warm state. Clone Auto resolves the output language from the target text; the reference
+language is saved conditioning metadata only, and an operator-entered reference transcript is never
+replaced by delayed recognition. Locale-locked consensus is necessary but not sufficient: live
+output verification binds every Speech pass to the immutable WAV duration and requires bounded
+coverage of both audio edges. Identical transcripts that cover only one utterance are reported as
+`speech_recognition_incomplete_temporal_coverage`, stay harness-inconclusive and produce no WER/CER
+score; independent ASR may diagnose the omitted region but cannot promote the take.
 
 ## Deterministic evidence retained
 

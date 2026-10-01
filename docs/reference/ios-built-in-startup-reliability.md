@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 reviewed: 2026-09-12
-summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including conservative historical classification, typed request receipts, startup boundaries, physical-device plans, and closure requirements.
+summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including typed request receipts, startup boundaries, physical-device plans, and closure requirements.
 sourceOfTruth:
   - config/roadmap.json
   - Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift
@@ -68,30 +68,6 @@ attempt one succeeds.
 Allocation recovery retains the same generation, request, session, prewarm, seed, predecessor,
 and operation identity; only `retryAttempt` and the observed warm state may change. Host validation
 requires exactly attempt zero or the contiguous sequence zero then one.
-
-## Read-only historical classification
-
-`scripts/delivery_failure_topology.py` accepts retained matrix reports, experiment state,
-generation telemetry, and failure journals without launching a model or reading audio. Every row
-is classified as success, confirmed pre-audio startup, confirmed post-generation QC, timeout,
-cancellation, memory failure, crash, or unmaterialized/unknown. A missing WAV alone remains
-unknown. Typed decoded-audio evidence or a retained rejected-output identity proves the request
-crossed the startup boundary.
-
-Example local-only use:
-
-```sh
-python3 scripts/delivery_failure_topology.py \
-  --matrix <matrix-report.json> \
-  --experiment <execution-state.json> \
-  --telemetry <generations.jsonl> \
-  --failure-journal <generation-failures.jsonl> \
-  --output-dir build/artifacts/diagnostics/delivery-failure-topology/<opaque-run-id>
-```
-
-The emitted JSON/Markdown contains only allowlisted identities, source digests, typed outcomes,
-attempt scope, predecessor/warm context when available, and confidence. It contains no source
-path, script, audio, URL, device identity, or raw error prose.
 
 ## Physical-device runner
 
@@ -228,7 +204,6 @@ the forced-unload memory finding, or ISR-06's broader reliability matrix.
 
 ## Current status
 
-- Historical/topology classifier: implemented with conservative negative fixtures.
 - Strict delivery resolution, request receipts, startup marks, retry preservation, and journal v3:
   implemented and deterministic-test covered.
 - Ordered device runner and visible UI parity lane: implemented and exercised on the physical

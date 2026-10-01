@@ -1,10 +1,9 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
-summary: The design-then-clone workflow — build curated emotion reference banks with the pipeline script, how curation scores and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.
+reviewed: 2026-10-01
+summary: The design-then-clone workflow — what a curated emotion reference bank is, how curation selects and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.
 sourceOfTruth:
-  - scripts/build_emotion_reference_bank.py
   - Sources/QwenVoiceCore/VoiceBankCatalog.swift
 ---
 # Emotion reference banks (design-then-clone, curated)
@@ -35,74 +34,38 @@ and emotion carry into the take.
 
 ## Building a bank
 
-The builder and its identity scorer run from a local, untracked virtual environment:
-`python3 -m venv .venv && .venv/bin/pip install torch speechbrain` (the header of
-`scripts/clone_speaker_similarity.py` names the exact ECAPA backend; it loads its pinned snapshot
-from the local Hugging Face cache only, so the maintainer caches the complete snapshot once with
-`hf download speechbrain/spkrec-ecapa-voxceleb --revision <revision>`, and before loading it
-requires exactly the files the judge registry, `config/audio-qc-judges.json`, pins from the Hub
-tree, each matching its LFS SHA-256 or git blob ID; the manifest records the verified digests). Never
-install these into the system interpreter and never run them while the engine is generating.
+The bank builder script and its scorers were retired with the v1 audio QC stack on 2026-10-01.
+Existing banks are ordinary saved voices and keep working. The curation method stays the reference
+for any rebuild, which scores with the QC v2 speaker and pitch runners ([`qc.md`](qc.md)):
 
-```sh
-.venv/bin/python3 scripts/build_emotion_reference_bank.py build \
-    --persona "Warm Narrator" \
-    --brief "A warm, calm middle-aged male narrator with a clear, measured pace." \
-    --work-dir "$HOME/Library/Application Support/QwenVoice-Debug/emotion-banks/warm-narrator"
-```
+1. **Generate.** A neutral anchor take plus several candidates per emotion from one VoiceDesign
+   brief, with a neutral-content transcript (about 20 s; an emotional transcript would leak
+   semantics into the conditioning) and distinct fixed seeds. Mandatory audio QC stays fail-closed
+   inside the engine; a QC casualty costs one candidate, never the bank.
+2. **Score and select, after the generator exits.** Each candidate's speaker identity against the
+   anchor, and its paired delivery deltas against the neutral anchor. Among the candidates that
+   carry the emotion, the winner is the one **nearest the anchor in speaker identity**, never the
+   most extreme take: overshoot and identity drift are the documented reference-bank failure
+   modes, and each VoiceDesign call re-invents the voice, so identity cohesion across the bank must
+   be selected for, not assumed.
 
-Two strictly ordered phases (no scorer ever runs beside a resident generator):
-
-1. **Generate.** A neutral anchor take plus N candidates per emotion
-   (default 4 × happy/sad/angry/whisper), same brief, same neutral-content
-   transcript (~20 s — an emotional transcript would leak semantics into the
-   conditioning), distinct fixed seeds, streaming (matches the app's chunk
-   path; also the route that stayed correct while CM-7 — fixed 2026-08-04 —
-   made `--no-stream` publish nothing). Audio QC is fail-closed inside the
-   engine; a QC casualty
-   costs one candidate, never the build.
-2. **Score and select.** Per candidate: ECAPA identity cosine against the
-   anchor (`scripts/clone_speaker_similarity.py` backend) and the paired,
-   same-voice arousal and prosody deltas against the neutral anchor.
-   Eligibility is the emotion criterion — the paired delivery adherence
-   verdict for the preset's strong tier (`scripts/delivery_quality_gate.py`
-   expectations), or for whisper a voiced-fraction drop of at least 0.05
-   against the anchor. Among eligible candidates the winner
-   is the one **nearest the anchor in speaker identity**, never the most
-   extreme take: overshoot and identity drift are the documented
-   reference-bank failure modes, and each VoiceDesign call re-invents the
-   voice, so identity cohesion across the bank must be selected for, not
-   assumed.
-
-Winners and the anchor are enrolled (replace-on-rebuild), and a
-`bank-manifest.json` records every candidate's scores, the selection reasons,
-and the pinned scorer identities so a selection can be re-litigated. An
-emotion with no eligible candidate is reported loudly and left out — a partial
-bank is honest; a padded one is not.
-
-## Advisory posture
-
-The paired adherence verdict and ECAPA cosine remain **advisory**
-instruments: never CI, never a packaging input, never benchmark history. The
-builder uses them the one way the audit's judge review endorsed — ranking our
-own candidates against each other under a pinned identity — and everything it
-decides is recorded in the manifest (bank version 2). The speech-emotion
-classifier that used to decide eligibility was retired on 2026-09-25: it was
-trained on non-commercial corpora (audio QC audit AQ-F03, decision 1a). An
-owned probe on the pinned recognizer's encoder may join later (AQ-08).
+Winners and the anchor are enrolled, and a manifest records every candidate's scores and the
+selection reasons so a selection can be re-litigated. An emotion with no eligible candidate is
+reported and left out: a partial bank is honest; a padded one is not. These scores rank our own
+candidates against each other; they are never CI, a packaging input or benchmark history.
 
 ## Known limits
 
 - Banks are **designed personas**. Building an emotion bank for a
   user-recorded voice would need the user to record emotional reference clips
-  of themselves; the pipeline scores and enrolls such clips fine, but nothing
+  of themselves; such clips enroll as ordinary saved voices, but nothing
   generates them.
 - The reference transcript is required (in-context conditioning). Both apps
   now say so: a reference without a transcript clones identity only, and the
   clone readiness line and the iOS save-voice sheet state it plainly.
 - Emotion in the reference competes with identity stability: the selection
   trades expressiveness for anchor similarity by design. If an emotion keeps
-  failing curation, raise `--candidates` before touching the criterion.
+  failing curation, generate more candidates before touching the criterion.
 - Whisper is the hard case: the first real build (Warm Narrator, 2026-08-04)
   produced no eligible whisper — its candidates measured *more* voiced than
   the anchor, meaning VoiceDesign rendered soft-but-voiced speech rather than
@@ -116,8 +79,8 @@ owned probe on the pinned recognizer's encoder may join later (AQ-08).
   closed 2026-08-04) then exhausted the VoiceDesign channel: six
   brief/instruction variants all produced candidates MORE harmonic than the
   anchor, so this checkpoint's design channel cannot render whisper phonation
-  no matter where the request lives, and the builder keeps refusing whisper
-  honestly. The one remaining path is cloning a genuinely whispered human
+  no matter where the request lives, and a bank honestly has no whisper
+  entry. The one remaining path is cloning a genuinely whispered human
   reference (record a 10-20 s whispered clip, enroll it, judge it with the
   validated HNR/CPP-delta criterion); any such lane also needs a
   whisper-aware audio-QC posture first, because the fast QC's dropout

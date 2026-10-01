@@ -218,8 +218,7 @@ The bare `--capture-codec-trace` flag (internal-diagnostics binaries with `QWENV
 telemetry on, short-form batches only) asks the engine for each take's codec trace. Under a
 registered run id (`QVOICE_MAC_BENCH_RUN_ID`) the engine keeps it beside its diagnostics as
 codec-trace v1 and records its digest in the take's engine row; sampling and output are unchanged.
-`scripts/macos_test.sh qc-takes` passes it, and the audio QC class I positives are built from those
-traces (see [`audio-qc-engineering.md`](audio-qc-engineering.md), Class I positives).
+`scripts/macos_test.sh qc-takes` passes it.
 
 ### `voices` — manage saved clone voices
 
@@ -271,10 +270,11 @@ vocello deliveries [--json]
 Lists every built-in delivery preset as a preset id and the natural-language instruction
 the model receives in its canonical English form (the source of truth is `EmotionPreset`). Static
 and instant. These ids are the
-`bench --delivery <id>` cells, and `--shipped-only --json` is the roster the delivery harness reads.
+`bench --delivery <id>` cells, and `--shipped-only --json` is the roster the delivery bench reads.
 Objective, reference-free delivery adherence (F0 / speaking-rate / duration deltas against a
 same-seed neutral take) is measured by `vocello bench --delivery` with
-`scripts/bench_delivery_prosody.py`; see [`delivery-harness.md`](delivery-harness.md).
+`scripts/bench_delivery_prosody.py`; see
+[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
 
 `generate` and `batch` accept `--delivery-cell <preset>.<intensity>` for repository-owned
 CustomVoice selections. That identity fails closed if its accompanying copy drifts. It also enables
@@ -401,23 +401,21 @@ establishes a sampled-model pathology or authorizes a product/model/QC change.
 
 `bench --codec-roundtrip <job.json> --output-dir <new-untracked-directory>` resynthesizes the job's
 digest-bound mono PCM16 24 kHz WAVs through the installed Voice Cloning Speed model's speech
-tokenizer (audio QC population N2), on one model load. Like the replay, it needs an
-internal-diagnostics binary and `QWENVOICE_DEBUG=1`, binds the model to the pinned catalog bytes and
-refuses an existing output directory. `scripts/macos_test.sh qc-n2` writes the job and binds the
-result; see [`audio-qc-engineering.md`](audio-qc-engineering.md) (Codec resynthesis).
+tokenizer, on one model load. Like the replay, it needs an internal-diagnostics binary and
+`QWENVOICE_DEBUG=1`, binds the model to the pinned catalog bytes and refuses an existing output
+directory.
 
 ### Codec loop (internal diagnostics only)
 
-`bench --codec-loop <job.json> --output-dir <new-untracked-directory>` builds the audio QC COD-LOOP
-positives (tier T2): each job item names a recorded codec trace by digest and one loop recipe (a span
-of frames repeated right after itself, or the untouched trace as the sham). It verifies every trace
+`bench --codec-loop <job.json> --output-dir <new-untracked-directory>` builds codec-loop takes:
+each job item names a recorded codec trace by digest and one loop recipe (a span of frames repeated
+right after itself, or the untouched trace as the sham). It verifies every trace
 and recipe before loading, binds the installed CustomVoice Speed model to the pinned catalog bytes,
 writes each mutated trace, decodes it through the codec replay's full arm (the production
 non-streaming 25-frame schedule) and writes the PCM16 through the production output limiter, then
 applies the publication marking once the model is unloaded. Like the replay, it needs an
 internal-diagnostics binary and `QWENVOICE_DEBUG=1` with telemetry on, and refuses an existing output
-directory. `scripts/macos_test.sh qc-introspection` writes the job and binds the result; see
-[`audio-qc-engineering.md`](audio-qc-engineering.md) (Class I positives).
+directory.
 
 ## Examples
 

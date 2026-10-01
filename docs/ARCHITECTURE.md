@@ -524,8 +524,20 @@ bench (2026-08-01, warn-first delivery-gate rule v1); persisted Fast QC plus the
 prosody and delivery validators remain the blocking authorities — see `unifiedQuality` in
 `config/runtime-refactor-contract.json`. The Python prosody analyzer is independently shipping algorithm v3, which uses two
 bounded passes rather than a duration-sized PCM/frame matrix. Its phonation/spectral outputs are
-acoustic proxies, not calibrated emotion or clinical measures. See the
-[Audio QC engineering review](reference/audio-qc-engineering.md) for cache/resource and accuracy boundaries.
+acoustic proxies, not calibrated emotion or clinical measures.
+
+Cadence validity is separate from delivery adherence. Fast QC carries a bounded, typed
+`AudioCadenceQCReport` (the punctuation-derived expected pause count, observed, excess and
+suspicious pauses, the bounded pause-duration vector, median and p90 pause, and the cadence-silence
+ratio; no script or audio). A `severe` classification is the existing gross-defect rule, a
+context-sensitive egregious interior gap or repeated suspicious-scale gaps, and fails mandatory QC;
+an ordinary excess is `unusual`, not a hidden rejection. An accepted unusual take stays playable and
+saved under a visible "Unusual pacing" notice; on iOS the player also offers "Generate again", which
+reuses the visible request. Vocello never silently retries, changes the seed or chooses among hidden
+takes.
+A take can match its delivery and still have pathological spacing, or the reverse. Offline audio
+QC of generated takes (models, labels, detectors and lane gates) is QC v2:
+[`docs/reference/qc.md`](reference/qc.md).
 
 ### 4.11 Spoken-text and long-form planning status
 
@@ -1036,9 +1048,9 @@ output and v1–v7 rows still decode. Engine rows also stamp free-form provenanc
 script identity (`promptChars`/`promptDigest` — the script text only, never the delivery
 instruction), the resolved language hint, sampling seed evidence, the bench `delivery`
 cell stamp, and — for any instructed take — the delivery-instruction receipt
-(`instructChars`/`instructDigest`) that the delivery harness verifies fail-closed against
+(`instructChars`/`instructDigest`) that the delivery bench verifies fail-closed against
 the bench manifest's instruction echo
-([`docs/reference/delivery-harness.md`](reference/delivery-harness.md) §4). The transport layer records request acceptance, first-chunk,
+([`docs/reference/benchmarking-procedure.md`](reference/benchmarking-procedure.md#46-delivery--prosody-cells) §4.6). The transport layer records request acceptance, first-chunk,
 session/chunk/order/terminal evidence; the backend records typed stages/timings/counters, final barrier,
 atomic output, process-owned memory, and audio QC v3's separate pre-limiter-instability and
 persisted-WAV written-output verdicts. Schema v8 adds absolute-uptime sample alignment, independent

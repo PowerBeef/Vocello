@@ -303,7 +303,8 @@ listening is optional annotation and cannot clear a deterministic failure or war
 
 - **`dropout` is punctuation-aware** (`ac86b8a`): the original ~586 ms "dropout" was the model's
   natural prosodic pauses on long slow narration. The regimes are defined once in
-  `makeAudioQCReport` and documented in [`audio-qc-engineering.md`](audio-qc-engineering.md).
+  `makeAudioQCReport` and documented in
+  [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).
 - **Latest canonical result:** all 29 takes in the clean schema-v2 iPhone UI record passed audioQC.
   Earlier accumulated rows with Design dropout/click warnings remain historical diagnostic leads;
   they are not the current acceptance verdict and cannot override the run-scoped canonical record.

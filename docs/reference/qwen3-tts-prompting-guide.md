@@ -1,15 +1,12 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-21
+reviewed: 2026-10-01
 summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - config/delivery-instruction-contract.json
-  - config/delivery-experiment-contract.json
-  - config/delivery-evaluation-corpus.json
   - Sources/QwenVoiceCore/EmotionPreset.swift
-  - scripts/delivery_experiment.py
-  - scripts/delivery_experiment_runner.py
+  - scripts/bench_delivery_prosody.py
 ---
 # Qwen3-TTS Prompting Guide
 
@@ -341,8 +338,8 @@ BH-FDR. The valence ceiling was upgraded from hypothesis to result: the pre-regi
 **happy-vs-angry 2-way probe sits at chance in both arms** (UAR 0.531 / 0.583 vs a 0.5 floor,
 p = 0.43 / 0.24), and `happy` fails FDR in both arms with `angry` as its top confusion each
 time. The 8-bit Quality arm separates no better than 4-bit, retiring quantization as a
-suspected adherence bottleneck. Protocol, provenance, and statistics:
-[`delivery-harness.md`](delivery-harness.md).
+suspected adherence bottleneck. Measurement protocol and instruction provenance:
+[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
 
 Consequence for prompt-writing: **wording cannot buy a distinction this instruction channel does
 not carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all
@@ -654,7 +651,7 @@ settled one.
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
-| Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery harness verifies them fail closed ([`delivery-harness.md`](delivery-harness.md) §4) |
+| Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery bench verifies them fail closed ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)) |
 
 Three of the four hazards that the research pass flagged as likely causes of "delivery sounds off"
 in MLX ports do not apply to this checkout. That is worth stating plainly, because it narrows the
@@ -772,39 +769,27 @@ and separation from Happy. The conflict-reduced Fearful arm removed one target-p
 and shortened the worst target output, but the Fearful/Sad screen remained incomplete and less
 separable. The more descriptive Fearful arm was worse. This is direct evidence against assuming
 that shorter, more explicit, or more acoustically detailed wording is universally better. The
-current checkpoint copy remains in production without a semantic-improvement claim; see
-[`delivery-harness.md`](delivery-harness.md) §2.8 for the bounded results.
+current checkpoint copy remains in production without a semantic-improvement claim.
 
 ### 8.4 The controlled experiment layer
 
-`MEASURED-HERE`, 2026-08-22. Vocello now compiles experiments through
-[`delivery-experiment-contract.json`](../../config/delivery-experiment-contract.json) rather than
-editing shipped copy. The six isolated arms progress from current copy through an official-minimal
+`MEASURED-HERE`, 2026-08-22. Experiments were compiled from a versioned contract rather than by
+editing shipped copy. Six isolated arms progressed from current copy through an official-minimal
 emotion phrase, acoustic attributes, emotion plus attributes, one compatible scene, and one
 anti-exaggeration constraint. No tags, SSML, prompt weights, negative-prompt channel, system turn,
-or classifier-free-guidance syntax is invented.
+or classifier-free-guidance syntax was invented. A versioned corpus separated calibration,
+development and untouched confirmation text, varied neutral, congruent and conflicting semantics at
+three lengths, covered the nine speakers natively and added fixed cross-language sentinels. A
+serial, resumable runner bound each plan to exact production instructions, binary digest, sampling
+parameters, seeds, script identities, instruction receipts and output hashes.
 
-[`delivery-evaluation-corpus.json`](../../config/delivery-evaluation-corpus.json) separates
-calibration, development, and untouched confirmation text; varies neutral, congruent, and
-conflicting semantics at three lengths; covers the nine speakers natively; and adds fixed
-cross-language sentinels. [`delivery_experiment_runner.py`](../../scripts/delivery_experiment_runner.py)
-binds a plan to exact production instructions, binary digest, sampling parameters, seeds, script
-identities, instruction receipts, and output hashes. It is serial, resumable, local-only, and never
-publishes evidence automatically; its `run_execution_plan` requires an explicit `lock_root` (the CLI
-passes the host-wide analysis lock root, `hostAnalysisLock` in `config/build-output-policy.json`,
-the same `delivery-analysis-supervisor.lock` root every heavy analyzer uses whatever its checkout or
-cache root), so programmatic callers must supply one. For evaluator calibration, its balanced rotation can keep one
-seed and one neutral script fixed per speaker across all presets while the cohort collectively
-spans multiple seeds and all three script lengths; this preserves paired neutral reuse and real
-speaker/script/seed blocking without expanding the listener packet into a full factorial.
-
-The experiment compiler and its candidate arms remain unchanged until an untouched candidate passes
-the automatic integrity/intelligibility/identity/naturalness guardrails and blinded listener rules
-in [`delivery-harness.md`](delivery-harness.md). The maintainer-directed 2026-08-24 production-copy
-checkpoint is tracked separately because it was not selected from those arms and makes no measured
-improvement claim. Concise and multidimensional prompts remain separate experiment arms because
-official examples support both and this repository has not shown either to dominate across speakers
-and scripts.
+That experiment layer was retired with the v1 audio QC stack on 2026-10-01; the findings recorded
+here stand. New delivery comparisons run as multi-seed `vocello bench --delivery` sweeps
+([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)), and moving their analysis onto QC v2 ([`qc.md`](qc.md)) is roadmap item QC-07. The
+maintainer-directed 2026-08-24 production-copy checkpoint was not selected from those arms and makes
+no measured improvement claim. Concise and multidimensional prompts remain separate candidates
+because official examples support both and this repository has not shown either to dominate across
+speakers and scripts.
 
 ---
 
@@ -896,17 +881,12 @@ Ordered by expected value. **None of these is a recommendation to change preset 
 unvalidated prompt guidance is the failure mode this document exists to stop; each item below is a
 measurement first.
 
-The harness already exists — the complete operator's reference is
-[`delivery-harness.md`](delivery-harness.md). In brief:
-[`scripts/delivery_separability.py`](../../scripts/delivery_separability.py) scores cross-preset
-separability (computed floors, permutation null, per-cell BH-FDR, `--presets` subset probes,
-exploratory/confirmatory designation), [`scripts/bench_delivery_prosody.py`](../../scripts/bench_delivery_prosody.py)
-turns a `bench --delivery` run into a receipt-verified paired sidecar,
-[`scripts/delivery_matrix_report.py`](../../scripts/delivery_matrix_report.py)
-runs a seeded delivery matrix, and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
-provides paired Wilcoxon tests, Cohen's d_z, BCa intervals, and Benjamini-Hochberg correction. Each
-experiment below is a matrix run plus a paired comparison, pre-registered per
-[`delivery-harness.md`](delivery-harness.md) §7.
+Measure with the delivery bench: [`scripts/bench_delivery_prosody.py`](../../scripts/bench_delivery_prosody.py)
+turns a `bench --delivery` run into a receipt-verified paired sidecar ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)). Each experiment
+below is a multi-seed sweep plus a paired comparison. Register its hypotheses, seeds, cells, arms
+and decision rule in the owning roadmap item's gate text before any generation (the commit
+timestamp is the registration proof), and append the results, coverage gaps included, to the same
+gate.
 
 1. ~~**Short versus long instruction.**~~ **SETTLED 2026-08-02 — the shipped long form wins,
    57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the

@@ -1737,7 +1737,7 @@ Do not change:
   - Capturing only one repetition per cell (#31).
   - The seed knob (knob registry and runtime-security contract, #29).
   - ui-perf ceilings derived from the spread between runs (#34).
-- **Audio and delivery, under the threshold-change authority in audio-qc-engineering.md:**
+- **Audio and delivery, under the threshold-change authority of the time (since 2026-10-01, QC v2: docs/reference/qc.md):**
   - Language: per-channel consensus and re-declaring the negative control (#42), seed identity v2 (#86) and WER v2 (#43).
   - Speaking-rate and click fail bounds (#10, #85).
   - Delivery: a cell-level adherence verdict and floor re-derivation (#39), the supervisor recovery rule (#102), and the "uncalibrated" prosody composition (#41).

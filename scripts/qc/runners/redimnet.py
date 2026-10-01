@@ -8,7 +8,8 @@ torch.hub entry. Only its `asv/models/redimnet2.py` and `asv/models/redimnet2_ve
 `asv` and `asv.models` are registered as bare packages so their `__init__` (hydra, omegaconf) never
 runs. It needs torch, torchaudio and scipy.
 
-The encoder is the B6 preset (`out_channels` 224, 1-D output), built with `pretrained=False` so
+The encoder is the B6 preset (`out_channels` 224, 2-D head: the released checkpoint's head is a 1x1
+Conv2d over 72 mel bands, pooled from 224 x 9 features), built with `pretrained=False` so
 nothing is downloaded. Its `forward` takes a spectrogram: the trained front end is the module's own
 `spec_frontend` (pre-emphasis, 400-sample Hamming, 512-point FFT, hop 160, the preset's mel bands,
 log, per-utterance mean removal) applied to 16 kHz `[B, T]` audio, as the authors' submission code
@@ -36,7 +37,7 @@ HOP_SECONDS = 1.0
 MAX_SECONDS = 60.0  # the model card's maximum input; longer audio is embedded per 60 s and averaged
 MIN_SECONDS = 0.5
 WEIGHTS_FILE = "pytorch_model_fsdp.bin"
-MODEL_OVERRIDES = {"out_channels": 224, "return_2d_output": False}
+MODEL_OVERRIDES = {"out_channels": 224, "return_2d_output": True}
 BATCH = 16
 
 

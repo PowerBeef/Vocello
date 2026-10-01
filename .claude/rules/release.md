@@ -86,7 +86,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   publish their digest and summary first; a CPU profile's raw trace is then deleted (`--keep-trace` is
   explicit), while a memory profile keeps its trace by default (`keptByDefault`).
 - **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every RTF-bearing record
-  since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` and `prosody-calibration` publish no RTF); legacy records are never rewritten and never share a comparison
+  since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` publishes no RTF); legacy records are never rewritten and never share a comparison
   key with new ones. A comparison key names what its kind measures (`scripts/lib/lineage_identity.py`: the
   project.yml build settings its lane builds, the take topology and a reviewed per-kind measurement version
   beside hardware, OS, toolchain, matrix, corpus, models, evidence and memory contracts and metric
@@ -113,19 +113,18 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   failing), zero capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`;
   contract-v1 records keep their ≥95% coverage rule. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
-- **Audio QA is autonomous.** Fixed seeds, byte-bound PCM QC, locale-locked full-WAV ASR and
-  prosody/delivery evidence are required; listening is optional, has no lane, and never clears a
-  machine failure. Language verdicts name their recognizer families: Apple Speech in the iPhone app,
-  the pinned whisper-small MLX producer (`scripts/independent_asr.py`) on the Mac after the generator
-  has exited; one family is one witness, two must agree for consensus. Shared metrics live in
-  `scripts/lib/language_metrics.py` and `scripts/lib/audio_qc.py`; thresholds stay in Swift. The
-  metrics also accept a third family id, `sensevoice`, which no lane produces today: SenseVoice
-  appears only as a compact-model adapter id in the delivery research cascade, never as a language
-  witness. A defect the maintainer hears is a QC blind spot: it enters Stage 0 or 1 as a
-  deterministic, reference-free shadow detector with a test, and the heard takes become its P4
-  positives; it fails takes once it qualifies under A1-A8 (A9,
-  `config/audio-qc-qualification-policy.json`); listening sets are never the ongoing control.
-  Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
+- **Audio QA is calibrated on the maintainer's ears (QC v2, `docs/reference/qc.md`).** Fixed seeds
+  and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 detectors are
+  fit on the maintainer's listening labels (`scripts/qc.py label`); `qc.py fit` freezes thresholds in
+  `config/qc/thresholds-v<N>.json`, committed before `qc.py eval` scores the held-out labels once,
+  and a model, feature or threshold change is a new version. A detector warns or fails a lane only
+  for the languages and classes its evaluation covers, and reports elsewhere. Listening labels takes
+  but never clears a machine failure; a heard defect no detector flags joins the next labelling
+  batch. Language verdicts name their recognizer families (Apple Speech in the iPhone app, QC v2's
+  two ASR families on the Mac); one family is one witness, two must agree for consensus, and shared
+  metrics live in `scripts/lib/language_metrics.py` and `scripts/lib/audio_qc.py`. Labels,
+  transcripts and take paths stay under `build/private/qc`; Git holds aggregates and digests. Every
+  QC model's weights carry a commercial-use license (`config/qc/models.json`).
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
   a contract calibrated with its run IDs fails a run. ui-perf ceilings stay warn-only; a
@@ -134,9 +133,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
   instead of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench|qc-takes|qc-n2|qc-introspection` and `release.yml` run only on explicit request, in the lead session, with no
-  parallel agent active, except that the non-timing audio-QC model runs (`qc-takes`, `qc-n2` and
-  orchestrator panels, which measure outputs, not timing) may run beside code-only agents
+  memory|lang-bench|qc-takes` and `release.yml` run only on explicit request, in the lead session, with no
+  parallel agent active, except that the non-timing audio-QC model runs (`qc-takes` and the QC v2
+  `scripts/qc.py` model runs, which measure outputs, not timing) may run beside code-only agents
   (`require_quiet_host <lane> agents-allowed`; maintainer decision 2026-09-29). Timing lanes refuse to start on a busy host (`require_quiet_host` in
   `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
   level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;

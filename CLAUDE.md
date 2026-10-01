@@ -110,8 +110,8 @@ npm --prefix website run check       # independent website acceptance
 - **Explicit consent:** device/UI/model/benchmark runs, releases and publication need an explicit
   request. Consent covers that request only; none carries over. Lanes run one at a time on committed
   source, in the lead session, with no agent or native build running alongside, except that the
-  non-timing audio-QC model runs (`qc-takes`, `qc-n2`, orchestrator panels) may run beside code-only
-  agents (maintainer decision, 2026-09-29). Never edit a script a running lane executes. Tool or skill
+  non-timing audio-QC model runs (`qc-takes`, QC v2 `scripts/qc.py` model runs) may run beside
+  code-only agents (maintainer decision, 2026-09-29). Never edit a script a running lane executes. Tool or skill
   availability grants no consent. Never retry a failed evidence run silently.
 - **Generated project:** edit `project.yml`, never `project.pbxproj`; run
   `./scripts/regenerate_project.sh --fast` after project inputs change.

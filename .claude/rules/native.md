@@ -14,7 +14,7 @@ paths:
 
 References, read only what the change needs: `docs/reference/mlx-guide.md`,
 `docs/reference/macos-app-guide.md`, `docs/reference/ios-app-guide.md`,
-`docs/reference/localization.md`, `docs/reference/delivery-harness.md`, `docs/ARCHITECTURE.md`.
+`docs/reference/localization.md`, `docs/reference/qc.md` (audio QC), `docs/ARCHITECTURE.md`.
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
 (generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
 (`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,

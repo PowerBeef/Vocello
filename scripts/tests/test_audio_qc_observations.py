@@ -196,54 +196,6 @@ class KnownReferenceTests(unittest.TestCase):
         self.assertAlmostEqual(noisy_result["noiseFloorDBFS"], 20 * math.log10(0.02 / math.sqrt(3)), delta=0.5)
 
 
-class InjectorTests(unittest.TestCase):
-    """AQ-03's T1 injectors move the measures they name, and their shams move nothing."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        from lib.qc_qualification import fixtures, injectors, pcm
-
-        cls.injectors = injectors
-        cls.pcm = pcm
-        cls.source = fixtures.clean_fixture(0)
-
-    def signal(self, samples) -> dict:
-        return observations.signal_observations(self.pcm.to_pcm16(samples), sample_rate=RATE)
-
-    def inject(self, injector: str, variant: str) -> dict:
-        return self.signal(self.injectors.inject(injector, variant, self.source, seed=11).samples)
-
-    def test_a_level_drop_moves_loudness_and_true_peak_by_its_gain(self) -> None:
-        clean = self.inject("SIG-LEVEL", "sham")
-        quieter = self.inject("SIG-LEVEL", "moderate")
-        self.assertEqual(clean, self.signal(self.source.samples))
-        self.assertAlmostEqual(quieter["integratedLoudnessLUFS"] - clean["integratedLoudnessLUFS"], -30.0, delta=0.1)
-        self.assertAlmostEqual(quieter["truePeakDBTP"] - clean["truePeakDBTP"], -30.0, delta=0.1)
-
-    def test_clicks_add_flux_events(self) -> None:
-        # Clicks within 50 ms of an onset or of each other join its event, so the
-        # count rises with the click rate without matching it.
-        events = [self.inject("SIG-CLICK", variant)["spectralFluxEventCount"]
-                  for variant in ("sham", "mild", "moderate", "severe")]
-        self.assertEqual(events, sorted(set(events)), "every click level adds events")
-        self.assertGreaterEqual(events[2] - events[0], 5, "16 moderate clicks in 3.1 s")
-        self.assertGreater(self.inject("SIG-CLICK", "moderate")["truePeakDBTP"],
-                           self.inject("SIG-CLICK", "sham")["truePeakDBTP"])
-
-    def test_noise_lowers_wada_snr_and_raises_the_floor(self) -> None:
-        sham = self.inject("SIG-NOISE", "sham")
-        noisy = self.inject("SIG-NOISE", "severe")
-        self.assertLess(noisy["wadaSNRDB"], sham["wadaSNRDB"])
-        self.assertGreater(noisy["noiseFloorDBFS"], sham["noiseFloorDBFS"] + 10.0)
-
-    def test_a_repeated_phrase_forms_a_stripe(self) -> None:
-        sham = self.inject("CNT-REP", "sham")
-        looped = self.inject("CNT-REP", "severe")
-        self.assertEqual(sham["repetitionStripeCount"], 0)
-        self.assertGreaterEqual(looped["repetitionStripeCount"], 1)
-        self.assertGreaterEqual(looped["repetitionStripeLongestMS"], 600)
-
-
 class FastQCMirrorTests(unittest.TestCase):
     def test_the_mirror_report_carries_the_signal_block_and_its_metrics(self) -> None:
         import numpy as np

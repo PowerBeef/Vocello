@@ -18,7 +18,7 @@ import time
 import wave
 # Imported here, not lazily: a host python3 without NumPy fails before any take
 # runs instead of after a consented rotation (review of #106).
-from delivery_statistics import bootstrap_ci, wilcoxon_signed_rank  # noqa: E402
+from lib.basic_stats import bootstrap_ci, wilcoxon_signed_rank  # noqa: E402
 from lib import jsonio  # noqa: E402
 
 
@@ -120,7 +120,7 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
     index (same seeded text, adjacent in time), so host drift between rotations
     cancels. Reports the median paired ratio, a BCa 95% interval of the mean
     paired percent difference and the exact Wilcoxon signed-rank test from
-    ``delivery_statistics``. Since audit #63 part 3 the interval decides the
+    ``lib.basic_stats``. Since audit #63 part 3 the interval decides the
     arm's verdict with the median as a check (``arm_verdict``); a failure here is recorded as
     ``unavailable`` rather than raised, and the median comparison then decides,
     so it can never cost the lane its verdict.

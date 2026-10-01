@@ -45,12 +45,5 @@
       }
     }
   ],
-  "safetyMatrix": {
-    "runner": "scripts/angry_bilingual_safety_matrix.py",
-    "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
-    "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
-    "requiredTakeCount": 36,
-    "authority": "hard-failure-and-routing-safety-only"
-  },
   "acknowledgedFindings": []
 }

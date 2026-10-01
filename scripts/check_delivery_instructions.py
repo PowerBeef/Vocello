@@ -12,8 +12,8 @@ normal-versus-strong comparison run over them. Every deterministic gate passed
 throughout.
 
 The gate also pins every canonical cell digest and validates each versioned localized variant,
-its source constant, supported language pair, speaker-metadata authority, dual-match routing,
-verbatim custom-text fallback, and hard-safety matrix identity.
+its source constant, supported language pair, speaker-metadata authority, dual-match routing
+and verbatim custom-text fallback.
 
 Four semantic-text checks follow, in two severities.
 
@@ -447,22 +447,6 @@ def validate_versioned_instructions(
         for row in metadata.values()
     ):
         raise ContractError("speaker contract has no registered Chinese-native speaker")
-
-    safety = contract.get("safetyMatrix")
-    if not isinstance(safety, dict):
-        raise ContractError(f"{CONTRACT_PATH}.safetyMatrix must be an object")
-    required_safety = {
-        "runner": "scripts/angry_bilingual_safety_matrix.py",
-        "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
-        "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
-        "requiredTakeCount": 36,
-        "authority": "hard-failure-and-routing-safety-only",
-    }
-    if safety != required_safety:
-        raise ContractError(f"{CONTRACT_PATH}.safetyMatrix drifted")
-    for path_key in ("runner", "tests"):
-        if not (root / safety[path_key]).is_file():
-            raise ContractError(f"missing safety-matrix surface: {safety[path_key]}")
     return {"canonicalCells": len(expected_cells), "localizedVariants": len(variants)}
 
 

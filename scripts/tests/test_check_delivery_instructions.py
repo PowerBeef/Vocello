@@ -238,10 +238,6 @@ public static let angryBilingualV3Mandarin = "{self.MANDARIN}"
                 "vivian": {"nativeLanguage": "Chinese"},
             },
         }), encoding="utf-8")
-        scripts = self.root / "scripts/tests"
-        scripts.mkdir(parents=True)
-        (self.root / "scripts/angry_bilingual_safety_matrix.py").touch()
-        (scripts / "test_angry_bilingual_safety_matrix.py").touch()
         self.presets = {"angry": {"normal": self.ENGLISH, "strong": "Strong angry."}}
         self.contract = {
             "canonicalInstructionDigests": {
@@ -266,13 +262,6 @@ public static let angryBilingualV3Mandarin = "{self.MANDARIN}"
                     "customTextBehavior": "verbatim",
                 },
             }],
-            "safetyMatrix": {
-                "runner": "scripts/angry_bilingual_safety_matrix.py",
-                "tests": "scripts/tests/test_angry_bilingual_safety_matrix.py",
-                "fixedSeeds": [32060826, 32060827, 32060828, 32060829],
-                "requiredTakeCount": 36,
-                "authority": "hard-failure-and-routing-safety-only",
-            },
         }
 
     def tearDown(self):

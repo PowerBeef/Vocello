@@ -59,14 +59,12 @@ DELIVERY_GATE_ALGORITHM_VERSION = 3
 # A required feature's cell flags when the median signed effect is not
 # positive (direction) or sits below its floor (weak); a supporting feature's
 # when the median moves clearly the opposite way. `paired_report`
-# (delivery_statistics) annotates each feature with its exact Wilcoxon test,
+# (lib.basic_stats) annotates each feature with its exact Wilcoxon test,
 # BCa interval and Wilson direction win-rate; they never decide the verdict.
 # Floors are provisional: the per-take floors, measured before the 2026-08-25
 # instruction rewrite, until a pre-registered post-rewrite run re-derives them
-# (`scripts/delivery_matrix_report.py --emit-expectations`, half the observed
-# median effect) under the threshold-change authority. A single run rarely
-# holds `CELL_MINIMUM_TAKES` takes of a cell; the cross-seed report judges the
-# campaign's cells (`cellAdherence`).
+# (half the observed median effect) under the threshold-change authority. A
+# single run rarely holds `CELL_MINIMUM_TAKES` takes of a cell.
 CELL_ADHERENCE_ALGORITHM = "delivery-cell-adherence-v1"
 CELL_FLOOR_STATUS = "provisional-per-take-floors"
 # Fewer takes than this give a cell verdict of `insufficient`: a median of one
@@ -360,7 +358,7 @@ def evaluate_delivery_cell(take_features, delivery_id, profile=None, *,
     }
     if expectation is None:
         return {**verdict, "status": "unavailable", "flags": ["expectation_missing"], "features": {}}
-    from delivery_statistics import paired_report  # NumPy only when a cell is judged
+    from lib.basic_stats import paired_report  # NumPy only when a cell is judged
 
     factor = intensity_factor(prof, intensity)
     flags = []

@@ -1216,14 +1216,10 @@ def _analyze(path: str, boundary_seconds: Iterable[float], *, delivery_projectio
 
 
 def analyze(path: str, boundary_seconds: Iterable[float] = (), *,
-            delivery_projection: bool = False, experimental_phonation: bool = False) -> dict[str, object]:
+            delivery_projection: bool = False) -> dict[str, object]:
     """Analyze one WAV without raising file/format/analysis errors to callers."""
     try:
-        result = _analyze(path, boundary_seconds, delivery_projection=delivery_projection)
-        if experimental_phonation and "error" not in result:
-            from audio_phonation import analyze_phonation
-            result["experimentalPhonation"] = analyze_phonation(path)
-        return result
+        return _analyze(path, boundary_seconds, delivery_projection=delivery_projection)
     except Exception as error:
         return {
             "clip": os.path.basename(path),
@@ -1246,8 +1242,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Bounded reference-free prosody analyzer.")
     parser.add_argument("clips", nargs="*", help="PCM16 WAV file(s) to analyze")
     parser.add_argument("--json", action="store_true", help="emit JSON")
-    parser.add_argument("--experimental-phonation", action="store_true",
-                        help="append uncalibrated window-corrected measurements; never changes v3 gates")
     parser.add_argument(
         "--boundary-seconds",
         type=_parse_boundary_seconds,
@@ -1258,8 +1252,7 @@ def main() -> None:
     if not arguments.clips:
         parser.print_help()
         return
-    output = [analyze(path, boundary_seconds=arguments.boundary_seconds,
-                      experimental_phonation=arguments.experimental_phonation) for path in arguments.clips]
+    output = [analyze(path, boundary_seconds=arguments.boundary_seconds) for path in arguments.clips]
     print(json.dumps(output, indent=2))
 
 

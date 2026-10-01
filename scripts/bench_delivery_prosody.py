@@ -520,8 +520,7 @@ def attach_cell_verdicts(results: list[dict[str, Any]], profile: dict[str, Any])
     The per-take `deliveryGate` flags stay as diagnostics; the verdict of the
     cell (all of this run's takes sharing mode, model, speaker, length and
     delivery) is the adherence verdict. A cell with fewer takes than the
-    minimum is `insufficient`: a campaign across seeds judges it
-    (`scripts/delivery_matrix_report.py`, `cellAdherence`).
+    minimum is `insufficient`.
     """
     cells: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for row in results:

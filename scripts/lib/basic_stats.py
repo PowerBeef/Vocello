@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-"""Paired-comparison statistics for delivery evidence.
+"""Paired-comparison statistics: significance, effect size and intervals.
 
-Delivery acceptance has been decided by direction win-rate over 7-14 takes.
-That bar is far noisier than it looks: a paired design at n=8 has ~80% power
-only for effects around d_z = 0.95, so anything subtler than "obvious to the
-ear" is invisible, and a rewrite can be accepted or rejected on sampling luck.
-Worse, a sweep tests dozens of features at once, so uncorrected p-values
-manufacture several false discoveries per run.
-
-This module supplies what the acceptance decision actually needs:
+Moved here from the retired ``delivery_statistics.py`` (QC v2, 2026-10-01) with
+the routines its two remaining consumers use, unchanged:
 
   wilcoxon_signed_rank  paired significance without a normality assumption --
                         prosody deltas are ordinal and heavy-tailed
@@ -18,19 +11,15 @@ This module supplies what the acceptance decision actually needs:
                         needs no distributional assumption
   wilson_interval       win-rate with an interval that behaves at the extremes
                         where the normal approximation fails
-  benjamini_hochberg    false-discovery control across a wide feature sweep
-  holm_bonferroni       family-wise correction for confirmatory preset claims
-  paired_bootstrap_delta paired candidate-minus-baseline confidence interval
-  required_pairs        the n a given effect size needs, so a sweep is sized
-                        before it runs rather than explained afterwards
+  required_pairs        the n a given effect size needs
+  paired_report         all of the above for one paired feature
 
-NumPy plus the standard library only, so it runs under system ``python3``
-alongside the rest of the deterministic analysis stack. Every routine is
-deterministic; the bootstrap takes an explicit seed.
+Consumers: ``scripts/delivery_quality_gate.py`` (the delivery bench's per-cell
+adherence verdict) and ``scripts/telemetry_overhead.py`` (the telemetry-on
+versus telemetry-off parity interval).
 
-Usage:
-  from delivery_statistics import paired_report
-  paired_report(instructed_values, neutral_values)
+NumPy plus the standard library only, so it runs under system ``python3``.
+Every routine is deterministic; the bootstrap takes an explicit seed.
 """
 
 from __future__ import annotations
@@ -233,108 +222,6 @@ def wilson_interval(successes, trials, confidence=0.95):
         "lower": max(0.0, centre - spread),
         "upper": min(1.0, centre + spread),
         "n": trials,
-    }
-
-
-def benjamini_hochberg(p_values, false_discovery_rate=0.10):
-    """Benjamini-Hochberg step-up procedure.
-
-    A delivery sweep tests dozens of features at once; without correction a run
-    this wide reports several spurious effects every time. Returns per-entry
-    ``{pValue, adjusted, significant}`` in the caller's original order.
-    """
-    entries = [(index, value) for index, value in enumerate(p_values) if value is not None]
-    results = [
-        {"pValue": value, "adjusted": None, "significant": False} for value in p_values
-    ]
-    if not entries:
-        return results
-
-    entries.sort(key=lambda item: item[1])
-    count = len(entries)
-    previous = 1.0
-    adjusted_by_index = {}
-    # Walk from the largest p-value down so the adjusted values stay monotone.
-    for position in range(count - 1, -1, -1):
-        index, value = entries[position]
-        candidate = min(previous, value * count / (position + 1))
-        adjusted_by_index[index] = min(1.0, candidate)
-        previous = candidate
-
-    for index, adjusted in adjusted_by_index.items():
-        results[index]["adjusted"] = round(adjusted, 6)
-        results[index]["significant"] = adjusted <= false_discovery_rate
-    return results
-
-
-def holm_bonferroni(p_values, alpha=0.05):
-    """Holm step-down family-wise error correction in caller order.
-
-    ``None`` entries remain explicitly untested. Once one ordered hypothesis
-    fails, all less-significant hypotheses fail as required by Holm's method.
-    """
-    if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must fall strictly inside (0, 1)")
-    entries = []
-    results = [
-        {"pValue": value, "adjusted": None, "significant": False}
-        for value in p_values
-    ]
-    for index, value in enumerate(p_values):
-        if value is None:
-            continue
-        number = float(value)
-        if not 0.0 <= number <= 1.0 or not math.isfinite(number):
-            raise ValueError("p-values must be finite values in [0, 1] or None")
-        entries.append((index, number))
-    entries.sort(key=lambda item: item[1])
-    count = len(entries)
-    running_adjusted = 0.0
-    family_open = True
-    for position, (index, value) in enumerate(entries):
-        adjusted = max(running_adjusted, min(1.0, value * (count - position)))
-        running_adjusted = adjusted
-        threshold = alpha / (count - position)
-        significant = family_open and value <= threshold
-        if not significant:
-            family_open = False
-        results[index] = {
-            "pValue": value,
-            "adjusted": round(adjusted, 6),
-            "significant": significant,
-        }
-    return results
-
-
-def paired_bootstrap_delta(
-    candidate, baseline, confidence=0.95, resamples=10_000, seed=20260822
-):
-    """Paired candidate-minus-baseline mean with a reproducible percentile CI.
-
-    This routine is suitable for paired binary listener correctness as well as
-    bounded ratings. Pair identity is preserved during every resample.
-    """
-    first = np.asarray([float(value) for value in candidate], dtype=np.float64)
-    second = np.asarray([float(value) for value in baseline], dtype=np.float64)
-    if first.size != second.size:
-        raise ValueError("paired inputs must be the same length")
-    if first.size < 2:
-        return None
-    if not (np.isfinite(first).all() and np.isfinite(second).all()):
-        raise ValueError("paired inputs must be finite")
-    differences = first - second
-    generator = np.random.default_rng(seed)
-    indices = generator.integers(0, differences.size, size=(resamples, differences.size))
-    replicates = differences[indices].mean(axis=1)
-    alpha = (1.0 - confidence) / 2.0
-    return {
-        "meanDifference": float(differences.mean()),
-        "lower": float(np.quantile(replicates, alpha)),
-        "upper": float(np.quantile(replicates, 1.0 - alpha)),
-        "confidence": confidence,
-        "resamples": resamples,
-        "n": int(differences.size),
-        "seed": seed,
     }
 
 

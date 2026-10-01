@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for scripts/delivery_statistics.py.
+"""Unit tests for scripts/lib/basic_stats.py.
 
 Every routine is checked against a value computed by hand or a property that
 must hold regardless of implementation, so a subtle formula error cannot hide
@@ -12,12 +12,9 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from delivery_statistics import (
-    benjamini_hochberg,
+from lib.basic_stats import (
     bootstrap_ci,
     cohens_dz,
-    holm_bonferroni,
-    paired_bootstrap_delta,
     paired_report,
     required_pairs,
     wilcoxon_signed_rank,
@@ -100,51 +97,6 @@ class IntervalTests(unittest.TestCase):
         self.assertLess(many["upper"] - many["lower"], few["upper"] - few["lower"])
 
 
-class MultipleComparisonTests(unittest.TestCase):
-    def test_adjusted_values_are_monotone_and_never_shrink_a_p_value(self):
-        p_values = [0.001, 0.008, 0.039, 0.041, 0.042, 0.06, 0.074, 0.205]
-        results = benjamini_hochberg(p_values, false_discovery_rate=0.10)
-        adjusted = [entry["adjusted"] for entry in results]
-        self.assertEqual(adjusted, sorted(adjusted))
-        for raw, entry in zip(p_values, results):
-            self.assertGreaterEqual(entry["adjusted"], raw)
-
-    def test_correction_rejects_a_finding_that_survives_uncorrected(self):
-        # One real effect and one borderline hit among 38 nulls. At the usual
-        # uncorrected 0.05 the borderline p=0.04 reads as a discovery; across a
-        # 40-feature sweep it is what you expect from chance alone, and BH says
-        # so. This is the failure mode a wide delivery sweep hits every run.
-        p_values = [0.001, 0.04] + [0.5] * 38
-        results = benjamini_hochberg(p_values, false_discovery_rate=0.10)
-        self.assertTrue(results[0]["significant"])
-        self.assertLess(p_values[1], 0.05)
-        self.assertFalse(results[1]["significant"])
-        self.assertFalse(any(entry["significant"] for entry in results[2:]))
-
-    def test_a_field_of_consistent_small_p_values_is_not_over_corrected(self):
-        # BH controls the false-discovery rate, not the family-wise error rate.
-        # When most tests genuinely show an effect it must keep them, otherwise
-        # a real across-the-board improvement would be discarded.
-        results = benjamini_hochberg([0.001] + [0.04] * 39, false_discovery_rate=0.10)
-        self.assertTrue(all(entry["significant"] for entry in results))
-
-    def test_missing_p_values_are_passed_through_untouched(self):
-        results = benjamini_hochberg([0.01, None, 0.5])
-        self.assertIsNone(results[1]["adjusted"])
-        self.assertFalse(results[1]["significant"])
-
-    def test_holm_stops_the_family_after_the_first_failed_hypothesis(self):
-        results = holm_bonferroni([0.001, 0.03, 0.031, None], alpha=0.05)
-        self.assertTrue(results[0]["significant"])
-        self.assertFalse(results[1]["significant"])
-        self.assertFalse(results[2]["significant"])
-        self.assertIsNone(results[3]["adjusted"])
-
-    def test_holm_rejects_invalid_p_values(self):
-        with self.assertRaises(ValueError):
-            holm_bonferroni([0.01, 1.2])
-
-
 class PairedReportTests(unittest.TestCase):
     def test_report_carries_significance_effect_interval_and_win_rate(self):
         instructed = [12.0, 13.0, 11.5, 12.5, 13.5, 12.2, 12.8, 13.1]
@@ -160,15 +112,6 @@ class PairedReportTests(unittest.TestCase):
     def test_mismatched_pair_lengths_fail_closed(self):
         with self.assertRaises(ValueError):
             paired_report([1.0, 2.0], [1.0])
-
-    def test_paired_bootstrap_preserves_pairs_and_is_reproducible(self):
-        candidate = [1, 1, 1, 0, 1, 1, 0, 1]
-        baseline = [0, 0, 1, 0, 0, 1, 0, 0]
-        first = paired_bootstrap_delta(candidate, baseline, resamples=2000)
-        second = paired_bootstrap_delta(candidate, baseline, resamples=2000)
-        self.assertEqual(first, second)
-        self.assertGreater(first["meanDifference"], 0)
-        self.assertGreaterEqual(first["upper"], first["meanDifference"])
 
 
 if __name__ == "__main__":

@@ -2,3 +2,22 @@
 # One requirement per line, each pinned with == (or an https direct reference).
 # Installed by: python3 scripts/qc.py runtimes setup --runtime torch
 # into build/cache/qc/runtimes/torch; a change here makes the venv stale until setup re-runs.
+
+# --- agent C ---
+# ReDimNet2+ (its pinned code needs torch, torchaudio, scipy), UTMOSv2 and Audiobox Aesthetics.
+# torchaudio 2.11 is its last release and runs on later torch; I/O goes through soundfile, never
+# torchaudio.load/info. timm, transformers and librosa follow UTMOSv2's own uv.lock;
+# transformers 5.2 needs huggingface-hub < 2.
+torch==2.14.1
+torchaudio==2.11.0
+torchvision==0.29.1
+numpy==2.5.3
+scipy==1.18.1
+soundfile==0.14.0
+safetensors==0.8.0
+huggingface-hub==1.33.0
+timm==1.0.25
+transformers==5.2.0
+librosa==0.11.0
+utmosv2 @ git+https://github.com/sarulab-speech/UTMOSv2.git@cc2700db57bb83ee13dc31ebe1b868c254e15d09
+audiobox_aesthetics==0.0.4

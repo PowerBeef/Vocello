@@ -2,3 +2,13 @@
 # One requirement per line, each pinned with == (or an https direct reference).
 # Installed by: python3 scripts/qc.py runtimes setup --runtime onnx
 # into build/cache/qc/runtimes/onnx; a change here makes the venv stale until setup re-runs.
+
+# --- agent C ---
+# RMVPE and SwiftF0 pitch; the llama.cpp judges run here too (stdlib + numpy). Wheels exist for
+# CPython 3.14 on macOS arm64. swift-f0 0.3 bundles its model.onnx; soxr (LGPL) is not needed, as
+# the runners resample to 16 kHz themselves.
+onnxruntime==1.30.0
+swift-f0==0.3.0
+numpy==2.5.3
+scipy==1.18.1
+soundfile==0.14.0

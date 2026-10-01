@@ -42,12 +42,44 @@ Registry entry `introspection.eos-overrun@1` in [config/audio-qc-detectors.json]
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Qualified (warn); confirmed (qualified).
 
 **Plan.** [config/audio-qc-preregistrations/introspection.eos-overrun@1.json](../../../../config/audio-qc-preregistrations/introspection.eos-overrun@1.json): digest `855b29791923038f`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N3; injector catalog 1, classes I, 150 per cell.
 Calibration cohort audio-qc-calibration-takes (vocello-takes-calibration, manifest `9482435d54f16582`); confirmation cohort audio-qc-calibration-takes (vocello-takes-confirmation, manifest `20211aeea93a0abd`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry qualified.
 
-**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+### Record [record-855b29791923038f.json](../../../../benchmarks/audio-qc-calibration/introspection.eos-overrun@1/record-855b29791923038f.json): qualified at warn
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per language; plan `855b29791923038f`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0 | 13/239 (0.054), upper 0.104 | 0.2 | yes |
+| english | 0 | 5/240 (0.021), upper 0.058 | 0.2 | yes |
+| french | 0 | 15/239 (0.063), upper 0.115 | 0.2 | yes |
+| german | 0 | 13/238 (0.055), upper 0.104 | 0.2 | yes |
+| italian | 0 | 13/238 (0.055), upper 0.104 | 0.2 | yes |
+| japanese | 1 | 2/239 (0.008), upper 0.038 | 0.2 | yes |
+| korean | 0 | 6/232 (0.026), upper 0.066 | 0.2 | yes |
+| portuguese | 1 | 0/238 (0.000), upper 0.022 | 0.2 | yes |
+| russian | 1 | 1/240 (0.004), upper 0.031 | 0.2 | yes |
+| spanish | 0 | 15/238 (0.063), upper 0.115 | 0.2 | yes |
+| pooled | - | 83/2381 (0.035), upper 0.042 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/2381 (0.000), upper 0.001 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T3-controlled-generation | GEN-NOEOS/severe | 65/69 (0.942), lower 0.872 | 0.7 | yes |
+
+Mechanisms meeting: T3-controlled-generation (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| GEN-NOEOS | 4/150 (0.027), upper 0.060 | yes | no |
+
+Counts: calibration 2370 clips, 2370 families, 0 abstained; confirmation N3 2381 clips, 2381 families, 0 abstained; P3 69 clips, 69 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 175 (identified, unit `vocello-voice`).
+
+Judge output identities: `fastqc@8` `072d385c65e95361`. Record limitations: `n3-no-labels`; risks: `introspection-rows-kept`, `generation-knob-published-only`.
 <!-- END GENERATED audio-qc-docs:qualification -->

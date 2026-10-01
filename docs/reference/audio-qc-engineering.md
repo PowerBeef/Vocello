@@ -3272,6 +3272,26 @@ Three plans were refused:
   0.39 against 0.999 native) lie far below that range, but nothing here qualifies the detector for
   them.
 
+**Long-form confirmations (2026-10-01).** CAM++ was recalibrated first: a canary at its current worker
+identity, its re-citation, then a ceiling of 1.09 GB from the full long-form cohort. Its calibration
+panel then scored all 75 long-form families. All three class J plans were refused on the 75-take
+confirmation split, for two reasons.
+
+The split is too small for the per-language false-alarm bound. With 7-8 takes per language, even zero
+false alarms leave the one-sided Clopper-Pearson upper bound at the policy's per-language confidence
+(0.99375) above the 0.2 limit. That needs about 23 families per language, and more with any false
+alarms.
+
+The detectors are also weak:
+
+- `long-form.seam-discontinuity@1` reached 0.08 on SEAM-DISC severe (20 ms removed), with a pooled
+  false-alarm rate of 0.133.
+- `long-form.seam-jump@1` reached 0.49 on the same cell, with 0.053.
+- `long-form.seam-identity@1` reached 0.24 on SEAM-VOICE severe, with 0.027.
+
+A next class J round needs both new detector versions and a long-form cohort of at least about 40
+takes per language.
+
 ### Speech/defect calibration: independent references, no required listening
 
 **Current maintainer decision (September 6): human listening is optional throughout automated

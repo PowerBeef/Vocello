@@ -43,12 +43,46 @@ Registry entry `long-form.seam-identity@1` in [config/audio-qc-detectors.json](.
 <!-- BEGIN GENERATED audio-qc-docs:qualification (scripts/audio_qc_docs.py regen; edit its sources, not this block) -->
 ## Qualification
 
-**Status.** Not qualified; planned, not confirmed.
+**Status.** Refused; confirmed (refused).
 
 **Plan.** [config/audio-qc-preregistrations/long-form.seam-identity@1.json](../../../../config/audio-qc-preregistrations/long-form.seam-identity@1.json): digest `61aa4a0dbda43863`, rule split-conformal, alpha 0.05, confidence 0.95, operating point warn, population N3; injector catalog 4, classes J, 150 per cell.
 Calibration cohort audio-qc-calibration-takes (vocello-long-form-calibration, manifest `4a141aaae38fc373`); confirmation cohort audio-qc-calibration-takes (vocello-long-form-confirmation, manifest `8366ac9b9b2368d5`).
 
-**Confirmation.** Not run: no ledger entry.
+**Confirmation.** Ledger entry refused (far-per-language-not-met, cross-mechanism-detection-not-met).
 
 **Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+### Record [record-61aa4a0dbda43863.json](../../../../benchmarks/audio-qc-calibration/long-form.seam-identity@1/record-61aa4a0dbda43863.json): refused (far-per-language-not-met, cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per pooled; plan `61aa4a0dbda43863`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| english | 0.0732114 | 0/6 (0.000), upper 0.586 | 0.2 | no |
+| french | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| german | 0.0732114 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| italian | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| japanese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| korean | 0.0732114 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| portuguese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| russian | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| spanish | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| pooled | 0.0732114 | 2/75 (0.027), upper 0.082 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/75 (0.000), upper 0.039 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | SEAM-VOICE/severe | 18/74 (0.243), lower 0.164 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| SEAM-VOICE | 4/74 (0.054), upper 0.119 | yes | yes |
+
+Counts: calibration 75 clips, 75 families, 0 abstained; confirmation N3 75 clips, 75 families, 0 abstained; P1 74 clips, 74 families, 0 abstained; S 74 clips, 74 families, 0 abstained. Speakers: 4 (identified, unit `vocello-voice`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `n3-no-labels`, `n3-long-form-cell`; risks: `seam-constructions`, `speaker-raw-windows-export`, `seam-window-similarity`, `resnet293-not-voting`.
 <!-- END GENERATED audio-qc-docs:qualification -->

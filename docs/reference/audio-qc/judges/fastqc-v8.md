@@ -59,8 +59,8 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`introspection.token-loop@1`](../detectors/introspection.token-loop-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `tokenCycleSpanFrames` | not qualified |
 | [`introspection.high-entropy@1`](../detectors/introspection.high-entropy-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `longestHighEntropyRunSteps` | not qualified |
 | [`introspection.eos-overrun@1`](../detectors/introspection.eos-overrun-v1.md) | I (introspection) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | introspection `eosLikelyStepsWithoutStop` | not qualified |
-| [`long-form.seam-discontinuity@1`](../detectors/long-form.seam-discontinuity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `seamDiscontinuityMaxZ` | not qualified |
-| [`long-form.seam-jump@1`](../detectors/long-form.seam-jump-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | longform `maximumSegmentBoundaryJump` | not qualified |
+| [`long-form.seam-discontinuity@1`](../detectors/long-form.seam-discontinuity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | observations `seamDiscontinuityMaxZ` | refused |
+| [`long-form.seam-jump@1`](../detectors/long-form.seam-jump-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | longform `maximumSegmentBoundaryJump` | refused |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

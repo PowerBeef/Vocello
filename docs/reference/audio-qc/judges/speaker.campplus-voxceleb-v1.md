@@ -64,7 +64,7 @@ Its accuracy is claimed only through the detectors that consume it:
 | [`identity.clone-similarity@1`](../detectors/identity.clone-similarity-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine` | qualified (warn) |
 | [`identity.window-drift@1`](../detectors/identity.window-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `windowCosineMinimum` | refused |
 | [`identity.onset-drift@1`](../detectors/identity.onset-drift-v1.md) | E (identity) | chinese, english, french, german, italian, korean, portuguese, spanish | panel `cosine`, panel `onsetWindowCosine` | qualified (warn) |
-| [`long-form.seam-identity@1`](../detectors/long-form.seam-identity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `seamWindowCosineMinimum` | not qualified |
+| [`long-form.seam-identity@1`](../detectors/long-form.seam-identity-v1.md) | J (long form) | chinese, english, french, german, italian, japanese, korean, portuguese, russian, spanish | raw-output `seamWindowCosineMinimum` | refused |
 <!-- END GENERATED audio-qc-docs:accuracy -->
 
 ## See also

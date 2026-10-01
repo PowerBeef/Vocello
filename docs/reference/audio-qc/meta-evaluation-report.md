@@ -36,9 +36,9 @@ The accuracy of every registered detector, rendered from the committed calibrati
 | [`introspection.token-loop@1`](detectors/introspection.token-loop-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`introspection.high-entropy@1`](detectors/introspection.high-entropy-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
 | [`introspection.eos-overrun@1`](detectors/introspection.eos-overrun-v1.md) | I (introspection) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
-| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | planned, not confirmed | not qualified | - | - | - | - | - | - |
+| [`long-form.seam-discontinuity@1`](detectors/long-form.seam-discontinuity-v1.md) | J (long form) | confirmed (refused) | refused | 10/75 (0.133), upper 0.216 | russian 2/7 (0.286), upper 0.797 | 6/75 (0.080), lower 0.035 | 0/75 (0.000), upper 0.039 | - / 75 / 75 | [record-fafb1f4c5be36ace.json](../../../benchmarks/audio-qc-calibration/long-form.seam-discontinuity@1/record-fafb1f4c5be36ace.json) |
+| [`long-form.seam-jump@1`](detectors/long-form.seam-jump-v1.md) | J (long form) | confirmed (refused) | refused | 4/75 (0.053), upper 0.118 | german 2/8 (0.250), upper 0.742 | 37/75 (0.493), lower 0.393 | 0/75 (0.000), upper 0.039 | - / 75 / 75 | [record-02344db45583f6a4.json](../../../benchmarks/audio-qc-calibration/long-form.seam-jump@1/record-02344db45583f6a4.json) |
+| [`long-form.seam-identity@1`](detectors/long-form.seam-identity-v1.md) | J (long form) | confirmed (refused) | refused | 2/75 (0.027), upper 0.082 | korean 1/8 (0.125), upper 0.632 | 18/74 (0.243), lower 0.164 | 0/75 (0.000), upper 0.039 | - / 74 / 74 | [record-61aa4a0dbda43863.json](../../../benchmarks/audio-qc-calibration/long-form.seam-identity@1/record-61aa4a0dbda43863.json) |
 
 ## Lane gates
 
@@ -1063,6 +1063,126 @@ Mechanisms meeting: - (minimum 1).
 Counts: calibration 2370 clips, 2370 families, 24 abstained; confirmation N3 2381 clips, 2381 families, 15 abstained; P1 150 clips, 150 families, 0 abstained; S 150 clips, 150 families, 0 abstained. Speakers: 175 (identified, unit `vocello-voice`).
 
 Judge output identities: `pitch.pyin@1` `a12f12f5cf71a807`. Record limitations: `n3-expressive-negatives`, `n3-clone-takes`; risks: `pyin-tracker-unvalidated`, `pyin-raw-track-export`.
+
+### `long-form.seam-discontinuity@1`
+
+Refused; confirmed (refused). Definition: [long-form.seam-discontinuity-v1.md](detectors/long-form.seam-discontinuity-v1.md).
+
+**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+#### Record [record-fafb1f4c5be36ace.json](../../../benchmarks/audio-qc-calibration/long-form.seam-discontinuity@1/record-fafb1f4c5be36ace.json): refused (far-pooled-not-met, far-per-language-not-met, cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per pooled; plan `fafb1f4c5be36ace`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 15.7671 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| english | 15.7671 | 1/6 (0.167), upper 0.746 | 0.2 | no |
+| french | 15.7671 | 1/7 (0.143), upper 0.685 | 0.2 | no |
+| german | 15.7671 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| italian | 15.7671 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| japanese | 15.7671 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| korean | 15.7671 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| portuguese | 15.7671 | 2/8 (0.250), upper 0.742 | 0.2 | no |
+| russian | 15.7671 | 2/7 (0.286), upper 0.797 | 0.2 | no |
+| spanish | 15.7671 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| pooled | 15.7671 | 10/75 (0.133), upper 0.216 | 0.1 | no |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/75 (0.000), upper 0.039 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | SEAM-DISC/severe | 6/75 (0.080), lower 0.035 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| SEAM-DISC | 10/75 (0.133), upper 0.216 | yes | no |
+
+Counts: calibration 75 clips, 75 families, 0 abstained; confirmation N3 75 clips, 75 families, 0 abstained; P1 75 clips, 75 families, 0 abstained; S 75 clips, 75 families, 0 abstained. Speakers: 4 (identified, unit `vocello-voice`).
+
+Judge output identities: `fastqc@8` `072d385c65e95361`. Record limitations: `n3-no-labels`, `n3-long-form-cell`; risks: `seam-constructions`, `seam-offsets-from-block`.
+
+### `long-form.seam-jump@1`
+
+Refused; confirmed (refused). Definition: [long-form.seam-jump-v1.md](detectors/long-form.seam-jump-v1.md).
+
+**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+#### Record [record-02344db45583f6a4.json](../../../benchmarks/audio-qc-calibration/long-form.seam-jump@1/record-02344db45583f6a4.json): refused (far-pooled-not-met, far-per-language-not-met, cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per pooled; plan `02344db45583f6a4`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 478 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| english | 478 | 0/6 (0.000), upper 0.586 | 0.2 | no |
+| french | 478 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| german | 478 | 2/8 (0.250), upper 0.742 | 0.2 | no |
+| italian | 478 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| japanese | 478 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| korean | 478 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| portuguese | 478 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| russian | 478 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| spanish | 478 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| pooled | 478 | 4/75 (0.053), upper 0.118 | 0.1 | no |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/75 (0.000), upper 0.039 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | SEAM-DISC/severe | 37/75 (0.493), lower 0.393 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| SEAM-DISC | 4/75 (0.053), upper 0.118 | yes | no |
+
+Counts: calibration 75 clips, 75 families, 0 abstained; confirmation N3 75 clips, 75 families, 0 abstained; P1 75 clips, 75 families, 0 abstained; S 75 clips, 75 families, 0 abstained. Speakers: 4 (identified, unit `vocello-voice`).
+
+Judge output identities: `fastqc@8` `072d385c65e95361`. Record limitations: `n3-no-labels`, `n3-long-form-cell`; risks: `seam-constructions`, `long-form-block`.
+
+### `long-form.seam-identity@1`
+
+Refused; confirmed (refused). Definition: [long-form.seam-identity-v1.md](detectors/long-form.seam-identity-v1.md).
+
+**Not qualified.** No committed calibration record qualifies it: its measurements compose as `uncalibrated` and it gates no lane.
+
+#### Record [record-61aa4a0dbda43863.json](../../../benchmarks/audio-qc-calibration/long-form.seam-identity@1/record-61aa4a0dbda43863.json): refused (far-per-language-not-met, cross-mechanism-detection-not-met)
+
+Operating point warn; rule split-conformal, alpha 0.05, thresholds per pooled; plan `61aa4a0dbda43863`. Rates count source families with one-sided Clopper-Pearson bounds.
+
+| Stratum | Threshold | FAR on confirmation N3 | Limit | Meets |
+|---|---|---|---|---|
+| chinese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| english | 0.0732114 | 0/6 (0.000), upper 0.586 | 0.2 | no |
+| french | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| german | 0.0732114 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| italian | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| japanese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| korean | 0.0732114 | 1/8 (0.125), upper 0.632 | 0.2 | no |
+| portuguese | 0.0732114 | 0/8 (0.000), upper 0.484 | 0.2 | no |
+| russian | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| spanish | 0.0732114 | 0/7 (0.000), upper 0.531 | 0.2 | no |
+| pooled | 0.0732114 | 2/75 (0.027), upper 0.082 | 0.1 | yes |
+
+Per-language bounds at confidence 0.995 (Bonferroni over the languages), pooled at 0.95. Clean abstention: 0/75 (0.000), upper 0.039 (limit 0.1, meets yes).
+
+| Mechanism | Cell | Detected | Limit | Meets |
+|---|---|---|---|---|
+| T1-pcm-construction | SEAM-VOICE/severe | 18/74 (0.243), lower 0.164 | 0.7 | no |
+
+Mechanisms meeting: - (minimum 1).
+
+| Sham cell | Alarms | Overlaps N2 FAR | Informative |
+|---|---|---|---|
+| SEAM-VOICE | 4/74 (0.054), upper 0.119 | yes | yes |
+
+Counts: calibration 75 clips, 75 families, 0 abstained; confirmation N3 75 clips, 75 families, 0 abstained; P1 74 clips, 74 families, 0 abstained; S 74 clips, 74 families, 0 abstained. Speakers: 4 (identified, unit `vocello-voice`).
+
+Judge output identities: `speaker.campplus-voxceleb@1` `e9531c63646f0192`. Record limitations: `n3-no-labels`, `n3-long-form-cell`; risks: `seam-constructions`, `speaker-raw-windows-export`, `seam-window-similarity`, `resnet293-not-voting`.
 
 ## Judge canaries
 

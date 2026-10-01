@@ -414,6 +414,20 @@ class RunnerHostTests(unittest.TestCase):
         sources = {path.name for path in runtime.runner_sources(self.layout, model_entry())}
         self.assertEqual(sources, {"_kit.py", "fake.py", "pitch.py", "store.py"})
 
+    def test_the_package_name_is_not_the_command_line(self):
+        # `from qc import store` names the package `qc`, which must not resolve to scripts/qc.py: the
+        # command line imports every lane module, so editing features or detectors would re-score
+        # every take of a runner that imports the package.
+        (self.root / "scripts/qc.py").write_text("from qc import lanes\n")
+        (self.root / "scripts/qc/lanes.py").write_text("# lanes\n")
+        identity = runtime.runner_identity(self.layout, model_entry())
+        sources = {path.relative_to(self.layout.scripts).as_posix()
+                   for path in runtime.runner_sources(self.layout, model_entry())}
+        self.assertEqual(sources, {"qc/runners/fake.py", "qc/store.py"})
+        (self.root / "scripts/qc/lanes.py").write_text("# lanes, changed\n")
+        (self.root / "scripts/qc.py").write_text("from qc import lanes  # changed\n")
+        self.assertEqual(runtime.runner_identity(self.layout, model_entry()), identity)
+
     def test_variant_models_key_results_by_text_language_and_reference(self):
         aligner = model_entry(id="align.fixture", kind="align")
         weights = self.layout.model_dir("align.fixture") / "weights/model.bin"

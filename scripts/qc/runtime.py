@@ -371,7 +371,8 @@ def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
 def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
     """The runner file and the shared code it can run, sorted: every `qc.*` module it imports,
     transitively (also inside functions, such as `runners/speech_common.py`), plus every
-    `runners/_*.py` helper and `qc/phones.py` and `qc/pitch.py`."""
+    `runners/_*.py` helper and `qc/phones.py` and `qc/pitch.py`. A package name (`qc`,
+    `qc.runners`) adds no file: its `__init__.py` is documentation only."""
 
     source = runner_source(layout, model)
     if not source.is_file():
@@ -395,6 +396,11 @@ def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
                 names = [node.module] + [f"{node.module}.{alias.name}" for alias in node.names]
             for name in names:
                 if name.split(".")[0] == "qc":
+                    # A package (`qc`, `qc.runners`) is not a module: `from qc import phones` must not
+                    # pull in `scripts/qc.py`, the command line that shares the package's name, and
+                    # with it every lane module (a feature edit would then re-score the phone models).
+                    if layout.scripts.joinpath(*name.split(".")).is_dir():
+                        continue
                     candidate = layout.scripts.joinpath(*name.split(".")).with_suffix(".py")
                     if candidate.is_file():
                         pending.append(candidate)

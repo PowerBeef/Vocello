@@ -1103,13 +1103,31 @@ PY
       | tee "$artifacts/independent-asr.txt" || asr_st=$?
   fi
 
+  # The lane's audio QC gates (config/audio-qc-lane-gates.json, AQ-07), once every CLI process and the
+  # recognizer have exited: the panel judges its gating detectors read and Stage 0 score each take bound
+  # by the independent-ASR manifest, on the run's own cache root, against each detector's qualified
+  # record (audio-qc/gates.json). Exit 0 pass, 3 warn, 1 fail, 2 not computed. A warn gate reports and
+  # never fails the lane.
+  local gates_st=0 gates_verdict=SKIPPED
+  if [[ -f "$artifacts/independent-asr-manifest.json" ]]; then
+    python3 "$SCRIPT_DIR/audio_qc_lane_gates.py" run --lane language-bench --run-dir "$artifacts" \
+      | tee "$artifacts/audio-qc-gates.txt" || gates_st=$?
+    case "$gates_st" in
+      0) gates_verdict=PASS ;;
+      3) gates_verdict=WARN ;;
+      1) gates_verdict=FAIL ;;
+      *) gates_verdict=ERROR ;;
+    esac
+  fi
+
   {
     echo "lang-bench runID=$run_id subset=$subset cells=$cell_count generate_fail=$cell_fail"
     echo "hint_gate=$([[ $hint_st -eq 0 ]] && echo PASS || echo FAIL)"
     echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "audio_qc_gates=$gates_verdict"
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || hint_st != 0 || asr_st != 0 )); then
+  if (( cell_fail > 0 || hint_st != 0 || asr_st != 0 )) || [[ "$gates_verdict" == FAIL ]]; then
     die "lang-bench FAIL · $artifacts"
   fi
   # The publisher re-qualifies and re-scores every recognition against the

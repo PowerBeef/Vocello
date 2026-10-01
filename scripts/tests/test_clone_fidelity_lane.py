@@ -4,9 +4,14 @@
 Generation and ML backends are injected/absent; these tests cover the plan,
 command construction, and fail-loud generation loop.
 """
+from contextlib import redirect_stdout
+import io
+import json
 import os
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from clone_fidelity_lane import (
@@ -15,6 +20,7 @@ from clone_fidelity_lane import (
     FIXED_TEXT,
     build_take_plan,
     builtin_speaker_genders,
+    gate_takes,
     generate_all,
     generation_command,
     infer_reference_gender,
@@ -132,6 +138,84 @@ class CloneFidelityLaneTests(unittest.TestCase):
         plan = build_take_plan("VoiceX", 2, 1, 7)
         generate_all(plan, "/tmp/run", "/repo/build/vocello", run=fake_run)
         self.assertEqual(len(calls), 3)
+
+    def test_only_the_clone_takes_are_gated_each_against_the_reference_clip(self):
+        plan = build_take_plan("A_warm_elderly_woman", 2, 2, 7, cross_clone_voices=["Calm_narrator"],
+                               cross_clone_count=1)
+        takes = gate_takes(plan, "/tmp/run", "/data/voices/A_warm_elderly_woman.wav")
+        self.assertEqual([take["takeID"] for take in takes if not take["control"]],
+                         ["clone_take_00", "clone_take_01"])
+        # The matched controls and the cross-clone negative are negative controls, with no reference.
+        self.assertEqual(sorted(take["takeID"] for take in takes if take["control"]),
+                         ["control_serena_01", "control_vivian_00", "cross_clone_00"])
+        self.assertEqual({take["reference"] for take in takes if not take["control"]},
+                         {"/data/voices/A_warm_elderly_woman.wav"})
+        self.assertEqual({take["reference"] for take in takes if take["control"]}, {None})
+        self.assertEqual({(take["language"], take["text"]) for take in takes}, {("english", FIXED_TEXT)})
+
+    def test_gates_that_cannot_be_computed_report_an_error_at_warn(self):
+        import audio_qc_lane_gates
+        from clone_fidelity_lane import audio_qc_gates
+
+        def refuse(*args, **kwargs):
+            raise audio_qc_lane_gates.GateError("speaker.campplus-voxceleb@1 is not acquired")
+
+        plan = build_take_plan("VoiceX", 1, 0, 7)
+        with mock.patch.object(audio_qc_lane_gates, "lane_has_fail_gate", return_value=False), \
+                redirect_stdout(io.StringIO()), mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            self.assertEqual(audio_qc_gates(plan, "/tmp/run", "/data/voices/VoiceX.wav", run_gates=refuse),
+                             {"verdict": "error"})
+        self.assertIn("ERROR · not computed", err.getvalue())
+        with mock.patch.object(audio_qc_lane_gates, "lane_has_fail_gate", return_value=True), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual(audio_qc_gates(plan, "/tmp/run", "/data/voices/VoiceX.wav", run_gates=refuse),
+                             {"verdict": "fail"})
+
+    def test_the_gates_run_after_every_take_and_analyzer_and_only_a_fail_gate_fails_the_lane(self):
+        import clone_fidelity_lane as lane
+
+        events = []
+        with tempfile.TemporaryDirectory() as temporary:
+            root = os.path.join(temporary, "repo")
+            os.makedirs(os.path.join(root, "build"))
+            open(os.path.join(root, "build", "vocello"), "w").close()
+            data = os.path.join(temporary, "data")
+            os.makedirs(os.path.join(data, "voices"))
+            open(os.path.join(data, "voices", "VoiceX.wav"), "w").close()
+            run_dir = os.path.join(temporary, "run")
+
+            def generate(plan, out_dir, vocello):
+                events.append("generate")
+                for item in plan:
+                    open(os.path.join(out_dir, item["name"]), "w").close()
+
+            def gate(plan, out_dir, reference):
+                events.append("gates")
+                self.assertTrue(all(os.path.isfile(os.path.join(out_dir, item["name"])) for item in plan))
+                return {"verdict": verdict}
+
+            argv = ["clone_fidelity_lane.py", "--voice", "VoiceX", "--takes", "2", "--controls", "1",
+                    "--reference-gender", "female", "--data-dir", data, "--run-dir", run_dir]
+            for verdict, failed in (("warn", False), ("fail", True)):
+                events.clear()
+                with mock.patch.object(lane, "repo_root", return_value=root), \
+                        mock.patch.object(lane, "generate_all", side_effect=generate), \
+                        mock.patch("analyze_prosody.analyze",
+                                   side_effect=lambda path: events.append("analyze") or {}), \
+                        mock.patch.object(lane, "evaluate_takes", return_value={"aggregate": {}}), \
+                        mock.patch.object(lane, "ecapa_section",
+                                          side_effect=lambda *args: events.append("similarity") or {}), \
+                        mock.patch.object(lane, "audio_qc_gates", side_effect=gate), \
+                        mock.patch.object(sys, "argv", argv), redirect_stdout(io.StringIO()):
+                    if failed:
+                        with self.assertRaises(SystemExit) as raised:
+                            lane.main()
+                        self.assertEqual(raised.exception.code, 1)
+                    else:
+                        lane.main()
+                self.assertEqual(events, ["generate", "analyze", "analyze", "analyze", "similarity", "gates"])
+                with open(os.path.join(run_dir, "clone-fidelity-report.json"), encoding="utf-8") as handle:
+                    self.assertEqual(json.load(handle)["audioQCGates"], {"verdict": verdict})
 
 
 if __name__ == "__main__":

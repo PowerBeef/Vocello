@@ -8,6 +8,17 @@ the layered analyzers against the voice's reference clip:
                                     (warn-first bounds from the prosody profile)
   2. ``clone_speaker_similarity`` — ECAPA identity cosine (advisory bands);
                                     skipped with a note when torch is absent
+  3. ``audio_qc_lane_gates``      — the clone lane's audio QC gates
+                                    (``config/audio-qc-lane-gates.json``: CAM++
+                                    clone similarity and onset drift against the
+                                    reference clip, at their qualified records'
+                                    thresholds) over the clone takes; the
+                                    controls and cross-clone negatives are
+                                    negative controls, never gated. A warn gate
+                                    reports in the summary and the report's
+                                    ``audioQCGates``; only a fail gate's flag
+                                    fails the lane (exit 1). The result is
+                                    ``<run dir>/audio-qc/gates.json``.
 
 Generates negative controls of the same text so the identity bands can be
 calibrated from measured same-voice vs different-voice separations instead of
@@ -61,6 +72,8 @@ FIXED_TEXT = (
     "The harbor lights flickered as the evening ferry pulled away, and she "
     "wondered how many more crossings the old captain had left in him."
 )
+FIXED_TEXT_LANGUAGE = "english"
+GATED_LANE = "clone-lane"
 DEFAULT_MATCHED_CONTROLS = 8
 # Cross-clone takes without a named voice: none. Each clone take attests consent.
 DEFAULT_CROSS_CLONES = 0
@@ -263,6 +276,46 @@ def ecapa_section(reference, clone_paths, control_paths, cross_clone_paths=()):
     return section
 
 
+def gate_takes(plan, run_dir, reference):
+    """The lane's takes as its audio QC gates read them: each clone take of the voice, scored against the
+    voice's reference clip; the controls and cross-clone negatives are negative controls, never gated."""
+    return [
+        {
+            "takeID": os.path.splitext(item["name"])[0],
+            "wav": os.path.join(run_dir, item["name"]),
+            "language": FIXED_TEXT_LANGUAGE,
+            "mode": item["mode"],
+            "text": FIXED_TEXT,
+            "control": item["kind"] != "clone",
+            "reference": reference if item["kind"] == "clone" else None,
+        }
+        for item in plan
+    ]
+
+
+def audio_qc_gates(plan, run_dir, reference, run_gates=None):
+    """The clone lane's audio QC gates, after every take was generated and every analyzer ran.
+
+    Prints the gates' summary and returns what the report keeps: the verdict
+    (pass, warn or fail; `error` when they could not be computed, which fails
+    the lane only when it has a fail gate) and the flagged-take count.
+    """
+    import audio_qc_lane_gates as lane_gates
+
+    run = run_gates or lane_gates.run_gates
+    try:
+        result, path = run(GATED_LANE, run_dir, takes=gate_takes(plan, run_dir, reference),
+                           run_id=os.path.basename(os.path.normpath(run_dir)))
+    except lane_gates.GateError as error:
+        verdict = "fail" if lane_gates.lane_has_fail_gate(lane_gates.REPO, GATED_LANE) else "error"
+        print(f"audio-qc gates · {GATED_LANE}: {verdict.upper()} · not computed: {error}", file=sys.stderr)
+        return {"verdict": verdict}
+    for line in lane_gates.summary_lines(result, path):
+        print(line, file=sys.stderr)
+    return {"verdict": result["verdict"], "flaggedTakes": result["counts"]["flagged"],
+            "result": f"{lane_gates.OUTPUT_DIRECTORY}/{lane_gates.RESULT_FILE}"}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Clone fidelity lane (advisory).")
     parser.add_argument("--voice", default="A_warm_elderly_woman")
@@ -354,6 +407,9 @@ def main():
         },
         "speakerSimilarity": ecapa_section(reference, clone_paths, control_paths, cross_clone_paths),
     }
+    # Evidence-lane rule: the gates' judges start only after the last generation process has exited and the
+    # in-process analyzers have finished.
+    report["audioQCGates"] = audio_qc_gates(plan, run_dir, reference)
     report_path = os.path.join(run_dir, "clone-fidelity-report.json")
     with open(report_path, "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, sort_keys=True)
@@ -363,7 +419,11 @@ def main():
         "prosody": fidelity["aggregate"],
         "similarity": report["speakerSimilarity"].get("clones", {}).get("aggregate")
         if isinstance(report["speakerSimilarity"], dict) else None,
+        "audioQCGates": report["audioQCGates"]["verdict"],
     }, indent=2))
+    if report["audioQCGates"]["verdict"] == "fail":
+        # Only a fail gate fails the lane; a warn gate's flags report above.
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

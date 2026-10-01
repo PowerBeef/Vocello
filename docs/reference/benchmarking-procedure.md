@@ -405,7 +405,12 @@ of other saved voices, need those voices named: every clone take passes `--confi
 operator's attestation that they own or may clone that voice. The lane never discovers saved voices
 and generates no cross-clone take by default (lane version 3). The lane embeds 16 kHz
 audio through the pinned polyphase resampler and loads the ECAPA snapshot from the local cache
-only.
+only. After the analyzers, the lane computes its audio QC gates (`config/audio-qc-lane-gates.json`):
+CAM++ clone similarity and onset drift of each clone take against the reference clip, at the
+thresholds of their qualified records. The controls and cross-clone takes are not gated. The gates
+are at warn, so a flag shows in the summary and in the report's `audioQCGates` and does not fail the
+lane; only a fail gate would. The result is `<run>/audio-qc/gates.json`
+([audio-qc-engineering.md](audio-qc-engineering.md#how-the-evidence-lanes-gate-aq-07-2026-10-01)).
 
 ### 4.7 iOS on-device bench
 

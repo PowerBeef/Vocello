@@ -507,6 +507,19 @@ downloads automatically. `scripts/lib/language_metrics.py` also accepts `sensevo
 identifier (the compact-model cascade's SenseVoice adapter, limited to English, Chinese, Japanese,
 Korean and Cantonese); publication today cites only `apple-speech` and `whisper`.
 
+After the independent recognizer, the lane computes its audio QC gates
+(`scripts/audio_qc_lane_gates.py run --lane language-bench`). The gates are truncation, run-on and
+consensus language ID, listed in `config/audio-qc-lane-gates.json`. The panel judges those detectors
+read (Whisper large-v3, Parakeet, Paraformer, SenseVoice, VoxLingua and the forced aligner, limited
+to the run's languages) and Stage 0 score every take the independent-ASR manifest binds, on the
+run's own analysis cache root. The French-text English-hint control is not gated. Each score is
+compared with the threshold the detector's qualified record pre-registered. The result is in
+`audio-qc/gates.json` and `audio-qc-gates.txt`, and the verdict adds an `audio_qc_gates` line.
+These gates are at warn, so a flag is reported and never fails the lane. If the gates cannot be
+computed, the verdict line reads ERROR and the lane continues. The gate result is not part of the
+published record. [audio-qc-engineering.md](audio-qc-engineering.md#how-the-evidence-lanes-gate-aq-07-2026-10-01)
+describes the procedure.
+
 ## Offline gate tests
 
 ```sh

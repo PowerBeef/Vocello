@@ -61,10 +61,10 @@ summarizer's `xRT` column.
    `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the in-process latch enables it, and always off under an
    explicit `QWENVOICE_NATIVE_TELEMETRY_MODE=off` (`vocello bench --telemetry off`).
 3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
-   The consent-bound lanes, never run unasked, are `scripts/macos_test.sh memory|lang-bench|qc-takes`, every
-   `scripts/ui_test.sh` lane and every `scripts/ios_device.sh` verb; `.claude/settings.json` also asks
-   before `scripts/macos_test.sh profile`, `gate` and `telemetry-overhead`. `telemetry-overhead` needs
-   the model fixture, `gate` only when `QWENVOICE_GATE_BENCH=1` adds its bounded bench.
+   The consent-bound lanes, never run unasked (`.claude/rules/release.md`, the `ask` rules in
+   `.claude/settings.json`), are `scripts/macos_test.sh memory|lang-bench|qc-takes|profile|telemetry-overhead|release-readiness`,
+   the gate bench (`gate` with `QWENVOICE_GATE_BENCH=1`), every `scripts/ui_test.sh` lane and every
+   `scripts/ios_device.sh` verb. `telemetry-overhead` needs the model fixture.
 4. **Lazy MLX caveat** — decode breakdown columns measure Swift wall-clock around lazy graph
    ops, not per-stage GPU compute. Use Instruments signposts for GPU attribution (§6.3).
 5. **PASS-only publication** — a successful repository benchmark publishes one allowlisted JSON

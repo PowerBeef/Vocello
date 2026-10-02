@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `qc-v2-2026-10` | active | backend-mlx | 2/8 (25%) |
+| `qc-v2-2026-10` | active | backend-mlx | 3/8 (38%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 2/6 (33%) |
@@ -26,13 +26,12 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
-| `audio-qc-audit-2026-09` | superseded | backend-mlx | 9/9 (100%) |
 
 ## Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels
 
 `qc-v2-2026-10` · **active** · backend-mlx · adopted 2026-10-01
 
-Replace the v1 audio QC stack with a lean harness of a few strong commercial-weight models (Qwen3-ASR, the Qwen3 aligner, Whisper large-v3, a phone recognizer with G2P, FCPE and SwiftF0, ReDimNet2+, UTMOSv2 with Audiobox Aesthetics, and an audio-LLM voter). Its detectors are fit on the maintainer's listening labels, with thresholds frozen before held-out scoring. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
+Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every rule is checked on human controls; detectors are fit on the maintainer's listening labels out of fold, with thresholds frozen before evaluation. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
 
 Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
@@ -42,7 +41,6 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 | `QC-03` | planned | Detectors, thresholds and evaluation | `QC-02` |
 | `QC-04` | planned | Lanes on QC v2 | `QC-03` |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
-| `QC-07` | planned | Move the delivery bench and voice-reliability analysis onto QC v2 | `QC-04` |
 | `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
 
 ### Open items in detail
@@ -51,16 +49,13 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
   gate: qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.
 
 - **`QC-03`** (planned) — Detectors, thresholds and evaluation.
-  gate: Detectors for content and phonemes, cut-off, wrong language, accent, pitch and register, tonal collapse, identity drift, artifacts, naturalness and the LLM rubric are fit on the train labels; thresholds-v<N> is committed before eval-v<N> scores the held-out labels; levels follow the plan's precision, recall and false-alarm rules.
+  gate: The lean detectors (pause, content at the phone and ASR level, wrong language, cut-off, speaking rate, signal artifacts; loudness advisory; clone pitch and identity in the clone lane only) are checked on human controls and fit on the maintainer's labels out of fold by script family; thresholds-v<N> is committed before eval-v<N> scores every labelled sample take once per label set; levels follow the precision, recall and false-alarm rules.
 
 - **`QC-04`** (planned) — Lanes on QC v2.
   gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
 
 - **`QC-06`** (planned) — Product follow-ups surfaced by QC.
-  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch, tonal collapse.
-
-- **`QC-07`** (planned) — Move the delivery bench and voice-reliability analysis onto QC v2.
-  gate: scripts/bench_delivery_prosody.py, scripts/analyze_prosody.py and scripts/prosody_profile.py measure delivery cells with the QC v2 pitch, speaker and naturalness runners, and scripts/voice_identity_language_reliability.py scores clone identity, pitch and language with QC v2; a delivery-copy or prompt change is promoted only on that evidence, and production prompts stay unchanged otherwise.
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch.
 
 - **`QC-08`** (planned) — In-app Fast QC v9: relative silence, ending fade and loudness.
   gate: Fast QC measures silence in 20 ms frames relative to the take's median speech level (20 dB under it), keeping the -60 dBFS floor for true dropouts, so a pause holding breath or low noise feeds the existing cadence:excess warning; single takes get a short fade and a fixed tail, and a loudness gain toward -23 LUFS. Each change is first measured on QC v2's human controls; fastqc@9 ships with a new calibration record, the Swift, Python mirror and record edited together, and a re-seeded benchmark lineage.
@@ -130,7 +125,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `AV-07` | superseded | P2 — independently validate prosody thresholds | — |
 | `AV-08` | parked | P2 — qualify multilingual output beyond a single cohort | `QC-04` |
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
@@ -155,7 +149,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
   unparkWhen: All current production models are Ready on the paired phone, then run the iOS benchmark and perf lanes; macOS clauses remain complete.
 
 - **`AV-17`** (parked) — First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs).
-  gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate at least three times on one clean commit seeds a pooled baseline (five warm takes each), committed as benchmarks/baselines/mac-gate-bench.json with its published records; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit the charts are regenerated (pooled medians of the newest lineage and build) and the README prose and the website medians, provenance line, anchor and pool size are updated; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.
+  gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate at least three times on one clean commit seeds a pooled baseline (five warm takes each), committed as benchmarks/baselines/mac-gate-bench.json with its published records; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit the charts are regenerated (pooled medians of the newest lineage and build) and the README prose and the website medians, provenance line, anchor and pool size are updated; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) retired with the v1 audio QC on 2026-10-01 (QC v2's models run on the M6 within budget, QC-01); (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.
   unparkWhen: The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.
 
 ## Benchmark and telemetry accuracy
@@ -171,7 +165,6 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 | `BT-01` | in-flight | Trustworthy memory evidence | — |
 | `BT-03` | in-flight | UI benchmark and ui-perf lanes ready for the M6 | — |
 | `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
-| `BT-05` | superseded | Audio, language and delivery QC accuracy | — |
 | `BT-06` | in-flight | Timing attribution, profiles and device-lane observers | — |
 
 ### Open items in detail
@@ -199,10 +192,6 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
-| `DP-28` | superseded | Calibrate the layered local delivery evaluator | — |
-| `DP-29` | superseded | Qualify the native-language delivery corpus and cross-language sentinels | — |
-| `DP-31` | superseded | Confirm Speed and Quality candidates with a frozen automated holdout | `AQ-07`, `AQ-08` |
-| `DP-32` | superseded | Promote only qualifying delivery changes and revalidate all modes | `DP-31`, `AQ-07`, `AQ-08` |
 
 ### Open items in detail
 
@@ -556,16 +545,3 @@ Narrative authority: [`docs/reference/ios-device-testing.md#model-readiness`](re
 - **`VLR-07`** (parked) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked. Before RF-09 freeze, new live verification must refuse absent, unreadable, zero or non-finite source duration instead of silently bypassing timing checks. Preserve legacy evidence decoding separately. Describe the current min-start/max-end predicate as edge coverage only, add an interior-omission counterexample alongside WER checks, and do not claim complete speech-interval coverage without independent evidence.
   unparkWhen: The paired iPhone is available for two consecutive 14-row closure passes with the post-051f7e30 classifier.
-
-## Autonomous, self-validating audio QC
-
-`audio-qc-audit-2026-09` · **superseded** · backend-mlx · adopted 2026-09-25
-
-Make the audio QC and speech-analysis harness measure its own accuracy and judge audio autonomously on the Mac mini M6, with no human ear as the judge: license-cleared pinned judges, construction-labeled qualification with measured false-alarm and miss rates, one staged pipeline, and one reference page per judge. Legacy evidence is never rewritten.
-
-Narrative authority: [`docs/reference/qc.md#why-v2`](reference/qc.md#why-v2)
-
-| Item | Status | Title | Blocked by |
-| --- | --- | --- | --- |
-| `AQ-07` | superseded | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
-| `AQ-08` | superseded | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |

@@ -601,66 +601,6 @@
       "version": 1
     },
     {
-      "id": "asr.qwen3-asr-1.7b-upstream",
-      "kind": "asr",
-      "role": "alternate",
-      "runner": "qc.runners.qwen3_asr",
-      "runtime": "torch",
-      "source": {
-        "host": "huggingface",
-        "repo": "Qwen/Qwen3-ASR-1.7B",
-        "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
-        "files": {
-          "chat_template.json": {
-            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
-            "bytes": 1161
-          },
-          "config.json": {
-            "sha256": "2e74a751548b8ad7d7526d29365ad8144c345d8b412b1152d25dc6698452712f",
-            "bytes": 6194
-          },
-          "generation_config.json": {
-            "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
-            "bytes": 142
-          },
-          "merges.txt": {
-            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
-            "bytes": 1671853
-          },
-          "model-00001-of-00002.safetensors": {
-            "sha256": "a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6",
-            "bytes": 4220320824
-          },
-          "model-00002-of-00002.safetensors": {
-            "sha256": "6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc",
-            "bytes": 478200688
-          },
-          "model.safetensors.index.json": {
-            "sha256": "f994739fe38e5210b9e3e8ce6c6307315e2ceac3cb630e7b7414d69dce520f60",
-            "bytes": 64821
-          },
-          "preprocessor_config.json": {
-            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
-            "bytes": 330
-          },
-          "tokenizer_config.json": {
-            "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
-            "bytes": 12487
-          },
-          "vocab.json": {
-            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
-            "bytes": 2776833
-          }
-        }
-      },
-      "license": "Apache-2.0",
-      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
-      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ASR-1.7B/blob/7278e1e70fe206f11671096ffdd38061171dd6e5/README.md). There is no LICENSE file in the repo. Code at github.com/QwenLM/Qwen3-ASR is Apache-2.0.",
-      "memoryGB": 7.0,
-      "languages": "any",
-      "version": 1
-    },
-    {
       "id": "align.qwen3-forcedaligner-0.6b-8bit",
       "kind": "align",
       "role": "alternate",
@@ -713,58 +653,6 @@
       "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
       "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/mlx-community/Qwen3-ForcedAligner-0.6B-8bit/blob/0e1a68e91d815300c7c9754b2a7639378b23db15/README.md).",
       "memoryGB": 2.5,
-      "languages": "any",
-      "version": 1
-    },
-    {
-      "id": "align.qwen3-forcedaligner-0.6b-upstream",
-      "kind": "align",
-      "role": "alternate",
-      "runner": "qc.runners.qwen3_aligner",
-      "runtime": "torch",
-      "source": {
-        "host": "huggingface",
-        "repo": "Qwen/Qwen3-ForcedAligner-0.6B",
-        "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
-        "files": {
-          "chat_template.json": {
-            "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
-            "bytes": 1161
-          },
-          "config.json": {
-            "sha256": "d616c65d46c4b90bdc651b0a0963ea932732241140f337f9bb6b0335a9c8ef09",
-            "bytes": 5982
-          },
-          "generation_config.json": {
-            "sha256": "948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c",
-            "bytes": 115
-          },
-          "merges.txt": {
-            "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
-            "bytes": 1671853
-          },
-          "model.safetensors": {
-            "sha256": "47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7",
-            "bytes": 1835544544
-          },
-          "preprocessor_config.json": {
-            "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
-            "bytes": 330
-          },
-          "tokenizer_config.json": {
-            "sha256": "3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c",
-            "bytes": 12666
-          },
-          "vocab.json": {
-            "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
-            "bytes": 2776833
-          }
-        }
-      },
-      "license": "Apache-2.0",
-      "notice": "Apache-2.0. Keep the Apache-2.0 text and credit 'Qwen3-ASR / Qwen3-ForcedAligner, Alibaba Cloud Qwen team' in third-party notices. Neither repo ships a NOTICE file.",
-      "licenseEvidence": "The card front matter says 'license: apache-2.0' (https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/blob/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/README.md).",
-      "memoryGB": 3.5,
       "languages": "any",
       "version": 1
     },

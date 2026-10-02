@@ -268,6 +268,7 @@ class StubEmbedder:
 
     def __init__(self) -> None:
         self.batches: list[tuple[int, int]] = []
+        self.releases = 0
 
     def embed(self, batch: np.ndarray) -> np.ndarray:
         self.batches.append(batch.shape)
@@ -277,6 +278,9 @@ class StubEmbedder:
             vector[0] += clip.size / 16_000
             rows.append(vector / np.linalg.norm(vector))
         return np.stack(rows)
+
+    def release(self) -> None:
+        self.releases += 1
 
 
 class RedimnetTests(RunnerCase):
@@ -307,6 +311,21 @@ class RedimnetTests(RunnerCase):
         self.assertAlmostEqual(short["windows"][0]["end"], 2.5, places=3)
         self.assertEqual(short["windows"][0]["embedding"], short["whole"])
         self.assertIsNone(short["reference"])
+
+    def test_windows_go_in_fixed_size_batches_and_each_take_releases(self) -> None:
+        model = self.model()
+        long = self.take("long", sine(9.5, 180.0))  # windows at 0..5 s and 5.5 s: seven of them
+        short = self.take("short", sine(0.2, 200.0))
+        self.assertEqual(_kit.run_job(self.job("speaker.redimnet2-plus", [long, short]), model, redimnet.process), 1)
+        windows = self.result(long)["outputs"]["windows"]
+        self.assertEqual(len(windows), 7)
+        self.assertEqual(windows[-1]["start"], 5.5)
+        window_batches = [shape for shape in model["embedder"].batches if shape[1] == 64_000]
+        self.assertEqual(window_batches, [(redimnet.BATCH, 64_000)] * 2)  # 4 + 3, the last one padded
+        # The padding is dropped: the last window is the clip's last 4 s, embedded as if alone.
+        audio, _, _ = _kit.load_take_audio(long, redimnet.SAMPLE_RATE)
+        self.assertEqual(windows[-1]["embedding"], _kit.unit(StubEmbedder().embed(audio[None, -64_000:])[0]))
+        self.assertEqual(model["embedder"].releases, 2)  # after every take, failed ones included
 
     def test_reference_is_embedded_once_per_digest(self) -> None:
         model = self.model()

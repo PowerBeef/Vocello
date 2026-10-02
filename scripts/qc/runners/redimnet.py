@@ -19,9 +19,16 @@ mismatch fails the strict tensor-shape load. Embeddings are 192-d and L2-normali
 Outputs: 4 s windows at a 1 s hop (a take shorter than 4 s is one whole-take window), the whole-take
 embedding, and the clone reference's whole embedding when the take has one (then the result is keyed
 by the variant).
+
+Memory: a job of a hundred takes once peaked at 9 GB. Every forward runs under
+`torch.inference_mode`; the windows go in batches of exactly `BATCH` (the last one padded with copies
+of its final window, whose embeddings are dropped), so the allocator reuses one shape; and each take
+releases its tensors and arrays before the next (`release`). Only the small reference embeddings
+(lists) are kept across takes.
 """
 from __future__ import annotations
 
+import gc
 import sys
 import types
 from pathlib import Path
@@ -38,7 +45,7 @@ MAX_SECONDS = 60.0  # the model card's maximum input; longer audio is embedded p
 MIN_SECONDS = 0.5
 WEIGHTS_FILE = "pytorch_model_fsdp.bin"
 MODEL_OVERRIDES = {"out_channels": 224, "return_2d_output": True}
-BATCH = 16
+BATCH = 4  # windows per forward, always exactly this many (16 s of audio)
 
 
 def find_code_root(model_dir: Path, options: Mapping[str, Any]) -> Path:
@@ -101,16 +108,28 @@ class Embedder:
 
         self.torch = torch
         self.encoder = encoder.to(device).eval()
+        for parameter in self.encoder.parameters():
+            parameter.requires_grad_(False)
         self.device = device
 
     def embed(self, batch: np.ndarray) -> np.ndarray:
+        """The batch's embeddings as a NumPy copy: no tensor outlives the call."""
+
         torch = self.torch
         with torch.inference_mode():
             audio = torch.from_numpy(np.ascontiguousarray(batch, dtype=np.float32)).to(self.device)
             spectrum = self.encoder.spec_frontend(audio)
-            embeddings = self.encoder(spectrum).float()
-            embeddings = torch.nn.functional.normalize(embeddings, dim=1)
-        return embeddings.cpu().numpy()
+            embeddings = torch.nn.functional.normalize(self.encoder(spectrum).float(), dim=1)
+            out = embeddings.cpu().numpy().copy()
+            del audio, spectrum, embeddings
+        return out
+
+    def release(self) -> None:
+        """Return the take's freed memory: a garbage pass, then the MPS cache when on MPS."""
+
+        gc.collect()
+        if self.device == "mps":
+            self.torch.mps.empty_cache()
 
 
 def load(job: Mapping[str, Any]) -> dict[str, Any]:
@@ -126,6 +145,8 @@ def load(job: Mapping[str, Any]) -> dict[str, Any]:
     if device == "mps" and not torch.backends.mps.is_available():
         device = "cpu"
     torch.manual_seed(0)
+    del state
+    gc.collect()
     return {"embedder": Embedder(encoder, device), "references": {}}
 
 
@@ -145,12 +166,16 @@ def window_embeddings(embedder: Any, audio: np.ndarray, duration: float) -> list
     if len(spans) == 1:
         return [{"start": 0.0, "end": round(duration, 6), "embedding": _kit.unit(whole_embedding(embedder, audio))}]
     length = int(round(WINDOW_SECONDS * SAMPLE_RATE))
-    batch = []
-    for start, _ in spans:
-        offset = min(int(round(start * SAMPLE_RATE)), audio.size - length)
-        batch.append(audio[offset:offset + length])
-    vectors = np.concatenate([embedder.embed(np.stack(batch[i:i + BATCH])) for i in range(0, len(batch), BATCH)])
-    return [{"start": start, "end": end, "embedding": _kit.unit(vector)} for (start, end), vector in zip(spans, vectors)]
+    offsets = [min(int(round(start * SAMPLE_RATE)), audio.size - length) for start, _ in spans]
+    out = []
+    for first in range(0, len(offsets), BATCH):
+        chosen = offsets[first:first + BATCH]
+        padded = chosen + [chosen[-1]] * (BATCH - len(chosen))  # one shape for every forward
+        vectors = embedder.embed(np.stack([audio[offset:offset + length] for offset in padded]))
+        for (start, end), vector in zip(spans[first:first + len(chosen)], vectors[:len(chosen)]):
+            out.append({"start": start, "end": end, "embedding": _kit.unit(vector)})
+        del vectors
+    return out
 
 
 def variant_of(take: Mapping[str, Any]) -> str | None:
@@ -158,27 +183,36 @@ def variant_of(take: Mapping[str, Any]) -> str | None:
 
 
 def process(model: Mapping[str, Any], take: Mapping[str, Any], job: Mapping[str, Any]) -> tuple[dict[str, Any], float, str | None]:
+    """One take's embeddings as JSON-ready lists; its audio and every array go before the next take."""
+
     embedder = model["embedder"]
-    audio, _, duration = _kit.load_take_audio(take, SAMPLE_RATE)
-    if audio.size < MIN_SECONDS * SAMPLE_RATE:
-        raise _kit.TakeError("audio-too-short")
-    duration_16k = audio.size / SAMPLE_RATE
-    outputs: dict[str, Any] = {
-        "windowSeconds": WINDOW_SECONDS,
-        "hopSeconds": HOP_SECONDS,
-        "windows": window_embeddings(embedder, audio, duration_16k),
-        "whole": _kit.unit(whole_embedding(embedder, audio)),
-        "reference": None,
-    }
-    if take.get("reference"):
-        key = take.get("referenceSHA256") or str(take["reference"])
-        if key not in model["references"]:
-            reference, _, _ = _kit.load_take_audio(take, SAMPLE_RATE, key="reference")
-            if reference.size < MIN_SECONDS * SAMPLE_RATE:
-                raise _kit.TakeError("reference-too-short")
-            model["references"][key] = _kit.unit(whole_embedding(embedder, reference))
-        outputs["reference"] = model["references"][key]
-    return outputs, duration, variant_of(take)
+    audio = reference = None
+    try:
+        audio, _, duration = _kit.load_take_audio(take, SAMPLE_RATE)
+        if audio.size < MIN_SECONDS * SAMPLE_RATE:
+            raise _kit.TakeError("audio-too-short")
+        duration_16k = audio.size / SAMPLE_RATE
+        outputs: dict[str, Any] = {
+            "windowSeconds": WINDOW_SECONDS,
+            "hopSeconds": HOP_SECONDS,
+            "windows": window_embeddings(embedder, audio, duration_16k),
+            "whole": _kit.unit(whole_embedding(embedder, audio)),
+            "reference": None,
+        }
+        if take.get("reference"):
+            key = take.get("referenceSHA256") or str(take["reference"])
+            if key not in model["references"]:
+                reference, _, _ = _kit.load_take_audio(take, SAMPLE_RATE, key="reference")
+                if reference.size < MIN_SECONDS * SAMPLE_RATE:
+                    raise _kit.TakeError("reference-too-short")
+                model["references"][key] = _kit.unit(whole_embedding(embedder, reference))
+            outputs["reference"] = model["references"][key]
+        return outputs, duration, variant_of(take)
+    finally:
+        del audio, reference
+        release = getattr(embedder, "release", None)
+        if release is not None:
+            release()
 
 
 if __name__ == "__main__":

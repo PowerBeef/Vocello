@@ -25,7 +25,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from qc import models, runtime, store  # noqa: E402
+from qc import models, prune, runtime, store  # noqa: E402
 from qc.store import Layout  # noqa: E402
 
 PAYLOAD = b"vocello qc fixture weights\n" * 64
@@ -72,13 +72,12 @@ def make_tar(members):
 
 class RegistryTests(unittest.TestCase):
     def test_valid_registry_loads(self):
-        github = model_entry(id="runtime.llamacpp", kind="runtime", runner=None, runtime="llamacpp", source={
-            "host": "github-release",
-            "files": {"llama.zip": {"url": "https://github.com/example/llama/releases/download/b1/llama.zip",
-                                    "sha256": PAYLOAD_SHA, "bytes": 10}}})
-        loaded = models.validate_registry(registry(model_entry(), github,
+        raw = model_entry(id="g2p.fixture", kind="g2p", source={
+            "host": "github-raw", "repo": "example/fixture", "revision": REVISION,
+            "files": {"data/table.csv": {"sha256": PAYLOAD_SHA, "bytes": 10}}})
+        loaded = models.validate_registry(registry(model_entry(), raw,
                                                    model_entry(id="pitch.fixture", languages=["french", "english"])))
-        self.assertEqual([entry["id"] for entry in loaded], ["asr.fixture", "runtime.llamacpp", "pitch.fixture"])
+        self.assertEqual([entry["id"] for entry in loaded], ["asr.fixture", "g2p.fixture", "pitch.fixture"])
 
     def test_registry_violations_are_refused(self):
         cases = {
@@ -94,9 +93,11 @@ class RegistryTests(unittest.TestCase):
                                                      files={"../escape.bin": {"sha256": PAYLOAD_SHA, "bytes": 1}}))),
             "license": registry(model_entry(license=" ")),
             "runner": registry(model_entry(runner="os.system")),
+            "no-runner": registry(model_entry(runner=None)),
             "language": registry(model_entry(languages=["klingon"])),
-            "github-host": registry(model_entry(source={"host": "github-release", "files": {
-                "x.zip": {"url": "https://example.com/x.zip", "sha256": PAYLOAD_SHA, "bytes": 1}}})),
+            "host": registry(model_entry(source={"host": "github-release", "files": {
+                "x.zip": {"url": "https://github.com/example/x/releases/download/b1/x.zip",
+                          "sha256": PAYLOAD_SHA, "bytes": 1}}})),
             "schema": {"schemaVersion": 2, "models": []},
         }
         for name, document in cases.items():
@@ -245,8 +246,7 @@ class FetchTests(unittest.TestCase):
         self.assertTrue(models.host_allowed("huggingface.co", hosts["huggingface"]))
         self.assertFalse(models.host_allowed("huggingface.co.evil.example", hosts["huggingface"]))
         self.assertFalse(models.host_allowed("evilhf.co", hosts["huggingface"]))
-        self.assertTrue(models.host_allowed("objects.githubusercontent.com", hosts["github-release"]))
-        self.assertFalse(models.host_allowed("raw.githubusercontent.com", hosts["github-release"]))
+        self.assertTrue(models.host_allowed("raw.githubusercontent.com", hosts["github-raw"]))
         self.assertTrue(models.host_allowed("codeload.github.com", hosts["github-archive"]))
         self.assertFalse(models.host_allowed("huggingface.co", hosts["github-raw"]))
 
@@ -400,8 +400,8 @@ class RunnerHostTests(unittest.TestCase):
         identity = runtime.runner_identity(self.layout, model_entry())
         with_dependency = model_entry(dependencies=[{"name": "ssl", "source": model_entry()["source"]}])
         self.assertNotEqual(runtime.runner_identity(self.layout, with_dependency), identity)
-        # A helper the runner does not import leaves it alone (the judge's prompts in _llama.py re-run
-        # only the judges); a helper it imports changes it, and so does that helper's next edit.
+        # A helper the runner does not import leaves it alone; a helper it imports changes it, and so
+        # does that helper's next edit.
         (self.root / "scripts/qc/runners/_kit.py").write_text("PROMPT = 'v1'\n")
         self.assertEqual(runtime.runner_identity(self.layout, model_entry()), identity)
         source.write_text(source.read_text() + "\nfrom qc.runners import _kit  # noqa: F401\n")
@@ -435,10 +435,13 @@ class RunnerHostTests(unittest.TestCase):
 
         for model_id in ("phones.zipa-large-crctc-500k", "phones.wav2vec2-xlsr-53-espeak-cv-ft", "g2p.espeak-ng"):
             self.assertEqual(shared(model_id), {"qc/phones.py"}, model_id)
-        for model_id in ("asr.qwen3-asr-1.7b", "asr.whisper-large-v3", "align.qwen3-forcedaligner-0.6b",
-                         "pitch.fcpe", "pitch.swiftf0", "speaker.redimnet2-plus", "mos.utmosv2",
-                         "aesthetics.audiobox-aesthetics", "llm.gemma-4-12b-it-qat"):
+        for model_id in ("asr.qwen3-asr-1.7b", "asr.whisper-large-v3", "pitch.fcpe", "pitch.swiftf0",
+                         "speaker.redimnet2-plus"):
             self.assertEqual(shared(model_id), set(), model_id)
+        self.assertEqual(set(registry), {
+            "asr.qwen3-asr-1.7b", "asr.whisper-large-v3", "phones.zipa-large-crctc-500k",
+            "phones.wav2vec2-xlsr-53-espeak-cv-ft", "g2p.espeak-ng", "pitch.fcpe", "pitch.swiftf0",
+            "speaker.redimnet2-plus"})
 
     def test_the_package_name_is_not_the_command_line(self):
         # `from qc import store` names the package `qc`, which must not resolve to scripts/qc.py: the
@@ -455,18 +458,18 @@ class RunnerHostTests(unittest.TestCase):
         self.assertEqual(runtime.runner_identity(self.layout, model_entry()), identity)
 
     def test_variant_models_key_results_by_text_language_and_reference(self):
-        aligner = model_entry(id="align.fixture", kind="align")
-        weights = self.layout.model_dir("align.fixture") / "weights/model.bin"
+        g2p = model_entry(id="g2p.fixture", kind="g2p")
+        weights = self.layout.model_dir("g2p.fixture") / "weights/model.bin"
         weights.parent.mkdir(parents=True)
         weights.write_bytes(PAYLOAD)
-        report = self.run_model(aligner)
+        report = self.run_model(g2p)
         self.assertEqual(report.ran, 3)
         take = self.takes[0]
         digest = store.audio_sha256(take["audio"])
         key = store.variant_key(take["text"], take["language"], None)
-        self.assertTrue(store.result_path(self.layout, "align.fixture", digest, key).is_file())
+        self.assertTrue(store.result_path(self.layout, "g2p.fixture", digest, key).is_file())
         changed = [dict(take, text="another script")] + self.takes[1:]
-        rerun = self.run_model(aligner, changed)
+        rerun = self.run_model(g2p, changed)
         self.assertEqual((rerun.ran, rerun.cached), (1, 2))
 
     def test_unsupported_languages_are_skipped(self):
@@ -500,10 +503,6 @@ class RunnerHostTests(unittest.TestCase):
             self.run_model()
         with self.assertRaisesRegex(runtime.RunnerError, "runtimes setup"):
             runtime.run_runner(model_entry(), self.takes, layout=self.layout, echo=self.lines.append)
-
-    def test_llamacpp_runners_use_the_onnx_venv(self):
-        self.assertEqual(runtime.runtime_python(self.layout, "llamacpp"),
-                         self.layout.runtimes / "onnx/bin/python3")
 
 
 class CacheTests(unittest.TestCase):
@@ -545,8 +544,8 @@ class CacheTests(unittest.TestCase):
     def test_take_variants_follow_the_model_kind(self):
         take = {"text": "t", "language": "french", "referenceSHA256": None}
         self.assertIsNone(store.take_variant({"kind": "asr"}, take))
-        self.assertEqual(store.take_variant({"kind": "align"}, take), store.variant_key("t", "french", None))
-        self.assertIsNone(store.take_variant({"kind": "align", "variant": False}, take))
+        self.assertEqual(store.take_variant({"kind": "speaker"}, take), store.variant_key("t", "french", None))
+        self.assertIsNone(store.take_variant({"kind": "speaker", "variant": False}, take))
         # G2P reads only the script: the same audio under another script keys another result.
         self.assertNotEqual(store.take_variant({"kind": "g2p"}, take), store.take_variant({"kind": "g2p"}, dict(take, text="u")))
 
@@ -626,10 +625,10 @@ class RuntimeTests(unittest.TestCase):
     def test_requirements_must_be_pinned(self):
         lines = runtime.parse_requirements("# header\nnumpy==2.4.6\nonnxruntime==1.23.0  # inline\n"
                                            "--extra-index-url https://download.example/whl\n"
-                                           f"utmosv2 @ git+https://github.com/example/utmosv2@{REVISION}\n")
+                                           f"examplepkg @ git+https://github.com/example/examplepkg@{REVISION}\n")
         self.assertEqual(runtime.pinned_versions(lines), {"numpy": "2.4.6", "onnxruntime": "1.23.0"})
         for bad in ("numpy\n", "numpy>=2\n", "-e .\n", "--trusted-host example.com\n",
-                    "utmosv2 @ git+https://github.com/example/utmosv2@main\n"):
+                    "examplepkg @ git+https://github.com/example/examplepkg@main\n"):
             with self.subTest(bad), self.assertRaises(runtime.RuntimeSetupError):
                 runtime.parse_requirements(bad)
 
@@ -672,32 +671,106 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(any("requirements changed" in problem for problem in problems))
         self.assertTrue(any("pinned 2.4.7" in problem for problem in problems))
 
-    def test_llamacpp_release_tarball_unpacks_into_its_runtime(self):
-        archive = make_tar({"build/": None, "build/bin/": None, "build/bin/llama-server": b"#!/bin/sh\n",
-                            "build/bin/libllama.0.dylib": b"lib", "build/bin/libllama.dylib": ("symlink", "libllama.0.dylib")})
-        name = "llama-b1-bin-macos-arm64.tar.gz"
-        entry = {"id": "runtime.llamacpp", "kind": "runtime", "runner": None, "runtime": "llamacpp",
-                 "source": {"host": "github-release", "files": {name: {
-                     "url": f"https://github.com/example/llama/releases/download/b1/{name}",
-                     "sha256": hashlib.sha256(archive).hexdigest(), "bytes": len(archive)}}},
-                 "license": "MIT", "version": 1}
-        self.layout.config.mkdir(parents=True, exist_ok=True)
-        self.layout.registry.write_text(json.dumps(registry(entry)))
-        with self.assertRaisesRegex(runtime.RuntimeSetupError, "models fetch"):
-            runtime.setup_runtime(self.layout, "llamacpp", log=lambda message: None)
-        (self.layout.model_dir("runtime.llamacpp")).mkdir(parents=True)
-        (self.layout.model_dir("runtime.llamacpp") / name).write_bytes(archive)
-        runtime.setup_runtime(self.layout, "llamacpp", log=lambda message: None)
-        server = self.layout.runtimes / "llamacpp/build/bin/llama-server"
-        self.assertTrue(os.access(server, os.X_OK))
-        self.assertEqual(os.readlink(self.layout.runtimes / "llamacpp/build/bin/libllama.dylib"), "libllama.0.dylib")
-        self.assertEqual(runtime.verify_runtime(self.layout, "llamacpp"),
-                         ["llamacpp: its runner needs the onnx venv (run qc.py runtimes setup --runtime onnx)"])
+    def test_setup_refuses_an_unknown_runtime(self):
+        with self.assertRaisesRegex(runtime.RuntimeSetupError, "unknown runtime"):
+            runtime.setup_runtime(self.layout, "llamacpp", run=mock.Mock(), log=lambda message: None)
 
     def test_setup_refuses_an_empty_requirements_file(self):
         (self.layout.runtime_requirements / "torch.txt").write_text("# header only\n")
         with self.assertRaisesRegex(runtime.RuntimeSetupError, "pins no package"):
             runtime.setup_runtime(self.layout, "torch", run=mock.Mock(), log=lambda message: None)
+
+
+class PruneTests(unittest.TestCase):
+    """`qc.py models prune`: only unregistered models' files and results, and retired runtimes."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.layout = Layout(self.root)
+        self.registered = [model_entry()]
+        cache = self.layout.cache
+        for relative, size in (("models/asr.fixture/weights/model.bin", 10), ("models/llm.gone/model.gguf", 100),
+                               ("results/asr.fixture/a.json", 5), ("results/mos.gone/a.json", 20),
+                               ("results/g2p/key.json", 7), ("runtimes/llamacpp/bin/llama-server", 30),
+                               ("runtimes/onnx/bin/python3", 3), ("runtimes/python/python/bin/python3", 3),
+                               ("work/excerpts/x.wav", 4)):
+            path = cache / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"x" * size)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def listed(self, found):
+        return sorted(target.path.relative_to(self.layout.cache).as_posix() for target in found)
+
+    def test_dry_run_lists_unregistered_models_and_retired_runtimes(self):
+        found = prune.prune(self.layout, self.registered, dry_run=True)
+        self.assertEqual(self.listed(found), ["models/llm.gone", "results/mos.gone", "runtimes/llamacpp"])
+        self.assertEqual({target.path.name: (target.bytes, target.freed) for target in found},
+                         {"llm.gone": (100, 100), "mos.gone": (20, 20), "llamacpp": (30, 30)})
+        self.assertTrue((self.layout.cache / "models/llm.gone/model.gguf").is_file())
+        lines = prune.report_lines(self.layout, found, dry_run=True)
+        self.assertIn("would remove build/cache/qc/models/llm.gone (model not in the registry): 100 bytes, 100 freed",
+                      lines)
+
+    def test_yes_removes_them_and_keeps_registered_models_the_text_cache_work_and_runtimes(self):
+        prune.prune(self.layout, self.registered, dry_run=False)
+        cache = self.layout.cache
+        for gone in ("models/llm.gone", "results/mos.gone", "runtimes/llamacpp"):
+            self.assertFalse((cache / gone).exists(), gone)
+        for kept in ("models/asr.fixture/weights/model.bin", "results/asr.fixture/a.json", "results/g2p/key.json",
+                     "runtimes/onnx/bin/python3", "runtimes/python/python/bin/python3", "work/excerpts/x.wav"):
+            self.assertTrue((cache / kept).is_file(), kept)
+        self.assertEqual(prune.prune(self.layout, self.registered, dry_run=True), [])
+
+    def test_a_file_hard_linked_elsewhere_is_not_counted_as_freed(self):
+        os.link(self.layout.cache / "models/llm.gone/model.gguf", self.root / "elsewhere.bin")
+        found = {target.path.name: target for target in prune.prune(self.layout, self.registered, dry_run=True)}
+        self.assertEqual((found["llm.gone"].bytes, found["llm.gone"].freed), (100, 0))
+
+    def test_refuses_while_a_run_holds_the_lock(self):
+        self.layout.cache.mkdir(parents=True, exist_ok=True)
+        with open(self.layout.run_lock, "a+") as other:
+            fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(prune.PruneError, "run.lock"):
+                prune.prune(self.layout, self.registered, dry_run=False)
+            self.assertEqual(len(prune.prune(self.layout, self.registered, dry_run=True)), 3)
+        self.assertTrue((self.layout.cache / "models/llm.gone").is_dir())
+
+    def test_a_symbolic_link_is_refused_and_nothing_is_removed(self):
+        outside = self.root / "outside"
+        (outside / "keep.bin").parent.mkdir(parents=True)
+        (outside / "keep.bin").write_bytes(b"keep")
+        os.symlink(outside, self.layout.cache / "models/linked.gone")
+        with self.assertRaisesRegex(prune.PruneError, "symbolic link"):
+            prune.prune(self.layout, self.registered, dry_run=False)
+        self.assertTrue((outside / "keep.bin").is_file())
+        self.assertTrue((self.layout.cache / "models/llm.gone").is_dir())
+
+    def test_the_text_cache_is_the_g2p_runners_default_cache(self):
+        from qc.runners import espeak_g2p
+
+        self.assertIn(espeak_g2p.G2P_CACHE_DIR.name, prune.TEXT_CACHES)
+        self.assertEqual(espeak_g2p.G2P_CACHE_DIR.parent, Layout().results)
+
+    def test_cli_prune(self):
+        self.layout.config.mkdir(parents=True)
+        self.layout.registry.write_text(json.dumps(registry(model_entry())))
+        spec = importlib.util.spec_from_file_location("qc_cli", SCRIPTS / "qc.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        with mock.patch("sys.stdout") as stdout:
+            self.assertEqual(cli.main(["models", "prune", "--dry-run"], layout=self.layout), 0)
+        printed = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertIn("qc prune: 3 paths, 150 bytes", printed)
+        self.assertTrue((self.layout.cache / "runtimes/llamacpp").is_dir())
+        with mock.patch("sys.stdout"):
+            self.assertEqual(cli.main(["models", "prune", "--yes"], layout=self.layout), 0)
+        self.assertFalse((self.layout.cache / "runtimes/llamacpp").exists())
+        with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            cli.main(["models", "prune"], layout=self.layout)
 
 
 class RepositoryTests(unittest.TestCase):
@@ -715,7 +788,7 @@ class RepositoryTests(unittest.TestCase):
         models.load_registry(Layout(ROOT))
 
     def test_runtime_requirement_files_parse(self):
-        for name in runtime.VENV_RUNTIMES:
+        for name in runtime.RUNTIMES:
             with self.subTest(name):
                 runtime.parse_requirements((ROOT / f"config/qc/runtimes/{name}.txt").read_text())
 

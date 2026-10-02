@@ -1,17 +1,16 @@
 """Detectors: `config/qc/detectors.json`, feature normalization and scoring.
 
-Each detector reads at most four features and maps them to one score:
-
-- `logistic`: an L2 logistic over the features' per-language z-scores (oriented so
-  that higher means more defective), fitted per language when the labels allow,
-  else pooled (`*`);
-- `threshold`: one feature's oriented raw value (the LLM judges' pYes).
+Each detector reads at most four features and maps them to one score, its
+`method`: `logistic`, an L2 logistic over the features' per-language z-scores
+(oriented so that higher means more defective), fitted per language when the
+labels allow, else pooled (`*`).
 
 A fitted detector flags a take when its score reaches the fitted cut. Before a
 fit (or for a detector the labels could not train) a detector with a
 `provisional` rule scores with it, at report-only; one without scores
 uncalibrated: the largest oriented z-score among its features, which ranks the
-listening queue but never flags.
+listening queue but never flags. A detector with `gateLanes` gates only in those
+lanes (the clone detectors gate only in `clone-lane`).
 
 A rule condition compares a feature with a fixed `value`, or with a percentile
 of the take's language from the newest `config/qc/norms-v<N>.json` (`norm`, of
@@ -28,17 +27,14 @@ from typing import Any, Iterable
 from qc import store
 from qc.store import Layout
 
-METHODS = ("logistic", "threshold")
+METHODS = ("logistic",)
 DIRECTIONS = ("higher", "lower")
-ROLES = ("asrA", "asrB", "align", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics",
-         "llm")
+ROLES = ("asrA", "asrB", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker")
 # Which runner roles a feature family reads (signal and engine features read only the WAV and the take).
 # The phone features need both recognizers: an insertion counts only when both make it.
 FEATURE_ROLES = {
-    "asr": ("asrA", "asrB", "g2p"), "align": ("align",), "phones": ("phones", "phonesB", "g2p"),
-    "pitch": ("pitchA", "pitchB"),
-    "speaker": ("speaker",), "mos": ("mos",), "aesthetics": ("aesthetics",), "llm": ("llm",),
-    "signal": (), "engine": (), "pause": (), "end": (), "level": (), "rate": ("g2p",),
+    "asr": ("asrA", "asrB", "g2p"), "phones": ("phones", "phonesB", "g2p"), "pitch": ("pitchA", "pitchB"),
+    "speaker": ("speaker",), "signal": (), "engine": (), "pause": (), "end": (), "level": (), "rate": ("g2p",),
 }
 LEVELS = ("report-only", "warn", "fail")
 LANE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
@@ -92,14 +88,18 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
             for conditions in rule.values():
                 for condition in conditions:
                     require(_valid_condition(condition), f"{label}: bad provisional condition {condition!r}")
-        require(detector.get("method") in METHODS, f"{label}: method must be logistic or threshold")
+        require(detector.get("method") in METHODS, f"{label}: method must be one of {', '.join(METHODS)}")
         features = detector.get("features")
         require(isinstance(features, list) and 1 <= len(features) <= 4, f"{label}: one to four features")
-        require(detector["method"] != "threshold" or len(features) == 1, f"{label}: a threshold reads one feature")
         for item in features:
             require(item.get("direction") in DIRECTIONS, f"{label}: direction must be higher or lower")
             family = str(item.get("name", "")).split(".", 1)[0]
             require(family in FEATURE_ROLES, f"{label}: unknown feature family in {item.get('name')!r}")
+        if "gateLanes" in detector:
+            gate_lanes = detector["gateLanes"]
+            require(isinstance(gate_lanes, list) and bool(gate_lanes)
+                    and set(gate_lanes) <= set(config.get("lanes") or {}),
+                    f"{label}: gateLanes must list lanes of the lanes map")
     for name in ("warn", "fail"):
         require(isinstance(config.get("levels", {}).get(name), dict), f"levels.{name} is required")
     lanes = config.get("lanes", {})
@@ -122,12 +122,15 @@ def lane_roles(config: dict[str, Any], lane: str | None) -> list[str]:
 
 def gated_detectors(config: dict[str, Any], lane: str | None) -> set[str]:
     """The detectors a lane's gate reads: those with a feature the lane can measure, from the WAV
-    and the take alone or from roles the lane runs. The others stay report-only in that lane, so a
-    model it never runs cannot turn a gate into an error."""
+    and the take alone or from roles the lane runs, and, for a detector with `gateLanes`, only in
+    those lanes. The others stay report-only in that lane, so a model it never runs cannot turn a
+    gate into an error."""
 
     roles = set(lane_roles(config, lane))
     gated = set()
     for detector in config["detectors"]:
+        if "gateLanes" in detector and lane not in detector["gateLanes"]:
+            continue
         families = {item["name"].split(".", 1)[0] for item in detector["features"]}
         if any(set(FEATURE_ROLES[family]) <= roles for family in families):
             gated.add(detector["id"])
@@ -164,18 +167,16 @@ SCORING_SOURCES = ("qc/features.py", "qc/detectors.py", "qc/phones.py", "qc/pitc
 
 
 def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:
-    """`{"sha256", "files", "norms", "references"}`: what scores a take once the runners have run.
+    """`{"sha256", "files", "norms"}`: what scores a take once the runners have run.
 
     `files` maps `config/qc/detectors.json` and the scoring code (`SCORING_SOURCES` under
     `scripts/`) to their SHA-256 (None for a missing file); `norms` is the newest norms file the
-    provisional rules read and `references` the newest frozen references file the features read
-    (each `{"file", "sha256"}`, or None). `sha256` covers all three. Runs record it in
+    provisional rules read (`{"file", "sha256"}`, or None). `sha256` covers both. Runs record it in
     `features.json` and fits in the thresholds file: thresholds apply only to features scored by
-    the same code, configuration, norms and references.
+    the same code, configuration and norms.
     """
 
     from qc import norms as norms_lib  # qc.norms imports this module
-    from qc import references as references_lib
 
     def digest(path: Any) -> str | None:
         return store.sha256_file(path) if path.is_file() else None
@@ -185,11 +186,8 @@ def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:
         files[f"scripts/{relative}"] = digest(layout.scripts / relative)
     newest = norms_lib.latest(layout)
     norms = {"file": newest.name, "sha256": store.sha256_file(newest)} if newest else None
-    frozen = references_lib.latest(layout)
-    references = {"file": frozen.name, "sha256": store.sha256_file(frozen)} if frozen else None
-    return {"sha256": store.sha256_text(store.canonical_json({"files": files, "norms": norms,
-                                                              "references": references})),
-            "files": files, "norms": norms, "references": references}
+    return {"sha256": store.sha256_text(store.canonical_json({"files": files, "norms": norms})),
+            "files": files, "norms": norms}
 
 
 def detector_roles(detector: dict[str, Any]) -> set[str]:
@@ -367,10 +365,6 @@ def score(detector: dict[str, Any], features: dict[str, Any], language: str,
         return {"score": uncalibrated(detector, features, language, norm) if present else None,
                 "cut": None, "scope": None, "present": present}
     scope = language if language in models else "*"
-    if detector["method"] == "threshold":
-        item = detector["features"][0]
-        value = oriented(features[item["name"]]["value"], item["direction"])
-        return {"score": value, "cut": model["cut"], "scope": scope, "present": present}
     values, _ = vector(detector, features, language, norm)
     logit = model["intercept"] + sum(weight * value for weight, value in zip(model["weights"], values))
     return {"score": sigmoid(logit), "cut": model["cut"], "scope": scope, "present": present}

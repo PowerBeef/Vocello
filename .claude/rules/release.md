@@ -117,7 +117,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 detectors are
   first measured on human recordings (`qc.py controls`), then fit on the maintainer's listening
   labels (`scripts/qc.py label`); `qc.py fit` freezes thresholds in `config/qc/thresholds-v<N>.json`,
-  bound to the scoring code, norms and references, and committed before `qc.py eval` scores the
+  bound to the scoring code and norms, and committed before `qc.py eval` scores the
   labels out of fold, once per label set. A model, feature or threshold change is a new version. A
   detector warns or fails a lane only for the languages and classes its evaluation covers, and
   reports elsewhere. Listening labels takes

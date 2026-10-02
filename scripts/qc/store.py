@@ -40,7 +40,7 @@ TAKES_SCHEMA = "vocello.qc.takes/1"
 # clip: their results carry a variant key next to the audio digest. G2P reads only
 # the text, so the same audio under another script (a language bench's negative
 # control) must not reuse its result.
-VARIANT_KINDS = frozenset({"align", "g2p", "llm", "speaker"})
+VARIANT_KINDS = frozenset({"g2p", "speaker"})
 
 
 @dataclass(frozen=True)
@@ -87,7 +87,7 @@ class Layout:
 
     @property
     def work(self) -> Path:
-        """Derived audio (muted variants for the pause mute test), content-addressed by name."""
+        """Derived audio (the excerpt test's pause excerpts), content-addressed by name."""
 
         return self.cache / "work"
 

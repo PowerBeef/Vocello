@@ -260,7 +260,7 @@ class ClassificationTests(unittest.TestCase):
             # QC v2 routes to the Python lane by path, never research-only.
             "scripts/qc.py": {"python"},
             "scripts/qc/store.py": {"python"},
-            "scripts/qc/runners/audiobox.py": {"python"},
+            "scripts/qc/runners/fcpe.py": {"python"},
             "config/qc/models.json": {"python"},
             "config/qc/runtimes/onnx.txt": {"python"},
             "scripts/tests/test_qc_core.py": {"python"},

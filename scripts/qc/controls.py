@@ -5,8 +5,8 @@ extracted speaker corpora (MLS for French, LibriTTS-R for English by default):
 a deterministic sample per language, at most a few clips per speaker, each
 marked `control: true` with mode `human`, cell `control` and family
 `human:<source>:<speaker>`. Run it with `qc.py run --takes <manifest> --lane
-controls`; a control take is scored and flagged, but always at report-only, and
-the controls lane stays out of `fit`, `queue`, norms and references.
+controls` (the qc-takes roles); a control take is scored and flagged, but always
+at report-only, and the controls lane stays out of `fit`, `queue` and norms.
 
 `report` compares a controls run with generated runs: per detector and
 language, the share of takes each provisional rule (or fitted threshold)

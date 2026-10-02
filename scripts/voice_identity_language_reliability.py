@@ -46,7 +46,7 @@ ANALYSIS_SOURCE_FILES = (
     "config/qc/models.json",
 )
 # The QC v2 detectors whose flags speak to reference-output fidelity.
-FIDELITY_DETECTORS = ("identity.drift", "prosody.pitch", "prosody.tonal-collapse")
+FIDELITY_DETECTORS = ("identity.drift", "prosody.pitch")
 
 
 class ReliabilityError(ValueError):

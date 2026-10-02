@@ -129,8 +129,8 @@ class FitEvalTests(unittest.TestCase):
                     "pause.longest_gap_seconds": feature(rng.gauss(1.0, 0.15) if gap_defect else rng.gauss(0.25, 0.08)),
                     "pause.nonspeech_level_db": feature(rng.gauss(-5, 3) if gap_defect else rng.gauss(-30, 5)),
                     "pause.voiced_blips": feature(1 if gap_defect and rng.random() < 0.6 else 0),
-                    "llm.stutter": feature(1.0 if stutter else 0.0),
-                    "llm.cutoff": feature(float(rng.random() < 0.5)),
+                    "asr.phonetic_error_min": feature(1.0 if stutter else 0.0),
+                    "signal.abrupt_offset_db": feature(float(rng.random() < 0.5)),
                 }
                 rows.append({"token": token, "takeID": f"{language}-{index}", "language": language, "features": values})
                 item_token = label.label_token("b1", 0, token, 0)
@@ -187,8 +187,8 @@ class FitEvalTests(unittest.TestCase):
         self.assertEqual(pause["train"]["positives"], 120)  # the final models train on every label
         self.assertTrue(thresholds["detectors"]["content.phoneme"]["reportOnly"])  # its features never computed
         self.assertTrue(thresholds["detectors"]["level.loudness"]["advisory"])
-        self.assertFalse(thresholds["detectors"]["judge.llm.stutter"]["reportOnly"])  # kappa 1.0
-        self.assertTrue(thresholds["detectors"]["judge.llm.cutoff"]["reportOnly"])  # no cutoff labels
+        self.assertFalse(thresholds["detectors"]["content.asr"]["reportOnly"])  # a second class fits
+        self.assertTrue(thresholds["detectors"]["boundary.cutoff"]["reportOnly"])  # no cutoff labels
         self.assertEqual(thresholds["models"], {"asrA": {"id": "asr.x", "runnerSHA256": "a" * 64}})
         self.assertEqual(thresholds["rater"], "maintainer")
         self.assertEqual(thresholds["scoringSHA256"], detectors.scoring_identity(self.layout)["sha256"])

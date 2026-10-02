@@ -1359,9 +1359,9 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
       "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)), limit)' "$manifest")
   fi
 
-  # QC v2 over the generated takes (docs/reference/qc.md, lane qc-takes: every role
-  # but the LLM judge), then the listening queue of the 50 takes most worth hearing,
-  # which `qc.py label serve --batch <queue>` opens. The models run one at a time,
+  # QC v2 over the generated takes (docs/reference/qc.md, lane qc-takes: the two ASR
+  # families, G2P and the two phone recognizers), then the listening queue of the 50
+  # takes most worth hearing, which `qc.py label serve --batch <queue>` opens. The models run one at a time,
   # cached by audio digest, so a rerun scores only new takes. QC v2 reports here; a
   # failure to compute it never fails the generation verdict.
   local qc_status="SKIPPED" qc_run="" qc_gate="none" qc_queue="none"

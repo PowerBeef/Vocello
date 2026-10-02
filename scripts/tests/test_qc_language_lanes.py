@@ -97,17 +97,24 @@ class LaneDefinitionTests(unittest.TestCase):
         self.assertEqual(detectors.lane_roles(self.config, "clone-lane"), ["speaker", "pitchA", "pitchB"])
         self.assertIn("asrA", detectors.lane_roles(self.config, "language-bench"))
         self.assertIn("asrB", detectors.lane_roles(self.config, "ios-language-bench"))
-        # The LLM judge runs only on labelled and queued takes.
-        self.assertNotIn("llm", detectors.lane_roles(self.config, "qc-takes"))
+        # The generated-take lanes and the human controls run the two ASR families, G2P and the two
+        # phone recognizers; pitch and speaker identity are measured for clones only.
+        lean = ["asrA", "asrB", "g2p", "phones", "phonesB"]
+        for name in ("language-bench", "ios-language-bench", "qc-takes", "controls"):
+            self.assertEqual(detectors.lane_roles(self.config, name), lean, name)
+        self.assertEqual(detectors.lane_roles(self.config, "voice-reliability"), ["speaker", "pitchA", "pitchB"])
         # A lane the map does not name runs every role.
         self.assertEqual(detectors.lane_roles(self.config, "pool"), list(self.config["models"]))
 
     def test_a_lane_gates_only_the_detectors_its_roles_can_score(self):
         clone = detectors.gated_detectors(self.config, "clone-lane")
-        self.assertTrue({"identity.drift", "prosody.pitch", "prosody.tonal-collapse", "signal.artifacts"} <= clone)
-        self.assertFalse({"content.phoneme", "quality.naturalness", "language.wrong"} & clone)
-        self.assertFalse(any(name.startswith("judge.llm") for name in clone))
-        self.assertIn("judge.llm.stutter", detectors.gated_detectors(self.config, "pool"))
+        self.assertTrue({"identity.drift", "prosody.pitch", "signal.artifacts"} <= clone)
+        self.assertFalse({"content.phoneme", "content.asr", "language.wrong"} & clone)
+        self.assertIn("content.phoneme", detectors.gated_detectors(self.config, "pool"))
+        # The clone detectors gate in the clone lane only: not in the generated-take lanes (which run
+        # no pitch or speaker role), nor where every role runs, nor in voice-reliability.
+        for lane in ("qc-takes", "language-bench", "ios-language-bench", "controls", "pool", "voice-reliability"):
+            self.assertFalse({"prosody.pitch", "identity.drift"} & detectors.gated_detectors(self.config, lane), lane)
 
     def test_lane_definitions_are_validated(self):
         for lane in ({"description": "x", "models": ["nope"]}, {"description": "", "models": ["asrA"]},

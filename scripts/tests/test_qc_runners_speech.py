@@ -1,4 +1,4 @@
-"""QC v2 speech runners (Qwen3-ASR, Qwen3-ForcedAligner, Whisper, ZIPA, wav2vec2 phones) and their
+"""QC v2 speech runners (Qwen3-ASR, Whisper, ZIPA, wav2vec2 phones) and their
 shared plumbing: job and result schema, WAV input, resampling, language windows, variant keys.
 
 Every model call is stubbed: the test python has NumPy but no mlx, onnxruntime or torch, and the
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from qc.runners import qwen3_aligner, qwen3_asr, speech_common as common, wav2vec2_phones, whisper, zipa  # noqa: E402
+from qc.runners import qwen3_asr, speech_common as common, wav2vec2_phones, whisper, zipa  # noqa: E402
 
 
 def write_pcm16(path: Path, samples: np.ndarray, rate: int, channels: int = 1) -> str:
@@ -353,52 +353,6 @@ class WhisperTests(unittest.TestCase):
             space.close()
 
 
-class FakeAligner:
-    def __init__(self, drop: bool = False):
-        self.drop, self.calls = drop, []
-
-    def align(self, audio, units):
-        self.calls.append(list(units))
-        spans = [(unit, 0.2 * index, 0.2 * index + 0.15) for index, unit in enumerate(units)]
-        return spans[:-1] if self.drop else spans
-
-
-class AlignerTests(unittest.TestCase):
-    def test_units_per_language(self):
-        units = qwen3_aligner.alignment_units
-        self.assertEqual(units("Les branches, des vieux ormes.", "french"), ["Les", "branches", "des", "vieux", "ormes"])
-        self.assertEqual(units("l’homme peut-être l'arbre", "french"), ["l", "homme", "peut", "être", "l'arbre"])
-        self.assertEqual(units("你好，世界AI 2", "chinese"), ["你", "好", "世", "界", "AI", "2"])
-        self.assertEqual(units("こんにちは、世界ー", "japanese"), ["こ", "ん", "に", "ち", "は", "世", "界", "ー"])
-        self.assertEqual(units("안녕하세요 세계!", "korean"), ["안녕하세요", "세계"])
-        self.assertEqual(units("한국語 말", "korean"), ["한국", "語", "말"])
-        self.assertEqual((qwen3_aligner.unit_kind("japanese"), qwen3_aligner.unit_kind("korean")), ("char", "word"))
-
-    def test_runner_aligns_the_script_under_a_variant_key(self):
-        space = Workspace()
-        try:
-            take = space.take("t", 1.0, text="Les branches des vieux ormes")
-            missing = space.take("m", 1.0)
-            dropped = space.take("d", 1.0, text="Bonjour monde")
-            engine = FakeAligner()
-            code, _ = run(space.job("align.qwen3-forcedaligner-0.6b", [take, missing]), qwen3_aligner.process,
-                          engine, depends=True)
-            self.assertEqual(code, 1)
-            variant = common.variant_key(take["text"], "french", None)
-            result = space.result(f"{take['audioSHA256']}.{variant}")
-            self.assertEqual(result["variantKey"], variant)
-            self.assertEqual(result["outputs"]["units"], "word")
-            self.assertEqual(result["outputs"]["words"][1], {"text": "branches", "start": 0.2, "end": 0.35, "score": None})
-            self.assertEqual(engine.calls, [["Les", "branches", "des", "vieux", "ormes"]])
-            missing_variant = common.variant_key(None, "french", None)
-            self.assertEqual(space.result(f"{missing['audioSHA256']}.{missing_variant}")["error"], "text-missing")
-            code, _ = run(space.job("align.qwen3-forcedaligner-0.6b", [{**dropped, "variantKey": "host"}]),
-                          qwen3_aligner.process, FakeAligner(drop=True), depends=True)
-            self.assertEqual(space.result(f"{dropped['audioSHA256']}.host")["error"], "alignment-units-mismatch")
-        finally:
-            space.close()
-
-
 class FakePhones:
     def __init__(self, vocab, logprobs, frame_seconds):
         self.vocab, self.scores, self.frame_seconds = vocab, logprobs, frame_seconds
@@ -457,7 +411,7 @@ class PhoneRunnerTests(unittest.TestCase):
 
     def test_engines_need_their_runtimes(self):
         for module, name in ((zipa, "ZipaEngine"), (wav2vec2_phones, "Wav2Vec2Engine"), (whisper, "WhisperEngine"),
-                             (qwen3_asr, "Qwen3AsrEngine"), (qwen3_aligner, "AlignerEngine")):
+                             (qwen3_asr, "Qwen3AsrEngine")):
             with self.subTest(engine=name):
                 try:
                     getattr(module, name)("/nonexistent-model-dir", {})

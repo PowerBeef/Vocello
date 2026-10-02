@@ -226,7 +226,7 @@
       "class": "cache",
       "owner": "Audio QC v2 (scripts/qc.py models fetch, runtimes setup, run)",
       "cleanup": "aggressive",
-      "retention": "Re-creatable from the checked-in registry and pins: the digest-verified model files under models/<model-id>, the pinned runner venvs, interpreter and llama.cpp release under runtimes, and the content-addressed runner results under results/<model-id>/<audioSHA256>[.<variantKey>].json, keyed to each runner's identity; never evidence by itself",
+      "retention": "Re-creatable from the checked-in registry and pins: the digest-verified model files under models/<model-id>, the pinned runner venvs and interpreter under runtimes, and the content-addressed runner results under results/<model-id>/<audioSHA256>[.<variantKey>].json, keyed to each runner's identity; qc.py models prune removes the files and results of models the registry no longer lists; never evidence by itself",
       "env": "QVOICE_QC_CACHE"
     },
     {

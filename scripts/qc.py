@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Vocello QC v2: the audio QC harness command line.
 
-    python3 scripts/qc.py models list|fetch|verify
+    python3 scripts/qc.py models list|fetch|verify|prune
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
-    python3 scripts/qc.py run | gate | queue | fit | eval | norms | references
+    python3 scripts/qc.py run | gate | queue | fit | eval | norms
     python3 scripts/qc.py controls build|report
     python3 scripts/qc.py language-bench takes|evidence
 
@@ -59,6 +59,17 @@ def cmd_models(args: argparse.Namespace, layout: Layout) -> int:
                 memory = f"{row['memoryGB']:>5} GB" if row["memoryGB"] else "     -  "
                 print(f"{row['id']:<40} {row['kind']:<10} {row['runtime']:<9} {row['role']:<9} {memory} "
                       f"{row['bytes'] / 1024**3:7.2f} GB  {'fetched' if row['fetched'] else 'missing'}  {row['license']}")
+        return EXIT_OK
+    if args.action == "prune":
+        from qc import prune
+
+        try:
+            found = prune.prune(layout, entries, dry_run=args.dry_run)
+        except (prune.PruneError, OSError) as error:
+            print(f"qc prune: refused: {error}", file=sys.stderr)
+            return EXIT_FAIL
+        for line in prune.report_lines(layout, found, dry_run=args.dry_run):
+            print(line)
         return EXIT_OK
 
     selected = _select_models(registry, entries, args)
@@ -298,21 +309,6 @@ def cmd_controls(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
-def cmd_references(args: argparse.Namespace, layout: Layout) -> int:
-    from qc import references
-
-    try:
-        document, path = references.command(layout, args.takes, min_count=args.min_count, dry_run=args.dry_run)
-    except (ValueError, OSError) as error:
-        print(f"qc references: {error}", file=sys.stderr)
-        return EXIT_ERROR
-    for line in references.summary_lines(document):
-        print(line)
-    if path is not None:
-        print(f"qc references: wrote {path.relative_to(layout.root)}; runs score against the newest references file")
-    return EXIT_OK
-
-
 # --- parser ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -334,14 +330,19 @@ def build_parser() -> argparse.ArgumentParser:
     verify = models_actions.add_parser("verify", help="re-hash fetched files; report missing ones")
     verify.add_argument("--model", action="append", help="model id (repeatable); default every model")
     verify.add_argument("--verbose", action="store_true")
+    pruning = models_actions.add_parser("prune", help="remove the cached files and results of models no longer "
+                                                      "registered, and retired runtimes")
+    prune_mode = pruning.add_mutually_exclusive_group(required=True)
+    prune_mode.add_argument("--dry-run", action="store_true", help="list each path and its bytes; remove nothing")
+    prune_mode.add_argument("--yes", action="store_true", help="remove them")
     models.set_defaults(handler=cmd_models)
 
-    runtimes = commands.add_parser("runtimes", help="pinned runner venvs and the llama.cpp release")
+    runtimes = commands.add_parser("runtimes", help="the pinned runner venvs")
     runtime_actions = runtimes.add_subparsers(dest="action", required=True)
     setup = runtime_actions.add_parser("setup", help="build a runtime from its pinned requirements")
-    setup.add_argument("--runtime", required=True, choices=("mlx", "onnx", "torch", "llamacpp"))
+    setup.add_argument("--runtime", required=True, choices=("mlx", "onnx", "torch"))
     check = runtime_actions.add_parser("verify", help="check runtimes against their pins")
-    check.add_argument("--runtime", choices=("mlx", "onnx", "torch", "llamacpp"))
+    check.add_argument("--runtime", choices=("mlx", "onnx", "torch"))
     runtimes.set_defaults(handler=cmd_runtimes)
 
     label = commands.add_parser("label", help="the maintainer's labels: sample, serve, export")
@@ -427,13 +428,6 @@ def build_parser() -> argparse.ArgumentParser:
                        help="values a language needs before it gets a feature's norms (default 100)")
     norms.add_argument("--dry-run", action="store_true", help="print the summary without writing config/qc/norms-v<N>.json")
     norms.set_defaults(handler=cmd_norms)
-
-    frozen = commands.add_parser("references", help="freeze per-voice pitch and per-cell Audiobox medians of a takes pool")
-    frozen.add_argument("--takes", nargs="+", required=True, help="qc-takes run directories or takes manifests")
-    frozen.add_argument("--min-count", type=int, default=3, help="takes a voice or cell needs (default 3)")
-    frozen.add_argument("--dry-run", action="store_true",
-                        help="print the summary without writing config/qc/references-v<N>.json")
-    frozen.set_defaults(handler=cmd_references)
 
     controls = commands.add_parser("controls", help="human-speech controls: every detector measured on people")
     control_actions = controls.add_subparsers(dest="action", required=True)

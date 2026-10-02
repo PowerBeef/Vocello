@@ -3,12 +3,11 @@
 A feature is `{"value": float or None, "start": seconds or None, "end": seconds or None}`;
 None means the inputs were unavailable (a model not run, a take it failed on).
 `extract(take, results, context, params)` reads the cached results by role (the
-`models` map of `config/qc/detectors.json`: asrA, asrB, align, phones, phonesB,
-g2p, pitchA, pitchB, speaker, mos, aesthetics, llm) and returns every feature the
-detectors name. `build_context` computes the lane-level references: voice pitch
-centroids and per-cell aesthetics baselines (from the newest frozen
-`config/qc/references-v<N>.json` first, `qc.references`), clone-reference pitch,
-and leave-one-out speaker centroids.
+`models` map of `config/qc/detectors.json`: asrA, asrB, phones, phonesB, g2p,
+pitchA, pitchB, speaker) and returns every feature the detectors name.
+`build_context` measures each clone reference's register; the pitch register
+offset and the speaker distances are measured against the clone reference only,
+so a take without one gets None for them.
 
 Transcripts are also compared at the sound level (`asr_phonetic_features`): the
 script and each ASR transcript go through the same cached G2P, so homophones cost
@@ -47,12 +46,10 @@ SCRIPTS = {
     "chinese": ("CJK",), "japanese": ("CJK", "HIRAGANA", "KATAKANA"), "korean": ("HANGUL",),
     "russian": ("CYRILLIC",),
 }
-LLM_CLASSES = ("stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch",
-               "tonal-collapse", "voice-change", "artifact", "unnatural")
 AUDIO_FEATURES = (
     "signal.clicks", "signal.dropout_seconds", "signal.clipping_fraction", "signal.terminal_silence_seconds",
     "signal.abrupt_offset_db", "pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips",
-    "pause.excerpt_phones", "pause.unpunctuated_gap_seconds", "end.drop_db_60ms", "end.tail_seconds",
+    "pause.excerpt_phones", "end.drop_db_60ms", "end.tail_seconds",
     "end.decay_db_per_ms", "end.file_tail_seconds", "level.lufs", "level.lufs_deviation", "level.true_peak_dbtp",
     "level.lra",
 )
@@ -377,93 +374,20 @@ def pause_gaps(samples: np.ndarray, rate: int, *, profile: dict[str, np.ndarray]
     return [round(length, 6) for length in lengths if length >= minimum - 1e-9]
 
 
-# Punctuation that does not mark a pause: the apostrophe of "l'arbre" and the hyphen of "peut-être".
-WORD_JOINERS = frozenset("'’ʼ-‐‑")
-
-
-def script_tokens(text: str | None, language: str | None) -> tuple[list[str], list[bool]]:
-    """The script's tokens as `normalize_text` splits them, and whether pause punctuation (a comma,
-    a full stop, a dash; not an apostrophe or a hyphen) follows each one before the next token."""
-
-    tokens: list[str] = []
-    breaks: list[bool] = []
-    current = ""
-    for char in unicodedata.normalize("NFKC", text or "").lower():
-        category = unicodedata.category(char)[0]
-        if category in "PSZC":
-            if current:
-                tokens.append(current)
-                breaks.append(False)
-                current = ""
-            if category == "P" and char not in WORD_JOINERS and tokens:
-                breaks[-1] = True
-        elif language in CJK_LANGUAGES:
-            tokens.append(char)
-            breaks.append(False)
-        else:
-            current += char
-    if current:
-        tokens.append(current)
-        breaks.append(False)
-    return tokens, breaks
-
-
-def unpunctuated_gap(aligned: dict[str, Any] | None, text: str | None, language: str | None) -> Feature:
-    """The longest silence between two aligned words that are neighbours in the script with no
-    punctuation between them (a norm-only measure: a pause the script does not call for).
-
-    The aligner's words are matched to the script's tokens by an edit alignment, so a word the
-    aligner splits or merges differently only loses its own pairs. None without aligned words or a
-    script."""
-
-    words = [word for word in (aligned or {}).get("words") or []
-             if word.get("start") is not None and word.get("end") is not None and word.get("text")]
-    tokens, breaks = script_tokens(text, language)
-    if len(words) < 2 or not tokens:
-        return feature()
-    heard: list[str] = []
-    owners: list[int] = []
-    for index, word in enumerate(words):
-        for token in normalize_text(str(word["text"]), language):
-            heard.append(token)
-            owners.append(index)
-    owner_of = {reference: owners[hypothesis] for op, reference, hypothesis in edit_alignment(tokens, heard)
-                if op == "match"}
-    first_token: dict[int, int] = {}
-    last_token: dict[int, int] = {}
-    for token, word in owner_of.items():
-        first_token[word] = min(token, first_token.get(word, token))
-        last_token[word] = max(token, last_token.get(word, token))
-    best = None
-    for index in range(len(words) - 1):
-        before, after = last_token.get(index), first_token.get(index + 1)
-        if before is None or after is None or after != before + 1 or breaks[before]:
-            continue
-        silence = max(0.0, float(words[index + 1]["start"]) - float(words[index]["end"]))
-        if best is None or silence > best[0]:
-            best = (silence, float(words[index]["end"]), float(words[index + 1]["start"]))
-    if best is None:
-        return feature()
-    return feature(best[0], *(best[1:] if best[0] > 0 else (None, None)))
-
-
-def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | None, *,
-                   profile: dict[str, np.ndarray] | None = None, text: str | None = None,
-                   language: str | None = None) -> dict[str, Feature]:
+def pause_features(samples: np.ndarray, rate: int, *,
+                   profile: dict[str, np.ndarray] | None = None) -> dict[str, Feature]:
     """The longest pause inside the sentence, from the audio alone.
 
     Speech frames come from `_speech_mask` (voiced, blips removed) and pauses from `_gap_frames`
     (quiet runs between the first and last speech frames). Features: the longest pause's length;
     the loudest sustained non-speech level of the non-speech stretch around it, relative to the
     speech median (a whisper or a breath at speech level next to the pause); and the blips inside
-    it. The aligner's word gaps no longer lengthen it: they give `pause.unpunctuated_gap_seconds`
-    (`unpunctuated_gap`, with `text`).
+    it.
     """
 
     names = ("pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips")
     out = {name: feature() for name in names}
     out["pause.excerpt_phones"] = feature()  # set by qc.lanes.excerpt_test, which runs the phone roles
-    out["pause.unpunctuated_gap_seconds"] = unpunctuated_gap(aligned, text, language)
     profile = frame_profile(samples, rate) if profile is None else profile
     hop = float(profile["hop"])
     mask = _speech_mask(profile)
@@ -956,32 +880,10 @@ def rate_features(expected: list[str] | None, span: tuple[float, float] | None,
     return out
 
 
-def word_gaps(aligned: dict[str, Any] | None) -> list[float]:
-    """The silences between consecutive aligned words, in seconds (only the positive ones)."""
-
-    words = [word for word in (aligned or {}).get("words") or []
-             if word.get("start") is not None and word.get("end") is not None]
-    gaps = [float(current["start"]) - float(previous["end"]) for previous, current in zip(words, words[1:])]
-    return [gap for gap in gaps if gap > 0]
-
-
-def align_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Feature]:
-    aligned = outputs(results, "align")
-    words = [word for word in (aligned or {}).get("words") or [] if word.get("start") is not None
-             and word.get("end") is not None]
-    if len(words) < 2:
-        return {"align.last_word_ratio": feature()}
-    durations = [max(0.0, float(word["end"]) - float(word["start"])) for word in words]
-    typical = float(np.median(durations[:-1])) or 1e-3
-    last = words[-1]
-    return {"align.last_word_ratio": feature(durations[-1] / typical, last["start"], last["end"])}
-
-
 # --- phones ----------------------------------------------------------------------
 
 PHONE_FEATURES = ("phones.deletion_rate", "phones.repeat_runs", "phones.low_gop_run", "phones.last_word_coverage",
-                  "phones.gop_mean", "phones.substitution_rate", "phones.l1_substitutions", "phones.per",
-                  "phones.insertion_rate")
+                  "phones.gop_mean", "phones.substitution_rate", "phones.per", "phones.insertion_rate")
 
 
 def expected_phones(take: dict[str, Any], results: dict[str, Any], layout: store.Layout,
@@ -1023,7 +925,7 @@ INSERTION_AGREEMENT_SECONDS = 0.06
 
 def _compare_role(role: str, expected: list[str], optional: list[bool] | None, take: dict[str, Any],
                   results: dict[str, Any], layout: store.Layout, model_ids: dict[str, str], params: dict[str, Any],
-                  *, posteriors: bool, keep_rhotic_ops: bool = False) -> dict[str, Any] | None:
+                  *, posteriors: bool) -> dict[str, Any] | None:
     """`qc.phones.compare` of one recognizer role's result (its posteriors from that role's own
     result directory, when `posteriors`), or None when the role has no result or it is malformed."""
 
@@ -1047,7 +949,7 @@ def _compare_role(role: str, expected: list[str], optional: list[bool] | None, t
                               frame_seconds=frame_seconds,
                               model_dir=layout.model_dir(model_ids.get("g2p", "g2p.espeak-ng")),
                               language=take.get("language"), optional=optional,
-                              low_gop=float(params.get("gopLow", -2.3)), keep_rhotic_ops=keep_rhotic_ops)
+                              low_gop=float(params.get("gopLow", -2.3)))
     except Exception:  # noqa: BLE001 - a malformed result leaves the features unavailable
         return None
 
@@ -1058,7 +960,7 @@ def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.
     PanPhon-weighted alignment (optional liaison consonants and final schwas cost nothing to leave
     out), GOP-SF on the first recognizer's posteriors, and its stutter features.
 
-    Deletions, substitutions, GOP, the L1 pairs and the last word's coverage come from the first
+    Deletions, substitutions, GOP and the last word's coverage come from the first
     recognizer (`phones`, ZIPA). `phones.insertion_rate` and `phones.repeat_runs` count only the
     insertions both recognizers made (`qc.phones.agreement`): a recognizer's own habit (ZIPA
     printing French silent letters) is not a stutter. Without the second recognizer's result
@@ -1073,16 +975,7 @@ def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.
         return out
     language = take.get("language")
     optional = expected_optional(words, len(expected))
-
-    def kept(phone: str) -> str:
-        return "".join(phones.normalize_phone(phone, keep_rhotics=True, language=language)) if phone else ""
-
-    # The L1 pairs keep the rhotics apart (/ʁ/ heard as /ɹ/), so they are counted on an alignment
-    # that keeps them too.
-    pairs = {(kept(a), kept(b)) for a, b in params.get("l1Substitutions", {}).get(language, [])}
-    pairs = {pair for pair in pairs if pair[0] and pair[0] != pair[1]}
-    compared = _compare_role("phones", expected, optional, take, results, layout, model_ids, params,
-                             posteriors=True, keep_rhotic_ops=bool(pairs))
+    compared = _compare_role("phones", expected, optional, take, results, layout, model_ids, params, posteriors=True)
     if compared is None:
         return out
     found, ops = compared["features"], compared["ops"]
@@ -1120,12 +1013,6 @@ def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.
         out["phones.low_gop_run"] = feature(worst["count"] if worst else 0, worst.get("start") if worst else None,
                                             worst.get("end") if worst else None)
 
-    if pairs:
-        accent_ops = compared.get("rhoticOps") or ops
-        l1 = [op for op in accent_ops if (op["op"] == "sub" and (op["expected"], op["recognized"]) in pairs)
-              or (op["op"] == "del" and (op["expected"], "") in pairs)]
-        out["phones.l1_substitutions"] = feature(len(l1), *_op_span(l1))
-
     expected_ops = [op for op in ops if op["op"] in ("match", "sub", "del", "skip")]
     last = (len(phones.normalize(words[-1]["phones"], language=language)) if words and words[-1].get("phones")
             else max(1, len(expected_ops) // 10))
@@ -1139,9 +1026,12 @@ def phone_features(take: dict[str, Any], results: dict[str, Any], layout: store.
 # --- pitch -------------------------------------------------------------------------
 
 def pitch_features(take: dict[str, Any], results: dict[str, Any], context: dict[str, Any],
-                   audio: tuple[np.ndarray, int] | None, params: dict[str, Any]) -> dict[str, Feature]:
+                   params: dict[str, Any]) -> dict[str, Feature]:
+    """On the frames both trackers agree on: the largest sustained shift, the octave jumps, the
+    trackers' disagreement, and the register offset from the clone reference (None without one)."""
+
     names = ("pitch.sustained_shift_st", "pitch.octave_jumps", "pitch.register_offset_st",
-             "pitch.tracker_disagreement", "pitch.tone_run_seconds", "pitch.tone_flatness", "pitch.tone_hnr_db")
+             "pitch.tracker_disagreement")
     out = {name: feature() for name in names}
     track_a, track_b = outputs(results, "pitchA"), outputs(results, "pitchB")
     if pitch is None or track_a is None or track_b is None:
@@ -1156,33 +1046,13 @@ def pitch_features(take: dict[str, Any], results: dict[str, Any], context: dict[
     jumps = pitch.octave_jumps(agreement)
     out["pitch.octave_jumps"] = feature(len(jumps), *((jumps[0].time, jumps[-1].time) if jumps else (None, None)))
     median = pitch.take_median_semitones(agreement)
-    centroid = centroid_for(take, context)
-    if median is not None and centroid is not None:
-        out["pitch.register_offset_st"] = feature(abs(median - centroid))
-    samples, rate = audio if audio else (None, None)
-    tone = pitch.tone_runs(agreement, samples, rate)
-    if tone.start is not None:
-        out["pitch.tone_run_seconds"] = feature(tone.duration, tone.start, tone.end)
-        out["pitch.tone_flatness"] = feature(tone.flatness, tone.start, tone.end)
-        out["pitch.tone_hnr_db"] = feature(tone.hnr_db, tone.start, tone.end)
+    reference = context.get("referencePitch", {}).get(take.get("referenceSHA256") or "")
+    if median is not None and reference is not None:
+        out["pitch.register_offset_st"] = feature(abs(median - reference))
     return out
 
 
-def centroid_for(take: dict[str, Any], context: dict[str, Any]) -> float | None:
-    """The register a take should sit at: its clone reference, else its voice's median of medians
-    (frozen, or the run's own; `build_context`)."""
-
-    reference = take.get("referenceSHA256")
-    if reference and reference in context.get("referencePitch", {}):
-        return context["referencePitch"][reference]
-    return context.get("voicePitch", {}).get(voice_key(take))
-
-
-def voice_key(take: dict[str, Any]) -> str:
-    return f"{take.get('mode')}|{take.get('voice')}"
-
-
-# --- speaker, quality, judge ----------------------------------------------------------
+# --- speaker --------------------------------------------------------------------------
 
 def _cosine_distance(a: Any, b: Any) -> float | None:
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
@@ -1192,40 +1062,19 @@ def _cosine_distance(a: Any, b: Any) -> float | None:
     return None if norm == 0 else 1.0 - float(np.dot(a, b)) / norm
 
 
-# A voice's speaker centroid needs this many of its other custom-mode takes.
-SPEAKER_CENTROID_MIN_TAKES = 3
+def speaker_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Feature]:
+    """The whole take's and the worst window's distance from the clone reference embedding (None
+    without a reference), and the spread of the take's windows around its own whole embedding."""
 
-
-def speaker_centroid(take: dict[str, Any], whole: Any, context: dict[str, Any]) -> list[float] | None:
-    """The take's voice centroid without the take itself (leave-one-out): the mean of the voice's
-    other custom-mode whole embeddings, unit length, or None with fewer than
-    `SPEAKER_CENTROID_MIN_TAKES` of them. A take never pulls its own anchor toward itself."""
-
-    entry = (context.get("voiceEmbeddings") or {}).get(voice_key(take))
-    if not entry:
-        return None
-    total, count = np.asarray(entry["sum"], dtype=float), int(entry["count"])
-    if take.get("token") in entry["members"] and whole is not None:
-        own = np.asarray(whole, dtype=float)
-        if own.shape != total.shape:
-            return None
-        total, count = total - own, count - 1
-    if count < SPEAKER_CENTROID_MIN_TAKES:
-        return None
-    norm = float(np.linalg.norm(total))
-    return None if norm == 0 else (total / norm).tolist()
-
-
-def speaker_features(take: dict[str, Any], results: dict[str, Any], context: dict[str, Any]) -> dict[str, Feature]:
     names = ("speaker.max_window_distance", "speaker.whole_distance", "speaker.window_range")
     out = {name: feature() for name in names}
     speaker = outputs(results, "speaker")
     if speaker is None:
         return out
     whole = speaker.get("whole")
-    anchor = speaker.get("reference") or speaker_centroid(take, whole, context) or whole
+    anchor = speaker.get("reference")
     windows = [window for window in speaker.get("windows") or [] if window.get("embedding")]
-    if anchor is not None and whole is not None and anchor is not whole:
+    if anchor is not None and whole is not None:
         out["speaker.whole_distance"] = feature(_cosine_distance(whole, anchor))
     distances = [(_cosine_distance(window["embedding"], anchor), window) for window in windows] if anchor else []
     distances = [(distance, window) for distance, window in distances if distance is not None]
@@ -1237,40 +1086,6 @@ def speaker_features(take: dict[str, Any], results: dict[str, Any], context: dic
         own = [value for value in own if value is not None]
         if own:
             out["speaker.window_range"] = feature(max(own) - min(own))
-    return out
-
-
-def quality_features(take: dict[str, Any], results: dict[str, Any], context: dict[str, Any]) -> dict[str, Feature]:
-    out = {name: feature() for name in ("mos.whole", "mos.worst_window", "aesthetics.pq_delta", "aesthetics.ce_delta")}
-    mos = outputs(results, "mos")
-    if mos is not None:
-        out["mos.whole"] = feature(mos.get("mos"))
-        windows = [window for window in mos.get("windows") or [] if window.get("mos") is not None]
-        if windows:
-            worst = min(windows, key=lambda window: window["mos"])
-            out["mos.worst_window"] = feature(worst["mos"], worst.get("start"), worst.get("end"))
-    aesthetics = outputs(results, "aesthetics")
-    baseline = context.get("cellAesthetics", {}).get(str(take.get("cell")), {})
-    if aesthetics is not None:
-        for axis, name in (("PQ", "aesthetics.pq_delta"), ("CE", "aesthetics.ce_delta")):
-            if aesthetics.get(axis) is not None and baseline.get(axis) is not None:
-                out[name] = feature(float(aesthetics[axis]) - baseline[axis])
-    return out
-
-
-def llm_features(results: dict[str, Any]) -> dict[str, Feature]:
-    judged = outputs(results, "llm")
-    classes = (judged or {}).get("classes") or {}
-    out = {}
-    for class_id in LLM_CLASSES:
-        verdict = classes.get(class_id)
-        if not isinstance(verdict, dict):
-            out[f"llm.{class_id}"] = feature()
-            continue
-        value = verdict.get("pYes")
-        if value is None:
-            value = 1.0 if verdict.get("present") else 0.0
-        out[f"llm.{class_id}"] = feature(value, verdict.get("start"), verdict.get("end"))
     return out
 
 
@@ -1292,8 +1107,7 @@ def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, An
     if audio is not None:
         profile = frame_profile(audio[0], audio[1])
         out.update(signal_features(audio[0], audio[1], params, profile=profile))
-        out.update(pause_features(audio[0], audio[1], outputs(results, "align"), profile=profile,
-                                  text=take.get("text"), language=take.get("language")))
+        out.update(pause_features(audio[0], audio[1], profile=profile))
         out.update(end_features(audio[0], audio[1], profile=profile))
         out.update(loudness_features(audio[0], audio[1], params.get("loudnessTarget", -23.0)))
         span = speech_span(audio[0], audio[1], profile=profile)
@@ -1304,17 +1118,11 @@ def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, An
     out["engine.finish_not_eos"] = feature(None if finish is None else float(finish != "eos"))
     out.update(asr_features(take, results))
     out.update(asr_phonetic_features(take, results, layout, model_ids))
-    out.update(align_features(take, results))
     out.update(phone_features(take, results, layout, model_ids, params))
     out.update(rate_features(expected_phones(take, results, layout, model_ids)[0], span, pauses))
-    out.update(pitch_features(take, results, context, audio, params))
-    out.update(speaker_features(take, results, context))
-    out.update(quality_features(take, results, context))
-    out.update(llm_features(results))
+    out.update(pitch_features(take, results, context, params))
+    out.update(speaker_features(take, results))
     return out
-
-
-AESTHETICS_AXES = ("PQ", "CE")
 
 
 def take_pitch_median(results: dict[str, Any], params: dict[str, Any]) -> float | None:
@@ -1327,70 +1135,13 @@ def take_pitch_median(results: dict[str, Any], params: dict[str, Any]) -> float 
         pitch.agreeing_frames(track_a, track_b, cents=params.get("pitchAgreeCents", 50)))
 
 
-def build_context(takes: list[dict[str, Any]], results_by_token: dict[str, dict[str, Any]],
-                  reference_results: dict[str, dict[str, Any]], params: dict[str, Any], *,
-                  layout: store.Layout | None = None, references: dict[str, Any] | None = None) -> dict[str, Any]:
-    """The lane-level references a run's takes are scored against.
+def build_context(reference_results: dict[str, dict[str, Any]], params: dict[str, Any]) -> dict[str, Any]:
+    """What a run's takes are scored against: each clone reference's median pitch in semitones
+    (`referencePitch`, by the reference's audio digest), measured on the clip itself."""
 
-    The voice pitch centroids (`mode|voice`) and the per-cell Audiobox baselines come first from the
-    frozen references (`references`, else the newest `config/qc/references-v<N>.json` under
-    `layout`; `qc.references`), so a take scores the same whatever else its run holds. A voice or
-    cell the references lack falls back to this run's own takes; `context["references"]` names the
-    file, its digest and those fallbacks (None without a references file: every value is the
-    run's own). The clone references' pitch is measured per clip, and the speaker centroid is
-    leave-one-out over the voice's custom-mode takes (`speaker_centroid`).
-    """
-
-    if references is None and layout is not None:
-        from qc import references as references_lib
-
-        references = references_lib.load(layout)
-    voice_pitch: dict[str, list[float]] = {}
-    voice_embeddings: dict[str, dict[str, Any]] = {}
-    cell_aesthetics: dict[str, dict[str, list[float]]] = {}
-    for take in takes:
-        results = results_by_token.get(take["token"], {})
-        key = voice_key(take)
-        median = take_pitch_median(results, params)
-        if median is not None:
-            voice_pitch.setdefault(key, []).append(median)
-        speaker = outputs(results, "speaker")
-        if speaker is not None and speaker.get("whole") and take.get("mode") == "custom":
-            vector = np.asarray(speaker["whole"], dtype=float)
-            entry = voice_embeddings.setdefault(key, {"sum": np.zeros_like(vector), "count": 0, "members": set()})
-            if entry["sum"].shape == vector.shape:
-                entry["sum"] = entry["sum"] + vector
-                entry["count"] += 1
-                entry["members"].add(take["token"])
-        aesthetics = outputs(results, "aesthetics")
-        if aesthetics is not None:
-            bucket = cell_aesthetics.setdefault(str(take.get("cell")), {})
-            for axis in AESTHETICS_AXES:
-                if aesthetics.get(axis) is not None:
-                    bucket.setdefault(axis, []).append(float(aesthetics[axis]))
     reference_pitch = {}
     for reference_sha, results in reference_results.items():
         median = take_pitch_median(results, params)
         if median is not None:
             reference_pitch[reference_sha] = median
-    run_pitch = {key: float(np.median(values)) for key, values in voice_pitch.items()}
-    run_cells = {cell: {axis: float(np.median(values)) for axis, values in axes.items()}
-                 for cell, axes in cell_aesthetics.items()}
-    pitch_by_voice, cells, record = dict(run_pitch), dict(run_cells), None
-    if references:
-        frozen_pitch = {key: float(entry["median"]) for key, entry in (references.get("voicePitch") or {}).items()}
-        frozen_cells = {cell: {axis: float(entry["median"]) for axis, entry in axes.items()}
-                        for cell, axes in (references.get("cellAesthetics") or {}).items()}
-        pitch_by_voice = {**run_pitch, **frozen_pitch}
-        cells = {**run_cells, **{cell: {**run_cells.get(cell, {}), **axes} for cell, axes in frozen_cells.items()}}
-        record = {"file": references.get("file"), "sha256": references.get("sha256"),
-                  "fallbacks": {"voicePitch": sorted(key for key in run_pitch if key not in frozen_pitch),
-                                "cellAesthetics": sorted(cell for cell in run_cells if cell not in frozen_cells)}}
-    return {
-        "voicePitch": pitch_by_voice,
-        "voicePitchSD": {key: float(np.std(values)) for key, values in voice_pitch.items() if len(values) > 1},
-        "voiceEmbeddings": voice_embeddings,
-        "referencePitch": reference_pitch,
-        "cellAesthetics": cells,
-        "references": record,
-    }
+    return {"referencePitch": reference_pitch}

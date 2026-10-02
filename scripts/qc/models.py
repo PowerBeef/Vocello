@@ -1,13 +1,12 @@
 """The QC v2 model registry (`config/qc/models.json`): load, validate, fetch, verify.
 
 A model has one main `source`, optional `dependencies` (`[{name, source}]`, for
-example the SSL encoder a MOS model builds on) and optional `code` pinned by
+example an encoder a model builds on) and optional `code` pinned by
 commit. Every file is pinned by size and SHA-256:
 
 | host             | pins                                   | lands in                              |
 |------------------|----------------------------------------|---------------------------------------|
 | `huggingface`    | `repo`, 40-hex `revision`, `files`     | `models/<id>/` (a dependency: `models/<id>/deps/<name>/`) |
-| `github-release` | `files` each with its own `url`        | as above                              |
 | `github-raw`     | `repo`, 40-hex `revision`, `files`     | as above (`code`: `models/<id>/code/`) |
 | `github-archive` | one `url`, `sha256`, `bytes` (`code`)  | extracted into `models/<id>/code/`    |
 
@@ -37,10 +36,10 @@ from typing import Any, Callable, Iterable, Iterator
 from qc.store import LANGUAGES, Layout, read_json, write_json_atomic
 
 SCHEMA_VERSION = 1
-KINDS = ("asr", "align", "phones", "g2p", "pitch", "speaker", "mos", "aesthetics", "llm", "runtime")
-RUNTIMES = ("mlx", "onnx", "torch", "llamacpp")
+KINDS = ("asr", "phones", "g2p", "pitch", "speaker")
+RUNTIMES = ("mlx", "onnx", "torch")
 ROLES = ("primary", "fallback", "alternate")
-FILE_HOSTS = ("huggingface", "github-release", "github-raw")
+FILE_HOSTS = ("huggingface", "github-raw")
 CODE_HOSTS = ("github-raw", "github-archive")
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -54,8 +53,6 @@ HF_BASE = "https://huggingface.co"
 RAW_BASE = "https://raw.githubusercontent.com"
 HOST_ALLOWLIST = {
     "huggingface": ("huggingface.co", "hf.co"),
-    # GitHub serves release assets from these hosts after the github.com redirect.
-    "github-release": ("github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"),
     "github-raw": ("raw.githubusercontent.com",),
     "github-archive": ("codeload.github.com", "github.com"),
 }
@@ -107,18 +104,15 @@ def validate_source(source: Any, label: str, *, hosts: tuple[str, ...] = FILE_HO
         _digest_pin(source, label)
         _https_url(source.get("url"), host, label)
         return
-    if host in ("huggingface", "github-raw"):
-        _require(isinstance(source.get("repo"), str) and bool(REPO_RE.fullmatch(source["repo"])),
-                 f"{label}: repo must be <owner>/<name>")
-        _require(isinstance(source.get("revision"), str) and bool(REVISION_RE.fullmatch(source["revision"])),
-                 f"{label}: revision must be a 40-hex commit")
+    _require(isinstance(source.get("repo"), str) and bool(REPO_RE.fullmatch(source["repo"])),
+             f"{label}: repo must be <owner>/<name>")
+    _require(isinstance(source.get("revision"), str) and bool(REVISION_RE.fullmatch(source["revision"])),
+             f"{label}: revision must be a 40-hex commit")
     files = source.get("files")
     _require(isinstance(files, dict) and bool(files), f"{label}: files must be a non-empty object")
     for path, pin in files.items():
         _relative(path, f"{label} file")
         _digest_pin(pin, f"{label} file {path}")
-        if host == "github-release":
-            _https_url(pin.get("url"), host, f"{label} file {path}")
 
 
 def validate_model(model: Any, index: int) -> None:
@@ -131,14 +125,11 @@ def validate_model(model: Any, index: int) -> None:
     _require(model.get("runtime") in RUNTIMES, f"{label}: unknown runtime {model.get('runtime')!r}")
     _require(model.get("role", "primary") in ROLES, f"{label}: role must be one of {', '.join(ROLES)}")
     runner = model.get("runner")
-    if model["kind"] == "runtime":
-        _require(runner is None, f"{label}: a runtime artifact has no runner")
-    else:
-        _require(isinstance(runner, str) and bool(RUNNER_RE.fullmatch(runner)),
-                 f"{label}: runner must be a qc.runners.<name> module, got {runner!r}")
-        memory = model.get("memoryGB")
-        _require(isinstance(memory, (int, float)) and not isinstance(memory, bool) and memory > 0,
-                 f"{label}: memoryGB must be a positive number")
+    _require(isinstance(runner, str) and bool(RUNNER_RE.fullmatch(runner)),
+             f"{label}: runner must be a qc.runners.<name> module, got {runner!r}")
+    memory = model.get("memoryGB")
+    _require(isinstance(memory, (int, float)) and not isinstance(memory, bool) and memory > 0,
+             f"{label}: memoryGB must be a positive number")
     license_name = model.get("license")
     _require(isinstance(license_name, str) and bool(license_name.strip()), f"{label}: license must be non-empty")
     _require(isinstance(model.get("notice", ""), str), f"{label}: notice must be a string")
@@ -315,13 +306,10 @@ def fetch_size(models: Iterable[dict[str, Any]]) -> int:
 
 # --- safe extraction ------------------------------------------------------
 
-def safe_extract_tar(archive: Path, destination: Path, *, strip_components: int = 0,
-                     allow_symlinks: bool = False) -> None:
-    """Extract regular files and directories only: no absolute paths, no `..`, no hard links,
-    no devices; symbolic links only when allowed and only to targets inside `destination`."""
+def safe_extract_tar(archive: Path, destination: Path, *, strip_components: int = 0) -> None:
+    """Extract regular files and directories only: no absolute paths, no `..`, no links, no devices."""
 
     destination.mkdir(parents=True, exist_ok=True)
-    root = destination.resolve()
     with tarfile.open(archive, "r:*") as bundle:
         for member in bundle.getmembers():
             pure = PurePosixPath(member.name)
@@ -340,15 +328,6 @@ def safe_extract_tar(archive: Path, destination: Path, *, strip_components: int 
                 with source, target.open("wb") as handle:
                     shutil.copyfileobj(source, handle)
                 os.chmod(target, 0o755 if member.mode & 0o111 else 0o644)
-            elif member.issym() and allow_symlinks:
-                link = PurePosixPath(member.linkname)
-                resolved = (target.parent / member.linkname).resolve()
-                if link.is_absolute() or not (resolved == root or root in resolved.parents):
-                    raise FetchError(f"archive link escapes the destination: {member.name}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if target.is_symlink() or target.exists():
-                    target.unlink()
-                os.symlink(member.linkname, target)
             else:
                 raise FetchError(f"archive member type not allowed: {member.name}")
 

@@ -4,15 +4,13 @@
 the `qc.py run` outputs (`build/private/qc/runs/*/features.json`), which must
 carry the current scoring identity (`qc.detectors.scoring_identity`), and
 writes `config/qc/thresholds-v<N>.json`:
-- per detector, an L2 logistic (or one threshold) with the cut that maximizes
-  the weighted F1;
+- per detector, an L2 logistic with the cut that maximizes the weighted F1;
 - per language when it has at least 60 clean and 20 positive takes, and one
   pooled model on per-language z-scores when the detector has at least
   `fit.pooledMinPositive` (10) positives; below that floor it keeps its
   provisional rule, report-only;
 - sample weights of 1 / inclusion probability, so the enrichment does not bias
   the fit;
-- the LLM judges stay report-only unless their kappa reaches 0.6;
 - `crossValidation`: the same fit once per fold of script families
   (`label.fold_for_family`, k = `fit.crossValidationFolds`), each without that
   fold's families, with the digest of each fold's training labels. The final
@@ -250,18 +248,6 @@ def fit_detector(detector: dict[str, Any], train: list[dict[str, Any]], features
         weights = [row["weight"] for row in subset]
         if not any(y):
             return None
-        if detector["method"] == "threshold":
-            item = detector["features"][0]
-            scores = []
-            kept_y, kept_w = [], []
-            for row, target, weight in zip(subset, y, weights):
-                value = (features[row["token"]]["features"].get(item["name"]) or {}).get("value")
-                if value is not None:
-                    scores.append(detector_lib.oriented(value, item["direction"]))
-                    kept_y.append(target)
-                    kept_w.append(weight)
-            cut = best_cut(scores, kept_y, kept_w)
-            return None if cut is None else {"cut": cut, "n": len(scores), "positives": sum(kept_y)}
         x = design(subset)
         intercept, coefficients = fit_logistic(x, np.array(y, dtype=float), np.array(weights, dtype=float),
                                                settings.get("l2", 1.0))
@@ -282,18 +268,6 @@ def fit_detector(detector: dict[str, Any], train: list[dict[str, Any]], features
     pooled = fit_scope(rows) if positives >= floor else None
     if pooled:
         entry["models"]["*"] = pooled
-    if detector.get("llm"):
-        item = detector["features"][0]
-        pairs = []
-        for row in rows:
-            value = (features[row["token"]]["features"].get(item["name"]) or {}).get("value")
-            if value is not None:
-                pairs.append((value >= 0.5, positive(row, class_id)))
-        kappa = label.cohen_kappa(pairs)
-        entry["kappa"] = kappa
-        if kappa is None or kappa < settings.get("llmKappaGate", 0.6):
-            entry.update(reportOnly=True, reason=f"train kappa {kappa} below {settings.get('llmKappaGate', 0.6)}")
-            return entry
     entry["reportOnly"] = not entry["models"]
     if entry["reportOnly"]:
         entry["reason"] = "no fit" if positives >= floor else \

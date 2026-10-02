@@ -20,7 +20,8 @@ report-only and `flags.json` (and `gate`) state why.
 
 A lane named in the `lanes` map of `config/qc/detectors.json` runs its own roles
 by default, and its gate reads only the detectors those roles (or the WAV alone)
-can score; any other lane name runs every role. A take marked `control` (a
+can score, a detector's `gateLanes` aside (the clone detectors gate only in
+`clone-lane`); any other lane name runs every role. A take marked `control` (a
 negative control, such as the language bench's pinned hint over a script in
 another language, or the clone lane's other speakers) is scored and flagged,
 but always at report-only: it never gates.
@@ -154,7 +155,7 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
             model_report["g2pTranscripts"] = {"texts": len(transcripts)}
 
         params = config.get("params", {})
-        context = feature_lib.build_context(takes, results_by_token, reference_results, params, layout=layout)
+        context = feature_lib.build_context(reference_results, params)
         rows = []
         for take in takes:
             values = feature_lib.extract(take, results_by_token[take["token"]], context, params=params,
@@ -175,13 +176,11 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
         "schema": FEATURES_SCHEMA, "run": run_id, "lane": lane, "source": manifest.get("source"),
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
         "scoringSHA256": scoring["sha256"],
-        "scoring": {"files": scoring["files"], "norms": scoring["norms"], "references": scoring.get("references")},
-        "references": context.get("references"), "models": identities, "takes": rows,
+        "scoring": {"files": scoring["files"], "norms": scoring["norms"]}, "models": identities, "takes": rows,
     }, indent=None)
     controls = {take["token"] for take in takes if take.get("control")}
     flags = score_run(layout, config, rows, identities, lane=lane, controls=controls, scoring=scoring)
-    flags.update(run=run_id, lane=lane, models=model_report,
-                 registerSD={key: round(value, 3) for key, value in context.get("voicePitchSD", {}).items()})
+    flags.update(run=run_id, lane=lane, models=model_report)
     store.write_json_atomic(directory / "flags.json", flags, indent=None)
     counts = flags["summary"]
     echo(f"qc run: {run_id}: {len(takes)} takes; flagged fail={counts['fail']} warn={counts['warn']} "

@@ -494,7 +494,8 @@ def tone_runs(
 def summarize(fcpe: Any, swiftf0: Any, audio: np.ndarray | None = None, sr: int | None = None) -> dict[str, Any]:
     """Every pitch feature of one take from its two tracks (the FCPE and SwiftF0 runner outputs),
     JSON-ready: the agreement, the take median, the largest sustained shift, the octave jumps and the
-    longest tone run, all on the agreeing frames. The register offset needs the voice's other takes."""
+    longest tone run, all on the agreeing frames. The register offset needs the clone reference's
+    median (`qc.fidelity`)."""
     agreement = agreeing_frames(fcpe, swiftf0)
     return {
         "agreement": agreement.summary(),

@@ -101,7 +101,7 @@ class SignalFeatureTests(unittest.TestCase):
     def test_fr_0101_dylan_pause_is_the_quiet_run_after_the_whisper(self):
         take = Synth(0).dylan()
         values = {}
-        values.update(features.pause_features(take, RATE, None))
+        values.update(features.pause_features(take, RATE))
         values.update(features.end_features(take, RATE))
         gap = values["pause.longest_gap_seconds"]
         # The whispered "-tus" is loud unvoiced sound, not a pause: the pause is the 0.8 s quiet run
@@ -128,41 +128,23 @@ class SignalFeatureTests(unittest.TestCase):
         self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 1.0)
         values["pause.excerpt_phones"] = features.feature(3.0)
         self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 0.0)
-        # The ending is still measured, but no provisional rule reads it: a cut-off is content evidence
-        # (boundary.cutoff), and a drop alone never flags.
+        # The ending is still measured, but no detector reads it: a cut-off is content evidence
+        # (boundary.cutoff), and the ending is a trimming check.
         self.assertGreater(values["end.drop_db_60ms"]["value"], 30)
         self.assertLess(values["end.tail_seconds"]["value"], 0.05)
-        self.assertNotIn("provisional", by_id("boundary.abrupt-end"))
-        self.assertIsNone(detectors.score(by_id("boundary.abrupt-end"), values, "french", None, {})["cut"])
+        self.assertNotIn("end", {item["name"].split(".", 1)[0] for detector in config()["detectors"]
+                                 for item in detector["features"]})
 
     def test_natural_pause_and_decay_pass(self):
         take = Synth(1).natural()
         values = {}
-        values.update(features.pause_features(take, RATE, None))
+        values.update(features.pause_features(take, RATE))
         values.update(features.end_features(take, RATE))
         self.assertAlmostEqual(values["pause.longest_gap_seconds"]["value"], 0.25, delta=0.02)
         self.assertLess(values["pause.nonspeech_level_db"]["value"], -30.0)  # a quiet pause
         self.assertLess(values["end.drop_db_60ms"]["value"], 30)
         self.assertGreater(values["end.tail_seconds"]["value"], 0.05)
         self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 0.0)
-
-    def test_aligned_word_gaps_no_longer_lengthen_the_pause(self):
-        take = Synth(1).natural()
-        aligned = {"words": [{"text": "Le", "start": 0.1, "end": 0.5}, {"text": "chat", "start": 1.3, "end": 1.6},
-                             {"text": "dort", "start": 2.6, "end": 3.0}]}
-        values = features.pause_features(take, RATE, aligned, text="Le chat, dort.", language="french")
-        self.assertAlmostEqual(values["pause.longest_gap_seconds"]["value"], 0.25, delta=0.02)  # the audio's own
-        # The longest silence between script neighbours with no punctuation between them: "le chat"
-        # (0.8 s), not "chat, dort" (1.0 s, after a comma).
-        unpunctuated = values["pause.unpunctuated_gap_seconds"]
-        self.assertAlmostEqual(unpunctuated["value"], 0.8, places=6)
-        self.assertEqual((unpunctuated["start"], unpunctuated["end"]), (0.5, 1.3))
-        commas = features.pause_features(take, RATE, aligned, text="Le, chat, dort.", language="french")
-        self.assertIsNone(commas["pause.unpunctuated_gap_seconds"]["value"])  # every pair is punctuated
-        self.assertIsNone(features.pause_features(take, RATE, aligned)["pause.unpunctuated_gap_seconds"]["value"])
-        # An apostrophe joins, it does not pause: "l'arbre" is two script tokens with no break.
-        self.assertEqual(features.script_tokens("L'arbre, tombé.", "french"), (["l", "arbre", "tombé"],
-                                                                              [False, True, True]))
 
     def test_the_ending_pads_at_the_tail_floor_and_clamps_silence(self):
         synth = Synth(4)
@@ -308,40 +290,6 @@ class ModelFeatureTests(unittest.TestCase):
         self.assertEqual(values["phones.per"]["value"], 0.0)
         self.assertEqual(values["phones.last_word_coverage"]["value"], 1.0)
 
-    def test_l1_rhotic_pairs_are_counted_on_a_rhotic_keeping_alignment(self):
-        if features.phones is None:
-            self.skipTest("qc.phones is not available")
-        # "branche" with an English /ɹ/ for the French /ʁ/: one L1 substitution, which the folded
-        # alignment (both rhotics as r) hides.
-        g2p = self.result({"phones": ["b", "ʁ", "ɑ̃", "ʃ"], "words": [{"ipa": "bʁɑ̃ʃ", "phones": ["b", "ʁ", "ɑ̃", "ʃ"]}]})
-        results = {"g2p": g2p, "phones": self.result({"phones": self.heard(("b", 0.0), ("ɹ", 0.1), ("ɑ̃", 0.2),
-                                                                            ("ʃ", 0.3))})}
-        values = features.phone_features(self.take(text="Branche."), results, Layout(), {}, config()["params"])
-        self.assertEqual(values["phones.l1_substitutions"]["value"], 1)
-        self.assertEqual(values["phones.l1_substitutions"]["start"], 0.1)
-        self.assertEqual(values["phones.substitution_rate"]["value"], 0.0)  # folded, /ʁ/ and /ɹ/ are both r
-
-    def test_speaker_centroid_is_leave_one_out_over_three_other_takes(self):
-        def speaker(whole):
-            return {"speaker": self.result({"whole": whole, "reference": None,
-                                            "windows": [{"start": 0, "end": 4, "embedding": whole}]})}
-
-        wholes = {"t1": [1.0, 0.0, 0.0], "t2": [0.0, 1.0, 0.0], "t3": [0.0, 1.0, 0.0], "t4": [0.0, 1.0, 0.0]}
-        takes = [self.take(token=token) for token in wholes]
-        results = {token: speaker(whole) for token, whole in wholes.items()}
-        context = features.build_context(takes, results, {}, {})
-        # t1's anchor is the other three (all [0, 1, 0]), not a mean that holds t1 itself.
-        self.assertEqual(features.speaker_centroid(takes[0], wholes["t1"], context), [0.0, 1.0, 0.0])
-        values = features.speaker_features(takes[0], results["t1"], context)
-        self.assertAlmostEqual(values["speaker.whole_distance"]["value"], 1.0)
-        # With two other takes there is no centroid: the take is its own anchor, no whole distance.
-        context = features.build_context(takes[:3], results, {}, {})
-        self.assertIsNone(features.speaker_centroid(takes[0], wholes["t1"], context))
-        self.assertIsNone(features.speaker_features(takes[0], results["t1"], context)["speaker.whole_distance"]["value"])
-        # A take outside the run is held to all of its voice's takes.
-        outsider = self.take(token="t9")
-        self.assertIsNotNone(features.speaker_centroid(outsider, [1.0, 0.0, 0.0], context))
-
     def test_content_phoneme_reads_the_insertions_both_recognizers_agree_on(self):
         """The provisional rule on the agreed insertions: a comparison whose insertions and repeats
         both recognizers made flags; the same first recognizer with a second that heard none of them
@@ -389,34 +337,37 @@ class ModelFeatureTests(unittest.TestCase):
         hop = 0.01
         f0 = [110.0] * 100 + [220.0] * 60 + [110.0] * 100
         track = {"hopSeconds": hop, "f0Hz": f0, "confidence": [0.9] * len(f0)}
-        values = features.pitch_features(self.take(), {"pitchA": self.result(track), "pitchB": self.result(track)},
-                                         {"voicePitch": {"custom|aiden": 0.0}}, None, config()["params"])
+        results = {"pitchA": self.result(track), "pitchB": self.result(track)}
+        clone = self.take(referenceSHA256="r" * 64)
+        values = features.pitch_features(clone, results, {"referencePitch": {"r" * 64: 0.0}}, config()["params"])
         self.assertGreaterEqual(values["pitch.octave_jumps"]["value"], 1)
         self.assertEqual(values["pitch.tracker_disagreement"]["value"], 0.0)
         self.assertGreater(values["pitch.register_offset_st"]["value"], 0)
+        self.assertNotIn("pitch.tone_run_seconds", values)
+        # The register offset is measured from the clone reference only: none without one.
+        plain = features.pitch_features(self.take(), results, {"referencePitch": {"r" * 64: 0.0}}, config()["params"])
+        self.assertIsNone(plain["pitch.register_offset_st"]["value"])
+        self.assertGreaterEqual(plain["pitch.octave_jumps"]["value"], 1)
+        # build_context measures each reference clip's register on the clip itself.
+        context = features.build_context({"r" * 64: results}, config()["params"])
+        self.assertEqual(set(context), {"referencePitch"})
+        self.assertIn("r" * 64, context["referencePitch"])
 
     def test_speaker_drift_against_the_clone_reference(self):
         reference = [1.0, 0.0, 0.0]
         speaker = {"windowSeconds": 3, "hopSeconds": 1, "whole": [0.9, 0.1, 0.0], "reference": reference,
                    "windows": [{"start": 0, "end": 3, "embedding": [1.0, 0.0, 0.0]},
                                {"start": 1, "end": 4, "embedding": [0.0, 1.0, 0.0]}]}
-        values = features.speaker_features(self.take(), {"speaker": self.result(speaker)}, {})
+        values = features.speaker_features(self.take(), {"speaker": self.result(speaker)})
         self.assertAlmostEqual(values["speaker.max_window_distance"]["value"], 1.0)
         self.assertEqual(values["speaker.max_window_distance"]["start"], 1)
+        self.assertGreater(values["speaker.whole_distance"]["value"], 0)
         self.assertGreater(values["speaker.window_range"]["value"], 0.5)
-
-    def test_llm_and_quality_features(self):
-        judged = {"transcript": "x", "classes": {"stutter": {"present": True, "severity": "mild", "start": 1.0,
-                                                             "end": 1.5, "evidence": "", "pYes": None}}}
-        values = features.llm_features({"llm": self.result(judged)})
-        self.assertEqual((values["llm.stutter"]["value"], values["llm.stutter"]["start"]), (1.0, 1.0))
-        self.assertIsNone(values["llm.pitch"]["value"])
-        quality = features.quality_features(self.take(), {
-            "mos": self.result({"mos": 3.1, "windows": [{"start": 0, "end": 3, "mos": 2.0}, {"start": 1, "end": 4, "mos": 3.5}]}),
-            "aesthetics": self.result({"CE": 5.0, "CU": 5.0, "PC": 2.0, "PQ": 6.0})},
-            {"cellAesthetics": {"standard": {"PQ": 7.0, "CE": 5.5}}})
-        self.assertEqual((quality["mos.worst_window"]["value"], quality["aesthetics.pq_delta"]["value"]), (2.0, -1.0))
-
+        # Without a clone reference there is nothing to drift from: only the window spread remains.
+        plain = features.speaker_features(self.take(), {"speaker": self.result(dict(speaker, reference=None))})
+        self.assertIsNone(plain["speaker.max_window_distance"]["value"])
+        self.assertIsNone(plain["speaker.whole_distance"]["value"])
+        self.assertGreater(plain["speaker.window_range"]["value"], 0.5)
 
 class DetectorConfigTests(unittest.TestCase):
     def test_checked_in_config_is_valid(self):
@@ -428,9 +379,12 @@ class DetectorConfigTests(unittest.TestCase):
         too_many = json.loads(json.dumps(base))
         too_many["detectors"][0]["features"] = too_many["detectors"][0]["features"] * 2
         cases.append(too_many)
-        threshold = json.loads(json.dumps(base))
-        threshold["detectors"][3]["method"] = "threshold"
-        cases.append(threshold)
+        method = json.loads(json.dumps(base))
+        method["detectors"][3]["method"] = "threshold"  # only the logistic remains
+        cases.append(method)
+        gate_lanes = json.loads(json.dumps(base))
+        gate_lanes["detectors"][0]["gateLanes"] = ["no-such-lane"]
+        cases.append(gate_lanes)
         rule = json.loads(json.dumps(base))
         rule["detectors"][0]["provisional"] = {"all": [{"feature": "pause.longest_gap_seconds", "op": "~", "value": 1}]}
         cases.append(rule)
@@ -452,16 +406,16 @@ class DetectorConfigTests(unittest.TestCase):
                                                       {"feature": "c", "op": ">", "value": 0}]}, {"c": value(1)}))
         detector = {"id": "d", "class": "artifact", "method": "logistic",
                     "features": [{"name": "signal.clicks", "direction": "higher"},
-                                 {"name": "mos.whole", "direction": "lower"}]}
+                                 {"name": "level.lufs", "direction": "lower"}]}
         norm = {"french": {"signal.clicks": {"mean": 1.0, "std": 1.0, "median": 1.0, "n": 10},
-                           "mos.whole": {"mean": 4.0, "std": 0.5, "median": 4.0, "n": 10}}}
-        take = {"signal.clicks": value(3), "mos.whole": value(3.0)}
+                           "level.lufs": {"mean": 4.0, "std": 0.5, "median": 4.0, "n": 10}}}
+        take = {"signal.clicks": value(3), "level.lufs": value(3.0)}
         self.assertEqual(detectors.score(detector, take, "french", None, norm)["score"], 2.0)  # max oriented z
         fitted = {"models": {"*": {"intercept": -1.0, "weights": [1.0, 1.0], "cut": 0.5}}}
         outcome = detectors.score(detector, take, "french", fitted, norm)
         self.assertAlmostEqual(outcome["score"], detectors.sigmoid(-1 + 2 + 2))
         self.assertEqual(outcome["scope"], "*")
-        missing = detectors.score(detector, {"mos.whole": value(3.0)}, "french", fitted, norm)
+        missing = detectors.score(detector, {"level.lufs": value(3.0)}, "french", fitted, norm)
         self.assertAlmostEqual(missing["score"], detectors.sigmoid(-1 + 0 + 2))  # the median fills clicks
 
 
@@ -529,7 +483,7 @@ class LaneTests(unittest.TestCase):
         by_take = {take["takeID"]: take for take in flags["takes"]}
         dylan = {flag["detector"]: flag for flag in by_take["fr-0101--dylan"]["flags"]}
         self.assertIn("pause.anomalous", dylan)
-        self.assertNotIn("boundary.abrupt-end", dylan)  # no provisional rule: it ranks, never flags
+        self.assertNotIn("boundary.cutoff", dylan)  # no provisional rule: it ranks, never flags
         self.assertEqual(dylan["pause.anomalous"]["level"], "report-only")
         evidence = {item["feature"]: item for item in dylan["pause.anomalous"]["evidence"]}
         self.assertAlmostEqual(evidence["pause.longest_gap_seconds"]["start"], 3.39, delta=0.02)
@@ -578,7 +532,7 @@ class LaneTests(unittest.TestCase):
 
     def test_gate_levels_come_from_the_evaluation_of_the_thresholds(self):
         self.run_lane("clone")
-        # level.loudness: the synths sit near -30 LUFS; abrupt-end has no provisional rule to flag with
+        # level.loudness: the synths sit near -30 LUFS; boundary.cutoff has no provisional rule to flag with
         self.write_evaluated_thresholds({"pause.anomalous": "fail", "level.loudness": "warn"})
         self.run_lane("clone")
         self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_FAIL)

@@ -1,10 +1,8 @@
-"""QC v2 per-language norms and frozen references: `qc.py norms` and `qc.py references` on synthetic
-pools, and the provisional rules and scoring context reading them.
+"""QC v2 per-language norms: `qc.py norms` on a synthetic pool, and the provisional rules reading them.
 
 French takes pause about 0.25 s and Japanese takes about 0.5 s: the norms keep the two apart, hold
 no take id, path or text, and the pause and rate rules compare each take with its own language's
-percentiles (falling back to the fixed rules without norms). The references freeze per-voice pitch
-and per-cell Audiobox medians, which a run then scores against instead of its own takes.
+percentiles (falling back to the fixed rules without norms).
 """
 
 from __future__ import annotations
@@ -27,13 +25,12 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from qc import detectors, features, lanes, norms, references, runtime, store  # noqa: E402
+from qc import detectors, features, lanes, norms, store  # noqa: E402
 from qc.runners import espeak_g2p  # noqa: E402
 from qc.store import Layout  # noqa: E402
 
 RATE = 16000
 G2P_ID = "g2p.espeak-ng"
-ALIGN_ID = "align.qwen3-forcedaligner-0.6b"
 SCRIPT_IPA = {"le chat dort ici.": "lə ʃˈa dˈɔʁ isˈi", "東京に行きます": "tˈo̞o̞kʲo̞o̞ nˈi ˈiki mˈäsɯᵝ"}
 
 
@@ -96,15 +93,15 @@ class PoolFixture(unittest.TestCase):
         self.layout.config.mkdir(parents=True)
         for name in ("detectors.json", "protocol.json"):
             shutil.copyfile(ROOT / "config/qc" / name, self.layout.config / name)
-        runner = self.root / "scripts/qc/runners/stub_align.py"
+        runner = self.root / "scripts/qc/runners/stub_g2p.py"
         runner.parent.mkdir(parents=True)
         runner.write_text("# stub\n")
-        self.aligner = {"id": ALIGN_ID, "kind": "align", "runner": "qc.runners.stub_align", "runtime": "mlx",
-                        "source": {"host": "huggingface", "repo": "a/b", "revision": "0" * 40,
-                                   "files": {"w": {"sha256": "0" * 64, "bytes": 1}}},
-                        "license": "MIT", "memoryGB": 1, "languages": "any", "version": 1}
-        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": [self.aligner]}))
-        identity = runtime.runner_identity(self.layout, self.aligner)
+        # The G2P role: the script's phones come from its text cache, which the pool fills below.
+        self.g2p = {"id": G2P_ID, "kind": "g2p", "runner": "qc.runners.stub_g2p", "runtime": "onnx",
+                    "source": {"host": "huggingface", "repo": "a/b", "revision": "0" * 40,
+                               "files": {"w": {"sha256": "0" * 64, "bytes": 1}}},
+                    "license": "MIT", "memoryGB": 1, "languages": "any", "version": 1}
+        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": [self.g2p]}))
         audio = self.root / "audio"
         audio.mkdir()
         self.takes = []
@@ -120,11 +117,6 @@ class PoolFixture(unittest.TestCase):
                         "mode": "custom", "voice": "v", "cell": "c", "reference": None, "referenceSHA256": None,
                         "finishReason": "eos", "family": take_id.split("--")[0]}
                 self.takes.append(take)
-                words = [{"text": "a", "start": 0.1, "end": 0.5}, {"text": "b", "start": 0.6, "end": 1.0},
-                         {"text": "c", "start": 1.0 + pause, "end": 1.5 + pause}]
-                store.write_result(self.layout.results_dir(ALIGN_ID), model=ALIGN_ID, runner_sha=identity,
-                                   audio_sha=take["audioSHA256"], variant=store.take_variant(self.aligner, take),
-                                   duration_seconds=2.0, outputs={"words": words})
         cut = dict(self.takes[0], takeID="fr-0099--cut", token="cut", finishReason="max-tokens")
         broken = dict(self.takes[1], takeID="fr-0098--gone", token="gone", audio=str(audio / "missing.wav"))
         self.takes += [cut, broken]
@@ -140,21 +132,20 @@ class NormsComputationTests(PoolFixture):
         document = norms.compute(self.layout, self.takes, min_count=3, echo=lambda line: None)
         self.assertEqual(document["counts"], {"french": 5, "japanese": 5})
         self.assertEqual(document["pool"]["excluded"], {"control": 0, "finishNotEOS": 1, "audioUnreadable": 1})
-        self.assertEqual(document["models"]["align"]["results"], 10)
+        self.assertEqual(set(document["models"]), {"g2p"})
         french, japanese = document["languages"]["french"], document["languages"]["japanese"]
         self.assertAlmostEqual(french["pause.gap_seconds"]["p50"], 0.25, delta=0.05)
         self.assertAlmostEqual(japanese["pause.gap_seconds"]["p50"], 0.50, delta=0.05)
         self.assertGreater(japanese["pause.gap_seconds"]["p99"], french["pause.gap_seconds"]["p99"])
         self.assertEqual(french["pause.gap_seconds"]["n"], 5)  # one pause of 100 ms or more per take
         self.assertAlmostEqual(french["pause.longest_gap_seconds"]["p50"], 0.25, delta=0.05)
-        self.assertEqual(french["pause.word_gap_seconds"]["n"], 10)  # two aligned gaps per take
-        self.assertAlmostEqual(japanese["pause.word_gap_seconds"]["p99"], 0.6, delta=0.01)
+        self.assertEqual(set(french), set(norms.NORM_FEATURES))
         for name in ("rate.phones_per_second", "rate.syllables_per_second", "end.tail_seconds"):
             self.assertEqual(french[name]["n"], 5, name)
             self.assertEqual(set(detectors.NORM_PERCENTILES) | {"n", "mean"}, set(french[name]), name)
         self.assertLess(french["end.tail_seconds"]["p1"], french["end.tail_seconds"]["p50"] + 1e-9)
         sparse = norms.compute(self.layout, self.takes, min_count=6, echo=lambda line: None)
-        self.assertEqual(set(sparse["languages"]["french"]), {"pause.word_gap_seconds"})  # 10 gaps, 5 takes
+        self.assertEqual(sparse["languages"], {})  # five takes per language, one value each
 
     def test_the_document_holds_aggregates_only(self):
         document = norms.compute(self.layout, self.takes, min_count=3, echo=lambda line: None)
@@ -228,120 +219,6 @@ class RateFeatureTests(unittest.TestCase):
         self.assertIsNone(features.speech_span(np.zeros(RATE), RATE))
 
 
-class ReferencesTests(unittest.TestCase):
-    """`qc.py references` freezes per-voice pitch and per-cell Audiobox medians; a run reads them."""
-
-    MODELS = {"pitchA": ("pitch.fcpe", "pitch"), "pitchB": ("pitch.swiftf0", "pitch"),
-              "aesthetics": ("aesthetics.audiobox-aesthetics", "aesthetics")}
-
-    def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.root = Path(self.directory.name)
-        self.layout = Layout(self.root)
-        self.layout.config.mkdir(parents=True)
-        for name in ("detectors.json", "protocol.json"):
-            shutil.copyfile(ROOT / "config/qc" / name, self.layout.config / name)
-        entries = []
-        for role, (model_id, kind) in self.MODELS.items():
-            runner = self.root / f"scripts/qc/runners/stub_{role.lower()}.py"
-            runner.parent.mkdir(parents=True, exist_ok=True)
-            runner.write_text("# stub\n")
-            entries.append({"id": model_id, "kind": kind, "runner": f"qc.runners.stub_{role.lower()}", "runtime": "onnx",
-                            "source": {"host": "huggingface", "repo": "a/b", "revision": "0" * 40,
-                                       "files": {"w": {"sha256": "0" * 64, "bytes": 1}}},
-                            "license": "MIT", "memoryGB": 1, "languages": "any", "version": 1})
-        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": entries}))
-        self.identities = {role: runtime.runner_identity(self.layout, entry) for role, entry
-                           in zip(self.MODELS, entries)}
-        self.params = json.loads((ROOT / "config/qc/detectors.json").read_text())["params"]
-
-    def tearDown(self):
-        self.directory.cleanup()
-
-    def take(self, name: str, *, voice: str, hz: float, pq: float, mode: str = "custom", **extra) -> dict:
-        digest = store.sha256_text(name)
-        take = {"takeID": f"fr-0001--{name}", "token": store.take_token("pool", name), "audio": f"/private/{name}.wav",
-                "audioSHA256": digest, "language": "french", "text": f"secret script {name}", "mode": mode,
-                "voice": voice, "cell": "standard", "reference": None, "referenceSHA256": None,
-                "finishReason": "eos"}
-        take.update(extra)
-        track = {"hopSeconds": 0.01, "f0Hz": [hz] * 200, "confidence": [0.9] * 200}
-        for role, outputs in (("pitchA", track), ("pitchB", track), ("aesthetics", {"PQ": pq, "CE": 5.0})):
-            model_id = self.MODELS[role][0]
-            store.write_result(self.layout.results_dir(model_id), model=model_id, runner_sha=self.identities[role],
-                               audio_sha=digest, variant=None, duration_seconds=2.0, outputs=outputs)
-        return take
-
-    def semitones(self, hz: float) -> float:
-        track = {"outputs": {"hopSeconds": 0.01, "f0Hz": [hz] * 200, "confidence": [0.9] * 200}}
-        return features.take_pitch_median({"pitchA": track, "pitchB": track}, self.params)
-
-    def pool(self) -> list[dict]:
-        return [self.take("a1", voice="aiden", hz=110.0, pq=7.0), self.take("a2", voice="aiden", hz=110.0, pq=7.2),
-                self.take("a3", voice="aiden", hz=110.0, pq=7.4),
-                self.take("r1", voice="ryan", hz=150.0, pq=7.2), self.take("r2", voice="ryan", hz=150.0, pq=7.2),
-                *[self.take(f"c{index}", voice="clone-x", hz=200.0, pq=7.2, mode="clone") for index in range(3)],
-                self.take("ctl", voice="aiden", hz=300.0, pq=1.0, control=True),
-                self.take("cut", voice="aiden", hz=300.0, pq=1.0, finishReason="max-tokens")]
-
-    def test_the_pool_s_voice_pitch_and_cell_aesthetics_are_frozen(self):
-        pool = self.pool()
-        document = references.compute(self.layout, pool, min_count=3, echo=lambda line: None)
-        self.assertEqual(set(document["voicePitch"]), {"custom|aiden"})  # ryan has 2 takes; clones use their clip
-        self.assertAlmostEqual(document["voicePitch"]["custom|aiden"]["median"], self.semitones(110.0), places=3)
-        self.assertEqual(document["voicePitch"]["custom|aiden"]["n"], 3)
-        self.assertEqual(document["cellAesthetics"]["standard"]["PQ"], {"median": 7.2, "n": 8})
-        self.assertEqual(document["pool"]["excluded"], {"control": 1, "finishNotEOS": 1})
-        self.assertEqual(document["models"]["pitchA"]["results"], 8)
-        text = json.dumps(document, ensure_ascii=False)
-        for take in pool:
-            for value in (take["takeID"], take["token"], take["audioSHA256"], take["text"], take["audio"]):
-                self.assertNotIn(value, text)
-
-        path = references.write(self.layout, document)
-        self.assertEqual(path.name, "references-v1.json")
-        loaded = references.load(self.layout)
-        self.assertEqual((loaded["file"], loaded["sha256"]), ("references-v1.json", store.sha256_file(path)))
-
-        # A run of one aiden take sung an octave up and one ryan take: aiden is held to the frozen
-        # median, ryan (absent from the file) to the run's own, and the context says which.
-        run = [self.take("new-a", voice="aiden", hz=220.0, pq=3.0), self.take("new-r", voice="ryan", hz=150.0, pq=3.0)]
-        results = {take["token"]: {role: store.read_result(self.layout, self.MODELS[role][0], take["audioSHA256"],
-                                                           None, self.identities[role])
-                                   for role in self.MODELS} for take in run}
-        context = features.build_context(run, results, {}, self.params, layout=self.layout)
-        self.assertAlmostEqual(context["voicePitch"]["custom|aiden"], self.semitones(110.0), places=3)
-        self.assertAlmostEqual(context["voicePitch"]["custom|ryan"], self.semitones(150.0), places=3)
-        self.assertEqual(context["cellAesthetics"]["standard"], {"PQ": 7.2, "CE": 5.0})
-        self.assertEqual(context["references"], {"file": "references-v1.json", "sha256": loaded["sha256"],
-                                                 "fallbacks": {"voicePitch": ["custom|ryan"], "cellAesthetics": []}})
-        quality = features.quality_features(run[0], results[run[0]["token"]], context)
-        self.assertAlmostEqual(quality["aesthetics.pq_delta"]["value"], 3.0 - 7.2)
-        # Without a references file the run is its own reference.
-        own = features.build_context(run, results, {}, self.params, layout=Layout(self.root / "empty"))
-        self.assertIsNone(own["references"])
-        self.assertAlmostEqual(own["voicePitch"]["custom|aiden"], self.semitones(220.0), places=3)
-        (self.layout.config / "references-v2.json").write_text("{}")
-        with self.assertRaises(ValueError):
-            references.load(self.layout)
-
-    def test_the_command(self):
-        manifest = self.root / "takes.json"
-        manifest.write_text(json.dumps({"schema": store.TAKES_SCHEMA, "source": "pool", "takes": self.pool()}))
-        spec = importlib.util.spec_from_file_location("qc_cli_references", SCRIPTS / "qc.py")
-        cli = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cli)
-        arguments = ["references", "--takes", str(manifest)]
-        with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
-            self.assertEqual(cli.main(arguments + ["--dry-run"], layout=self.layout), 0)
-        self.assertIn("custom|aiden", output.getvalue())
-        self.assertIsNone(references.latest(self.layout))
-        with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
-            self.assertEqual(cli.main(arguments, layout=self.layout), 0)
-        self.assertIn("references-v1.json", output.getvalue())
-        self.assertEqual(references.load(self.layout)["voicePitch"]["custom|aiden"]["n"], 3)
-
-
 class NormRuleTests(unittest.TestCase):
     NORMS = norms_document({
         "french": {"pause.gap_seconds": {"p99": 0.9}, "pause.longest_gap_seconds": {"p99": 5.0},
@@ -371,14 +248,6 @@ class NormRuleTests(unittest.TestCase):
         # A language the norms lack keeps the fixed rule.
         fallback = self.score("pause.anomalous", "german", self.NORMS, pause__longest_gap_seconds=0.7)
         self.assertEqual((fallback["score"], fallback["rule"][0]["threshold"], fallback["rule"][0]["norm"]), (1.0, 0.5, None))
-
-    def test_an_abrupt_end_ranks_but_never_flags_before_a_fit(self):
-        # The drop rule saturated on its own padding and flagged clean endings; a cut-off is content
-        # evidence (boundary.cutoff), so the ending only ranks the listening queue until it is fitted.
-        cut = {"end__drop_db_60ms": 35.0, "end__tail_seconds": 0.04}
-        for norms_doc in (None, self.NORMS):
-            outcome = self.score("boundary.abrupt-end", "french", norms_doc, **cut)
-            self.assertEqual((outcome["scope"], outcome["cut"]), (None, None))
 
     def test_rate_outliers_need_norms(self):
         self.assertIsNone(self.score("prosody.rate", "french", rate__phones_per_second=5.0)["scope"])  # uncalibrated

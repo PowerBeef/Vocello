@@ -1,36 +1,29 @@
-# Vocello QC v2 runtime "torch": PyTorch runners (FCPE, ReDimNet2+, UTMOSv2, Audiobox Aesthetics).
+# Vocello QC v2 runtime "torch": PyTorch runners (FCPE, ReDimNet2+, wav2vec2 phones).
 # One requirement per line, each pinned with == (or an https direct reference).
 # Installed by: python3 scripts/qc.py runtimes setup --runtime torch
 # into build/cache/qc/runtimes/torch; a change here makes the venv stale until setup re-runs.
 
 # --- agent C ---
-# FCPE, ReDimNet2+ (its pinned code needs torch, torchaudio, scipy), UTMOSv2 and Audiobox Aesthetics.
-# torchaudio 2.11 is its last release and runs on later torch; I/O goes through soundfile, never
-# torchaudio.load/info. timm, transformers and librosa follow UTMOSv2's own uv.lock;
-# transformers 5.2 needs huggingface-hub < 2.
+# FCPE and ReDimNet2+ (its pinned code needs torch, torchaudio and scipy). torchaudio 2.11 is its
+# last release and runs on later torch; I/O goes through soundfile, never torchaudio.load/info.
 torch==2.14.1
 torchaudio==2.11.0
-torchvision==0.29.1
 numpy==2.5.3
 scipy==1.18.1
 soundfile==0.14.0
-safetensors==0.8.0
-huggingface-hub==1.33.0
-timm==1.0.25
-transformers==5.2.0
-librosa==0.11.0
-utmosv2 @ git+https://github.com/sarulab-speech/UTMOSv2.git@cc2700db57bb83ee13dc31ebe1b868c254e15d09
-audiobox_aesthetics==0.0.4
 # FCPE: torchfcpe 0.0.4 ships its MIT weights (assets/fcpe_c_v001.pt); its conv-only model never
 # builds local attention, but the module imports it: 1.9.0 was the latest when torchfcpe 0.0.4
-# shipped (2024-03); later releases add a hyper-connections dependency.
+# shipped (2024-03); later releases add a hyper-connections dependency. Without librosa it uses
+# its own copy of librosa's mel filter bank (torchfcpe.mel_fn_librosa).
 torchfcpe==0.0.4
 einops==0.8.2
 local-attention==1.9.0
 
 # --- agent B ---
-# qc.runners.wav2vec2_phones (the ZIPA fallback) needs only torch, transformers, numpy and
-# soundfile, all pinned in agent C's block (torch==2.14.1 loads pytorch_model.bin with
-# weights_only; Wav2Vec2ForCTC and Wav2Vec2FeatureExtractor are in transformers==5.2.0).
-# No package of its own.
+# qc.runners.wav2vec2_phones (the second phone recognizer, phonesB): torch (2.14.1 loads
+# pytorch_model.bin with weights_only), numpy, soundfile and transformers (Wav2Vec2ForCTC and
+# Wav2Vec2FeatureExtractor); transformers 5.2 needs huggingface-hub < 2.
+transformers==5.2.0
+huggingface-hub==1.33.0
+safetensors==0.8.0
 # --- end agent B ---

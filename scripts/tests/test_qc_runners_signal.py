@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""QC v2 signal and judge runners with stubbed models: the result schema each writes, FCPE's
-decoding, and the llama.cpp judge's requests and parsing against a fake server."""
+"""QC v2 signal runners with stubbed models: the result schema each writes and FCPE's decoding."""
 
 from __future__ import annotations
 
 import hashlib
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
 from pathlib import Path
-import socketserver
 import sys
 import tempfile
-import threading
 import unittest
 import wave
 
@@ -21,9 +17,8 @@ import numpy as np
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
-from qc.runners import _kit, _llama, audiobox, fcpe, redimnet, swiftf0, utmosv2  # noqa: E402
+from qc.runners import _kit, fcpe, redimnet, swiftf0  # noqa: E402
 
-ROOT = SCRIPTS.parent
 SR = 24_000
 
 
@@ -153,6 +148,18 @@ class KitTests(RunnerCase):
         self.assertEqual(failed["error"], "audio-unreadable")
         self.assertNotIn("outputs", failed)
         self.assertEqual([p.name for p in self.output.iterdir() if p.name.startswith(".")], [])
+
+    def test_a_model_that_fails_to_load_records_an_error_per_take(self) -> None:
+        take = self.take("short", sine(0.5, 180.0), variantKey="0123456789abcdef")
+        job_path = self.root / "job.json"
+        job_path.write_text(json.dumps(self.job("test.model", [take])), encoding="utf-8")
+
+        def load(job):
+            raise OSError("no weights")
+
+        code = _kit.main(load, lambda model, take, job: ({}, 0.0, None), argv=["--job", str(job_path)])
+        self.assertEqual(code, 1)
+        self.assertEqual(self.result(take, "0123456789abcdef")["error"], "model-load-failed:OSError")
 
     def test_unit_embedding_is_l2_normalized(self) -> None:
         vector = _kit.unit(np.array([3.0, 4.0]))
@@ -372,271 +379,6 @@ class RedimnetTests(RunnerCase):
             for name in [n for n in sys.modules if n == "asv" or n.startswith("asv.")]:
                 del sys.modules[name]
             sys.modules.update(saved)
-
-
-class StubScorer:
-    def __init__(self) -> None:
-        self.calls: list[tuple[tuple[int, ...], int]] = []
-
-    def predict(self, clips: np.ndarray, repetitions: int) -> np.ndarray:
-        self.calls.append((clips.shape, repetitions))
-        return 3.0 + np.sqrt(np.mean(clips ** 2, axis=1))
-
-
-class Utmosv2Tests(RunnerCase):
-    def model(self, **overrides: object) -> dict:
-        model = {"scorer": StubScorer(), "repetitions": 5, "windowRepetitions": 1, "windows": True, "fold": 0}
-        model.update(overrides)
-        return model
-
-    def test_whole_take_and_three_second_windows(self) -> None:
-        model = self.model()
-        take = self.take("long", np.concatenate([sine(3.0, 200.0, amplitude=0.2), sine(2.5, 200.0, amplitude=0.6)]))
-        self.assertEqual(_kit.run_job(self.job("mos.utmosv2", [take]), model, utmosv2.process), 0)
-        outputs = self.result(take)["outputs"]
-        self.assertIsInstance(outputs["mos"], float)
-        spans = [(w["start"], w["end"]) for w in outputs["windows"]]
-        self.assertEqual(spans, [(0.0, 3.0), (1.0, 4.0), (2.0, 5.0), (2.5, 5.5)])
-        self.assertLess(outputs["windows"][0]["mos"], outputs["windows"][-1]["mos"])
-        (whole_shape, whole_reps), (window_shape, window_reps) = model["scorer"].calls
-        self.assertEqual((whole_shape[0], whole_reps), (1, 5))
-        self.assertEqual((window_shape, window_reps), ((4, utmosv2.WINDOW_SAMPLES), 1))
-        self.assertEqual(utmosv2.WINDOW_SAMPLES, 48_001)
-
-    def test_short_take_is_one_window(self) -> None:
-        take = self.take("short", sine(2.0, 200.0))
-        self.assertEqual(_kit.run_job(self.job("mos.utmosv2", [take]), self.model(), utmosv2.process), 0)
-        outputs = self.result(take)["outputs"]
-        self.assertEqual(len(outputs["windows"]), 1)
-        self.assertEqual(outputs["windows"][0]["mos"], outputs["mos"])
-
-    def test_local_code_and_ssl_directories_are_found(self) -> None:
-        model_dir = self.root / "model"
-        (model_dir / "code/UTMOSv2-cc2700db/utmosv2").mkdir(parents=True)
-        (model_dir / "code/UTMOSv2-cc2700db/utmosv2/__init__.py").write_text("", encoding="utf-8")
-        ssl = model_dir / "deps/wav2vec2-base"
-        ssl.mkdir(parents=True)
-        for name in ("config.json", "preprocessor_config.json"):
-            (ssl / name).write_text("{}", encoding="utf-8")
-        self.assertEqual(utmosv2.find_code_root(model_dir, {}), model_dir / "code/UTMOSv2-cc2700db")
-        self.assertEqual(utmosv2.find_ssl_dir(model_dir, {}), ssl)
-        self.assertIsNone(utmosv2.find_ssl_dir(self.root / "elsewhere", {}))
-
-
-class AudioboxTests(RunnerCase):
-    def test_runner_writes_the_four_axes(self) -> None:
-        class Stub:
-            def __init__(self) -> None:
-                self.seen = []
-
-            def score(self, audio, sr):
-                self.seen.append((audio.size, sr))
-                return {"CE": 6.123456, "CU": 7.5, "PC": 2.25, "PQ": 7.75, "extra": 1}
-
-        stub = Stub()
-        take = self.take("take", sine(1.5, 220.0))
-        self.assertEqual(_kit.run_job(self.job("aesthetics.audiobox-aesthetics", [take]), stub, audiobox.process), 0)
-        self.assertEqual(stub.seen, [(24_000, 16_000)])
-        self.assertEqual(self.result(take)["outputs"], {"CE": 6.1235, "CU": 7.5, "PC": 2.25, "PQ": 7.75})
-
-
-# --- the llama.cpp judge -------------------------------------------------------------------------
-
-
-def token_stream(text: str, probabilities: dict[str, float]) -> list[dict]:
-    """Split generated JSON into tokens with `true`/`false` as their own tokens, giving each class's
-    `present` value top log-probabilities from `probabilities` (P(true))."""
-    tokens: list[dict] = []
-    cursor = 0
-    for name, p_true in probabilities.items():
-        at = text.find('"present":', text.find(json.dumps(name), cursor)) + len('"present":')
-        literal = "true" if text.startswith("true", at) else "false"
-        if at > cursor:
-            tokens.append({"token": text[cursor:at], "logprob": 0.0, "top_logprobs": []})
-        top = [{"token": "true", "logprob": math.log(p_true)}, {"token": "false", "logprob": math.log(1 - p_true)}]
-        tokens.append({"token": literal, "logprob": math.log(p_true if literal == "true" else 1 - p_true), "top_logprobs": top})
-        cursor = at + len(literal)
-    tokens.append({"token": text[cursor:], "logprob": 0.0, "top_logprobs": []})
-    return tokens
-
-
-class LocalHTTPServer(ThreadingHTTPServer):
-    def server_bind(self) -> None:
-        # HTTPServer.server_bind resolves its own FQDN, which can stall on a host without DNS.
-        socketserver.TCPServer.server_bind(self)
-        self.server_name, self.server_port = self.server_address[:2]
-
-
-class FakeLlamaServer:
-    """`/health` and `/v1/chat/completions` like llama-server: a transcript, or the rubric JSON with
-    log-probabilities when the request carries a JSON schema."""
-
-    def __init__(self, stutter_chunk: int = 1) -> None:
-        self.requests: list[dict] = []
-        self.stutter_chunk = stutter_chunk
-        owner = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *args):
-                pass
-
-            def _reply(self, payload: dict) -> None:
-                data = json.dumps(payload).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-
-            def do_GET(self):
-                self._reply({"status": "ok"})
-
-            def do_POST(self):
-                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                owner.requests.append(body)
-                self._reply(owner.answer(body))
-
-        self.httpd = LocalHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
-        self.thread.start()
-        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
-
-    def answer(self, body: dict) -> dict:
-        if "response_format" not in body:
-            return {"choices": [{"message": {"role": "assistant", "content": " bon-bonjour "}}]}
-        chunk = sum(1 for r in self.requests if "response_format" in r)
-        stutter = chunk == self.stutter_chunk
-        classes = {name: {"present": False, "severity": "none", "start": None, "end": None, "evidence": ""}
-                   for name in _llama.class_ids()}
-        if stutter:
-            classes["stutter"] = {"present": True, "severity": "moderate", "start": 0.5, "end": 0.9,
-                                  "evidence": "bon-bonjour repeated"}
-        text = json.dumps(classes)
-        probabilities = {name: (0.8 if stutter and name == "stutter" else 0.1) for name in _llama.class_ids()}
-        return {"choices": [{"message": {"role": "assistant", "content": text},
-                             "logprobs": {"content": token_stream(text, probabilities)}}]}
-
-    def close(self) -> None:
-        self.httpd.shutdown()
-        self.httpd.server_close()
-
-
-class LlamaJudgeTests(RunnerCase):
-    def test_class_ids_match_the_contract_and_the_protocol(self) -> None:
-        expected = ["stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch", "tonal-collapse",
-                    "voice-change", "artifact", "unnatural", "other"]
-        self.assertEqual(_llama.class_ids(), expected)
-        protocol = ROOT / "config/qc/protocol.json"
-        if protocol.is_file():
-            classes = json.loads(protocol.read_text(encoding="utf-8")).get("classes", [])
-            ids = [c if isinstance(c, str) else c.get("id") for c in classes]
-            self.assertEqual(ids, expected)
-
-    def test_requests_are_deterministic_and_the_script_goes_only_to_the_rubric(self) -> None:
-        wav = _kit.wav_bytes(np.zeros(1600), 16_000)
-        transcript = _llama.chat_request(_llama.transcript_prompt(), wav, seed=7, max_tokens=64)
-        self.assertEqual(transcript["temperature"], 0.0)
-        self.assertEqual(transcript["seed"], 7)
-        self.assertNotIn("response_format", transcript)
-        parts = transcript["messages"][0]["content"]
-        self.assertEqual(parts[0]["type"], "input_audio")
-        self.assertEqual(parts[0]["input_audio"]["format"], "wav")
-        prompt = _llama.rubric_prompt("french", "Bonjour à tous.", 3.0)
-        self.assertIn("French", prompt)
-        self.assertIn("Bonjour à tous.", prompt)
-        rubric = _llama.chat_request(prompt, wav, seed=7, max_tokens=64, schema=_llama.rubric_schema(), logprobs=5)
-        schema = rubric["response_format"]["json_schema"]["schema"]
-        self.assertEqual(schema["required"], _llama.class_ids())
-        self.assertEqual(list(schema["properties"]["cutoff"]["properties"])[0], "present")
-        self.assertTrue(rubric["logprobs"])
-        self.assertEqual(rubric["top_logprobs"], 5)
-
-    def test_rubric_parsing_normalizes_and_reads_p_yes(self) -> None:
-        verdicts = {name: {"present": False, "severity": "none", "start": None, "end": None, "evidence": ""}
-                    for name in _llama.class_ids()}
-        verdicts["cutoff"] = {"present": True, "severity": "none", "start": 2.0, "end": 1.5, "evidence": "ends mid-word"}
-        verdicts["pitch"] = {"present": False, "severity": "severe", "start": 1.0, "end": 2.0, "evidence": ""}
-        text = json.dumps(verdicts)
-        response = {"choices": [{"message": {"content": text},
-                                 "logprobs": {"content": token_stream(text, {"stutter": 0.25, "cutoff": 0.9})}}]}
-        parsed = _llama.parse_rubric(response)
-        self.assertEqual(parsed["cutoff"]["severity"], "mild")
-        self.assertEqual((parsed["cutoff"]["start"], parsed["cutoff"]["end"]), (1.5, 2.0))
-        self.assertEqual(parsed["pitch"]["severity"], "none")
-        self.assertIsNone(parsed["pitch"]["start"])
-        self.assertAlmostEqual(parsed["stutter"]["pYes"], 0.25, places=5)
-        self.assertAlmostEqual(parsed["cutoff"]["pYes"], 0.9, places=5)
-        self.assertIsNone(parsed["artifact"]["pYes"])
-        no_logprobs = _llama.parse_rubric({"choices": [{"message": {"content": "```json\n" + text + "\n```"}}]})
-        self.assertIsNone(no_logprobs["cutoff"]["pYes"])
-        with self.assertRaises(_kit.TakeError):
-            _llama.parse_rubric({"choices": [{"message": {"content": "no json here"}}]})
-
-    def test_server_command_binds_localhost_with_the_projector(self) -> None:
-        command = _llama.server_command(Path("/opt/llama-server"), Path("m.gguf"), Path("mmproj.gguf"), 8099,
-                                        _llama.Profile("gemma"), {})
-        self.assertEqual(command[command.index("--host") + 1], "127.0.0.1")
-        self.assertEqual(command[command.index("--mmproj") + 1], "mmproj.gguf")
-        self.assertEqual(command[command.index("--port") + 1], "8099")
-
-    def test_model_files_and_the_unpacked_server_are_found(self) -> None:
-        model_dir = self.root / "model"
-        model_dir.mkdir()
-        (model_dir / "gemma-it-q4_0.gguf").write_bytes(b"")
-        (model_dir / "mmproj-gemma-f16.gguf").write_bytes(b"")
-        model, mmproj = _llama.find_model_files(model_dir, _llama.Profile("gemma"), {})
-        self.assertEqual((model.name, mmproj.name), ("gemma-it-q4_0.gguf", "mmproj-gemma-f16.gguf"))
-        unpacked = self.root / "llamacpp/llama-b11146"
-        unpacked.mkdir(parents=True)
-        (unpacked / "llama-server").write_bytes(b"")
-        found = _llama.find_server_binary({"llamacppDir": str(self.root / "llamacpp")})
-        self.assertEqual(found, unpacked / "llama-server")
-        from qc.runners import gemma_judge, qwen_omni_judge
-        self.assertEqual(gemma_judge.PROFILE.mmproj_file, "mmproj-gemma-4-12b-it-qat-q4_0.gguf")
-        self.assertEqual(qwen_omni_judge.PROFILE.model_file, "Qwen2.5-Omni-7B-Q4_K_M.gguf")
-        self.assertIn("--reasoning", _llama.server_command(found, model, mmproj, 1, gemma_judge.PROFILE, {}))
-
-    def test_judge_end_to_end_against_a_fake_server_with_chunk_merging(self) -> None:
-        server = FakeLlamaServer(stutter_chunk=2)
-        self.addCleanup(server.close)
-        take = self.take("long", sine(5.0, 180.0), text="Bonjour à tous.", language="french")
-        job = self.job("llm.gemma", [take], serverURL=server.url, chunkSeconds=2.0, seed=11)
-        job_path = self.root / "job.json"
-        job_path.write_text(json.dumps(job), encoding="utf-8")
-        load, process, close, variant_of = _llama.make_runner(_llama.Profile("gemma"))
-        code = _kit.main(load, process, variant_of=variant_of, argv=["--job", str(job_path)], close=close)
-        self.assertEqual(code, 0)
-        record = self.result(take, _kit.variant_key(take))
-        outputs = record["outputs"]
-        self.assertEqual(outputs["chunks"], 3)
-        self.assertEqual(outputs["transcript"], "bon-bonjour bon-bonjour bon-bonjour")
-        stutter = outputs["classes"]["stutter"]
-        self.assertTrue(stutter["present"])
-        self.assertEqual(stutter["severity"], "moderate")
-        offset = round(5.0 / 3, 3)
-        self.assertAlmostEqual(stutter["start"], offset + 0.5, places=2)
-        self.assertAlmostEqual(stutter["pYes"], 0.8, places=5)
-        self.assertFalse(outputs["classes"]["cutoff"]["present"])
-        self.assertAlmostEqual(outputs["classes"]["cutoff"]["pYes"], 0.1, places=5)
-        self.assertEqual(sorted(outputs["classes"]), sorted(_llama.class_ids()))
-        self.assertEqual(len(server.requests), 6)
-        for request in server.requests:
-            self.assertEqual(request["seed"], 11)
-            self.assertEqual(request["temperature"], 0.0)
-            text = request["messages"][0]["content"][1]["text"]
-            self.assertEqual("Bonjour à tous." in text, "response_format" in request)
-            audio = request["messages"][0]["content"][0]["input_audio"]
-            self.assertEqual(audio["format"], "wav")
-
-    def test_unreachable_server_records_an_error_per_take(self) -> None:
-        take = self.take("short", sine(0.5, 180.0))
-        job = self.job("llm.gemma", [take], serverURL="http://127.0.0.1:9", startupTimeout=0.5)
-        job_path = self.root / "job.json"
-        job_path.write_text(json.dumps(job), encoding="utf-8")
-        load, process, close, variant_of = _llama.make_runner(_llama.Profile("gemma"))
-        code = _kit.main(load, process, variant_of=variant_of, argv=["--job", str(job_path)], close=close)
-        self.assertEqual(code, 1)
-        self.assertTrue(self.result(take, _kit.variant_key(take))["error"].startswith("model-load-failed"))
 
 
 if __name__ == "__main__":

@@ -2,8 +2,6 @@
 
 `setup_runtime` builds `build/cache/qc/runtimes/<name>` (mlx, onnx, torch) as a
 venv of the pinned interpreter and installs `config/qc/runtimes/<name>.txt`.
-The llama.cpp release is unpacked into `runtimes/llamacpp`; its runner uses the
-onnx venv's python.
 
 `run_runner` sends the takes a model has not scored yet to its runner:
 
@@ -29,21 +27,16 @@ import subprocess
 import sys
 import threading
 import time
-import zipfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from qc import store
-from qc.models import (
-    FetchError, code_extracted, file_status, model_files, pins_digest, runner_source, safe_extract_tar,
-)
+from qc.models import RUNTIMES, code_extracted, model_files, pins_digest, runner_source
 from qc.store import Layout
 
-VENV_RUNTIMES = ("mlx", "onnx", "torch")
-RUNTIMES = VENV_RUNTIMES + ("llamacpp",)
 RECEIPT = "qc-runtime.json"
 RECEIPT_SCHEMA = "vocello.qc.runtime/1"
 # The standalone CPython the v1 harness pinned (cpython-3.14.4+20260414). Setup
@@ -145,10 +138,8 @@ def runtime_dir(layout: Layout, runtime: str) -> Path:
 
 
 def runtime_python(layout: Layout, runtime: str) -> Path:
-    """The python a runtime's runners use (llama.cpp runners use the onnx venv)."""
+    """The python a runtime's runners use: its venv's."""
 
-    if runtime == "llamacpp":
-        runtime = "onnx"
     return runtime_dir(layout, runtime) / "bin/python3"
 
 
@@ -159,9 +150,7 @@ Runner = Callable[..., subprocess.CompletedProcess]
 
 def setup_runtime(layout: Layout, runtime: str, *, run: Runner = subprocess.run,
                   log: Callable[[str], None] = lambda message: print(message, file=sys.stderr)) -> dict[str, Any]:
-    if runtime == "llamacpp":
-        return setup_llamacpp(layout, log=log)
-    if runtime not in VENV_RUNTIMES:
+    if runtime not in RUNTIMES:
         raise RuntimeSetupError(f"unknown runtime: {runtime}")
     requirements = layout.runtime_requirements / f"{runtime}.txt"
     text = requirements.read_text(encoding="utf-8")
@@ -185,8 +174,6 @@ def setup_runtime(layout: Layout, runtime: str, *, run: Runner = subprocess.run,
 def verify_runtime(layout: Layout, runtime: str, *, run: Runner = subprocess.run) -> list[str]:
     """Problems with a runtime, empty when it matches its pins."""
 
-    if runtime == "llamacpp":
-        return verify_llamacpp(layout)
     venv = runtime_dir(layout, runtime)
     python = venv / "bin/python3"
     if not python.is_file():
@@ -208,75 +195,6 @@ def verify_runtime(layout: Layout, runtime: str, *, run: Runner = subprocess.run
     for name, version in sorted(pinned_versions(parse_requirements(text)).items()):
         if installed.get(name) != version:
             problems.append(f"{runtime}: {name} is {installed.get(name, 'missing')}, pinned {version}")
-    return problems
-
-
-def _llamacpp_artifacts(layout: Layout) -> list[tuple[dict[str, Any], str, dict[str, Any]]]:
-    from qc.models import load_registry
-
-    artifacts = []
-    for model in load_registry(layout):
-        if model["kind"] == "runtime" and model["runtime"] == "llamacpp":
-            for path, pin in sorted(model["source"]["files"].items()):
-                artifacts.append((model, path, pin))
-    return artifacts
-
-
-def _safe_member(name: str) -> bool:
-    pure = PurePosixPath(name)
-    return bool(name) and not pure.is_absolute() and ".." not in pure.parts
-
-
-def setup_llamacpp(layout: Layout, *, log: Callable[[str], None]) -> dict[str, Any]:
-    artifacts = _llamacpp_artifacts(layout)
-    if not artifacts:
-        raise RuntimeSetupError("the registry pins no llama.cpp release (kind runtime, runtime llamacpp)")
-    target = runtime_dir(layout, "llamacpp")
-    staging = target.with_name("llamacpp.staging")
-    shutil.rmtree(staging, ignore_errors=True)
-    staging.mkdir(parents=True)
-    unpacked = {}
-    for model, path, pin in artifacts:
-        archive = layout.model_dir(model["id"]) / path
-        if file_status(archive, pin) != "ok":
-            raise RuntimeSetupError(f"{model['id']}/{path} is missing or unverified (run qc.py models fetch)")
-        log(f"qc runtimes: unpacking {model['id']}/{path}")
-        if path.endswith(".zip"):
-            with zipfile.ZipFile(archive) as bundle:
-                for member in bundle.infolist():
-                    if not _safe_member(member.filename):
-                        raise RuntimeSetupError(f"unsafe archive member: {member.filename}")
-                    bundle.extract(member, staging)
-                    mode = (member.external_attr >> 16) & 0o777
-                    if mode and not member.is_dir():
-                        os.chmod(staging / member.filename, mode)
-        elif path.endswith((".tar.gz", ".tgz")):
-            try:
-                safe_extract_tar(archive, staging, allow_symlinks=True)
-            except FetchError as error:
-                raise RuntimeSetupError(str(error)) from None
-        else:
-            shutil.copy2(archive, staging / PurePosixPath(path).name)
-        unpacked[f"{model['id']}/{path}"] = pin["sha256"]
-    receipt = {"schema": RECEIPT_SCHEMA, "runtime": "llamacpp", "artifacts": unpacked, "createdAt": utc_now()}
-    store.write_json_atomic(staging / RECEIPT, receipt)
-    shutil.rmtree(target, ignore_errors=True)
-    os.replace(staging, target)
-    return receipt
-
-
-def verify_llamacpp(layout: Layout) -> list[str]:
-    target = runtime_dir(layout, "llamacpp")
-    try:
-        receipt = store.read_json(target / RECEIPT)
-    except (OSError, ValueError):
-        return ["llamacpp: not unpacked (run qc.py runtimes setup --runtime llamacpp)"]
-    expected = {f"{model['id']}/{path}": pin["sha256"] for model, path, pin in _llamacpp_artifacts(layout)}
-    problems = []
-    if receipt.get("artifacts") != expected:
-        problems.append("llamacpp: the pinned release changed since setup (re-run setup)")
-    if not (runtime_python(layout, "llamacpp")).is_file():
-        problems.append("llamacpp: its runner needs the onnx venv (run qc.py runtimes setup --runtime onnx)")
     return problems
 
 
@@ -354,8 +272,7 @@ def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
 
     The sources are the runner file, every `qc.*` module it imports (the phone
     and G2P runners reach `qc/phones.py` that way) and the shared runner helpers
-    (`runners/_*.py`: the job kit, the LLM prompts and class definitions). Any
-    change to them, to the registry `version` or to a pinned model, dependency
+    it imports (`runners/_kit.py`, `runners/speech_common.py`). Any change to them, to the registry `version` or to a pinned model, dependency
     or code file gives a new identity, so cached results of the old one are
     re-run. Code a runner never imports, such as the feature code that reads its
     results, belongs to the scoring identity (`qc.detectors.scoring_identity`).
@@ -375,8 +292,7 @@ def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
     transitively (also inside functions, such as `runners/speech_common.py`), the `runners/_*.py`
     helpers included. A package name (`qc`, `qc.runners`) adds no file: its `__init__.py` is
     documentation only. So a `qc/phones.py` edit re-runs only the runners that import it (the
-    phone recognizers and the G2P), and a `runners/_llama.py` edit (the judge's prompts) only the
-    audio-LLM judges, never the ASR, MOS or speaker caches."""
+    phone recognizers and the G2P), never the ASR, pitch or speaker caches."""
 
     source = runner_source(layout, model)
     if not source.is_file():
@@ -470,8 +386,6 @@ def run_runner(
 ) -> RunnerReport:
     """Score `takes` with one model, reusing cached results; one model at a time."""
 
-    if model.get("kind") == "runtime":
-        raise RunnerError(f"{model['id']}: a runtime artifact has no runner")
     echo = echo or (lambda line: print(line, file=sys.stderr, flush=True))
     runner_sha = runner_identity(layout, model)
     report = RunnerReport(model=model["id"], runner_sha=runner_sha)
@@ -506,8 +420,6 @@ def run_runner(
 
     job_options = dict(model.get("options", {}))
     job_options.update({key: value for key, value in (options or {}).items() if key != "retryErrors"})
-    if model["runtime"] == "llamacpp":
-        job_options.setdefault("llamacppDir", str(runtime_dir(layout, "llamacpp").resolve()))
     output_dir = layout.results_dir(model["id"])
     output_dir.mkdir(parents=True, exist_ok=True)
     job = {

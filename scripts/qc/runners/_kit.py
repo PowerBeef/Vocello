@@ -1,9 +1,9 @@
-"""Shared plumbing for the QC v2 signal and judge runners (FCPE, SwiftF0, ReDimNet, UTMOSv2,
-Audiobox, the llama.cpp judges): the job file, WAV input, resampling, the variant key and atomic
-result writes, as the runner protocol in the QC v2 contract defines them.
+"""Shared plumbing for the QC v2 signal runners (FCPE, SwiftF0, ReDimNet2+): the job file, WAV
+input, resampling, the variant key and atomic result writes, as the runner protocol in the QC v2
+contract defines them. The speech runners share `speech_common` instead.
 
-numpy and the standard library only, so every runtime (onnx, torch, llamacpp) and the test python
-can import it. soundfile and scipy are used when the runtime has them.
+numpy and the standard library only, so every runtime (mlx, onnx, torch) and the test python can
+import it. soundfile and scipy are used when the runtime has them.
 """
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ import os
 import struct
 import tempfile
 import time
-import wave
 from math import gcd
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -167,9 +166,8 @@ def main(
     process: ProcessTake,
     variant_of: Callable[[Mapping[str, Any]], str | None] | None = None,
     argv: Iterable[str] | None = None,
-    close: Callable[[Any], None] | None = None,
 ) -> int:
-    """The runner entry point: read the job, load the model once, process every take, close."""
+    """The runner entry point: read the job, load the model once, process every take."""
     job = load_job(parse_job_argument(argv))
     started = time.monotonic()
     try:
@@ -177,11 +175,7 @@ def main(
     except Exception as failure:  # noqa: BLE001
         print(f"[{job['model']}] model load failed: {type(failure).__name__}", flush=True)
         return fail_all(job, f"model-load-failed:{type(failure).__name__}", variant_of)
-    try:
-        code = run_job(job, model, process, variant_of)
-    finally:
-        if close is not None:
-            close(model)
+    code = run_job(job, model, process, variant_of)
     print(f"[{job['model']}] done in {time.monotonic() - started:.1f}s", flush=True)
     return code
 
@@ -286,18 +280,6 @@ def load_take_audio(take: Mapping[str, Any], target_sr: int | None = None, key: 
     return samples, sr, duration
 
 
-def wav_bytes(samples: np.ndarray, sr: int) -> bytes:
-    """16-bit PCM mono WAV bytes."""
-    pcm = np.clip(np.rint(np.asarray(samples, dtype=np.float64) * 32767.0), -32768, 32767).astype("<i2")
-    buffer = io.BytesIO()
-    with wave.open(buffer, "wb") as writer:
-        writer.setnchannels(1)
-        writer.setsampwidth(2)
-        writer.setframerate(int(sr))
-        writer.writeframes(pcm.tobytes())
-    return buffer.getvalue()
-
-
 def windows(duration: float, length: float, hop: float) -> list[tuple[float, float]]:
     """`length`-second windows every `hop` seconds covering `[0, duration]`; the last window is
     aligned to the end. A take shorter than `length` is one whole-take window."""
@@ -320,7 +302,3 @@ def unit(vector: np.ndarray) -> list[float]:
     if not np.isfinite(norm) or norm == 0:
         raise TakeError("embedding-degenerate")
     return [round(float(v), 6) for v in vector / norm]
-
-
-def repository_root() -> Path:
-    return Path(__file__).resolve().parents[3]

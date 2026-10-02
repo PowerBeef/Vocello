@@ -1,5 +1,5 @@
 ---
-status: current
+status: historical
 owner: backend-and-platform
 reviewed: 2026-09-17
 summary: Findings of the specialist audit run over the macOS UI-fidelity range 3874b70d..e1755734 and the project around it, separating defects that range introduced from pre-existing conditions it surfaced.

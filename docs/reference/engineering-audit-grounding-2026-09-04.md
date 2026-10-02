@@ -17,7 +17,7 @@ sourceOfTruth:
 # September 4 engineering audit — source grounding
 
 This is the disposition at the `75ecb740` review baseline. Subsequent source corrections and
-verification are recorded in the [current checkpoint](../development-progress.md#resume-here-2026-09-04)
+verification are recorded in the [current checkpoint](../development-progress.md)
 and authoritative roadmap; the baseline findings below are not claims that those paths remain unfixed.
 
 ## Decision and scope

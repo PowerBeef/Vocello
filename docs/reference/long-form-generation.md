@@ -24,7 +24,7 @@ standalone History. These source corrections still require corrected-candidate a
 
 ## Shipping path (macOS)
 
-`LongTextGenerationRouter` routes scripts above 900 trimmed characters (the retired character
+`LongTextGenerationRouter` routes scripts above 900 characters (`singleTakeScriptLimit`, untrimmed count) (the retired character
 segmenter's historical threshold, kept so routing behavior is unchanged) into a long-form project:
 
 1. **Planning.** `SpokenTextPlanner` + `LongFormPlanner` produce a schema-v4 plan: normalization
@@ -81,7 +81,7 @@ audio-QC implementation (`makeAudioQCReport`; a threshold changes only on labell
 
 ## Measured performance
 
-First instrumented project (2026-07-23, canonical Mac mini M2 8 GB, smoke lane): a 2,280-character
+First instrumented project (2026-07-23, then-canonical Mac mini M2 8 GB, smoke lane): a 2,280-character
 script planned three ~50–60 s segments, streamed them sequentially, and joined 161.5 s of audio in
 92.0 s wall — project rtf 0.57 (wall ÷ audio, the standard since 2026-09-12; the figure originally
 recorded as 1.76 was the inverted audio ÷ wall ratio now reported as `decodeSpeedupX`), inside the
@@ -107,7 +107,7 @@ iOS runs the same design in-process — `IOSGenerationTextLimitPolicy` routes sc
 900-character single-take limit into `IOSLongFormCoordinator`/`IOSLongFormProjectRunner`
 (`Sources/iOS/Studio/IOSLongFormProject.swift`): the shared planner, per-segment sub-seeds, one
 ordinary streaming take per segment with live narration (auto-play-gated), per-segment and
-joined-output QC through the ported `AudioQualityGate` twin, bounded assembly, manifest v4, the
+joined-output QC through the shared `AudioQualityGate` adapter (`Sources/SharedSupport/Services/AudioQualityGate.swift`), bounded assembly, manifest v4, the
 same per-project filenames, and one joined History row (iOS `Generation`/`DatabaseService` gained
 the v5 columns and joined-row replacement). History groups projects behind a per-segment
 disclosure (`history_longFormSegmentsToggle_<digest8>`), flattens during search, and keeps orphan
@@ -132,7 +132,7 @@ disclosure. The iOS smoke lane now runs both journeys (standard + long-form).
   steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
   remains open, and the scaled smoke journey currently caps at 12 segments per run.
 - **Corrected-candidate acceptance** — exercise long-form, segment replacement, interruption,
-  recovery export and retained-output deletion on the RF-10 desktop and RF-11/RF-12 iPhone
+  recovery export and retained-output deletion on the RF-10 desktop and RF-12 iPhone
   candidates. Older measured runs above are historical, not evidence for changed source.
 
 Single-take spoken-text normalization is already implemented at the shared generation entry;

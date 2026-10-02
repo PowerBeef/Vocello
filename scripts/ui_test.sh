@@ -1493,10 +1493,12 @@ elif [[ "$platform" == "macos" ]]; then
   elif [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
   elif [[ "$lane" == "smoke" ]]; then
-    # The smoke class runs its ordered journeys (navigation/readiness,
-    # completed generation + History, mid-generation cancellation, virtual-mic
-    # recording, library surfaces, long-form project, line batch, Design brief/player) in
-    # method-name order.
+    # The smoke class runs its thirteen ordered journeys (test00-test12: window
+    # sizes + Settings scene, navigation/readiness, completed generation +
+    # History, mid-generation cancellation, virtual-mic recording, library
+    # surfaces, long-form project, line batch, Design brief/player, Clone
+    # reference/player, missing models + Studio links, generation error +
+    # recovery, cross-language Studio content) in method-name order.
     only_test="VocelloMacUITests/VocelloMacSmokeUITests"
     case "$scenario_argument" in
       layout) only_test+="/test00_WindowSizesAndSettingsScene" ;;

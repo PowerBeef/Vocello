@@ -26,7 +26,7 @@ Vocello's text-to-speech pipeline ends with a **neural audio codec** that turns 
 | Codebook size | 2,048 | 2,048 (decoder) |
 | Semantic codebooks | 1 | 1 |
 | Bitrate | ~1.1 kbps | ~2.1 kbps |
-| Decoder transformer | No | Yes (8-layer sliding-window) |
+| Decoder transformer | No | Yes (8-layer causal) |
 | Decoder SEANet | Yes | Yes, with SnakeBeta + ConvNeXt |
 
 The decoder is the quality-critical path. It receives 16 integer codes per frame from the code predictor, looks up quantized vectors, runs a small transformer, upsamples, and emits waveform samples through a SEANet-style upsampling stack. Because Vocello streams audio as soon as tokens are available, the decoder must be **causal** and **chunk-size invariant**: the same audio must be produced whether tokens are decoded in one 300-token batch or in 12-token dribbles.
@@ -101,7 +101,7 @@ Audio [B, 1, T]
     ↓
 SeanetEncoder          (SEANet downsampling convolutions, ratios [8, 6, 5, 4])
     ↓
-ProjectedTransformer   (8-layer transformer with RoPE, sliding-window context)
+ProjectedTransformer   (8-layer causal transformer with RoPE)
     ↓
 ConvDownsample1d       (stride computed from encoderFrameRate / frameRate)
     ↓
@@ -125,7 +125,7 @@ CausalConv1d (pre_conv)              →  [B, latentDim, T]
     ↓
 Transpose 0↔2                        →  [B, T, latentDim]
     ↓
-DecoderTransformer (8 layers, sliding-window RoPE)
+DecoderTransformer (8 layers, causal RoPE)
     ↓
 Transpose 0↔2                        →  [B, latentDim, T]
     ↓
@@ -161,7 +161,7 @@ The decoder has two distinct upsampling stages:
 | Transformer hidden size | 512 | Inside the decoder transformer. |
 | Transformer heads | 16 | Head dim 64. |
 | Transformer layers | 8 | With layer scale. |
-| Sliding window | 72 | Decoder transformer local attention. |
+| Sliding window | 72 | Declared in the decoder config; not yet applied (full causal mask, PA-16). |
 | Upsample ratios (transformer) | [2, 2] | `UpsampleLayer`. |
 | Upsample rates (SEANet) | [8, 5, 4, 3] | `DecoderBlock`; product = 480. |
 | Total decoder upsample | 1,920 | 2 × 2 × 8 × 5 × 4 × 3 = 1,920. |
@@ -202,7 +202,7 @@ The encoder uses the generic SEANet stack from `Seanet.swift`:
 - `SeanetResnetBlock` — dilated residual convolutions.
 - `EncoderLayer` — downsampling layer with optional residual repetition.
 
-After SEANet, `ProjectedTransformer` (from `Transformer.swift`) applies an 8-layer causal transformer with **sliding-window attention**: the KV cache is trimmed to `context` past tokens, so memory stays bounded even for long utterances. The `convLayout` flag toggles between `[B, C, T]` and `[B, T, C]` layouts automatically.
+After SEANet, `ProjectedTransformer` (from `Transformer.swift`) applies an 8-layer causal transformer; its config declares a 250-frame window, but a one-pass encode uses a full causal mask, so references over 10 s attend beyond it (PA-16). The `convLayout` flag toggles between `[B, C, T]` and `[B, T, C]` layouts automatically.
 
 `ConvDownsample1d` then reduces the transformer output to the target frame rate before quantization.
 
@@ -238,7 +238,7 @@ The decoder transformer (`pre_transformer`) is small but critical for temporal c
 - `KVCacheSimple` for incremental decoding.
 - A causal mask when `seqLen > 1`. The reference model limits attention to a 72-frame sliding
   window (`sliding_window` in the decoder config), but the current Vocello decoder applies a full
-  causal mask; restoring the window is roadmap item PA-17.
+  causal mask; restoring the window is roadmap item PA-16.
 
 Because it sits *inside* the decoder, not before it, the transformer sees the already-quantized latent and can smooth discontinuities across frames.
 
@@ -334,7 +334,7 @@ Smaller chunks increase boundary count and can amplify any residual drift bug. L
 MLX uses **unified memory** on Apple Silicon. Decoder weights and KV caches live in the same pool as app allocations and OS pressure. On an 8 GB machine:
 
 - Keep the decoder transformer KV cache small. Today it grows with the take (up to the 2,048-frame cap,
-  about 128 MiB in fp32) because the 72-frame sliding window is not applied; PA-17 restores the bound.
+  about 128 MiB in fp32) because the 72-frame sliding window is not applied; PA-16 restores the bound.
 - Avoid materializing long intermediate arrays. Use `eval()` only on the audio chunk that is about to be handed to the audio player.
 - The decoder weights are not quantized in current Vocello builds; the 1.7 B talker and code predictor are. If memory is tight, the decoder is a smaller but non-zero contributor.
 

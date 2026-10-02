@@ -121,13 +121,13 @@ The app process is the TCC client for everything; the CLI never triggers prompts
   label with an Open System Settings (Privacy → Microphone) path; a
   "No microphone detected" state when there's no input device; permission
   state refreshes on app activation.
-- **Enroll sheet** (`SavedVoiceSheet`): transcript section shows
+- **Enroll sheet** (`MacSavedVoiceSheet`): transcript section shows
   "Transcribing on-device…" while running and a denied/Siri-disabled caption
   with a direct System Settings button otherwise; retries the auto-fill when
   access is granted mid-session.
 - **Voice Cloning**: same unavailability hint near the transcript field for
   fresh-file imports; clears + retries on activation.
-- **Settings → Storage**: warning badge + caption when the configured output
+- **Settings → Models & Files (Storage section)**: warning badge + caption when the configured output
   folder is missing/unwritable; generation transparently falls back to the
   default outputs folder (`AudioService.makeOutputPath`) so audio is never lost.
 

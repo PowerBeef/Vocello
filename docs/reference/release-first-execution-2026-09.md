@@ -24,12 +24,13 @@ owner) and RF-12 now waits on ICA-05; RF-09 is re-gated on the freeze commit beh
 
 **September 14 amendment.** The harness plan completed (MV-07 decided by restoring the fp32 codec,
 PC-03 explained, MV-06 and MV-05 judged, HS-01 promoted TSan to blocking) and this plan is
-`primaryPlan` again; work resumes at RF-13.
+`primaryPlan` again; work resumed at RF-13. Since 2026-09-29 the audio QC work holds `primaryPlan`
+(`audio-qc-audit-2026-09`, now `qc-v2-2026-10`); this plan stays active with every RF item parked.
 
 Until then, `config/roadmap.json` designated **`release-first-3-0-2026-09` as `primaryPlan`**. Its
 `RF-01` through `RF-13` milestones remain the execution roadmap. The September 6 iOS-first
 amendment below supersedes their original numeric scheduling order, not their closure gates.
-Both `roadmap.py status` and the generated `docs/ROADMAP.md` present it first. Older plans retain
+Both `roadmap.py status` and `docs/ROADMAP.md` presented it first while it held `primaryPlan`. Older plans retain
 technical defect ownership, evidence and deferred backlog; their active status does not independently
 schedule another workstream. RF milestone completion never closes a referenced defect implicitly:
 for example RF-03 source proof does not close F-15's packaged-candidate acceptance.
@@ -131,7 +132,7 @@ storage-failure recovery. The test product is provisional and not active in ship
 Deterministic checks and generic compilation are distinct from the still-required physical purchase
 and processed-candidate acceptance. Use [the app guide](ios-app-guide.md#ios-export-purchase) and
 [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect); RF-13
-stays in flight until its focused acceptance gate passes. Do not create a second purchase harness.
+stays open (now parked) until its focused acceptance gate passes. Do not create a second purchase harness.
 
 September 8 account checkpoint: the maintainer approved and authorized the non-consumable
 `com.patricedery.vocello.design_clone_export`, reference name Design & Clone Export, USD 19.99 base

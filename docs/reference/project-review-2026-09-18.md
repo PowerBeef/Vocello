@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-09-18
 summary: Independent cross-project review, revalidation of AUD-01 through AUD-12, and the initial Codex–Claude setup evidence.
@@ -292,6 +292,9 @@ all` therefore reports drift; this does not prevent ordinary development. Pins a
 were preserved. Local compatibility is not a substitute for the pinned CI verdict.
 
 ## Handoff and activation limitation
+
+> Superseded 2026-09-22: Codex, `AGENTS.md`, `.agents/` and `.codex/` were retired at the Claude Code
+> takeover ([project audit](project-audit-2026-09-22.md)); the Codex hook-trust step below is history.
 
 The existing primary roadmap remains authoritative; this setup does not reprioritize UI work or
 authorize application remediation. Claude should inspect the actual commit/diff and dirty tree before

@@ -98,8 +98,8 @@ release-readiness and artifact checks.
 4. **Static audits** (release-sized changesets): use the relevant installed macOS skills (Axiom auditors, the
    `swift-review` subagent) plus direct code review for SwiftUI architecture/performance, memory, concurrency, signing,
    and security/privacy. Scope findings to changed surfaces; fix or explicitly defer them.
-5. **Version bump**: `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml` (shared by
-   the two user-facing targets) → `./scripts/regenerate_project.sh`.
+5. **Version bump**: `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml`'s project-level
+   `settings.base` (shared by every generated target) → `./scripts/regenerate_project.sh`.
 6. **Local package verification**:
    ```sh
    ./scripts/release.sh --preflight full --signing-mode developer-id --signing-identity "<Developer ID Application: …>"
@@ -161,7 +161,7 @@ Since the macOS app adopted the iOS screens (plan `macos-ios-convergence-2026-09
 copy, spacing and French. Run it on the candidate build with the interface language set to
 French once and to System Default once (Settings, `settings_appLanguage`); the app is dark-only.
 
-1. **Sidebar and status**: brand lockup, Studio and Library sections, Settings last; the inline
+1. **Sidebar and status**: brand lockup, then the four destinations (Studio, Voices, History, Settings); the inline
    player card and the status strip under it (`sidebar_backendStatus`, `sidebar_generationStatus`)
    reflect the engine's load state; ⌘1–⌘6 switch screens.
 2. **Built-in Voice**: composer with the character count, the speaker, delivery, language and seed
@@ -172,7 +172,7 @@ French once and to System Default once (Settings, `settings_appLanguage`); the a
 4. **Voice Cloning**: the reference chip lists saved voices (persona rows for emotion banks) with
    Import, Record and Clear inside; drop an unsupported file and confirm the footer warning; the
    transcript field, the one-time consent and the readiness line read correctly.
-5. **Batch and long-form**: the Batch chip opens the sheet in line mode; a script over 900
+5. **Batch and long-form**: the Batch toggle selects line-by-line and Generate then opens the sheet in line mode; a script over 900
    characters routes Generate to long form; run a two-line batch, cancel a long-form project and
    resume it, regenerate one segment; the dock behind the sheet shows the live card.
 6. **History, Saved Voices, Settings**: sort and search in the toolbar, the long-form segments
@@ -199,11 +199,11 @@ from a working directory outside the checkout. Missing or newly dynamic non-syst
 fail closed and must be deliberately packaged and verified before release. No resource lookup
 rewrite was needed by the initial relocation proof.
 
-This deterministic smoke does not run synthesis. RF-10 (parked until RF-09 clears the iOS critical
-path; RF-08 is parked and F-17 planned behind it) additionally qualifies all three modes,
+This deterministic smoke does not run synthesis. RF-10 (parked until the iOS submission path clears
+or the maintainer prioritizes desktop/CLI; RF-08, formerly F-17, is parked on the same condition) additionally qualifies all three modes,
 French Design with a pinned seed, Clone, one two-item batch in a single process, cancellation, generation-error exit status, and resource
 loading during real inference on the copied **signed candidate**. Record those results separately;
-neither a development CLI smoke nor a valid manifest closes F-17 or authorizes publication.
+neither a development CLI smoke nor a valid manifest closes RF-08/RF-10 or authorizes publication.
 Cancellation qualification requires the command's cleanup acknowledgement, exit 130, and absence
 of both the cancelled destination and its UUID staging WAV. A forced exit or host-side deletion
 cannot produce PASS. Keep failed output and the partial report for investigation. Native signal

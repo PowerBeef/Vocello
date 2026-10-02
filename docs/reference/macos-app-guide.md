@@ -202,7 +202,7 @@ use `settings_detail_<category>`, and `settings_backButton` returns to the overv
 | Mode row | `settings_mode_<mode>` (scrolled to and flashed from a Studio installation link) |
 | Package row | `settings_package_<modelID>` / `settings_packageBadge_<modelID>` (Recommended or Heavy) / `settings_packageStatus_<modelID>` / `settings_downloadProgress_<modelID>` |
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
-| App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads System Default) |
+| App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads English, which beginSession selects through this control) |
 | Auto-play | `preferences_autoPlayToggle` |
 | Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
 | Prefer lower-memory models | `settings_preferSpeedEverywhere` |
@@ -311,9 +311,9 @@ The shell harness owns deterministic proof and evidence:
 | Lane | Purpose |
 |------|---------|
 | `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
-| `scripts/ui_test.sh macos smoke` | Nine ordered focused journeys (navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, three-segment long-form project, two-line batch, Design brief + completed player, Clone reference + completed player) with named screenshots and automatic on-failure desktop + element-tree evidence |
+| `scripts/ui_test.sh macos smoke` | Thirteen ordered focused journeys (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (two planned segments by default), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content; `--scenario layout\|studio-content\|generation-errors` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
-| `scripts/ui_test.sh macos perf` | Nine scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
+| `scripts/ui_test.sh macos perf` | Eleven scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 | `scripts/ui_test.sh macos marketing` | Product image refresh (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`, `--scenario models` for the Model Downloads image): two demo takes and one saved designed voice through visible controls at a 1040×680 window, captures attached for export; `evidenceClass: marketing-assets`, never acceptance or benchmark evidence |
 
 ### macOS-specific patterns (vs iOS)

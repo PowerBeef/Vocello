@@ -67,7 +67,8 @@ schemes, CLI identity, localization, saved-voice lifecycle, entitlements, suppor
 (`scripts/public_facts_contract.py`: release identity, README and website copy), attribution, runtime
 security (debug knobs, concurrency registry, TSan policy), owned-runtime inventory, backend wiring,
 model catalog and host availability, iOS storage protection, supply chain, release steps, benchmark
-history, README charts, the text-level delivery and prosody contracts, the roadmap, the exact
+history, README charts, the text-level delivery-instruction copy and audio QC take inputs (script
+pool, calibration-take policy), the roadmap, the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 
 `--python all|selected|none` picks the Python lane: `all` (the default) runs the whole suite;
@@ -282,8 +283,8 @@ time under `build/cache/qc/run.lock`) measure outputs, not timing, so editing ag
 them. The agents only edit Python and run module-targeted pytest: no native builds, no full
 `pytest -n auto` and no second model run. `qc-takes` calls
 `require_quiet_host <lane> agents-allowed`, which records the agents and still refuses on load,
-memory pressure or a held native lock. Memory contention can still cost a worker chunk a
-host-condition retry. Timing benchmarks, memory qualification, UI, device and release lanes keep
+memory pressure or a held native lock. Timing benchmarks, memory qualification, UI, device and
+release lanes keep
 the strict rule. Never edit a script a running lane executes: bash reads it from disk as it runs.
 
 ## Claude Code setup and tool routing

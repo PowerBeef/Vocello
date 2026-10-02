@@ -160,7 +160,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |
 | Error retry | `textInput_generationError` | Retry bar on a failed generation |
 | Foreground-exit notice | `textInput_backgroundNotice` | Shown on return after leaving the app stopped a take or long-form project; tap to dismiss |
-| Player controls | `studio_livePreview_playPause`, `studio_livePreview_cancel`; `studio_inlinePlayer_playPause`, `studio_inlinePlayer_download`, `studio_inlinePlayer_dismiss` | Live streaming preview and completed-take controls. The enclosing SwiftUI card has no test identifier. |
+| Player controls | `studio_livePreview_playPause`, `studio_livePreview_cancel`; `studio_inlinePlayer_playPause`, `studio_inlinePlayer_download`, `studio_inlinePlayer_dismiss` | Live streaming preview and completed-take controls. The enclosing card is `studio_livePreview_card` while streaming and `studio_inlinePlayer_generation_<uuid>` once complete. |
 | Cadence review | `studio_inlinePlayer_cadenceNotice`, `studio_inlinePlayer_cadenceRetry` | An accepted take with unusual pause spacing remains playable and saved, but exposes a non-color-only warning and an explicit “Generate again” action using the currently visible settings. Severe gaps remain rejected before this surface. |
 
 **Selector pills (chips)** — `studioChip_*` identifiers are directly queryable in Studio. Per mode:
@@ -361,11 +361,12 @@ full explanations remain in the detail pages and accessibility hints. Values wra
 instead of competing for a narrow trailing column.
 No nested navigation stack is introduced. App Language adds a UI-only persisted preference,
 defaulting to System Default, then native-name choices from complete bundled translations
-(currently English and French). It does not select the language of generated speech. The
+(currently ten: English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified
+Chinese, Japanese, Korean and Russian). It does not select the language of generated speech. The
 observable app-lifetime owner updates typed display copy without replacing runtime dependencies;
 system dialogs may retain the OS language. English/French switching, relaunch and draft checks have
-partial physical evidence; full AX-XXXL/pseudo layout acceptance and the remaining eight translation
-batches are still pending under ASR-12/ISU-4.
+partial physical evidence that predates the eight catalogs added 2026-09-21; full AX-XXXL/pseudo
+layout and physical acceptance of all ten languages remain pending under ASR-12/ISU-4.
 
 Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
 `iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and
@@ -401,7 +402,7 @@ full-width live StoreKit-price action, Restore, policy/support links, and thank-
 purchase states, disabling rules and explicit post-purchase export retry remain unchanged.
 If product information cannot load while verified export access is already unlocked, the notice
 explicitly confirms that exports remain available. Product availability does not revoke access.
-New Settings/purchase presentation copy is typed and includes English/French catalog entries.
+New Settings/purchase presentation copy is typed and has catalog entries in all ten interface languages.
 Settings variation names and model names/actions/statuses are localized display values; saved
 variation raw values, model IDs, installation behavior and purchase policy remain unchanged.
 The existing Settings localization walk includes a French-Default pass alongside the four
@@ -438,8 +439,9 @@ Full-screen player (`Sources/iOS/Sheets/IOSPlayerSheet.swift`):
 supplies a distinct save handler — `iosPlayer_save`. Recording overlay (`Sources/iOS/Overlays/IOSRecordingOverlay.swift`):
 `iosRecord_close`, `iosRecord_start` / `iosRecord_stop`, `iosRecord_retake`, `iosRecord_use`, and the
 conditional `iosRecord_consentRequired` notice.
-Lifecycle toasts (`IOSEngineLifecycleToast.swift`) are transient ("Preparing runtime",
-"Model loading") and labeled with `engineLifecycleToast_<id>`.
+Lifecycle toasts (`IOSEngineLifecycleToast.swift`) cover engine paused/recovering/restarted
+(auto-dismiss after 4 s) and engine error (persists until dismissed or state changes), labeled
+`engineLifecycleToast_<id>` with ids `interrupted`, `recovering`, `invalidated`, `failed`.
 
 **Audio session (PA-21, AUD-02).** `IOSAudioSessionOwner` is the only code that calls
 `setCategory` or `setActive`; `IOSAudioSessionLedger` (`Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift`)
@@ -537,7 +539,7 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 
 - **Install:** Settings → Voice Models → `iosModelDownload_<id>`.tap() → (wait for complete → `iosModelStatus_<id>` = "Ready").
 - **Cancel:** `iosModelDownload_<id>`.tap() → `iosModelCancel_<id>`.tap() →
-  `waitForConfirmationButton("iosModelCancelDownloadConfirmButton")` → tap it → Install reappears.
+  `VocelloUIWait.exists(element("iosModelCancelDownloadConfirmButton"))` → tap it → Install reappears.
 - **Retry/cancel:** Retry a failed request with `iosModelRetry_<id>` to reuse verified files. Cancel
   an active request with `iosModelCancel_<id>`, then confirm `iosModelCancelDownloadConfirmButton`;
   staging is removed only after URLSession cancellation callbacks and tasks are terminal.

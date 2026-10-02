@@ -38,7 +38,8 @@ handoffs may change the in-session Studio mode.
 ### Built-in Voice
 
 - Script editor and count: `textInput_textEditor`, `textInput_lengthCount`.
-- Voice, delivery, language, and variation controls.
+- Voice, delivery and language chips (`studioChip_*`); variation is the Settings → Audio preference
+  (`iosSettings_variationRow`).
 - Generate: `textInput_generateButton`.
 - Inline progress and completed player.
 
@@ -102,8 +103,8 @@ Files app route through the same flow via `RootView.onOpenURL`).
 Custom. Benchmark-fixture enrollment is script-owned via
 `scripts/ios_device.sh enroll-clone-fixture`.
 
-History supports search, mode filtering, sorting, playback, export, saving a take as a voice, and
-deletion. A row whose take recorded a sampling seed offers "Pin seed N for new takes" in its
+History supports search, mode filtering, newest-first date grouping, playback, export, seed pinning
+and deletion. A row whose take recorded a sampling seed offers "Pin seed N for new takes" in its
 overflow menu (`historyRowPinSeed_<id>`, DP-15): pinning lands in that take's Studio mode with the
 Seed chip visible. Long-form projects group as one joined row plus a per-segment disclosure
 (`history_longFormSegmentsToggle_<digest8>`); search flattens the grouping, and orphan segments

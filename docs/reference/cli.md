@@ -32,7 +32,7 @@ It serves two roles:
 It links the engine framework directly, like the apps, **ships no model weights and no Python**, and runs
 **in place** beside its MLX metallib bundle. It shares the same on-disk model store as the app
 (`~/Library/Application Support/QwenVoice/models` by default). Install weights via the app
-(Settings → Model downloads) or headlessly with `vocello models install <id>` — the same
+(Settings → Models & Files) or headlessly with `vocello models install <id>` — the same
 HuggingFace downloader the app uses. `generate`/`bench` fail fast if a requested model isn't
 installed (`vocello models list` / `models status` show what's present). For macOS UI tests and
 bench in debug context, see [`testing-runbook.md`](testing-runbook.md) "Model readiness"
@@ -211,7 +211,8 @@ contains every planned index/generation identity with `completed`, `failed`, `ca
 row `cancelled`; a genuine failure that coincides with a signal stays `failed` and adds
 `cancellationRequested: true`. Failure exits nonzero. All-success JSON stays
 compatible. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
-language per text and non-streaming output; `--language`, `--stream`, and `--out` are rejected
+language per text and non-streaming output (with `--long-form`, each line is a long-form project
+whose segments stream); `--language`, `--stream`, and `--out` are rejected
 instead of silently ignored (use `generate` or batch `--out-dir`).
 
 The bare `--capture-codec-trace` flag (internal-diagnostics binaries with `QWENVOICE_DEBUG=1` and
@@ -270,7 +271,7 @@ vocello deliveries [--json]
 Lists every built-in delivery preset as a preset id and the natural-language instruction
 the model receives in its canonical English form (the source of truth is `EmotionPreset`). Static
 and instant. These ids are the
-`bench --delivery <id>` cells, and `--shipped-only --json` is the roster the delivery bench reads.
+`bench --delivery <id>` cells, and `--shipped-only --json` is the shipped roster `scripts/voice_identity_language_reliability.py` reads.
 Objective, reference-free delivery adherence (F0 / speaking-rate / duration deltas against a
 same-seed neutral take) is measured by `vocello bench --delivery` with
 `scripts/bench_delivery_prosody.py`; see
@@ -389,7 +390,7 @@ model file must match the pinned catalog bytes, including the receipt's tokenize
 Source and local manifest digests are recorded separately: installation timestamps and older
 revision metadata can differ even when all model bytes match. The output directory must not exist;
 source artifacts remain untouched, partial results survive failure, and no benchmark history
-is published. Use the ordinary resource supervisor and source snapshot for local runs.
+is published.
 
 The original replay field named `full` is the **production non-streaming 25-frame decoder
 schedule**, not an independent implementation or a whole-sequence decoder call. The Mac result

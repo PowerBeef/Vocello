@@ -90,13 +90,15 @@ runs the same bench but adds the run to the staged baseline instead of comparing
 `release-readiness` is the packaging prerequisite `scripts/release.sh` invokes before signing; it
 needs no model fixture and no UI evidence.
 
-The gate bench, `telemetry-overhead`, `lang-bench` and `memory` refuse to start on a busy host (the
+The gate bench, `profile`, `telemetry-overhead`, `lang-bench`, `memory` and `qc-takes` (with
+`agents-allowed`) refuse to start on a busy host (the
 deterministic gate without a bench does not check, so it can run beside an agent or a native build):
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
 core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
 or a locked agent worktree before any model loads, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
-`memory` and `lang-bench` are consent-bound (`ask` rules in `.claude/settings.json`; explicit
+`memory`, `lang-bench`, `qc-takes`, `profile`, `telemetry-overhead`, `gate` and `release-readiness`
+are consent-bound (`ask` rules in `.claude/settings.json`; explicit
 request required) and are never run unasked; the storage floors every lane checks first are listed under Instruments profiles below.
 
 ## Blocking ThreadSanitizer subset
@@ -128,7 +130,8 @@ with the XPC service on 2026-09-15; the lane is core-only since).
 ## Explicit XCUITest lanes
 
 Run only when frontend acceptance is explicitly requested. `test01_NavigationAndReadiness` (the whole
-`localization` lane, and the first journey of every `smoke` lane) launches the app with Foundation's
+`localization` lane, and the second journey of the full `smoke` lane, after
+`test00_WindowSizesAndSettingsScene`) launches the app with Foundation's
 `-NSDoubleLocalizedStrings YES -NSShowNonLocalizedStrings YES`, so doubled text (menus included) and
 UPPERCASE labels in its attachment `mac-smoke-readiness-pseudolocalized` are the diagnostic, not a
 defect: doubling is the long-string stress and uppercase marks a key absent from the String Catalog.
@@ -228,7 +231,8 @@ sidebar-navigation-warms measures them apart. Scenarios that repeat a cycle (sid
 delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
 records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action, and the
 generation-active take names the memory samplers' cadence during its take (`samplerTargetIntervalMS`,
-from the probe's environment row: 100, 250 or 500 ms by tier; the iPhone lane names it too). Since
+from the probe's environment row: 100 or 250 ms by tier (the floor tiers sampled at 500 ms before
+2026-09-25); the iPhone lane names it too). Since
 2026-09-25 each probe block also carries every frame gap (`gaps`, end offset and length) and the
 private watchdog's heartbeats of that block (`heartbeatCount`, `delayedHeartbeats`), so the checker
 clips `uiMaxGapMS` to the window (a gap straddling a window edge counts only its in-window part),
@@ -262,7 +266,7 @@ source). Ceilings come only from the counted runs' own spread, through `--derive
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Seven ordered focused journeys, each in a fresh app session; generated diagnostic-store audio and History are retained, not automatically erased: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
+| Smoke | Thirteen journeys in method-name order (`test00`–`test12`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors` runs `test00`, `test12` or `test11` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery) and `test12` (cross-language content), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching
@@ -317,8 +321,8 @@ New publishable generation runs use telemetry schema v8 and evidence manifest v2
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and leave no
 gap between samples above the policy's unobserved-gap bound (twice the sampler cadence, at least
-500 ms, or 1,000 ms on an 8 GB Mac, provisional until the first consented M6 memory lane calibrates
-it; `config/memory-qualification-policy.json`). The app and engine samples of the one hosting
+500 ms, calibrated on the M6 on 2026-09-25; 1,000 ms on the 8 GB Mac and the iPhone, provisional
+until an unforced record of theirs calibrates it; `config/memory-qualification-policy.json`). The app and engine samples of the one hosting
 process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
@@ -359,8 +363,8 @@ scripts/macos_test.sh profile --kind witness
 The memory profile captures one cold long take so Allocations/VM Tracker include model-load and
 sustained-generation peaks. It uses Apple's Allocations template, which contains both memory tracks
 with automatic VM snapshots disabled; standalone VM Tracker auto-snapshots suspend the target and
-would legitimately blind its 500 ms sampler. Publication verifies that setting from the captured
-trace and still enforces the unobserved-gap gate unmodified. The default 180-second safety
+would legitimately blind its memory sampler (250 ms on the M6). Publication verifies that setting
+from the captured trace and still enforces the unobserved-gap gate unmodified. The default 180-second safety
 cap accommodates a cold long take, while target exit ends recording early. `scripts/macos_test.sh
 memory` owns the repeated retained-growth qualification.
 

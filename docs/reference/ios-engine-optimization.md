@@ -29,7 +29,7 @@ this doc.** All claims below are cited to a file or commit; re-verify before rel
 
 ---
 
-## TL;DR — latest clean canonical evidence (iPhone 17 Pro)
+## TL;DR — clean canonical evidence as of 2026-07-16 (iPhone 17 Pro)
 
 - **In-process, Speed (4-bit) only.** The engine runs inside the app process (`MLXTTSEngine` via
   `NativeRuntimeFactory`); the ExtensionKit extension was removed (it could never load the model —
@@ -43,8 +43,8 @@ this doc.** All claims below are cited to a file or commit; re-verify before rel
 - **Entitlement enabled, self-serve.** `increased-memory-limit` is on the app App ID; measured
   entitled per-app limit ≈ **~6 GB** on the 17 Pro, ~5–5.5 GB on 8 GB devices. No hard
   `Memory.memoryLimit` on any tier (§2).
-- **Remaining work (§9):** an 8 GB-device proof (only the 17 Pro is measured), App Store
-  credential/metadata setup, and the gated mlx-swift 0.31 bump. (The 0.6B variant evaluation was
+- **Remaining work (§9):** an 8 GB-device proof (only the 17 Pro is measured) and the public App
+  Store submission (credentials and a public TestFlight beta are in place). (The 0.6B variant evaluation was
   **ruled out 2026-07-02** — see §9 P2.)
 
 ---
@@ -112,8 +112,8 @@ The `iPhonePro` policy is the most aggressive tier (it shares the app's budget):
 | Clear MLX cache after each generation | **always** | `!isBatch` | false |
 | Clear MLX cache on each stream chunk emit | **true** | true | false |
 | MLX token-memory clear cadence | **every 50 tokens** | 50 | 200 |
-| Idle-unload window | **30 s** | 120 s (adaptive 30/10 under trim) | never |
-| Pressure monitor active | **yes** | yes | no |
+| Idle-unload window | **30 s** | 120 s (adaptive 30/10 under trim) | 1,800 s |
+| Pressure monitor active | **yes** | yes | yes |
 
 (`NativeMemoryPolicyResolver.swift` — iPhonePro block. The 128 MB cache + per-chunk clear + 50-token
 cadence + 30 s idle-unload are what keep the streaming peak flat.)
@@ -135,8 +135,8 @@ from **two independent criteria**, and the engine band is the worse of them:
 > distinct live admission criterion (footprint-based, not headroom-based), and it stays.
 
 `NativeMemoryPressureMonitor` maps kernel pressure → trim: `.warning → softTrim`,
-`.critical → hardTrim`, `.normal → clear`. It is started on `iPhonePro` (and the constrained Mac
-tiers). Warning pressure keeps the existing non-interrupting soft-trim policy. Critical pressure
+`.critical → hardTrim`, `.normal → clear`. It is started on every tier (high-memory Mac too since AUD-10,
+2026-09-24). Warning pressure keeps the existing non-interrupting soft-trim policy. Critical pressure
 uses the typed `.memoryPressure` reason to cancel the active generation and await its terminal
 barrier before the hard trim can begin. On iPhone hard-trim / unload / failure,
 `NativeEngineRuntime.clearQwen3MemoryCachesIfNeeded()`
@@ -182,7 +182,7 @@ How the streaming path stays flat (all `iPhonePro`-tuned, §2.2):
 - **Lossless bounded core audio.** Final PCM uses the single-consumer, frame-bounded suspending
   classified-session channel. `MLXTTSEngine.events` is backed by a separate per-generation
   suspending router with capacity 96 on iOS and 256 on macOS;
-  `GenerationEventDeliveryProbe` accounts for accepted/terminated/unobserved sends.
+  `GenerationScopedEventRouter` (`GenerationEventDeliveryProbe.swift`) accounts for accepted/terminated/unobserved sends.
 - **Preview only after durable drain.** `GenerationOutputAdapter` writes each frame to the
   incremental WAV before frontend preview publication. Preview PCM uses the bounded suspending
   event router and is never evicted. The debug-gated `QWENVOICE_STREAMING_PREVIEW_DATA=off` remains
@@ -192,7 +192,8 @@ How the streaming path stays flat (all `iPhonePro`-tuned, §2.2):
   request-local `Qwen3RequestMemoryPolicy` with `clearCacheOnStreamChunk=true` and
   `tokenMemoryClearCadence=50`. Generation never mutates a process-global tuning singleton.
 - **Streaming requests everywhere.** Custom / Design / Clone all build their `GenerationRequest` with
-  `shouldStream: true` (the three coordinators in `Sources/ViewModels/`).
+  `shouldStream: true` (`Sources/iOS/IOSGenerationModeViews.swift` on iPhone,
+  `Sources/Services/MacStudioGenerationRequestFactory.swift` on macOS).
 
 `Qwen3RequestMemoryPolicy.talkerKVGeneratedWindow` is `nil` by default (unbounded
 `KVCacheSimple`). The talker-KV sliding window remains **debug-gated and off** through
@@ -228,7 +229,7 @@ The owned Vocello Qwen3 Core runtime already implements the large majority of th
 iPhone-Qwen3-TTS optimization playbook (OPTIMIZATION.md "Grounding"): `small_to_mtp_projection`
 2048→1024 bridge, 2048-dim speaker embedding, interleaved MRoPE `[24,20,20]`, Q/K RMSNorm,
 `MLXFast.scaledDotProductAttention`, a single per-frame `eval()` (no per-step `.item()`), `asyncEval`
-streaming, the input-side decoder-drift fix (`4fab110`), per-tier `GPU.cacheLimit`, fp16 KV cache, and
+streaming, the input-side decoder-drift fix (`4fab110`), per-tier `Memory.cacheLimit`, fp16 KV cache, and
 a `compile(shapeless:)` SwiGLU. Backend speed for 1.7B 4-bit on this stack is **bounded**, not freely
 improvable:
 
@@ -256,11 +257,12 @@ focuses on 1.7B variants only (mlx-swift bump when gated review passes, kernel-l
 
 ## 6. Measured on-device performance
 
-Latest clean canonical record: iPhone 17 Pro · Speed (4-bit) · in-process · streaming · 29 XCUITest
+Clean canonical record (2026-07-16; newest canonical iOS record is
+`ios-xcui-benchmark-20260801-132415-abbec96b`): iPhone 17 Pro · Speed (4-bit) · in-process · streaming · 29 XCUITest
 takes · source `bcb5265a…` ·
 [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json).
 Warm rows below are per-cell medians across three takes; cold rows contain one take. Peak footprint is
-the maximum within the cell. This record directly covers the current owned-core runtime source.
+the maximum within the cell.
 
 | mode | state/length | median RTF | peak physFoot MB | max soft trims | audioQC |
 |---|---|---:|---:|---:|---|
@@ -352,9 +354,8 @@ stays open (streaming playback tolerance to sub-realtime decode is the question 
 answers). A memory-profile row is labeled diagnostic evidence, never different-device proof.
 
 **P2 — App Store distribution setup.** The manual `archive-ios` CI job already archives, verifies,
-exports, and optionally uploads. It still needs maintainer-owned iOS Distribution credentials, an
-App Store provisioning profile carrying the increased-memory entitlement, the App Store Connect
-record and metadata, and an explicit dispatch. Local on-device build/test is already established
+exports, and optionally uploads. Distribution credentials, the App Store Connect record and a public
+TestFlight beta are in place; App Store submission remains open. Local on-device build/test is already established
 (`ios-device-testing.md`); optional frontend proof is independent of archive packaging.
 
 **P2 — 0.6B variant: RULED OUT (maintainer decision, 2026-07-02).** The 0.6B checkpoints exist
@@ -364,15 +365,14 @@ mode matrix (Custom-only tier) for a speed win the 1.7B doesn't need (already fa
 device). Vocello stays **1.7B-variants-only** (Speed 4-bit / Quality 8-bit). Do not resurrect
 without a new maintainer decision.
 
-**P3 — mlx-swift 0.31.x / mlx-swift-lm 2.31.x bump (gated).** Deferred — **stay pinned at 0.30.6 /
-2.30.6**. 0.31 changes the quantization API (`Quantizable.toQuantized` gains a `QuantizationMode`;
-quantize moves to a top-level fn), which lands on the 4-bit/8-bit model-load path, so it's not a free
-bump. Procedure (OPTIMIZATION.md §E, `.claude/rules/native.md` "SPM pins move in lockstep"):
-obtain explicit maintainer authorization on `main` → bump all pin sites in lockstep (`project.yml`
-*and* owned `Packages/VocelloQwen3Core/Package.swift`) →
-`regenerate_project.sh` → both `build_foundation_targets.sh` → fixed-seed `vocello bench` vs the
-committed baseline + applicable automated language/prosody gates → keep only if RTF/quality/QC are
-unchanged.
+**P3 — mlx-swift 0.31.6 / mlx-swift-lm 3.31.4 bump: done (2026-08-01).** Both pin sites
+(`project.yml` *and* owned `Packages/VocelloQwen3Core/Package.swift`) moved in lockstep and were kept
+after a same-day fixed-seed A/B on the canonical M2 floor: warm RTF within noise and identical QC
+verdict distributions (OPTIMIZATION.md §Q). A later bump follows the same procedure
+(OPTIMIZATION.md §E, `.claude/rules/native.md` "SPM pins move in lockstep"): explicit maintainer
+authorization → lockstep pin bump → `regenerate_project.sh` → foundation builds → fixed-seed
+`vocello bench` vs the committed baseline + applicable automated language/prosody gates → keep only
+if RTF/quality/QC are unchanged.
 
 **P3 — thermal-state monitoring + proactive-warm gate: implemented.**
 `TTSEngineStore.startThermalObservation` observes `ProcessInfo.thermalState`; serious/critical state

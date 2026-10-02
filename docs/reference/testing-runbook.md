@@ -104,11 +104,12 @@ artifacts or caches are disposable. Multi-run evidence is pinned before launch.
 Native Xcode/SwiftPM commands are serialized by the host-wide native lock across every checkout and
 agent worktree. Generation and heavy analyzers run in the lead session, and no evaluator runs beside
 a resident generator: neural evaluators start only after the TTS process exits, and the canonical
-Mac mini M6's measured budget governs them from then on (the 8 GB Mac is a product floor, not an
-evaluator host); timing lanes refuse to start on a busy host. The busy-host rule is
+Mac mini M6 runs QC v2's models one at a time under `build/cache/qc/run.lock` (the 8 GB Mac is a
+product floor, not an evaluator host); timing lanes refuse to start on a busy host. The busy-host rule is
 `require_quiet_host` in `scripts/lib/host_preflight.sh`: a one-minute load above twice the core
 count, a kernel memory-pressure level above normal, another holder of the native lock or a running
-agent worktree refuses the lane before any model loads.
+agent worktree refuses the lane before any model loads (`qc-takes` passes `agents-allowed` and only
+records the agents).
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues for an explicitly exploratory run, which
 the publisher then classifies from the run's own load sample.
 
@@ -126,4 +127,4 @@ and artifact verification; a development build is not a processed distribution c
 
 Former recipes, including operator-local ML setup, are in git history (the runbook before
 2026-09-06). Dated pins and commands there are not current authority. For current analyzer
-configuration use the delivery harness and its checked-in contracts.
+configuration use QC v2 ([qc.md](qc.md)) and its checked-in `config/qc/` contracts.

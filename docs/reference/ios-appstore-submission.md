@@ -202,7 +202,7 @@ owner/web checks; record an unavailable answer as pending, never as PASS. Keep o
 is complete.
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
-      Settings → About → Privacy Policy row links to the same URL).
+      Settings → Privacy & Permissions → Privacy Policy row links to the same URL).
 - [ ] **App Privacy "nutrition label"**: do not select **Data Not Collected** until ASR-02 closes.
       Mic audio, transcripts, prompts, and generated audio remain local, but Hugging Face receives
       network request metadata during model downloads. Record the vendor retention and qualified
@@ -233,9 +233,9 @@ is complete.
 
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
 > small. On first launch, open Settings → Voice Models and tap **Install** for the Studio mode you want:
-> Built-in Voice is 1,708,583,689 bytes, Voice Design is 1,708,583,196 bytes, and Voice Cloning is
-> 1,732,600,769 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
-> at least 4 GB of free space available before each installation; completion time depends on the review network and may take several
+> Built-in Voice is 2,049,696,897 bytes, Voice Design is 2,049,696,404 bytes, and Voice Cloning is
+> 2,073,713,977 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
+> at least 4.5 GB of free space available before each installation; completion time depends on the review network and may take several
 > minutes. Progress reports exact downloaded catalog bytes. A download can be cancelled and restarted, and
 > an interrupted background download is adopted after relaunch. Final verification/installation is shown as
 > an indeterminate finishing step. Once the model shows **Ready**, that mode works offline. Open Studio,
@@ -251,7 +251,7 @@ non-functional under Guideline 2.1.
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
 `max(2 × catalog bytes, catalog bytes + 256 MiB)`. The coordinator supplies the full model
 catalog total, even when components can be reused. Current admission needs are approximately
-3.42–3.47 GB of available space; the 4 GB advice provides reviewer headroom, not a different
+4.10–4.15 GB of available space; the 4.5 GB advice provides reviewer headroom, not a different
 runtime policy or a guarantee against concurrent storage use. Recheck against the candidate
 catalog before pasting these notes into App Store Connect.
 
@@ -410,7 +410,7 @@ Upload the IPA via Transporter or `xcrun altool --upload-app -f build/dist/ios/e
 The repo's standing iOS quality work covers the code side (audio-session lifecycle, accessibility, dismissible
 onboarding, error/empty states, portrait lock, privacy link). Before submitting, additionally confirm on a real
 device: launch + all 4 tabs; install a model; generate in each mode; record→enroll→clone with mic/speech permission
-**denial + recovery** via Settings → About → Open iOS Settings; cancel mid-generation; an incoming call mid-record
+**denial + recovery** via Settings → Privacy & Permissions → Permissions (iOS Settings); cancel mid-generation; an incoming call mid-record
 keeps the take; VoiceOver reads the primary controls; the largest Dynamic Type doesn't clip the composer.
 
 ## 6. Submit

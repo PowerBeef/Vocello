@@ -261,8 +261,8 @@ Per-tier defaults:
 
 | Tier | Cache limit | Memory limit | Clear cache cadence |
 | --- | --- | --- | --- |
-| `floor8GBMac` | 256 MB | none | every 50 tokens |
-| `mid16GBMac` | 512 MB | none | every 50 tokens |
+| `floor8GBMac` | 256 MB | none | every 50 tokens, per chunk |
+| `mid16GBMac` | 512 MB | none | every 50 tokens, per chunk |
 | `highMemoryMac` | 1 GB | none | every 200 tokens |
 | `iPhonePro` | 128 MB | env-only | every 50 tokens, per chunk |
 
@@ -428,7 +428,7 @@ Start with **Performance Limiter** counters. They point to the slowest subsystem
 
 iOS terminates apps whose physical footprint crosses a per-process limit. Because memory is unified, Metal allocations count against that limit. Vocello's iOS target enables `com.apple.developer.kernel.increased-memory-limit`, which raises the ceiling on supported devices, but the app must still fit within the runtime budget measured by `os_proc_available_memory()`.
 
-Telemetry shows that Vocello's streaming path peaks around **3.0 GB physical footprint** on iPhone, comfortably under the entitled ceiling (~5–6 GB) but not with much margin.
+Telemetry shows that Vocello's streaming path peaks at about **2.2–3.5 GB physical footprint** on iPhone (Clone heaviest), comfortably under the entitled ceiling (~5–6 GB) but not with much margin.
 
 ### 8.2 Thermal throttling and sustained performance
 

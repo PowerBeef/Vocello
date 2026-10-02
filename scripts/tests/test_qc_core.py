@@ -400,10 +400,16 @@ class RunnerHostTests(unittest.TestCase):
         identity = runtime.runner_identity(self.layout, model_entry())
         with_dependency = model_entry(dependencies=[{"name": "ssl", "source": model_entry()["source"]}])
         self.assertNotEqual(runtime.runner_identity(self.layout, with_dependency), identity)
-        # A shared helper (the LLM prompts live in runners/_llama.py) changes it too.
+        # A helper the runner does not import leaves it alone (the judge's prompts in _llama.py re-run
+        # only the judges); a helper it imports changes it, and so does that helper's next edit.
         (self.root / "scripts/qc/runners/_kit.py").write_text("PROMPT = 'v1'\n")
+        self.assertEqual(runtime.runner_identity(self.layout, model_entry()), identity)
+        source.write_text(source.read_text() + "\nfrom qc.runners import _kit  # noqa: F401\n")
         with_helper = runtime.runner_identity(self.layout, model_entry())
         self.assertNotEqual(with_helper, identity)
+        (self.root / "scripts/qc/runners/_kit.py").write_text("PROMPT = 'v2'\n")
+        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_helper)
+        with_helper = runtime.runner_identity(self.layout, model_entry())
         # Code the runner does not import does not: qc/phones.py and qc/pitch.py belong to the scoring
         # identity, and to the runners that import them.
         (self.root / "scripts/qc/pitch.py").write_text("# pitch helpers\n")

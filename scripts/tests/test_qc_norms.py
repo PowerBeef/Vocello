@@ -139,7 +139,7 @@ class NormsComputationTests(PoolFixture):
     def test_per_language_percentiles_from_the_pool(self):
         document = norms.compute(self.layout, self.takes, min_count=3, echo=lambda line: None)
         self.assertEqual(document["counts"], {"french": 5, "japanese": 5})
-        self.assertEqual(document["pool"]["excluded"], {"finishNotEOS": 1, "audioUnreadable": 1})
+        self.assertEqual(document["pool"]["excluded"], {"control": 0, "finishNotEOS": 1, "audioUnreadable": 1})
         self.assertEqual(document["models"]["align"]["results"], 10)
         french, japanese = document["languages"]["french"], document["languages"]["japanese"]
         self.assertAlmostEqual(french["pause.gap_seconds"]["p50"], 0.25, delta=0.05)

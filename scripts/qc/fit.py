@@ -90,6 +90,11 @@ def feature_rows(layout: Layout, runs: Iterable[str] | None = None
     if runs:
         wanted = set(runs)
         directories = [path for path in directories if path.name in wanted]
+    else:  # the human-controls lane measures detectors on people; it never trains them
+        from qc.controls import CONTROLS_LANE
+
+        directories = [path for path in directories
+                       if store.read_json(path / "features.json").get("lane") != CONTROLS_LANE]
     rows: dict[str, dict[str, Any]] = {}
     identities: dict[str, Any] = {}
     scorings: set[str | None] = set()

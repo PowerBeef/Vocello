@@ -140,11 +140,14 @@ def compute(layout: Layout, takes: list[dict[str, Any]], *, min_count: int = DEF
     values: dict[str, dict[str, list[float]]] = {}
     counts: dict[str, int] = {}
     found = {role: 0 for role in role_models}
-    excluded = {"finishNotEOS": 0, "audioUnreadable": 0}
+    excluded = {"control": 0, "finishNotEOS": 0, "audioUnreadable": 0}
     digests = []
     for index, take in enumerate(takes, start=1):
         if index % 500 == 0:
             echo(f"qc norms: {index}/{len(takes)} takes")
+        if take.get("control"):  # human controls and negative controls are not the pool
+            excluded["control"] += 1
+            continue
         if take.get("finishReason") not in (None, "eos"):
             excluded["finishNotEOS"] += 1
             continue

@@ -50,6 +50,7 @@ FLAGS_SCHEMA = "vocello.qc.flags/1"
 LEVEL_RANK = {"report-only": 0, "warn": 1, "fail": 2}
 EXIT_PASS, EXIT_FAIL, EXIT_ERROR, EXIT_WARN = 0, 1, 2, 3
 PITCH_ROLES = ("pitchA", "pitchB")
+EXCERPT_ROLES = ("phones", "phonesB")  # the phone recognizers the excerpt test runs on a pause alone
 LANE_RE = detector_lib.LANE_NAME
 
 
@@ -153,16 +154,17 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
             model_report["g2pTranscripts"] = {"texts": len(transcripts)}
 
         params = config.get("params", {})
-        context = feature_lib.build_context(takes, results_by_token, reference_results, params)
+        context = feature_lib.build_context(takes, results_by_token, reference_results, params, layout=layout)
         rows = []
         for take in takes:
             values = feature_lib.extract(take, results_by_token[take["token"]], context, params=params,
                                          layout=layout, model_ids=dict(config["models"]))
             rows.append({"token": take["token"], "takeID": take.get("takeID"), "language": take.get("language"),
                          "features": values})
-        model_report["muteTest"] = mute_test(layout, takes, rows, results_by_token, role_models.get("asrA"),
-                                             identities.get("asrA", {}), params, run_now="asrA" in selected,
-                                             runner=runner, echo=echo)
+        model_report["excerptTest"] = excerpt_test(
+            layout, takes, rows, {role: role_models.get(role) for role in EXCERPT_ROLES},
+            {role: identities.get(role, {}) for role in EXCERPT_ROLES}, params,
+            run_now={role for role in EXCERPT_ROLES if role in selected}, runner=runner, echo=echo)
 
     run_id = f"{lane}-{utc_stamp()}-{secrets.token_hex(2)}"
     directory = layout.runs / run_id
@@ -172,8 +174,9 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     store.write_json_atomic(directory / "features.json", {
         "schema": FEATURES_SCHEMA, "run": run_id, "lane": lane, "source": manifest.get("source"),
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
-        "scoringSHA256": scoring["sha256"], "scoring": {"files": scoring["files"], "norms": scoring["norms"]},
-        "models": identities, "takes": rows,
+        "scoringSHA256": scoring["sha256"],
+        "scoring": {"files": scoring["files"], "norms": scoring["norms"], "references": scoring.get("references")},
+        "references": context.get("references"), "models": identities, "takes": rows,
     }, indent=None)
     controls = {take["token"] for take in takes if take.get("control")}
     flags = score_run(layout, config, rows, identities, lane=lane, controls=controls, scoring=scoring)
@@ -186,55 +189,67 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     return directory
 
 
-def mute_test(layout: Layout, takes: list[dict[str, Any]], rows: list[dict[str, Any]],
-              results_by_token: dict[str, dict[str, Any]], model: dict[str, Any] | None, identity: dict[str, Any],
-              params: dict[str, Any], *, run_now: bool, runner: Callable[..., runtime.RunnerReport],
-              echo: Callable[[str], None]) -> dict[str, Any]:
-    """Silence each take's longest gap, re-transcribe it with the first ASR, and compare.
+def excerpt_test(layout: Layout, takes: list[dict[str, Any]], rows: list[dict[str, Any]],
+                 models: dict[str, dict[str, Any] | None], identities: dict[str, dict[str, Any]],
+                 params: dict[str, Any], *, run_now: set[str], runner: Callable[..., runtime.RunnerReport],
+                 echo: Callable[[str], None]) -> dict[str, Any]:
+    """Run the phone recognizers on each take's longest pause alone.
 
-    An unchanged transcript proves the gap holds no words (`pause.mute_confirmed` 1); a
-    changed one means the gap held speech (0). The muted WAVs live under
-    `build/cache/qc/work/muted/<audioSHA256>-<startMs>-<endMs>.wav`, and their transcripts are
-    cached by the muted audio's own digest.
+    The pause, from `excerptMinGapSeconds` (0.4 s) up, is cut `excerptEdgeSeconds` (40 ms) inside its
+    edges into `build/cache/qc/work/excerpts/<audioSHA256>-<startMs>-<endMs>.wav`. With no speech
+    around it to lean on, what a recognizer hears there is in the pause: `pause.excerpt_phones` is
+    the most phones either recognizer hears at `excerptPhoneMinProb` or more, breath-like phones
+    (`excerptIgnorePhones`) aside. Zero says the pause holds no speech sound; muting a pause inside
+    its sentence proved nothing, since recognizers fill in phones over zeros. The excerpts' results
+    are cached by the excerpt's own digest.
     """
 
-    minimum = params.get("muteTestMinGapSeconds", 0.4)
+    minimum = params.get("excerptMinGapSeconds", 0.4)
+    edge = params.get("excerptEdgeSeconds", 0.04)
+    floor = params.get("excerptPhoneMinProb", 0.5)
+    ignore = set(params.get("excerptIgnorePhones", ["h", "ɦ"]))
     candidates = []
     for take, row in zip(takes, rows):
         gap = row["features"].get("pause.longest_gap_seconds") or {}
-        original = feature_lib.outputs(results_by_token[take["token"]], "asrA")
-        if gap.get("value") is None or gap["value"] < minimum or gap.get("start") is None or original is None:
+        if gap.get("value") is None or gap["value"] < minimum or gap.get("start") is None or gap.get("end") is None:
             continue
-        start, end = gap["start"], gap["end"]
-        path = layout.work / "muted" / f"{take['audioSHA256']}-{int(start * 1000)}-{int(end * 1000)}.wav"
+        start, end = gap["start"] + edge, gap["end"] - edge
+        path = layout.work / "excerpts" / f"{take['audioSHA256']}-{int(start * 1000)}-{int(end * 1000)}.wav"
         if not path.is_file():
-            feature_lib.mute_wav(take["audio"], path, start, end)
+            feature_lib.excerpt_wav(take["audio"], path, start, end)
         digest = store.audio_sha256(path)
-        candidates.append((row, original, start, end, {
-            "token": f"mute{digest[:12]}", "audio": str(path), "audioSHA256": digest,
-            "language": take.get("language"), "text": take.get("text"), "reference": None,
-            "referenceSHA256": None}))
-    if not candidates or model is None or not identity.get("runnerSHA256"):
-        return {"candidates": len(candidates), "confirmed": 0, "tested": 0}
-    if run_now:
+        candidates.append((row, gap, {
+            "token": f"gap{digest[:13]}", "audio": str(path), "audioSHA256": digest,
+            "language": take.get("language"), "text": None, "reference": None, "referenceSHA256": None}))
+    report: dict[str, Any] = {"candidates": len(candidates), "tested": 0, "empty": 0}
+    usable = {role: model for role, model in models.items()
+              if model is not None and identities.get(role, {}).get("runnerSHA256")}
+    if not candidates or not usable:
+        return report
+    for role, model in usable.items():
+        if role not in run_now:
+            continue
         try:
-            runner(model, [candidate[4] for candidate in candidates], layout=layout, echo=echo)
+            runner(model, [candidate[2] for candidate in candidates], layout=layout, echo=echo)
         except runtime.RunnerError as error:
-            echo(f"qc run: mute test: {error}")
-    tested = confirmed = 0
-    for row, original, start, end, muted in candidates:
-        result = store.read_result(layout, model["id"], muted["audioSHA256"], None, identity["runnerSHA256"])
-        if not result or "outputs" not in result:
+            echo(f"qc run: excerpt test ({role}): {error}")
+    for row, gap, excerpt in candidates:
+        heard = []
+        for role, model in usable.items():
+            result = store.read_result(layout, model["id"], excerpt["audioSHA256"], None,
+                                       identities[role]["runnerSHA256"])
+            if not result or "outputs" not in result:
+                continue
+            phones = [item for item in result["outputs"].get("phones") or []
+                      if (item.get("prob") is None or item["prob"] >= floor) and item.get("phone") not in ignore]
+            heard.append(len(phones))
+        if not heard:
             continue
-        distance = feature_lib.transcript_distance(original.get("text") or "", result["outputs"].get("text") or "",
-                                                   muted["language"])
-        if distance is None:
-            continue
-        unchanged = distance <= params.get("muteTestMaxDistance", 0.1)
-        row["features"]["pause.mute_confirmed"] = feature_lib.feature(1.0 if unchanged else 0.0, start, end)
-        tested += 1
-        confirmed += int(unchanged)
-    return {"candidates": len(candidates), "tested": tested, "confirmed": confirmed}
+        count = max(heard)
+        row["features"]["pause.excerpt_phones"] = feature_lib.feature(float(count), gap["start"], gap["end"])
+        report["tested"] += 1
+        report["empty"] += int(count == 0)
+    return report
 
 
 def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]],
@@ -355,7 +370,10 @@ def gate(layout: Layout, lane: str, run_id: str | None = None) -> int:
 def queue(layout: Layout, top: int, *, run_id: str | None = None, name: str | None = None) -> Path:
     """The `top` unlabelled takes most worth hearing, as a label batch (`kind: queue`)."""
 
-    runs = [layout.runs / run_id] if run_id else lane_runs(layout)[-1:]
+    from qc.controls import CONTROLS_LANE
+
+    runs = [layout.runs / run_id] if run_id else [
+        path for path in lane_runs(layout) if store.read_json(path / "flags.json").get("lane") != CONTROLS_LANE][-1:]
     if not runs:
         raise FileNotFoundError("no run to queue from (run qc.py run first)")
     directory = runs[0]

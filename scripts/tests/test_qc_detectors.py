@@ -123,8 +123,10 @@ class SignalFeatureTests(unittest.TestCase):
         self.assertTrue(gap["start"] < values["pause.voiced_blips"]["start"] < gap["end"])
         outcome = detectors.score(by_id("pause.anomalous"), values, "french", None, {})
         self.assertEqual((outcome["scope"], outcome["score"], outcome["cut"]), ("provisional", 1.0, 1.0))
-        # A mute test that found words in the gap clears the pause flag.
-        values["pause.mute_confirmed"] = features.feature(0.0)
+        # Phones heard in the pause cut out alone clear the pause flag; none keep it.
+        values["pause.excerpt_phones"] = features.feature(0.0)
+        self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 1.0)
+        values["pause.excerpt_phones"] = features.feature(3.0)
         self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 0.0)
         # The ending is still measured, but no provisional rule reads it: a cut-off is content evidence
         # (boundary.cutoff), and a drop alone never flags.
@@ -206,16 +208,15 @@ class SignalFeatureTests(unittest.TestCase):
         self.assertAlmostEqual(features.signal_features(dropout, RATE, {})["signal.dropout_seconds"]["value"],
                                0.3, delta=0.02)
 
-    def test_wav_io_and_mute(self):
+    def test_wav_io_and_excerpt(self):
         with tempfile.TemporaryDirectory() as directory:
             source = write_wav(Path(directory) / "take.wav", Synth(3).syllables(1.0))
             samples, rate = features.read_wav(source)
             self.assertEqual((rate, samples.size), (RATE, RATE))
-            muted = features.mute_wav(source, Path(directory) / "work/muted.wav", 0.25, 0.5)
-            self.assertEqual(muted.stat().st_size, source.stat().st_size)
-            quiet, _ = features.read_wav(muted)
-            self.assertTrue(np.all(quiet[int(0.25 * RATE):int(0.5 * RATE)] == 0))
-            np.testing.assert_array_equal(quiet[: int(0.25 * RATE)], samples[: int(0.25 * RATE)])
+            excerpt = features.excerpt_wav(source, Path(directory) / "work/excerpt.wav", 0.25, 0.5)
+            piece, piece_rate = features.read_wav(excerpt)
+            self.assertEqual((piece_rate, piece.size), (RATE, int(0.25 * RATE)))
+            np.testing.assert_array_equal(piece, samples[int(0.25 * RATE):int(0.5 * RATE)])
         self.assertEqual(features.transcript_distance("le chat dort", "le chat dort", "french"), 0.0)
         self.assertAlmostEqual(features.transcript_distance("le chat dort", "le dort", "french"), 1 / 3)
 
@@ -481,7 +482,8 @@ class LaneTests(unittest.TestCase):
                     "source": {"host": "huggingface", "repo": "a/b", "revision": "0" * 40,
                                "files": {"w": {"sha256": "0" * 64, "bytes": 1}}},
                     "license": "MIT", "memoryGB": 1, "languages": "any", "version": 1}
-        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": [self.asr]}))
+        self.phones = dict(self.asr, id="phones.zipa-large-crctc-500k", kind="phones", runtime="onnx")
+        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": [self.asr, self.phones]}))
         audio = self.root / "audio"
         audio.mkdir()
         takes = []
@@ -496,6 +498,7 @@ class LaneTests(unittest.TestCase):
         self.manifest = self.root / "takes.json"
         self.manifest.write_text(json.dumps({"schema": store.TAKES_SCHEMA, "source": "pool-a", "takes": takes}))
         self.calls = []
+        self.excerpt_phones = []
 
     def tearDown(self):
         self.directory.cleanup()
@@ -505,19 +508,23 @@ class LaneTests(unittest.TestCase):
         report = runtime.RunnerReport(model=model["id"], runner_sha=identity)
         self.calls.append([take["token"] for take in takes])
         for take in takes:
+            if model.get("kind") == "phones":  # a pause cut out alone (`gap…`) hears self.excerpt_phones
+                outputs = {"phones": list(self.excerpt_phones) if take["token"].startswith("gap") else [],
+                           "frameSeconds": 0.02}
+            else:
+                outputs = {"text": "De fait, les branches.", "language": "French", "languageProbs": None,
+                           "words": None}
             store.write_result(layout.results_dir(model["id"]), model=model["id"], runner_sha=identity,
-                               audio_sha=take["audioSHA256"], variant=None, duration_seconds=1.0,
-                               outputs={"text": "De fait, les branches.", "language": "French", "languageProbs": None,
-                                        "words": None})
+                               audio_sha=take["audioSHA256"], variant=None, duration_seconds=1.0, outputs=outputs)
             report.ran += 1
         return report
 
-    def run_lane(self, lane="pool"):
-        return lanes.run(self.layout, str(self.manifest), lane, roles=["asrA"], runner=self.fake_runner,
+    def run_lane(self, lane="pool", roles=("asrA",)):
+        return lanes.run(self.layout, str(self.manifest), lane, roles=list(roles), runner=self.fake_runner,
                          echo=lambda line: None)
 
     def test_run_flags_the_dylan_take_with_evidence_and_confirms_the_gap(self):
-        directory = self.run_lane()
+        directory = self.run_lane(roles=("asrA", "phones"))
         flags = store.read_json(directory / "flags.json")
         by_take = {take["takeID"]: take for take in flags["takes"]}
         dylan = {flag["detector"]: flag for flag in by_take["fr-0101--dylan"]["flags"]}
@@ -526,15 +533,30 @@ class LaneTests(unittest.TestCase):
         self.assertEqual(dylan["pause.anomalous"]["level"], "report-only")
         evidence = {item["feature"]: item for item in dylan["pause.anomalous"]["evidence"]}
         self.assertAlmostEqual(evidence["pause.longest_gap_seconds"]["start"], 3.39, delta=0.02)
-        self.assertEqual(evidence["pause.mute_confirmed"]["value"], 1.0)
-        self.assertEqual(flags["models"]["muteTest"], {"candidates": 1, "tested": 1, "confirmed": 1})
-        self.assertEqual(len(self.calls), 2)  # the takes, then the muted variant
+        self.assertEqual(evidence["pause.excerpt_phones"]["value"], 0.0)
+        self.assertEqual(flags["models"]["excerptTest"], {"candidates": 1, "tested": 1, "empty": 1})
+        self.assertEqual(len(self.calls), 3)  # the takes (asrA, phones), then the pause cut out alone
+        self.assertTrue(all(token.startswith("gap") for token in self.calls[-1]))
         aiden = {flag["detector"] for flag in by_take["fr-0102--aiden"]["flags"]}
         self.assertNotIn("pause.anomalous", aiden)
         features_doc = store.read_json(directory / "features.json")
         self.assertTrue(features_doc["models"]["asrA"]["available"])
-        self.assertFalse(features_doc["models"]["phones"]["available"])
+        self.assertTrue(features_doc["models"]["phones"]["available"])
+        self.assertFalse(features_doc["models"]["phonesB"]["available"])  # not registered here
         self.assertEqual(lanes.gate(self.layout, "pool"), lanes.EXIT_PASS)  # report-only never gates
+
+    def test_phones_heard_in_the_pause_alone_clear_the_pause_flag(self):
+        self.excerpt_phones = [{"phone": "t", "start": 0.0, "end": 0.04, "prob": 0.9},
+                               {"phone": "h", "start": 0.1, "end": 0.14, "prob": 0.9},  # breath-like: ignored
+                               {"phone": "y", "start": 0.2, "end": 0.24, "prob": 0.3}]  # below the floor
+        directory = self.run_lane(roles=("asrA", "phones"))
+        flags = store.read_json(directory / "flags.json")
+        dylan = next(take for take in flags["takes"] if take["takeID"] == "fr-0101--dylan")
+        self.assertNotIn("pause.anomalous", {flag["detector"] for flag in dylan["flags"]})
+        self.assertEqual(flags["models"]["excerptTest"], {"candidates": 1, "tested": 1, "empty": 0})
+        row = next(row for row in store.read_json(directory / "features.json")["takes"]
+                   if row["takeID"] == "fr-0101--dylan")
+        self.assertEqual(row["features"]["pause.excerpt_phones"]["value"], 1.0)
 
     def write_evaluated_thresholds(self, levels):
         """Thresholds fitted on the current scoring identity, and their evaluation's French levels."""

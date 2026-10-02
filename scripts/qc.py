@@ -5,6 +5,7 @@
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
     python3 scripts/qc.py run | gate | queue | fit | eval | norms | references
+    python3 scripts/qc.py controls build|report
     python3 scripts/qc.py language-bench takes|evidence
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
@@ -274,6 +275,29 @@ def cmd_norms(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
+def cmd_controls(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import controls
+
+    try:
+        if args.action == "build":
+            manifest = controls.build_manifest(args.sources, per_language=args.per_language,
+                                               per_speaker=args.per_speaker, seed=args.seed)
+            path = controls.write_manifest(layout, manifest, args.name)
+            print(f"qc controls: {len(manifest['takes'])} human takes -> {path.relative_to(layout.root)}")
+            print(f"qc controls: score them with: python3 scripts/qc.py run --takes {path.relative_to(layout.root)} "
+                  f"--lane {controls.CONTROLS_LANE}")
+            return EXIT_OK
+        document = controls.report(layout, args.runs, args.generated or [])
+    except (controls.ControlsError, ValueError, OSError) as error:
+        print(f"qc controls {args.action}: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    for line in controls.format_report(document, limit=args.limit):
+        print(line)
+    if args.output:
+        store.write_json_atomic(Path(args.output), document)
+    return EXIT_OK
+
+
 def cmd_references(args: argparse.Namespace, layout: Layout) -> int:
     from qc import references
 
@@ -410,6 +434,22 @@ def build_parser() -> argparse.ArgumentParser:
     frozen.add_argument("--dry-run", action="store_true",
                         help="print the summary without writing config/qc/references-v<N>.json")
     frozen.set_defaults(handler=cmd_references)
+
+    controls = commands.add_parser("controls", help="human-speech controls: every detector measured on people")
+    control_actions = controls.add_subparsers(dest="action", required=True)
+    build = control_actions.add_parser("build", help="a takes manifest of human read speech, marked control")
+    build.add_argument("--sources", nargs="+", default=["mls:french", "libritts-r:english"],
+                       help="<corpus>:<language> pairs from config/audio-qc-corpora.json")
+    build.add_argument("--per-language", type=int, default=150)
+    build.add_argument("--per-speaker", type=int, default=3)
+    build.add_argument("--seed", type=int, default=0)
+    build.add_argument("--name", default="controls-1", help="the manifest's name under build/private/qc/manifests")
+    control_report = control_actions.add_parser("report", help="flag rates and feature percentiles, human vs generated")
+    control_report.add_argument("--runs", nargs="+", required=True, help="controls lane runs")
+    control_report.add_argument("--generated", nargs="*", help="generated-take runs to compare with")
+    control_report.add_argument("--limit", type=float, default=0.05, help="mark rates above this share (default 0.05)")
+    control_report.add_argument("--output", help="also write the report JSON here")
+    controls.set_defaults(handler=cmd_controls)
     return parser
 
 

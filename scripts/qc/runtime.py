@@ -372,10 +372,11 @@ def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
 
 def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
     """The runner file and the shared code it can run, sorted: every `qc.*` module it imports,
-    transitively (also inside functions, such as `runners/speech_common.py`), plus every
-    `runners/_*.py` helper. A package name (`qc`, `qc.runners`) adds no file: its `__init__.py`
-    is documentation only. So a `qc/phones.py` edit re-runs only the runners that import it (the
-    phone recognizers and the G2P), never the ASR, MOS or LLM caches."""
+    transitively (also inside functions, such as `runners/speech_common.py`), the `runners/_*.py`
+    helpers included. A package name (`qc`, `qc.runners`) adds no file: its `__init__.py` is
+    documentation only. So a `qc/phones.py` edit re-runs only the runners that import it (the
+    phone recognizers and the G2P), and a `runners/_llama.py` edit (the judge's prompts) only the
+    audio-LLM judges, never the ASR, MOS or speaker caches."""
 
     source = runner_source(layout, model)
     if not source.is_file():
@@ -407,8 +408,7 @@ def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
                     candidate = layout.scripts.joinpath(*name.split(".")).with_suffix(".py")
                     if candidate.is_file():
                         pending.append(candidate)
-    helpers = {path for path in source.parent.glob("_*.py") if path.name != "__init__.py"}
-    return sorted(found | helpers)
+    return sorted(found)
 
 
 @dataclass

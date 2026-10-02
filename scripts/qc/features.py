@@ -52,7 +52,7 @@ LLM_CLASSES = ("stutter", "mispronunciation", "wrong-language", "cutoff", "pause
 AUDIO_FEATURES = (
     "signal.clicks", "signal.dropout_seconds", "signal.clipping_fraction", "signal.terminal_silence_seconds",
     "signal.abrupt_offset_db", "pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips",
-    "pause.mute_confirmed", "pause.unpunctuated_gap_seconds", "end.drop_db_60ms", "end.tail_seconds",
+    "pause.excerpt_phones", "pause.unpunctuated_gap_seconds", "end.drop_db_60ms", "end.tail_seconds",
     "end.decay_db_per_ms", "end.file_tail_seconds", "level.lufs", "level.lufs_deviation", "level.true_peak_dbtp",
     "level.lra",
 )
@@ -462,7 +462,7 @@ def pause_features(samples: np.ndarray, rate: int, aligned: dict[str, Any] | Non
 
     names = ("pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips")
     out = {name: feature() for name in names}
-    out["pause.mute_confirmed"] = feature()
+    out["pause.excerpt_phones"] = feature()  # set by qc.lanes.excerpt_test, which runs the phone roles
     out["pause.unpunctuated_gap_seconds"] = unpunctuated_gap(aligned, text, language)
     profile = frame_profile(samples, rate) if profile is None else profile
     hop = float(profile["hop"])
@@ -640,30 +640,40 @@ def loudness_features(samples: np.ndarray, rate: int, target: float = -23.0) -> 
     }
 
 
-def mute_wav(source: str | Path, destination: str | Path, start: float, end: float) -> Path:
-    """Copy a PCM or float WAV with `[start, end)` seconds silenced, keeping its format."""
+def excerpt_wav(source: str | Path, destination: str | Path, start: float, end: float) -> Path:
+    """Write `[start, end)` seconds of a PCM or float WAV as a WAV of its own, in the same format.
 
-    raw = bytearray(Path(source).read_bytes())
-    offset, fmt = 12, None
+    The excerpt test runs a phone recognizer on a gap alone: with no speech around it to lean on,
+    what the recognizer hears there is in the gap (it fills in phones over zeroed audio inside a
+    sentence, so silencing a gap in place proves nothing).
+    """
+
+    raw = Path(source).read_bytes()
+    offset, fmt_chunk, fmt = 12, None, None
     while offset + 8 <= len(raw):
-        chunk, size = bytes(raw[offset:offset + 4]), struct.unpack("<I", raw[offset + 4:offset + 8])[0]
+        chunk, size = raw[offset:offset + 4], struct.unpack("<I", raw[offset + 4:offset + 8])[0]
         if chunk == b"fmt ":
-            tag, channels, rate = struct.unpack("<HHI", raw[offset + 8:offset + 16])
-            block_align, bits = struct.unpack("<HH", raw[offset + 20:offset + 24])
-            fmt = (rate, block_align, bits)
+            fmt_chunk = raw[offset:offset + 8 + size]
+            rate = struct.unpack("<I", raw[offset + 12:offset + 16])[0]
+            block_align = struct.unpack("<H", raw[offset + 20:offset + 22])[0]
+            fmt = (rate, block_align)
         elif chunk == b"data" and fmt:
-            rate, block_align, bits = fmt
-            first = offset + 8 + min(size, int(round(start * rate)) * block_align)
-            last = offset + 8 + min(size, int(round(end * rate)) * block_align)
-            raw[first:last] = (b"\x80" if bits == 8 else b"\x00") * (last - first)
+            rate, block_align = fmt
+            body = raw[offset + 8:offset + 8 + size]
+            first = min(len(body), max(0, int(round(start * rate))) * block_align)
+            last = min(len(body), max(0, int(round(end * rate))) * block_align)
+            data = body[first:max(first, last)]
             break
         offset += 8 + size + (size & 1)
     else:
-        raise ValueError("WAV without a data chunk")
+        raise ValueError("WAV without a fmt and data chunk")
+    assert fmt_chunk is not None
+    pad = b"\x00" if len(fmt_chunk) % 2 else b""
+    out = b"WAVE" + fmt_chunk + pad + b"data" + struct.pack("<I", len(data)) + data + (b"\x00" if len(data) % 2 else b"")
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + ".part")
-    temporary.write_bytes(bytes(raw))
+    temporary.write_bytes(b"RIFF" + struct.pack("<I", len(out)) + out)
     temporary.replace(destination)
     return destination
 

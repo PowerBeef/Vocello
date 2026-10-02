@@ -164,16 +164,18 @@ SCORING_SOURCES = ("qc/features.py", "qc/detectors.py", "qc/phones.py", "qc/pitc
 
 
 def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:
-    """`{"sha256", "files", "norms"}`: what scores a take once the runners have run.
+    """`{"sha256", "files", "norms", "references"}`: what scores a take once the runners have run.
 
     `files` maps `config/qc/detectors.json` and the scoring code (`SCORING_SOURCES` under
     `scripts/`) to their SHA-256 (None for a missing file); `norms` is the newest norms file the
-    provisional rules read (`{"file", "sha256"}`, or None). `sha256` covers both. Runs record it in
+    provisional rules read and `references` the newest frozen references file the features read
+    (each `{"file", "sha256"}`, or None). `sha256` covers all three. Runs record it in
     `features.json` and fits in the thresholds file: thresholds apply only to features scored by
-    the same code, configuration and norms.
+    the same code, configuration, norms and references.
     """
 
     from qc import norms as norms_lib  # qc.norms imports this module
+    from qc import references as references_lib
 
     def digest(path: Any) -> str | None:
         return store.sha256_file(path) if path.is_file() else None
@@ -183,8 +185,11 @@ def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:
         files[f"scripts/{relative}"] = digest(layout.scripts / relative)
     newest = norms_lib.latest(layout)
     norms = {"file": newest.name, "sha256": store.sha256_file(newest)} if newest else None
-    return {"sha256": store.sha256_text(store.canonical_json({"files": files, "norms": norms})),
-            "files": files, "norms": norms}
+    frozen = references_lib.latest(layout)
+    references = {"file": frozen.name, "sha256": store.sha256_file(frozen)} if frozen else None
+    return {"sha256": store.sha256_text(store.canonical_json({"files": files, "norms": norms,
+                                                              "references": references})),
+            "files": files, "norms": norms, "references": references}
 
 
 def detector_roles(detector: dict[str, Any]) -> set[str]:

@@ -115,10 +115,12 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   (`config/marking-peak-equality.json`).
 - **Audio QA is calibrated on the maintainer's ears (QC v2, `docs/reference/qc.md`).** Fixed seeds
   and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 detectors are
-  fit on the maintainer's listening labels (`scripts/qc.py label`); `qc.py fit` freezes thresholds in
-  `config/qc/thresholds-v<N>.json`, committed before `qc.py eval` scores the held-out labels once,
-  and a model, feature or threshold change is a new version. A detector warns or fails a lane only
-  for the languages and classes its evaluation covers, and reports elsewhere. Listening labels takes
+  first measured on human recordings (`qc.py controls`), then fit on the maintainer's listening
+  labels (`scripts/qc.py label`); `qc.py fit` freezes thresholds in `config/qc/thresholds-v<N>.json`,
+  bound to the scoring code, norms and references, and committed before `qc.py eval` scores the
+  labels out of fold, once per label set. A model, feature or threshold change is a new version. A
+  detector warns or fails a lane only for the languages and classes its evaluation covers, and
+  reports elsewhere. Listening labels takes
   but never clears a machine failure; a heard defect no detector flags joins the next labelling
   batch. Language verdicts name their recognizer families (Apple Speech in the iPhone app, QC v2's
   two ASR families on the Mac); one family is one witness, two must agree for consensus, and shared

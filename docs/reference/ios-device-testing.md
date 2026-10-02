@@ -564,9 +564,11 @@ quality; three transcription passes prove recognizer reproducibility rather than
 independence. `--diagnostic-cohort` runs the fixed 15-take English-Design and
 French pinned/Auto regression cohort without retries or history publication. Language acceptance is
 fully autonomous; listening is optional annotation only. Its primary accuracy metric is WER for
-word-delimited languages and CER for Chinese/Japanese, both at the versioned 0.15 threshold; the
-Python validator and publisher recompute the edit evidence from the corpus rather than trusting the
-app's aggregate score.
+word-delimited languages and CER for Chinese, Japanese and Korean, both at the versioned 0.15
+threshold; the Python validator and publisher recompute the edit evidence from the corpus rather
+than trusting the app's aggregate score. After collection the Mac scores every take with QC v2's
+Qwen3-ASR and Whisper large-v3 (lane `ios-language-bench`); both must meet each take's outcome beside
+the in-app gate (`spoken_content`), and of the QC v2 gate only a fail fails the lane.
 
 ## Model readiness
 
@@ -692,10 +694,11 @@ python3 scripts/voice_identity_language_reliability.py analyze \
 
 The plan holds 734 immutable rows. A row whose tokenizer runtime is unavailable is recorded as an
 explicit prerequisite block (`<tokenizer>-runtime-unavailable`), never run on a substitute runtime,
-and no row retries. The analyzer records mandatory audio QC, reference-to-output prosody fidelity
-and optional speaker similarity. It cannot establish semantic emotion or French correctness from
-acoustics alone; French correctness rests on locale-locked ASR, and the speaker and prosody metrics
-are advisory. Moving this analysis onto the QC v2 runners ([`qc.md`](qc.md)) is roadmap item QC-07.
+and no row retries. The analyzer records mandatory audio QC and, through QC v2 (lane
+`voice-reliability`), each Clone take's register shift on frames where FCPE and SwiftF0 agree, plus
+ReDimNet2+ similarity with `--speaker-similarity`. It cannot establish semantic emotion or French
+correctness from acoustics alone; French correctness rests on locale-locked ASR, and the pitch and
+speaker metrics are advisory.
 
 **Receipts and coverage.** The schema-2 generation receipt is assembled from the exact native actor
 request: stored UI language, target-text detection, reference-transcript language, final
@@ -707,7 +710,7 @@ replaced by delayed recognition. Locale-locked consensus is necessary but not su
 output verification binds every Speech pass to the immutable WAV duration and requires bounded
 coverage of both audio edges. Identical transcripts that cover only one utterance are reported as
 `speech_recognition_incomplete_temporal_coverage`, stay harness-inconclusive and produce no WER/CER
-score; independent ASR may diagnose the omitted region but cannot promote the take.
+score; QC v2's full-file ASR families on the Mac may diagnose the omitted region but cannot promote the take.
 
 ## Deterministic evidence retained
 

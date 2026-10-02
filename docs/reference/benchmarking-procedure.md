@@ -61,10 +61,10 @@ summarizer's `xRT` column.
    `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the in-process latch enables it, and always off under an
    explicit `QWENVOICE_NATIVE_TELEMETRY_MODE=off` (`vocello bench --telemetry off`).
 3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
-   The consent-bound lanes, never run unasked, are `scripts/macos_test.sh memory|lang-bench|qc-takes|qc-n2|qc-introspection`, every
-   `scripts/ui_test.sh` lane and every `scripts/ios_device.sh` verb; `scripts/macos_test.sh gate` and
-   `telemetry-overhead` are ordinary local lanes; `telemetry-overhead` needs the model fixture, `gate`
-   only when `QWENVOICE_GATE_BENCH=1` adds its bounded bench.
+   The consent-bound lanes, never run unasked, are `scripts/macos_test.sh memory|lang-bench|qc-takes`, every
+   `scripts/ui_test.sh` lane and every `scripts/ios_device.sh` verb; `.claude/settings.json` also asks
+   before `scripts/macos_test.sh profile`, `gate` and `telemetry-overhead`. `telemetry-overhead` needs
+   the model fixture, `gate` only when `QWENVOICE_GATE_BENCH=1` adds its bounded bench.
 4. **Lazy MLX caveat** — decode breakdown columns measure Swift wall-clock around lazy graph
    ops, not per-stage GPU compute. Use Instruments signposts for GPU attribution (§6.3).
 5. **PASS-only publication** — a successful repository benchmark publishes one allowlisted JSON
@@ -168,8 +168,8 @@ prints read-only status); bare `xcodebuild` performs no such check.
 
 | Check | Action |
 |-------|--------|
-| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count, kernel memory pressure above normal, another holder of the host-wide native lock or a locked agent worktree exits 1 before any model loads; it guards the `macos_test.sh gate` bench (`QWENVOICE_GATE_BENCH=1`; the deterministic gate alone does not check) and `macos_test.sh memory|lang-bench|qc-takes|qc-n2|qc-introspection|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Engine and UI benchmark takes (macOS and iPhone) also keep their own one-minute load (`metrics.loadAverage1M`): publication marks an engine or UI benchmark record exploratory when any take exceeded 1× the core count of its canonical profile, and the gate bench is inconclusive (exit 3) when its busiest warm take exceeded 2×. Quit heavy apps and watch thermals (see §6.4). |
-| Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench`, macOS `qc-takes`, `qc-n2` and `qc-introspection` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
+| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count, kernel memory pressure above normal, another holder of the host-wide native lock or a locked agent worktree exits 1 before any model loads; it guards the `macos_test.sh gate` bench (`QWENVOICE_GATE_BENCH=1`; the deterministic gate alone does not check) and `macos_test.sh profile|memory|lang-bench|qc-takes|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Engine and UI benchmark takes (macOS and iPhone) also keep their own one-minute load (`metrics.loadAverage1M`): publication marks an engine or UI benchmark record exploratory when any take exceeded 1× the core count of its canonical profile, and the gate bench is inconclusive (exit 3) when its busiest warm take exceeded 2×. Quit heavy apps and watch thermals (see §6.4). |
+| Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench`, macOS `qc-takes` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
 | Single Vocello session | Quit any separately installed Vocello first. The XCUITest runner verifies exact executable paths and signals only its own Release products. |
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
 | Floor-tier simulation | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` forces the tier's policy (read in-process by whichever host runs the engine); `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` emulates the whole 8 GB machine on the M6 (tier, footprint bands, Metal working set). Both are exploratory only; see §4.4 |
@@ -415,8 +415,8 @@ spectral behavior, repeatability, and an 80–390 Hz harmonic F0 sweep with at m
 establishes implementation correctness, not perceptual ground truth: the built-in profile
 (`scripts/prosody_profile.py`) was calibrated on earlier generated takes, not on an independently
 labelled holdout. A delivery effect shows that presets reach different acoustic regions, not that
-they sound like the named delivery. Moving the delivery bench onto the QC v2 runners
-([`qc.md`](qc.md)) is roadmap item QC-07.
+they sound like the named delivery. The delivery bench keeps its own analyzers (QC-07 declined
+2026-10-02: QC v2 measures pitch and identity for clones only).
 
 **Evidence.** Every delivery run keeps a durable copy under
 `~/Library/Application Support/QwenVoice-Debug/outputs/bench-archive/<runID>/`: all take WAVs plus
@@ -439,8 +439,8 @@ QWENVOICE_DEBUG=1 ./build/vocello bench --modes custom --variants speed --length
 # 2. Neutral consistency — N same-preset fixed-seed takes through the cohort gate.
 python3 scripts/delivery_quality_gate.py --cohort take1.wav … takeN.wav
 
-# 3. Clone fidelity — identity + prosody + SER layers vs the fixture voice.
-.venv/bin/python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman
+# 3. Clone fidelity — QC v2 identity (ReDimNet2+) and pitch (FCPE, SwiftF0) vs the fixture voice.
+python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman
 ```
 
 The delivery gate and cohort bounds are calibrated, digest-chained profile values
@@ -460,7 +460,7 @@ rate the null simulation reproduces, not a bound calibrated on delivery evidence
 enters `passed`, `flags` or any outcome. Making it binding needs calibration evidence under the
 audio-QC threshold-change authority: a labeled set of cohorts with known unstable takes, judged on
 an untouched confirmation cohort. The clone lane
-and SER column stay advisory; the clone lane reports AUC and equal error rate with seeded 95%
+stays advisory; it reports AUC and equal error rate with seeded 95%
 intervals whenever it has controls (`bandCalibrationReady` needs at least eight). Since
 2026-09-25 (audit #103 part 1, decided by the audit's recommendation) its default plan generates
 eight built-in-speaker controls matched to the reference voice's gender (read from the voice name,
@@ -469,13 +469,13 @@ else `--reference-gender`), and reports the separation per kind (`controlSeparat
 of other saved voices, need those voices named: every clone take passes `--confirm-consent`, so each
 `--cross-clone-voice NAME` (repeatable; one take per named voice unless `--cross-clones N`) is the
 operator's attestation that they own or may clone that voice. The lane never discovers saved voices
-and generates no cross-clone take by default (lane version 3). The lane embeds 16 kHz
-audio through the pinned polyphase resampler and loads the ECAPA snapshot from the local cache
-only. After the analyzers, the lane computes its audio QC gates (`config/audio-qc-lane-gates.json`):
-CAM++ clone similarity and onset drift of each clone take against the reference clip, at the
-thresholds of their qualified records. The controls and cross-clone takes are not gated. The gates
-are at warn, so a flag shows in the summary and in the report's `audioQCGates` and does not fail the
-lane; only a fail gate would. The result is `<run>/audio-qc/gates.json`.
+and generates no cross-clone take by default (lane version 3). Since lane version 5 (2026-10-01) the
+lane scores every take with QC v2 after the last generation exits (lane `clone-lane`): ReDimNet2+
+similarity of the whole take and its least similar 4 s window to the reference, and the register
+shift on frames where FCPE and SwiftF0 agree. Only clone takes gate; controls and cross-clone takes
+never do. Flags stay report-only until an evaluated thresholds file gives a level; a warn is
+reported, a fail or an uncomputed gate fails the lane. The report is
+`<run>/clone-fidelity-report.json` (`qcGate`, `fidelity`), with `<run>/qc-takes.json` beside it.
 
 ### 4.7 iOS on-device bench
 
@@ -867,7 +867,7 @@ non-authoritative without the runner-owned crash delta and evidence manifest.
 
 | Phase | Tool |
 |-------|------|
-| Trace capture | `xctrace record --attach <exact-service-pid>` during a benchmark scenario |
+| Trace capture | `xctrace record --attach <exact-app-pid>` during a benchmark scenario |
 | Trace analysis | Instruments/xctrace plus the relevant installed macOS performance skill |
 | Logs / warm-admission | `scripts/macos_test.sh logs` and unified-log inspection |
 | Crash post-mortem | `scripts/macos_test.sh crashes`, dSYMs, and standard symbolication |
@@ -1086,7 +1086,7 @@ crash inspection, preflight, and standalone analysis tools do not publish benchm
 | `language` | macOS/iOS `lang-bench` | Requested hint/output gates; hint-only is explicitly `partial` |
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of physical RAM |
-| `prosody-calibration` | `prosody_calibration.py` | Required corpus coverage with no analysis failure |
+| `prosody-calibration` | `publish_benchmark_history.py prosody` (producer `prosody_calibration.py` deleted 2026-10-01, `c44d0205`) | Required corpus coverage with no analysis failure |
 | `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`); iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
 
 `HISTORY.md` is a generated index grouped by kind, platform, hardware, and comparable

@@ -363,7 +363,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/cache/xcode/ios-device/` | Physical-device iOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental physical-device Xcode cache |
 | `build/cache/xcode/source-packages/` | Serialized Xcode SwiftPM resolver | `cache` | `aggressive` | Shared pinned Xcode package checkout and artifact store |
 | `build/cache/swiftpm/mlx-audio-runtime/` | Owned Vocello Qwen3 Core SwiftPM commands | `cache` | `aggressive` | Persistent package-specific SwiftPM scratch cache |
-| `build/cache/delivery-analysis/` | Operator-local delivery evaluator and the audio QC judge panel | `cache` | `aggressive` | Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (retired v1 judges, removed by build_cleanup.py --qc-v1 except the files QC v2 hard-links; re-fetchable), and the per-panel confirmation cache roots under confirmation/<name>, which --prune-confirmation-caches removes once idle (childRetention.analysisConfirmation); never promotion evidence by itself |
+| `build/cache/delivery-analysis/` | Retired v1 delivery evaluator and audio QC judge panel (deleted 2026-10-01); build_cleanup.py --qc-v1 removes what remains | `cache` | `aggressive` | Leftovers of the retired v1 harness: canonical PCM, analysis layers, judge snapshots, runtimes and receipts under external-models, and per-panel confirmation roots. Nothing writes here; --qc-v1 removes them except the files QC v2 hard-links (its Qwen3-ASR and Whisper large-v3 snapshots) and the pinned interpreter until QC v2 holds its copy; never promotion evidence by itself |
 | `build/cache/audio-qc-corpora/` | Audio QC corpus files: the script pool's sentence sources (scripts/audio_qc_script_pool.py fetch) and the speaker corpora the take generator's Voice Clone cell reads (scripts/qc/corpora.py) | `cache` | `aggressive` | Digest-pinned corpus files, one directory per pinned commit or revision: the CC0 Common Voice sentence files the script pool is selected from, under common-voice-sentences (re-fetchable), and the speaker corpora of config/audio-qc-corpora.json with their fetch receipts, extracted WAVs and manifests (transcripts included), under <source>/<revision or zenodo-record>, whose extractions the take generator's Voice Clone cell reads through scripts/qc/corpora.py. The QC v1 fetcher and extractor retired on 2026-10-01, so the repository can no longer rebuild a speaker-corpus extraction removed here; QC v1 also left FLEURS under fleurs and its qualification corpora, which its storage cleanup removes; third-party corpus data, never committed and never evidence |
 | `build/cache/qc/` | Audio QC v2 (scripts/qc.py models fetch, runtimes setup, run) | `cache` | `aggressive` | Re-creatable from the checked-in registry and pins: the digest-verified model files under models/<model-id>, the pinned runner venvs and interpreter under runtimes, and the content-addressed runner results under results/<model-id>/<audioSHA256>[.<variantKey>].json, keyed to each runner's identity; qc.py models prune removes the files and results of models the registry no longer lists; never evidence by itself |
 | `build/private/qc/` | Audio QC v2 private store (scripts/qc.py label, run, queue) | `artifact` | `preserve` | The maintainer's labels (labels/<batch>.jsonl, append-only), the label batches, listening queues, runner jobs and per-take run flags: take paths, scripts and judgements that never enter Git; only aggregates and digests are committed; preserved until the maintainer retires them |
@@ -427,15 +427,12 @@ source, tracked benchmark history, persistent caches, current UUID-matched dSYMs
 outputs, publication-repair evidence, and model stores. `--aggressive` additionally removes
 persistent compilation/package caches and the public aliases. `--prune-ui-results` and `--dist`
 target only their named class; `--clobber --yes` removes ignored repository-local generated state.
-`--prune-confirmation-caches` removes the per-panel audio QC confirmation cache roots,
-`build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`; the
-evidence lanes' gate panels use `confirmation/lane-<lane>-<run>` too), and
+`--prune-confirmation-caches` removes leftover per-panel confirmation roots of the retired v1 audio
+QC, `build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`), and
 nothing else of that cache: a root goes only while the cleanup holds the host analysis lock
-exclusively (it refuses while any orchestrator, generator or analyzer runs, and none can start
-until it finishes), when no process holds a file open under it and when nothing in it changed for
+exclusively, no process holds a file open under it and nothing in it changed for
 `minimumIdleHours` (24; `--older-than-hours` overrides). Its `--dry-run` only probes the lock.
-Routine cleanup leaves these roots alone, since they stay replay inputs until the panel's records
-are committed. Every in-use probe reads the process list `lsof` prints, never its exit status,
+Nothing creates these roots any more; `--qc-v1` removes the whole `confirmation` cache. Every in-use probe reads the process list `lsof` prints, never its exit status,
 which is 1 after any partial error even when it listed a holder.
 `--qc-v1` is the one-time removal of the retired v1 audio QC data that `qcV1Cleanup` in the
 manifest names: the v1 judge models and runtimes in the analysis cache's `external-models`, its

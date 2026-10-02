@@ -102,9 +102,10 @@ Vocello calibration takes, which `scripts/audio_qc_calibration_takes.py` generat
 Requires Built-in Voice and Voice Design **Speed** installed on the paired iPhone.
 
 **Speech Recognition (app):** Phase 3 transcribes each output WAV in the app process; after the run
-the Mac adds the whisper family over the collected `output.wav` files (`scripts/independent_asr.py`),
-and the publisher requires the two families to agree (`languageVerification.families:
-["apple-speech", "whisper"]`). Grant
+the Mac scores the collected `output.wav` files with QC v2's two ASR families (Qwen3-ASR and Whisper
+large-v3, lane `ios-language-bench`, [qc.md](qc.md)), which must both meet each take's outcome per
+channel beside Apple Speech's in-app gate; the record lists `languageVerification.families:
+["apple-speech", "qwen3-asr", "whisper"]`, and only the two QC families vote. Grant
 **Settings → Privacy → Speech Recognition → Vocello** once before the first output-gated run.
 
 ### Phase 3 prerequisites (on-device Speech assets)
@@ -130,7 +131,8 @@ words with a block of one to four hypothesis words at no cost when both spell th
 and one side holds two or more words (a merge such as "vor Mittag" heard as "Vormittag", a split, or
 a moved boundary). Every other edit keeps its v1 cost, and a merge of five or more words is charged
 as before. Takes publish `segmentationAwareWordErrorRate` and `wordBoundaryOnlyEdits` (the plain
-edits the v2 alignment credited) per family (`independent…` for whisper) beside the unchanged v1
+edits the v2 alignment credited) per family (`independent…` for the retired whisper-small witness;
+`qcQwen3Asr…`/`qcWhisper…` since language measurement version 6) beside the unchanged v1
 `wordErrorRate`, and `primaryAccuracyScore` is the v2 rate for word languages; the character rate is
 the same under both versions. Swift (`VoiceClipTranscriber.segmentationAwareWordMetrics`) and
 `scripts/lib/language_metrics.py` share the operation set and parity fixtures; the minimum is unique,
@@ -141,8 +143,7 @@ score 0.0 under v2; no passing take can change verdict because the v2 distance n
 distance; the two macOS accuracy controls (WER 0.5625) need their transcripts, which are not
 committed, so the next lang-bench measures them under v2. The app's `languageASR` quality gate
 reports the rate its outcome reads since gate composition 5 (the v2 word rate as `word_error_rate`,
-or the character rate as `character_error_rate`; through version 4 it reported the v1 word rate),
-and the delivery cascade records the `accuracyMetricVersion` it scored each recognition under.
+or the character rate as `character_error_rate`; through version 4 it reported the v1 word rate).
 
 Since 2026-09-25 (AQ-02 phase P2a, from the audio QC audit the maintainer accepted) the contract is
 `normalization-v2-edit-rate-v3`: the same WER v2 and character rates, scored under text
@@ -153,7 +154,8 @@ adds ß, æ, œ, ø and ł, and in English, French and Italian joins a word acro
 (l'homme, dell'autunno, don't) without scoring the apostrophe, so a recognizer that splits the
 elision makes a boundary edit WER v2 credits. Bracket contents and fillers stay words (Whisper's
 normalizers delete both); fillers beyond the script's are also counted per family
-(`excessFillerCount`, `independentExcessFillerCount`) and never gate. Korean gates its space-free
+(`excessFillerCount`; `qcQwen3AsrExcessFillerCount`/`qcWhisperExcessFillerCount` since version 6)
+and never gate. Korean gates its space-free
 syllable rate, never NFKD jamo (audit AQ-F21). The character rate is space- and punctuation-free in
 every version. The language tables cover the product's ten languages, so Italian, Portuguese,
 Russian and Korean cells no longer fail closed; the corpus still scripts six. Korean jamo CER and a
@@ -188,7 +190,8 @@ every case of `scripts/tests/fixtures/language_normalization.json` identically
 (`WordErrorRateTests` and `test_language_metrics.py`), including a generated sweep of every table
 entry; the Chinese cases the fold changes also pin their normalization v2 count, which records
 declaring `normalization-v2-edit-rate-v3` keep rescoring under. The in-app `languageASR` gate is
-composition 7 and the language kinds' measurement version is 5. Replayed over the same 45
+composition 7 and the language kinds' measurement version became 5 (6 since the QC v2 families,
+2026-10-01). Replayed over the same 45
 committed scored family-takes, no verdict can change: 3 are Chinese (one Apple take with no edit
 and two passing Apple takes at CER 0.111, which the fold can only lower), and every other take
 scores as under v2.
@@ -211,7 +214,8 @@ fixtures). It is warn-only: a skipped phrase of two to four words stays under th
 corpus's 17-32-unit scripts, so a run of two or more on a take that must pass publishes the take with
 `language.deletion_run:<family>` and never changes a verdict or the accuracy contract.
 Published as `longestDeletionRun` (Apple Speech, recomputed and checked against the app's value) and
-`independentLongestDeletionRun` (whisper). Replayed over the committed records, no passing take can
+`qcQwen3AsrLongestDeletionRun`/`qcWhisperLongestDeletionRun` (`independentLongestDeletionRun` on
+whisper-small records through version 5). Replayed over the committed records, no passing take can
 carry a run of two: the only takes with two deletions are the German cells, whose zero CER makes
 every word error a two-word compound merge.
 
@@ -293,15 +297,12 @@ identical). The iOS rerun that shows the Auto takes' own verdicts is the part-3 
 instruction; the shared Design fixture keeps language as the controlled variable and preserves one
 typed fixture identity for the model across the matrix.
 The diagnostic cohort is seed-major and evaluates exactly three cells across five fixed
-seeds (15 takes). It performs no retry and never publishes benchmark history. Whisper runs for the
-cohort too (recognition rows are keyed by the take's child run ID, so a cell repeated across seeds
-is five distinct rows), and `independent_asr.py verdict` combines each take's whisper verdict with
-its in-app Apple Speech verdict through the shared family rule: the cohort passes only when the two
-families agree on every take's expected outcome (`witnesses=apple-speech,whisper consensus=pass`),
-disagreement is `inconclusive` and fails the lane, and a cohort run without the in-app pass is
-labelled `one-witness` rather than reported as consensus (audit #44). A whisper recognition the
-publisher would refuse (a truncated decode, an empty transcript, uncovered edges) is no witness:
-its take is `unqualified`, which fails the lane whatever the take's expected outcome, so a broken
+seeds (15 takes). It performs no retry and never publishes benchmark history. QC v2's two families
+score the cohort too (takes are keyed by child run ID, so a cell repeated across seeds is five
+takes), and `qc.py language-bench evidence` prints each take's two-family verdict: the cohort passes
+only when both families meet every take's expected outcome per channel, beside the in-app Apple
+Speech gate. A take the families split on is `inconclusive`, and one with a missing or disqualified
+recognition (truncated, empty, wrong digest) is `unqualified`; either fails the lane, so a broken
 decode never confirms a negative control.
 
 Gates:
@@ -328,9 +329,11 @@ Each family's language check observes something different, and records say so (a
 `evidence.languageVerification.languageCheckKinds` declares `transcript-language-consistency` for
 Apple Speech (text language detection over a transcript produced with the recognizer locked to the
 expected locale, close to unfalsifiable for an anglicized take) and `audio-language-identification`
-for whisper (detection from the first 30 s of audio). Each language take publishes the language each
-family detected in `detectedLanguages`. On the negative control an English-locked whisper hears
-English and passes its language check; the control fails on accuracy alone.
+for Qwen3-ASR and Whisper large-v3 (both decode with no language lock; Whisper detects from the
+first 30 s). Each language take publishes each family's detected language in `detectedLanguages`.
+Under QC v2 both families hear the negative control's French, so it is a language control
+(`negativeControlKind: language-control`); records through version 5 used an English-locked
+whisper-small, which passed the language check, so the control failed on accuracy alone.
 
 Consensus is per channel (audit #42; the maintainer delegated the decision to the audit's
 recommendation on 2026-09-25). A verdict has a `language` channel and an `accuracy` channel, and
@@ -342,9 +345,11 @@ channel by consensus, and its language channel is reported only. A two-family re
 scored take's `channelConsensus` (`pass`, `fail` or `inconclusive` per channel) and the run's
 `languageVerification.channelVerdicts` (a channel is `pass` when every take that constrains it
 reached its expected status) with `channelConsensusAlgorithm: per-channel-family-consensus-v1`, and
-a run with a control declares `negativeControlKind: accuracy-control`. The history validator
+a run with a control declares `negativeControlKind: accuracy-control`. QC v2 records vote the two QC
+families under `qc-v2-family-consensus-v1` and declare `language-control`. The history validator
 recomputes both from the per-family verdicts the takes publish. The cohort verdict
-(`independent_asr.py verdict`) applies the same rule and prints each take's channels. A second
+(`qc.py language-bench evidence`) applies the same rule and prints each take's status and
+per-family detected language and error rate. A second
 acoustic language detector would be research, not part of this rule.
 
 ### Validation and diagnostic snapshot (through 2026-07-16)
@@ -380,7 +385,9 @@ means the model started honoring the pinned hint; a skipped verification is not 
 control. Before 2026-09-12 this cell was hint-only and never measured its output. In a published
 record the control's take carries `expectedOutcome: "fail"` (a schema-v3 take key) and
 `scripts/benchmark_history.py` inverts its accuracy gate: the take is evidence only if its
-verification failed, and the stamped takes must match `negativeControlsConfirmed`.
+verification failed, and the stamped takes must match `negativeControlsConfirmed`. With the QC v2
+families, which decode without a language lock, the control instead must be heard as a language
+other than the pinned English by both families.
 
 The version-2 corpus, explicit Design language, native-language Custom fixtures where available,
 stricter validator correlation, and CJK-aware punctuation pause accounting address the defects
@@ -419,42 +426,28 @@ the publisher proves Auto resolution on the Mac by requiring every member of a p
 group to carry that digest and share it; the plan's fixtures and seed policy enter the analysis
 profile. The hint gate reads `~/Library/Application Support/QwenVoice-Debug/diagnostics/` with
 `QWENVOICE_DEBUG=1`. Apple Speech is **not**
-available to the CLI (TCC). Spoken content is instead verified after every CLI process has exited by
-`scripts/independent_asr.py`: the pinned `whisper-small` MLX model
-(`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded and warmed once in a
-supervised subprocess (`scripts/independent_asr_worker.py`, whose digest alone is the recognizer's
-cache and provenance identity; the cache holds the worker's raw result and the producer derives each
-recognition from it on every read, and takes with byte-identical audio and one language share one
-decode), decodes each take with the language locked to the expected language,
-detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
-processed duration the publisher checks against the WAV), the per-take recognition time without model
-load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language
-lineage's measurement version was 3 for WER v2, the per-channel vote, the Auto seed, the corpus
-fixtures and the macOS prompt digest, 4 for text normalization v2 and is 5 for the Chinese
-Traditional-to-Simplified fold) and whisper's worst no-speech probability and
-mean log probability, published as `independentMaximumNoSpeechProbability` and
-`independentMeanAverageLogProbability`. The publisher re-scores every transcript against the corpus with the same
-15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that
-gate, so treat those verdicts as real evidence, not noise; recognizer or metric changes go into
-`scripts/lib/language_metrics.py`, never its consumers). The recognizer never runs while the engine
-is resident. The record is `focused` with `languageVerification.families: ["whisper"]`: one
-independent witness, explicitly not a two-family consensus. The recognizer is prepared from the local
-Hugging Face cache by `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx`; nothing
-downloads automatically. `scripts/lib/language_metrics.py` also accepts `sensevoice` as a family
-identifier (the compact-model cascade's SenseVoice adapter, limited to English, Chinese, Japanese,
-Korean and Cantonese); publication today cites only `apple-speech` and `whisper`.
+available to the CLI (TCC). After every CLI process has exited, QC v2 verifies spoken content
+([qc.md](qc.md)): `qc.py language-bench takes` binds each planned WAV to the digest the engine
+published, `qc.py run --lane language-bench` scores it with Qwen3-ASR 1.7B and Whisper large-v3
+(MLX, one model process at a time, cached by audio digest), and `qc.py language-bench evidence`
+writes their recognitions with each take's two-family verdict. Both decode the whole take with
+neither its script nor its language. The publisher (`--output-gate independent --recognitions`)
+re-qualifies and re-scores every transcript with the same 15 % gate and refuses a cell the two
+families do not both meet on both channels; recognizer or metric changes go into
+`scripts/lib/language_metrics.py`. The record is `focused` with `languageVerification.families:
+["qwen3-asr", "whisper"]`, a two-family consensus. The lineage's measurement version was 3 (WER v2,
+per-channel vote, Auto seed, corpus fixtures, macOS prompt digest), 4 (normalization v2), 5
+(Chinese fold) and is 6 (QC v2 families); records through 5 cite the retired whisper-small witness
+and keep validating. Fetch the models and build the runtimes first (`qc.py models fetch --all`,
+`qc.py runtimes setup --runtime mlx|onnx|torch`); nothing downloads automatically.
+`language_metrics.py` also accepts `sensevoice` as a family identifier; publication cites only
+`apple-speech`, `qwen3-asr` and `whisper`.
 
-After the independent recognizer, the lane computes its audio QC gates
-(`scripts/audio_qc_lane_gates.py run --lane language-bench`). The gates are truncation, run-on and
-consensus language ID, listed in `config/audio-qc-lane-gates.json`. The panel judges those detectors
-read (Whisper large-v3, Parakeet, Paraformer, SenseVoice, VoxLingua and the forced aligner, limited
-to the run's languages) and Stage 0 score every take the independent-ASR manifest binds, on the
-run's own analysis cache root. The French-text English-hint control is not gated. Each score is
-compared with the threshold the detector's qualified record pre-registered. The result is in
-`audio-qc/gates.json` and `audio-qc-gates.txt`, and the verdict adds an `audio_qc_gates` line.
-These gates are at warn, so a flag is reported and never fails the lane. If the gates cannot be
-computed, the verdict line reads ERROR and the lane continues. The gate result is not part of the
-published record.
+Then `qc.py gate --lane language-bench` gates the run's QC v2 detectors (`audio-qc-gates.txt`; the
+verdict's `audio_qc_gates` line). Until an evaluated thresholds file gives a detector a level, every
+flag is report-only and the gate passes. A warn or a gate that could not be computed (ERROR) is
+reported and never fails the lane; a fail does. The negative control is marked `control` and never
+gates. The gate result is not part of the published record.
 
 ## Offline gate tests
 

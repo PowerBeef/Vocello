@@ -38,6 +38,8 @@ The current contracts are:
 capability development, not an accumulating patch. Selective upstream intake remains possible, but
 it must preserve product behavior and never rewrite the historical import identity.
 
+> Renamed 2026-09-12 (`0bca280b`): `VENDOR_MANIFEST.json` → `RUNTIME_MANIFEST.json`, `PATCHES.json` → `SEMANTIC_DELTAS.json`, `scripts/vendor_runtime_contract.py` → `scripts/qwen3_core_contract.py`.
+
 ## Consequences
 
 - Contributors review this package as critical first-party runtime code.

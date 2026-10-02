@@ -145,7 +145,7 @@
     "schemaVersion": 1,
     "defaultPath": "~/Library/Caches/Vocello/delivery-analysis-lock",
     "env": "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT",
-    "purpose": "Host-wide lock root shared by every generator, standalone analyzer and audio QC orchestrator on the Mac, whatever checkout, worktree or analysis cache root each uses: delivery-analysis-supervisor.lock (exclusive for a generator or standalone analyzer, shared by an orchestrator run) and the audio QC admission ledger. The environment override exists for tests only."
+    "purpose": "Host-wide lock root of the retired v1 delivery analysis (delivery-analysis-supervisor.lock). Since the v1 harness was deleted on 2026-10-01, only build_cleanup.py takes it, exclusively, for --qc-v1 and --prune-confirmation-caches."
   },
   "entries": [
     {
@@ -206,9 +206,9 @@
       "id": "delivery-analysis-cache",
       "path": "build/cache/delivery-analysis",
       "class": "cache",
-      "owner": "Operator-local delivery evaluator and the audio QC judge panel",
+      "owner": "Retired v1 delivery evaluator and audio QC judge panel (deleted 2026-10-01); build_cleanup.py --qc-v1 removes what remains",
       "cleanup": "aggressive",
-      "retention": "Content-addressed canonical PCM and source-bound analysis layers, plus the digest-pinned judge snapshots, runtimes and receipts under external-models (retired v1 judges, removed by build_cleanup.py --qc-v1 except the files QC v2 hard-links; re-fetchable), and the per-panel confirmation cache roots under confirmation/<name>, which --prune-confirmation-caches removes once idle (childRetention.analysisConfirmation); never promotion evidence by itself",
+      "retention": "Leftovers of the retired v1 harness: canonical PCM, analysis layers, judge snapshots, runtimes and receipts under external-models, and per-panel confirmation roots. Nothing writes here; --qc-v1 removes them except the files QC v2 hard-links (its Qwen3-ASR and Whisper large-v3 snapshots) and the pinned interpreter until QC v2 holds its copy; never promotion evidence by itself",
       "env": "QVOICE_DELIVERY_ANALYSIS_CACHE"
     },
     {

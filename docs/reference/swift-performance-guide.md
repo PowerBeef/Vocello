@@ -10,8 +10,8 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for Swift 6 language and runtime performance decisions that affect Vocello's macOS app, iOS app, and `vocello` CLI. It is meant to complement the backend-focused [`mlx-guide.md`](mlx-guide.md) and the model-focused [`qwen3-tts-guide.md`](qwen3-tts-guide.md). When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-09-12 (`@Observable` store, `events(for:)`, `Memory.cacheLimit`, the current
-> verification loop). Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
+> Last reviewed: 2026-09-12 (`ObservableObject` store, corrected 2026-10-02; `events(for:)`,
+> `Memory.cacheLimit`, the current verification loop). Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
 
 ---
 
@@ -90,27 +90,27 @@ This keeps data-race checking tractable and matches the natural boundaries of th
 
 ### 3.2 `@MainActor` and the UI
 
-`TTSEngineStore` is a `@MainActor` `@Observable` class that bridges the engine's Combine publishers into SwiftUI state. It left `ObservableObject` in the 2026-08 UI review (W2-A) because the coarse object made every screen re-diff on every engine tick; with Observation, a view that reads one property re-renders only when that property changes. The Observation framework has no publishers, so the few imperative consumers subscribe to explicit Combine bridges instead of `$`-projections:
+`TTSEngineStore` is a `@MainActor final class TTSEngineStore: ObservableObject` (`Sources/iOS/TTSEngineStore.swift`, compiled into both apps). macOS hosts `MLXTTSEngine` in-process through the same type-erased `AnyTTSEngineBackend` the iPhone uses (`MacEngineBootstrap`). The store's `@Published` state (`loadState`, `clonePreparationState`, `latestEvent`, …) is fed from the backend's `stateDidChange` signal, which hops onto the main actor and re-reads one backend snapshot:
 
 ```swift
 @MainActor
-@Observable
-public final class TTSEngineStore {
-    public private(set) var snapshot: TTSEngineSnapshot
-    @ObservationIgnored private var snapshotCancellable: AnyCancellable?
+final class TTSEngineStore: ObservableObject, TTSEngine {
+    @Published private(set) var loadState: EngineLoadState = .idle
+    private let backend: AnyTTSEngineBackend
 
-    init(engine: any MacTTSEngine) {
+    init(backend: AnyTTSEngineBackend, ...) {
         ...
-        snapshotCancellable = engine.snapshotPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] snapshot in
-                self?.apply(snapshot: snapshot)
+        changeObserver = backend.stateDidChange
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.syncFromBackend()
+                }
             }
     }
 }
 ```
 
-`.receive(on: DispatchQueue.main)` is defensive: even though the publisher should already emit on the main thread, the explicit scheduler prevents a misrouted stream from silently dropping state updates. Do not remove it for performance without a measured UI-telemetry improvement.
+Because the store is one coarse `ObservableObject`, a view that reads it in `body` re-renders on every published change. Streaming chunks therefore never become `@Published` state (they are forwarded to the player separately), and the Mac root shell does not observe the store at all: it subscribes to the explicit `snapshotChanges` bridge (`Sources/Services/TTSEngineStore+Mac.swift`) with `onReceive`, which fires only on applied snapshot changes (W1-D/W2-A). Keep new imperative consumers on such explicit bridges rather than reading the store in a view body.
 
 ### 3.3 Actors as serialization points
 
@@ -202,7 +202,7 @@ For the hot path (token loop, audio decoder, telemetry sampler), prefer static d
 
 Existentials carry a 3-pointer inline buffer; larger values are heap-allocated. They also prevent specialization and inlining. Vocello uses existentials deliberately in a few places:
 
-- `any MacTTSEngine` in `TTSEngineStore` — the concrete type is determined at app startup and never changes; the existential cost is paid once per call, not per token.
+- `TTSEngineStore` holds the type-erased `AnyTTSEngineBackend`, fixed at app startup and never changed; the existential cost is paid once per call, not per token.
 - `any MLXModelCoordinating` / `any AudioPreparationService` in `NativeEngineRuntime` — injected dependencies, stable for the lifetime of the actor.
 
 Do not introduce `any P` parameters inside the token loop or per-chunk audio path without profiling. If the loop calls a method on an existential, the dynamic dispatch + heap-boxing overhead can add up.
@@ -241,9 +241,13 @@ For synchronous functions, local values that fit in the call frame are essential
 Non-escaping closures are stack-allocated; escaping closures are heap-allocated and reference-counted. The long-form runner shows the pattern the codebase prefers: `IOSLongFormProjectRunner.run` (a `@MainActor` class in `Sources/iOS/Studio/IOSLongFormProject.swift`, compiled by both apps) takes its progress sinks as `@escaping @MainActor (IOSLongFormProgressSnapshot) -> Void` / `([IOSLongFormSegmentState]) -> Void` closures (`onProgress:` / `onSegmentsUpdated:`), so every UI update is already isolated to the main actor and nothing needs an `@unchecked Sendable` relay object. Off-main work that must not block the actor (audio QC, duration probes) hops through `Task.detached(priority: .utility)` and returns a value:
 
 ```swift
-audioQualityEvaluator: @escaping (URL, Int) async -> AudioQualityGate.Report = { url, expectedPauseCount in
+// IOSLongFormProjectRunner.evaluateQC(path:expectedPauseCount:)
+private func evaluateQC(path: String, expectedPauseCount: Int) async -> AudioQualityGate.Report {
     await Task.detached(priority: .utility) {
-        AudioQualityGate.evaluate(url: url, expectedPauseCount: expectedPauseCount)
+        AudioQualityGate.evaluate(
+            url: URL(fileURLWithPath: path),
+            expectedPauseCount: expectedPauseCount
+        )
     }.value
 }
 ```
@@ -266,7 +270,7 @@ Every strong reference copy is a retain; every last-use is a release. They are a
 ### 7.2 How to reduce retain/release traffic
 
 1. **Borrow instead of copy.** Read-only access to a value should borrow it. Swift usually does this automatically for local variables; for class properties it may need a defensive copy.
-2. **Use `Span` / `InlineArray` where appropriate (Swift 6.2+).** `Span` gives non-escaping, zero-reference-count access to contiguous memory. `InlineArray` stores a fixed-size collection inline, eliminating COW uniqueness checks and heap allocation. Vocello targets iOS/macOS 26.0 with Xcode 26.0; if the deployment toolchain supports these types, they are the preferred replacement for unsafe buffer pointers in new binary/audio parsing code.
+2. **Use `Span` / `InlineArray` where appropriate (Swift 6.2+).** `Span` gives non-escaping, zero-reference-count access to contiguous memory. `InlineArray` stores a fixed-size collection inline, eliminating COW uniqueness checks and heap allocation. Vocello targets iOS/macOS 26.0 and builds with the pinned Xcode 26.6 / Swift 6.3.3 (`config/toolchain.json`), which support these types; they are the preferred replacement for unsafe buffer pointers in new binary/audio parsing code.
 3. **Move large values across boundaries with `consume`.** The `consume` operator explicitly transfers ownership, helping the compiler avoid a retain/release pair.
 4. **Avoid retain cycles.** The store and the player hold long-lived Combine sinks and notification observers; use `[weak self]` in every sink and observer closure.
 
@@ -330,7 +334,7 @@ WWDC 2025 demonstrated profiling a test from Xcode's test navigator (secondary-c
 - Frontend preview/status events use a separate suspending router with capacity 256 on macOS and 96
   on iOS.
 
-`GenerationEventDeliveryProbe` measures accepted, terminated, and unobserved sends. The consumer
+`GenerationScopedEventRouter` measures accepted, terminated, and unobserved sends. The consumer
 must drain continuously; a full router suspends rather than evicting an audio-bearing preview event.
 Heavy output work belongs in `GenerationOutputAdapter` after the mandatory audio drain.
 
@@ -358,8 +362,8 @@ evidence. Before promoting or releasing a Swift performance change, complete the
       `scripts/ui_test.sh macos smoke`. Its absence never blocks promotion or release packaging.
 - [ ] For audio-output changes, require clean deterministic QC plus the applicable fixed-seed
       language/prosody gates. Language verdicts name their recognizer family: Apple Speech in the
-      iPhone app, the pinned whisper-small MLX producer (`scripts/independent_asr.py`) on the Mac after
-      the generator has exited; one family is one witness and two must agree for consensus. Listening
+      iPhone app; QC v2's Qwen3-ASR and Whisper large-v3 on the Mac after the generator has exited,
+      `qc.py language-bench`; one family is one witness and two must agree for consensus. Listening
       is optional annotation with no lane and never clears a machine failure.
 
 ---

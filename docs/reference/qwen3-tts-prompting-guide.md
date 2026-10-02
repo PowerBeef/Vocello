@@ -391,7 +391,7 @@ localized. Before the copy became the default, a debug-only arm completed 36/36 
 takes across four fixed seeds, five Chinese-native speakers, two English controls, and both
 fallback directions with exact instruction-language/digest receipts and no hard generation or
 audio-QC failure. That screen establishes routing and generation safety only; it is not evidence
-that listeners perceive better anger, and DP-31/DP-32 remain open.
+that listeners perceive better anger, and DP-31/DP-32 (superseded by QC-07 on 2026-10-01) never measured it.
 
 ### 4.5 What does not work
 
@@ -734,8 +734,8 @@ Delivery quality needs audio, models, and seeds, so it can never be an ordinary 
 text-level ways the copy can be wrong are deterministic, and
 [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py) runs inside
 `./scripts/check_project_inputs.sh` — locally through `scripts/dev.sh check` (advisory; only the commit
-lint blocks a commit) and on every push to `main` in the CI `macos-tests` job whenever Swift or
-workflow paths change. It fails outright on **append parity** across a
+lint blocks a commit) and on every push to `main` and every pull request in the Linux CI `contracts`
+job (`check_project_inputs.sh --python none`). It fails outright on **append parity** across a
 preset's tiers and on **repeated intensifiers**, both indefensible whatever the right copy turns out
 to be. It reports **tier direction inversions** and **copy-versus-expectation conflicts** against
 [`delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json): a listed
@@ -785,7 +785,7 @@ parameters, seeds, script identities, instruction receipts and output hashes.
 
 That experiment layer was retired with the v1 audio QC stack on 2026-10-01; the findings recorded
 here stand. New delivery comparisons run as multi-seed `vocello bench --delivery` sweeps
-([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)), and moving their analysis onto QC v2 ([`qc.md`](qc.md)) is roadmap item QC-07. The
+([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)), and the delivery bench keeps its own analyzers (QC-07 declined 2026-10-02). The
 maintainer-directed 2026-08-24 production-copy checkpoint was not selected from those arms and makes
 no measured improvement claim. Concise and multidimensional prompts remain separate candidates
 because official examples support both and this repository has not shown either to dominate across

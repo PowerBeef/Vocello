@@ -183,8 +183,8 @@ those exact assets. The frozen model/artifact digest and runtime matter more tha
 The angry bilingual safety checkpoint of 2026-08-26 recorded 36/36 Speed takes without hard
 generation/audio-QC failure. That is historical recorded
 evidence, not a rerun in this review. It establishes a narrow routing/safety checkpoint, not improved
-anger perception or the best language for French instructions. DP-31 and DP-32 remain open in the
-existing roadmap; this research does not close either.
+anger perception or the best language for French instructions. DP-31 and DP-32 were open then
+(superseded by QC-07 on 2026-10-01); this research does not close either.
 
 ## 8. Recommendations by generation mode
 
@@ -318,7 +318,8 @@ failure rate rather than relying on one unusually good pair.
 | Audio integrity | Existing PCM, clipping, silence, duration and truncation checks | A successful request means usable audio. |
 | Runtime | Duration, latency and peak memory if that comparison is explicitly included | Better language adherence implies the best performance tier. |
 
-Use the existing independent-judge and order-reversal requirements for promotion. Give judges a
+Any promotion judge must be independent of the generator and scored in both presentation orders
+(the v1 judge requirements retired 2026-10-01; QC v2 has no audio-LLM judge). Give judges a
 single canonical semantic specification rather than changing the judge's prompt language with
 the generation treatment. Otherwise one can measure the evaluator's preference for English or
 French wording instead of the generated audio. A judge must demonstrably handle French speech;
@@ -347,8 +348,8 @@ Still unknown:
 - Whether mixed-language description/delivery improves, harms or simply changes designed identity.
 - Whether a short-form result generalizes to the existing long-form and batch execution paths.
 
-DP-31/DP-32 remain the existing promotion work, not completed evidence. Any future French-language
-experiment belongs within that work and its consent/evidence boundaries, not a second task ledger.
+DP-31/DP-32 (superseded by QC-07) produced no completed evidence. Any future French-language
+experiment needs its own roadmap item and its consent/evidence boundaries, not a second task ledger.
 
 ## 12. Search coverage and reproducibility limits
 

@@ -27,7 +27,7 @@ sourceOfTruth:
 
 Keep early first/later codec frames, the preview-vs-lossless split, request-local sampling v2, tiered
 `Memory.cacheLimit` with soft relief (no hard production `memoryLimit`), XPC engine isolation on
-macOS, and the 1.7B Speed/Quality matrix. Do not chase A100 first-packet figures, reopen 0.6B, or
+macOS (superseded 2026-09-15: the Mac engine runs in-process), and the 1.7B Speed/Quality matrix. Do not chase A100 first-packet figures, reopen 0.6B, or
 add Core ML / custom Metal during convergence. The characterization fixtures that
 named the latency/memory cells were retired on 2026-09-12, after every phase had closed.
 
@@ -57,7 +57,8 @@ product sources. Its convergence direction is accepted with these corrections:
 - Recognizer-family consensus remains the promotion authority: the in-app three-pass Apple Speech
   file consensus is one witness and the pinned whisper-small MLX family (`scripts/independent_asr.py`,
   after the generator exits) is the second; two families must agree, and a single-pass diagnostic
-  cannot replace them.
+  cannot replace them (superseded 2026-10-01: the Mac-side witnesses are QC v2's Qwen3-ASR and
+  Whisper large-v3; `scripts/independent_asr.py` is deleted).
 - Timing and memory thresholds remain candidate budgets until repeated clean controls establish
   measurement noise.
 
@@ -104,7 +105,7 @@ local Git bundle or migration tag is required.
 
 ## Promotion requirements
 
-Runtime behavior changes require deterministic macOS/Core/XPC tests and iOS device-SDK compilation.
+Runtime behavior changes require deterministic macOS/Core tests and iOS device-SDK compilation.
 Mode cutover or shared generation changes additionally require explicit model-dependent focused and
 full macOS/physical-iPhone evidence. Ordinary commits on `main` remain deterministic-only; push CI
 on `main` is the gate.

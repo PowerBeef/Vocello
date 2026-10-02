@@ -113,7 +113,7 @@ Typical backend‑optimization invocation:
 QWENVOICE_DEBUG=1 QWENVOICE_NATIVE_TELEMETRY_MODE=verbose ./scripts/build.sh run
 ```
 
-### Related benchmark knobs (also propagated over the handshake)
+### Related benchmark knobs (read in-process by the engine's host)
 
 `config/runtime-debug-knobs.json` owns this inventory. Production-affecting knobs are read through
 `RuntimeDebugGate` and require both `VOCELLO_INTERNAL_DIAGNOSTICS` and `QWENVOICE_DEBUG=1`;
@@ -128,7 +128,7 @@ values without retaining raw launch input. Never add an undocumented environment
 | `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` | **Floor emulation on a larger Mac** (`NativeHostMemoryEmulation`, audit #11): the host reads as a Mac with that much RAM wherever policy reads the machine: `NativeMemoryPolicyResolver.deviceClass()` (so 8 resolves the floor tier and its policy), the store's footprint bands (`MacMemoryBudgetPolicy`: guarded at 55%, critical at 72% of the emulated RAM) and the snapshot's `totalDeviceRAMMB` and Metal working set (two thirds of the emulated RAM: 5,461 MB for 8 GB), so the GPU working-set ratio is judged against the floor's budget. Only a smaller Mac can be emulated. Rows stamp `notes.deviceClassForced=true`, `notes.simulatedPhysicalMemoryMB` and `notes.simulatedMetalWorkingSetMB`; records are exploratory. Policy and footprint only: see §11. |
 | `QWENVOICE_BENCH_SEED_POLICY=cell-hash-v1` | **UI benchmark seed policy** (`BenchSeedPolicy`, audit #29): every generation samples with the seed of the benchmark cell it measures (the first eight bytes of SHA-256 of `vocello-ui-bench-seed-v1`, NUL, the cell ID such as `custom/short/warm#1`), replacing a draft's pinned seed; the cell comes from `QWENVOICE_BENCH_SEED_CELLS` (a comma-separated launch schedule consumed one per generation, the iPhone lane) or else the benchmark's current-take file (macOS). Rows stamp `notes.samplingSeedPolicy`; the lane checkers and the history validator recompute each take's seed (`scripts/lib/bench_seed.py`) and the record names `run.seedPolicy`. `scripts/ui_test.sh <platform> benchmark` sets it by default (`--seed-policy generated` keeps random seeds). |
 | `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on every Mac tier (the high‑memory Mac since AUD‑10). Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
-| `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% RTF** — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
+| `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% decode speedup** (`decodeSpeedupX`; pre-2026-09-12 "RTF") — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
 | `QVOICE_IOS_MLX_MEMORY_LIMIT_MB=<n>` | **Dev-only / do not ship** override of MLX `Memory.memoryLimit`. Production avoids a hard `memoryLimit`; see `mlx-guide.md` §5.2. |
 | `QVOICE_IOS_MEMORY_PROFILE=iphone15pro` | **Physical-device memory-profile diagnostic**: clamps the effective per-process limit inside `IOSMemorySnapshot.capture()` so bands/admission/clone-gate use the smaller-device budget (`iphone15pro` → 5,000 MB). Rows stamp `notes.memoryProfile` and `notes.simulatedProcessLimitMB`. GPU compute and thermals remain those of the connected device; this is not proof for a different device. See the canonical benchmark procedure for `--memory-profile`. |
@@ -139,7 +139,7 @@ values without retaining raw launch input. Never add an undocumented environment
 
 ```
  App process (Vocello)                    Engine (same process on macOS and iOS)
- ┌───────────────────────────┐  IPC      ┌──────────────────────────────────────────┐
+ ┌───────────────────────────┐  in-proc  ┌──────────────────────────────────────────┐
  │ Coordinators              │  ───────► │ NativeEngineRuntime.prepareGeneration      │
  │   mint generationID       │ generate  │   creates per‑generation recorder          │
  │ AudioPlayerViewModel      │           │ MLXModelLoadCoordinator (load/tokenize)    │
@@ -180,7 +180,7 @@ folder when DebugMode is on, so real data is never polluted):
 | `app/generations.jsonl` | frontend | Submit→first chunk→playback scheduled→completed, delayed-heartbeat coverage, and playback health. It does not claim acoustic audibility or inherit engine memory. |
 | `generations-merged.jsonl` | merged | Layers joined per `generationID`, with explicit `requiredLayers`, `missingLayers`, and `complete`. |
 | `engine/samples-*.jsonl` | backend (verbose only) | Raw per‑sample memory/timing series, one file per `generationID`. |
-| `*/native-events.jsonl` | engine/middle/app | Chunk‑sequence gaps + encode drops; the **app** file also carries `mac_warm_admission_observed` / `mac_warm_blocked` (warm‑admission gate) and `engine_service_retired` (XPC retirement) events. **Written only when telemetry is enabled** (`TelemetryGate.resolvedEnabled` / app-process intended mode). |
+| `*/native-events.jsonl` | engine/app | Chunk‑sequence gaps + encode drops; the **app** file also carries `mac_warm_admission_observed` / `mac_warm_blocked` (warm‑admission gate) events. **Written only when telemetry is enabled** (`TelemetryGate.resolvedEnabled` / app-process intended mode). |
 | `<documents>/generation-failures.jsonl` | debug | Append-only failure log when telemetry is on (see `GenerationFailureDiagnosticLogger`). |
 
 One JSON object per line. The field-reading order is in [§10](#10-reading-telemetry).
@@ -230,14 +230,14 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `finishReason` | String? | Typed terminal reason: `eos` / `maxTokens` / `cancelled` / `failed` / `completed` / `superseded` / `unknown`. Compatibility input also accepts `max_tokens` and `canceled`; v7 typed payloads encode the canonical values. |
 | `stageMarks` | `[{tMS, tNS?, sequence?, stage, metadata}]` | Lifecycle timeline with optional nanosecond timestamps and monotonic sequence numbers (see §6). |
 | `frontendMetrics` | `FrontendGenerationMetrics?` | Typed submit/first-chunk/playback-scheduled/completed, delayed-heartbeat coverage, and bounded playback queue/continuity/underrun metrics. Legacy `*Audible*` keys decode as compatibility aliases only. |
-| `transportMetrics` | `EngineTransportMetrics?` | Typed request-to-first-chunk timing, terminal/cancellation/lifecycle, opaque session identity, first/last sequence, and forwarded/gap/duplicate/reordered counters. |
+| `transportMetrics` | `EngineTransportMetrics?` | Retired engine-service rows only (macOS records before 2026-09-15): typed request-to-first-chunk timing, terminal/cancellation/lifecycle, opaque session identity, first/last sequence, and forwarded/gap/duplicate/reordered counters. |
 | `backendMetrics` | `BackendGenerationMetrics?` | Typed lifecycle stages, warm/streaming state, finish reason, timing/counter enums, and final-chunk barrier. |
 | `outputMetrics` | `GenerationOutputMetrics?` | Duration, readable-WAV verdict, atomic-publication verdict, and audio QC. |
 | `timingsMS` / `counters` | compatibility maps | Generated compatibility output for existing summarizers and old rows; new validators consume typed payloads. |
 | `derivedMetrics` | `[String: Double]?` | Headline KPIs (see §7). Includes `kvCacheEstimatedPeakMB` (2026‑07‑01, audit P1‑2) — the peak of the per‑chunk KV‑cache footprint estimates, surfaced at row level so regression tooling doesn't walk the chunk timeline. |
 | `mlxMemoryByStage` | `[String: {activeMB, cacheMB, peakMB, stagePeakMB?}]?` | MLX GPU memory at each stage (see §8); `stagePeakMB` only under `QWENVOICE_MLX_STAGE_PEAKS=1`. |
 | `chunkTimeline` | `[GenerationChunkTelemetry]?` | Per‑chunk decode substages, with `arrivalNS` (v5) and optional `mimiDecoderBreakdownMS` (v5) (see §6.3). |
-| `audioQC` | `AudioQCReport?` | Versioned reference‑free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per‑chunk QC. Algorithm v6 (`makeAudioQCReport`) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request. |
+| `audioQC` | `AudioQCReport?` | Versioned reference‑free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per‑chunk QC. Algorithm v8 (`makeAudioQCReport`; v7 adds warn-only `onset_step_burst`, v8 `speaking_rate_slow`) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request. |
 | `audioQC.signal` | `AudioQCSignalObservations?` | Since 2026-09-26 (AQ-04, additive on QC v8): the Stage 0 observational measures of the persisted WAV (BS.1770 loudness, loudness range and 4x true peak, noise floor, WADA-SNR, effective bandwidth, spectral-flux events, 12.5 Hz codec-frame modulation, seam z-score, repetition stripe) under their own `algorithmVersion`. No flag or verdict reads them; eleven reach the tracked take as `audioQC.metrics`. |
 | `engineIntrospection` | `GenerationEngineIntrospection?` | Since 2026-09-26 (AQ-04, engine rows, success and post-terminal failure): the talker's own signals, from the facade's `VocelloQwen3GenerationIntrospection`: codebook-0 token cycles, per-step entropy (mean, p95, longest run at or above 4 nats), the EOS-probability trajectory and the streaming seam frames. Observational; telemetry only. |
 | `summary` | `TelemetrySummary?` | Owning-process resident/physical-footprint/compressed/headroom/Metal start, end, delta, peak/min and aligned extrema snapshots; total RAM and implied process limit; independent memory/thread/headroom/Metal coverage; sampler cadence/boundaries; and process CPU/page-fault/context-switch/block-I/O deltas. `timeToPeakMS` tracks the physical-footprint peak. |
@@ -245,10 +245,10 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `notes` | `[String: String]` | Bounded compatibility metadata such as `deviceClass`, `promptChars`, privacy-safe `promptDigest` (script text only — never the delivery instruction), the bench `delivery` cell stamp, the delivery-instruction receipt `instructChars`/`instructDigest` on instructed takes (verified fail-closed by the delivery bench; [`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)), and memory pressure. Raw script, transcript, voice description, file path, and failure message are forbidden; prompts/failures/instructions use SHA-256 identity rather than content. |
 | `recordedAt` / `processName` / `processIdentifier` | | Provenance. |
 
-`MergedGenerationTelemetry` is schema v2. A macOS UI record requires `.app`,
-`.engineService`, and `.engine`; an iOS UI validator requires app and engine rows from the same
-run/generation. The `complete` flag and `missingLayers` list prevent a timed-out partial merge from
-appearing authoritative.
+`MergedGenerationTelemetry` is schema v2. A macOS or iOS UI record requires the app and engine
+rows of the same run/generation (`engineService` only decodes pre-2026-09-15 records). The
+`complete` flag and `missingLayers` list prevent a timed-out partial merge from appearing
+authoritative.
 
 ---
 
@@ -372,7 +372,8 @@ declaration and keep their keys.
 Frontend latency is the app row's `submitToFirstChunkMS` and
 `submitToPlaybackScheduledMS`. The latter means the player was commanded with a bounded queued
 buffer; it is **not** proof that acoustic output was audible. The engine row's `firstChunk` mark is
-backend-only, while the macOS transport row's `requestToFirstChunkMS` begins at request acceptance.
+backend-only; the transport row's `requestToFirstChunkMS` exists only in macOS records before
+2026-09-15.
 
 **Played-audio capture (PC-01, macOS benchmark lane).** The XCUITest runner taps the app's own audio
 output during one take per cell (since 2026-09-25, audit #31: the last warm repetition of each mode
@@ -471,7 +472,7 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   peak.
 - **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim.
   They sit at stage edges, not at the allocation spike, so sampled peaks still miss allocations
-  shorter than the 500 ms constrained-device tick: in committed records 2,035 of 3,634 takes sampled
+  shorter than the sampler tick (250 ms on the floor tiers since 2026-09-25): in committed records 2,035 of 3,634 takes sampled
   a Metal peak below the exact `mlxPeakMB` (the MLX allocator's own per-request high-water mark),
   by a median of about 120-460 MB per record kind. Treat sampled peaks as lower bounds and
   `mlxPeakMB` as the exact MLX figure. `benchmark_history.py validate` and `record` warn (without
@@ -625,14 +626,14 @@ Designed so the numbers you optimize against are trustworthy.
   reused (`IOSMemorySnapshot.capture` would otherwise allocate a fresh `MTLCreateSystemDefaultDevice()`
   every tick). A sample is a few `task_info`/mach calls + one cached‑device GPU read.
 - **No hot‑path additions.** Writes happen at generation boundaries; the per‑chunk timeline
-  is an in‑memory append, persisted once at the end; the engine‑service transport row is
-  flushed off the publish loop. The bounded macOS chunk stream is drained continuously and never
-  blocked by file I/O; `GenerationEventDeliveryProbe` reports any dropped yield.
+  is an in‑memory append, persisted once at the end. The bounded macOS chunk stream is drained
+  continuously and never blocked by file I/O; `GenerationScopedEventRouter` accounts every send as
+  accepted, terminated or unobserved.
 - **The backend timing reads do not add GPU syncs.** The `eval`/EOS‑read syncs that
   `qwen_stream_step_*` measure are required by generation itself — telemetry times existing
   work. Signposts are near‑zero when Instruments isn't attached.
 
-Rule of thumb: compare like with like. A `verbose` run on an 8 GB Mac adds a 500 ms
+Rule of thumb: compare like with like. A `verbose` run on an 8 GB Mac adds a 250 ms
 sampler + a sidecar write; for the tightest latency numbers use `lightweight` and read
 `derivedMetrics` + `timingsMS`.
 
@@ -814,7 +815,7 @@ dropouts, garbled words, "sounds worse"). Three layers, increasing in what they 
    aggregation; the summarizer then surfaces `prosEff` / `dF0Std` / `dRateCV` / `dPauseR` /
    `dRough` in the delivery table. A benchmark without `--delivery` does not run that paired gate.
    `scripts/prosody_quality_gate.py` analyzes individual takes for monotone, rushed, flat, and
-   pause-issue signatures only when invoked explicitly. Analyzer algorithm v2 reads the persisted PCM16 in exactly two
+   pause-issue signatures only when invoked explicitly. Analyzer algorithm v3 (adds the `voice_*` and `spectral_*` proxies) reads the persisted PCM16 in exactly two
    fixed-block passes, retains no whole-file PCM or frame matrix, adds semitone-relative pitch and
    caller-declared boundary continuity summaries, and reports bounded managed-buffer/working-set
    evidence. Its fixed-bin quantiles may differ slightly from the legacy full-array algorithm, so

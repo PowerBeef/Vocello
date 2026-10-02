@@ -302,7 +302,7 @@ The streaming peak is **flat with length** — short, medium, and long inputs al
 - **macOS**: capacity 256.
 - **iOS**: capacity 96 to stay bounded under the shared-process budget.
 
-`GenerationEventDeliveryProbe` records accepted, terminated, and unobserved sends. A full router
+`GenerationScopedEventRouter` records accepted, terminated, and unobserved sends. A full router
 suspends the producer until the sole consumer advances; preview/status events are never evicted.
 
 Final PCM uses `ClassifiedGenerationSession`'s separate single-consumer, frame-bounded suspending
@@ -397,7 +397,7 @@ The owned Qwen3-TTS decode loop emits `os_signpost` intervals:
 - "Code Predictor Loop" / "Code Predictor Step"
 - "Step Eval Flush"
 - "Audio Decoder"
-- "Sample First Codebook" / "Sample Predicted Codebooks"
+- "Sample First Codebook" / "Sample Predicted Codebook"
 
 Prefer the repository profile lane, which launches or attaches by exact PID, requires tracer
 success, and validates the trace table of contents:
@@ -410,7 +410,7 @@ Trace overhead is ~25%, so compare fractions, not absolute RTF.
 
 ### 8.2 Reading Vocello telemetry
 
-When telemetry is on (`QWENVOICE_DEBUG=1` in an internal-diagnostics build), each generation writes rows to `<app-support root>/diagnostics/engine/generations.jsonl`. The key fields for MLX work are:
+When telemetry is on (`QWENVOICE_DEBUG=1` or `QWENVOICE_NATIVE_TELEMETRY_MODE`; only production-affecting overrides need the internal build), each generation writes rows to `<app-support root>/diagnostics/engine/generations.jsonl`. The key fields for MLX work are:
 
 - `timingsMS.qwen_*` — Swift-side wall-clock breakdown of the decode loop.
 - `mlxMemoryByStage` — `active` / `cache` / `peak` GPU memory at stage boundaries.
@@ -488,9 +488,8 @@ Only upgrade when:
    is the old inverted figure and never shares a comparison key with `rtf`; `toolchain.optimization`
    comes from the hash-bound build receipt via `scripts/lib/build_provenance.py`, never a literal.
 7. Require the applicable automated language/prosody evidence, naming its recognizer family:
-   Apple Speech in the iPhone app, the pinned whisper-small MLX producer
-   (`scripts/independent_asr.py`) on the Mac after the generator has exited; two families for
-   consensus. Optional listening is annotation only, with no lane.
+   Apple Speech in the iPhone app; QC v2's Qwen3-ASR and Whisper large-v3 on the Mac after the
+   generator has exited, `qc.py language-bench`; two families for consensus. Optional listening is annotation only, with no lane.
 8. Keep the bump only if `rtf`, memory, and audioQC are unchanged or improved.
 9. If anything regresses, document the blocker and revert.
 

@@ -2,7 +2,7 @@
 status: active
 owner: backend-mlx
 reviewed: 2026-09-12
-summary: Maintaining the owned Qwen3 core package — first-party monorepo posture, facade vs compatibility identities, and the vendor-runtime contract that guards the boundary.
+summary: Maintaining the owned Qwen3 core package — first-party monorepo posture, facade vs compatibility identities, and the Qwen3 core contract (`scripts/qwen3_core_contract.py`) that guards the boundary.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
   - scripts/qwen3_core_contract.py
@@ -88,8 +88,8 @@ they are not required for documentation-only or ordinary deterministic publishin
 needs a validated generation record (schema v3; `rtf` = wall ÷ audio, lower is faster, declared through `run.rtfDefinition`;
 `decodeSpeedupX` is the old inverted figure; `toolchain.optimization` comes from the hash-bound build
 receipt, never a literal), and language or prosody evidence names its recognizer family (Apple Speech
-on the iPhone, the pinned whisper-small MLX producer `scripts/independent_asr.py` on the Mac after the
-generator has exited; two families for consensus).
+in the iPhone app; QC v2's Qwen3-ASR and Whisper large-v3 on the Mac after the generator has exited,
+`qc.py language-bench`; two families for consensus).
 
 ## Review checklist
 

@@ -362,17 +362,16 @@ Official guidance: **explicit language tokens outperform `auto`**. Vocello there
 
 **Unit tests:** `Tests/VocelloCoreTests/` covers `Qwen3SupportedLanguage.normalized`, `PromptLanguageDetector`, `LanguageSelectionPresentation`, and the `qwenLanguageHint` matrix. Run on macOS with `scripts/dev.sh test --only <TestClass>` (which dispatches to `scripts/macos_test.sh core-test --only`); the full bundle is also step 2 of `scripts/macos_test.sh gate`.
 
-**Headless hint bench (Phase 2):** `config/language-bench-matrix.json` + `scripts/ios_device.sh lang-bench` (device) or `scripts/macos_test.sh lang-bench` (CLI). Gated by `scripts/check_language_hints.py` on `notes.languageHint`. Both lanes are consent-bound (run only on explicit request), refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`), and require the pinned whisper-small MLX recognizer to be prepared first with `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx` — nothing downloads automatically.
+**Headless hint bench (Phase 2):** `config/language-bench-matrix.json` + `scripts/ios_device.sh lang-bench` (device) or `scripts/macos_test.sh lang-bench` (CLI). Gated by `scripts/check_language_hints.py` on `notes.languageHint`. Both lanes are consent-bound (run only on explicit request), refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`), and need the QC v2 models and runtimes set up first (`qc.py models fetch --all`, `qc.py runtimes setup`) — nothing downloads automatically.
 
 **Output round-trip (Phase 3):** on iOS the same fixed-seed matrix retains and revalidates the
 exact generated WAV, runs three sequential locale-locked on-device Speech passes, and
 `scripts/check_language_output.py` requires exact transcript consensus and independently recomputes
 the primary edit metric against the tracked corpus: WER for word-delimited languages or CER for
-Chinese and Japanese, with the shared `MAX_ACCURACY_ERROR_RATE = 0.15` from
-`scripts/lib/language_metrics.py`. After generation has finished, both lanes add the pinned
-whisper-small MLX family through `scripts/independent_asr.py` (prepared as above; nothing downloads
-automatically): on iOS the publisher requires Apple Speech and whisper to agree, on macOS whisper is
-the single witness. Requires on-device Speech assets for non-EN/FR locales (iOS Settings → dictation
+Chinese, Japanese and Korean, with the shared `MAX_ACCURACY_ERROR_RATE = 0.15` from
+`scripts/lib/language_metrics.py`. After generation has finished, both lanes score the takes with QC
+v2's Qwen3-ASR and Whisper large-v3 (`qc.py language-bench`, [qc.md](qc.md)); the two must agree per
+channel on both platforms, beside Apple Speech's in-app gate on iOS. Requires on-device Speech assets for non-EN/FR locales (iOS Settings → dictation
 languages + Wi-Fi download). See [`language-bench.md`](language-bench.md).
 
 ### 7.4 Dialects and accents
@@ -483,7 +482,7 @@ At 12.5 frames per second of audio:
 | --- | --- | --- |
 | Talker | 28 layers × 1 pass | Q/K RMSNorm, M-RoPE, GQA 2:1 |
 | Code Predictor | 5 layers × 15 passes | One pass per residual codebook |
-| Speech decoder | 8 pre-transform + 7 conv + 2 upsample | F16 weights (since 2026-08-01); smaller matrices |
+| Speech decoder | 8 pre-transform + 7 conv + 2 upsample | fp32 weights (the f16 codec was withdrawn 2026-09-14) |
 | **Total** | **~103 layer evals/frame** | ~1,288 layer evals/second of audio |
 
 ### 10.2 Latency
@@ -524,7 +523,7 @@ These are compiled from the official docs, community reports, and Vocello's own 
 - **Voice Design has no fixed speaker.** Each call samples a fresh voice; reuse requires building a clone prompt.
 - **Accent/dialect control is suggestive, not deterministic.** It works better for broad language-native speakers than for fine-grained regional accents.
 - **Conflicting descriptions fail.** `"high-pitched deep bass voice"` will produce unpredictable results.
-- **High-arousal emotions can add sounds.** The preset copy explicitly forbids laughing/gasping in strong tiers.
+- **High-arousal emotions can add sounds.** The shipped preset copy carries no anti-laughing clause; that remedy is unverified (see the prompting guide).
 - **Reference audio sweet spot is 10–20 s.** Shorter clips work (the paper claims 3 s rapid clone) but may be less consistent. Over 60 s is blocked.
 - **Music and noise are not the model's strength.** The tokenizer is optimized for clean speech; noisy or musical references degrade.
 - **Celebrity/voice impersonation requests are rejected** by the prompt validator.

@@ -1,9 +1,10 @@
 """QC v2 features, detectors and lanes on synthetic audio and stubbed runner outputs.
 
-The acceptance case reproduces fr-0101--dylan: speech-like voiced syllables, a 1.1 s gap of
-breath-like hiss, faint noise, a short voiced blip and near-digital silence mid-sentence, and
-a last vowel cut in about 40 ms. pause.anomalous and boundary.abrupt-end must flag it; a take
-with a 0.25 s pause and a natural 200 ms decay must pass.
+The acceptance case reproduces fr-0101--dylan as the review measured it: speech-like voiced
+syllables, then the /t/ closure and burst of "abattus", its whispered "-tus" (loud and unvoiced,
+0.35 s), a 0.8 s pause of faint noise and near-digital silence with one short voiced blip, and a
+last vowel cut in about 40 ms. The pause is the quiet run after the whisper, not the whisper with
+it; pause.anomalous must flag it. A take with a 0.25 s pause and a natural 200 ms decay must pass.
 """
 
 from __future__ import annotations
@@ -60,7 +61,10 @@ class Synth:
     def dylan(self) -> np.ndarray:
         return np.concatenate([
             self.silence(0.07), self.syllables(0.7), self.silence(0.2), self.syllables(2.0),
-            self.hiss(0.35, -31.0), self.hiss(0.4, -58.0), self.voiced(0.05, 120, -32.0), self.silence(0.3),
+            self.silence(0.05),  # the /t/ closure of "abattus" (2.97-3.02)
+            self.hiss(0.02, -26.0),  # its burst
+            self.hiss(0.35, -31.0),  # the whispered "-tus" (3.04-3.39): loud and unvoiced
+            self.hiss(0.4, -58.0), self.voiced(0.05, 120, -32.0), self.silence(0.35),  # the pause (3.39-4.19)
             self.syllables(1.1), self.voiced(0.2, 92, -33.0),
             self.voiced(0.03, 92, -45.0), self.voiced(0.02, 92, -60.0), self.silence(0.02, -90.0),
         ])
@@ -92,45 +96,82 @@ def by_id(name: str) -> dict:
 
 
 class SignalFeatureTests(unittest.TestCase):
-    def test_fr_0101_dylan_pause_and_abrupt_end_are_flagged(self):
+    def test_fr_0101_dylan_pause_is_the_quiet_run_after_the_whisper(self):
         take = Synth(0).dylan()
         values = {}
         values.update(features.pause_features(take, RATE, None))
         values.update(features.end_features(take, RATE))
         gap = values["pause.longest_gap_seconds"]
-        # The 1.1 s gap starts with hiss at speech level, so up to 120 ms of it reads as a word-final
-        # consonant and is trimmed (the real take measures 1.21 s at 3.01-4.22).
-        self.assertTrue(0.95 <= gap["value"] <= 1.15, gap)
-        self.assertTrue(2.95 <= gap["start"] <= 3.12, gap)
-        self.assertAlmostEqual(gap["end"], 4.07, delta=0.08)
-        self.assertGreater(values["pause.nonspeech_level_db"]["value"], -6.0)  # hiss near speech level
+        # The whispered "-tus" is loud unvoiced sound, not a pause: the pause is the 0.8 s quiet run
+        # after it (the real take: about 0.82 s, not the 1.21 s that took the whisper in).
+        self.assertAlmostEqual(gap["value"], 0.8, delta=0.03)
+        self.assertAlmostEqual(gap["start"], 3.39, delta=0.02)
+        self.assertAlmostEqual(gap["end"], 4.19, delta=0.02)
+        # The 0.2 s pause, then the /t/ closure (a gap of its own, under the 100 ms the norms count),
+        # then the whisper, which bounds the closure and the pause.
+        gaps = features.pause_gaps(take, RATE)
+        self.assertEqual(len(gaps), 3, gaps)
+        for measured, expected in zip(gaps, (0.2, 0.045, 0.8)):
+            self.assertAlmostEqual(measured, expected, delta=0.02)
+        # The non-speech stretch around the pause holds the whisper, at speech level.
+        level = values["pause.nonspeech_level_db"]
+        self.assertGreater(level["value"], -6.0)
+        self.assertLess(level["start"], 3.04)
         self.assertEqual(values["pause.voiced_blips"]["value"], 1)
-        self.assertGreater(values["end.drop_db_60ms"]["value"], 30)
-        self.assertLess(values["end.tail_seconds"]["value"], 0.05)
-        for detector_id in ("pause.anomalous", "boundary.abrupt-end"):
-            outcome = detectors.score(by_id(detector_id), values, "french", None, {})
-            self.assertEqual((outcome["scope"], outcome["score"], outcome["cut"]), ("provisional", 1.0, 1.0), detector_id)
+        self.assertTrue(gap["start"] < values["pause.voiced_blips"]["start"] < gap["end"])
+        outcome = detectors.score(by_id("pause.anomalous"), values, "french", None, {})
+        self.assertEqual((outcome["scope"], outcome["score"], outcome["cut"]), ("provisional", 1.0, 1.0))
         # A mute test that found words in the gap clears the pause flag.
         values["pause.mute_confirmed"] = features.feature(0.0)
         self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 0.0)
+        # The ending is still measured, but no provisional rule reads it: a cut-off is content evidence
+        # (boundary.cutoff), and a drop alone never flags.
+        self.assertGreater(values["end.drop_db_60ms"]["value"], 30)
+        self.assertLess(values["end.tail_seconds"]["value"], 0.05)
+        self.assertNotIn("provisional", by_id("boundary.abrupt-end"))
+        self.assertIsNone(detectors.score(by_id("boundary.abrupt-end"), values, "french", None, {})["cut"])
 
     def test_natural_pause_and_decay_pass(self):
         take = Synth(1).natural()
         values = {}
         values.update(features.pause_features(take, RATE, None))
         values.update(features.end_features(take, RATE))
-        self.assertLess(values["pause.longest_gap_seconds"]["value"], 0.4)
+        self.assertAlmostEqual(values["pause.longest_gap_seconds"]["value"], 0.25, delta=0.02)
+        self.assertLess(values["pause.nonspeech_level_db"]["value"], -30.0)  # a quiet pause
         self.assertLess(values["end.drop_db_60ms"]["value"], 30)
         self.assertGreater(values["end.tail_seconds"]["value"], 0.05)
-        for detector_id in ("pause.anomalous", "boundary.abrupt-end"):
-            self.assertEqual(detectors.score(by_id(detector_id), values, "french", None, {})["score"], 0.0)
+        self.assertEqual(detectors.score(by_id("pause.anomalous"), values, "french", None, {})["score"], 0.0)
 
-    def test_aligned_word_gaps_count(self):
+    def test_aligned_word_gaps_no_longer_lengthen_the_pause(self):
         take = Synth(1).natural()
-        aligned = {"words": [{"text": "a", "start": 0.1, "end": 0.5}, {"text": "b", "start": 1.3, "end": 1.6}]}
-        gap = features.pause_features(take, RATE, aligned)["pause.longest_gap_seconds"]
-        self.assertAlmostEqual(gap["value"], 0.8, places=3)
-        self.assertEqual((gap["start"], gap["end"]), (0.5, 1.3))
+        aligned = {"words": [{"text": "Le", "start": 0.1, "end": 0.5}, {"text": "chat", "start": 1.3, "end": 1.6},
+                             {"text": "dort", "start": 2.6, "end": 3.0}]}
+        values = features.pause_features(take, RATE, aligned, text="Le chat, dort.", language="french")
+        self.assertAlmostEqual(values["pause.longest_gap_seconds"]["value"], 0.25, delta=0.02)  # the audio's own
+        # The longest silence between script neighbours with no punctuation between them: "le chat"
+        # (0.8 s), not "chat, dort" (1.0 s, after a comma).
+        unpunctuated = values["pause.unpunctuated_gap_seconds"]
+        self.assertAlmostEqual(unpunctuated["value"], 0.8, places=6)
+        self.assertEqual((unpunctuated["start"], unpunctuated["end"]), (0.5, 1.3))
+        commas = features.pause_features(take, RATE, aligned, text="Le, chat, dort.", language="french")
+        self.assertIsNone(commas["pause.unpunctuated_gap_seconds"]["value"])  # every pair is punctuated
+        self.assertIsNone(features.pause_features(take, RATE, aligned)["pause.unpunctuated_gap_seconds"]["value"])
+        # An apostrophe joins, it does not pause: "l'arbre" is two script tokens with no break.
+        self.assertEqual(features.script_tokens("L'arbre, tombé.", "french"), (["l", "arbre", "tombé"],
+                                                                              [False, True, True]))
+
+    def test_the_ending_pads_at_the_tail_floor_and_clamps_silence(self):
+        synth = Synth(4)
+        cut = np.concatenate([synth.silence(0.1), synth.syllables(1.0), synth.voiced(0.3, 100, -28.0)])
+        values = features.end_features(cut, RATE)
+        # Cut at the last sample: a drop to the -60 dBFS tail floor (about 32 dB), not to a -120 dB
+        # padding that made every cut a 90 dB drop.
+        self.assertAlmostEqual(values["end.drop_db_60ms"]["value"], 32.0, delta=3.0)
+        self.assertAlmostEqual(values["end.file_tail_seconds"]["value"], 0.0, delta=0.03)
+        zeros = features.end_features(np.concatenate([cut, np.zeros(int(0.5 * RATE))]), RATE)
+        self.assertLessEqual(zeros["end.drop_db_60ms"]["value"], 72.5)  # digital silence clamps at -100 dB
+        self.assertAlmostEqual(zeros["end.file_tail_seconds"]["value"], 0.5, delta=0.03)  # the trim check
+        self.assertIsNone(features.end_features(np.zeros(RATE), RATE)["end.file_tail_seconds"]["value"])
 
     def test_k_weighting_and_loudness(self):
         (b1, a1), (b2, a2) = features.k_weighting(48000)
@@ -150,10 +191,14 @@ class SignalFeatureTests(unittest.TestCase):
     def test_dsp_checks(self):
         synth = Synth(2)
         take = synth.natural()
+        # The synth's fricatives (hiss between syllables) are no clicks: a take-wide scale counted
+        # over twenty of them; the local one counts the one injected click.
+        self.assertEqual(features.signal_features(take, RATE, config()["params"])["signal.clicks"]["value"], 0)
         take[RATE] += 0.6  # one click
         values = features.signal_features(take, RATE, config()["params"])
-        self.assertGreaterEqual(values["signal.clicks"]["value"], 1)
+        self.assertEqual(values["signal.clicks"]["value"], 1)
         self.assertAlmostEqual(values["signal.clicks"]["start"], 1.0, delta=0.01)
+        self.assertNotIn("signal.clicks", [item["name"] for item in by_id("signal.artifacts")["features"]])
         self.assertEqual(values["signal.clipping_fraction"]["value"], 0.0)
         dropout = np.concatenate([synth.syllables(1.0), np.zeros(int(0.3 * RATE)), synth.syllables(1.0)])
         self.assertAlmostEqual(features.signal_features(dropout, RATE, {})["signal.dropout_seconds"]["value"],
@@ -208,16 +253,31 @@ class ModelFeatureTests(unittest.TestCase):
                            "words": [{"ipa": "le", "phones": ["l", "e"]}, {"ipa": "bʁɑ̃ʃ", "phones": ["b", "ʁ", "ɑ̃", "ʃ"]},
                                      {"ipa": "de", "phones": ["d", "e"]}]})
 
-        def run(*phones_heard):
-            results = {"g2p": g2p, "phones": self.result({"phones": self.heard(
-                *((phone, 0.1 * index) for index, phone in enumerate(phones_heard)))})}
+        def recognized(phones_heard):
+            return self.result({"phones": self.heard(*((phone, 0.1 * index) for index, phone in enumerate(phones_heard)))})
+
+        def run(*phones_heard, second=None):
+            # Both recognizers hear the same phones unless `second` says otherwise ("" for no result).
+            results = {"g2p": g2p, "phones": recognized(phones_heard)}
+            if second != "":
+                results["phonesB"] = recognized(phones_heard if second is None else second)
             return features.phone_features(self.take(text="Les branches de."), results, Layout(), {}, config()["params"])
 
-        stutter = run("l", "e", "b", "ʁ", "ɑ̃", "b", "ʁ", "ɑ̃", "ʃ", "d", "e")
+        stuttered = ("l", "e", "b", "ʁ", "ɑ̃", "b", "ʁ", "ɑ̃", "ʃ", "d", "e")
+        stutter = run(*stuttered)
         self.assertEqual(stutter["phones.repeat_runs"]["value"], 1)
         self.assertEqual(stutter["phones.repeat_runs"]["start"], 0.2)
+        self.assertAlmostEqual(stutter["phones.insertion_rate"]["value"], 3 / 8, places=4)
         self.assertEqual(stutter["phones.deletion_rate"]["value"], 0.0)
         self.assertIsNone(stutter["phones.gop_mean"]["value"])  # no posteriors
+        # Only one recognizer heard the repetition: its own habit, not a stutter.
+        alone = run(*stuttered, second=("l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d", "e"))
+        self.assertEqual((alone["phones.repeat_runs"]["value"], alone["phones.insertion_rate"]["value"]), (0, 0.0))
+        # Without the second recognizer's result the insertion features abstain; the rest stay.
+        single = run(*stuttered, second="")
+        self.assertIsNone(single["phones.repeat_runs"]["value"])
+        self.assertIsNone(single["phones.insertion_rate"]["value"])
+        self.assertEqual(single["phones.deletion_rate"]["value"], 0.0)
         missing = run("l", "e", "b", "ʁ", "ɑ̃", "d", "e")
         self.assertEqual(missing["phones.deletion_rate"]["value"], 0.125)
         self.assertEqual(missing["phones.repeat_runs"]["value"], 0)
@@ -227,8 +287,62 @@ class ModelFeatureTests(unittest.TestCase):
         cut = run("l", "e", "b", "ʁ", "ɑ̃", "ʃ", "d")
         self.assertEqual(cut["phones.last_word_coverage"]["value"], 0.5)  # the last word lost its /e/
 
-    def test_content_phoneme_flags_dylan_from_the_measured_phone_comparison(self):
-        """The lead's ZIPA-against-espeak measurements on the real takes (2026-10-01)."""
+    def test_liaison_and_final_schwa_left_out_cost_nothing(self):
+        if features.phones is None:
+            self.skipTest("qc.phones is not available")
+        # "les ormes abattus" as espeak-ng reads it, /lez ɔʁməz abaty/: the liaison /z/ of "les", the
+        # schwa and liaison /z/ of "ormes" may all go.
+        g2p = self.result({"phones": ["l", "e", "z", "ɔ", "ʁ", "m", "ə", "z", "a", "b", "a", "t", "y"],
+                           "words": [{"ipa": "lez", "phones": ["l", "e", "z"], "optional": [2]},
+                                     {"ipa": "ɔʁməz", "phones": ["ɔ", "ʁ", "m", "ə", "z"], "optional": [3, 4]},
+                                     {"ipa": "abaty", "phones": ["a", "b", "a", "t", "y"], "optional": []}]})
+        heard = ("l", "e", "ɔ", "ʁ", "m", "a", "b", "a", "t", "y")
+        results = {"g2p": g2p}
+        for role in ("phones", "phonesB"):
+            results[role] = self.result({"phones": self.heard(*((phone, 0.1 * index) for index, phone in enumerate(heard)))})
+        values = features.phone_features(self.take(text="Les ormes abattus."), results, Layout(), {}, config()["params"])
+        self.assertEqual(values["phones.deletion_rate"]["value"], 0.0)
+        self.assertEqual(values["phones.per"]["value"], 0.0)
+        self.assertEqual(values["phones.last_word_coverage"]["value"], 1.0)
+
+    def test_l1_rhotic_pairs_are_counted_on_a_rhotic_keeping_alignment(self):
+        if features.phones is None:
+            self.skipTest("qc.phones is not available")
+        # "branche" with an English /ɹ/ for the French /ʁ/: one L1 substitution, which the folded
+        # alignment (both rhotics as r) hides.
+        g2p = self.result({"phones": ["b", "ʁ", "ɑ̃", "ʃ"], "words": [{"ipa": "bʁɑ̃ʃ", "phones": ["b", "ʁ", "ɑ̃", "ʃ"]}]})
+        results = {"g2p": g2p, "phones": self.result({"phones": self.heard(("b", 0.0), ("ɹ", 0.1), ("ɑ̃", 0.2),
+                                                                            ("ʃ", 0.3))})}
+        values = features.phone_features(self.take(text="Branche."), results, Layout(), {}, config()["params"])
+        self.assertEqual(values["phones.l1_substitutions"]["value"], 1)
+        self.assertEqual(values["phones.l1_substitutions"]["start"], 0.1)
+        self.assertEqual(values["phones.substitution_rate"]["value"], 0.0)  # folded, /ʁ/ and /ɹ/ are both r
+
+    def test_speaker_centroid_is_leave_one_out_over_three_other_takes(self):
+        def speaker(whole):
+            return {"speaker": self.result({"whole": whole, "reference": None,
+                                            "windows": [{"start": 0, "end": 4, "embedding": whole}]})}
+
+        wholes = {"t1": [1.0, 0.0, 0.0], "t2": [0.0, 1.0, 0.0], "t3": [0.0, 1.0, 0.0], "t4": [0.0, 1.0, 0.0]}
+        takes = [self.take(token=token) for token in wholes]
+        results = {token: speaker(whole) for token, whole in wholes.items()}
+        context = features.build_context(takes, results, {}, {})
+        # t1's anchor is the other three (all [0, 1, 0]), not a mean that holds t1 itself.
+        self.assertEqual(features.speaker_centroid(takes[0], wholes["t1"], context), [0.0, 1.0, 0.0])
+        values = features.speaker_features(takes[0], results["t1"], context)
+        self.assertAlmostEqual(values["speaker.whole_distance"]["value"], 1.0)
+        # With two other takes there is no centroid: the take is its own anchor, no whole distance.
+        context = features.build_context(takes[:3], results, {}, {})
+        self.assertIsNone(features.speaker_centroid(takes[0], wholes["t1"], context))
+        self.assertIsNone(features.speaker_features(takes[0], results["t1"], context)["speaker.whole_distance"]["value"])
+        # A take outside the run is held to all of its voice's takes.
+        outsider = self.take(token="t9")
+        self.assertIsNotNone(features.speaker_centroid(outsider, [1.0, 0.0, 0.0], context))
+
+    def test_content_phoneme_reads_the_insertions_both_recognizers_agree_on(self):
+        """The provisional rule on the agreed insertions: a comparison whose insertions and repeats
+        both recognizers made flags; the same first recognizer with a second that heard none of them
+        does not (on native French speech ZIPA alone prints the silent letters of 38% of "les")."""
 
         def measured(per, insertion, repeats):
             runs = [{"start": 1.0 + index, "end": 1.3 + index, "n": 2, "copies": 2, "phones": ["b", "r"]}
@@ -238,16 +352,20 @@ class ModelFeatureTests(unittest.TestCase):
                                             "repeatCount": repeats, "insertionBursts": [], "deletionRuns": [],
                                             "lowGopSpans": [], "meanGop": None}}
 
-        results = {"g2p": self.result({"phones": ["a"], "words": []}), "phones": self.result({"phones": []})}
+        results = {"g2p": self.result({"phones": ["a"], "words": []}), "phones": self.result({"phones": []}),
+                   "phonesB": self.result({"phones": []})}
         detector = by_id("content.phoneme")
-        for name, comparison, expected in (("fr-0101--dylan", measured(0.475, 0.275, 4), 1.0),
-                                           ("en-0008--ryan", measured(0.103, 0.0, 0), 0.0)):
-            stub = types.SimpleNamespace(compare=lambda *args, comparison=comparison, **kwargs: comparison,
-                                         normalize_phone=lambda phone: [phone], normalize=lambda items: list(items))
+        stuttered, clean = measured(0.475, 0.275, 4), measured(0.103, 0.0, 0)
+        for name, agreed, expected in (("both heard it", stuttered, 1.0), ("one heard it", clean, 0.0)):
+            stub = types.SimpleNamespace(
+                compare=lambda *args, **kwargs: stuttered,
+                agreement=lambda first, second, agreed=agreed, **kwargs: {"agreed": [], "features": agreed["features"]},
+                normalize_phone=lambda phone, **kwargs: [phone], normalize=lambda items, **kwargs: list(items))
             with mock.patch.object(features, "phones", stub):
-                values = features.phone_features(self.take(takeID=name), results, Layout(), {}, config()["params"])
-            self.assertEqual(values["phones.repeat_runs"]["value"], comparison["features"]["repeatCount"])
-            self.assertEqual(values["phones.insertion_rate"]["value"], comparison["features"]["insertionRate"])
+                values = features.phone_features(self.take(), results, Layout(), {}, config()["params"])
+            self.assertEqual(values["phones.repeat_runs"]["value"], agreed["features"]["repeatCount"])
+            self.assertEqual(values["phones.insertion_rate"]["value"], agreed["features"]["insertionRate"])
+            self.assertEqual(values["phones.deletion_rate"]["value"], 0.05)  # the first recognizer's own
             self.assertEqual(detectors.score(detector, values, "french", None, {})["score"], expected, name)
 
     def test_phone_features_need_both_inputs(self):
@@ -402,16 +520,15 @@ class LaneTests(unittest.TestCase):
         by_take = {take["takeID"]: take for take in flags["takes"]}
         dylan = {flag["detector"]: flag for flag in by_take["fr-0101--dylan"]["flags"]}
         self.assertIn("pause.anomalous", dylan)
-        self.assertIn("boundary.abrupt-end", dylan)
+        self.assertNotIn("boundary.abrupt-end", dylan)  # no provisional rule: it ranks, never flags
         self.assertEqual(dylan["pause.anomalous"]["level"], "report-only")
         evidence = {item["feature"]: item for item in dylan["pause.anomalous"]["evidence"]}
-        self.assertTrue(2.95 <= evidence["pause.longest_gap_seconds"]["start"] <= 3.12)
+        self.assertAlmostEqual(evidence["pause.longest_gap_seconds"]["start"], 3.39, delta=0.02)
         self.assertEqual(evidence["pause.mute_confirmed"]["value"], 1.0)
         self.assertEqual(flags["models"]["muteTest"], {"candidates": 1, "tested": 1, "confirmed": 1})
         self.assertEqual(len(self.calls), 2)  # the takes, then the muted variant
         aiden = {flag["detector"] for flag in by_take["fr-0102--aiden"]["flags"]}
         self.assertNotIn("pause.anomalous", aiden)
-        self.assertNotIn("boundary.abrupt-end", aiden)
         features_doc = store.read_json(directory / "features.json")
         self.assertTrue(features_doc["models"]["asrA"]["available"])
         self.assertFalse(features_doc["models"]["phones"]["available"])
@@ -425,7 +542,7 @@ class LaneTests(unittest.TestCase):
         store.write_json_atomic(path, thresholds)
         evaluation = {"version": 1, "thresholdsSHA256": store.sha256_file(path), "detectors": {
             "pause.anomalous": {"languages": {"french": {"level": "fail"}}},
-            "boundary.abrupt-end": {"languages": {"french": {"level": "warn"}}}}}
+            "level.loudness": {"languages": {"french": {"level": "warn"}}}}}  # the synths sit near -30 LUFS
         store.write_json_atomic(self.root / "benchmarks/qc/eval-v1.json", evaluation)
         self.run_lane("clone")
         self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_FAIL)

@@ -1,8 +1,10 @@
-"""QC v2 per-language norms: `qc.py norms` on a synthetic pool, and the provisional rules reading them.
+"""QC v2 per-language norms and frozen references: `qc.py norms` and `qc.py references` on synthetic
+pools, and the provisional rules and scoring context reading them.
 
 French takes pause about 0.25 s and Japanese takes about 0.5 s: the norms keep the two apart, hold
-no take id, path or text, and the pause, abrupt-end and rate rules compare each take with its own
-language's percentiles (falling back to the fixed rules without norms).
+no take id, path or text, and the pause and rate rules compare each take with its own language's
+percentiles (falling back to the fixed rules without norms). The references freeze per-voice pitch
+and per-cell Audiobox medians, which a run then scores against instead of its own takes.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from qc import detectors, features, lanes, norms, runtime, store  # noqa: E402
+from qc import detectors, features, lanes, norms, references, runtime, store  # noqa: E402
 from qc.runners import espeak_g2p  # noqa: E402
 from qc.store import Layout  # noqa: E402
 
@@ -201,11 +203,143 @@ class RateFeatureTests(unittest.TestCase):
         self.assertIsNone(features.rate_features(["a"], (0.0, 0.2))["rate.phones_per_second"]["value"])
         self.assertIsNone(features.rate_features(None, (0.0, 2.0))["rate.phones_per_second"]["value"])
 
+    def test_rate_is_over_the_articulation_time(self):
+        # A 2 s span with a 1 s pause articulates for 1 s; a 50 ms gap is a closure, not a pause.
+        values = features.rate_features(["l", "a", "v", "w", "a", "t", "aɪ"], (0.5, 2.5), [1.0, 0.05])
+        self.assertAlmostEqual(values["rate.phones_per_second"]["value"], 8.0)
+        self.assertAlmostEqual(values["rate.seconds_per_phone"]["value"], 0.125)
+        self.assertEqual((values["rate.phones_per_second"]["start"], values["rate.phones_per_second"]["end"]), (0.5, 2.5))
+        # Pauses that leave under 0.3 s of speech leave the rate unavailable.
+        self.assertIsNone(features.rate_features(["a", "b"], (0.0, 1.0), [0.8])["rate.phones_per_second"]["value"])
+        # From the audio: the same script with a 0.25 s and a 1.0 s pause has one articulation rate.
+        script = ["a"] * 12
+        rates = []
+        for pause in (0.25, 1.0):
+            audio = synth(pause, 0)
+            span = features.speech_span(audio, RATE)
+            gaps = features.pause_gaps(audio, RATE, minimum=features.ARTICULATION_PAUSE_SECONDS)
+            rates.append(features.rate_features(script, span, gaps)["rate.phones_per_second"]["value"])
+        self.assertAlmostEqual(rates[0], rates[1], delta=0.1)
+
     def test_speech_span_skips_the_leading_and_trailing_silence(self):
         start, end = features.speech_span(synth(0.3, 0), RATE)
         self.assertAlmostEqual(start, 0.1, delta=0.03)
         self.assertGreater(end, 0.1 + 10 * 0.18 + 0.3 + 0.05)
         self.assertIsNone(features.speech_span(np.zeros(RATE), RATE))
+
+
+class ReferencesTests(unittest.TestCase):
+    """`qc.py references` freezes per-voice pitch and per-cell Audiobox medians; a run reads them."""
+
+    MODELS = {"pitchA": ("pitch.fcpe", "pitch"), "pitchB": ("pitch.swiftf0", "pitch"),
+              "aesthetics": ("aesthetics.audiobox-aesthetics", "aesthetics")}
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.layout = Layout(self.root)
+        self.layout.config.mkdir(parents=True)
+        for name in ("detectors.json", "protocol.json"):
+            shutil.copyfile(ROOT / "config/qc" / name, self.layout.config / name)
+        entries = []
+        for role, (model_id, kind) in self.MODELS.items():
+            runner = self.root / f"scripts/qc/runners/stub_{role.lower()}.py"
+            runner.parent.mkdir(parents=True, exist_ok=True)
+            runner.write_text("# stub\n")
+            entries.append({"id": model_id, "kind": kind, "runner": f"qc.runners.stub_{role.lower()}", "runtime": "onnx",
+                            "source": {"host": "huggingface", "repo": "a/b", "revision": "0" * 40,
+                                       "files": {"w": {"sha256": "0" * 64, "bytes": 1}}},
+                            "license": "MIT", "memoryGB": 1, "languages": "any", "version": 1})
+        self.layout.registry.write_text(json.dumps({"schemaVersion": 1, "models": entries}))
+        self.identities = {role: runtime.runner_identity(self.layout, entry) for role, entry
+                           in zip(self.MODELS, entries)}
+        self.params = json.loads((ROOT / "config/qc/detectors.json").read_text())["params"]
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def take(self, name: str, *, voice: str, hz: float, pq: float, mode: str = "custom", **extra) -> dict:
+        digest = store.sha256_text(name)
+        take = {"takeID": f"fr-0001--{name}", "token": store.take_token("pool", name), "audio": f"/private/{name}.wav",
+                "audioSHA256": digest, "language": "french", "text": f"secret script {name}", "mode": mode,
+                "voice": voice, "cell": "standard", "reference": None, "referenceSHA256": None,
+                "finishReason": "eos"}
+        take.update(extra)
+        track = {"hopSeconds": 0.01, "f0Hz": [hz] * 200, "confidence": [0.9] * 200}
+        for role, outputs in (("pitchA", track), ("pitchB", track), ("aesthetics", {"PQ": pq, "CE": 5.0})):
+            model_id = self.MODELS[role][0]
+            store.write_result(self.layout.results_dir(model_id), model=model_id, runner_sha=self.identities[role],
+                               audio_sha=digest, variant=None, duration_seconds=2.0, outputs=outputs)
+        return take
+
+    def semitones(self, hz: float) -> float:
+        track = {"outputs": {"hopSeconds": 0.01, "f0Hz": [hz] * 200, "confidence": [0.9] * 200}}
+        return features.take_pitch_median({"pitchA": track, "pitchB": track}, self.params)
+
+    def pool(self) -> list[dict]:
+        return [self.take("a1", voice="aiden", hz=110.0, pq=7.0), self.take("a2", voice="aiden", hz=110.0, pq=7.2),
+                self.take("a3", voice="aiden", hz=110.0, pq=7.4),
+                self.take("r1", voice="ryan", hz=150.0, pq=7.2), self.take("r2", voice="ryan", hz=150.0, pq=7.2),
+                *[self.take(f"c{index}", voice="clone-x", hz=200.0, pq=7.2, mode="clone") for index in range(3)],
+                self.take("ctl", voice="aiden", hz=300.0, pq=1.0, control=True),
+                self.take("cut", voice="aiden", hz=300.0, pq=1.0, finishReason="max-tokens")]
+
+    def test_the_pool_s_voice_pitch_and_cell_aesthetics_are_frozen(self):
+        pool = self.pool()
+        document = references.compute(self.layout, pool, min_count=3, echo=lambda line: None)
+        self.assertEqual(set(document["voicePitch"]), {"custom|aiden"})  # ryan has 2 takes; clones use their clip
+        self.assertAlmostEqual(document["voicePitch"]["custom|aiden"]["median"], self.semitones(110.0), places=3)
+        self.assertEqual(document["voicePitch"]["custom|aiden"]["n"], 3)
+        self.assertEqual(document["cellAesthetics"]["standard"]["PQ"], {"median": 7.2, "n": 8})
+        self.assertEqual(document["pool"]["excluded"], {"control": 1, "finishNotEOS": 1})
+        self.assertEqual(document["models"]["pitchA"]["results"], 8)
+        text = json.dumps(document, ensure_ascii=False)
+        for take in pool:
+            for value in (take["takeID"], take["token"], take["audioSHA256"], take["text"], take["audio"]):
+                self.assertNotIn(value, text)
+
+        path = references.write(self.layout, document)
+        self.assertEqual(path.name, "references-v1.json")
+        loaded = references.load(self.layout)
+        self.assertEqual((loaded["file"], loaded["sha256"]), ("references-v1.json", store.sha256_file(path)))
+
+        # A run of one aiden take sung an octave up and one ryan take: aiden is held to the frozen
+        # median, ryan (absent from the file) to the run's own, and the context says which.
+        run = [self.take("new-a", voice="aiden", hz=220.0, pq=3.0), self.take("new-r", voice="ryan", hz=150.0, pq=3.0)]
+        results = {take["token"]: {role: store.read_result(self.layout, self.MODELS[role][0], take["audioSHA256"],
+                                                           None, self.identities[role])
+                                   for role in self.MODELS} for take in run}
+        context = features.build_context(run, results, {}, self.params, layout=self.layout)
+        self.assertAlmostEqual(context["voicePitch"]["custom|aiden"], self.semitones(110.0), places=3)
+        self.assertAlmostEqual(context["voicePitch"]["custom|ryan"], self.semitones(150.0), places=3)
+        self.assertEqual(context["cellAesthetics"]["standard"], {"PQ": 7.2, "CE": 5.0})
+        self.assertEqual(context["references"], {"file": "references-v1.json", "sha256": loaded["sha256"],
+                                                 "fallbacks": {"voicePitch": ["custom|ryan"], "cellAesthetics": []}})
+        quality = features.quality_features(run[0], results[run[0]["token"]], context)
+        self.assertAlmostEqual(quality["aesthetics.pq_delta"]["value"], 3.0 - 7.2)
+        # Without a references file the run is its own reference.
+        own = features.build_context(run, results, {}, self.params, layout=Layout(self.root / "empty"))
+        self.assertIsNone(own["references"])
+        self.assertAlmostEqual(own["voicePitch"]["custom|aiden"], self.semitones(220.0), places=3)
+        (self.layout.config / "references-v2.json").write_text("{}")
+        with self.assertRaises(ValueError):
+            references.load(self.layout)
+
+    def test_the_command(self):
+        manifest = self.root / "takes.json"
+        manifest.write_text(json.dumps({"schema": store.TAKES_SCHEMA, "source": "pool", "takes": self.pool()}))
+        spec = importlib.util.spec_from_file_location("qc_cli_references", SCRIPTS / "qc.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        arguments = ["references", "--takes", str(manifest)]
+        with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
+            self.assertEqual(cli.main(arguments + ["--dry-run"], layout=self.layout), 0)
+        self.assertIn("custom|aiden", output.getvalue())
+        self.assertIsNone(references.latest(self.layout))
+        with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
+            self.assertEqual(cli.main(arguments, layout=self.layout), 0)
+        self.assertIn("references-v1.json", output.getvalue())
+        self.assertEqual(references.load(self.layout)["voicePitch"]["custom|aiden"]["n"], 3)
 
 
 class NormRuleTests(unittest.TestCase):
@@ -238,16 +372,13 @@ class NormRuleTests(unittest.TestCase):
         fallback = self.score("pause.anomalous", "german", self.NORMS, pause__longest_gap_seconds=0.7)
         self.assertEqual((fallback["score"], fallback["rule"][0]["threshold"], fallback["rule"][0]["norm"]), (1.0, 0.5, None))
 
-    def test_an_abrupt_end_is_under_the_language_p1_decay_and_50_ms(self):
+    def test_an_abrupt_end_ranks_but_never_flags_before_a_fit(self):
+        # The drop rule saturated on its own padding and flagged clean endings; a cut-off is content
+        # evidence (boundary.cutoff), so the ending only ranks the listening queue until it is fitted.
         cut = {"end__drop_db_60ms": 35.0, "end__tail_seconds": 0.04}
-        self.assertEqual(self.score("boundary.abrupt-end", "french", **cut)["score"], 1.0)
-        # A pool whose p1 decay is 0 s (its own cut endings) keeps the 50 ms rule.
-        held = self.score("boundary.abrupt-end", "french", self.NORMS, **cut)
-        self.assertEqual((held["score"], held["rule"][1]["threshold"]), (1.0, 0.05))
-        # A language whose endings all decay slowly flags a shorter decay.
-        slow = dict(cut, end__tail_seconds=0.06)
-        self.assertEqual(self.score("boundary.abrupt-end", "french", self.NORMS, **slow)["score"], 0.0)
-        self.assertEqual(self.score("boundary.abrupt-end", "japanese", self.NORMS, **slow)["score"], 1.0)
+        for norms_doc in (None, self.NORMS):
+            outcome = self.score("boundary.abrupt-end", "french", norms_doc, **cut)
+            self.assertEqual((outcome["scope"], outcome["cut"]), (None, None))
 
     def test_rate_outliers_need_norms(self):
         self.assertIsNone(self.score("prosody.rate", "french", rate__phones_per_second=5.0)["scope"])  # uncalibrated

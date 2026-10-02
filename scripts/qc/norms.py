@@ -8,10 +8,14 @@ cached results (the aligner's words and the G2P phones; nothing runs a model), p
   the measure `pause.anomalous` takes the longest of). The pause rule reads its p99: a take has
   several pauses, so the pool's own defective pauses barely move it, unlike the p99 of each
   take's longest pause, which a defect rate above 1% pushes past the defects themselves;
-- `pause.longest_gap_seconds` (each take's longest, the aligner's word gaps included when cached)
-  and `pause.word_gap_seconds` (every silence between two aligned words): descriptive;
-- `rate.phones_per_second` and `rate.syllables_per_second`: the speaking rate over the speech span;
-- `end.tail_seconds`, `end.decay_db_per_ms` and `end.drop_db_60ms`: how the take ends.
+- `pause.longest_gap_seconds` (each take's longest, from the audio), `pause.word_gap_seconds`
+  (every silence between two aligned words) and `pause.unpunctuated_gap_seconds` (each take's
+  longest silence between two aligned words with no punctuation between them in the script):
+  descriptive;
+- `rate.phones_per_second` and `rate.syllables_per_second`: the articulation rate, over the speech
+  span minus its pauses of 100 ms or more;
+- `end.tail_seconds`, `end.decay_db_per_ms`, `end.drop_db_60ms` and `end.file_tail_seconds` (the
+  file after the last speech frame): how the take ends.
 
 It writes `config/qc/norms-v<N>.json`: per language and feature, `n`, the mean and the
 percentiles of `qc.detectors.NORM_PERCENTILES`, plus counts and one digest of the pool's audio
@@ -40,11 +44,12 @@ from qc.store import Layout
 NORMS_SCHEMA = "vocello.qc.norms/1"
 NORMS_RE = re.compile(r"^norms-v(\d+)\.json$")
 NORM_FEATURES = (
-    "pause.gap_seconds", "pause.longest_gap_seconds", "pause.word_gap_seconds", "rate.phones_per_second",
-    "rate.syllables_per_second", "end.tail_seconds", "end.decay_db_per_ms", "end.drop_db_60ms",
+    "pause.gap_seconds", "pause.longest_gap_seconds", "pause.word_gap_seconds", "pause.unpunctuated_gap_seconds",
+    "rate.phones_per_second", "rate.syllables_per_second", "end.tail_seconds", "end.decay_db_per_ms",
+    "end.drop_db_60ms", "end.file_tail_seconds",
 )
 # The shortest non-speech stretch that counts as a pause: below it, a gap is a consonant closure.
-PAUSE_MIN_SECONDS = 0.1
+PAUSE_MIN_SECONDS = feature_lib.ARTICULATION_PAUSE_SECONDS
 ROLES = ("align", "g2p")
 DEFAULT_MIN_COUNT = 100
 
@@ -92,16 +97,16 @@ def take_measures(take: dict[str, Any], results: dict[str, Any], *, layout: Layo
         return None
     profile = feature_lib.frame_profile(samples, rate)
     aligned = feature_lib.outputs(results, "align")
+    pauses = feature_lib.pause_gaps(samples, rate, profile=profile, minimum=PAUSE_MIN_SECONDS)
     found: dict[str, Any] = {}
-    found.update(feature_lib.pause_features(samples, rate, aligned, profile=profile))
-    found.update(feature_lib.end_features(samples, rate))
+    found.update(feature_lib.pause_features(samples, rate, aligned, profile=profile, text=take.get("text"),
+                                            language=take.get("language")))
+    found.update(feature_lib.end_features(samples, rate, profile=profile))
     expected = feature_lib.expected_phones(take, results, layout, model_ids)[0]
-    found.update(feature_lib.rate_features(expected, feature_lib.speech_span(samples, rate, profile=profile)))
+    found.update(feature_lib.rate_features(expected, feature_lib.speech_span(samples, rate, profile=profile), pauses))
     measures = {name: [found[name]["value"]] for name in NORM_FEATURES
                 if name in found and found[name].get("value") is not None}
-    for name, values in (("pause.gap_seconds", feature_lib.pause_gaps(samples, rate, profile=profile,
-                                                                       minimum=PAUSE_MIN_SECONDS)),
-                         ("pause.word_gap_seconds", feature_lib.word_gaps(aligned))):
+    for name, values in (("pause.gap_seconds", pauses), ("pause.word_gap_seconds", feature_lib.word_gaps(aligned))):
         if values:
             measures[name] = values
     return measures

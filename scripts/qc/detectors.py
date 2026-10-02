@@ -30,10 +30,13 @@ from qc.store import Layout
 
 METHODS = ("logistic", "threshold")
 DIRECTIONS = ("higher", "lower")
-ROLES = ("asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics", "llm")
+ROLES = ("asrA", "asrB", "align", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics",
+         "llm")
 # Which runner roles a feature family reads (signal and engine features read only the WAV and the take).
+# The phone features need both recognizers: an insertion counts only when both make it.
 FEATURE_ROLES = {
-    "asr": ("asrA", "asrB", "g2p"), "align": ("align",), "phones": ("phones", "g2p"), "pitch": ("pitchA", "pitchB"),
+    "asr": ("asrA", "asrB", "g2p"), "align": ("align",), "phones": ("phones", "phonesB", "g2p"),
+    "pitch": ("pitchA", "pitchB"),
     "speaker": ("speaker",), "mos": ("mos",), "aesthetics": ("aesthetics",), "llm": ("llm",),
     "signal": (), "engine": (), "pause": (), "end": (), "level": (), "rate": ("g2p",),
 }

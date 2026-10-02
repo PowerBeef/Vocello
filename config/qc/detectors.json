@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
-  "version": 3,
+  "version": 4,
   "models": {
     "asrA": "asr.qwen3-asr-1.7b",
     "asrB": "asr.whisper-large-v3",
     "align": "align.qwen3-forcedaligner-0.6b",
     "phones": "phones.zipa-large-crctc-500k",
+    "phonesB": "phones.wav2vec2-xlsr-53-espeak-cv-ft",
     "g2p": "g2p.espeak-ng",
     "pitchA": "pitch.fcpe",
     "pitchB": "pitch.swiftf0",
@@ -15,7 +16,7 @@
     "llm": "llm.gemma-4-12b-it-qat"
   },
   "params": {
-    "gopLow": -2.0,
+    "gopLow": -2.3,
     "loudnessTarget": -23.0,
     "muteTestMinGapSeconds": 0.4,
     "muteTestMaxDistance": 0.1,
@@ -41,15 +42,15 @@
   "lanes": {
     "language-bench": {
       "description": "scripts/macos_test.sh lang-bench: the language matrix's takes from the Mac CLI. asrA and asrB are the two spoken-content families of the language record (scripts/qc/language.py).",
-      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+      "models": ["asrA", "asrB", "align", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
     },
     "ios-language-bench": {
       "description": "scripts/ios_device.sh lang-bench: the iPhone's takes, scored on the Mac once they are collected.",
-      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+      "models": ["asrA", "asrB", "align", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
     },
     "qc-takes": {
       "description": "scripts/macos_test.sh qc-takes: the take pool after generation, then the listening queue. The LLM judge runs only on labelled and queued takes (--models llm).",
-      "models": ["asrA", "asrB", "align", "phones", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
+      "models": ["asrA", "asrB", "align", "phones", "phonesB", "g2p", "pitchA", "pitchB", "speaker", "mos", "aesthetics"]
     },
     "clone-lane": {
       "description": "scripts/clone_fidelity_lane.py: fixed-seed clone takes against their reference clip (identity and pitch); its controls are scored against the same clip and never gate.",
@@ -72,9 +73,7 @@
       {"name": "end.drop_db_60ms", "direction": "higher"},
       {"name": "end.tail_seconds", "direction": "lower"},
       {"name": "end.decay_db_per_ms", "direction": "higher"},
-      {"name": "engine.finish_not_eos", "direction": "higher"}],
-     "provisional": {"all": [{"feature": "end.drop_db_60ms", "op": ">", "value": 30},
-                             {"feature": "end.tail_seconds", "op": "<", "value": 0.05, "norm": "p1", "atLeast": 0.05}]}},
+      {"name": "engine.finish_not_eos", "direction": "higher"}]},
     {"id": "level.loudness", "class": null, "advisory": true, "method": "logistic", "features": [
       {"name": "level.lufs_deviation", "direction": "higher"},
       {"name": "level.true_peak_dbtp", "direction": "higher"},
@@ -122,7 +121,6 @@
       {"name": "speaker.whole_distance", "direction": "higher"},
       {"name": "speaker.window_range", "direction": "higher"}]},
     {"id": "signal.artifacts", "class": "artifact", "method": "logistic", "features": [
-      {"name": "signal.clicks", "direction": "higher"},
       {"name": "signal.dropout_seconds", "direction": "higher"},
       {"name": "signal.clipping_fraction", "direction": "higher"},
       {"name": "signal.terminal_silence_seconds", "direction": "higher"}]},

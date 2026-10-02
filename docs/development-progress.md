@@ -17,6 +17,31 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 2 — an external review corrects QC v2; labelling is safe, fixes in progress
+
+An external review ran QC v2's own code on human recordings (289 FLEURS French, 150 English, 72
+CaFE) and found three conclusions resting on measurement artefacts. Every finding was confirmed in
+the code. The maintainer chose out-of-fold evaluation, "moderate or worse" as a defect, a new
+`devoiced` label class, and a roadmap item (QC-08) for the in-app Fast QC changes.
+
+- **Withdrawn:** `fr-0101--dylan`'s "spelling pronunciation". ZIPA prints silent letters on native
+  French speech (38% of "les"); "de fait" /dəfɛt/ is correct. Its "1.2 s gap" holds a whispered
+  "-tus"; the real pause is 0.82 s. Muting proves nothing, since recognizers fill in over zeros.
+- **Done (c6532c85):** the label page saves only heard takes with explicit severities, per rater,
+  with the protocol digest; moderate or worse is a defect; the `devoiced` class.
+- **In progress (worktree agents):** two-recognizer phone insertions, optional liaisons, quiet-frame
+  pauses, ending padding, local click detection, articulation rate, frozen references, ReDimNet2+
+  memory; scoring identity, out-of-fold evaluation, one eval per label set, a pooled floor.
+
+**Next.**
+1. Integrate both agents; replace the mute test with an excerpt test; add human controls (MLS fr,
+   LibriTTS-R en) and check every rule on them (at most 5% flagged per language).
+2. Rescore both qc-takes runs once (identities change), then commit norms-v1 and references-v1.
+3. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`) and listens to
+   `fr-0101--dylan` for the whisper, the sound before "obstruaient" and "orme-euz-abattus".
+4. Fit out-of-fold, commit thresholds-v1, evaluate once, commit eval-v1.
+5. Dry-run `build_cleanup.py --qc-v1`, then delete on the maintainer's go-ahead.
+
 ### October 1, evening — QC v2 replaces the v1 audio QC harness
 
 The v1 harness missed defects the maintainer heard: clone pitch, cut-offs, accented French from a
@@ -30,8 +55,8 @@ local models, all with commercial-use weights. It is calibrated on the maintaine
 - Detectors run report-only until labels exist. They cover phone-level stutter, sound-level ASR
   error, anomalous pauses, abrupt ends, loudness, pitch and register, tonal collapse, identity drift,
   artifacts, naturalness and the LLM rubric.
-- On `fr-0101--dylan`, ZIPA hears silent letters pronounced (phone error 0.48, four repeated runs).
-  The pause detector flags the 1.2 s gap; the boundary detector flags the abrupt end.
+- On `fr-0101--dylan` the pause and boundary detectors flag the gap and the abrupt end (the silent-
+  letter reading of ZIPA's phones was withdrawn on October 2, see above).
 - Lanes: lang-bench (language version 6, two ASR families), qc-takes (scores and queues) and the
   clone lane (version 5). The qc-n2 and qc-introspection lanes are gone.
 - The label tool's batch-1 is 106 takes (French and English, 10 blind repeats). It lives under

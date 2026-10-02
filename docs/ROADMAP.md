@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `qc-v2-2026-10` | active | backend-mlx | 0/7 (0%) |
+| `qc-v2-2026-10` | active | backend-mlx | 0/8 (0%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 2/6 (33%) |
@@ -45,6 +45,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 | `QC-05` | in-flight | Retire the v1 stack | — |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
 | `QC-07` | planned | Move the delivery bench and voice-reliability analysis onto QC v2 | `QC-04` |
+| `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
 
 ### Open items in detail
 
@@ -52,7 +53,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
   gate: config/qc/models.json pins every model by revision and SHA-256 with a commercial-use weight license; qc.py fetches and verifies them; each runner passes a 3-take smoke run on the M6 within its memory budget.
 
 - **`QC-02`** (in-flight) — Maintainer labels.
-  gate: qc.py label sample/serve/export runs locally; batch 1 (160 fr/en takes, family-split 60/40, 10% blind repeats) is labelled; labels stay under build/private/qc; intra-rater kappa is reported.
+  gate: qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.
 
 - **`QC-03`** (planned) — Detectors, thresholds and evaluation.
   gate: Detectors for content and phonemes, cut-off, wrong language, accent, pitch and register, tonal collapse, identity drift, artifacts, naturalness and the LLM rubric are fit on the train labels; thresholds-v<N> is committed before eval-v<N> scores the held-out labels; levels follow the plan's precision, recall and false-alarm rules.
@@ -64,10 +65,13 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
   gate: The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.
 
 - **`QC-06`** (planned) — Product follow-ups surfaced by QC.
-  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual spelling pronunciation (the heard stutter), clone pitch, tonal collapse.
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch, tonal collapse.
 
 - **`QC-07`** (planned) — Move the delivery bench and voice-reliability analysis onto QC v2.
   gate: scripts/bench_delivery_prosody.py, scripts/analyze_prosody.py and scripts/prosody_profile.py measure delivery cells with the QC v2 pitch, speaker and naturalness runners, and scripts/voice_identity_language_reliability.py scores clone identity, pitch and language with QC v2; a delivery-copy or prompt change is promoted only on that evidence, and production prompts stay unchanged otherwise.
+
+- **`QC-08`** (planned) — In-app Fast QC v9: relative silence, ending fade and loudness.
+  gate: Fast QC measures silence in 20 ms frames relative to the take's median speech level (20 dB under it), keeping the -60 dBFS floor for true dropouts, so a pause holding breath or low noise feeds the existing cadence:excess warning; single takes get a short fade and a fixed tail, and a loudness gain toward -23 LUFS. Each change is first measured on QC v2's human controls; fastqc@9 ships with a new calibration record, the Swift, Python mirror and record edited together, and a re-seeded benchmark lineage.
 
 ## Specialist-audit remediation
 

@@ -106,7 +106,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `prosody.pitch` | pitch | On frames where both trackers agree (`qc.pitch`): the sustained shift, octave jumps, the register offset from the voice's or clone reference's median, and tracker disagreement. |
 | `prosody.rate` | unnatural | The script's G2P phones per second over the speech span (first to last speech frame), and its reciprocal, so a fit can weigh both tails. |
 | `prosody.tonal-collapse` | tonal-collapse | The longest steady-F0 run, its spectral flatness and its harmonic-to-noise ratio. |
-| `identity.drift` | voice-change | The worst 3 s window's distance from the clone reference, the Built-in voice centroid or the take's own embedding; the whole take's distance; and the window range. |
+| `identity.drift` | voice-change | The worst 4 s window's distance from the clone reference, the Built-in voice centroid or the take's own embedding; the whole take's distance; and the window range. |
 | `signal.artifacts` | artifact | Click clusters, internal digital dropouts, clipping and terminal silence. |
 | `quality.naturalness` | unnatural | UTMOSv2 on the whole take and its worst 3 s window, and Audiobox PQ and CE relative to the cell median. |
 | `judge.llm.<class>` | each class | The audio LLM's `pYes`. It stays report-only unless its train kappa is at least 0.6. Gemma 4 documents its audio for speech recognition and translation only, and audio LLMs lean on the words more than the voice, so the prosody, accent and naturalness votes are expected to miss the gate. Its transcript can fill in words it expects, so no content feature reads it. |
@@ -116,7 +116,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 - `boundary.abrupt-end`: the drop is over 30 dB within 60 ms, with a tail under the language's p1 decay time, and at least 50 ms (50 ms without norms).
 - `prosody.rate`: the phones per second are under the language's p1 or over its p99. Without norms it has no rule.
 - `level.loudness`: the loudness is more than 4 LU from −23 LUFS, or the true peak is above −1 dBTP.
-- `content.phoneme`: at least 2 repeated-syllable runs, or a phone insertion rate of at least 0.2. Against espeak-ng, ZIPA measured fr-0101--dylan at 4 runs and 0.275, and a clean en-0008--ryan at 0 and 0.
+- `content.phoneme`: at least 2 repeated-syllable runs, or a phone insertion rate of at least 0.2. With ZIPA alone this flags 9.7% of human French recordings (FLEURS): ZIPA prints silent letters native speakers do not say. The insertion rate and repeat runs therefore count only insertions both phone recognizers hear.
 
 The rules live in `detectors.json`, not in a thresholds file, so a fit never has to carry them. A condition names its `norm` percentile (of its own feature or of `normFeature`) and bounds it with `atLeast` or `atMost`; each flag records the threshold it met and the norm behind it. `fit` replaces the rules once labels exist.
 
@@ -129,11 +129,12 @@ Before any fit, a detector without a rule scores uncalibrated (its largest orien
 
 The synthetic test case reproduces fr-0101--dylan: a 1.1 s hiss, blip and silence gap, and a 40 ms cut ending. The provisional rules must flag it, and a 0.25 s pause with a 200 ms decay must pass (`scripts/tests/test_qc_detectors.py`).
 
-**The first heard positive: `fr-0101--dylan`.** A 5.44 s Built-in Voice take of Dylan reading French. The maintainer's own signal analysis, with two Whisper models, found two defects while every word was recognized:
-- a 1.16 s non-speech gap mid-sentence (hiss, breath noise, a voiced blip and silence), proven word-free by muting it and transcribing again;
-- an abrupt ending: about 36 dB of drop in 40 ms, with a 20 ms tail.
+**The first heard positive: `fr-0101--dylan`.** A 5.44 s Built-in Voice take of Dylan reading French, in which the maintainer heard a stutter and missing syllables while every word was recognized. What the signal shows, as corrected on October 2 by an external review run against human French recordings:
+- the last syllable of "abattus" ("-tus", 3.07–3.43 s) is whispered, then the voice stops for 0.82 s, with one short voiced sound at 3.92 s just before "obstruaient";
+- the take ends 0.02 s after its last sound;
+- it sits at −26.4 LUFS.
 
-QC v2's phone check found what the ASR families hid: the voice pronounces silent letters. "fait" is read as /fɛt/, "les" as /lɛs/, "vieux" as /vjœks/ and "ormes" as /ɔʁmɛs/. The take's phone error rate is 0.48, with 11 insertions, against 0.10 on a clean take. The heard stutter is therefore spelling pronunciation, a cross-lingual defect of a Built-in voice reading French; QC-06 tracks the product side. `pause.anomalous`, `boundary.abrupt-end` and `content.phoneme` cover the three defects.
+Two earlier readings were wrong. The "1.16 s non-speech gap" held the whispered syllable, and muting it proved nothing: speech and phone recognizers fill in words and phones over zeroed audio. ZIPA's silent letters ("les" /lɛs/, "des" /dɛs/) are the recognizer's own bias: it prints them after 38% and 36% of those words read by native French speakers, where the wav2vec2 phone recognizer does after 3% and 0%; and "de fait" /dəfɛt/ is correct French. What was heard as a stutter is unexplained. The candidates are the whispered syllable, the voiced sound before "obstruaient", and "ormes abattus" linked as "orme-euz-abattus"; only listening can choose. The new `devoiced` label class names the first.
 
 ## Sound-level transcript scoring
 

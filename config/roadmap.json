@@ -1583,13 +1583,13 @@
       "title": "Maintainer labels",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "qc.py label sample/serve/export runs locally; batch 1 (160 fr/en takes, family-split 60/40, 10% blind repeats) is labelled; labels stay under build/private/qc; intra-rater kappa is reported.",
+      "gate": "qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-01",
+      "updated": "2026-10-02",
       "unparkWhen": null,
-      "notes": "fr-0101--dylan (stutter and missing syllables) is the first heard positive. Acoustic-only labels cover the languages the maintainer can't judge linguistically."
+      "notes": "fr-0101--dylan (heard: stutter and missing syllables) is the first heard positive. Moderate or worse counts as a defect; the devoiced class names a whispered syllable. Acoustic-only labels cover the languages the maintainer can't judge linguistically."
     },
     {
       "id": "QC-03",
@@ -1657,13 +1657,13 @@
       "blockedBy": [
         "QC-03"
       ],
-      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, cross-lingual spelling pronunciation (the heard stutter), clone pitch, tonal collapse.",
+      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch, tonal collapse.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-01",
+      "updated": "2026-10-02",
       "unparkWhen": null,
-      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan: the heard stutter is spelling pronunciation. Built-in voices reading French pronounce silent letters (\"fait\" /fɛt/, \"les\" /lɛs/, \"vieux\" /vjœks/, \"ormes\" /ɔʁmɛs/; phone error rate 0.48 with 11 insertions, against 0.10 on a clean take), which both ASR families read as the right words. The 804-take sampling-variation experiment awaits analysis with FCPE and SwiftF0."
+      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan, corrected on 2026-10-02 by an external review against human French recordings: the last syllable of \"abattus\" is whispered, followed by a 0.82 s pause with a short voiced sound before \"obstruaient\", and the take ends 0.02 s after its last sound. The earlier 'spelling pronunciation' diagnosis is withdrawn: ZIPA prints silent letters on 38% of \"les\" read by native speakers. What was heard as a stutter awaits the maintainer's listening (whisper, the sound before \"obstruaient\", or \"ormes abattus\" linked as \"orme-euz-abattus\"). The 804-take sampling-variation experiment awaits analysis with FCPE and SwiftF0."
     },
     {
       "id": "QC-07",
@@ -1688,6 +1688,24 @@
         "DP-32"
       ],
       "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2. Emotion adherence (the maintainer's 2026-10-01 emotion and intent analysis of fr-0101--dylan): the qc-takes pool has no instructed takes, so nothing yet checks that a requested emotion is heard. Candidates: emotion2vec+ large (FunASR model license: commercial use with attribution) as an emotion vote, plus the acoustic cues that separated emotions best in that analysis: pitch level against the voice's neutral take (every acted emotion sat more than 5 st above neutral), energy, alpha ratio and Hammarberg index, computed in NumPy (openSMILE needs a commercial license). Excluded: audeering's wav2vec2 emotion model and the CaFE reference set (both CC BY-NC-SA). Emotion models score 15-50% on synthetic speech, so the measure is calibrated on maintainer labels of instructed takes and starts report-only."
+    },
+    {
+      "id": "QC-08",
+      "plan": "qc-v2-2026-10",
+      "title": "In-app Fast QC v9: relative silence, ending fade and loudness",
+      "status": "planned",
+      "blockedBy": [
+        "QC-03"
+      ],
+      "gate": "Fast QC measures silence in 20 ms frames relative to the take's median speech level (20 dB under it), keeping the -60 dBFS floor for true dropouts, so a pause holding breath or low noise feeds the existing cadence:excess warning; single takes get a short fade and a fixed tail, and a loudness gain toward -23 LUFS. Each change is first measured on QC v2's human controls; fastqc@9 ships with a new calibration record, the Swift, Python mirror and record edited together, and a re-seeded benchmark lineage.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "config/audio-qc-stage0-calibration.json",
+        "scripts/lib/audio_qc.py"
+      ],
+      "updated": "2026-10-02",
+      "unparkWhen": null,
+      "notes": "From the 2026-10-02 external review: on fr-0101--dylan the per-sample silence rule (|x| < 0.001) sees one 236 ms run and flags nothing, though the take has two pauses over 350 ms against one comma (cadence:excess1 with frame-based silence). Touches GenerationOutputAdapter.swift (silence state, persisted pass, report), GenerationTelemetryRecord currentAlgorithmVersion 8 -> 9, config/audio-qc-stage0-{calibration,observations}.json, scripts/lib/audio_qc.py, the Swift tests that hard-code version 8 and the sample-exact dropout tests, test_audio_qc*.py, and the M6 gate baseline. Single takes have no fade, tail or gain today; only LongFormAssembly shapes joins."
     }
   ]
 }

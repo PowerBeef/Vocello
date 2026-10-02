@@ -135,7 +135,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
   instead of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench|qc-takes` and `release.yml` run only on explicit request, in the lead session, with no
+  memory|lang-bench|qc-takes|profile|telemetry-overhead|release-readiness`, the gate bench
+  (`macos_test.sh gate` with `QWENVOICE_GATE_BENCH=1`) and `release.yml` run only on explicit request, in the lead session, with no
   parallel agent active, except that the non-timing audio-QC model runs (`qc-takes` and the QC v2
   `scripts/qc.py` model runs, which measure outputs, not timing) may run beside code-only agents
   (`require_quiet_host <lane> agents-allowed`; maintainer decision 2026-09-29). Timing lanes refuse to start on a busy host (`require_quiet_host` in

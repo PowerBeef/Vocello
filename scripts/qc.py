@@ -315,7 +315,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="qc.py", description="Vocello QC v2 audio QC harness.")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    models = commands.add_parser("models", help="the model registry: list, fetch, verify")
+    models = commands.add_parser("models", help="the model registry: list, fetch, verify, prune")
     models_actions = models.add_subparsers(dest="action", required=True)
     listing = models_actions.add_parser("list", help="registered models and whether they are fetched")
     listing.add_argument("--json", action="store_true")
@@ -371,7 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--takes", required=True, help="takes manifest or qc-takes run directory")
     run.add_argument("--lane", required=True,
                      help="lane name: one of the `lanes` of config/qc/detectors.json (language-bench, "
-                          "ios-language-bench, qc-takes, clone-lane, voice-reliability), or any other "
+                          "ios-language-bench, qc-takes, controls, clone-lane, voice-reliability), or any other "
                           "name, such as pool, for every role")
     run.add_argument("--models", help="comma-separated roles or model ids to run now (default the lane's "
                                       "models); the others are read from the cache")

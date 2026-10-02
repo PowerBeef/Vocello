@@ -1,4 +1,7 @@
-"""ZIPA-large CR-CTC phone recognizer (ONNX Runtime, CPU): phones without a language model.
+"""ZIPA-large CR-CTC phone recognizer (ONNX Runtime, CPU): phones with no external language model or lexicon.
+
+Its training data still shapes what it prints (it writes French silent letters on native speech), so
+`qc.phones.agreement` counts an insertion only when the second recognizer also makes it.
 
 ZIPA (Zhu et al., ACL 2025) is a Zipformer trained with CR-CTC on IPA-Pack++ over 127 IPA tokens
 (`tokens.txt`: `<blk>` 0, the word-start token `▁`, letters, and diacritics such as `̃`, `ʰ` and

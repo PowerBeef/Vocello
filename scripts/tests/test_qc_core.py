@@ -521,6 +521,8 @@ class CacheTests(unittest.TestCase):
         self.assertIsNone(store.take_variant({"kind": "asr"}, take))
         self.assertEqual(store.take_variant({"kind": "align"}, take), store.variant_key("t", "french", None))
         self.assertIsNone(store.take_variant({"kind": "align", "variant": False}, take))
+        # G2P reads only the script: the same audio under another script keys another result.
+        self.assertNotEqual(store.take_variant({"kind": "g2p"}, take), store.take_variant({"kind": "g2p"}, dict(take, text="u")))
 
 
 def write_qc_takes_run(root: Path) -> Path:

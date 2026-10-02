@@ -37,8 +37,10 @@ RESULT_SCHEMA = "vocello.qc.result/1"
 TAKES_SCHEMA = "vocello.qc.takes/1"
 
 # Model kinds whose output depends on the take's text, language or reference
-# clip: their results carry a variant key next to the audio digest.
-VARIANT_KINDS = frozenset({"align", "llm", "speaker"})
+# clip: their results carry a variant key next to the audio digest. G2P reads only
+# the text, so the same audio under another script (a language bench's negative
+# control) must not reuse its result.
+VARIANT_KINDS = frozenset({"align", "g2p", "llm", "speaker"})
 
 
 @dataclass(frozen=True)

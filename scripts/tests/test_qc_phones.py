@@ -47,15 +47,21 @@ def peaky(sequence: list[int], vocab_size: int, *, frames_per_token: int = 2, ga
 
 
 class FakeEngine:
+    """espeak-ng stand-in: sentences from `table`; a French word read alone (the liaison check) from
+    `words`, else its own spelling."""
+
     name = "fake-espeak"
     version = "test"
 
-    def __init__(self, table: dict[str, str]) -> None:
+    def __init__(self, table: dict[str, str], words: dict[str, str] | None = None) -> None:
         self.table = table
-        self.calls = 0
+        self.words = words or {}
+        self.texts: list[str] = []
 
     def phonemize(self, text: str, voice: str) -> str:
-        self.calls += 1
+        self.texts.append(text)
+        if text not in self.table and " " not in text:
+            return self.words.get(text, text)
         return self.table[text]
 
 
@@ -93,6 +99,21 @@ class NormalizationTests(unittest.TestCase):
         for ipa, expected in cases.items():
             with self.subTest(ipa=ipa):
                 self.assertEqual(broad(ipa), expected)
+
+    def test_the_flap_is_a_rhotic_only_in_spanish_italian_and_portuguese(self):
+        # English "butter" /bʌɾɚ/: the flap is a /t/, so it keeps its symbol and never matches an /ɹ/.
+        self.assertEqual(broad("bˈʌɾɚ", language="english"), ["b", "ʌ", "ɾ", "ə"])
+        self.assertEqual(broad("ˈpeɾo", language="spanish"), ["p", "e", "r", "o"])
+        self.assertEqual(broad("ɾ", language="it"), ["r"])
+        self.assertEqual(broad("ɾ"), ["r"])  # no language: the language-free fold
+        self.assertEqual(broad("ɹ", language="english"), ["r"])  # the other rhotics still fold
+        heard = [{"phone": phone, "start": None, "end": None} for phone in ("b", "ʌ", "ɹ", "ɚ")]
+        english = phones.compare(phones.segment_ipa("bˈʌɾɚ"), heard, language="english",
+                                 model_dir=Path(tempfile.gettempdir()) / "qc-no-panphon")
+        self.assertEqual([op["op"] for op in english["ops"]], ["match", "match", "sub", "match"])
+        spanish = phones.compare(phones.segment_ipa("bˈʌɾɚ"), heard, language="spanish",
+                                 model_dir=Path(tempfile.gettempdir()) / "qc-no-panphon")
+        self.assertEqual([op["op"] for op in spanish["ops"]], ["match"] * 4)
 
     def test_keep_rhotics_keeps_the_accent_signal(self):
         self.assertEqual(broad("ʁ", keep_rhotics=True), ["ʁ"])
@@ -174,6 +195,44 @@ class AlignTests(unittest.TestCase):
     def test_empty_sides(self):
         self.assertEqual([op["op"] for op in phones.align([], self.heard("ab"), distance=self.distance)], ["ins", "ins"])
         self.assertEqual([op["op"] for op in phones.align(["a"], [], distance=self.distance)], ["del"])
+
+    def test_an_optional_liaison_or_schwa_costs_nothing_to_leave_out(self):
+        # "les ormes" as espeak-ng reads it before a vowel, /lez ɔʁməz/; /z/, /ə/ and the last /z/
+        # may go. Leaving them out is a skip, which no rate counts.
+        expected = broad("lez ɔʁməz")
+        optional = [False, False, True, False, False, False, True, True]
+        ops = phones.align(expected, self.heard("le ɔʁm"), distance=self.distance, optional=optional)
+        self.assertEqual([op["op"] for op in ops], ["match", "match", "skip", "match", "match", "match", "skip", "skip"])
+        self.assertEqual([op["cost"] for op in ops if op["op"] == "skip"], [0.0, 0.0, 0.0])
+        self.assertEqual((ops[2]["start"], ops[2]["end"]), (0.2, 0.2))  # between its heard neighbours
+        result = phones.stutter_features(ops, distance=self.distance)
+        self.assertEqual((result["expectedCount"], result["deletions"], result["skips"], result["per"]), (5, 0, 3, 0.0))
+        # Said, the optional phones match as usual; without the flags their absence is a deletion.
+        said = phones.align(expected, self.heard("lez ɔʁməz"), distance=self.distance, optional=optional)
+        self.assertEqual({op["op"] for op in said}, {"match"})
+        plain = phones.align(expected, self.heard("le ɔʁm"), distance=self.distance)
+        self.assertEqual(sum(op["op"] == "del" for op in plain), 3)
+        with self.assertRaises(ValueError):
+            phones.align(expected, self.heard("le"), distance=self.distance, optional=[True])
+
+    def test_compare_threads_optional_flags_through_the_broad_split_and_gop(self):
+        vocab = ["<blk>", "l", "e", "z", "a"]
+        scores = peaky([1, 2, 4], len(vocab))  # "le a": the liaison /z/ left out
+        heard = phones.ctc_greedy(scores, vocab, 0.04)
+        result = phones.compare(["l", "e", "z", "a"], heard, logprobs=scores, vocab=vocab, frame_seconds=0.04,
+                                optional=[False, False, True, False],
+                                model_dir=Path(tempfile.gettempdir()) / "qc-no-panphon")
+        self.assertEqual([op["op"] for op in result["ops"]], ["match", "match", "skip", "match"])
+        self.assertEqual(result["features"]["deletionRate"], 0.0)
+        # GOP-SF scores the phones that were said: the skipped /z/ is not a missing phone.
+        self.assertEqual([entry["phone"] for entry in result["gop"]["phones"]], ["l", "e", "a"])
+        self.assertTrue(all(entry["gop"] > -1.0 for entry in result["gop"]["phones"]))
+        # A diphthong's flag covers both of its broad phones.
+        split = phones.compare(["b", "aɪ"], [{"phone": "b"}], optional=[False, True],
+                               model_dir=Path(tempfile.gettempdir()) / "qc-no-panphon")
+        self.assertEqual([op["op"] for op in split["ops"]], ["match", "skip", "skip"])
+        with self.assertRaises(ValueError):
+            phones.compare(["a", "b"], [], optional=[True])
 
     def test_panphon_table_distance(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -328,6 +387,24 @@ class StutterTests(unittest.TestCase):
     def test_repetition_in_the_script_is_not_a_stutter(self):
         self.assertEqual(self.features("no no no", "no no no")["repeatCount"], 0)
 
+    def test_a_rhyme_is_not_a_repeat(self):
+        # "bran" then "tran": one phone in three differs, so it is not a copy (the review found rhymes
+        # and alliteration counted as stutters). A true copy still is.
+        self.assertEqual(self.features("le bʁɑ̃ʃ", "le bʁɑ̃ tʁɑ̃ʃ")["repeatCount"], 0)
+        self.assertEqual(self.features("le bʁɑ̃ʃ", "le bʁɑ̃ bʁɑ̃ʃ")["repeatCount"], 1)
+
+    def test_a_near_substitution_counts_as_a_match(self):
+        def small_scale(a: str, b: str) -> float:
+            return 0.0 if a == b else (0.02 if {a, b} == {"b", "p"} else 0.5)
+
+        ops = phones.align(["b", "a", "t"], self.heard("pas"), distance=small_scale)
+        self.assertEqual([op["op"] for op in ops], ["sub", "match", "sub"])  # the alignment keeps both
+        result = phones.stutter_features(ops, distance=small_scale)
+        # /p/ for /b/ is within the near-identity scale (a voicing pair): a match; /s/ for /t/ is not.
+        self.assertEqual((result["matches"], result["substitutions"]), (2, 1))
+        self.assertEqual(result["substitutionRate"], round(1 / 3, 4))
+        self.assertEqual(result["per"], round(1 / 3, 4))
+
     def test_single_phone_repeats_need_three_copies(self):
         self.assertEqual(self.features("ba", "bba")["repeatCount"], 0)
         result = self.features("ba", "bbba")
@@ -374,6 +451,57 @@ class StutterTests(unittest.TestCase):
         self.assertLess(min(entry["gop"] for entry in result["gop"]["phones"]), -1.0)
 
 
+class AgreementTests(unittest.TestCase):
+    """Two recognizers against the same expected phones: an insertion counts only when both made it."""
+
+    NO_PANPHON = Path(tempfile.gettempdir()) / "qc-no-panphon"
+
+    def compare(self, script: str, heard: list[tuple[str, float]]) -> dict:
+        timed = [{"phone": phone, "start": start, "end": round(start + 0.04, 3)} for phone, start in heard]
+        return phones.compare(phones.segment_ipa(script), timed, model_dir=self.NO_PANPHON)
+
+    def test_an_insertion_counts_only_when_both_recognizers_make_it(self):
+        script = "le bʁɑ̃ʃ"
+        # A: "le lez bʁɑ̃ bʁɑ̃ʃ"-like output: a silent-letter /z/ after "le" and a repeated "bʁɑ̃".
+        first = self.compare(script, [("l", 0.0), ("e", 0.1), ("z", 0.2), ("b", 0.3), ("ʁ", 0.4), ("ɑ̃", 0.5),
+                                      ("b", 0.6), ("ʁ", 0.7), ("ɑ̃", 0.8), ("ʃ", 0.9)])
+        # B heard the repetition (a few frames later) but not the /z/.
+        second = self.compare(script, [("l", 0.0), ("e", 0.1), ("b", 0.32), ("ʁ", 0.42), ("ɑ̃", 0.52),
+                                       ("b", 0.62), ("ʁ", 0.72), ("ɑ̃", 0.82), ("ʃ", 0.92)])
+        self.assertEqual(first["features"]["insertions"], 4)
+        agreed = phones.agreement(first, second, model_dir=self.NO_PANPHON)
+        self.assertEqual(agreed["features"]["insertions"], 3)
+        self.assertEqual([first["ops"][index]["recognized"] for index in agreed["agreed"]], ["b", "r", nfd("ɑ̃")])
+        self.assertEqual(agreed["features"]["repeatCount"], 1)
+        self.assertEqual(agreed["features"]["insertionRate"], 0.5)
+        self.assertEqual(agreed["features"]["insertionBursts"][0]["start"], 0.3)
+        # B heard none of it: nothing counts, though A's own features keep every insertion.
+        clean = self.compare(script, [("l", 0.0), ("e", 0.1), ("b", 0.3), ("ʁ", 0.4), ("ɑ̃", 0.5), ("ʃ", 0.6)])
+        none = phones.agreement(first, clean, model_dir=self.NO_PANPHON)
+        self.assertEqual((none["agreed"], none["features"]["repeatCount"], none["features"]["insertionRate"]),
+                         ([], 0, 0.0))
+        self.assertEqual(first["features"]["repeatCount"], 1)
+
+    def test_insertions_agree_by_expected_position_or_within_60_ms(self):
+        expected = ["a", "b", "c"]
+
+        def ops(*items):
+            return phones.align(expected, [{"phone": phone, "start": start, "end": start + 0.02}
+                                           for phone, start in items], distance=phones.coarse_distance)
+
+        first = ops(("a", 0.0), ("x", 0.1), ("b", 0.2), ("c", 0.3))  # an insertion after /a/
+        elsewhere = ops(("a", 0.0), ("b", 0.5), ("y", 0.6), ("c", 0.9))  # after /b/, and half a second later
+        self.assertEqual(phones.agreed_insertions(first, elsewhere), [])
+        after_a = ops(("a", 0.0), ("y", 0.9), ("b", 1.0), ("c", 1.1))  # after /a/, far later in time
+        self.assertEqual(phones.agreed_insertions(first, after_a), [1])
+        near_in_time = ops(("a", 0.0), ("b", 0.06), ("y", 0.13), ("c", 0.3))  # after /b/, but 30 ms off
+        self.assertEqual(phones.agreed_insertions(first, near_in_time), [1])
+        # One insertion of the second recognizer backs one of the first's.
+        doubled = ops(("a", 0.0), ("x", 0.1), ("x", 0.12), ("b", 0.2), ("c", 0.3))
+        self.assertEqual(len(phones.agreed_insertions(doubled, first)), 1)
+        self.assertEqual(phones.insertion_positions(doubled), [(1, 0), (2, 0)])
+
+
 class G2PTests(unittest.TestCase):
     TABLE = {"les branches": "le bʁˈɑ̃ʃ", "hello world": "(en)həlˈoʊ wˈɜːld(fr)", "bonjour": "bɔ̃ʒˈuʁ"}
 
@@ -387,9 +515,34 @@ class G2PTests(unittest.TestCase):
             path = Path(cache) / f"{espeak_g2p.g2p_key('les branches', 'french')}.json"
             self.assertTrue(path.is_file())
             self.assertEqual(phones.g2p("les branches", "french", cache_dir=cache, compute=False), record["phones"])
-            self.assertEqual(engine.calls, 1)
+            self.assertEqual(engine.texts.count("les branches"), 1)  # the cache answered the second read
             with self.assertRaises(phones.G2PCacheMiss):
                 phones.g2p("bonjour", "french", cache_dir=cache, compute=False)
+
+    def test_french_liaison_consonants_and_final_schwas_are_optional(self):
+        engine = FakeEngine({"les ormes abattus.": "lez ɔʁməz abaty", "Les branches de l'arbre": "le bʁɑ̃ʃə də laʁbʁ",
+                             "les amis": "lez ami", "hello world": "həlˈoʊ wˈɜːld"},
+                            words={"les": "le", "Les": "le", "ormes": "ɔʁm", "abattus": "abaty", "branches": "bʁɑ̃ʃ",
+                                   "de": "də", "l'arbre": "laʁbʁ", "amis": "ami"})
+        with tempfile.TemporaryDirectory() as cache:
+            record = phones.g2p_record("les ormes abattus.", "french", cache_dir=cache, engine=engine)
+            # The liaison /z/ of "les" (absent when read alone), the schwa and /z/ of "ormes".
+            self.assertEqual([word["optional"] for word in record["words"]], [[2], [3, 4], []])
+            self.assertEqual(record["g2pVersion"], 2)
+            self.assertIn("abattus", engine.texts)  # each word read alone once
+            record = phones.g2p_record("Les branches de l'arbre", "french", cache_dir=cache, engine=engine)
+            # The final schwa of "branches" (spelled -es, another vowel); never the only vowel of "de".
+            self.assertEqual([word["optional"] for word in record["words"]], [[], [4], [], []])
+            # Words that do not pair one to one with the IPA get nothing.
+            engine.table["les amis"] = "lezami"
+            self.assertEqual([word["optional"] for word in phones.g2p_record("les amis", "french", cache_dir=cache,
+                                                                           engine=engine)["words"]], [[]])
+            # Other languages read no word alone and mark nothing.
+            before = len(engine.texts)
+            english = phones.g2p_record("hello world", "english", cache_dir=cache, engine=engine)
+            self.assertEqual([word["optional"] for word in english["words"]], [[], []])
+            self.assertEqual(len(engine.texts), before + 1)
+        self.assertEqual(espeak_g2p.text_words("« Les arbres », dit-il — tombés…"), ["Les", "arbres", "dit-il", "tombés"])
 
     def test_key_depends_on_language_and_text(self):
         key = espeak_g2p.g2p_key("bonjour", "french")

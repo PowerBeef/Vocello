@@ -20,6 +20,14 @@ Japanese records. Without the reader, Japanese G2P is unavailable: the job write
 those takes (an environment gap, retried by the next run), and every Japanese phone feature
 abstains instead of comparing against "Chinese letter".
 
+Optional phones: each word lists the indices of the phones natural speech may leave out
+(`optional`), which the phone alignment then drops at no cost. In French these are a liaison
+consonant (a word-final consonant, optionally after a schwa, that espeak-ng gives the word in the
+sentence but not when the word is read alone: "les" is /lez/ before "arbres", /le/ alone) and a
+final schwa after a consonant in a word spelled -e, -es or -ent with another vowel ("branches",
+"ormes"). They are marked only when the script's words and the IPA words pair one to one; every
+other language gets none.
+
 Limits: espeak-ng gives Chinese polyphones one reading (the same on both sides of a comparison) and
 uses its own Korean rules; ja, zh and ko phone comparisons stay report-only.
 """
@@ -37,13 +45,18 @@ import unicodedata
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from qc.phones import ESPEAK_VOICES, G2P_MODEL_ID, LANGUAGE_SWITCH, REPO_ROOT, G2PCacheMiss, G2PUnavailable, segment_ipa
+from qc.phones import (ESPEAK_VOICES, G2P_MODEL_ID, LANGUAGE_SWITCH, REPO_ROOT, VOWELS, G2PCacheMiss,
+                       G2PUnavailable, normalize_phone, segment_ipa)
 from qc.runners import speech_common as common
 
 G2P_CACHE_DIR = REPO_ROOT / "build/cache/qc/results/g2p"
 G2P_SCHEMA = "vocello.qc.g2p/1"
 # Bump when the G2P output for the same text changes (engine options, cleaning): it keys the cache.
-G2P_VERSION = 1
+# 2: each word lists its optional phones (French liaison consonants and final schwas).
+G2P_VERSION = 2
+# The languages whose words get optional phones, and the French spellings of a droppable final schwa.
+OPTIONAL_LANGUAGES = frozenset({"french"})
+SCHWA_SPELLINGS = ("e", "es", "ent")
 # The Japanese reader's pinned packages (config/qc/runtimes/onnx.txt); they key Japanese records.
 JAPANESE_READER = "fugashi-1.5.2+unidic-lite-1.0.8"
 
@@ -193,6 +206,74 @@ def _ipa(engine: Any, text: str, language: str) -> str:
     return " ".join(LANGUAGE_SWITCH.sub(" ", engine.phonemize(text, ESPEAK_VOICES[language])).split())
 
 
+def text_words(text: str) -> list[str]:
+    """The script's words as espeak-ng reads them: whitespace-separated tokens holding a letter or
+    digit, without their leading and trailing punctuation ("arbres," is "arbres")."""
+
+    words = []
+    for token in unicodedata.normalize("NFC", text or "").split():
+        start, end = 0, len(token)
+        while start < end and unicodedata.category(token[start])[0] in "PS":
+            start += 1
+        while end > start and unicodedata.category(token[end - 1])[0] in "PS":
+            end -= 1
+        core = token[start:end]
+        if any(char.isalnum() for char in core):
+            words.append(core)
+    return words
+
+
+def _base(phone: str) -> str:
+    return "".join(normalize_phone(phone, keep_rhotics=True))
+
+
+def _vowel(phone: str) -> bool:
+    return phone[:1] in VOWELS
+
+
+def optional_indices(spelling: str, phones: list[str], alone: list[str] | None) -> list[int]:
+    """The phones of one French word (in its sentence) that natural speech may leave out.
+
+    - A liaison: the word read alone (`alone`) is the sentence's word minus a final consonant,
+      or minus a schwa and a final consonant ("ormes" /ɔʁm/ alone, /ɔʁməz/ before a vowel);
+    - a final schwa after a consonant, in a word spelled -e, -es or -ent that has another vowel
+      ("branches" /bʁɑ̃ʃə/; never the only vowel of "le" or "de").
+    """
+
+    optional: set[int] = set()
+    core = len(phones)
+    if alone and len(alone) < len(phones) and [_base(p) for p in phones[:len(alone)]] == [_base(p) for p in alone]:
+        extra = phones[len(alone):]
+        liaison = (len(extra) == 1 and not _vowel(extra[0])) or (
+            len(extra) == 2 and _base(extra[0]) == "ə" and not _vowel(extra[1]))
+        if liaison:
+            optional.update(range(len(alone), len(phones)))
+            core = len(alone)
+    lowered = spelling.lower()
+    if (core >= 2 and _base(phones[core - 1]) == "ə" and not _vowel(phones[core - 2])
+            and lowered.endswith(SCHWA_SPELLINGS) and any(_vowel(phone) for phone in phones[:core - 1])):
+        optional.add(core - 1)
+    return sorted(optional)
+
+
+def mark_optional(words: list[dict[str, Any]], text: str, language: str, engine: Any) -> None:
+    """Give every word its `optional` phone indices (`optional_indices`, French only); none when the
+    script's words and the IPA words do not pair one to one."""
+
+    for word in words:
+        word["optional"] = []
+    if language not in OPTIONAL_LANGUAGES:
+        return
+    spellings = text_words(text)
+    if len(spellings) != len(words):
+        return
+    alone: dict[str, list[str]] = {}
+    for spelling, word in zip(spellings, words):
+        if spelling not in alone:
+            alone[spelling] = segment_ipa(_ipa(engine, spelling, language))
+        word["optional"] = optional_indices(spelling, word["phones"], alone[spelling])
+
+
 def g2p_record(text: str, language: str, *, cache_dir: Path | str | None = None, engine: Any = None,
                compute: bool = True, reader: Any = None) -> dict[str, Any]:
     """The cached G2P record for (text, language), computing and caching it when allowed."""
@@ -213,6 +294,7 @@ def g2p_record(text: str, language: str, *, cache_dir: Path | str | None = None,
     ipa = _ipa(engine, text if reading is None else reading, language)
     words = [{"ipa": word, "phones": segment_ipa(word)} for word in ipa.split(" ") if word]
     words = [word for word in words if word["phones"]]
+    mark_optional(words, text if reading is None else reading, language, engine)
     record = {"schema": G2P_SCHEMA, "model": G2P_MODEL_ID, "g2pVersion": G2P_VERSION, "engine": engine.name,
               "engineVersion": getattr(engine, "version", None), "voice": ESPEAK_VOICES[language],
               "language": language, "text": text, "ipa": ipa, "words": words,

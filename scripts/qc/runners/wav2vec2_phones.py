@@ -1,4 +1,5 @@
-"""wav2vec2-xlsr-53-espeak-cv-ft phone recognizer (transformers on torch): the ZIPA fallback.
+"""wav2vec2-xlsr-53-espeak-cv-ft phone recognizer (transformers on torch): the second recognizer
+(role `phonesB`), whose insertions must agree with ZIPA's before a phone feature counts them.
 
 A CTC model over espeak-ng phone labels (`vocab.json`: `<pad>` 0 is the blank; labels such as
 `aɪ`, `tʃ`, `iː` or `i5` can hold several IPA symbols, a length mark or a tone digit) at 16 kHz,

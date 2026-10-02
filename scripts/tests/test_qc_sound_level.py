@@ -48,6 +48,8 @@ class FakeEngine:
 
     def phonemize(self, text: str, voice: str) -> str:
         self.texts.append(text)
+        if text not in self.table and " " not in text:
+            return text  # a French word read alone, for its liaison check
         return self.table[text]
 
 

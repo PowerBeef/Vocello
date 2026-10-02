@@ -151,13 +151,13 @@ def cmd_label(args: argparse.Namespace, layout: Layout) -> int:
     if args.action == "serve":
         try:
             label.serve(layout, args.batch, port=args.port,
-                        acoustic_only_languages=_csv(args.acoustic_only_languages or ""))
+                        acoustic_only_languages=_csv(args.acoustic_only_languages or ""), rater=args.rater)
         except (ValueError, OSError) as error:
             print(f"qc label serve: {error}", file=sys.stderr)
             return EXIT_ERROR
         return EXIT_OK
     try:
-        summary = label.export_summary(layout, args.batch)
+        summary = label.export_summary(layout, args.batch, args.rater)
     except (ValueError, OSError) as error:
         print(f"qc label export: {error}", file=sys.stderr)
         return EXIT_ERROR
@@ -320,8 +320,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--batch", required=True)
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument("--acoustic-only-languages", default="", help="e.g. zh,ja,ko,ru: hide the script and linguistic classes")
+    serve.add_argument("--rater", help="who is labelling (default the protocol's rater); each rater keeps their own labels")
     export = label_actions.add_parser("export", help="counts per class, severity and language, plus intra-rater kappa")
     export.add_argument("--batch", required=True)
+    export.add_argument("--rater", help="whose labels (default the protocol's rater)")
     export.add_argument("--output", help="also write the summary JSON here")
     label.set_defaults(handler=cmd_label)
 

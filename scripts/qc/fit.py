@@ -44,6 +44,8 @@ THRESHOLDS_SCHEMA = "vocello.qc.thresholds/1"
 EVAL_SCHEMA = "vocello.qc.eval/1"
 THRESHOLDS_RE = re.compile(r"^thresholds-v(\d+)\.json$")
 LINGUISTIC = {"stutter", "mispronunciation", "wrong-language"}
+SEVERITY_RANK = {"none": 0, "mild": 1, "moderate": 2, "severe": 3}
+DEFAULT_MIN_SEVERITY = "moderate"
 
 
 class FitError(RuntimeError):
@@ -79,33 +81,50 @@ def feature_rows(layout: Layout, runs: Iterable[str] | None = None) -> tuple[dic
     return rows, identities
 
 
-def label_rows(layout: Layout, batches: Iterable[str] | None = None) -> list[dict[str, Any]]:
-    """Every labelled primary item: token, split, weight, probability sample or not, label."""
+def label_rows(layout: Layout, batches: Iterable[str] | None = None, rater: str | None = None) -> list[dict[str, Any]]:
+    """Every labelled primary item of one rater: token, split, weight, probability sample or not, label.
 
-    names = list(batches) if batches else sorted(path.stem for path in layout.batches.glob("*.json"))
+    Each row carries the configured severity bar (`fit.positiveMinSeverity`), which `positive` and
+    `usable` read.
+    """
+
+    names = list(batches) if batches else label.batch_names(layout)
+    rater = rater or label.default_rater(layout)
+    min_severity = detector_lib.load_config(layout).get("fit", {}).get("positiveMinSeverity", DEFAULT_MIN_SEVERITY)
+    if min_severity not in SEVERITY_RANK or min_severity == "none":
+        raise FitError(f"fit.positiveMinSeverity must be mild, moderate or severe, not {min_severity!r}")
     rows = []
     for name in names:
         batch = label.load_batch(layout, name)
         probability = batch.get("kind") == "sample"
-        for entry in label.labelled_takes(layout, name):
+        for entry in label.labelled_takes(layout, name, rater):
             item, take = entry["item"], entry["take"]
             inclusion = item.get("inclusionProbability")
             rows.append({
                 "batch": name, "token": take["token"], "language": take.get("language"), "split": item["split"],
+                "family": str(take.get("family") or take.get("takeID") or take["token"]),
                 "weight": 1.0 / inclusion if probability and inclusion else 1.0, "probabilitySample": probability,
-                "label": entry["label"],
+                "rater": rater, "minSeverity": min_severity, "label": entry["label"],
             })
     return rows
 
 
 def label_set_digest(rows: list[dict[str, Any]]) -> str:
-    payload = sorted((row["batch"], row["token"], row["split"], row["label"].get("verdict"),
+    payload = sorted((row["batch"], row.get("rater", "maintainer"), row["token"], row["split"],
+                      row.get("minSeverity", DEFAULT_MIN_SEVERITY), row["label"].get("verdict"),
                       store.canonical_json(row["label"].get("classes") or {})) for row in rows)
     return store.sha256_text(store.canonical_json(payload))
 
 
+def _severity(label_row: dict[str, Any], class_id: str) -> int:
+    value = ((label_row["label"].get("classes") or {}).get(class_id) or {}).get("severity", "none")
+    return SEVERITY_RANK.get(value, 0)
+
+
 def positive(label_row: dict[str, Any], class_id: str) -> bool:
-    return label.defect_present(label_row["label"], class_id)
+    """The class ticked at the configured severity or worse (moderate by default)."""
+
+    return _severity(label_row, class_id) >= SEVERITY_RANK[label_row.get("minSeverity", DEFAULT_MIN_SEVERITY)]
 
 
 def is_clean(label_row: dict[str, Any]) -> bool:
@@ -113,9 +132,19 @@ def is_clean(label_row: dict[str, Any]) -> bool:
 
 
 def usable(label_row: dict[str, Any], class_id: str) -> bool:
-    """Acoustic-only labels say nothing about the linguistic classes."""
+    """Whether the label says yes or no about this class.
 
-    return not (label_row["label"].get("acousticOnly") and class_id in LINGUISTIC)
+    Acoustic-only labels say nothing about the linguistic classes; a tick below the severity bar
+    (mild, by default) and an uncertain verdict without a qualifying tick count on neither side.
+    """
+
+    if label_row["label"].get("acousticOnly") and class_id in LINGUISTIC:
+        return False
+    if positive(label_row, class_id):
+        return True
+    if _severity(label_row, class_id) > 0:
+        return False
+    return label_row["label"].get("verdict") != "uncertain"
 
 
 # --- the fit ------------------------------------------------------------------------

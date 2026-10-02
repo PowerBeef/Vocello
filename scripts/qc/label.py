@@ -9,7 +9,10 @@ come back later in the order under a second token, for intra-rater agreement.
 
 `serve` runs one local page on 127.0.0.1: one take at a time, opaque tokens
 only (never a path, mode, voice, score or enrichment reason), and appends each
-label to `build/private/qc/labels/<batch>.jsonl`; the latest line per token wins.
+label to `build/private/qc/labels/<batch>.jsonl`; the latest line per rater and
+token wins. A label is saved only after the take has played to the end (the page
+sends the share it played), every ticked class carries an explicit severity, and
+each line records its rater and the protocol's digest.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ DEFAULT_LANGUAGES = ("french", "english")
 ENRICH_FRACTION = 0.4
 TRAIN_FRACTION = 0.6
 MAX_BODY = 64 * 1024
+MIN_PLAYED_FRACTION = 0.95
 
 
 # --- protocol -----------------------------------------------------------------
@@ -264,6 +268,20 @@ def load_batch(layout: Layout, name: str) -> dict[str, Any]:
     return batch
 
 
+def batch_names(layout: Layout) -> list[str]:
+    """The batches in the store; any other JSON file there (a takes manifest) is skipped."""
+
+    names = []
+    for path in sorted(layout.batches.glob("*.json")):
+        try:
+            document = store.read_json(path)
+        except (OSError, ValueError):
+            continue
+        if isinstance(document, dict) and document.get("schema") == BATCH_SCHEMA and BATCH_NAME_RE.fullmatch(path.stem):
+            names.append(path.stem)
+    return names
+
+
 def sample_command(layout: Layout, runs: list[str], *, name: str, size: int, languages: list[str],
                    enrich_file: str | None, blind: float, seed: int, overwrite: bool = False) -> dict[str, Any]:
     manifests = []
@@ -298,12 +316,24 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def latest_labels(layout: Layout, name: str) -> dict[str, dict[str, Any]]:
-    """The latest label line per token (re-labelling appends; the last line wins)."""
+def protocol_digest(protocol: dict[str, Any]) -> str:
+    return store.sha256_text(store.canonical_json(protocol))
 
+
+def default_rater(layout: Layout = Layout()) -> str:
+    return str(load_protocol(layout).get("rater") or "maintainer")
+
+
+def latest_labels(layout: Layout, name: str, rater: str | None = None) -> dict[str, dict[str, Any]]:
+    """One rater's latest label line per token (re-labelling appends; the last line wins).
+
+    Lines of other raters never replace this rater's; `rater` defaults to the protocol's rater.
+    """
+
+    rater = rater or default_rater(layout)
     latest: dict[str, dict[str, Any]] = {}
     for row in store.read_jsonl(labels_path(layout, name)):
-        if isinstance(row, dict) and row.get("token"):
+        if isinstance(row, dict) and row.get("token") and row.get("rater", "maintainer") == rater:
             latest[row["token"]] = row
     return latest
 
@@ -314,6 +344,10 @@ def validate_label(payload: Any, *, protocol: dict[str, Any], acoustic_only: boo
     verdict = payload.get("verdict")
     if verdict not in protocol["verdicts"]:
         raise ValueError("a verdict is required")
+    played = payload.get("playedFraction")
+    if (not isinstance(played, (int, float)) or isinstance(played, bool) or not math.isfinite(played)
+            or played < MIN_PLAYED_FRACTION):
+        raise ValueError("play the whole take before saving")
     allowed = set(class_ids(protocol, acoustic_only=acoustic_only))
     classes_in = payload.get("classes") or {}
     if not isinstance(classes_in, dict):
@@ -337,7 +371,7 @@ def validate_label(payload: Any, *, protocol: dict[str, Any], acoustic_only: boo
         if start is not None and end is not None and end < start:
             start, end = end, start
         classes[class_id] = {"severity": value["severity"], "start": start, "end": end}
-    return {"classes": classes, "verdict": verdict}
+    return {"classes": classes, "verdict": verdict, "playedFraction": round(min(1.0, float(played)), 3)}
 
 
 def defect_present(label: dict[str, Any], class_id: str | None = None) -> bool:
@@ -362,10 +396,10 @@ def cohen_kappa(pairs: list[tuple[Any, Any]]) -> float | None:
     return round((observed - expected) / (1 - expected), 4)
 
 
-def export_summary(layout: Layout, name: str) -> dict[str, Any]:
+def export_summary(layout: Layout, name: str, rater: str | None = None) -> dict[str, Any]:
     batch = load_batch(layout, name)
     protocol = load_protocol(layout)
-    labels = latest_labels(layout, name)
+    labels = latest_labels(layout, name, rater)
     takes = batch["takes"]
     primaries = [item for item in batch["items"] if item["repeatOf"] is None]
     verdicts: Counter[str] = Counter()
@@ -413,11 +447,11 @@ def repeat_agreement(batch: dict[str, Any], labels: dict[str, dict[str, Any]], p
     }
 
 
-def labelled_takes(layout: Layout, name: str) -> list[dict[str, Any]]:
-    """Each labelled primary item of a batch with its take and latest label (fit and eval read these)."""
+def labelled_takes(layout: Layout, name: str, rater: str | None = None) -> list[dict[str, Any]]:
+    """Each labelled primary item of a batch with its take and the rater's latest label (fit and eval read these)."""
 
     batch = load_batch(layout, name)
-    labels = latest_labels(layout, name)
+    labels = latest_labels(layout, name, rater)
     rows = []
     for item in batch["items"]:
         if item["repeatOf"] is None and item["token"] in labels:
@@ -431,10 +465,13 @@ class LabelServer(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, layout: Layout, batch: dict[str, Any], *, port: int = 8765,
-                 acoustic_only_languages: Iterable[str] = ()) -> None:
+                 acoustic_only_languages: Iterable[str] = (), rater: str | None = None) -> None:
         self.layout = layout
         self.batch = batch
         self.protocol = load_protocol(layout)
+        self.rater = rater or str(self.protocol.get("rater") or "maintainer")
+        if not BATCH_NAME_RE.fullmatch(self.rater):
+            raise ValueError(f"invalid rater id: {self.rater!r}")
         self.acoustic_only = {store.normalize_language(language) for language in acoustic_only_languages}
         self.items = {item["token"]: item for item in batch["items"]}
         self.labels_file = labels_path(layout, batch["batch"])
@@ -460,10 +497,11 @@ class LabelServer(http.server.ThreadingHTTPServer):
                 "text": None if acoustic_only else take.get("text"), "hasReference": bool(take.get("reference"))}
 
     def state(self) -> dict[str, Any]:
-        labels = latest_labels(self.layout, self.batch["batch"])
+        labels = latest_labels(self.layout, self.batch["batch"], self.rater)
         views = [self.item_view(item) for item in self.batch["items"]]
         return {
-            "batch": self.batch["batch"], "total": len(views), "items": views,
+            "batch": self.batch["batch"], "rater": self.rater, "total": len(views), "items": views,
+            "minPlayedFraction": MIN_PLAYED_FRACTION,
             "classes": [{"id": c["id"], "label": c["label"], "linguistic": bool(c.get("linguistic"))}
                         for c in self.protocol["classes"]],
             "severities": [s for s in self.protocol["severities"] if s != "none"],
@@ -480,12 +518,13 @@ class LabelServer(http.server.ThreadingHTTPServer):
             raise ValueError("unknown token")
         acoustic_only = self.item_view(self.items[token])["acousticOnly"]
         label = validate_label(payload, protocol=self.protocol, acoustic_only=acoustic_only)
-        row = {"token": token, "batch": self.batch["batch"], "rater": self.protocol.get("rater", "maintainer"),
+        row = {"token": token, "batch": self.batch["batch"], "rater": self.rater,
                "classes": label["classes"], "verdict": label["verdict"], "acousticOnly": acoustic_only,
+               "playedFraction": label["playedFraction"], "protocolSHA256": protocol_digest(self.protocol),
                "labelledAt": utc_now()}
         with self.write_lock:
             store.append_jsonl(self.labels_file, row)
-            return len(latest_labels(self.layout, self.batch["batch"]))
+            return len(latest_labels(self.layout, self.batch["batch"], self.rater))
 
 
 class LabelHandler(http.server.BaseHTTPRequestHandler):
@@ -621,10 +660,13 @@ class LabelHandler(http.server.BaseHTTPRequestHandler):
         self._json(200, {"ok": True, "labelled": labelled})
 
 
-def serve(layout: Layout, name: str, *, port: int = 8765, acoustic_only_languages: Iterable[str] = ()) -> None:
-    server = LabelServer(layout, load_batch(layout, name), port=port, acoustic_only_languages=acoustic_only_languages)
+def serve(layout: Layout, name: str, *, port: int = 8765, acoustic_only_languages: Iterable[str] = (),
+          rater: str | None = None) -> None:
+    server = LabelServer(layout, load_batch(layout, name), port=port, acoustic_only_languages=acoustic_only_languages,
+                         rater=rater)
     host, bound = server.server_address[:2]
-    print(f"qc label: batch {name}, {len(server.items)} items: http://{host}:{bound}/ (Ctrl-C stops)", flush=True)
+    print(f"qc label: batch {name}, {len(server.items)} items, rater {server.rater}: "
+          f"http://{host}:{bound}/ (Ctrl-C stops)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -662,16 +704,23 @@ button.on{border-color:var(--accent);color:var(--accent)}button.primary{backgrou
 <div class="card" id="classes"></div>
 <div class="card verdicts" id="verdicts"></div>
 <div class="row"><button id="prev">&larr; Previous</button><button id="next">Next &rarr;</button><button id="unlabelled">Next unlabelled</button><button class="primary" id="save">Save &amp; next (Enter)</button><span id="message"></span></div>
-<p class="muted" style="font-size:13px"><kbd>Space</kbd> play/pause &middot; <kbd>a</kbd> acceptable, save &amp; next &middot; <kbd>o</kbd> objectionable &middot; <kbd>u</kbd> uncertain &middot; <kbd>1</kbd>&ndash;<kbd>0</kbd>, <kbd>-</kbd> toggle a class &middot; <kbd>Enter</kbd> save &amp; next &middot; <kbd>l</kbd> loop &middot; <kbd>s</kbd> 0.5&times; &middot; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> previous/next</p>
+<p class="muted" style="font-size:13px"><kbd>Space</kbd> play/pause &middot; <kbd>a</kbd> acceptable with no class ticked, save &amp; next &middot; <kbd>o</kbd> objectionable &middot; <kbd>u</kbd> uncertain &middot; <kbd>1</kbd>&ndash;<kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd> toggle a class &middot; <kbd>Enter</kbd> save &amp; next &middot; <kbd>l</kbd> loop &middot; <kbd>s</kbd> 0.5&times; &middot; <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> previous/next. A take saves only once it has played to the end, and every ticked class needs a severity.</p>
 </main>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
-let state = null, index = 0, draft = null, shownAt = Date.now(), durations = [];
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
+let state = null, index = 0, draft = null, shownAt = Date.now(), durations = [], heard = false, saving = false;
 const audio = $("take"), ref = $("ref");
 
 function visibleClasses(item){ return state.classes.filter(c => !(item.acousticOnly && c.linguistic)); }
+function playedFraction(){
+  if (heard) return 1;
+  const d = audio.duration; if (!isFinite(d) || d <= 0) return 0;
+  let total = 0; for (let i = 0; i < audio.played.length; i++) total += audio.played.end(i) - audio.played.start(i);
+  return Math.min(1, total / d);
+}
+function say(text, ok){ $("message").textContent = text; $("message").className = ok ? "saved" : "error"; }
 function labelledCount(){ return Object.keys(state.labels).length; }
 function fmtTime(s){ if(!isFinite(s)) return ""; const m = Math.round(s/60); return m < 1 ? "under a minute left" : `about ${m} min left`; }
 
@@ -716,12 +765,13 @@ function render(){
     `<label><input type="radio" name="verdict" value="${v}" ${draft.verdict === v ? "checked" : ""}> ${v}</label>`).join("");
   document.querySelectorAll("input[name=verdict]").forEach(r => r.addEventListener("change", () => { draft.verdict = r.value; }));
   $("message").textContent = "";
+  heard = false;
   updateProgress();
   shownAt = Date.now();
   audio.play().catch(() => { $("status").textContent = "press Space to play"; });
 }
 
-function ensure(id){ if(!draft.classes[id]) draft.classes[id] = {severity:"moderate", start:null, end:null}; return draft.classes[id]; }
+function ensure(id){ if(!draft.classes[id]) draft.classes[id] = {severity:null, start:null, end:null}; return draft.classes[id]; }
 function toggleClass(id, on){
   const div = document.querySelector(`.cls[data-id="${id}"]`);
   if (on) { ensure(id); } else { delete draft.classes[id]; }
@@ -740,16 +790,24 @@ function setVerdict(v){ draft.verdict = v; document.querySelectorAll("input[name
 
 async function save(){
   const item = state.items[index];
-  if (!draft.verdict) { $("message").textContent = "choose an overall verdict"; $("message").className = "error"; return false; }
-  const body = {token: item.token, verdict: draft.verdict, classes: draft.classes};
+  if (!draft.verdict) { say("choose an overall verdict"); return false; }
+  const missing = state.classes.filter(c => draft.classes[c.id] && !draft.classes[c.id].severity).map(c => c.label);
+  if (missing.length) { say(`choose a severity for: ${missing.join(", ")}`); return false; }
+  const played = playedFraction();
+  if (played < state.minPlayedFraction) { say("play the whole take before saving"); return false; }
+  const body = {token: item.token, verdict: draft.verdict, classes: draft.classes, playedFraction: played};
   const res = await fetch("/api/label", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
   const out = await res.json();
-  if (!res.ok) { $("message").textContent = out.error || "not saved"; $("message").className = "error"; return false; }
+  if (!res.ok) { say(out.error || "not saved"); return false; }
   state.labels[item.token] = {classes: JSON.parse(JSON.stringify(draft.classes)), verdict: draft.verdict};
   durations.push(Math.min(120, (Date.now() - shownAt) / 1000));
   return true;
 }
-async function saveNext(){ if (await save()) go(index + 1); }
+async function saveNext(){
+  if (saving) return;
+  saving = true;
+  try { if (await save()) go(index + 1); } finally { saving = false; }
+}
 function go(i){ if (i < 0 || i >= state.total) { updateProgress(); return; } audio.pause(); ref.pause(); index = i; render(); }
 function nextUnlabelled(){
   for (let k = 1; k <= state.total; k++) { const i = (index + k) % state.total; if (!state.labels[state.items[i].token]) { go(i); return; } }
@@ -763,14 +821,19 @@ $("next").onclick = () => go(index + 1);
 $("unlabelled").onclick = nextUnlabelled;
 $("save").onclick = saveNext;
 audio.addEventListener("loadedmetadata", () => { audio.playbackRate = $("slow").classList.contains("on") ? 0.5 : 1; });
+audio.addEventListener("ended", () => { heard = true; });
+audio.addEventListener("timeupdate", () => { if (audio.loop && audio.duration && audio.currentTime < 0.25 && playedFraction() >= 0.95) heard = true; });
 
 document.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
   const item = state && state.items[index]; if (!item) return;
   const k = e.key;
   if (k === " ") { e.preventDefault(); if (audio.paused) audio.play(); else audio.pause(); }
   else if (k === "Enter") { e.preventDefault(); saveNext(); }
-  else if (k === "a") { setVerdict("acceptable"); saveNext(); }
+  else if (k === "a") {
+    if (Object.keys(draft.classes).length) { say("a class is ticked: untick it, or choose o or u and press Enter"); return; }
+    setVerdict("acceptable"); saveNext();
+  }
   else if (k === "o") setVerdict("objectionable");
   else if (k === "u") setVerdict("uncertain");
   else if (k === "l") $("loop").click();
@@ -784,7 +847,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 fetch("/api/state").then(r => r.json()).then(s => {
-  state = s; $("batch").textContent = s.batch;
+  state = s; $("batch").textContent = `${s.batch} · ${s.rater}`;
   const first = s.items.findIndex(it => !s.labels[it.token]);
   index = first < 0 ? 0 : first; render();
 });

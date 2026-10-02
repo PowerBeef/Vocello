@@ -31,7 +31,8 @@
     "l2": 1.0,
     "perLanguageMinClean": 60,
     "perLanguageMinPositive": 20,
-    "llmKappaGate": 0.6
+    "llmKappaGate": 0.6,
+    "positiveMinSeverity": "moderate"
   },
   "levels": {
     "warn": {"precisionLower": 0.6, "recall": 0.6},
@@ -139,6 +140,7 @@
     {"id": "judge.llm.tonal-collapse", "class": "tonal-collapse", "method": "threshold", "llm": true, "features": [{"name": "llm.tonal-collapse", "direction": "higher"}]},
     {"id": "judge.llm.voice-change", "class": "voice-change", "method": "threshold", "llm": true, "features": [{"name": "llm.voice-change", "direction": "higher"}]},
     {"id": "judge.llm.artifact", "class": "artifact", "method": "threshold", "llm": true, "features": [{"name": "llm.artifact", "direction": "higher"}]},
-    {"id": "judge.llm.unnatural", "class": "unnatural", "method": "threshold", "llm": true, "features": [{"name": "llm.unnatural", "direction": "higher"}]}
+    {"id": "judge.llm.unnatural", "class": "unnatural", "method": "threshold", "llm": true, "features": [{"name": "llm.unnatural", "direction": "higher"}]},
+    {"id": "judge.llm.devoiced", "class": "devoiced", "method": "threshold", "llm": true, "features": [{"name": "llm.devoiced", "direction": "higher"}]}
   ]
 }

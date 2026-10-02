@@ -338,9 +338,9 @@ def queue(layout: Layout, top: int, *, run_id: str | None = None, name: str | No
     flags = store.read_json(directory / "flags.json")
     takes = {take["token"]: take for take in store.read_json(directory / "takes.json")["takes"]}
     labelled = set()
-    for batch_file in layout.batches.glob("*.json"):
-        batch = store.read_json(batch_file)
-        labels = label.latest_labels(layout, batch["batch"])
+    for existing in label.batch_names(layout):
+        batch = label.load_batch(layout, existing)
+        labels = label.latest_labels(layout, existing)
         labelled.update(item["takeToken"] for item in batch["items"] if item["token"] in labels)
 
     def rank(entry: dict[str, Any]) -> tuple:

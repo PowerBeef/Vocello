@@ -52,6 +52,8 @@ CLASSES: tuple[tuple[str, str], ...] = (
                "that stops dead instead of fading out naturally"),
     ("pause", "an unnatural pause or non-speech noise mid-sentence: a gap far longer than a natural "
               "phrase pause, or breath, hiss or other non-speech sound between words"),
+    ("devoiced", "a whispered or devoiced syllable: part of a word, often its last syllable, spoken "
+                 "in a whisper or with the voice dropping out while the rest is voiced"),
     ("pitch", "pitch instability: pitch jumping, wobbling or swinging unnaturally, or an abrupt "
               "register jump"),
     ("tonal-collapse", "the voice collapsing into a sustained tone, hum or buzz instead of speech"),

@@ -676,7 +676,7 @@ class RepositoryTests(unittest.TestCase):
     def test_protocol_matches_the_contract(self):
         protocol = json.loads((ROOT / "config/qc/protocol.json").read_text())
         self.assertEqual([item["id"] for item in protocol["classes"]], [
-            "stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "pitch", "tonal-collapse",
+            "stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch", "tonal-collapse",
             "voice-change", "artifact", "unnatural", "other"])
         self.assertEqual(protocol["severities"], ["none", "mild", "moderate", "severe"])
         self.assertEqual(protocol["verdicts"], ["acceptable", "objectionable", "uncertain"])

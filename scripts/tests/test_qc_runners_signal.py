@@ -504,7 +504,7 @@ class FakeLlamaServer:
 
 class LlamaJudgeTests(RunnerCase):
     def test_class_ids_match_the_contract_and_the_protocol(self) -> None:
-        expected = ["stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "pitch", "tonal-collapse",
+        expected = ["stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch", "tonal-collapse",
                     "voice-change", "artifact", "unnatural", "other"]
         self.assertEqual(_llama.class_ids(), expected)
         protocol = ROOT / "config/qc/protocol.json"

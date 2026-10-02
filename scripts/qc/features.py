@@ -45,8 +45,8 @@ SCRIPTS = {
     "chinese": ("CJK",), "japanese": ("CJK", "HIRAGANA", "KATAKANA"), "korean": ("HANGUL",),
     "russian": ("CYRILLIC",),
 }
-LLM_CLASSES = ("stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "pitch", "tonal-collapse",
-               "voice-change", "artifact", "unnatural")
+LLM_CLASSES = ("stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch",
+               "tonal-collapse", "voice-change", "artifact", "unnatural")
 AUDIO_FEATURES = (
     "signal.clicks", "signal.dropout_seconds", "signal.clipping_fraction", "signal.terminal_silence_seconds",
     "signal.abrupt_offset_db", "pause.longest_gap_seconds", "pause.nonspeech_level_db", "pause.voiced_blips",

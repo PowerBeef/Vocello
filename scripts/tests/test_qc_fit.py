@@ -94,7 +94,7 @@ class FitEvalTests(unittest.TestCase):
                 if gap_defect:
                     classes["pause"] = {"severity": "moderate", "start": None, "end": None}
                 if stutter:
-                    classes["stutter"] = {"severity": "mild", "start": None, "end": None}
+                    classes["stutter"] = {"severity": "moderate", "start": None, "end": None}
                 labels.append({"token": item_token, "batch": "b1", "rater": "maintainer", "classes": classes,
                                "verdict": "objectionable" if classes else "acceptable", "acousticOnly": False,
                                "labelledAt": "2026-10-01T21:00:00Z"})

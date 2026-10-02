@@ -224,7 +224,9 @@ class ServeTests(unittest.TestCase):
         finally:
             connection.close()
 
-    def post_label(self, payload, content_type="application/json"):
+    def post_label(self, payload, content_type="application/json", *, played=1.0):
+        if isinstance(payload, dict) and played is not None and "playedFraction" not in payload:
+            payload = dict(payload, playedFraction=played)
         return self.request("POST", "/api/label", json.dumps(payload).encode(), {"Content-Type": content_type})
 
     def item(self, language, *, clone=None):
@@ -289,9 +291,11 @@ class ServeTests(unittest.TestCase):
         rows = store.read_jsonl(self.layout.labels / "serve-batch.jsonl")
         self.assertEqual(len(rows), 2)
         first = rows[0]
-        self.assertEqual(set(first), {"token", "batch", "rater", "classes", "verdict", "acousticOnly", "labelledAt"})
+        self.assertEqual(set(first), {"token", "batch", "rater", "classes", "verdict", "acousticOnly", "playedFraction",
+                                      "protocolSHA256", "labelledAt"})
         self.assertEqual(first["classes"]["stutter"], {"severity": "moderate", "start": 0.5, "end": 1.25})
-        self.assertEqual((first["rater"], first["acousticOnly"]), ("maintainer", False))
+        self.assertEqual((first["rater"], first["acousticOnly"], first["playedFraction"]), ("maintainer", False, 1.0))
+        self.assertEqual(first["protocolSHA256"], label.protocol_digest(label.load_protocol(self.layout)))
         self.assertEqual(label.latest_labels(self.layout, "serve-batch")[item["token"]]["verdict"], "acceptable")
         state = json.loads(self.request("GET", "/api/state")[2])
         self.assertEqual(state["labels"][item["token"]]["verdict"], "acceptable")
@@ -308,6 +312,11 @@ class ServeTests(unittest.TestCase):
             ({"token": "0" * 16, "verdict": "acceptable", "classes": {}}, 400),
             ({"token": japanese["token"], "verdict": "objectionable",
               "classes": {"mispronunciation": {"severity": "mild"}}}, 400),
+            ({"token": french["token"], "verdict": "objectionable", "classes": {"cutoff": {"severity": None}}}, 400),
+            ({"token": french["token"], "verdict": "objectionable", "classes": {"cutoff": {}}}, 400),
+            ({"token": french["token"], "verdict": "acceptable", "classes": {}, "playedFraction": 0.5}, 400),
+            ({"token": french["token"], "verdict": "acceptable", "classes": {}, "playedFraction": True}, 400),
+            ({"token": french["token"], "verdict": "acceptable", "classes": {}, "playedFraction": None}, 400),
         ]
         for payload, expected in cases:
             with self.subTest(payload):
@@ -320,6 +329,26 @@ class ServeTests(unittest.TestCase):
                                         "classes": {"artifact": {"severity": "severe", "start": 2.0, "end": None}}})
         self.assertEqual(status, 200)
         self.assertTrue(store.read_jsonl(self.layout.labels / "serve-batch.jsonl")[0]["acousticOnly"])
+
+
+    def test_a_second_rater_keeps_separate_labels(self):
+        item, _ = self.item("french")
+        self.assertEqual(self.post_label({"token": item["token"], "verdict": "objectionable",
+                                          "classes": {"pause": {"severity": "severe"}}})[0], 200)
+        second = label.LabelServer(self.layout, self.batch, port=0, rater="second")
+        try:
+            self.assertEqual(second.state()["labels"], {})
+            second.save({"token": item["token"], "verdict": "acceptable", "classes": {}, "playedFraction": 1})
+        finally:
+            second.server_close()
+        self.assertEqual(label.latest_labels(self.layout, "serve-batch")[item["token"]]["verdict"], "objectionable")
+        self.assertEqual(label.latest_labels(self.layout, "serve-batch", "second")[item["token"]]["verdict"], "acceptable")
+        with self.assertRaises(ValueError):
+            label.LabelServer(self.layout, self.batch, port=0, rater="../x")
+
+    def test_batch_names_skip_other_json(self):
+        store.write_json_atomic(self.layout.batches / "batch-1.takes.json", {"schema": "vocello.qc.takes/1", "takes": []})
+        self.assertEqual(label.batch_names(self.layout), ["serve-batch"])
 
 
 class ExportTests(unittest.TestCase):

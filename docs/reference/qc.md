@@ -23,8 +23,8 @@ All commands go through `python3 scripts/qc.py`.
 | `runtimes setup --runtime mlx\|onnx\|torch\|llamacpp` | Builds a runner venv from `config/qc/runtimes/<name>.txt`, or unpacks the pinned llama.cpp release. |
 | `runtimes verify [--runtime …]` | Checks the venvs against their pins. |
 | `label sample --runs <qc-takes runs…> --batch NAME` | Draws a listening batch. Defaults: `--size 96 --languages french,english --blind 0.1`, plus `--enrich-file`. |
-| `label serve --batch NAME [--port 8765]` | Serves the listening page on 127.0.0.1. `--acoustic-only-languages zh,ja,ko,ru` hides the script and the linguistic classes for those languages. |
-| `label export --batch NAME` | Summarizes the labels: counts per class, severity and language, and intra-rater kappa from the blind repeats. |
+| `label serve --batch NAME [--port 8765] [--rater ID]` | Serves the listening page on 127.0.0.1. `--acoustic-only-languages zh,ja,ko,ru` hides the script and the linguistic classes for those languages. `--rater` defaults to the protocol's rater; each rater keeps their own labels. |
+| `label export --batch NAME [--rater ID]` | Summarizes one rater's labels: counts per class, severity and language, and intra-rater kappa from the blind repeats. |
 | `run --takes <manifest or qc-takes run> --lane NAME [--models roles or ids]` | Scores the takes with the lane's models (see [Lanes](#lanes)), one at a time; `--models` limits which run now, and the rest come from the cache. Then it runs the mute test, the features and the detectors, and prints the run id. |
 | `language-bench takes --platform macos\|ios --run-id ID --plan PLAN --corpus CORPUS --diagnostics DIR [--wav-dir DIR] --output FILE` | Writes a lang-bench run's planned takes as a takes manifest, each WAV bound to the digest its generation published. |
 | `language-bench evidence --run QC_RUN --output FILE` | Writes the two ASR families' recognitions of a QC run for the language publisher, with each take's two-family verdict. Exits 0 when every take met its outcome, 1 when one did not, and 2 when a recognition is missing. |
@@ -175,6 +175,8 @@ Run `norms` after the pool's G2P role (and its aligner, for the descriptive word
 - Each detector gets an L2 logistic on per-language z-scores, or one threshold for an LLM judge.
 - The cut is the one that maximizes the weighted F1.
 - The fit is per language when that language has at least 60 clean and 20 positive train takes. Otherwise, one pooled model covers it.
+- A class counts as a defect at `fit.positiveMinSeverity` or worse (moderate). A tick below that bar (mild) counts on neither side for that class, nor does an uncertain verdict without a qualifying tick. A clean take is acceptable with no class ticked.
+- `fit` and `eval` read the protocol's rater's labels; other JSON files in `batches/` (a takes manifest) are skipped.
 - Weights are 1 / inclusion probability, so the enrichment does not bias the fit.
 - Only takes where the detector's features were measured count.
 
@@ -221,8 +223,9 @@ The batch also gets:
 The page shows one take at a time:
 - It autoplays each take and offers loop, 0.5× and replay.
 - It shows the script, plus the reference clip for clones.
-- Each defect class has a checkbox, a severity and start/end buttons that read the playhead.
+- Each defect class has a checkbox, a severity and start/end buttons that read the playhead. A ticked class has no severity until one is chosen.
 - An overall verdict is required.
+- A take saves only once it has played to the end (at least 95% of it, or the `ended` event); held keys never repeat a save.
 - It shows `n / total` and an estimate of the time left.
 
 It never shows a path, mode, voice, score or enrichment reason. Audio streams by opaque token only, and the server answers only 127.0.0.1 and `localhost`.
@@ -232,23 +235,23 @@ Keys:
 | Key | Action |
 |---|---|
 | Space | Play or pause. |
-| `a` | Mark acceptable, save and go to the next take. |
+| `a` | Mark acceptable, save and go to the next take. Refused while a class is ticked. |
 | `o` | Mark objectionable. |
 | `u` | Mark uncertain. |
-| `1` to `0`, `-` | Toggle a class. |
+| `1` to `0`, `-`, `=` | Toggle a class. |
 | Enter | Save and go to the next take. |
 | `l` | Loop. |
 | `s` | Play at 0.5×. |
 | ← / → | Go to the previous or next take. |
 
-The classes, severities and verdicts come from `config/qc/protocol.json`.
+The classes, severities and verdicts come from `config/qc/protocol.json`. The `devoiced` class marks a whispered or devoiced syllable, such as a last syllable spoken in a whisper.
 
 Each save appends one line to `labels/<batch>.jsonl`, with these fields:
 - `token`, `batch` and `rater`;
 - `classes`: per class, a severity, start and end;
-- `verdict`, `acousticOnly` and `labelledAt`.
+- `verdict`, `acousticOnly`, `playedFraction`, `protocolSHA256` and `labelledAt`.
 
-Re-labelling appends a new line, and the latest line per token wins.
+Re-labelling appends a new line, and the latest line per rater and token wins; another rater's lines never replace them.
 
 ## Data layout
 

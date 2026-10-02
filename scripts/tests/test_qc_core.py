@@ -400,19 +400,39 @@ class RunnerHostTests(unittest.TestCase):
         identity = runtime.runner_identity(self.layout, model_entry())
         with_dependency = model_entry(dependencies=[{"name": "ssl", "source": model_entry()["source"]}])
         self.assertNotEqual(runtime.runner_identity(self.layout, with_dependency), identity)
-        # A shared helper (the LLM prompts live in runners/_llama.py) or qc/pitch.py changes it too.
+        # A shared helper (the LLM prompts live in runners/_llama.py) changes it too.
         (self.root / "scripts/qc/runners/_kit.py").write_text("PROMPT = 'v1'\n")
         with_helper = runtime.runner_identity(self.layout, model_entry())
         self.assertNotEqual(with_helper, identity)
+        # Code the runner does not import does not: qc/phones.py and qc/pitch.py belong to the scoring
+        # identity, and to the runners that import them.
         (self.root / "scripts/qc/pitch.py").write_text("# pitch helpers\n")
-        with_pitch = runtime.runner_identity(self.layout, model_entry())
-        self.assertNotEqual(with_pitch, with_helper)
+        (self.root / "scripts/qc/phones.py").write_text("# phone helpers\n")
+        self.assertEqual(runtime.runner_identity(self.layout, model_entry()), with_helper)
         # Imported shared modules count, whatever their name (the fake runner imports qc.store).
         store_copy = self.root / "scripts/qc/store.py"
         store_copy.write_text(store_copy.read_text() + "\n# changed\n")
-        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_pitch)
+        self.assertNotEqual(runtime.runner_identity(self.layout, model_entry()), with_helper)
         sources = {path.name for path in runtime.runner_sources(self.layout, model_entry())}
-        self.assertEqual(sources, {"_kit.py", "fake.py", "pitch.py", "store.py"})
+        self.assertEqual(sources, {"_kit.py", "fake.py", "store.py"})
+
+    def test_each_registered_runner_covers_the_qc_code_it_imports(self):
+        # A qc/phones.py edit re-runs the phone recognizers and the G2P only; the pitch trackers never
+        # read qc/pitch.py (the feature code does, under the scoring identity).
+        layout = Layout(ROOT)
+        registry = {model["id"]: model for model in models.load_registry(layout)}
+
+        def shared(model_id):
+            sources = {path.relative_to(layout.scripts).as_posix()
+                       for path in runtime.runner_sources(layout, registry[model_id])}
+            return sources & {"qc/phones.py", "qc/pitch.py"}
+
+        for model_id in ("phones.zipa-large-crctc-500k", "phones.wav2vec2-xlsr-53-espeak-cv-ft", "g2p.espeak-ng"):
+            self.assertEqual(shared(model_id), {"qc/phones.py"}, model_id)
+        for model_id in ("asr.qwen3-asr-1.7b", "asr.whisper-large-v3", "align.qwen3-forcedaligner-0.6b",
+                         "pitch.fcpe", "pitch.swiftf0", "speaker.redimnet2-plus", "mos.utmosv2",
+                         "aesthetics.audiobox-aesthetics", "llm.gemma-4-12b-it-qat"):
+            self.assertEqual(shared(model_id), set(), model_id)
 
     def test_the_package_name_is_not_the_command_line(self):
         # `from qc import store` names the package `qc`, which must not resolve to scripts/qc.py: the

@@ -352,11 +352,13 @@ def utc_now() -> str:
 def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
     """`runnerSHA256`: the digest of the runner sources, the model version and every pin.
 
-    The sources are the runner file, the shared runner helpers (`runners/_*.py`:
-    the job kit, the LLM prompts and class definitions) and `qc/phones.py` and
-    `qc/pitch.py`. Any change to them, to the registry `version` or to a pinned
-    model, dependency or code file gives a new identity, so cached results of
-    the old one are re-run.
+    The sources are the runner file, every `qc.*` module it imports (the phone
+    and G2P runners reach `qc/phones.py` that way) and the shared runner helpers
+    (`runners/_*.py`: the job kit, the LLM prompts and class definitions). Any
+    change to them, to the registry `version` or to a pinned model, dependency
+    or code file gives a new identity, so cached results of the old one are
+    re-run. Code a runner never imports, such as the feature code that reads its
+    results, belongs to the scoring identity (`qc.detectors.scoring_identity`).
     """
 
     payload = store.canonical_json({
@@ -371,8 +373,9 @@ def runner_identity(layout: Layout, model: dict[str, Any]) -> str:
 def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
     """The runner file and the shared code it can run, sorted: every `qc.*` module it imports,
     transitively (also inside functions, such as `runners/speech_common.py`), plus every
-    `runners/_*.py` helper and `qc/phones.py` and `qc/pitch.py`. A package name (`qc`,
-    `qc.runners`) adds no file: its `__init__.py` is documentation only."""
+    `runners/_*.py` helper. A package name (`qc`, `qc.runners`) adds no file: its `__init__.py`
+    is documentation only. So a `qc/phones.py` edit re-runs only the runners that import it (the
+    phone recognizers and the G2P), never the ASR, MOS or LLM caches."""
 
     source = runner_source(layout, model)
     if not source.is_file():
@@ -405,8 +408,7 @@ def runner_sources(layout: Layout, model: dict[str, Any]) -> list[Path]:
                     if candidate.is_file():
                         pending.append(candidate)
     helpers = {path for path in source.parent.glob("_*.py") if path.name != "__init__.py"}
-    shared = {layout.scripts / "qc/phones.py", layout.scripts / "qc/pitch.py"}
-    return sorted(found | helpers | {path for path in shared if path.is_file()})
+    return sorted(found | helpers)
 
 
 @dataclass

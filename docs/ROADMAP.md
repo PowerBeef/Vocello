@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `qc-v2-2026-10` | active | backend-mlx | 0/8 (0%) |
+| `qc-v2-2026-10` | active | backend-mlx | 2/8 (25%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 2/6 (33%) |
@@ -38,19 +38,14 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `QC-01` | in-flight | Models and runtimes | — |
 | `QC-02` | in-flight | Maintainer labels | — |
-| `QC-03` | planned | Detectors, thresholds and evaluation | `QC-01`, `QC-02` |
+| `QC-03` | planned | Detectors, thresholds and evaluation | `QC-02` |
 | `QC-04` | planned | Lanes on QC v2 | `QC-03` |
-| `QC-05` | in-flight | Retire the v1 stack | — |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
 | `QC-07` | planned | Move the delivery bench and voice-reliability analysis onto QC v2 | `QC-04` |
 | `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
 
 ### Open items in detail
-
-- **`QC-01`** (in-flight) — Models and runtimes.
-  gate: config/qc/models.json pins every model by revision and SHA-256 with a commercial-use weight license; qc.py fetches and verifies them; each runner passes a 3-take smoke run on the M6 within its memory budget.
 
 - **`QC-02`** (in-flight) — Maintainer labels.
   gate: qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.
@@ -60,9 +55,6 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
 - **`QC-04`** (planned) — Lanes on QC v2.
   gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
-
-- **`QC-05`** (in-flight) — Retire the v1 stack.
-  gate: The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.
 
 - **`QC-06`** (planned) — Product follow-ups surfaced by QC.
   gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch, tonal collapse.
@@ -577,4 +569,3 @@ Narrative authority: [`docs/reference/qc.md#why-v2`](reference/qc.md#why-v2)
 | --- | --- | --- | --- |
 | `AQ-07` | superseded | Detector qualification and lane gating sets | `AQ-02`, `AQ-03`, `AQ-06` |
 | `AQ-08` | superseded | Prosody, delivery and advisory quality rebuild | `AQ-03`, `AQ-06` |
-| `AQ-09` | superseded | Audio QC documentation and generated accuracy report | `AQ-01`, `AQ-03` |

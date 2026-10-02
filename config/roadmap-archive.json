@@ -4186,6 +4186,48 @@
       "notes": "Closed 2026-09-27. P2a (wave 10): normalization v2 with byte-exact Python/Swift parity (Korean syllable CER, NFKC and casefold, Latin folds, tag stripping, bracket and filler safety, space-free CER, ten-language tables), a corpus lint refusing digits, symbols and abbreviations, language measurement v4. P2b: v3 folds Traditional to Simplified for Chinese through a committed 3,079-entry ICU Hant-Hans table (measurement v5, languageASR gate 7), clearing the design-zh false fail; lang-bench v5 published. The CC0 script pool (config/audio-qc-script-pool.json, scripts/audio_qc_script_pool.py) holds 120 Common Voice Sentence Collector sentences per language from a pinned commit, split 60 calibration and 60 confirmation, with an auditable filter funnel (Chinese is the limiting source: 136 candidates). Not needed: cn2an, num2words and fugashi (the lint admits no digits, the pool no unsegmented edge cases). Deferred to AQ-07: the hard-case and digits diagnostic pools; human recordings come from FLEURS (N1), never committed.",
       "plan": "audio-qc-audit-2026-09",
       "updated": "2026-09-27"
+    },
+    {
+      "id": "QC-01",
+      "title": "Models and runtimes",
+      "status": "done",
+      "gate": "config/qc/models.json pins every kept model by revision and SHA-256 with a commercial-use weight license; qc.py fetches, verifies and prunes them; every kept runner has scored real takes on the M6 within its memory budget.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "notes": "Closed 2026-10-02, lean by the maintainer's decision: only what the external reports recommend. Kept: Whisper large-v3 and Qwen3-ASR 1.7B (two transcription families, consensus), ZIPA and wav2vec2-xlsr-espeak (phones, agreeing), espeak-ng + PanPhon G2P, and for clones only FCPE, SwiftF0 and ReDimNet2+. All eight scored the 300 human controls and batch-1 on the M6; ReDimNet2+ peaked at 3.58 GiB on 11-20 s clips (budget 4 GB). Removed: the Gemma 4 and Qwen2.5-Omni judges with llama.cpp, the forced aligner, UTMOSv2, Audiobox Aesthetics and the 8-bit alternates (24e8b715); `qc.py models prune` deleted their files.",
+      "plan": "qc-v2-2026-10",
+      "updated": "2026-10-02"
+    },
+    {
+      "id": "QC-05",
+      "title": "Retire the v1 stack",
+      "status": "done",
+      "gate": "The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "notes": "Closed 2026-10-02. The v1 code, configs, records, docs, tests and CI routes were deleted (c44d0205, efe548d8, 45421df2). build_cleanup.py --qc-v1 ran after a reviewed dry run (the maintainer approved deletion): about 43 GiB of v1 judge models, analysis caches, unused corpora and evidence runs, then 2.1 GiB of v1 model copies once qc.py models prune had removed the dropped v2 models (7.8 GB). Free disk went from 54 GB to 107 GB. MLS, LibriTTS-R, the speaker cohorts and the qc-takes pools stay.",
+      "plan": "qc-v2-2026-10",
+      "updated": "2026-10-02"
+    },
+    {
+      "id": "AQ-09",
+      "title": "Audio QC documentation and generated accuracy report",
+      "status": "superseded",
+      "gate": "The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; the engineering review is historical; release.md is updated per decision 7.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md",
+        ".claude/rules/release.md"
+      ],
+      "notes": "Audit AQ-F50, F51 (P6). Landed 2026-09-29/30: the generated docs/reference/audio-qc/ tree (a page per judge, detector and corpus source; generated meta-evaluation report; scripts/audio_qc_docs.py registered in refresh_derived_artifacts), and the lane-gating contract (config/audio-qc-lane-gates.json, scripts/audio_qc_lane_gates.py). 2026-10-01: five gates declared and validated from the round-2 records (enforcement inside the lanes is AQ-07). 2026-10-01: the v1 docs were deleted and release.md was rewritten for QC v2 (QC-05).",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-10-01",
+      "blockedBy": [
+        "AQ-01",
+        "AQ-03"
+      ],
+      "supersededBy": "QC-05"
     }
   ]
 }

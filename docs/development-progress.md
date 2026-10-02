@@ -17,6 +17,30 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 2, morning — QC v2 cut to the external reports; 53 GB freed; ready for labels
+
+The maintainer asked for a lean harness built only from the external reports' recommendations, fast.
+Kept (24e8b715): Whisper large-v3 and Qwen3-ASR (two transcription families with consensus), ZIPA
+and wav2vec2-espeak (phones; an insertion counts only when both hear it), espeak-ng + PanPhon, WAV
+signal measures, and for clones only FCPE, SwiftF0 and ReDimNet2+. Removed: the audio-LLM judge
+(a cloud audio LLM and Gemma 4 proved useless), the aligner, UTMOSv2, Audiobox, the accent,
+abrupt-end, tonal-collapse and naturalness detectors, and the frozen references.
+
+- **Storage:** `build_cleanup.py --qc-v1` and `qc.py models prune` freed about 53 GB (54 → 107 GB
+  free). MLS, LibriTTS-R, the speaker cohorts and the qc-takes pools stay.
+- **norms-v1** (4,751 takes): French within-sentence pause p99 1.06 s.
+- **Human controls** (300): `content.phoneme` 0.7% of French, 0% English (ZIPA alone: 9.7%);
+  `prosody.rate` at most 1.3%; `pause.anomalous` 0% English (the French MLS control holds
+  between-sentence pauses). fr-0101--dylan: pause 0.84 s, the whisper outside it, no phone heard in
+  it, insertion rate 0.025 with agreement.
+
+**Next.**
+1. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`) and listens
+   to `fr-0101--dylan` for the whisper, the sound before "obstruaient" and "orme-euz-abattus".
+2. `qc.py fit --runs <the batch-1 run under norms-v1>` (out of fold), commit thresholds-v1, then
+   `qc.py eval` once and commit eval-v1.
+3. One real qc-takes queue and one clone-lane run, on request.
+
 ### October 2 — an external review corrects QC v2; labelling is safe, fixes in progress
 
 An external review ran QC v2's own code on human recordings (289 FLEURS French, 150 English, 72

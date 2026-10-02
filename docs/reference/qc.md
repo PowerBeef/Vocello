@@ -229,6 +229,19 @@ The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` run
 
 **Human controls.** `controls build` samples human read speech from the extracted speaker corpora (MLS for French, LibriTTS-R for English; 150 per language, at most 3 clips per speaker), and `run --lane controls` scores it with the qc-takes roles. The controls lane never feeds `fit`, `queue` or norms. `controls report` gives each detector's flag rate on the controls beside the generated takes': a provisional rule should flag at most 5% of human recordings per language before it is trusted, and a fit should sit above the controls' own floor (human French has a median ZIPA phone error rate of 0.15).
 
+**Controls results (2026-10-02, 300 human takes against batch-1's 96, under `norms-v1`):**
+
+| Rule | Human French | Human English | Batch-1 takes |
+|---|---|---|---|
+| `content.phoneme` | 0.7% | 0% | 0% |
+| `prosody.rate` | 1.3% | 0% | 1% |
+| `pause.anomalous` | 27% (not comparable, below) | 0% | 3% |
+| `level.loudness` (advisory) | 37% | 100% | 43% |
+
+- `content.phoneme` with two-recognizer agreement flags 0.7% of human French, where ZIPA alone flagged 9.7% (FLEURS, external review).
+- The French pause figure is not a like-for-like control: MLS clips are 11-20 s audiobook passages of several sentences (median 35 words, transcripts without punctuation), so their longest pause is often between sentences (median 0.82 s, p90 1.52 s). The English clips are single punctuated sentences (median 17 words, longest pause median 0.17 s), and the rule flags none of them. The French pause rule stays unvalidated until the labels.
+- `level.loudness` measures how a recording was mastered against −23 LUFS, not a defect; it is advisory, never gates and never ranks the listening queue.
+
 | Lane | Script | Roles | What it does with QC v2 |
 |---|---|---|---|
 | `language-bench` | `scripts/macos_test.sh lang-bench` | `asrA`, `asrB`, `g2p`, `phones`, `phonesB` | `language-bench takes`, then `run`, `language-bench evidence` (the verdict line `spoken_content`) and `gate` (`audio_qc_gates`). The evidence feeds `publish_benchmark_history.py language --recognitions`. |

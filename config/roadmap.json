@@ -1533,24 +1533,6 @@
       "supersededBy": "QC-03"
     },
     {
-      "id": "AQ-09",
-      "title": "Audio QC documentation and generated accuracy report",
-      "status": "superseded",
-      "gate": "The docs/reference/audio-qc/ tree exists with one page per registry judge; refresh_derived_artifacts.py validate covers the generated accuracy blocks; the contract test refuses a gating detector without a scope-covering calibration record; the engineering review is historical; release.md is updated per decision 7.",
-      "sourceOfTruth": [
-        "docs/reference/qc.md",
-        ".claude/rules/release.md"
-      ],
-      "notes": "Audit AQ-F50, F51 (P6). Landed 2026-09-29/30: the generated docs/reference/audio-qc/ tree (a page per judge, detector and corpus source; generated meta-evaluation report; scripts/audio_qc_docs.py registered in refresh_derived_artifacts), and the lane-gating contract (config/audio-qc-lane-gates.json, scripts/audio_qc_lane_gates.py). 2026-10-01: five gates declared and validated from the round-2 records (enforcement inside the lanes is AQ-07). 2026-10-01: the v1 docs were deleted and release.md was rewritten for QC v2 (QC-05).",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-10-01",
-      "blockedBy": [
-        "AQ-01",
-        "AQ-03"
-      ],
-      "supersededBy": "QC-05"
-    },
-    {
       "id": "PA-33",
       "plan": "project-audit-2026-09",
       "title": "Engine-side lease for model deletion",
@@ -1562,20 +1544,6 @@
       ],
       "notes": "Found by the PA-26 B3 review on 2026-09-26. MacModelDeletionSequence unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation.",
       "updated": "2026-09-26"
-    },
-    {
-      "id": "QC-01",
-      "plan": "qc-v2-2026-10",
-      "title": "Models and runtimes",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "config/qc/models.json pins every model by revision and SHA-256 with a commercial-use weight license; qc.py fetches and verifies them; each runner passes a 3-take smoke run on the M6 within its memory budget.",
-      "sourceOfTruth": [
-        "docs/reference/qc.md"
-      ],
-      "updated": "2026-10-01",
-      "unparkWhen": null,
-      "notes": "Fetched and verified: Qwen3-ASR-1.7B, Qwen3-ForcedAligner-0.6B, Whisper large-v3, ZIPA with espeak-ng G2P (fallback wav2vec2-xlsr-espeak), FCPE and SwiftF0, ReDimNet2+, Audiobox Aesthetics, Gemma 4 12B (fallback Qwen2.5-Omni-7B). The UTMOSv2 smoke run is pending."
     },
     {
       "id": "QC-02",
@@ -1597,16 +1565,15 @@
       "title": "Detectors, thresholds and evaluation",
       "status": "planned",
       "blockedBy": [
-        "QC-01",
         "QC-02"
       ],
       "gate": "Detectors for content and phonemes, cut-off, wrong language, accent, pitch and register, tonal collapse, identity drift, artifacts, naturalness and the LLM rubric are fit on the train labels; thresholds-v<N> is committed before eval-v<N> scores the held-out labels; levels follow the plan's precision, recall and false-alarm rules.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-01",
+      "updated": "2026-10-02",
       "unparkWhen": null,
-      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train. Detectors, fit and eval are built and run report-only with provisional per-language rules; thresholds-v1 waits on the batch-1 labels.",
+      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train. Lean detector set (detectors.json v5): pause.anomalous, content.phoneme, content.asr, language.wrong, boundary.cutoff, prosody.rate, level.loudness (advisory), signal.artifacts, and for clones prosody.pitch and identity.drift. norms-v1 committed. Human controls (300): content.phoneme 0.7% fr / 0% en, prosody.rate 1.3% / 0%, pause.anomalous 0% en (the French MLS control holds between-sentence pauses, not comparable). Fit is out of fold by script family once batch-1 is labelled.",
       "legacyIds": [
         "AQ-07",
         "AQ-08",
@@ -1625,28 +1592,11 @@
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-01",
+      "updated": "2026-10-02",
       "unparkWhen": null,
-      "notes": "Wired: lang-bench on Qwen3-ASR and Whisper large-v3 (language version 6), qc-takes scoring and queueing, the clone lane (version 5). The one real run of each waits on thresholds-v1.",
+      "notes": "Wired: lang-bench (Qwen3-ASR + Whisper, language version 6) and qc-takes run asrA, asrB, g2p, phones, phonesB; the clone lane (version 5) and voice-reliability run speaker, pitchA, pitchB, and the clone detectors gate only in the clone lane. The one real run of each waits on thresholds-v1.",
       "legacyIds": [
         "BT-05"
-      ]
-    },
-    {
-      "id": "QC-05",
-      "plan": "qc-v2-2026-10",
-      "title": "Retire the v1 stack",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The v1 audio QC and delivery-research code, configs, records, docs, tests and CI routes are deleted, with only the product, the CLI, the take generator and the four lanes left; build_cleanup.py --qc-v1 removes the old models, caches, corpora and evidence after a reviewed dry run.",
-      "sourceOfTruth": [
-        "docs/reference/qc.md"
-      ],
-      "updated": "2026-10-01",
-      "unparkWhen": null,
-      "notes": "The v1 code, configs, records, docs, tests and CI routes are deleted (45421df2). build_cleanup.py --qc-v1 (about 38 GiB) waits on a reviewed dry run and the maintainer's go-ahead.",
-      "legacyIds": [
-        "AQ-09"
       ]
     },
     {
@@ -1681,13 +1631,13 @@
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-01",
+      "updated": "2026-10-02",
       "unparkWhen": null,
       "legacyIds": [
         "DP-31",
         "DP-32"
       ],
-      "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2. Emotion adherence (the maintainer's 2026-10-01 emotion and intent analysis of fr-0101--dylan): the qc-takes pool has no instructed takes, so nothing yet checks that a requested emotion is heard. Candidates: emotion2vec+ large (FunASR model license: commercial use with attribution) as an emotion vote, plus the acoustic cues that separated emotions best in that analysis: pitch level against the voice's neutral take (every acted emotion sat more than 5 st above neutral), energy, alpha ratio and Hammarberg index, computed in NumPy (openSMILE needs a commercial license). Excluded: audeering's wav2vec2 emotion model and the CaFE reference set (both CC BY-NC-SA). Emotion models score 15-50% on synthetic speech, so the measure is calibrated on maintainer labels of instructed takes and starts report-only."
+      "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2. QC v2 keeps pitch and speaker identity for clones only (maintainer decision 2026-10-02); emotion adherence is not measured (the reports leave delivery to the listener)."
     },
     {
       "id": "QC-08",

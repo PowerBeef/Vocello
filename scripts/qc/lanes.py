@@ -7,12 +7,16 @@ sound-level transcript features. Then it computes the features and detector
 scores (the provisional rules read the newest `config/qc/norms-v<N>.json`), and
 writes these files under `build/private/qc/runs/<run-id>/`:
 - `takes.json`: the manifest;
-- `features.json`: the features, with the model identities;
+- `features.json`: the features, with the model identities and the scoring
+  identity (`qc.detectors.scoring_identity`: the detectors configuration, the
+  feature and detector code and the newest norms file);
 - `flags.json`: the flags, each with its level and its evidence
   `{feature, value, start, end}`.
 
-The level comes from the evaluation of the newest thresholds file. Before an
-evaluation exists, every flag is report-only.
+The level comes from the evaluation of the newest thresholds file, applied only
+when the thresholds were fitted on the same model identities and scoring
+identity as the run. Otherwise, and before an evaluation exists, every flag is
+report-only and `flags.json` (and `gate`) state why.
 
 A lane named in the `lanes` map of `config/qc/detectors.json` runs its own roles
 by default, and its gate reads only the detectors those roles (or the WAV alone)
@@ -163,14 +167,16 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     run_id = f"{lane}-{utc_stamp()}-{secrets.token_hex(2)}"
     directory = layout.runs / run_id
     directory.mkdir(parents=True, exist_ok=False)
+    scoring = detector_lib.scoring_identity(layout)
     store.write_json_atomic(directory / "takes.json", dict(manifest, takes=takes), indent=None)
     store.write_json_atomic(directory / "features.json", {
         "schema": FEATURES_SCHEMA, "run": run_id, "lane": lane, "source": manifest.get("source"),
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
+        "scoringSHA256": scoring["sha256"], "scoring": {"files": scoring["files"], "norms": scoring["norms"]},
         "models": identities, "takes": rows,
     }, indent=None)
     controls = {take["token"] for take in takes if take.get("control")}
-    flags = score_run(layout, config, rows, identities, lane=lane, controls=controls)
+    flags = score_run(layout, config, rows, identities, lane=lane, controls=controls, scoring=scoring)
     flags.update(run=run_id, lane=lane, models=model_report,
                  registerSD={key: round(value, 3) for key, value in context.get("voicePitchSD", {}).items()})
     store.write_json_atomic(directory / "flags.json", flags, indent=None)
@@ -233,15 +239,26 @@ def mute_test(layout: Layout, takes: list[dict[str, Any]], rows: list[dict[str, 
 
 def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]],
               identities: dict[str, Any], *, lane: str | None = None,
-              controls: set[str] | frozenset[str] = frozenset()) -> dict[str, Any]:
+              controls: set[str] | frozenset[str] = frozenset(),
+              scoring: dict[str, Any] | None = None) -> dict[str, Any]:
     """Flags for a run's feature rows, with the newest applicable thresholds and levels.
 
-    A detector outside the lane's gated set, and every flag of a control take, stays report-only."""
+    The thresholds apply only when they were fitted on the run's model identities and its scoring
+    identity (`scoring`, by default the current one); `thresholdsReason` says why they did not, or
+    why no level came from an evaluation. A detector outside the lane's gated set, and every flag
+    of a control take, stays report-only."""
 
     thresholds_path = fit_lib.latest_thresholds(layout)
     thresholds = store.read_json(thresholds_path) if thresholds_path else None
-    applicable = thresholds is not None and _identities_match(thresholds, identities)
+    scoring = scoring or detector_lib.scoring_identity(layout)
+    reason = "no thresholds fitted"
+    if thresholds_path is not None and thresholds is not None:
+        mismatch = _thresholds_mismatch(thresholds, identities, scoring["sha256"])
+        reason = None if mismatch is None else f"{thresholds_path.name} {mismatch}"
+    applicable = thresholds is not None and reason is None
     levels = fit_lib.levels_for(layout, thresholds_path) if applicable else {}
+    if applicable and not levels:
+        reason = f"{thresholds_path.name} has no evaluation"
     names = detector_lib.feature_names(config)
     run_norm = detector_lib.normalization(rows, names)
     norm = thresholds["normalization"] if applicable else run_norm
@@ -283,17 +300,23 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     return {
         "schema": FLAGS_SCHEMA, "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "thresholds": thresholds_path.name if thresholds_path else None, "thresholdsApplied": applicable,
-        "norms": (pool_norms or {}).get("file"),
+        "thresholdsReason": reason, "scoringSHA256": scoring["sha256"], "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
     }
 
 
-def _identities_match(thresholds: dict[str, Any], identities: dict[str, Any]) -> bool:
+def _thresholds_mismatch(thresholds: dict[str, Any], identities: dict[str, Any], scoring_sha: str) -> str | None:
+    """Why a thresholds file does not apply to a run, or None when it does: it was fitted with
+    other scoring code, configuration or norms, or on another identity of a model the run has
+    results of."""
+
+    if thresholds.get("scoringSHA256") != scoring_sha:
+        return f"was fitted with other {fit_lib.SCORING_CHANGED}"
     for role, expected in thresholds.get("models", {}).items():
         current = identities.get(role) or {}
         if current.get("runnerSHA256") and current["runnerSHA256"] != expected.get("runnerSHA256"):
-            return False
-    return True
+            return f"was fitted on another {role} model identity"
+    return None
 
 
 def lane_runs(layout: Layout, lane: str | None = None) -> list[Path]:
@@ -320,9 +343,10 @@ def gate(layout: Layout, lane: str, run_id: str | None = None) -> int:
             elif flag["level"] == "warn" and worst == "pass":
                 worst = "warn"
     summary = flags["summary"]
+    note = "" if flags.get("levelsFromEval") else \
+        f" (report-only: {flags.get('thresholdsReason') or 'no evaluated thresholds'})"
     print(f"qc gate {lane}: run {flags['run']}: {worst}; takes {len(flags['takes'])}, fail {summary['fail']}, "
-          f"warn {summary['warn']}, report-only {summary['report-only']}, errors {len(flags['errors'])}"
-          f"{'' if flags.get('levelsFromEval') else ' (no evaluated thresholds: report-only)'}")
+          f"warn {summary['warn']}, report-only {summary['report-only']}, errors {len(flags['errors'])}{note}")
     if flags["errors"]:
         return EXIT_ERROR
     return {"fail": EXIT_FAIL, "warn": EXIT_WARN}.get(worst, EXIT_PASS)

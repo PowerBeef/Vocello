@@ -158,6 +158,35 @@ def config_digest(layout: Layout = Layout()) -> str:
     return store.sha256_file(layout.config / "detectors.json")
 
 
+# The code that turns runner results into features and detector scores. `qc/features.py` imports
+# `qc/phones.py` and `qc/pitch.py` by name at run time, so they are listed rather than scanned.
+SCORING_SOURCES = ("qc/features.py", "qc/detectors.py", "qc/phones.py", "qc/pitch.py")
+
+
+def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:
+    """`{"sha256", "files", "norms"}`: what scores a take once the runners have run.
+
+    `files` maps `config/qc/detectors.json` and the scoring code (`SCORING_SOURCES` under
+    `scripts/`) to their SHA-256 (None for a missing file); `norms` is the newest norms file the
+    provisional rules read (`{"file", "sha256"}`, or None). `sha256` covers both. Runs record it in
+    `features.json` and fits in the thresholds file: thresholds apply only to features scored by
+    the same code, configuration and norms.
+    """
+
+    from qc import norms as norms_lib  # qc.norms imports this module
+
+    def digest(path: Any) -> str | None:
+        return store.sha256_file(path) if path.is_file() else None
+
+    files = {"config/qc/detectors.json": digest(layout.config / "detectors.json")}
+    for relative in SCORING_SOURCES:
+        files[f"scripts/{relative}"] = digest(layout.scripts / relative)
+    newest = norms_lib.latest(layout)
+    norms = {"file": newest.name, "sha256": store.sha256_file(newest)} if newest else None
+    return {"sha256": store.sha256_text(store.canonical_json({"files": files, "norms": norms})),
+            "files": files, "norms": norms}
+
+
 def detector_roles(detector: dict[str, Any]) -> set[str]:
     roles: set[str] = set()
     for item in detector["features"]:

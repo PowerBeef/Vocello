@@ -1,27 +1,43 @@
-"""Fit detector thresholds on the train labels; evaluate them once on the held-out labels.
+"""Fit detector thresholds on one rater's labels; evaluate them out of fold, once per label set.
 
-`fit` joins the maintainer's labels (`build/private/qc/labels`) to the features
-of the `qc.py run` outputs (`build/private/qc/runs/*/features.json`) and writes
-`config/qc/thresholds-v<N>.json`:
+`fit` joins the rater's labels (`build/private/qc/labels`) to the features of
+the `qc.py run` outputs (`build/private/qc/runs/*/features.json`), which must
+carry the current scoring identity (`qc.detectors.scoring_identity`), and
+writes `config/qc/thresholds-v<N>.json`:
 - per detector, an L2 logistic (or one threshold) with the cut that maximizes
-  the weighted F1 on the train split;
-- per language when it has at least 60 clean and 20 positive train takes, else
-  one pooled model on per-language z-scores;
+  the weighted F1;
+- per language when it has at least 60 clean and 20 positive takes, and one
+  pooled model on per-language z-scores when the detector has at least
+  `fit.pooledMinPositive` (10) positives; below that floor it keeps its
+  provisional rule, report-only;
 - sample weights of 1 / inclusion probability, so the enrichment does not bias
   the fit;
-- the LLM judges stay report-only unless their train-split kappa reaches 0.6.
+- the LLM judges stay report-only unless their kappa reaches 0.6;
+- `crossValidation`: the same fit once per fold of script families
+  (`label.fold_for_family`, k = `fit.crossValidationFolds`), each without that
+  fold's families, with the digest of each fold's training labels. The final
+  `detectors` are fitted on every label.
 
-The file records the model identities, the detectors digest and the label-set
-digest. It is committed before `eval` runs.
+A positive is a class ticked at `fit.positiveMinSeverity` (moderate) or worse;
+a milder tick counts on neither side. Queue batches train but are never
+evaluated, and the 60/40 `split` of a batch item is not used. The file records
+the rater, the model and scoring identities and the label-set digests. It is
+committed before `eval` runs.
 
-`eval` refuses a thresholds file that is not committed unchanged, and refuses to
-score a version twice. It writes `benchmarks/qc/eval-v<N>.json` with aggregates
-only:
+`eval` scores every labelled probability-sample take with the models of its own
+family's fold, so no take is scored by a model fitted on its script. It refuses
+a thresholds file that is not committed unchanged, a version already scored,
+features or scoring code other than the fit's, labels changed since the fit,
+and a label set an earlier evaluation scored, unless the thresholds file
+declares `reuse: {"reason"}` (`qc.py fit --reuse-reason`). It writes
+`benchmarks/qc/eval-v<N>.json` with aggregates only, and appends the scored
+take tokens to the private ledger `build/private/qc/eval-ledger.jsonl`:
 - per detector and language: weighted precision and recall with Clopper-Pearson
   bounds (on the Kish effective sample size), clean false alarms and kappa;
 - the level each detector earns: warn when the precision lower bound is at
   least 0.6 and the recall at least 0.6; fail when the precision lower bound is
-  at least 0.8 and the clean false-alarm upper bound at most 5%.
+  at least 0.8 and the clean false-alarm upper bound at most 5%. A detector
+  gates only the languages its evaluation covers.
 """
 
 from __future__ import annotations
@@ -40,12 +56,17 @@ from qc import label, store
 from qc import norms as norms_lib
 from qc.store import Layout
 
-THRESHOLDS_SCHEMA = "vocello.qc.thresholds/1"
-EVAL_SCHEMA = "vocello.qc.eval/1"
+THRESHOLDS_SCHEMA = "vocello.qc.thresholds/2"
+EVAL_SCHEMA = "vocello.qc.eval/2"
 THRESHOLDS_RE = re.compile(r"^thresholds-v(\d+)\.json$")
+EVAL_RE = re.compile(r"^eval-v(\d+)\.json$")
+EVAL_LEDGER = "eval-ledger.jsonl"
 LINGUISTIC = {"stutter", "mispronunciation", "wrong-language"}
 SEVERITY_RANK = {"none": 0, "mild": 1, "moderate": 2, "severe": 3}
 DEFAULT_MIN_SEVERITY = "moderate"
+DEFAULT_FOLDS = 5
+DEFAULT_POOLED_MIN_POSITIVE = 10
+SCORING_CHANGED = "scoring code (feature, detector, phone or pitch code, detectors.json or norms)"
 
 
 class FitError(RuntimeError):
@@ -58,8 +79,11 @@ def utc_now() -> str:
 
 # --- inputs -----------------------------------------------------------------------
 
-def feature_rows(layout: Layout, runs: Iterable[str] | None = None) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """The newest features per take token across runs, and the runs' model identities."""
+def feature_rows(layout: Layout, runs: Iterable[str] | None = None
+                 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any], str | None]:
+    """The newest features per take token across runs, the runs' model identities and their scoring
+    identity (`scoringSHA256`, None for a run older than it). Runs that disagree on a model identity
+    or on the scoring identity are refused: name runs of one identity."""
 
     directories = sorted((path for path in layout.runs.glob("*") if (path / "features.json").is_file()),
                          key=lambda path: path.stat().st_mtime)
@@ -68,8 +92,13 @@ def feature_rows(layout: Layout, runs: Iterable[str] | None = None) -> tuple[dic
         directories = [path for path in directories if path.name in wanted]
     rows: dict[str, dict[str, Any]] = {}
     identities: dict[str, Any] = {}
+    scorings: set[str | None] = set()
     for directory in directories:
         document = store.read_json(directory / "features.json")
+        scorings.add(document.get("scoringSHA256"))
+        if len(scorings) > 1:
+            raise FitError(f"runs were scored with different {SCORING_CHANGED}; name runs of one scoring "
+                           "identity with --runs")
         for role, identity in document.get("models", {}).items():
             if identity.get("available"):
                 previous = identities.get(role)
@@ -78,11 +107,12 @@ def feature_rows(layout: Layout, runs: Iterable[str] | None = None) -> tuple[dic
                 identities[role] = {"id": identity["id"], "runnerSHA256": identity["runnerSHA256"]}
         for row in document.get("takes", []):
             rows[row["token"]] = dict(row, run=directory.name)
-    return rows, identities
+    return rows, identities, next(iter(scorings), None)
 
 
 def label_rows(layout: Layout, batches: Iterable[str] | None = None, rater: str | None = None) -> list[dict[str, Any]]:
-    """Every labelled primary item of one rater: token, split, weight, probability sample or not, label.
+    """Every labelled primary item of one rater: token, script family (its cross-validation fold),
+    split (recorded by the batch, unused by fit and eval), weight, probability sample or not, label.
 
     Each row carries the configured severity bar (`fit.positiveMinSeverity`), which `positive` and
     `usable` read.
@@ -203,7 +233,7 @@ def fit_detector(detector: dict[str, Any], train: list[dict[str, Any]], features
     entry["train"] = {"takes": len(rows), "positives": positives,
                       "clean": sum(is_clean(row) for row in rows)}
     if not rows or positives == 0:
-        entry.update(reportOnly=True, reason="no positive train labels with these features measured")
+        entry.update(reportOnly=True, reason="no positive labels with these features measured")
         return entry
 
     def design(subset: list[dict[str, Any]]) -> np.ndarray:
@@ -243,7 +273,8 @@ def fit_detector(detector: dict[str, Any], train: list[dict[str, Any]], features
             fitted = fit_scope(subset)
             if fitted:
                 entry["models"][language] = fitted
-    pooled = fit_scope(rows)
+    floor = settings.get("pooledMinPositive", DEFAULT_POOLED_MIN_POSITIVE)
+    pooled = fit_scope(rows) if positives >= floor else None
     if pooled:
         entry["models"]["*"] = pooled
     if detector.get("llm"):
@@ -260,8 +291,21 @@ def fit_detector(detector: dict[str, Any], train: list[dict[str, Any]], features
             return entry
     entry["reportOnly"] = not entry["models"]
     if entry["reportOnly"]:
-        entry["reason"] = "no fit"
+        entry["reason"] = "no fit" if positives >= floor else \
+            f"{positives} positive labels, below the pooled floor of {floor}: the provisional rule stays"
     return entry
+
+
+def fit_settings(config: dict[str, Any]) -> dict[str, Any]:
+    """The `fit` block of the detectors configuration, with its fold count and pooled floor checked."""
+
+    settings = dict(config.get("fit", {}))
+    for key, default, minimum in (("crossValidationFolds", DEFAULT_FOLDS, 2),
+                                  ("pooledMinPositive", DEFAULT_POOLED_MIN_POSITIVE, 1)):
+        value = settings.setdefault(key, default)
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise FitError(f"fit.{key} must be an integer of at least {minimum}, not {value!r}")
+    return settings
 
 
 def next_version(layout: Layout) -> int:
@@ -276,28 +320,56 @@ def latest_thresholds(layout: Layout) -> Path | None:
     return max(candidates)[1] if candidates else None
 
 
-def fit(layout: Layout, *, batches: Iterable[str] | None = None, runs: Iterable[str] | None = None) -> Path:
+def fold_training(rows: list[dict[str, Any]], fold: int, k: int) -> list[dict[str, Any]]:
+    """The labelled rows a fold's models train on: every row whose script family is in another fold."""
+
+    return [row for row in rows if label.fold_for_family(row["family"], k) != fold]
+
+
+def fit(layout: Layout, *, batches: Iterable[str] | None = None, runs: Iterable[str] | None = None,
+        rater: str | None = None, reuse_reason: str | None = None) -> Path:
+    """Write the next thresholds file: the out-of-fold models `eval` scores with, then the final
+    models fitted on every label. `reuse_reason` declares why this file may be evaluated on a label
+    set an earlier evaluation already scored."""
+
     config = detector_lib.load_config(layout)
-    features, identities = feature_rows(layout, runs)
+    settings = fit_settings(config)
+    if reuse_reason is not None and not reuse_reason.strip():
+        raise FitError("a reuse needs its reason")
+    features, identities, run_scoring = feature_rows(layout, runs)
     if not features:
         raise FitError("no run features under build/private/qc/runs (run qc.py run first)")
-    labels = label_rows(layout, batches)
-    train = [row for row in labels if row["split"] == "train" and row["token"] in features]
-    if not train:
-        raise FitError("no labelled train takes with features")
+    scoring = detector_lib.scoring_identity(layout)
+    if run_scoring != scoring["sha256"]:
+        raise FitError(f"the run features were scored with other {SCORING_CHANGED} than the current; "
+                       "rerun qc.py run on the labelled takes, then fit from that run (--runs)")
+    rater = rater or label.default_rater(layout)
+    labelled = [row for row in label_rows(layout, batches, rater) if row["token"] in features]
+    if not labelled:
+        raise FitError("no labelled takes with features")
     norm = detector_lib.normalization(features.values(), detector_lib.feature_names(config))
-    settings = config.get("fit", {})
-    fitted = {detector["id"]: fit_detector(detector, train, features, norm, settings)
+    k = settings["crossValidationFolds"]
+    folds = []
+    for fold in range(k):
+        training = fold_training(labelled, fold, k)
+        folds.append({"fold": fold, "takes": len(training), "labelSetDigest": label_set_digest(training),
+                      "detectors": {detector["id"]: fit_detector(detector, training, features, norm, settings)
+                                    for detector in config["detectors"]}})
+    fitted = {detector["id"]: fit_detector(detector, labelled, features, norm, settings)
               for detector in config["detectors"]}
     version = next_version(layout)
     document = {
         "schema": THRESHOLDS_SCHEMA, "version": version, "createdAt": utc_now(),
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
-        "models": identities,
-        "labelSet": {"batches": sorted({row["batch"] for row in labels}), "trainTakes": len(train),
-                     "digest": label_set_digest(train)},
+        "scoringSHA256": scoring["sha256"], "scoring": {"files": scoring["files"], "norms": scoring["norms"]},
+        "models": identities, "rater": rater,
+        "labelSet": {"batches": sorted({row["batch"] for row in labelled}), "takes": len(labelled),
+                     "digest": label_set_digest(labelled)},
+        "crossValidation": {"k": k, "salt": label.FOLD_SALT, "folds": folds},
         "normalization": norm, "detectors": fitted,
     }
+    if reuse_reason is not None:
+        document["reuse"] = {"reason": reuse_reason.strip()}
     path = layout.config / f"thresholds-v{version}.json"
     store.write_json_atomic(path, document)
     return path
@@ -405,74 +477,155 @@ def committed_unchanged(root: Path, path: Path) -> bool:
     return clean.returncode == 0
 
 
+def _evaluated_before(layout: Layout, digest: str) -> str | None:
+    """The earlier evaluation (a `benchmarks/qc/eval-v*.json`, or a line of the private ledger)
+    that already scored this label set, or None."""
+
+    for path in sorted((layout.root / "benchmarks/qc").glob("eval-v*.json")):
+        if not EVAL_RE.match(path.name):
+            continue
+        try:
+            document = store.read_json(path)
+        except (OSError, ValueError):
+            continue
+        if isinstance(document, dict) and document.get("labelSetDigest") == digest:
+            return path.name
+    for row in store.read_jsonl(layout.private / EVAL_LEDGER):
+        if isinstance(row, dict) and row.get("labelSetDigest") == digest:
+            return f"evaluation v{row.get('version')} (private ledger)"
+    return None
+
+
+def _metrics(scored: list[tuple[dict[str, Any], bool]], class_id: str, rules: dict[str, Any],
+             report_only: bool) -> dict[str, Any]:
+    flagged_rows = [(row, flag) for row, flag in scored if flag]
+    positives = [(row, flag) for row, flag in scored if positive(row, class_id)]
+    clean = [(row, flag) for row, flag in scored if is_clean(row)]
+    entry = {
+        "n": len(scored), "positives": len(positives), "flagged": len(flagged_rows),
+        "precision": weighted_rate([positive(row, class_id) for row, _ in flagged_rows],
+                                   [row["weight"] for row, _ in flagged_rows]),
+        "recall": weighted_rate([flag for _, flag in positives], [row["weight"] for row, _ in positives]),
+        "cleanFalseAlarms": weighted_rate([flag for _, flag in clean], [row["weight"] for row, _ in clean]),
+        "kappa": label.cohen_kappa([(flag, positive(row, class_id)) for row, flag in scored]),
+    }
+    entry["level"] = level_for(entry, rules, report_only)
+    return entry
+
+
 def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterable[str] | None = None,
-             runs: Iterable[str] | None = None) -> Path:
+             runs: Iterable[str] | None = None, rater: str | None = None) -> Path:
+    """Score every labelled probability-sample take out of fold and write `eval-v<N>.json`.
+
+    A take is scored with the models of its own family's fold, which never trained on its script.
+    For a detector whose final fit is report-only, every take scores with its provisional rule, as
+    in runs (the level stays report-only); for a fitted detector, a take whose fold is report-only
+    is left out (`unscored`), so a language the folds cannot score earns no level.
+    """
+
     thresholds = thresholds or latest_thresholds(layout)
     if thresholds is None or not thresholds.is_file():
         raise FitError("no thresholds file (run qc.py fit, then commit it)")
     if not committed_unchanged(layout.root, thresholds):
-        raise FitError(f"{thresholds.name} is not committed unchanged; commit it before the held-out evaluation")
+        raise FitError(f"{thresholds.name} is not committed unchanged; commit it before the evaluation")
     document = store.read_json(thresholds)
     version = document["version"]
     output = layout.root / "benchmarks/qc" / f"eval-v{version}.json"
     if output.exists():
-        raise FitError(f"{output.name} exists: the held-out split is scored once per thresholds version")
+        raise FitError(f"{output.name} exists: a thresholds version is evaluated once")
+    validation = document.get("crossValidation") or {}
+    if document.get("schema") != THRESHOLDS_SCHEMA or validation.get("salt") != label.FOLD_SALT:
+        raise FitError(f"{thresholds.name} has no out-of-fold models; refit with this qc.py")
     config = detector_lib.load_config(layout)
-    features, _ = feature_rows(layout, runs)
-    labels = label_rows(layout, batches)
-    heldout = [row for row in labels if row["split"] == "heldout" and row["probabilitySample"]
-               and row["token"] in features]
-    if not heldout:
-        raise FitError("no labelled held-out takes with features")
+    if document.get("scoringSHA256") != detector_lib.scoring_identity(layout)["sha256"]:
+        raise FitError(f"{thresholds.name} was fitted with other {SCORING_CHANGED} than the current; refit")
+    features, identities, run_scoring = feature_rows(layout, runs)
+    if not features:
+        raise FitError("no run features under build/private/qc/runs (run qc.py run first)")
+    if run_scoring != document["scoringSHA256"]:
+        raise FitError(f"the run features were scored with other {SCORING_CHANGED} than {thresholds.name} "
+                       "was fitted on")
+    fitted_models = document.get("models", {})
+    changed = sorted(role for role in set(identities) | set(fitted_models)
+                     if identities.get(role) != fitted_models.get(role))
+    if changed:
+        raise FitError(f"the run features come from other model identities than {thresholds.name} "
+                       f"({', '.join(changed)})")
+    fitted_rater = document.get("rater")
+    rater = rater or fitted_rater or label.default_rater(layout)
+    if fitted_rater and rater != fitted_rater:
+        raise FitError(f"{thresholds.name} was fitted on the labels of rater {fitted_rater}, not {rater}")
+    labelled = [row for row in label_rows(layout, batches, rater) if row["token"] in features]
+    k = validation["k"]
+    for entry in validation["folds"]:
+        if label_set_digest(fold_training(labelled, entry["fold"], k)) != entry["labelSetDigest"]:
+            raise FitError(f"the labels, or the takes with features, differ from those {thresholds.name} was fitted "
+                           f"on (fold {entry['fold']}); evaluate with the fit's --batches and --runs, or refit")
+    sample = [row for row in labelled if row["probabilitySample"]]
+    if not sample:
+        raise FitError("no labelled probability-sample takes with features")
+    digest = label_set_digest(sample)
+    earlier = _evaluated_before(layout, digest)
+    reuse = (document.get("reuse") or {}).get("reason")
+    if earlier and not (isinstance(reuse, str) and reuse.strip()):
+        raise FitError(f"{earlier} already scored this label set; label new takes, or refit with "
+                       "--reuse-reason to declare why it is scored again")
+    folds = {entry["fold"]: entry["detectors"] for entry in validation["folds"]}
     norm = document["normalization"]
     pool_norms = norms_lib.load(layout)  # a report-only detector scores with its provisional rule, as in runs
     rules = config["levels"]
     results: dict[str, Any] = {}
     for detector in config["detectors"]:
-        fitted = document["detectors"].get(detector["id"], {})
+        final = document["detectors"].get(detector["id"], {})
         if detector.get("advisory") or detector["class"] is None:
             results[detector["id"]] = {"class": None, "advisory": True, "reportOnly": True, "languages": {}}
             continue
-        rows = [row for row in heldout if usable(row, detector["class"])]
-        by_language: dict[str, list[dict[str, Any]]] = {"*": rows}
-        for row in rows:
-            by_language.setdefault(row["language"], []).append(row)
-        report = {}
-        for language, subset in sorted(by_language.items()):
-            scored = []
-            for row in subset:
-                outcome = detector_lib.score(detector, features[row["token"]]["features"], row["language"],
-                                             None if fitted.get("reportOnly") else fitted, norm, norms=pool_norms)
-                flagged = outcome["cut"] is not None and outcome["score"] is not None \
-                    and outcome["score"] >= outcome["cut"]
-                scored.append((row, flagged))
-            flagged_rows = [(row, flag) for row, flag in scored if flag]
-            positives = [(row, flag) for row, flag in scored if positive(row, detector["class"])]
-            clean = [(row, flag) for row, flag in scored if is_clean(row)]
-            entry = {
-                "n": len(scored), "positives": len(positives), "flagged": len(flagged_rows),
-                "precision": weighted_rate([positive(row, detector["class"]) for row, _ in flagged_rows],
-                                           [row["weight"] for row, _ in flagged_rows]),
-                "recall": weighted_rate([flag for _, flag in positives], [row["weight"] for row, _ in positives]),
-                "cleanFalseAlarms": weighted_rate([flag for _, flag in clean], [row["weight"] for row, _ in clean]),
-                "kappa": label.cohen_kappa([(flag, positive(row, detector["class"])) for row, flag in scored]),
-            }
-            entry["level"] = level_for(entry, rules, bool(fitted.get("reportOnly", True)))
-            report[language] = entry
-        results[detector["id"]] = {"class": detector["class"], "reportOnly": bool(fitted.get("reportOnly", True)),
-                                   "languages": report}
+        report_only = bool(final.get("reportOnly", True))
+        scored: list[tuple[dict[str, Any], bool]] = []
+        unscored = 0
+        for row in sample:
+            if not usable(row, detector["class"]):
+                continue
+            fitted = None
+            if not report_only:
+                fitted = folds[label.fold_for_family(row["family"], k)].get(detector["id"]) or {}
+                if fitted.get("reportOnly", True):
+                    unscored += 1
+                    continue
+            outcome = detector_lib.score(detector, features[row["token"]]["features"], row["language"], fitted,
+                                         norm, norms=pool_norms)
+            flagged = outcome["cut"] is not None and outcome["score"] is not None \
+                and outcome["score"] >= outcome["cut"]
+            scored.append((row, flagged))
+        by_language: dict[str, list[tuple[dict[str, Any], bool]]] = {"*": scored}
+        for row, flag in scored:
+            by_language.setdefault(row["language"], []).append((row, flag))
+        results[detector["id"]] = {
+            "class": detector["class"], "reportOnly": report_only,
+            "scoredWith": "provisional" if report_only else "out-of-fold", "unscored": unscored,
+            "languages": {language: _metrics(subset, detector["class"], rules, report_only)
+                          for language, subset in sorted(by_language.items())},
+        }
     intra = {}
     protocol = label.load_protocol(layout)
-    for name in sorted({row["batch"] for row in labels}):
-        intra[name] = label.repeat_agreement(label.load_batch(layout, name), label.latest_labels(layout, name),
+    for name in sorted({row["batch"] for row in labelled}):
+        intra[name] = label.repeat_agreement(label.load_batch(layout, name), label.latest_labels(layout, name, rater),
                                              protocol)
     evaluation = {
         "schema": EVAL_SCHEMA, "version": version, "createdAt": utc_now(),
         "thresholds": thresholds.name, "thresholdsSHA256": store.sha256_file(thresholds),
-        "commit": _head(layout.root), "labelSet": {"heldoutTakes": len(heldout), "digest": label_set_digest(heldout)},
+        "commit": _head(layout.root), "rater": rater, "scoringSHA256": document["scoringSHA256"],
+        "method": {"name": "out-of-fold", "k": k, "salt": validation["salt"], "groups": "script family"},
+        "labelSetDigest": digest,
+        "labelSet": {"batches": sorted({row["batch"] for row in sample}), "takes": len(sample)},
         "norms": (pool_norms or {}).get("file"), "detectors": results, "intraRater": intra,
     }
+    if earlier:
+        evaluation["reuse"] = {"reason": reuse.strip(), "earlier": earlier}
     store.write_json_atomic(output, evaluation)
+    store.append_jsonl(layout.private / EVAL_LEDGER, {
+        "version": version, "labelSetDigest": digest, "tokens": sorted(row["token"] for row in sample),
+        "evaluatedAt": evaluation["createdAt"]})
     return output
 
 

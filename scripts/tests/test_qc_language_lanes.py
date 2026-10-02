@@ -126,7 +126,8 @@ class ControlAndLaneGatingTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.layout = temporary_layout(self.root)
         self.config = detectors.load_config(self.layout)
-        thresholds = {"schema": "vocello.qc.thresholds/1", "version": 1, "models": {}, "normalization": {},
+        thresholds = {"schema": "vocello.qc.thresholds/2", "version": 1, "models": {}, "normalization": {},
+                      "scoringSHA256": detectors.scoring_identity(self.layout)["sha256"],
                       "detectors": {detector["id"]: {"reportOnly": True} for detector in self.config["detectors"]}}
         path = self.layout.config / "thresholds-v1.json"
         store.write_json_atomic(path, thresholds)

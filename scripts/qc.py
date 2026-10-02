@@ -238,7 +238,7 @@ def cmd_fit(args: argparse.Namespace, layout: Layout) -> int:
     from qc import fit
 
     try:
-        path = fit.fit(layout, batches=args.batches, runs=args.runs)
+        path = fit.fit(layout, batches=args.batches, runs=args.runs, rater=args.rater, reuse_reason=args.reuse_reason)
     except (fit.FitError, ValueError, OSError) as error:
         print(f"qc fit: {error}", file=sys.stderr)
         return EXIT_ERROR
@@ -251,7 +251,7 @@ def cmd_eval(args: argparse.Namespace, layout: Layout) -> int:
 
     try:
         path = fit.evaluate(layout, thresholds=Path(args.thresholds) if args.thresholds else None,
-                            batches=args.batches, runs=args.runs)
+                            batches=args.batches, runs=args.runs, rater=args.rater)
     except (fit.FitError, ValueError, OSError) as error:
         print(f"qc eval: {error}", file=sys.stderr)
         return EXIT_ERROR
@@ -381,15 +381,20 @@ def build_parser() -> argparse.ArgumentParser:
     queue.add_argument("--batch", help="batch name for the queue (default queue-<run id>)")
     queue.set_defaults(handler=cmd_queue)
 
-    fit = commands.add_parser("fit", help="fit detector thresholds from the train-split labels")
+    fit = commands.add_parser("fit", help="fit detector thresholds on the labels, per family fold and in full")
     fit.add_argument("--batches", nargs="+", help="label batches (default every batch)")
     fit.add_argument("--runs", nargs="+", help="run ids whose features to use (default every run)")
+    fit.add_argument("--rater", help="whose labels (default the protocol's rater)")
+    fit.add_argument("--reuse-reason", help="why eval may score a label set an earlier evaluation scored "
+                                            "(recorded in the thresholds file)")
     fit.set_defaults(handler=cmd_fit)
 
-    evaluate = commands.add_parser("eval", help="score the held-out split once against committed thresholds")
+    evaluate = commands.add_parser("eval", help="score the labelled sample out of fold, once, against "
+                                                "committed thresholds")
     evaluate.add_argument("--thresholds", help="thresholds file (default the newest)")
     evaluate.add_argument("--batches", nargs="+")
     evaluate.add_argument("--runs", nargs="+")
+    evaluate.add_argument("--rater", help="whose labels (default the rater the thresholds were fitted on)")
     evaluate.set_defaults(handler=cmd_eval)
 
     norms = commands.add_parser("norms", help="per-language pause, pace and ending percentiles of a takes pool")

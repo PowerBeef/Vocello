@@ -9,6 +9,8 @@ it; pause.anomalous must flag it. A take with a 0.25 s pause and a natural 200 m
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import shutil
 import sys
@@ -534,23 +536,77 @@ class LaneTests(unittest.TestCase):
         self.assertFalse(features_doc["models"]["phones"]["available"])
         self.assertEqual(lanes.gate(self.layout, "pool"), lanes.EXIT_PASS)  # report-only never gates
 
-    def test_gate_levels_come_from_the_evaluation_of_the_thresholds(self):
-        self.run_lane("clone")
-        thresholds = {"schema": "vocello.qc.thresholds/1", "version": 1, "models": {}, "normalization": {},
+    def write_evaluated_thresholds(self, levels):
+        """Thresholds fitted on the current scoring identity, and their evaluation's French levels."""
+
+        thresholds = {"schema": "vocello.qc.thresholds/2", "version": 1, "models": {}, "normalization": {},
+                      "scoringSHA256": detectors.scoring_identity(self.layout)["sha256"],
                       "detectors": {detector["id"]: {"reportOnly": True} for detector in config()["detectors"]}}
         path = self.layout.config / "thresholds-v1.json"
         store.write_json_atomic(path, thresholds)
         evaluation = {"version": 1, "thresholdsSHA256": store.sha256_file(path), "detectors": {
-            "pause.anomalous": {"languages": {"french": {"level": "fail"}}},
-            "level.loudness": {"languages": {"french": {"level": "warn"}}}}}  # the synths sit near -30 LUFS
+            detector: {"languages": {"french": {"level": level}}} for detector, level in levels.items()}}
         store.write_json_atomic(self.root / "benchmarks/qc/eval-v1.json", evaluation)
+
+    def gate_line(self, lane):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = lanes.gate(self.layout, lane)
+        return code, output.getvalue()
+
+    def test_gate_levels_come_from_the_evaluation_of_the_thresholds(self):
+        self.run_lane("clone")
+        # level.loudness: the synths sit near -30 LUFS; abrupt-end has no provisional rule to flag with
+        self.write_evaluated_thresholds({"pause.anomalous": "fail", "level.loudness": "warn"})
         self.run_lane("clone")
         self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_FAIL)
-        evaluation["detectors"]["pause.anomalous"]["languages"]["french"]["level"] = "report-only"
-        store.write_json_atomic(self.root / "benchmarks/qc/eval-v1.json", evaluation)
+        self.write_evaluated_thresholds({"pause.anomalous": "report-only", "level.loudness": "warn"})
         self.run_lane("clone")
         self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_WARN)
         self.assertEqual(lanes.gate(self.layout, "no-such-lane"), lanes.EXIT_ERROR)
+
+    def test_thresholds_of_other_scoring_code_leave_a_run_report_only(self):
+        self.write_evaluated_thresholds({"pause.anomalous": "fail"})
+        directory = self.run_lane("clone")
+        identity = detectors.scoring_identity(self.layout)
+        self.assertEqual(store.read_json(directory / "features.json")["scoringSHA256"], identity["sha256"])
+        self.assertEqual(store.read_json(directory / "flags.json")["thresholdsReason"], None)
+        self.assertEqual(self.gate_line("clone")[0], lanes.EXIT_FAIL)
+
+        # Editing a detector's feature list changes the scoring identity.
+        path = self.layout.config / "detectors.json"
+        original = path.read_text()
+        document = json.loads(original)
+        pause = next(item for item in document["detectors"] if item["id"] == "pause.anomalous")
+        pause["features"] = pause["features"][:3]
+        path.write_text(json.dumps(document, indent=2))
+        directory = self.run_lane("clone")
+        flags = store.read_json(directory / "flags.json")
+        self.assertFalse(flags["thresholdsApplied"])
+        self.assertEqual(flags["thresholdsReason"], "thresholds-v1.json was fitted with other scoring code "
+                                                    "(feature, detector, phone or pitch code, detectors.json "
+                                                    "or norms)")
+        code, line = self.gate_line("clone")
+        self.assertEqual(code, lanes.EXIT_PASS)
+        self.assertIn("(report-only: thresholds-v1.json was fitted with other scoring code", line)
+
+        # So does an edit of the feature code (here a features.py the identity did not hold before).
+        path.write_text(original)
+        self.run_lane("clone")
+        self.assertEqual(self.gate_line("clone")[0], lanes.EXIT_FAIL)
+        (self.root / "scripts/qc/features.py").write_text("# edited feature code\n")
+        self.assertNotEqual(detectors.scoring_identity(self.layout)["sha256"], identity["sha256"])
+        directory = self.run_lane("clone")
+        self.assertIn("other scoring code", store.read_json(directory / "flags.json")["thresholdsReason"])
+        self.assertEqual(self.gate_line("clone")[0], lanes.EXIT_PASS)
+
+        # A new norms file is part of the identity too.
+        (self.root / "scripts/qc/features.py").unlink()
+        store.write_json_atomic(self.layout.config / "norms-v1.json", {"schema": "vocello.qc.norms/1",
+                                                                        "languages": {}})
+        norms_identity = detectors.scoring_identity(self.layout)
+        self.assertEqual(norms_identity["norms"]["file"], "norms-v1.json")
+        self.assertNotEqual(norms_identity["sha256"], identity["sha256"])
 
     def test_queue_writes_a_label_batch_of_unlabelled_takes(self):
         directory = self.run_lane()

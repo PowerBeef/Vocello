@@ -67,6 +67,20 @@ def split_for_family(family: str) -> str:
     return "train" if bucket < TRAIN_FRACTION else "heldout"
 
 
+FOLD_SALT = "vocello.qc.fold/1"
+
+
+def fold_for_family(family: str, k: int = 5) -> int:
+    """The cross-validation fold (0 to k-1) of a script family, fixed across every batch.
+
+    `qc.py fit` trains each fold's models without that fold's families, and `qc.py eval` scores a
+    take only with the models of its own family's fold, so no script is scored by a model that
+    heard it.
+    """
+
+    return int(store.sha256_text(f"{FOLD_SALT}:{family}")[:8], 16) % k
+
+
 def stratum(take: dict[str, Any]) -> str:
     return "|".join(str(take.get(key)) for key in ("language", "mode", "cell", "voice"))
 

@@ -1,19 +1,19 @@
 {
- "commit": "ab68894394895792fec4a9ca7e6af2891730e6e4",
- "createdAt": "2026-10-05T22:16:02Z",
+ "commit": "93c2fde6e6814aae98b73dd777e65a4815184a59",
+ "createdAt": "2026-10-05T22:22:39Z",
  "detectors": {
   "boundary.cutoff": {
    "class": "cutoff",
    "confirmations": {
     "failReady": false,
-    "flagged": 1,
+    "flagged": 3,
     "precision": {
-     "lower": 0.025,
-     "n": 1,
+     "lower": 0.1581,
+     "n": 2,
      "rate": 1.0,
      "upper": 1.0
     },
-    "uncertain": 0
+    "uncertain": 1
    },
    "languages": {
     "chinese": {
@@ -96,10 +96,10 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 1,
+    "flagged": 3,
     "precision": {
-     "lower": 0.025,
-     "n": 1,
+     "lower": 0.2924,
+     "n": 3,
      "rate": 1.0,
      "upper": 1.0
     },
@@ -186,12 +186,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 2,
+    "flagged": 5,
     "precision": {
-     "lower": 0.0126,
-     "n": 2,
-     "rate": 0.5,
-     "upper": 0.9874
+     "lower": 0.1466,
+     "n": 5,
+     "rate": 0.6,
+     "upper": 0.9473
     },
     "uncertain": 0
    },
@@ -282,12 +282,12 @@
    "class": "wrong-language",
    "confirmations": {
     "failReady": false,
-    "flagged": 2,
+    "flagged": 4,
     "precision": {
-     "lower": 0.1581,
-     "n": 2,
-     "rate": 1.0,
-     "upper": 1.0
+     "lower": 0.1941,
+     "n": 4,
+     "rate": 0.75,
+     "upper": 0.9937
     },
     "uncertain": 0
    },
@@ -378,14 +378,14 @@
    "class": "pause",
    "confirmations": {
     "failReady": false,
-    "flagged": 2,
+    "flagged": 3,
     "precision": {
      "lower": 0.0126,
      "n": 2,
      "rate": 0.5,
      "upper": 0.9874
     },
-    "uncertain": 0
+    "uncertain": 1
    },
    "languages": {
     "chinese": {
@@ -474,10 +474,10 @@
    "class": "unnatural",
    "confirmations": {
     "failReady": false,
-    "flagged": 1,
+    "flagged": 2,
     "precision": {
-     "lower": 0.025,
-     "n": 1,
+     "lower": 0.1581,
+     "n": 2,
      "rate": 1.0,
      "upper": 1.0
     },
@@ -653,9 +653,10 @@
  },
  "labelSet": {
   "batches": [
-   "confirm-1"
+   "confirm-1",
+   "confirm-2"
   ],
-  "confirmations": 5,
+  "confirmations": 10,
   "controls": {
    "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
    "runs": [
@@ -663,9 +664,9 @@
    ],
    "takes": 1600
   },
-  "takes": 5
+  "takes": 10
  },
- "labelSetDigest": "5837638f1336a2ebd267c696a413e1887dcd1b3c49a61aa8be9a256a4d514669",
+ "labelSetDigest": "1b821c2aa4fda11396dfded5c3954546f15d9b628e1f062b61c96b8708efe4c0",
  "levels": {
   "failPrecisionLower": 0.8,
   "humanReference": {
@@ -683,8 +684,8 @@
  "norms": "norms-v1.json",
  "rater": "maintainer",
  "replaces": {
-  "createdAt": "2026-10-05T21:48:58Z",
-  "labelSetDigest": "0cb402204d676ae8eabcfe90b862df2e84e92a4508b50c7d02b3cd43de13cef1"
+  "createdAt": "2026-10-05T22:16:02Z",
+  "labelSetDigest": "5837638f1336a2ebd267c696a413e1887dcd1b3c49a61aa8be9a256a4d514669"
  },
  "schema": "vocello.qc.eval/2",
  "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",

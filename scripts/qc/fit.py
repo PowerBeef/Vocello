@@ -1,5 +1,9 @@
 """Fit detector thresholds on one rater's labels; evaluate them out of fold, once per label set.
 
+This is the supervised path, for when labels accumulate. The default thresholds are calibrated on
+human recordings instead (`qc.calibrate`, `method: "human-reference"`); `evaluate` hands such a
+file to `qc.calibrate.evaluate`.
+
 `fit` joins the rater's labels (`build/private/qc/labels`) to the features of
 the `qc.py run` outputs (`build/private/qc/runs/*/features.json`), which must
 carry the current scoring identity (`qc.detectors.scoring_identity`), and
@@ -117,8 +121,10 @@ def label_rows(layout: Layout, batches: Iterable[str] | None = None, rater: str 
     """Every labelled primary item of one rater: token, script family (its cross-validation fold),
     split (recorded by the batch, unused by fit and eval), weight, probability sample or not, label.
 
-    Each row carries the configured severity bar (`fit.positiveMinSeverity`), which `positive` and
-    `usable` read.
+    Only `sample` batches are probability samples (weight 1 / inclusion probability); `queue`
+    batches and the chat confirmations (`confirm`) were chosen by the detectors, so they weigh 1
+    and are never evaluated as a sample. Each row carries the configured severity bar
+    (`fit.positiveMinSeverity`), which `positive` and `usable` read.
     """
 
     names = list(batches) if batches else label.batch_names(layout)
@@ -168,7 +174,9 @@ def usable(label_row: dict[str, Any], class_id: str) -> bool:
     """Whether the label says yes or no about this class.
 
     Acoustic-only labels say nothing about the linguistic classes; a tick below the severity bar
-    (mild, by default) and an uncertain verdict without a qualifying tick count on neither side.
+    (mild, by default), an uncertain verdict without a qualifying tick, and an objectionable
+    verdict with no class ticked at all (a chat confirmation's "unusable": a defect of unknown
+    class) count on neither side.
     """
 
     if label_row["label"].get("acousticOnly") and class_id in LINGUISTIC:
@@ -177,7 +185,10 @@ def usable(label_row: dict[str, Any], class_id: str) -> bool:
         return True
     if _severity(label_row, class_id) > 0:
         return False
-    return label_row["label"].get("verdict") != "uncertain"
+    verdict = label_row["label"].get("verdict")
+    if verdict == "objectionable" and not label.defect_present(label_row["label"]):
+        return False
+    return verdict != "uncertain"
 
 
 # --- the fit ------------------------------------------------------------------------
@@ -504,12 +515,16 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
 
     thresholds = thresholds or latest_thresholds(layout)
     if thresholds is None or not thresholds.is_file():
-        raise FitError("no thresholds file (run qc.py fit, then commit it)")
+        raise FitError("no thresholds file (run qc.py calibrate or qc.py fit, then commit it)")
     if not committed_unchanged(layout.root, thresholds):
         raise FitError(f"{thresholds.name} is not committed unchanged; commit it before the evaluation")
     document = store.read_json(thresholds)
     version = document["version"]
     output = layout.root / "benchmarks/qc" / f"eval-v{version}.json"
+    if document.get("method") == detector_lib.HUMAN_REFERENCE:
+        from qc import calibrate  # qc.calibrate imports this module
+
+        return calibrate.evaluate(layout, thresholds, document, output, batches=batches, runs=runs, rater=rater)
     if output.exists():
         raise FitError(f"{output.name} exists: a thresholds version is evaluated once")
     validation = document.get("crossValidation") or {}

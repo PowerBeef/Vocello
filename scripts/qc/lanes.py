@@ -13,10 +13,12 @@ writes these files under `build/private/qc/runs/<run-id>/`:
 - `flags.json`: the flags, each with its level and its evidence
   `{feature, value, start, end}`.
 
-The level comes from the evaluation of the newest thresholds file, applied only
-when the thresholds were fitted on the same model identities and scoring
-identity as the run. Otherwise, and before an evaluation exists, every flag is
-report-only and `flags.json` (and `gate`) state why.
+The level comes from the evaluation of the newest thresholds file (calibrated
+on human controls or fitted on labels), applied only when the thresholds were
+made on the same model identities and scoring identity as the run. Otherwise,
+and before an evaluation exists, every flag is report-only and `flags.json`
+(and `gate`) state why. Under human-reference thresholds, a flag of a language
+the controls gave no reference (the provisional rule) stays report-only.
 
 A lane named in the `lanes` map of `config/qc/detectors.json` runs its own roles
 by default, and its gate reads only the detectors those roles (or the WAV alone)
@@ -275,7 +277,8 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
         reason = f"{thresholds_path.name} has no evaluation"
     names = detector_lib.feature_names(config)
     run_norm = detector_lib.normalization(rows, names)
-    norm = thresholds["normalization"] if applicable else run_norm
+    # A human-reference file has no z-score statistics: its fallbacks rank on the run's own.
+    norm = thresholds.get("normalization", run_norm) if applicable else run_norm
     gated = detector_lib.gated_detectors(config, lane)
     pool_norms = norms_lib.load(layout)  # the provisional rules' per-language percentiles
     out_takes, errors = [], []
@@ -298,9 +301,12 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
                     errors.append({"token": row["token"], "detector": detector["id"], "reason": "missing-inputs"})
                 continue
             if outcome["cut"] is not None and outcome["score"] >= outcome["cut"]:
+                if (fitted or {}).get("method") == detector_lib.HUMAN_REFERENCE \
+                        and outcome["scope"] != detector_lib.HUMAN_REFERENCE:
+                    level = "report-only"  # no human reference in this language: the provisional rule
                 flag = {"detector": detector["id"], "class": detector["class"], "level": level,
                         "score": round(outcome["score"], 6), "cut": outcome["cut"], "scope": outcome["scope"],
-                        "evidence": detector_lib.evidence(detector, row["features"])}
+                        "evidence": outcome.get("evidence") or detector_lib.evidence(detector, row["features"])}
                 if outcome.get("rule"):
                     flag["rule"] = outcome["rule"]
                 flags.append(flag)
@@ -314,15 +320,16 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     return {
         "schema": FLAGS_SCHEMA, "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "thresholds": thresholds_path.name if thresholds_path else None, "thresholdsApplied": applicable,
+        "thresholdsMethod": thresholds.get("method", "logistic") if applicable else None,
         "thresholdsReason": reason, "scoringSHA256": scoring["sha256"], "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
     }
 
 
 def _thresholds_mismatch(thresholds: dict[str, Any], identities: dict[str, Any], scoring_sha: str) -> str | None:
-    """Why a thresholds file does not apply to a run, or None when it does: it was fitted with
-    other scoring code, configuration or norms, or on another identity of a model the run has
-    results of."""
+    """Why a thresholds file (fitted on labels or calibrated on human controls) does not apply to a
+    run, or None when it does: it was made with other scoring code, configuration or norms, or on
+    another identity of a model the run has results of."""
 
     if thresholds.get("scoringSHA256") != scoring_sha:
         return f"was fitted with other {fit_lib.SCORING_CHANGED}"

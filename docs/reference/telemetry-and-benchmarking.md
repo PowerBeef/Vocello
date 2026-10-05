@@ -802,7 +802,7 @@ dropouts, garbled words, "sounds worse"). Three layers, increasing in what they 
    punctuation pause budget; an excess (flag `dropout:excessN`, followed by the long-pause count over the budget in parentheses; ≥2 fail, 1 warn) or a
    single egregious gap (≥1200 ms fail, ≥900 ms warn) flags. The regimes and their calibration
    history live in `makeAudioQCReport`; a threshold changes only on labelled evidence (QC v2 owns
-   the maintainer's labels and their held-out evaluation, [`qc.md`](qc.md)), and a warning is
+   the maintainer's labels and confirmations and their evaluation, [`qc.md`](qc.md)), and a warning is
    never cleared by a subjective waiver.
    In v5 `audioQC` also reports **defect sample offsets** for debugging: `firstNonFiniteSample`,
    `firstClipSample`, and `longestSilenceStartMS`. In verbose mode the streaming path captures

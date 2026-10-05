@@ -1,16 +1,19 @@
 # Audio QC v2
 
-QC v2 is the audio QC harness, rebuilt on 2026-10-01. It is calibrated on the maintainer's labels:
+QC v2 is the audio QC harness, rebuilt on 2026-10-01. It is calibrated on human recordings and checked by the maintainer's ears:
 - a few strong specialist models score every take: two speech recognition (ASR) families, two phone recognizers and a G2P; for clones only, two pitch trackers and a speaker embedder;
 - small detectors turn their outputs into flags with time-localized evidence;
-- every detector is first measured on human read speech (the controls), where it should almost never flag;
-- thresholds are fitted on the labels and evaluated once per label set out of fold: each labelled take is scored by a model fitted without its script family.
+- every detector is calibrated on human read speech (the controls): its cut lets about 1% of human recordings reach it, and speakers the calibration never saw measure that rate (see [Calibration on human controls](#calibration-on-human-controls));
+- the maintainer hears only flagged takes and answers "usable" or "unusable" in chat; those confirmations measure each detector's precision (see [Chat confirmation](#chat-confirmation));
+- once labels accumulate, thresholds can also be fitted on them and evaluated out of fold, once per label set (see [Supervised fit](#supervised-fit-when-labels-accumulate)).
+
+The maintainer cannot label a hundred clips by ear, so on 2026-10-05 the calibration moved from labels to human controls; the supervised fit stays for later.
 
 Everything runs locally on the Mac, one model at a time, and no model weights enter Git.
 
 ## Why v2
 
-The v1 harness missed defects the maintainer heard at once: clone pitch drift, cut-offs, accented French and the broken syllables of `fr-0101--dylan`. Its synthetic injectors often did not carry the defect they were named for, so detectors qualified on positives that were not positive. Its pitch tracker, pYIN, dropped voicing across pitch steps, the very breaks it was meant to find. No judge measured phonemes, so the ASR families turned stutters and mispronunciations into plausible words. And its ground truth never came from the maintainer's ears; v2 fits every detector on his labels instead.
+The v1 harness missed defects the maintainer heard at once: clone pitch drift, cut-offs, accented French and the broken syllables of `fr-0101--dylan`. Its synthetic injectors often did not carry the defect they were named for, so detectors qualified on positives that were not positive. Its pitch tracker, pYIN, dropped voicing across pitch steps, the very breaks it was meant to find. No judge measured phonemes, so the ASR families turned stutters and mispronunciations into plausible words. And its ground truth never came from the maintainer's ears; v2 calibrates every detector on human recordings and checks its flags against his ears instead.
 
 ## What v2 measures, and from which report
 
@@ -49,10 +52,13 @@ All commands go through `python3 scripts/qc.py`.
 | `language-bench evidence --run QC_RUN --output FILE` | Writes the two ASR families' recognitions of a QC run for the language publisher, with each take's two-family verdict. Exits 0 when every take met its outcome, 1 when one did not, and 2 when a recognition is missing. |
 | `gate --lane NAME [--run ID]` | Exits 0 pass, 3 warn, 1 fail, or 2 error (no run, or a gating detector missing its inputs). |
 | `queue --top N [--run ID] [--batch NAME]` | Writes the most suspicious unlabelled takes of a run as a label batch, which `label serve --batch NAME` opens. |
-| `fit [--batches …] [--runs …] [--rater ID] [--reuse-reason TEXT]` | Fits the detectors per script-family fold and on every label, and writes `config/qc/thresholds-v<N>.json`. |
-| `eval [--thresholds FILE] [--rater ID]` | Scores every labelled sample take out of fold against a committed thresholds file, once per label set, and writes `benchmarks/qc/eval-v<N>.json`. |
+| `calibrate --controls <controls runs…> [--runs <generated runs…>] [--quantile 0.99] [--min-controls 150] [--reuse-reason TEXT]` | Calibrates the detectors on human recordings, with no label, and writes `config/qc/thresholds-v<N>.json` (`method: "human-reference"`; see [Calibration on human controls](#calibration-on-human-controls)). `--runs` adds the share of generated takes each reference would flag. |
+| `confirm next --run ID [--n 5] [--languages french,english] [--name NAME]` | Copies up to `--n` takes the run flagged under neutral names for the maintainer to hear, blind, and writes them as a confirm batch (see [Chat confirmation](#chat-confirmation)). Never a clone or a human control. |
+| `confirm record --batch NAME --answers "1=x,2=u,3=?" [--classes "1=devoiced:severe,pause:moderate"]` | Records the answers as labels: `x` unusable, `u` usable, `?` unsure. |
+| `fit [--batches …] [--runs …] [--rater ID] [--reuse-reason TEXT]` | The supervised path, for when labels accumulate: fits the detectors per script-family fold and on every label, and writes `config/qc/thresholds-v<N>.json`. |
+| `eval [--thresholds FILE] [--batches …] [--runs …] [--rater ID]` | Evaluates a committed thresholds file once per label set and writes `benchmarks/qc/eval-v<N>.json`: a calibration on its human false alarms and the confirmations, a fit on every labelled sample take out of fold (see [Levels](#levels)). |
 | `norms --takes <qc-takes runs…> [--min-count 100] [--dry-run]` | Measures per-language pause, pace and ending percentiles from the pool's audio and cached results, and writes `config/qc/norms-v<N>.json` (see [Per-language norms](#per-language-norms)). |
-| `controls build [--sources mls:french libritts-r:english] [--per-language 150]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. |
+| `controls build [--sources mls:french libritts-r:english] [--per-language 150] [--per-speaker 3]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. The [corpora per language](#calibration-on-human-controls) cover eight languages. |
 | `controls report --runs <controls runs…> [--generated <runs…>]` | Each detector's flag rate on the human controls (with bounds) beside the generated takes', and every feature's p50 and p90. |
 
 ## Models and runtimes
@@ -107,7 +113,7 @@ The venvs are built from v2's own copy of the pinned standalone CPython (`cpytho
 Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].json`.
 - **Variant key:** G2P and speaker results also depend on the take's text, language and reference clip. `qc.store.variant_key` hashes those three into the variant key, and the job hands it to the runner as `variantKey`.
 - **Runner identity:** `runnerSHA256` digests the runner file and the `qc` modules it imports (transitively, helpers such as `runners/_kit.py` and `runners/speech_common.py` included), the registry `version` and every pin. Changing any of them re-scores that model's takes, and only that model's: a `qc/phones.py` edit re-runs the phone recognizers and the G2P only. A package name (`from qc import phones`) adds no file, so editing the command line, features, detectors or lanes re-scores nothing.
-- **Scoring identity:** `qc.detectors.scoring_identity` digests `config/qc/detectors.json`, the scoring code (`qc/features.py`, `qc/detectors.py`, `qc/phones.py`, `qc/pitch.py`) and the newest norms file. Runs record it in `features.json`; thresholds apply only to features scored by the same code, configuration and norms, and `run` otherwise stays report-only and says why.
+- **Scoring identity:** `qc.detectors.scoring_identity` digests `config/qc/detectors.json`, the scoring code (`qc/features.py`, `qc/detectors.py`, `qc/phones.py`, `qc/pitch.py`) and the newest norms file. The human-reference score (its percentile rank and quantile grid) lives in `qc/detectors.py`, so it is scoring code too. Runs record the identity in `features.json`; thresholds apply only to features scored by the same code, configuration and norms, and `run` otherwise stays report-only and says why. A change to any of them is a new identity: rerun `run` on the controls and the pool (their model results come from the cache) before the next `calibrate`.
 
 ## Detectors
 
@@ -121,7 +127,7 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 | `pitchA`, `pitchB` | Two pitch trackers (clones only). |
 | `speaker` | Speaker embeddings (clones only). |
 
-`config/qc/detectors.json` also lists the detectors: eight for every take and two for clones. Each detector reads one to four features (`qc.features`), oriented so that higher means worse, through an L2 logistic once fitted. Every feature carries its evidence span (`start`, `end`). A detector with `gateLanes` gates only in those lanes: the two clone detectors gate only in `clone-lane`.
+`config/qc/detectors.json` also lists the detectors: eight for every take and two for clones. Each detector reads one to four features (`qc.features`), oriented so that higher means worse. Calibrated on human controls, its score is the take's largest human percentile among those features; fitted on labels, an L2 logistic over them. Every feature carries its evidence span (`start`, `end`). A detector with `gateLanes` gates only in those lanes: the two clone detectors gate only in `clone-lane`.
 
 | Detector | Class | Features |
 |---|---|---|
@@ -138,20 +144,20 @@ Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].
 
 **The ending** is measured and reported, never a detector: from 10 ms levels (the file's end padded at −60 dB, levels clamped at −100 dB), the drop within 60 ms of the final peak, the tail from 10 dB below the peak down to −60 dBFS and the decay slope; on human recordings that signature (a drop and a short tail) flags 5% of French and 47% of English files, which describes how files are trimmed. `end.file_tail_seconds`, the time from the last speech frame to the file's end, is the trimming check. A cut-off needs content evidence (`boundary.cutoff`).
 
-**Provisional rules.** A detector the labels have not fitted yet scores with its `provisional` rule, when it has one, and flags at report-only. A rule reads the take's language's percentiles from the newest `config/qc/norms-v<N>.json` and falls back to its fixed value when there is no norms file, or the file lacks that language:
+**Provisional rules.** A detector neither calibrated nor fitted for a take's language scores with its `provisional` rule, when it has one, and flags at report-only. A rule reads the take's language's percentiles from the newest `config/qc/norms-v<N>.json` and falls back to its fixed value when there is no norms file, or the file lacks that language:
 - `pause.anomalous`: the pause is over the language's p99 of every within-sentence pause, and at least 0.5 s (0.5 s without norms); and the excerpt test heard no phone in it.
 - `prosody.rate`: the phones per second are under the language's p1 or over its p99. Without norms it has no rule.
 - `level.loudness`: the loudness is more than 4 LU from −23 LUFS, or the true peak is above −1 dBTP.
 - `content.phoneme`: at least 2 repeated-syllable runs, or a phone insertion rate of at least 0.2. With ZIPA alone this flags 9.7% of human French recordings (FLEURS): ZIPA prints silent letters native speakers do not say. The insertion rate and repeat runs therefore count only insertions both phone recognizers hear.
 
-The rules live in `detectors.json`, not in a thresholds file, so a fit never has to carry them. A condition names its `norm` percentile (of its own feature or of `normFeature`) and bounds it with `atLeast` or `atMost`; each flag records the threshold it met and the norm behind it. `fit` replaces the rules once labels exist.
+The rules live in `detectors.json`, not in a thresholds file, so a calibration or a fit never has to carry them. A condition names its `norm` percentile (of its own feature or of `normFeature`) and bounds it with `atLeast` or `atMost`; each flag records the threshold it met and the norm behind it. A calibration replaces the rules in the languages its controls cover; Japanese and Russian, without controls, keep them.
 
 **The excerpt test.** Speech and phone recognizers fill in words and phones over zeroed audio inside a sentence, so silencing a pause and transcribing again proves nothing. Instead:
 1. For every take whose longest pause reaches 0.4 s (`excerptMinGapSeconds`), `run` cuts the pause, 40 ms inside its edges, into a WAV of its own: `build/cache/qc/work/excerpts/<audioSHA256>-<startMs>-<endMs>.wav`.
 2. Both phone recognizers run on that excerpt alone, with no speech around it to lean on.
 3. `pause.excerpt_phones` is the most phones either recognizer hears there at probability 0.5 or more (`excerptPhoneMinProb`), breath-like /h/ and /ɦ/ aside (`excerptIgnorePhones`). Zero says the pause holds no speech sound; the floor is checked on the human controls.
 
-Before any fit, a detector without a rule scores uncalibrated (its largest oriented z-score), which ranks the queue but never flags.
+Without a calibration or a fit for the take's language, a detector without a rule scores uncalibrated (its largest oriented z-score), which ranks the queue but never flags.
 
 The synthetic test case reproduces fr-0101--dylan as the review measured it: a /t/ closure, a 0.35 s whispered syllable, then a 0.8 s pause with one voiced blip. The pause rule must measure the 0.8 s pause, not the whisper, and a 0.25 s pause must pass (`scripts/tests/test_qc_detectors.py`).
 
@@ -198,13 +204,68 @@ The pool's own defects shape these choices:
 
 Run `norms` after the pool's G2P role, with the onnx runtime set up from the current pins, so Japanese has its reading. Any later run writes the next version, and the rules read the newest.
 
-## Calibration and levels
+## Calibration on human controls
+
+The default thresholds need no label: they are calibrated on people reading aloud (maintainer decision, 2026-10-05).
+
+**The controls.** `controls build` samples human read speech per language from the extracted speaker corpora (`config/audio-qc-corpora.json`), at most `--per-speaker` clips per speaker, and `run --lane controls` scores it with the qc-takes roles.
+
+| Language | `--sources` | Notes |
+|---|---|---|
+| French, German, Spanish, Italian, Portuguese | `mls:<language>` (Multilingual LibriSpeech) | Audiobook passages of 11-20 s, several sentences, lossy-coded. Portuguese has 46 speakers, so 150 clips need `--per-speaker 4`. |
+| English | `libritts-r:english` | Single punctuated sentences, restored audio. |
+| Chinese | `aishell3-subset:chinese` | The pinned AISHELL-3 test subset (76 speakers). |
+| Korean | `zeroth-korean:korean` | Zeroth-Korean. |
+| Japanese, Russian | none | No pinned corpus: they keep their provisional rules, report-only. |
+
+All eight in one manifest: `controls build --sources mls:french mls:german mls:spanish mls:italian mls:portuguese libritts-r:english aishell3-subset:chinese zeroth-korean:korean --per-speaker 4`.
+
+**The MLS caveat.** An MLS clip is a passage of several sentences with an unpunctuated transcript, so its longest pause is often the pause between two sentences (French median 0.82 s, p90 1.52 s), where a generated take reads one sentence. The pause references of the five MLS languages are therefore loose: a pause too long inside one sentence can still sit within their human range. LibriTTS-R's single sentences give English tight pause references.
+
+**`calibrate`** reads the controls runs' `features.json` and `takes.json`. It refuses a run of another lane, a take not marked a human control, runs that disagree on a model or scoring identity, and controls scored with another scoring identity than the current. Per detector and language with at least `--min-controls` (150) human recordings that measure one of its features:
+- **Speaker-disjoint halves.** A fixed hash of each recording's speaker family (`sha256("vocello.qc.calibrate/1:" + family)`) puts it in the calibration half or the check half, so no speaker sits on both sides.
+- **The reference.** Each feature measured on at least 30 calibration recordings gets a quantile table of its oriented values: percentiles 0 to 100 by 0.5, and 99 to 100 by 0.05, to six significant digits. A feature no control measures (the engine's finish reason: a person has none) is `unreferenced` and ignored; one measured on fewer than 30 calibration recordings of a language is unreferenced there.
+- **The score.** A take's score is its largest human percentile among the referenced features it measured: the share of the calibration half below its value, interpolated on the table. A tie ranks at the bottom of its run, so a feature most people hold at zero adds nothing at zero, and a value beyond every human scores 1. A missing feature is ignored; a take that measured none has no score (a gating detector then reports missing inputs). The flag's evidence is the feature that reached the score, with its value, its human percentile and its span.
+- **The cut.** The lowest score that at most 1 − `--quantile` (1%) of the calibration half reach. With a tie at the top, or (at the default quantile) fewer than 100 calibration recordings, it is 1: a take flags only beyond every calibration recording on some feature.
+- **The check.** The check half, which shaped neither the tables nor the cut, gives the human false-alarm rate at the cut, with Clopper-Pearson bounds.
+- **Report-only.** The advisory loudness detector and the clone detectors (`prosody.pitch`, `identity.drift`: their features need a clone's reference clip) keep their provisional rules, report-only, and so does every language without enough controls; the file records why.
+- `--runs` adds, per detector and language, the share of generated takes the reference would flag (informational).
+
+The thresholds file (`vocello.qc.thresholds/2`, `method: "human-reference"`) records the scoring and model identities, the controls runs with their counts per language and source and their digest, the quantile, and per detector its features and unreferenced ones and, per language, the quantile tables, the cut and the calibration, check and generated rates. It holds aggregates only, never a take id, path or text, and its quantile tables stay one line each (about 270 KB for eight languages). Commit it, then run `eval`.
+
+With 150 controls per language, a check half holds about 75 recordings, and a warn needs no human false alarm there (one in 75 bounds the rate at 7.2%); 300 controls per language allow up to three in 150.
+
+## Chat confirmation
+
+The maintainer hears only flagged takes, a few at a time, and answers in chat:
+1. `confirm next --run <generated run>` picks up to `--n` (5) takes the run flagged with a detector that has a class (a loudness flag alone never sends a take). It prefers `--languages` (French and English), then the others, and spreads over detectors: round-robin by detector, the highest score first.
+2. It never sends a human control, a clone take (mode `clone`, or any take with a reference clip: corpus-voice clones are internal-only and are never sent) or a take already answered in a confirm batch, and refuses a controls run.
+3. It writes a `kind: "confirm"` label batch (`build/private/qc/batches/<name>.json`, default name `confirm-<NNN>`), copies each WAV to `build/private/qc/confirm/<name>/<k>.wav`, and prints each take's number, file, language and script.
+4. **Blind:** it shows no detector, score, voice or take id. The batch keeps the flagging detectors (`reasons`) for the record.
+5. The maintainer hears each take in full and answers per number: `x` unusable, `u` usable, `?` unsure. `confirm record --batch <name> --answers "1=x,2=u,3=?"` writes them to `labels/<name>.jsonl` as the listening page writes labels: verdict objectionable, acceptable or uncertain, the protocol's rater, `playedFraction` 1.0 (he attests hearing each take in full), the protocol digest and no class. `--classes "1=devoiced:severe,pause:moderate"` ticks the classes he names. An unknown take number, a bad answer or class, or a batch that is not a confirm batch is refused before anything is written.
+
+The confirmations measure each detector's precision (see [Levels](#levels)). The supervised fit reads them like queue labels, never as a probability sample, and an unusable answer without a class counts on neither side of any class.
+
+## Levels
+
+`run` takes each flag's level from the evaluation of exactly the thresholds file it scored with. Without one, every flag is report-only, so `gate` passes. Under human-reference thresholds, a flag of a language without a reference (the provisional rule) stays report-only.
+
+**A calibration's evaluation.** `eval` on a human-reference file re-measures the check half on the controls runs the file names, and refuses them if their digest changed or they no longer reproduce the recorded rates. It reads the confirm batches' labels (`--batches`, `--rater`) and scores each confirmed take on its newest features (`--runs`, of the file's scoring and model identities). Each detector earns a level per language:
+- **warn:** the check half's human false-alarm rate is at most 2% and its Clopper-Pearson upper bound at most 6% (`levels.humanReference.warnFalseAlarmRate` and `warnFalseAlarmUpper` in `config/qc/detectors.json`).
+- **fail:** warn, and among the confirmed takes the detector flagged in any language (pooled), at least 17 usable or unusable answers (`levels.humanReference.failMinConfirmed`; unsure answers count on neither side) with a precision lower bound of at least 0.8 (`levels.fail.precisionLower`). Seventeen unusable answers out of seventeen is the smallest count that reaches it. Precision counts an unusable take as a true flag of every detector that flagged it.
+- **report-only:** otherwise.
+
+The label set is the confirmations plus the controls' digest. `eval` refuses a thresholds file that is not committed unchanged and a label set an earlier evaluation already scored (in `benchmarks/qc/eval-v*.json` or the private `eval-ledger.jsonl`), unless the calibration declared `--reuse-reason`. New confirmations make a new label set, which `eval` scores on the same thresholds version: it replaces `eval-v<N>.json` and records the digest it replaces, since the cuts never learn from confirmations. The evaluation holds aggregates only: per detector and language the human false alarms and the level, and per detector the pooled confirmation precision (n, rate, bounds).
+
+## Supervised fit (when labels accumulate)
+
+The supervised path stays for when labels accumulate; its file replaces a calibration as the newest thresholds version.
 
 **`fit`** joins one rater's labels to the newest features per take from `build/private/qc/runs/*/features.json` (the controls lane aside), and refuses runs of different runner or scoring identities.
 - Each detector gets an L2 logistic on per-language z-scores.
 - The cut is the one that maximizes the weighted F1.
 - The fit is per language when that language has at least 60 clean and 20 positive takes. Otherwise, one pooled model covers it, from 10 positives up (`pooledMinPositive`); below that the detector keeps its provisional rule.
-- A class counts as a defect at `fit.positiveMinSeverity` or worse (moderate). A tick below that bar (mild) counts on neither side for that class, nor does an uncertain verdict without a qualifying tick. A clean take is acceptable with no class ticked.
+- A class counts as a defect at `fit.positiveMinSeverity` or worse (moderate). A tick below that bar (mild) counts on neither side for that class, nor does an uncertain verdict without a qualifying tick, nor an objectionable verdict with no class ticked (an unusable confirmation). A clean take is acceptable with no class ticked.
 - `fit` and `eval` read one rater's labels (`--rater`, default the protocol's); other JSON files in `batches/` are skipped.
 - **Out of fold:** script families fall into `crossValidationFolds` (5) folds by a fixed hash (`label.fold_for_family`). Each fold's detectors are fitted on every label outside it, and the final detectors on every label. The stored 60/40 `split` plays no part.
 - Weights are 1 / inclusion probability, so the enrichment does not bias the fit.
@@ -213,21 +274,19 @@ Run `norms` after the pool's G2P role, with the onnx runtime set up from the cur
 The thresholds file (`vocello.qc.thresholds/2`) records the model identities, the scoring identity, the rater, each fold's label-set digest and detectors, and the final detectors. Every fit writes a new version.
 
 **`eval`** refuses a thresholds file that is not committed unchanged, a version that has already been scored, features scored with other runners or scoring code, and a label set an earlier evaluation already scored (in `benchmarks/qc/eval-v*.json` or the private `eval-ledger.jsonl`), unless the fit declared `--reuse-reason`.
-- It scores every labelled probability-sample take with its own fold's model; queue batches are excluded.
+- It scores every labelled probability-sample take with its own fold's model; queue and confirm batches are excluded.
 - It writes aggregates only: per detector and language, weighted precision and recall with Clopper-Pearson bounds on the Kish effective size, the clean false-alarm rate, and kappa. It also writes the intra-rater kappa per batch.
 
-Each detector earns a level per language:
+Each fitted detector earns a level per language:
 - **warn:** the precision lower bound is at least 0.6 and the recall at least 0.6.
 - **fail:** the precision lower bound is at least 0.8 and the clean false-alarm upper bound at most 5%. A fail needs about 72 clean labelled takes in that language with no false alarm.
 - **report-only:** otherwise.
-
-`run` takes each flag's level from the evaluation of exactly the thresholds file it scored with. Without one, every flag is report-only, so `gate` passes.
 
 ## Lanes
 
 The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` runs them by default; a lane the map does not name, such as `pool`, runs every role. A lane's gate reads only the detectors with a feature it can measure, from the WAV alone or from the roles it runs, and the clone detectors only in `clone-lane` (`gateLanes`); the others stay report-only in that lane. A take marked `control` (a negative control, or a human recording) is scored and flagged, but always at report-only.
 
-**Human controls.** `controls build` samples human read speech from the extracted speaker corpora (MLS for French, LibriTTS-R for English; 150 per language, at most 3 clips per speaker), and `run --lane controls` scores it with the qc-takes roles. The controls lane never feeds `fit`, `queue` or norms. `controls report` gives each detector's flag rate on the controls beside the generated takes': a provisional rule should flag at most 5% of human recordings per language before it is trusted, and a fit should sit above the controls' own floor (human French has a median ZIPA phone error rate of 0.15).
+**Human controls.** `controls build` samples human read speech from the extracted speaker corpora (by default MLS for French and LibriTTS-R for English; 150 per language, at most 3 clips per speaker; see [the corpora per language](#calibration-on-human-controls)), and `run --lane controls` scores it with the qc-takes roles. The controls lane feeds `calibrate` only, never `fit`, `queue`, `confirm` or norms. `controls report` gives each detector's flag rate on the controls beside the generated takes': a provisional rule should flag at most 5% of human recordings per language before it is trusted, and a fit should sit above the controls' own floor (human French has a median ZIPA phone error rate of 0.15).
 
 **Controls results (2026-10-02, 300 human takes against batch-1's 96, under `norms-v1`):**
 
@@ -239,7 +298,7 @@ The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` run
 | `level.loudness` (advisory) | 37% | 100% | 43% |
 
 - `content.phoneme` with two-recognizer agreement flags 0.7% of human French, where ZIPA alone flagged 9.7% (FLEURS, external review).
-- The French pause figure is not a like-for-like control: MLS clips are 11-20 s audiobook passages of several sentences (median 35 words, transcripts without punctuation), so their longest pause is often between sentences (median 0.82 s, p90 1.52 s). The English clips are single punctuated sentences (median 17 words, longest pause median 0.17 s), and the rule flags none of them. The French pause rule stays unvalidated until the labels.
+- The French pause figure is not a like-for-like control: MLS clips are 11-20 s audiobook passages of several sentences (median 35 words, transcripts without punctuation), so their longest pause is often between sentences (median 0.82 s, p90 1.52 s). The English clips are single punctuated sentences (median 17 words, longest pause median 0.17 s), and the rule flags none of them. The French pause reference stays loose (see the MLS caveat in [Calibration on human controls](#calibration-on-human-controls)).
 - `level.loudness` measures how a recording was mastered against −23 LUFS, not a defect; it is advisory, never gates and never ranks the listening queue.
 
 | Lane | Script | Roles | What it does with QC v2 |
@@ -247,7 +306,7 @@ The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` run
 | `language-bench` | `scripts/macos_test.sh lang-bench` | `asrA`, `asrB`, `g2p`, `phones`, `phonesB` | `language-bench takes`, then `run`, `language-bench evidence` (the verdict line `spoken_content`) and `gate` (`audio_qc_gates`). The evidence feeds `publish_benchmark_history.py language --recognitions`. |
 | `ios-language-bench` | `scripts/ios_device.sh lang-bench` | the same | The same, on the Mac over the collected iPhone takes, beside Apple Speech's in-app gate. |
 | `qc-takes` | `scripts/macos_test.sh qc-takes` | the same | `run` over the generated take pool, then `queue --top 50`; the summary joins the verdict, and a failure to compute it never fails the generation. |
-| `controls` | `qc.py controls build`, then `run --lane controls` | the same | Human read speech: every flag is report-only, and the lane never feeds `fit`, `queue` or norms. |
+| `controls` | `qc.py controls build`, then `run --lane controls` | the same | Human read speech: every flag is report-only; the lane feeds `calibrate`, never `fit`, `queue`, `confirm` or norms. |
 | `clone-lane` | `scripts/clone_fidelity_lane.py` | `speaker`, `pitchA`, `pitchB` | Every take against the voice's reference clip; the clone takes gate, the controls measure the identity separation. |
 | `voice-reliability` | `scripts/voice_identity_language_reliability.py analyze` | `speaker`, `pitchA`, `pitchB` | Clone takes against their reference; reported, never gated. |
 
@@ -263,7 +322,7 @@ The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` run
 
 The batch also gets:
 - **Inclusion probabilities:** each take's probability is recorded, and the evaluation reweights by it.
-- **A family split:** script families split 60/40 by a fixed hash of the script id. Fitting no longer reads it: evaluation is out of fold by the same families (see [Calibration and levels](#calibration-and-levels)).
+- **A family split:** script families split 60/40 by a fixed hash of the script id. Fitting no longer reads it: evaluation is out of fold by the same families (see [Supervised fit](#supervised-fit-when-labels-accumulate)).
 - **Blind repeats:** about 10% of the takes come back later under a second token, for intra-rater agreement.
 
 The page shows one take at a time:
@@ -307,15 +366,16 @@ Re-labelling appends a new line, and the latest line per rater and token wins; a
 | `build/cache/qc/runtimes/{mlx,onnx,torch}/` | The runner venvs. |
 | `build/cache/qc/runtimes/python/` | The pinned interpreter copy. |
 | `build/cache/qc/results/<id>/` | Runner results and `runs.jsonl`; `results/g2p/` is the G2P text cache. |
-| `build/private/qc/batches/<name>.json` | Label batches: token to take, split, order and inclusion probability. |
-| `build/private/qc/labels/<batch>.jsonl` | The maintainer's labels, append-only. |
+| `build/private/qc/batches/<name>.json` | Label batches (`kind` `sample`, `queue` or `confirm`): token to take, split, order and inclusion probability. |
+| `build/private/qc/labels/<batch>.jsonl` | The maintainer's labels and chat confirmations, append-only. |
+| `build/private/qc/confirm/<batch>/<k>.wav` | The takes a confirm batch sends, under neutral names. |
 | `build/private/qc/jobs/` | Runner jobs and logs. A job that succeeds removes them; a failed one keeps them. |
 | `build/cache/qc/work/excerpts/` | Pause excerpts for the excerpt test. |
 | `build/private/qc/manifests/` | Takes manifests (the controls, a batch's takes); never read as batches. |
 | `build/private/qc/eval-ledger.jsonl` | The label sets each evaluation scored (tokens), so a deleted eval file cannot hide a re-run. |
 | `build/private/qc/runs/<run-id>/` | `takes.json`, `features.json` and `flags.json` of each `qc.py run`. |
 | `build/private/qc/queues/` | The listening queues `queue` writes. |
-| `config/qc/thresholds-v<N>.json`, `benchmarks/qc/eval-v<N>.json` | Fitted thresholds and their one out-of-fold evaluation, both committed. |
+| `config/qc/thresholds-v<N>.json`, `benchmarks/qc/eval-v<N>.json` | Thresholds calibrated on human controls (or fitted on labels) and their evaluation, both committed. |
 | `config/qc/norms-v<N>.json` | Per-language percentiles for the provisional rules, committed; aggregates only. |
 
 `build/cache/qc` (`qc-cache`) is re-creatable from the registry and pins; `qc.py models prune` removes what the registry no longer lists. `build/private/qc` (`qc-private`) is preserved by every cleanup. Both are registered in `config/build-output-policy.json` and git-ignored under `build/`. Labels, transcripts and take paths never enter Git; only aggregates and digests are committed.

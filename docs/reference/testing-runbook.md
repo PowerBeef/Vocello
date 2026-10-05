@@ -34,7 +34,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Benchmark operation / publication | [Benchmarking procedure](benchmarking-procedure.md) | Exact-source qualified PASS only; no automatic Git changes |
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
 | Delivery bench | [Benchmarking procedure §4.6](benchmarking-procedure.md#46-delivery--prosody-cells) | Paired instructed/neutral takes with fail-closed instruction receipts; acoustic effects, not listener-proven delivery |
-| Audio QC | [QC v2](qc.md) | Models run one at a time after TTS exits; detectors fit on the maintainer's labels, thresholds frozen before the held-out evaluation |
+| Audio QC | [QC v2](qc.md) | Models run one at a time after TTS exits; detectors calibrated on human recordings and checked by the maintainer's confirmations of flagged takes, thresholds frozen before the evaluation |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate or contract changes | [Development workflow](development-workflow.md), `.claude/rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 

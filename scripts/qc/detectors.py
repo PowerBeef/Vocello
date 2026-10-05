@@ -1,12 +1,20 @@
 """Detectors: `config/qc/detectors.json`, feature normalization and scoring.
 
-Each detector reads at most four features and maps them to one score, its
-`method`: `logistic`, an L2 logistic over the features' per-language z-scores
-(oriented so that higher means more defective), fitted per language when the
-labels allow, else pooled (`*`).
+Each detector reads at most four features, oriented so that higher means more
+defective, and maps them to one score. A thresholds file scores it one of two
+ways:
+- `human-reference` (`qc.py calibrate`, the default path): per language, each
+  feature's quantile table over human recordings (the controls); the score is
+  the largest human percentile among the take's referenced features
+  (`human_rank`), and the cut is set on the controls so that about 1% of human
+  recordings reach it. A language without a reference keeps the provisional
+  rule, report-only;
+- `logistic` (`qc.py fit`, once labels accumulate): an L2 logistic over the
+  features' per-language z-scores, fitted per language when the labels allow,
+  else pooled (`*`).
 
-A fitted detector flags a take when its score reaches the fitted cut. Before a
-fit (or for a detector the labels could not train) a detector with a
+A calibrated detector flags a take when its score reaches the cut. Before a
+calibration (or for a detector it could not calibrate) a detector with a
 `provisional` rule scores with it, at report-only; one without scores
 uncalibrated: the largest oriented z-score among its features, which ranks the
 listening queue but never flags. A detector with `gateLanes` gates only in those
@@ -20,6 +28,7 @@ the condition's feature or of `normFeature`, bounded by `atLeast` and
 
 from __future__ import annotations
 
+import bisect
 import math
 import re
 from typing import Any, Iterable
@@ -42,6 +51,12 @@ RULE_OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b
             "<=": lambda a, b: a <= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}
 # The percentiles a norms file holds for each language and feature (`qc.norms`).
 NORM_PERCENTILES = ("p1", "p3", "p10", "p50", "p90", "p97", "p99")
+# A thresholds entry calibrated on human recordings (`qc.calibrate`) rather than fitted on labels.
+HUMAN_REFERENCE = "human-reference"
+# The percentiles (in percent) of a human-reference quantile table: 0 to 100 by 0.5, and the tail
+# from 99 to 100 by 0.05. The grid is scoring code: a change is a new scoring identity.
+QUANTILE_GRID = tuple(sorted({round(step * 0.5, 2) for step in range(201)}
+                             | {round(99 + step * 0.05, 2) for step in range(21)}))
 
 
 class ConfigError(ValueError):
@@ -102,6 +117,14 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
                     f"{label}: gateLanes must list lanes of the lanes map")
     for name in ("warn", "fail"):
         require(isinstance(config.get("levels", {}).get(name), dict), f"levels.{name} is required")
+    human = config.get("levels", {}).get("humanReference")
+    if human is not None:
+        require(isinstance(human, dict)
+                and all(_unit_number(human.get(key)) for key in ("warnFalseAlarmRate", "warnFalseAlarmUpper"))
+                and isinstance(human.get("failMinConfirmed"), int) and not isinstance(human["failMinConfirmed"], bool)
+                and human["failMinConfirmed"] >= 1,
+                "levels.humanReference needs warnFalseAlarmRate and warnFalseAlarmUpper in [0, 1] and a "
+                "positive integer failMinConfirmed")
     lanes = config.get("lanes", {})
     require(isinstance(lanes, dict), "lanes must map lane names to definitions")
     for name, lane in lanes.items():
@@ -111,6 +134,10 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
         models = lane.get("models")
         require(isinstance(models, list) and models and len(set(models)) == len(models)
                 and set(models) <= set(roles), f"lane {name!r}: models must list roles of the models map once")
+
+
+def _unit_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
 
 
 def lane_roles(config: dict[str, Any], lane: str | None) -> list[str]:
@@ -343,16 +370,78 @@ def rule_thresholds(rule: dict[str, Any], norms: dict[str, Any] | None = None) -
     return resolved
 
 
+def human_rank(value: float, quantiles: list[float], grid: tuple[float, ...] = QUANTILE_GRID) -> float:
+    """The human percentile (0 to 1) of an oriented value on a quantile table (`QUANTILE_GRID`).
+
+    The share of the reference below the value, linearly interpolated between the table's points.
+    A tie ranks at the bottom of its run, so a feature most people hold at zero adds nothing at
+    zero; a value at or below the table's minimum ranks 0, and one above its maximum 1."""
+
+    if len(quantiles) != len(grid):
+        raise ValueError(f"a quantile table has {len(grid)} points, not {len(quantiles)}")
+    if value > quantiles[-1]:
+        return 1.0
+    if value <= quantiles[0]:
+        return 0.0
+    index = bisect.bisect_left(quantiles, value)  # quantiles[index - 1] < value <= quantiles[index]
+    low, high = quantiles[index - 1], quantiles[index]
+    share = grid[index - 1] + (value - low) / (high - low) * (grid[index] - grid[index - 1])
+    return min(1.0, max(0.0, share / 100.0))
+
+
+def _finite(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def human_reference_best(detector: dict[str, Any], features: dict[str, Any],
+                         reference: dict[str, Any]) -> tuple[float, str, dict[str, Any]] | None:
+    """The take's largest human percentile among the features one language's reference holds
+    (`reference["features"]`, name to quantile table), with that feature's name and entry; None
+    when the take measured none of them. Unreferenced or missing features are ignored."""
+
+    tables = reference.get("features") or {}
+    best: tuple[float, str, dict[str, Any]] | None = None
+    for item in detector["features"]:
+        table = tables.get(item["name"])
+        entry = features.get(item["name"]) or {}
+        if table is None or not _finite(entry.get("value")):
+            continue
+        rank = human_rank(oriented(float(entry["value"]), item["direction"]), table)
+        if best is None or rank > best[0]:
+            best = (rank, item["name"], entry)
+    return best
+
+
 def score(detector: dict[str, Any], features: dict[str, Any], language: str,
           fitted: dict[str, Any] | None, norm: dict[str, dict[str, dict[str, float]]], *,
           norms: dict[str, Any] | None = None) -> dict[str, Any]:
-    """`{"score", "cut", "scope", "present"}`. A fitted detector scores with its model and cut; an
-    unfitted one with its provisional rule (score 1 or 0, cut 1, scope "provisional", and the
-    resolved `rule`) when it has one, else uncalibrated with no cut. `norm` holds the z-score
-    statistics; `norms` is a norms document whose percentiles the rule conditions may read."""
+    """`{"score", "cut", "scope", "present"}`.
+
+    A human-reference entry (`qc.calibrate`) scores a take of a language it holds a reference
+    for with the largest human percentile among its referenced features (scope
+    "human-reference", with `evidence`: that feature, its value and percentile), or None when the
+    take measured none of them; in any other language it falls back as an unfitted detector. A
+    fitted logistic detector scores with its model and cut. An unfitted one scores with its
+    provisional rule (score 1 or 0, cut 1, scope "provisional", and the resolved `rule`) when it
+    has one, else uncalibrated with no cut. `norm` holds the z-score statistics; `norms` is a
+    norms document whose percentiles the rule conditions may read."""
 
     names = [item["name"] for item in detector["features"]]
     present = sum(1 for name in names if (features.get(name) or {}).get("value") is not None)
+    if fitted and fitted.get("method") == HUMAN_REFERENCE:
+        reference = (fitted.get("languages") or {}).get(language or "")
+        if reference and reference.get("features"):
+            best = human_reference_best(detector, features, reference)
+            outcome: dict[str, Any] = {"score": None, "cut": reference["cut"], "scope": HUMAN_REFERENCE,
+                                       "present": present}
+            if best is not None:
+                rank, name, entry = best
+                outcome["score"] = rank
+                outcome["evidence"] = [{"feature": name, "value": entry["value"],
+                                        "humanPercentile": round(100.0 * rank, 2), "start": entry.get("start"),
+                                        "end": entry.get("end")}]
+            return outcome
+        fitted = None  # no human reference in this language: the provisional rule, report-only
     models = (fitted or {}).get("models") or {}
     model = models.get(language) or models.get("*")
     if not fitted or not model or present == 0:

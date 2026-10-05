@@ -4,8 +4,9 @@
     python3 scripts/qc.py models list|fetch|verify|prune
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
-    python3 scripts/qc.py run | gate | queue | fit | eval | norms
+    python3 scripts/qc.py run | gate | queue | calibrate | fit | eval | norms
     python3 scripts/qc.py controls build|report
+    python3 scripts/qc.py confirm next|record
     python3 scripts/qc.py language-bench takes|evidence
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
@@ -246,6 +247,40 @@ def cmd_language_bench(args: argparse.Namespace, layout: Layout) -> int:
     return language.exit_code(evidence)
 
 
+def cmd_calibrate(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import calibrate
+
+    try:
+        path, document = calibrate.calibrate(layout, controls=args.controls, runs=args.runs, quantile=args.quantile,
+                                             min_controls=args.min_controls, reuse_reason=args.reuse_reason)
+    except (calibrate.CalibrationError, ValueError, OSError) as error:
+        print(f"qc calibrate: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    for line in calibrate.summary_lines(document):
+        print(line)
+    print(f"qc calibrate: wrote {path.relative_to(layout.root)}; commit it before qc.py eval")
+    return EXIT_OK
+
+
+def cmd_confirm(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import confirm
+
+    try:
+        if args.action == "next":
+            result = confirm.next_batch(layout, args.run, n=args.n, languages=_csv(args.languages), name=args.name)
+            for line in confirm.next_lines(result):
+                print(line)
+            return EXIT_OK
+        summary = confirm.record(layout, args.batch, args.answers, classes=args.classes, rater=args.rater)
+    except (confirm.ConfirmError, FileExistsError, ValueError, OSError) as error:
+        print(f"qc confirm {args.action}: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    verdicts = ", ".join(f"{verdict} {count}" for verdict, count in sorted(summary["verdicts"].items()))
+    print(f"qc confirm: recorded {summary['recorded']} answers in {summary['batch']} ({verdicts}); "
+          f"{summary['unanswered']} of {summary['takes']} takes unanswered")
+    return EXIT_OK
+
+
 def cmd_fit(args: argparse.Namespace, layout: Layout) -> int:
     from qc import fit
 
@@ -406,6 +441,34 @@ def build_parser() -> argparse.ArgumentParser:
     queue.add_argument("--batch", help="batch name for the queue (default queue-<run id>)")
     queue.set_defaults(handler=cmd_queue)
 
+    calibrate = commands.add_parser("calibrate", help="calibrate the detectors on human controls (no labels needed)")
+    calibrate.add_argument("--controls", nargs="+", required=True, help="controls lane runs (human recordings)")
+    calibrate.add_argument("--runs", nargs="+", help="generated runs: the share of their takes each reference "
+                                                     "would flag (informational)")
+    calibrate.add_argument("--quantile", type=float, default=0.99,
+                           help="the share of human recordings under the cut (default 0.99)")
+    calibrate.add_argument("--min-controls", type=int, default=150,
+                           help="human recordings a language needs for a reference (default 150)")
+    calibrate.add_argument("--reuse-reason", help="why eval may score a label set an earlier evaluation scored "
+                                                  "(recorded in the thresholds file)")
+    calibrate.set_defaults(handler=cmd_calibrate)
+
+    confirm = commands.add_parser("confirm", help="chat confirmations: send flagged takes, record the answers")
+    confirm_actions = confirm.add_subparsers(dest="action", required=True)
+    confirm_next = confirm_actions.add_parser("next", help="copy a few flagged takes under neutral names, blind")
+    confirm_next.add_argument("--run", required=True, help="a generated run id (never controls; clones are never sent)")
+    confirm_next.add_argument("--n", type=int, default=5, help="takes to send (default 5)")
+    confirm_next.add_argument("--languages", default="french,english",
+                              help="comma-separated languages to prefer (default french,english)")
+    confirm_next.add_argument("--name", help="batch name (default confirm-<NNN>)")
+    confirm_record = confirm_actions.add_parser("record", help="record the maintainer's answers as labels")
+    confirm_record.add_argument("--batch", required=True)
+    confirm_record.add_argument("--answers", required=True, help='per take: x unusable, u usable, ? unsure, '
+                                                                 'e.g. "1=x,2=u,3=?"')
+    confirm_record.add_argument("--classes", help='optional classes, e.g. "1=devoiced:severe,pause:moderate"')
+    confirm_record.add_argument("--rater", help="who answered (default the protocol's rater)")
+    confirm.set_defaults(handler=cmd_confirm)
+
     fit = commands.add_parser("fit", help="fit detector thresholds on the labels, per family fold and in full")
     fit.add_argument("--batches", nargs="+", help="label batches (default every batch)")
     fit.add_argument("--runs", nargs="+", help="run ids whose features to use (default every run)")
@@ -414,12 +477,15 @@ def build_parser() -> argparse.ArgumentParser:
                                             "(recorded in the thresholds file)")
     fit.set_defaults(handler=cmd_fit)
 
-    evaluate = commands.add_parser("eval", help="score the labelled sample out of fold, once, against "
-                                                "committed thresholds")
+    evaluate = commands.add_parser("eval", help="evaluate committed thresholds once per label set: human false "
+                                                "alarms and confirmations (calibrated), or the labelled sample "
+                                                "out of fold (fitted)")
     evaluate.add_argument("--thresholds", help="thresholds file (default the newest)")
-    evaluate.add_argument("--batches", nargs="+")
-    evaluate.add_argument("--runs", nargs="+")
-    evaluate.add_argument("--rater", help="whose labels (default the rater the thresholds were fitted on)")
+    evaluate.add_argument("--batches", nargs="+", help="label batches (default every batch; confirm batches for "
+                                                       "a calibration)")
+    evaluate.add_argument("--runs", nargs="+", help="run ids whose features score the labelled takes")
+    evaluate.add_argument("--rater", help="whose labels (default the rater the thresholds were fitted on, or the "
+                                          "protocol's)")
     evaluate.set_defaults(handler=cmd_eval)
 
     norms = commands.add_parser("norms", help="per-language pause, pace and ending percentiles of a takes pool")

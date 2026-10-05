@@ -32,7 +32,8 @@
   },
   "levels": {
     "warn": {"precisionLower": 0.6, "recall": 0.6},
-    "fail": {"precisionLower": 0.8, "cleanFalseAlarmUpper": 0.05}
+    "fail": {"precisionLower": 0.8, "cleanFalseAlarmUpper": 0.05},
+    "humanReference": {"warnFalseAlarmRate": 0.02, "warnFalseAlarmUpper": 0.06, "failMinConfirmed": 17}
   },
   "lanes": {
     "language-bench": {

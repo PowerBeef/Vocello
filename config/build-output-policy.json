@@ -233,9 +233,9 @@
       "id": "qc-private",
       "path": "build/private/qc",
       "class": "artifact",
-      "owner": "Audio QC v2 private store (scripts/qc.py label, run, queue)",
+      "owner": "Audio QC v2 private store (scripts/qc.py label, run, queue, confirm)",
       "cleanup": "preserve",
-      "retention": "The maintainer's labels (labels/<batch>.jsonl, append-only), the label batches, listening queues, runner jobs and per-take run flags: take paths, scripts and judgements that never enter Git; only aggregates and digests are committed; preserved until the maintainer retires them",
+      "retention": "The maintainer's labels and chat confirmations (labels/<batch>.jsonl, append-only), the label batches, the takes a confirm batch sends (confirm/<batch>/), listening queues, runner jobs and per-take run flags: take paths, scripts and judgements that never enter Git; only aggregates and digests are committed; preserved until the maintainer retires them",
       "env": "QVOICE_QC_PRIVATE"
     },
     {

@@ -1394,32 +1394,30 @@
     {
       "id": "QC-02",
       "plan": "qc-v2-2026-10",
-      "title": "Maintainer labels",
+      "title": "Maintainer confirmations",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.",
+      "gate": "The maintainer confirms flagged takes by ear in chat (qc.py confirm next/record; blind, clones never sent): enough confirmations per detector to measure its precision (17 at a lower bound of 0.8 for fail); labels stay under build/private/qc.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-02",
+      "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "fr-0101--dylan (heard: stutter and missing syllables) is the first heard positive. Moderate or worse counts as a defect; the devoiced class names a whispered syllable. Acoustic-only labels cover the languages the maintainer can't judge linguistically."
+      "notes": "2026-10-05: listening to all of batch-1 on the label page was too slow for the maintainer; calibration moved to human controls and the ear now confirms only flagged takes. fr-0101--dylan is labelled (three severe defects); the label page and batch-1 stay for later labelling."
     },
     {
       "id": "QC-03",
       "plan": "qc-v2-2026-10",
       "title": "Detectors, thresholds and evaluation",
-      "status": "planned",
-      "blockedBy": [
-        "QC-02"
-      ],
-      "gate": "The lean detectors (pause, content at the phone and ASR level, wrong language, cut-off, speaking rate, signal artifacts; loudness advisory; clone pitch and identity in the clone lane only) are checked on human controls and fit on the maintainer's labels out of fold by script family; thresholds-v<N> is committed before eval-v<N> scores every labelled sample take once per label set; levels follow the precision, recall and false-alarm rules.",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "The lean detectors are calibrated on human controls (qc.py calibrate: per language, a cut beyond the calibration speakers' 99th percentile, checked on held-out speakers), thresholds-v<N> is committed, and qc.py eval gives warn where the held-out human false-alarm rate is at most 2% (upper bound 6%) and fail only with 17+ maintainer confirmations at a precision lower bound of 0.8.",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-02",
+      "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "Acceptance: fr-0101--dylan and every take the maintainer marked defective are flagged on train. Lean detector set (detectors.json v5): pause.anomalous, content.phoneme, content.asr, language.wrong, boundary.cutoff, prosody.rate, level.loudness (advisory), signal.artifacts, and for clones prosody.pitch and identity.drift. norms-v1 committed. Human controls (300): content.phoneme 0.7% fr / 0% en, prosody.rate 1.3% / 0%, pause.anomalous 0% en (the French MLS control holds between-sentence pauses, not comparable). Fit is out of fold by script family once batch-1 is labelled.",
+      "notes": "Calibration moved from the maintainer's labels to human controls on 2026-10-05. Controls: MLS French, German, Spanish, Italian and Portuguese, LibriTTS-R English, AISHELL-3 Chinese and Zeroth Korean, 200 each; Japanese and Russian have none and stay report-only. The supervised out-of-fold fit stays for when labels accumulate.",
       "legacyIds": [
         "AQ-07",
         "AQ-08",

@@ -37,19 +37,19 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `QC-02` | in-flight | Maintainer labels | — |
-| `QC-03` | planned | Detectors, thresholds and evaluation | `QC-02` |
+| `QC-02` | in-flight | Maintainer confirmations | — |
+| `QC-03` | in-flight | Detectors, thresholds and evaluation | — |
 | `QC-04` | planned | Lanes on QC v2 | `QC-03` |
 | `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
 | `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
 
 ### Open items in detail
 
-- **`QC-02`** (in-flight) — Maintainer labels.
-  gate: qc.py label sample/serve/export runs locally; batch 1 (106 items: 96 fr/en takes and 10 blind repeats, family-split by hash) is labelled on the safe page (heard to the end, explicit severities, per rater); labels stay under build/private/qc; intra-rater kappa is reported.
+- **`QC-02`** (in-flight) — Maintainer confirmations.
+  gate: The maintainer confirms flagged takes by ear in chat (qc.py confirm next/record; blind, clones never sent): enough confirmations per detector to measure its precision (17 at a lower bound of 0.8 for fail); labels stay under build/private/qc.
 
-- **`QC-03`** (planned) — Detectors, thresholds and evaluation.
-  gate: The lean detectors (pause, content at the phone and ASR level, wrong language, cut-off, speaking rate, signal artifacts; loudness advisory; clone pitch and identity in the clone lane only) are checked on human controls and fit on the maintainer's labels out of fold by script family; thresholds-v<N> is committed before eval-v<N> scores every labelled sample take once per label set; levels follow the precision, recall and false-alarm rules.
+- **`QC-03`** (in-flight) — Detectors, thresholds and evaluation.
+  gate: The lean detectors are calibrated on human controls (qc.py calibrate: per language, a cut beyond the calibration speakers' 99th percentile, checked on held-out speakers), thresholds-v<N> is committed, and qc.py eval gives warn where the held-out human false-alarm rate is at most 2% (upper bound 6%) and fail only with 17+ maintainer confirmations at a precision lower bound of 0.8.
 
 - **`QC-04`** (planned) — Lanes on QC v2.
   gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.

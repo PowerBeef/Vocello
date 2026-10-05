@@ -115,10 +115,12 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   (`config/marking-peak-equality.json`).
 - **Audio QA is calibrated on the maintainer's ears (QC v2, `docs/reference/qc.md`).** Fixed seeds
   and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 detectors are
-  first measured on human recordings (`qc.py controls`), then fit on the maintainer's listening
-  labels (`scripts/qc.py label`); `qc.py fit` freezes thresholds in `config/qc/thresholds-v<N>.json`,
-  bound to the scoring code and norms, and committed before `qc.py eval` scores the
-  labels out of fold, once per label set. A model, feature or threshold change is a new version. A
+  calibrated on human recordings (`qc.py controls`, `qc.py calibrate`: a take flags only beyond what
+  held-out human speakers do, per language), and the maintainer confirms flagged takes by ear in chat
+  (`qc.py confirm`), which measures precision; `qc.py fit` on listening labels stays for when labels
+  accumulate. Thresholds freeze in `config/qc/thresholds-v<N>.json`, bound to the scoring code and
+  norms, and are committed before `qc.py eval` sets their levels. A model, feature or threshold change
+  is a new version. A
   detector warns or fails a lane only for the languages and classes its evaluation covers, and
   reports elsewhere. Listening labels takes
   but never clears a machine failure; a heard defect no detector flags joins the next labelling

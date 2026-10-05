@@ -58,7 +58,7 @@ All commands go through `python3 scripts/qc.py`.
 | `fit [--batches …] [--runs …] [--rater ID] [--reuse-reason TEXT]` | The supervised path, for when labels accumulate: fits the detectors per script-family fold and on every label, and writes `config/qc/thresholds-v<N>.json`. |
 | `eval [--thresholds FILE] [--batches …] [--runs …] [--rater ID]` | Evaluates a committed thresholds file once per label set and writes `benchmarks/qc/eval-v<N>.json`: a calibration on its human false alarms and the confirmations, a fit on every labelled sample take out of fold (see [Levels](#levels)). |
 | `norms --takes <qc-takes runs…> [--min-count 100] [--dry-run]` | Measures per-language pause, pace and ending percentiles from the pool's audio and cached results, and writes `config/qc/norms-v<N>.json` (see [Per-language norms](#per-language-norms)). |
-| `controls build [--sources mls:french libritts-r:english] [--per-language 150] [--per-speaker 3]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. The [corpora per language](#calibration-on-human-controls) cover eight languages. |
+| `controls build [--sources <corpus>:<language> …] [--per-language 200] [--per-speaker 5]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. The [corpora per language](#calibration-on-human-controls) cover eight languages. |
 | `controls report --runs <controls runs…> [--generated <runs…>]` | Each detector's flag rate on the human controls (with bounds) beside the generated takes', and every feature's p50 and p90. |
 
 ## Models and runtimes
@@ -212,13 +212,13 @@ The default thresholds need no label: they are calibrated on people reading alou
 
 | Language | `--sources` | Notes |
 |---|---|---|
-| French, German, Spanish, Italian, Portuguese | `mls:<language>` (Multilingual LibriSpeech) | Audiobook passages of 11-20 s, several sentences, lossy-coded. Portuguese has 46 speakers, so 150 clips need `--per-speaker 4`. |
+| French, German, Spanish, Italian, Portuguese | `mls:<language>` (Multilingual LibriSpeech) | Audiobook passages of 11-20 s, several sentences, lossy-coded. Portuguese has 46 speakers, so 200 clips need `--per-speaker 5` (the default). |
 | English | `libritts-r:english` | Single punctuated sentences, restored audio. |
 | Chinese | `aishell3-subset:chinese` | The pinned AISHELL-3 test subset (76 speakers). |
 | Korean | `zeroth-korean:korean` | Zeroth-Korean. |
 | Japanese, Russian | none | No pinned corpus: they keep their provisional rules, report-only. |
 
-All eight in one manifest: `controls build --sources mls:french mls:german mls:spanish mls:italian mls:portuguese libritts-r:english aishell3-subset:chinese zeroth-korean:korean --per-speaker 4`.
+All eight are the default: `controls build` samples 200 per language, at most 5 per speaker (`controls-2`, scored 2026-10-05, is that set).
 
 **The MLS caveat.** An MLS clip is a passage of several sentences with an unpunctuated transcript, so its longest pause is often the pause between two sentences (French median 0.82 s, p90 1.52 s), where a generated take reads one sentence. The pause references of the five MLS languages are therefore loose: a pause too long inside one sentence can still sit within their human range. LibriTTS-R's single sentences give English tight pause references.
 
@@ -286,7 +286,7 @@ Each fitted detector earns a level per language:
 
 The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` runs them by default; a lane the map does not name, such as `pool`, runs every role. A lane's gate reads only the detectors with a feature it can measure, from the WAV alone or from the roles it runs, and the clone detectors only in `clone-lane` (`gateLanes`); the others stay report-only in that lane. A take marked `control` (a negative control, or a human recording) is scored and flagged, but always at report-only.
 
-**Human controls.** `controls build` samples human read speech from the extracted speaker corpora (by default MLS for French and LibriTTS-R for English; 150 per language, at most 3 clips per speaker; see [the corpora per language](#calibration-on-human-controls)), and `run --lane controls` scores it with the qc-takes roles. The controls lane feeds `calibrate` only, never `fit`, `queue`, `confirm` or norms. `controls report` gives each detector's flag rate on the controls beside the generated takes': a provisional rule should flag at most 5% of human recordings per language before it is trusted, and a fit should sit above the controls' own floor (human French has a median ZIPA phone error rate of 0.15).
+**Human controls.** `controls build` samples human read speech from the extracted speaker corpora (by default all eight languages of the table above; 200 per language, at most 5 clips per speaker; see [the corpora per language](#calibration-on-human-controls)), and `run --lane controls` scores it with the qc-takes roles. The controls lane feeds `calibrate` only, never `fit`, `queue`, `confirm` or norms. `controls report` gives each detector's flag rate on the controls beside the generated takes': a provisional rule should flag at most 5% of human recordings per language before it is trusted, and a fit should sit above the controls' own floor (human French has a median ZIPA phone error rate of 0.15).
 
 **Controls results (2026-10-02, 300 human takes against batch-1's 96, under `norms-v1`):**
 

@@ -347,6 +347,8 @@ def cmd_controls(args: argparse.Namespace, layout: Layout) -> int:
 # --- parser ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
+    from qc import controls as controls_lib  # the human-control defaults
+
     parser = argparse.ArgumentParser(prog="qc.py", description="Vocello QC v2 audio QC harness.")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -498,10 +500,10 @@ def build_parser() -> argparse.ArgumentParser:
     controls = commands.add_parser("controls", help="human-speech controls: every detector measured on people")
     control_actions = controls.add_subparsers(dest="action", required=True)
     build = control_actions.add_parser("build", help="a takes manifest of human read speech, marked control")
-    build.add_argument("--sources", nargs="+", default=["mls:french", "libritts-r:english"],
+    build.add_argument("--sources", nargs="+", default=list(controls_lib.DEFAULT_SOURCES),
                        help="<corpus>:<language> pairs from config/audio-qc-corpora.json")
-    build.add_argument("--per-language", type=int, default=150)
-    build.add_argument("--per-speaker", type=int, default=3)
+    build.add_argument("--per-language", type=int, default=controls_lib.DEFAULT_PER_LANGUAGE)
+    build.add_argument("--per-speaker", type=int, default=controls_lib.DEFAULT_PER_SPEAKER)
     build.add_argument("--seed", type=int, default=0)
     build.add_argument("--name", default="controls-1", help="the manifest's name under build/private/qc/manifests")
     control_report = control_actions.add_parser("report", help="flag rates and feature percentiles, human vs generated")

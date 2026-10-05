@@ -28,9 +28,10 @@ from qc import corpora, store
 from qc.store import Layout
 
 CONTROLS_LANE = "controls"
-DEFAULT_SOURCES = ("mls:french", "libritts-r:english")
-DEFAULT_PER_LANGUAGE = 150
-DEFAULT_PER_SPEAKER = 3
+DEFAULT_SOURCES = ("mls:french", "mls:german", "mls:spanish", "mls:italian", "mls:portuguese", "libritts-r:english",
+                   "aishell3-subset:chinese", "zeroth-korean:korean")
+DEFAULT_PER_LANGUAGE = 200
+DEFAULT_PER_SPEAKER = 5
 MIN_SECONDS = 2.0
 MAX_SECONDS = 20.0
 REPORT_SCHEMA = "vocello.qc.controls-report/1"

@@ -1,0 +1,688 @@
+{
+ "commit": "5c8dc11ab0220e8701754512e208331cf35b1e96",
+ "createdAt": "2026-10-05T21:48:58Z",
+ "detectors": {
+  "boundary.cutoff": {
+   "class": "cutoff",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0118,
+      "n": 93,
+      "rate": 0.043,
+      "upper": 0.1065
+     },
+     "level": "report-only"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 119,
+      "rate": 0.0,
+      "upper": 0.0305
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0003,
+      "n": 99,
+      "rate": 0.0101,
+      "upper": 0.055
+     },
+     "level": "warn"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0139,
+      "n": 118,
+      "rate": 0.0424,
+      "upper": 0.0961
+     },
+     "level": "report-only"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 108,
+      "rate": 0.0,
+      "upper": 0.0336
+     },
+     "level": "warn"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 115,
+      "rate": 0.0087,
+      "upper": 0.0475
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0003,
+      "n": 87,
+      "rate": 0.0115,
+      "upper": 0.0624
+     },
+     "level": "report-only"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 82,
+      "rate": 0.0,
+      "upper": 0.044
+     },
+     "level": "warn"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "content.asr": {
+   "class": "stutter",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0067,
+      "n": 93,
+      "rate": 0.0323,
+      "upper": 0.0914
+     },
+     "level": "report-only"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.002,
+      "n": 119,
+      "rate": 0.0168,
+      "upper": 0.0594
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 99,
+      "rate": 0.0,
+      "upper": 0.0366
+     },
+     "level": "warn"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 118,
+      "rate": 0.0,
+      "upper": 0.0308
+     },
+     "level": "warn"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 108,
+      "rate": 0.0,
+      "upper": 0.0336
+     },
+     "level": "warn"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 115,
+      "rate": 0.0087,
+      "upper": 0.0475
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0028,
+      "n": 87,
+      "rate": 0.023,
+      "upper": 0.0806
+     },
+     "level": "report-only"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0076,
+      "n": 82,
+      "rate": 0.0366,
+      "upper": 0.1032
+     },
+     "level": "report-only"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "content.phoneme": {
+   "class": "stutter",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0003,
+      "n": 93,
+      "rate": 0.0108,
+      "upper": 0.0585
+     },
+     "level": "warn"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.0352,
+      "n": 119,
+      "rate": 0.0756,
+      "upper": 0.1387
+     },
+     "level": "report-only"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0025,
+      "n": 99,
+      "rate": 0.0202,
+      "upper": 0.0711
+     },
+     "level": "report-only"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 118,
+      "rate": 0.0,
+      "upper": 0.0308
+     },
+     "level": "warn"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 108,
+      "rate": 0.0093,
+      "upper": 0.0505
+     },
+     "level": "warn"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 115,
+      "rate": 0.0,
+      "upper": 0.0316
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0189,
+      "n": 87,
+      "rate": 0.0575,
+      "upper": 0.129
+     },
+     "level": "report-only"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0076,
+      "n": 82,
+      "rate": 0.0366,
+      "upper": 0.1032
+     },
+     "level": "report-only"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "identity.drift": {
+   "class": "voice-change",
+   "languages": {},
+   "reason": "clone-only (it gates in clone-lane): its features are measured against a clone's reference clip, which human recordings do not have; it keeps its provisional rule, report-only",
+   "reportOnly": true
+  },
+  "language.wrong": {
+   "class": "wrong-language",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 93,
+      "rate": 0.0,
+      "upper": 0.0389
+     },
+     "level": "warn"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.002,
+      "n": 119,
+      "rate": 0.0168,
+      "upper": 0.0594
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0063,
+      "n": 99,
+      "rate": 0.0303,
+      "upper": 0.086
+     },
+     "level": "report-only"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0093,
+      "n": 118,
+      "rate": 0.0339,
+      "upper": 0.0845
+     },
+     "level": "report-only"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 108,
+      "rate": 0.0093,
+      "upper": 0.0505
+     },
+     "level": "warn"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 115,
+      "rate": 0.0,
+      "upper": 0.0316
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 87,
+      "rate": 0.0,
+      "upper": 0.0415
+     },
+     "level": "warn"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 82,
+      "rate": 0.0,
+      "upper": 0.044
+     },
+     "level": "warn"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "level.loudness": {
+   "advisory": true,
+   "class": null,
+   "languages": {},
+   "reportOnly": true
+  },
+  "pause.anomalous": {
+   "class": "pause",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0026,
+      "n": 93,
+      "rate": 0.0215,
+      "upper": 0.0755
+     },
+     "level": "report-only"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.002,
+      "n": 119,
+      "rate": 0.0168,
+      "upper": 0.0594
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0003,
+      "n": 99,
+      "rate": 0.0101,
+      "upper": 0.055
+     },
+     "level": "warn"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0021,
+      "n": 118,
+      "rate": 0.0169,
+      "upper": 0.0599
+     },
+     "level": "warn"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0102,
+      "n": 108,
+      "rate": 0.037,
+      "upper": 0.0921
+     },
+     "level": "report-only"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0021,
+      "n": 115,
+      "rate": 0.0174,
+      "upper": 0.0614
+     },
+     "level": "report-only"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0028,
+      "n": 87,
+      "rate": 0.023,
+      "upper": 0.0806
+     },
+     "level": "report-only"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 82,
+      "rate": 0.0,
+      "upper": 0.044
+     },
+     "level": "warn"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "prosody.pitch": {
+   "class": "pitch",
+   "languages": {},
+   "reason": "clone-only (it gates in clone-lane): its features are measured against a clone's reference clip, which human recordings do not have; it keeps its provisional rule, report-only",
+   "reportOnly": true
+  },
+  "prosody.rate": {
+   "class": "unnatural",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0026,
+      "n": 93,
+      "rate": 0.0215,
+      "upper": 0.0755
+     },
+     "level": "report-only"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.002,
+      "n": 119,
+      "rate": 0.0168,
+      "upper": 0.0594
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 99,
+      "rate": 0.0,
+      "upper": 0.0366
+     },
+     "level": "warn"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 118,
+      "rate": 0.0,
+      "upper": 0.0308
+     },
+     "level": "warn"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0587,
+      "n": 108,
+      "rate": 0.1111,
+      "upper": 0.186
+     },
+     "level": "report-only"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 115,
+      "rate": 0.0087,
+      "upper": 0.0475
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 87,
+      "rate": 0.0,
+      "upper": 0.0415
+     },
+     "level": "warn"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.003,
+      "n": 82,
+      "rate": 0.0244,
+      "upper": 0.0853
+     },
+     "level": "report-only"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  },
+  "signal.artifacts": {
+   "class": "artifact",
+   "confirmations": {
+    "failReady": false,
+    "flagged": 0,
+    "precision": {
+     "lower": null,
+     "n": 0,
+     "rate": null,
+     "upper": null
+    },
+    "uncertain": 0
+   },
+   "languages": {
+    "chinese": {
+     "humanFalseAlarms": {
+      "lower": 0.0003,
+      "n": 93,
+      "rate": 0.0108,
+      "upper": 0.0585
+     },
+     "level": "warn"
+    },
+    "english": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 119,
+      "rate": 0.0,
+      "upper": 0.0305
+     },
+     "level": "warn"
+    },
+    "french": {
+     "humanFalseAlarms": {
+      "lower": 0.0025,
+      "n": 99,
+      "rate": 0.0202,
+      "upper": 0.0711
+     },
+     "level": "report-only"
+    },
+    "german": {
+     "humanFalseAlarms": {
+      "lower": 0.0021,
+      "n": 118,
+      "rate": 0.0169,
+      "upper": 0.0599
+     },
+     "level": "warn"
+    },
+    "italian": {
+     "humanFalseAlarms": {
+      "lower": 0.0152,
+      "n": 108,
+      "rate": 0.0463,
+      "upper": 0.1047
+     },
+     "level": "report-only"
+    },
+    "korean": {
+     "humanFalseAlarms": {
+      "lower": 0.0002,
+      "n": 115,
+      "rate": 0.0087,
+      "upper": 0.0475
+     },
+     "level": "warn"
+    },
+    "portuguese": {
+     "humanFalseAlarms": {
+      "lower": 0.0189,
+      "n": 87,
+      "rate": 0.0575,
+      "upper": 0.129
+     },
+     "level": "report-only"
+    },
+    "spanish": {
+     "humanFalseAlarms": {
+      "lower": 0.0,
+      "n": 82,
+      "rate": 0.0,
+      "upper": 0.044
+     },
+     "level": "warn"
+    }
+   },
+   "method": "human-reference",
+   "reportOnly": false
+  }
+ },
+ "labelSet": {
+  "batches": [],
+  "confirmations": 0,
+  "controls": {
+   "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
+   "runs": [
+    "controls-20261005-211756-abae"
+   ],
+   "takes": 1600
+  },
+  "takes": 0
+ },
+ "labelSetDigest": "0cb402204d676ae8eabcfe90b862df2e84e92a4508b50c7d02b3cd43de13cef1",
+ "levels": {
+  "failPrecisionLower": 0.8,
+  "humanReference": {
+   "failMinConfirmed": 17,
+   "warnFalseAlarmRate": 0.02,
+   "warnFalseAlarmUpper": 0.06
+  }
+ },
+ "method": {
+  "groups": "speaker family",
+  "name": "human-reference",
+  "quantile": 0.99,
+  "salt": "vocello.qc.calibrate/1"
+ },
+ "norms": "norms-v1.json",
+ "rater": "maintainer",
+ "schema": "vocello.qc.eval/2",
+ "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",
+ "thresholds": "thresholds-v1.json",
+ "thresholdsSHA256": "90e23b31dd512fa2b846cb04819f66aa48b09e4a7b1403a0b236f08fd83c4117",
+ "version": 1
+}

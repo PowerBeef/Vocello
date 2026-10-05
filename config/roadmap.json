@@ -1453,13 +1453,13 @@
       "blockedBy": [
         "QC-03"
       ],
-      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, the whispered final syllable and mid-phrase pause on fr-0101--dylan, clone pitch.",
+      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).",
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-02",
+      "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan, corrected on 2026-10-02 by an external review against human French recordings: the last syllable of \"abattus\" is whispered, followed by a 0.82 s pause with a short voiced sound before \"obstruaient\", and the take ends 0.02 s after its last sound. What was heard as a stutter awaits the maintainer's listening (the whisper, the sound before \"obstruaient\", or \"ormes abattus\" linked as \"orme-euz-abattus\"). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC."
+      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC."
     },
     {
       "id": "QC-08",

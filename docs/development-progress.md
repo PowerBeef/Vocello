@@ -35,8 +35,9 @@ abrupt-end, tonal-collapse and naturalness detectors, and the frozen references.
   it, insertion rate 0.025 with agreement.
 
 **Next.**
-1. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`) and listens
-   to `fr-0101--dylan` for the whisper, the sound before "obstruaient" and "orme-euz-abattus".
+1. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`). On
+   2026-10-05 they confirmed all three `fr-0101--dylan` defects by ear: the whispered "-tus", the
+   false start before "obstruaient" and "orme-euz-abattus" (QC-06).
 2. `qc.py fit --runs <the batch-1 run under norms-v1>` (out of fold), commit thresholds-v1, then
    `qc.py eval` once and commit eval-v1.
 3. One real qc-takes queue and one clone-lane run, on request.
@@ -61,8 +62,8 @@ the code. The maintainer chose out-of-fold evaluation, "moderate or worse" as a 
 1. Integrate both agents; replace the mute test with an excerpt test; add human controls (MLS fr,
    LibriTTS-R en) and check every rule on them (at most 5% flagged per language).
 2. Rescore both qc-takes runs once (identities change), then commit norms-v1 and references-v1.
-3. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`) and listens to
-   `fr-0101--dylan` for the whisper, the sound before "obstruaient" and "orme-euz-abattus".
+3. The maintainer labels batch-1 (`python3 scripts/qc.py label serve --batch batch-1`); the
+   `fr-0101--dylan` defects are confirmed by ear (2026-10-05, QC-06).
 4. Fit out-of-fold, commit thresholds-v1, evaluate once, commit eval-v1.
 5. Dry-run `build_cleanup.py --qc-v1`, then delete on the maintainer's go-ahead.
 

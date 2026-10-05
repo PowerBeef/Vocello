@@ -1417,7 +1417,7 @@
       ],
       "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "Calibration moved from the maintainer's labels to human controls on 2026-10-05. Controls: MLS French, German, Spanish, Italian and Portuguese, LibriTTS-R English, AISHELL-3 Chinese and Zeroth Korean, 200 each; Japanese and Russian have none and stay report-only. The supervised out-of-fold fit stays for when labels accumulate.",
+      "notes": "Calibration moved from the maintainer's labels to human controls on 2026-10-05. Controls (controls-2): MLS French, German, Spanish, Italian and Portuguese, LibriTTS-R English, AISHELL-3 Chinese and Zeroth Korean, 200 each; Japanese and Russian have none and stay report-only. thresholds-v1 (5c8dc11a) and eval-v1 (465f6dd8): every lean detector warns in four to six of the eight languages; French warns on cut-off, content (ASR), pause and rate, while wrong-language and phone-level content stay report-only there (held-out human French false alarms 3% and 2%). On the 957 French and English pool takes, 164 flag at warn. fr-0101--dylan is not flagged: its whisper, 0.84 s pause and over-linked liaison all sit inside the human range, so subtle defects need the maintainer's ear. Precision comes from chat confirmations (confirm-1 sent 2026-10-05). The supervised out-of-fold fit stays for when labels accumulate.",
       "legacyIds": [
         "AQ-07",
         "AQ-08",

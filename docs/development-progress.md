@@ -17,6 +17,25 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 5 — QC v2 calibrated on human speech; first confirmations sent
+
+Labelling 106 clips by ear was too slow for the maintainer, so QC v2 now calibrates on human
+controls and the ear only confirms flagged takes in chat (`qc.py calibrate`, `qc.py confirm`).
+
+- **Controls:** 1,600 human recordings (MLS fr/de/es/it/pt, LibriTTS-R en, AISHELL-3 zh, Zeroth ko;
+  200 each). Japanese and Russian have none and stay report-only.
+- **thresholds-v1 / eval-v1** (5c8dc11a, 465f6dd8): a take flags only beyond the calibration speakers;
+  held-out speakers measure the false-alarm rate on people. Every lean detector warns in four to six
+  languages.
+- **French and English pool** (957 takes): 164 flag at warn. `fr-0101--dylan` is not flagged: its
+  three heard defects (confirmed severe by ear on 2026-10-05) sit inside the human range.
+
+**Next.**
+1. The maintainer answers confirm-1 (5 clips sent in chat): `qc.py confirm record --batch confirm-1
+   --answers "1=x,2=u,…"`; then more rounds with `qc.py confirm next`, toward 17 per detector for fail.
+2. `qc.py eval` again after each round (precision); re-calibrate only with new controls.
+3. One real qc-takes queue, one clone-lane run and the language bench, on request.
+
 ### October 2, morning — QC v2 cut to the external reports; 53 GB freed; ready for labels
 
 The maintainer asked for a lean harness built only from the external reports' recommendations, fast.

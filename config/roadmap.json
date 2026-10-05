@@ -1459,7 +1459,7 @@
       ],
       "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC."
+      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The maintainer rates all three severe: the take is unusable. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC."
     },
     {
       "id": "QC-08",

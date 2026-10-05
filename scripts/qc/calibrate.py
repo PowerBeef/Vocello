@@ -480,6 +480,7 @@ def evaluate(layout: Layout, thresholds: Path, document: dict[str, Any], output:
                                "scored again")
     pool_norms = norms_lib.load(layout)
     results: dict[str, Any] = {}
+    flagged_by: dict[str, set[str]] = {}  # each confirmed take's flagging detectors, for the agreement report
     for detector in config["detectors"]:
         entry = (document.get("detectors") or {}).get(detector["id"]) or {}
         if detector.get("advisory") or detector.get("class") is None:
@@ -504,6 +505,7 @@ def evaluate(layout: Layout, thresholds: Path, document: dict[str, Any], output:
                                          norms=pool_norms)
             if outcome["scope"] != HUMAN_REFERENCE or outcome["score"] is None or outcome["score"] < outcome["cut"]:
                 continue
+            flagged_by.setdefault(row["token"], set()).add(detector["id"])
             if row["label"].get("verdict") == "uncertain":
                 uncertain += 1
                 continue
@@ -522,6 +524,15 @@ def evaluate(layout: Layout, thresholds: Path, document: dict[str, Any], output:
                               "failReady": fail_ready},
             "languages": languages,
         }
+    # Precision pooled over detectors by how many of them flagged the take: does agreement predict
+    # an unusable take better than a lone flag?
+    agreement: dict[str, Any] = {}
+    for bucket, minimum, maximum in (("1", 1, 1), ("2+", 2, None)):
+        bucket_hits = [row["label"].get("verdict") == "objectionable" for row in scored
+                       if row["label"].get("verdict") != "uncertain"
+                       and len(flagged_by.get(row["token"], ())) >= minimum
+                       and (maximum is None or len(flagged_by.get(row["token"], ())) <= maximum)]
+        agreement[bucket] = fit.weighted_rate(bucket_hits, [1.0] * len(bucket_hits))
     previous = store.read_json(output) if output.is_file() else None
     evaluation: dict[str, Any] = {
         "schema": fit.EVAL_SCHEMA, "version": document["version"], "createdAt": fit.utc_now(),
@@ -535,6 +546,7 @@ def evaluate(layout: Layout, thresholds: Path, document: dict[str, Any], output:
                      "controls": {"runs": recorded.get("runs"), "takes": len(rows), "digest": recorded["digest"]}},
         "levels": {"humanReference": human, "failPrecisionLower": rules["fail"]["precisionLower"]},
         "norms": (pool_norms or {}).get("file"), "detectors": results,
+        "agreement": {"detectorsFlagging": agreement},
     }
     if isinstance(previous, dict):
         evaluation["replaces"] = {"labelSetDigest": previous.get("labelSetDigest"),

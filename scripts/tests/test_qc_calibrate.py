@@ -401,6 +401,27 @@ class HumanReferenceEvalTests(unittest.TestCase):
         self.assertEqual(asr["languages"]["french"]["level"], "warn")
         self.assertEqual(len(store.read_jsonl(self.layout.private / "eval-ledger.jsonl")), 4)
 
+    def test_eval_reports_precision_by_how_many_detectors_flagged(self):
+        self.commit(self.path)
+        self.evaluate()
+        # The first ten pool takes also lose two seconds of audio: content.asr and signal.artifacts both flag.
+        features = store.read_json(self.pool / "features.json")
+        for row in features["takes"][:10]:
+            row["features"]["signal.dropout_seconds"] = feature(2.0)
+        store.write_json_atomic(self.pool / "features.json", features)
+        self.flag_pool()
+        result = confirm.next_batch(self.layout, "pool-1", n=6, mix_agreement=True)
+        items = label.load_batch(self.layout, result["batch"])["items"]
+        self.assertEqual(sorted(len(item["reasons"]) for item in items), [1, 1, 1, 2, 2, 2])
+        # Agreeing flags unusable, lone flags usable, one lone flag unsure (counted on neither side).
+        lone = [k for k, item in enumerate(items, 1) if len(item["reasons"]) == 1]
+        confirm.record(self.layout, result["batch"], ",".join(
+            f"{k}={'u' if len(item['reasons']) == 1 else 'x'}" if k != lone[0] else f"{k}=?"
+            for k, item in enumerate(items, 1)))
+        agreement = self.evaluate()["agreement"]["detectorsFlagging"]
+        self.assertEqual((agreement["2+"]["n"], agreement["2+"]["rate"]), (3, 1.0))
+        self.assertEqual((agreement["1"]["n"], agreement["1"]["rate"]), (2, 0.0))
+
     def test_eval_refuses_other_scoring_or_controls(self):
         self.commit(self.path)
         rows = store.read_json(self.layout.runs / "controls-1/features.json")
@@ -443,6 +464,7 @@ class ConfirmTests(unittest.TestCase):
             return item, [{"detector": detector, "class": cls, "score": score, "level": "report-only"}
                           for detector, cls, score in flags]
 
+        self.take = take
         asr, pause, loud = ("content.asr", "stutter"), ("pause.anomalous", "pause"), ("level.loudness", None)
         self.takes = dict((item["takeID"], (item, flags)) for item, flags in [
             take("fr-0001--a", "french", [pause + (0.999,)]),
@@ -514,6 +536,52 @@ class ConfirmTests(unittest.TestCase):
         self.assertEqual(more["batch"], "confirm-002")
         with self.assertRaisesRegex(FileExistsError, "exists"):
             confirm.next_batch(self.layout, "pool-1", name="confirm-002")
+
+    def test_mix_agreement_sends_agreeing_and_lone_flags_half_and_half_in_a_seeded_order(self):
+        def candidate(token, language, *names):
+            return {"token": token, "language": language,
+                    "flags": [{"detector": name, "class": "c", "score": 1.0} for name in names]}
+
+        several = [candidate("a", "french", "content.asr", "pause.anomalous"),
+                   candidate("b", "english", "content.phoneme", "content.asr", "prosody.rate"),
+                   candidate("f", "chinese", "content.asr", "language.wrong")]
+        lone = [candidate("c", "french", "content.asr"), candidate("d", "french", "pause.anomalous"),
+                candidate("e", "english", "prosody.rate")]
+        self.assertEqual([confirm.agreement(item) for item in several + lone], [2, 3, 2, 1, 1, 1])
+        chosen = confirm.pick(several + lone, 4, ["french", "english"], mix_agreement=True, seed="s")
+        self.assertEqual(sorted(item["token"] for item in chosen), ["a", "b", "c", "d"])
+        orders = {tuple(item["token"] for item in confirm.pick(several + lone, 4, ["french", "english"],
+                                                               mix_agreement=True, seed=f"s{k}"))
+                  for k in range(8)}
+        self.assertGreater(len(orders), 1)  # shuffled, so position says nothing about agreement
+        self.assertEqual([item["token"] for item in chosen],
+                         [item["token"] for item in confirm.pick(several + lone, 4, ["french", "english"],
+                                                                 mix_agreement=True, seed="s")])
+        # Either half fills in when the other runs short; without the flag, nothing changes.
+        short_several = confirm.pick(several[:1] + lone, 4, ["french"], mix_agreement=True, seed="s")
+        self.assertEqual(sorted(item["token"] for item in short_several), ["a", "c", "d", "e"])
+        short_lone = confirm.pick(several + lone[:1], 4, ["french", "english"], mix_agreement=True, seed="s")
+        self.assertEqual(sorted(item["token"] for item in short_lone), ["a", "b", "c", "f"])
+        self.assertEqual([item["token"] for item in confirm.pick(several + lone, 4, ["french", "english"])],
+                         ["a", "b", "d", "e"])
+
+        # In a batch: the advisory loudness flag adds no agreement, clones stay out, the params record the mix.
+        asr, pause, loud = ("content.asr", "stutter"), ("pause.anomalous", "pause"), ("level.loudness", None)
+        for item, flags in (self.take("fr-0011--k", "french", [asr + (0.99,), pause + (0.996,)]),
+                            self.take("fr-0012--l", "french", [asr + (0.99,), loud + (1.0,)]),
+                            self.take("fr-0013--m", "french", [asr + (1.0,), pause + (1.0,)], mode="clone")):
+            self.takes[item["takeID"]] = (item, flags)
+        self.write_flags("pool-1", "qc-takes")
+        result = confirm.next_batch(self.layout, "pool-1", n=2, name="mix-1", mix_agreement=True)
+        batch = label.load_batch(self.layout, "mix-1")
+        self.assertTrue(batch["params"]["mixAgreement"])
+        self.assertEqual(len(result["takes"]), 2)
+        tokens = [item["takeToken"] for item in batch["items"]]
+        self.assertIn(self.token("fr-0011--k"), tokens)
+        self.assertNotIn(self.token("fr-0013--m"), tokens)
+        self.assertEqual(sorted(len(item["reasons"]) for item in batch["items"]), [1, 2])
+        self.assertFalse(label.load_batch(self.layout, confirm.next_batch(self.layout, "pool-1", n=1)["batch"])
+                         ["params"]["mixAgreement"])
 
     def test_controls_runs_and_runs_without_sendable_takes_are_refused(self):
         self.write_flags("controls-1", "controls")

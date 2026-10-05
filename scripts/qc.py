@@ -267,7 +267,8 @@ def cmd_confirm(args: argparse.Namespace, layout: Layout) -> int:
 
     try:
         if args.action == "next":
-            result = confirm.next_batch(layout, args.run, n=args.n, languages=_csv(args.languages), name=args.name)
+            result = confirm.next_batch(layout, args.run, n=args.n, languages=_csv(args.languages), name=args.name,
+                                        mix_agreement=args.mix_agreement)
             for line in confirm.next_lines(result):
                 print(line)
             return EXIT_OK
@@ -463,6 +464,8 @@ def build_parser() -> argparse.ArgumentParser:
     confirm_next.add_argument("--languages", default="french,english",
                               help="comma-separated languages to prefer (default french,english)")
     confirm_next.add_argument("--name", help="batch name (default confirm-<NNN>)")
+    confirm_next.add_argument("--mix-agreement", action="store_true",
+                              help="half takes two or more detectors flagged, half takes one flagged, shuffled")
     confirm_record = confirm_actions.add_parser("record", help="record the maintainer's answers as labels")
     confirm_record.add_argument("--batch", required=True)
     confirm_record.add_argument("--answers", required=True, help='per take: x unusable, u usable, ? unsure, '

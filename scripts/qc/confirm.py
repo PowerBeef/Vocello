@@ -5,7 +5,8 @@ detector that has a class (the advisory loudness flag alone never sends a take).
 human controls, every clone take (mode `clone`, or a take with a reference clip: corpus-voice
 clones are internal-only and are never sent) and every take already answered in a confirm batch.
 It prefers `--languages` (French and English) and spreads over detectors: round-robin by
-detector, the highest score first. It writes a `kind: "confirm"` label batch
+detector, the highest score first; `--mix-agreement` takes half the batch from takes two or more
+detectors flagged and half from lone flags, in a shuffled order. It writes a `kind: "confirm"` label batch
 (`build/private/qc/batches/<name>.json`), copies each WAV to
 `build/private/qc/confirm/<name>/<k>.wav` under a neutral name, and lists, per take, the file, the
 language and the script, never a detector, score or voice: the maintainer judges blind.
@@ -20,6 +21,7 @@ optionally ticks classes. These labels measure the precision of the human-refere
 
 from __future__ import annotations
 
+import random
 import re
 import shutil
 from collections import Counter
@@ -94,21 +96,48 @@ def _round_robin(group: list[dict[str, Any]], count: int, taken: set[str]) -> li
     return picked
 
 
-def pick(candidates: list[dict[str, Any]], n: int, languages: Iterable[str]) -> list[dict[str, Any]]:
-    """The takes to send: the preferred languages first, then the others, each round-robin by detector."""
+def agreement(candidate: dict[str, Any]) -> int:
+    """How many detectors flagged the take."""
 
-    preferred = set(languages)
+    return len({flag["detector"] for flag in candidate["flags"]})
+
+
+def _pick_by_language(candidates: list[dict[str, Any]], n: int, preferred: set[str],
+                      taken: set[str]) -> list[dict[str, Any]]:
     first = [candidate for candidate in candidates if candidate["language"] in preferred]
     rest = [candidate for candidate in candidates if candidate["language"] not in preferred]
-    taken: set[str] = set()
     chosen = _round_robin(first, n, taken)
     if len(chosen) < n:
         chosen += _round_robin(rest, n - len(chosen), taken)
     return chosen
 
 
+def pick(candidates: list[dict[str, Any]], n: int, languages: Iterable[str], *,
+         mix_agreement: bool = False, seed: str = "") -> list[dict[str, Any]]:
+    """The takes to send: the preferred languages first, then the others, each round-robin by detector.
+
+    With `mix_agreement`, half the batch (rounded up) comes from takes two or more detectors flagged and
+    the rest from takes one detector flagged (either half filling in when the other runs short), shown
+    in an order shuffled by `seed`: the answers then compare the precision of agreeing and lone flags
+    without the maintainer knowing which is which.
+    """
+
+    preferred = set(languages)
+    taken: set[str] = set()
+    if not mix_agreement:
+        return _pick_by_language(candidates, n, preferred, taken)
+    several = [candidate for candidate in candidates if agreement(candidate) >= 2]
+    lone = [candidate for candidate in candidates if agreement(candidate) == 1]
+    chosen = _pick_by_language(several, (n + 1) // 2, preferred, taken)
+    chosen += _pick_by_language(lone, n - len(chosen), preferred, taken)
+    if len(chosen) < n:
+        chosen += _pick_by_language(several, n - len(chosen), preferred, taken)
+    random.Random(f"vocello.qc.confirm/1:{seed}").shuffle(chosen)
+    return chosen
+
+
 def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: Iterable[str] = DEFAULT_LANGUAGES,
-               name: str | None = None) -> dict[str, Any]:
+               name: str | None = None, mix_agreement: bool = False) -> dict[str, Any]:
     """Write the next confirm batch from a generated run's flags and copy its WAVs under neutral
     names; return what the maintainer is shown: per take its number, file, language and script."""
 
@@ -133,11 +162,11 @@ def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: It
         if not flagged or not take.get("audio") or not Path(take["audio"]).is_file():
             continue
         candidates.append({"token": entry["token"], "language": take.get("language"), "flags": flagged, "take": take})
-    chosen = pick(candidates, n, preferred)
+    name = name or _default_name(layout)
+    chosen = pick(candidates, n, preferred, mix_agreement=mix_agreement, seed=name)
     if not chosen:
         raise ConfirmError(f"run {run_id} flagged no take that can be sent (controls, clones and answered takes "
                            "are never sent)")
-    name = name or _default_name(layout)
     if label.batch_path(layout, name).exists():
         raise FileExistsError(f"batch {name} exists; choose another name")
     folder = confirm_directory(layout, name)
@@ -157,7 +186,7 @@ def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: It
                         "text": " ".join(str(take.get("text") or "").split())})
     label.write_batch(layout, {
         "schema": label.BATCH_SCHEMA, "batch": name, "kind": CONFIRM_KIND, "createdAt": label.utc_now(),
-        "params": {"run": run_id, "n": n, "languages": preferred}, "items": items,
+        "params": {"run": run_id, "n": n, "languages": preferred, "mixAgreement": mix_agreement}, "items": items,
         "takes": {item["takeToken"]: takes[item["takeToken"]] for item in items},
     })
     return {"batch": name, "takes": listing}

@@ -30,10 +30,16 @@ controls and the ear only confirms flagged takes in chat (`qc.py calibrate`, `qc
 - **French and English pool** (957 takes): 164 flag at warn. `fr-0101--dylan` is not flagged: its
   three heard defects (confirmed severe by ear on 2026-10-05) sit inside the human range.
 
+- **Confirmations:** confirm-1 to confirm-3 answered (15 takes, 13 decisive; eval-v1 at 1c46e823).
+  Takes two or more detectors flagged were unusable 4 of 6 times, lone flags 1 of 7, so later rounds
+  send half of each (`confirm next --mix-agreement`, b5ea864b) and `eval` reports precision by
+  agreement (`agreement.detectorsFlagging`).
+
 **Next.**
-1. The maintainer answers confirm-1 (5 clips sent in chat): `qc.py confirm record --batch confirm-1
-   --answers "1=x,2=u,…"`; then more rounds with `qc.py confirm next`, toward 17 per detector for fail.
-2. `qc.py eval` again after each round (precision); re-calibrate only with new controls.
+1. More rounds: `qc.py confirm next --run qc-takes-20261005-214936-eb0a --mix-agreement`, answers with
+   `qc.py confirm record`, then `qc.py eval --runs qc-takes-20261005-214936-eb0a --batches confirm-…`.
+   If agreement holds, warn on agreeing flags only; otherwise toward 17 per detector for fail.
+2. Re-calibrate only with new controls.
 3. One real qc-takes queue, one clone-lane run and the language bench, on request.
 
 ### October 2, morning — QC v2 cut to the external reports; 53 GB freed; ready for labels

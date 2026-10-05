@@ -1403,7 +1403,7 @@
       ],
       "updated": "2026-10-05",
       "unparkWhen": null,
-      "notes": "2026-10-05: listening to all of batch-1 on the label page was too slow for the maintainer; calibration moved to human controls and the ear now confirms only flagged takes. fr-0101--dylan is labelled (three severe defects); the label page and batch-1 stay for later labelling."
+      "notes": "2026-10-05: listening to all of batch-1 on the label page was too slow for the maintainer; calibration moved to human controls and the ear now confirms only flagged takes. fr-0101--dylan is labelled (three severe defects); the label page and batch-1 stay for later labelling. 15 confirmations so far (confirm-1 to 3); later rounds mix agreeing and lone flags (--mix-agreement) to test warning only on agreement."
     },
     {
       "id": "QC-03",

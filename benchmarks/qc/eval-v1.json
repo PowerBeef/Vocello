@@ -1,17 +1,17 @@
 {
- "commit": "5c8dc11ab0220e8701754512e208331cf35b1e96",
- "createdAt": "2026-10-05T21:48:58Z",
+ "commit": "ab68894394895792fec4a9ca7e6af2891730e6e4",
+ "createdAt": "2026-10-05T22:16:02Z",
  "detectors": {
   "boundary.cutoff": {
    "class": "cutoff",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 1,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.025,
+     "n": 1,
+     "rate": 1.0,
+     "upper": 1.0
     },
     "uncertain": 0
    },
@@ -96,12 +96,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 1,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.025,
+     "n": 1,
+     "rate": 1.0,
+     "upper": 1.0
     },
     "uncertain": 0
    },
@@ -186,12 +186,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 2,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.0126,
+     "n": 2,
+     "rate": 0.5,
+     "upper": 0.9874
     },
     "uncertain": 0
    },
@@ -282,12 +282,12 @@
    "class": "wrong-language",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 2,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.1581,
+     "n": 2,
+     "rate": 1.0,
+     "upper": 1.0
     },
     "uncertain": 0
    },
@@ -378,12 +378,12 @@
    "class": "pause",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 2,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.0126,
+     "n": 2,
+     "rate": 0.5,
+     "upper": 0.9874
     },
     "uncertain": 0
    },
@@ -474,12 +474,12 @@
    "class": "unnatural",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 1,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.025,
+     "n": 1,
+     "rate": 1.0,
+     "upper": 1.0
     },
     "uncertain": 0
    },
@@ -564,12 +564,12 @@
    "class": "artifact",
    "confirmations": {
     "failReady": false,
-    "flagged": 0,
+    "flagged": 1,
     "precision": {
-     "lower": null,
-     "n": 0,
-     "rate": null,
-     "upper": null
+     "lower": 0.0,
+     "n": 1,
+     "rate": 0.0,
+     "upper": 0.975
     },
     "uncertain": 0
    },
@@ -652,8 +652,10 @@
   }
  },
  "labelSet": {
-  "batches": [],
-  "confirmations": 0,
+  "batches": [
+   "confirm-1"
+  ],
+  "confirmations": 5,
   "controls": {
    "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
    "runs": [
@@ -661,9 +663,9 @@
    ],
    "takes": 1600
   },
-  "takes": 0
+  "takes": 5
  },
- "labelSetDigest": "0cb402204d676ae8eabcfe90b862df2e84e92a4508b50c7d02b3cd43de13cef1",
+ "labelSetDigest": "5837638f1336a2ebd267c696a413e1887dcd1b3c49a61aa8be9a256a4d514669",
  "levels": {
   "failPrecisionLower": 0.8,
   "humanReference": {
@@ -680,6 +682,10 @@
  },
  "norms": "norms-v1.json",
  "rater": "maintainer",
+ "replaces": {
+  "createdAt": "2026-10-05T21:48:58Z",
+  "labelSetDigest": "0cb402204d676ae8eabcfe90b862df2e84e92a4508b50c7d02b3cd43de13cef1"
+ },
  "schema": "vocello.qc.eval/2",
  "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",
  "thresholds": "thresholds-v1.json",

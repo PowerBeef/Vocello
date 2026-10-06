@@ -17,6 +17,31 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 6, evening — audit second pass: 35 of the 41 P1/P2 findings fixed, release path hardened
+
+The maintainer asked for DA-02, DA-03 and DA-08 to DA-12. Five agents worked in isolated worktrees;
+each branch was integrated on `main`, built and tested there, and reviewed (Swift review on every
+Swift change, an adversarial review of the release path). The reviews' fixes are in the same batch.
+81 confirmed findings are now fixed ([report](audits/2026-10-06-deep-audit.md), section 9).
+
+- **Done (archived):** DA-08 (iPhone model removal coordinated with the engine and a busy alert;
+  damaged History records can be set aside; journaled single delete), DA-09 (tests drive the shipped
+  take choreography and the real engine's cancellation wiring), DA-10 (a deleted voice's clone cache,
+  folder copies held for access, Restore cancellation), DA-11 (signing jobs build the authorized
+  commit; promotion runs from the tag under the `release` environment, checks tag- and commit-bound
+  attestations and exact assets, and its base is the previous public release).
+- **Fixed in code, verification left:** DA-02 (Studio state and window ownership; one Mac app run for
+  a window closed mid-take), DA-03 (accessibility, localization, glass; a device check, A13-06).
+- **DA-12:** the two P2s (build-lock spin, unchecked archive evidence) are fixed in 04bec09a; the P3s
+  stay. **DA-13** holds the reviews' smaller follow-ups.
+- **Open P2s:** E1-02, E2-01, E4-01 (a model run or a maintainer decision), A7-02, A7-03, T3-02.
+
+**Next.**
+1. On request: one Mac app run for DA-02 and a device check for DA-03.
+2. The maintainer's choices among DA-04 to DA-07 (model runs, a memory-policy decision).
+3. RF-14 (take quality) and the release critical path; `release.yml` and `promote-release.yml` first
+   run end to end at the next release.
+
 ### October 6, later — deep audit: one P1, 40 P2, 111 P3 confirmed; 24 fixed the same day
 
 A read-only audit of the whole project at 66ecb85b

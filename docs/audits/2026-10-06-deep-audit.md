@@ -15,7 +15,7 @@ sourceOfTruth:
 
 **Verdict.** The core is sound. The engine's lease, reservation and terminal design left no reachable hang or double terminal; model delivery is fail-closed on every shipped path; the token loop, sampling and cancellation cadence hold; commerce has one StoreKit owner and verified-only grants; the diagnostics privacy work holds; target wiring, pins and the localization catalog are consistent. The defects are at the edges: what happens to History after a device migration, a few stuck or misleading states, guard scripts that match one spelling, and a release path whose last step is less protected than its first.
 
-**Since the audit:** 24 findings are fixed on `main`, including the P1 and five of the P2 items listed below; section 9 has the commits and what was deliberately left.
+**Since the audit:** 81 confirmed findings are fixed on `main` in two passes the same day, 35 of the 41 P1 and P2 items among them, plus six that were only plausible; section 9 has the commits and what is left. The P2 items still open are E1-02, E2-01, E4-01 (each needs a model run or a maintainer decision), A7-02, A7-03 and T3-02.
 
 **One P1 defect.**
 
@@ -93,7 +93,7 @@ sourceOfTruth:
 - **How it fails:** 1. Someone edits GenerationOutputAdapter.run, for example moving acknowledgeProductFinalization before chunkSink(.completed) or dropping the abortReservation call on the not-opened path. 2. All 12 adapter and sink tests still pass, because they run the package's unused copy. 3. A lease leak or a completed-then-failed ordering regression reaches users. 4. The roadmap item PA-19 (generate-loop and orchestrator coverage) reads as closed on this path.
 - **Fix:** Either route GenerationOutputAdapter.run through VocelloQwen3ProductOutputAdapter with AtomicWAVGenerationOutputSink, so the tested code is the shipped code, or delete the unused adapter and sink and their tests. Then test the real adapter over the package fixture engine (VocelloQwen3Engine with FacadeCompatibilityModel) through GenerationOutputAdapting, covering success, sink failure, pre-cancel and acknowledge-throws.
 - **Notes:** confirmed by both verification passes.
-- **Action:** Roadmap DA-09.
+- **Action:** Fixed in `89896465`, `6306e841`.
 
 #### E7-03 (P2): The PA-15 shutdown-reason tests re-create the engine wiring inline instead of exercising it
 
@@ -102,7 +102,7 @@ sourceOfTruth:
 - **How it fails:** 1. A refactor of MLXTTSEngine.generate swaps the order to `coordinatorCancellationReason ?? cancellationIngress.reason`, or stops installing the typed reason in the coordinator's cancel closure. 2. The terminal `.cancelled` summary reports `.user` for a shutdown. 3. All three tests still pass, because the precedence they check is written in the test itself.
 - **Fix:** Drive a real MLXTTSEngine.generate over a stub GenerationOutputAdapting factory that suspends until cancelled. Cancel through cancelActiveGeneration(reason: .shutdown), then assert the `.cancelled` GenerationEvent summary reason from events(for:), and also assert the .user fallback when only the task is cancelled.
 - **Notes:** confirmed by both verification passes.
-- **Action:** Roadmap DA-09.
+- **Action:** Fixed in `89896465`.
 
 ### iOS and macOS apps
 
@@ -132,7 +132,7 @@ sourceOfTruth:
 - **How it fails:** 1) Generate a Voice Design take. The inline card shows it complete and `saveSheetAudioPath` is set. 2) Tap the Built-in capsule, or switch tab and come back. `IOSGenerateModeViewport` and `RootView` use `switch`, so IOSVoiceDesignView is rebuilt with `saveSheetAudioPath == nil`. 3) The complete card still shows from `coordinator.lastCompletedOutput`, but `onSaveAsVoice` is nil, so the Save action is gone. 4) Separately, edit the script after a take and tap Save: `saveSheetTranscript = promptText` pairs the old audio with the new text, and that is persisted as the reference transcript of a saved clone voice.
 - **Fix:** Move the candidate to AppModel as a `VoiceDesignSavedVoiceCandidate`. The type is in MacAppModel.swift, which iOS does not compile, so first extract it to a shared file under Sources/iOSSupport or SharedSupport. Set it in an `onCompleted` step from the take's `result.audioPath`, `plan.request.text` and the brief. Drive `onSaveAsVoice`, the sheet's clip URL and the default transcript from it, and clear it when the take is replaced or no longer matches the draft. Add a VocelloCoreTests case for `matches(draft:)`.
 - **Notes:** confirmed by both verification passes; relates to AUD-03.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`.
 
 #### A10-02 (P2): Programmatic routes switch Studio mode during a generation
 
@@ -141,7 +141,7 @@ sourceOfTruth:
 - **How it fails:** 1) Start a Voice Design take or a long-form project. 2) Open the Voices tab and tap a saved voice or a built-in speaker. 3) `studioMode` becomes `.clone` or `.custom`, and the Studio tab shows an idle canvas with Generate disabled because the engine is busy. 4) The mode selector is disabled for the other modes (`.disabled(isSelectionDisabled && item != selection)`), so the running Design canvas and its Stop button are unreachable until the work completes. For long-form that can be minutes.
 - **Fix:** Add one AppModel method, for example `requestStudioMode(_:)`, that returns without switching when `studioCoordinators`/`longForm` report active work in a different mode. Route the Voices, recorder and import call sites through it. Alternatively, let the canvas of any mode show a Stop control for `ttsEngine.hasActiveGeneration`. Mirror the Mac `selectDestination` rule.
 - **Notes:** confirmed by both verification passes.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`, `5186f914`, `303ad901`.
 
 #### A12-02 (P2): Skip and Retake buttons size from outside their label (small hit region)
 
@@ -149,7 +149,7 @@ sourceOfTruth:
 - **Defect:** The onboarding Skip button and the recording Retake button put their sizing (frame, background, capsule) on the Button from outside instead of inside its label. Under SwiftUI's behavior of limiting a Button's hit and accessibility region to its label, only the text bounds (about 40x20 pt) are tappable. Retake draws a full-width 52 pt capsule where most of the visible area does nothing.
 - **How it fails:** 1. A user taps the empty part of the Retake capsule (or near the small Skip word). 2. Nothing happens because the hit region is only the text label. 3. Users with motor impairments, or at larger sizes, fail repeatedly. 4. The 44 pt minimum named in the audit contract is not met and these controls are not covered by the audit's target check.
 - **Fix:** Move the frame, background and contentShape(Rectangle()) inside the Button label (as IOSPlayerSheet's topBar does) with minHeight 44, and add both identifiers to the target assertions.
-- **Action:** Roadmap DA-03.
+- **Action:** Fixed in `e62747f0`.
 
 #### A12-03 (P2): iOS History segments disclosure has no expanded state for VoiceOver
 
@@ -157,7 +157,7 @@ sourceOfTruth:
 - **Defect:** The iOS History long-form segments disclosure has no expanded or collapsed accessibility value and a text-sized hit region. The macOS twin was fixed with both an accessibilityValue and an inner contentShape plus vertical padding. The iOS version applies only horizontal padding outside the Button and exposes the state only through an unlabeled chevron image.
 - **How it fails:** 1. A VoiceOver user lands on 'N segments' in History. 2. VoiceOver reads the label but not whether the list is expanded, and the chevron is an unlabeled symbol. 3. They cannot tell whether activating expands or collapses. 4. The roughly 20 pt tall target is also hard to hit for motor-impaired users.
 - **Fix:** Mirror the Mac implementation: add .accessibilityValue(expanded/collapsed) using catalog strings, hide the chevron, and add vertical padding plus contentShape(Rectangle()) with minHeight 44 inside the label.
-- **Action:** Roadmap DA-03.
+- **Action:** Fixed in `e62747f0`.
 
 #### A12-04 (P2): Only Studio transitions are announced to VoiceOver; lifecycle toasts and other status changes are silent
 
@@ -166,7 +166,7 @@ sourceOfTruth:
 - **How it fails:** 1. A VoiceOver user is mid-take, or in History, when the engine is interrupted and recovers. 2. The toast appears and is removed 4 s later, and VoiceOver focus never moves to it. 3. The user never learns the engine restarted, or whether a purchase or restore succeeded. 4. On Mac a crashed or errored engine shows only a visual strip.
 - **Fix:** Route the lifecycle toast, purchase notice, enqueue warning and Mac status errors through the same announcer, on appearance and with the localized message; keep informational toasts from relying on 4 s visibility alone.
 - **Notes:** relates to IOS-12.
-- **Action:** Roadmap DA-03.
+- **Action:** Fixed in `e62747f0`, `201194a6`.
 
 #### A12-05 (P2): The shared filter chip row truncates at large text sizes
 
@@ -175,7 +175,7 @@ sourceOfTruth:
 - **How it fails:** 1. A user at AX3 or larger opens History with four chips, or Voices with three. 2. Each chip gets roughly a quarter or third of the width and its label is limited to one line with minimumScaleFactor 0.85. 3. Labels truncate to fragments, so the filter choices cannot be told apart visually. 4. The chip group can neither wrap nor scroll.
 - **Fix:** At isAccessibilitySize render the chips in a vertical stack or a LazyVGrid, or allow two lines, matching the capsule selector's adaptation. Add History and Voices to the AX walk.
 - **Notes:** relates to PA-20.
-- **Action:** Roadmap DA-03.
+- **Action:** Fixed in `e62747f0`, `201194a6`.
 
 #### A12-51 (P2): Onboarding and the recording overlay clip at large Dynamic Type sizes
 
@@ -184,7 +184,7 @@ sourceOfTruth:
 - **How it fails:** 1. A user with AX3 or larger text installs and opens the app, so the onboarding fullScreenCover shows. 2. The 36 pt largeTitle-scaled headline, the 17 pt body copy limited to 320 pt wide, and the three benefit rows exceed the screen height. 3. The pages container is centered with maxHeight .infinity and cannot scroll, so top and bottom content is clipped and unreachable except by VoiceOver. 4. The recording overlay shows the same clipping for its guidance and status text.
 - **Fix:** Wrap the onboarding pages and the recording stage in IOSScrollView (or branch on dynamicTypeSize.isAccessibilitySize to a scrolling layout), drop the fixed 280/300/320 widths at accessibility sizes, and add onboarding and recording to the AX-XXXL walk.
 - **Notes:** relates to PA-20.
-- **Action:** Roadmap DA-03.
+- **Action:** Fixed in `e62747f0`.
 
 #### A14-01 (P2): A line batch cancelled by the engine never closes its Studio attempt
 
@@ -193,7 +193,7 @@ sourceOfTruth:
 - **How it fails:** 1) Start a line batch on a memory-tight Mac. 2) Kernel critical pressure (hardTrim) or the store's critical band cancels the active take with reason memoryPressure; engine.generate throws CancellationError. 3) run() returns .cancelled, cancelTask is nil, finish(.cancelled) only sets the outcome. 4) coordinator.isGenerating stays true: the canvas stays locked, the sheet's retry shows the busy message although the engine is idle, and the outcome reads 'cancelled' with no reason. Recovery only by pressing Cancel or Cmd-. on a batch that is no longer running.
 - **Fix:** In finish(.cancelled) call studioCoordinator.finish(attempt: attempt), as IOSLongFormCoordinator does: it is a no-op while a user cancellation barrier is pending and closes the attempt otherwise. Carry the non-user reason into the outcome so the sheet does not present it as a user cancel.
 - **Notes:** relates to PA-19.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`. Why the engine cancelled is not shown yet (DA-13).
 
 #### A14-02 (P2): A failed Mac engine start is swallowed: the app stays on "Starting engine…" forever
 
@@ -211,7 +211,7 @@ sourceOfTruth:
 - **How it fails:** 1) Voice Cloning, reference not yet primed: Generate, then Cancel during 'Preparing voice reference…'. The barrier finds no generation, returns, and the coordinator is idle while the prime unwinds. 2) Press Generate again inside that window: take 2 claims playback ownership and waits behind the prime. 3) The prime ends; stale task 1 calls generationSubmitted, beginGenerationPlayback(op1) replaces take 2's ownership, then its generate is refused and generationCancelled aborts the preview. 4) Take 2 completes with every preview chunk dropped and no final handoff or autoplay; it is in History but the Studio player never loads it.
 - **Fix:** After await prepare(), throw CancellationError when Task.isCancelled or the attempt is no longer the coordinator's running attempt, before calling the executor. Optionally keep the coordinator nonterminal until the task has exited (await the task in the cancel path), matching the documented barrier contract.
 - **Notes:** relates to AUD-03.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`.
 
 #### A14-04 (P2): The Mac footer keeps showing an old error after the engine recovered
 
@@ -219,7 +219,7 @@ sourceOfTruth:
 - **Defect:** The footer status maps any non-empty visibleErrorMessage to .error before it looks at loadState, and the engine clears that message only when a later operation succeeds, so a retry after a failed take shows the previous error for the whole run instead of the running activity.
 - **How it fails:** 1) A take fails; handle() sets visibleErrorMessage and .failed, the strip shows Error (correct). 2) Press Generate again without dismissing the strip; the failed model was unloaded, so this is a cold start. 3) The engine publishes .running but keeps the old message. 4) The sidebar strip (identifier sidebar_backendStatus_error) keeps showing the old error with a dismiss button during the retry, and again after a user cancel of that retry; it clears only on success. With loadState .starting the old error text is shown as the activity title.
 - **Fix:** In resolve(), let .running and .starting win over a stale message (show the error only for .failed, or for idle/loaded states), or clear the engine's visible error when a user generation is admitted. Add a table test over the snapshot combinations.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`.
 
 #### A14-05 (P2): Mac Navigate commands stay enabled during a line batch or long-form project
 
@@ -228,7 +228,7 @@ sourceOfTruth:
 - **How it fails:** 1) Start a 100-line batch or a long-form project from Built-in Voice (sheet presented by MacCustomVoiceScreen). 2) Press Cmd-4, Cmd-5, Cmd-6 or Cmd-F. 3) selectDestination switches the detail view, the presenting screen leaves the hierarchy and the sheet is dismissed. 4) onDisappear calls cancelIfDismissedWhileProcessing or longForm.cancel: the run is cancelled with no confirmation, and reopening the sheet resets the line-batch outcome. Cmd-1/2/3 do the same in the gap between two lines, when hasActiveGeneration is briefly false; during a take they are silent no-ops.
 - **Fix:** Disable the Navigate commands (or make selectDestination refuse) while appModel.lineBatch.isProcessing or appModel.longForm.isProcessing, using the coordinators' isGenerating rather than the store's per-take flag; or host the batch sheet above the destination switch so navigation does not dismiss it.
 - **Notes:** relates to MAC-23.
-- **Action:** Roadmap DA-02.
+- **Action:** Fixed in `8e8d5556`.
 
 #### A2-02 (P2): One unreadable outbox entry permanently blocks Clear All and pending-audio removal
 
@@ -237,7 +237,7 @@ sourceOfTruth:
 - **How it fails:** 1. One outbox .json becomes undecodable (disk fault, interrupted external copy, a restore that dropped half a file). 2. scan.issueCount becomes 1. 3. clearAll throws clearUnavailable on every call, removePendingAudio returns early so removed-row audio is never reclaimed, and withReferencedAudioPaths returns nil. 4. The banner says 'Retry before clearing History', Retry changes nothing, and only a reinstall clears it.
 - **Fix:** Add an explicit user-confirmed 'Discard unverifiable record' action: move the damaged file to a .unreadable side file as the removal-list path already does, count it in the notice, and let clear-all and removal proceed once the user has seen it.
 - **Notes:** confirmed by both verification passes; relates to F-06.
-- **Action:** Roadmap DA-08 (needs a confirmed discard action and copy; F-06 is related).
+- **Action:** Fixed in `8ad9723c`, `86fd0afe`.
 
 #### A5-01 (P2): iPhone model delete removes files with no engine coordination
 
@@ -246,7 +246,7 @@ sourceOfTruth:
 - **How it fails:** 1. iPhone Studio is generating a Custom take (engine loadState.currentModelID == pro_custom, weights resident). 2. User opens Settings > Voice Models and taps Remove, confirms the sheet. 3. coordinator.delete tombstones the model folder immediately (SharedModelComponentStore.deleteModel) and publishes .deleted; no alert, unlike the Mac's 'Generation in Progress'. 4. Inventory now says not installed while the engine still reports the model loaded with gigabytes of weights resident; Studio flips to 'install the model' while the memory stays held until idle unload, and a later Install of an updated artifact is served by the stale weights until the engine unloads.
 - **Fix:** Move MacModelDeletionSequence (it already only needs a MacModelEngineCoordinating value) into Sources/iOSSupport/Services as a shared deletion sequence, make the iOS TTSEngineStore conform (it already publishes hasActiveGeneration, hasSustainedPerformanceActivity, loadState, clonePreparationState and has unloadModel), give IOSModelInstallerViewModel/coordinator the engine reference from IOSAppDependenciesContainer, and show the busy outcome in VoiceModelsScreen like MacSettingsScreen does. When PA-33's engine-side lease lands, the iOS coordinator must take it too; PA-33's sourceOfTruth lists only the Mac files.
 - **Notes:** confirmed by both verification passes; candidate A-1; relates to PA-33 (also MAC-20): what is new is that the iOS path has no gate at all, not even the store-level sequence the Mac got for MAC-20, and PA-33 as scoped (Mac sequence + MLXTTSEngine) would not reach the iOS delete unless the iOS coordinator is wired to the lease.
-- **Action:** Roadmap DA-08: the fix shares the Mac deletion sequence with iOS and needs new busy-state copy; PA-33 keeps the engine-side lease.
+- **Action:** Fixed in `8ad9723c`. The engine-side lease stays PA-33.
 
 #### A5-02 (P2): An incomplete install cannot be removed from the iPhone UI
 
@@ -282,7 +282,7 @@ sourceOfTruth:
 - **How it fails:** 1) iPhone: import a friend's .m4a voice memo as a saved voice named Alice (stored as voices/Alice.m4a; supportedSavedVoiceAudioExtensions keeps m4a as is). 2) Generate one Clone take: NativePreparedCloneConditioningCache.normalizeCloneReference writes cache/normalized_clone_refs/Alice_<sha256>.wav and copies Alice.txt beside it. 3) Delete Alice in Voices: PreparedVoiceRepository.delete moves only voices/Alice.* into the tombstone; deletePreparedVoice clears in-memory caches only. 4) Alice_<sha256>.wav and Alice_<sha256>.txt remain on disk forever (no sweep names them; the only sweep removes .converting-*/saved-voice-import-* temporaries), although the user asked for the voice to be deleted and privacy-storage.md says each voice is individually deletable.
 - **Fix:** In deletePreparedVoice (or repository.delete via a hook) remove cache/normalized_clone_refs/<id>_*.wav/.txt (fingerprint of the deleted audio is computable before the move), or key normalized outputs for saved voices under voices/<id>.clone_prompt/ so the existing tombstone carries them. Document the normalized cache lifecycle in privacy-storage.md and add a repository/engine test that a deleted non-canonical voice leaves nothing in the normalized directory.
 - **Notes:** confirmed by both verification passes; relates to ASR-06 (backup classification of cache/; this is deletion retention, not backup).
-- **Action:** Roadmap DA-10: a deletion path with no test seam yet; it lands with its test.
+- **Action:** Fixed in `2b7c49ba`.
 
 ### Tooling, CI, release, docs and website
 
@@ -361,7 +361,7 @@ sourceOfTruth:
 - **How it fails:** 1. v3.0.0 is tagged; the true diff since public v2.4.0 touches catalog, memory, UI and engine routing classes. 2. The operator runs `quality_promotion.py create --base v3.0.0-rc.1` (a never-promoted candidate tag, the natural reading of the runbook's `<previous-tag>`) or `--base HEAD~1`. 3. `changed_paths` returns a handful of paths matching no class, so `requiredEvidence` is only `macos-ui-benchmark`. 4. promote-release recomputes the same small set from the manifest's own baseCommit and publishes without the other lanes.
 - **Fix:** In validate_manifest (and create), require baseCommit to equal the commit of `stableMacRelease.tag` from config/public-product-facts.json at the candidate tag (or of the newest tag whose GitHub Release is public), and reject any other base.
 - **Notes:** also reported as T4-03.
-- **Action:** Roadmap DA-11.
+- **Action:** Fixed in `e45d3ad2`.
 
 #### T2-03 (P2): release.yml has no concurrency group and cannot archive iOS alone
 
@@ -370,7 +370,7 @@ sourceOfTruth:
 - **How it fails:** 1. Tag push builds the macOS draft; the maintainer qualifies that DMG and uploads quality-promotion.json. 2. The maintainer runs `gh workflow run release.yml --ref v3.0.0 -f tag=v3.0.0 -f archive_ios=true` for the IPA. 3. `package` runs again and 'Reset draft Release assets' deletes the DMGs, evidence and quality-promotion.json, then uploads a newly notarized DMG. 4. Promotion fails on the missing manifest; regenerating it from the same source-bound records publishes a DMG that was never the one hand-qualified. If the release was already public, the job signs, notarizes and attests a second DMG before failing at the draft check.
 - **Fix:** Add `concurrency: { group: release-${{ env-independent tag expression }}, cancel-in-progress: false }` to release.yml and promote-release.yml (same group), and add a dispatch input or `if:` so an `archive_ios` dispatch skips `package` unless a macOS rebuild is explicitly requested; correct the runbook sentence.
 - **Notes:** candidate T-6; also reported as T2-56.
-- **Action:** Roadmap DA-11.
+- **Action:** Fixed in `e45d3ad2`.
 
 #### T2-05 (P2): A change to the public facts file never runs the website check that depends on it
 
@@ -387,7 +387,7 @@ sourceOfTruth:
 - **Defect:** When the lock directory cannot be created but its parent exists (parent not writable), the acquire loop takes the `continue` branch forever: no sleep, no `waited` increment, no timeout, no error. Every native build or test then burns a core silently instead of failing.
 - **How it fails:** 1. The lock parent (~/Library/Caches/Vocello) exists but is not writable for this process (root-owned after one sudo build, read-only volume, or a write-restricted agent sandbox). 2. Run scripts/dev.sh test or build -> xcb_run -> acquire_native_lock. 3. `mkdir "$lock_dir"` fails, `-d` is false, `-e` is false, `mkdir -p` of the existing parent returns 0, so the code hits `continue`. 4. The loop repeats at 100% CPU indefinitely; QVOICE_NATIVE_LOCK_WAIT_SECONDS never applies and 'cannot create the native lock' is never printed.
 - **Fix:** Count the `continue` branch against the wait budget: sleep and increment `waited` there, or allow one immediate retry and then fail with 'cannot create the native lock' when mkdir fails while the path still does not exist. Add a test with a chmod 555 parent.
-- **Action:** Roadmap DA-12.
+- **Action:** Fixed in `04bec09a`.
 
 #### T3-02 (P2): A macOS UI lane's EXIT trap can exit 1 and mask the lane's real result
 
@@ -411,7 +411,7 @@ sourceOfTruth:
 - **Defect:** The roadmap's rule that a done item must cite resolvable evidence never runs. A done item is rejected in config/roadmap.json and must move to config/roadmap-archive.json, which is never validated. 15 of 213 archived done items have no evidence at all (QC-01, QC-02, QC-03, QC-05, BT-02, PA-32, AUD-05, AUD-08, AUD-10, AQ-01 to AQ-06). A further 58 references use a 'run:' kind the resolver rejects as unknown.
 - **How it fails:** 1. Move an item to roadmap-archive.json with status done and no evidence, as QC-03 was on 2026-10-06. 2. roadmap.py validate and render --check pass. 3. Its dependants (QC-04, QC-06, QC-08 on QC-03; AV-17 on BT-02) count as unblocked and the plan's progress percentage rises, on an unverified self-assertion.
 - **Fix:** Validate archived done items for non-empty evidence. Resolve evidence at closure, for example for archive items whose updated date falls inside a recent window, or record a resolved-at commit. Add 'run' as a known kind or convert those references.
-- **Action:** Roadmap DA-12.
+- **Action:** Fixed in `04bec09a`.
 
 #### T5-02 (P2): Promotion routing leaves 188 of 446 product files in no class
 
@@ -419,7 +419,7 @@ sourceOfTruth:
 - **Defect:** Promotion routing leaves 188 of 446 tracked product files (135 Swift files, project.yml, the entitlements file) in no class, so changing them adds no promotion evidence beyond the platform UI benchmark. The gaps are inconsistent with the classes' own intent. memory-runtime covers Sources/QwenVoiceCore/*Memory*.swift and the iOS store but not Sources/Services/MacMemoryBudgetPolicy.swift or MacWarmupAdmissionPolicy.swift. model-catalog-and-delivery lists the Mac TTSModel, TTSContract and ModelManagerViewModel but not the iOS copies under Sources/iOSSupport. platform-ui covers Sources/Views/** and Sources/iOS/** but nothing under Sources/SharedSupport. Two include globs match no file. Nothing checks completeness.
 - **How it fails:** 1. A point release after 3.0.0 changes only Sources/Services/MacMemoryBudgetPolicy.swift (admission and critical-band unload thresholds). 2. classify_paths matches no class. 3. Promotion requires only macos-ui-benchmark; macos-retained-memory evidence is never requested for a memory-policy change.
 - **Fix:** Add the Mac memory and warm-up policies to memory-runtime, the iOSSupport model/contract/manager copies to model-catalog-and-delivery, and Sources/SharedSupport/Views and ViewModels to platform-ui. Remove the two dead globs. Have validate-contract fail when a tracked Sources/**.swift file matches no class and is not on an explicit no-evidence list.
-- **Action:** Roadmap DA-11.
+- **Action:** Fixed in `e45d3ad2`.
 
 ## 4. Confirmed findings, P3
 
@@ -448,25 +448,25 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 
 | ID | Where | Defect | Action |
 | --- | --- | --- | --- |
-| A10-05 | `IOSGenerationModeViews.swift:197` | The iOS mode views run `PromptLanguageDetector.detect(promptText)` synchronously on the main actor after the 350 ms debounce, in all three modes. | Roadmap DA-02. |
-| A10-06 | `IOSGenerateFlowViews.swift:7` | `IOSGenerateContainerView` declares `@EnvironmentObject` `audioPlayer` and `ttsEngine` and a `hasAnyInstalledModel` computed property. | Roadmap DA-02. |
-| A12-06 | `VocelloPrimaryCTAButton.swift:196` | The primary CTA scales its .headline title but forces a fixed 56 pt (phone) frame height and sits in a fixed 64 pt Studio dock slot. | Roadmap DA-03. |
-| A12-07 | `IOSBottomSheets.swift:143` | Several sheet controls are below 44 pt, although the control-audit contract lists 44 pt as the minimum for the sheet-navigation family. | Roadmap DA-03. |
-| A12-08 | `MacInlinePlayerCard.swift:82` | Three VoiceOver values are hard-coded English literals in an app that ships French. | Roadmap DA-03. |
-| A12-09 | `ios-control-audit.json:491` | Several control-family identifier patterns name identifiers that no longer exist in code, and the validator cannot notice. voices-surface lists voicesFilterButton, voicesImportAudioFile and voicesSaveNewVoice. | Roadmap DA-03. |
-| A12-10 | `IOSBottomSheets.swift:1062` | The voice-picker filter chip identifier is built from the localized visible label. | Roadmap DA-03. |
-| A12-11 | `IOSVoicesView.swift:394` | The language tag pill (EN, ZH, ...) on every Built-in Voices row uses a fixed 10 pt non-scaling system font inside a fixed 20 pt frame, while all neighbouring text scales. | Roadmap DA-03. |
-| A13-01 | `IOSShellPrimitives.swift:859` | The iOS utility buttons apply the system glass button styles (.glassProminent / .glass) directly, outside IOSGatedGlassModifier. | Roadmap DA-03. |
-| A13-02 | `Theme.swift:195` | The iOS Theme says it forwards to the shared VocelloTheme but redeclares several tokens as literals. | Roadmap DA-03. |
-| A13-03 | `IOSGenerationSharedViews.swift:320` | The notice reads `iosReduceTransparencyEnabled` itself to choose its solid backing opacity (0.18 vs 0.06) and passes no `gatedFill`. | Roadmap DA-03. |
-| A13-04 | `Theme.swift:22` | Theme claims to forward to the shared VocelloTheme but re-declares a large set by value: Brand.goldSoft/goldGlow, Surface.glassSurface/glassSurfaceMuted/glassFloating/hairline/glassOuterStroke/glassInnerStroke, accentSurface/Stroke/Wash, glassTint,… | Roadmap DA-03. |
-| A13-05 | `ThemeModifiers.swift:122` | Several design-system helpers have no callers: `ThemeShape`, `Color.themeOnAccent`/`themeOnAccentPressed`, `ThemeFeedback.Selection`, `View.iosDockGlass`, `View.iosSectionGlass` (whose comment says studio dock and section group use them),… | Roadmap DA-03. |
-| A14-06 | `MacStudioGenerationRequestFactory.swift:19` | The Voice Design and Voice Cloning factories omit streamingInterval while Built-in Voice, the iOS views, long-form segments and the warmup coordinator's Design request all pass GenerationSemantics.appStreamingInterval, so on 16 GB and larger Macs Design and… | Roadmap DA-02. |
+| A10-05 | `IOSGenerationModeViews.swift:197` | The iOS mode views run `PromptLanguageDetector.detect(promptText)` synchronously on the main actor after the 350 ms debounce, in all three modes. | Fixed in `8e8d5556`. |
+| A10-06 | `IOSGenerateFlowViews.swift:7` | `IOSGenerateContainerView` declares `@EnvironmentObject` `audioPlayer` and `ttsEngine` and a `hasAnyInstalledModel` computed property. | Fixed in `8e8d5556`. |
+| A12-06 | `VocelloPrimaryCTAButton.swift:196` | The primary CTA scales its .headline title but forces a fixed 56 pt (phone) frame height and sits in a fixed 64 pt Studio dock slot. | Fixed in `e62747f0`. |
+| A12-07 | `IOSBottomSheets.swift:143` | Several sheet controls are below 44 pt, although the control-audit contract lists 44 pt as the minimum for the sheet-navigation family. | Fixed in `e62747f0`. |
+| A12-08 | `MacInlinePlayerCard.swift:82` | Three VoiceOver values are hard-coded English literals in an app that ships French. | Fixed in `e62747f0`. |
+| A12-09 | `ios-control-audit.json:491` | Several control-family identifier patterns name identifiers that no longer exist in code, and the validator cannot notice. voices-surface lists voicesFilterButton, voicesImportAudioFile and voicesSaveNewVoice. | Fixed in `e62747f0`. |
+| A12-10 | `IOSBottomSheets.swift:1062` | The voice-picker filter chip identifier is built from the localized visible label. | Fixed in `e62747f0`. |
+| A12-11 | `IOSVoicesView.swift:394` | The language tag pill (EN, ZH, ...) on every Built-in Voices row uses a fixed 10 pt non-scaling system font inside a fixed 20 pt frame, while all neighbouring text scales. | Fixed in `e62747f0`. |
+| A13-01 | `IOSShellPrimitives.swift:859` | The iOS utility buttons apply the system glass button styles (.glassProminent / .glass) directly, outside IOSGatedGlassModifier. | Fixed in `2b2b7bf4`. |
+| A13-02 | `Theme.swift:195` | The iOS Theme says it forwards to the shared VocelloTheme but redeclares several tokens as literals. | Fixed in `2b2b7bf4`. |
+| A13-03 | `IOSGenerationSharedViews.swift:320` | The notice reads `iosReduceTransparencyEnabled` itself to choose its solid backing opacity (0.18 vs 0.06) and passes no `gatedFill`. | Fixed in `2b2b7bf4`. |
+| A13-04 | `Theme.swift:22` | Theme claims to forward to the shared VocelloTheme but re-declares a large set by value: Brand.goldSoft/goldGlow, Surface.glassSurface/glassSurfaceMuted/glassFloating/hairline/glassOuterStroke/glassInnerStroke, accentSurface/Stroke/Wash, glassTint,… | Fixed in `2b2b7bf4`. |
+| A13-05 | `ThemeModifiers.swift:122` | Several design-system helpers have no callers: `ThemeShape`, `Color.themeOnAccent`/`themeOnAccentPressed`, `ThemeFeedback.Selection`, `View.iosDockGlass`, `View.iosSectionGlass` (whose comment says studio dock and section group use them),… | Fixed in `2b2b7bf4`. |
+| A14-06 | `MacStudioGenerationRequestFactory.swift:19` | The Voice Design and Voice Cloning factories omit streamingInterval while Built-in Voice, the iOS views, long-form segments and the warmup coordinator's Design request all pass GenerationSemantics.appStreamingInterval, so on 16 GB and larger Macs Design and… | Fixed in `8e8d5556`. |
 | A14-07 | `IOSAppDefaults.swift:33` | The vocello.ios.autoplayCompletions preference accessor has no reader or writer anywhere; the live autoplay setting on both platforms is the autoPlay key. | Fixed in `5b3ebba2`. |
-| A14-08 | `MacGenerationWarmupCoordinator.swift:166` | A warm intent that arrives while the engine is not ready or busy, or that the admission gate defers, is dropped, and nothing schedules it again when the engine state changes: the shell's snapshot handler only calls observe(), which never schedules, although… | Roadmap DA-02. |
+| A14-08 | `MacGenerationWarmupCoordinator.swift:166` | A warm intent that arrives while the engine is not ready or busy, or that the admission gate defers, is dropped, and nothing schedules it again when the engine state changes: the shell's snapshot handler only calls observe(), which never schedules, although… | Fixed in `8e8d5556`, `105bdac3`, `303ad901`. |
 | A14-52 | `MacStudioSingleTakeGenerationHooks.swift:40` | On macOS a Stop (⌘. or the Studio Cancel) accepted while generationCompleted is suspended in History persistence still lands the take in History (and announces "stopped"), because the executor's cancellation check runs only before generationCompleted and the… | Fixed in `64ad6677`. |
-| A14-53 | `MacGenerationWarmupCoordinator.swift:289` | A prefetch or clone prime the store refused (thermal or memory-band gate inside allowsProactiveWarmOperations) is recorded as a completed warm whenever the model is already loaded, so the same Studio intent is never re-warmed after the gate clears and the… | Roadmap DA-02. |
-| A14-55 | `MacWarmupAdmissionPolicy.swift:21` | The type's doc comment still says the warm gate defaults to `records` while validating, but Mode.fromEnvironment defaults to `.enforce` (flipped 2026-06-09 per the inline comment), so the header misdescribes shipped behavior. | Roadmap DA-02. |
+| A14-53 | `MacGenerationWarmupCoordinator.swift:289` | A prefetch or clone prime the store refused (thermal or memory-band gate inside allowsProactiveWarmOperations) is recorded as a completed warm whenever the model is already loaded, so the same Studio intent is never re-warmed after the gate clears and the… | Fixed in `8e8d5556`, `105bdac3`, `303ad901`. |
+| A14-55 | `MacWarmupAdmissionPolicy.swift:21` | The type's doc comment still says the warm gate defaults to `records` while validating, but Mode.fromEnvironment defaults to `.enforce` (flipped 2026-06-09 per the inline comment), so the header misdescribes shipped behavior. | Fixed in `8e8d5556`. |
 | A15-01 | `project.yml:304` | The two diagnostics compile capabilities are injected through build settings that project.yml never defines, so their value in a distribution build is whatever the xcodebuild process environment supplies. | Roadmap DA-12. |
 | A15-02 | `project.yml:366` | The VocelloiOS target carries a `resources:` key, which native.md forbids outright, and the project's own comment 35 lines above says entries under that key are silently dropped. | Roadmap DA-12. |
 | A15-03 | `project.yml:149` | Because the macOS target globs all of Sources/ and excludes only retired paths, the Mac app's Resources phase carries iPhone-only material that no Mac code reads: the nine voice-preview WAVs (about 1.5 MB), qwenvoice_ios_model_catalog.json, and the developer… | Roadmap DA-12. |
@@ -475,20 +475,20 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | A15-52 | `project.yml:353` | The developer-facing `Sources/Resources/voice-previews/README.md` is bundled into both shipping app bundles because the voice-previews folder is added as a resource folder on iOS and the QwenVoice `Sources/Resources` resource glob excludes only… | Roadmap DA-12. |
 | A16-01 | `GenerationTelemetryJSONLSink.swift:69` | The QWENVOICE_DIAGNOSTICS_MAX_MB knob is clamped from below (max(1, n)) but not from above, and the result is multiplied with Swift's trapping Int operator. | Roadmap DA-06. |
 | A16-02 | `IOSCrashObserver.swift:85` | Crash and hang payloads from one MetricKit delivery are written under a name built from a one-second-resolution timestamp, so a batch of two or more diagnostic payloads overwrites itself and only the last survives. | Roadmap DA-06. |
-| A2-03 | `HistoryPersistenceError.swift:28` | The typed History storage errors have English-only literal descriptions. | Roadmap DA-08. |
-| A2-04 | `HistoryDeletionEngine.swift:43` | A single delete commits the row deletion before any durable record of the audio removal exists. | Roadmap DA-08. |
-| A4-01 | `IOSSavedOutputsDestination+Commerce.swift:8` | The automatic Files-folder copy reads the purchase state synchronously at completion. | Roadmap DA-10. |
-| A4-02 | `IOSExportPurchaseState.swift:144` | Purchase maps a thrown user cancellation to `.cancelled` through `isUserCancellation`, but Restore does not. | Roadmap DA-10. |
-| A5-03 | `IOSModelDownloadCoordinator.swift:274` | When the durable cancel intent cannot be written for an active download, the coordinator publishes .failed with a message telling the user to 'Retry Cancel' while the transfer keeps running in inflight; the row in .failed state shows only Retry, and Retry… | Roadmap DA-08. |
-| A5-04 | `IOSModelDownloadCoordinator.swift:239` | Cancelling a queued (pending) model calls stopDiagnosticsHeartbeat(), which cancels the single diagnosticsHeartbeat task that belongs to the different model currently downloading, so that model's heartbeat events stop for the rest of its transfer. | Roadmap DA-08. |
-| A5-05 | `IOSAppBootstrap.swift:212` | The installer's onModelInstalled hook is documented as the engine preload after an install, but the only assignment sets it to nil, so the post-install preload path described in the view model does not exist and the documentation is drift. | Roadmap DA-08. |
+| A2-03 | `HistoryPersistenceError.swift:28` | The typed History storage errors have English-only literal descriptions. | Fixed in `1662434c`, `86fd0afe`. |
+| A2-04 | `HistoryDeletionEngine.swift:43` | A single delete commits the row deletion before any durable record of the audio removal exists. | Fixed in `8ad9723c`, `86fd0afe`. |
+| A4-01 | `IOSSavedOutputsDestination+Commerce.swift:8` | The automatic Files-folder copy reads the purchase state synchronously at completion. | Fixed in `21ea84ab`, `6306e841`. |
+| A4-02 | `IOSExportPurchaseState.swift:144` | Purchase maps a thrown user cancellation to `.cancelled` through `isUserCancellation`, but Restore does not. | Fixed in `21ea84ab`. |
+| A5-03 | `IOSModelDownloadCoordinator.swift:274` | When the durable cancel intent cannot be written for an active download, the coordinator publishes .failed with a message telling the user to 'Retry Cancel' while the transfer keeps running in inflight; the row in .failed state shows only Retry, and Retry… | Fixed in `8ad9723c`. |
+| A5-04 | `IOSModelDownloadCoordinator.swift:239` | Cancelling a queued (pending) model calls stopDiagnosticsHeartbeat(), which cancels the single diagnosticsHeartbeat task that belongs to the different model currently downloading, so that model's heartbeat events stop for the rest of its transfer. | Fixed in `8ad9723c`. |
+| A5-05 | `IOSAppBootstrap.swift:212` | The installer's onModelInstalled hook is documented as the engine preload after an install, but the only assignment sets it to nil, so the post-install preload path described in the view model does not exist and the documentation is drift. | Fixed in `8ad9723c`. |
 | A6-01 | `IOSAppBootstrap.swift:140` | The clone-gate decision is written with an unconditional `print` on every app launch and every startup Retry, while every other log line in the iOS lifecycle files is gated by `TelemetryGate.resolvedEnabled` or compiled out under `QVOICE_DEVICE_DIAGNOSTICS`. | Fixed in `5b3ebba2`. |
 | A7-04 | `IOSStudioInlinePlayerCard.swift:813` | In adoption mode the display-link tick mirrors the shared player's state and returns early, so the ~15 fps CADisplayLink keeps firing after the shared player has stopped or finished; only the own-player branch invalidates the link. | Roadmap DA-07. |
-| A8-02 | `IOSGenerationModeViews.swift:759` | The iOS 'Save generated voice' path hand-builds PreparedVoiceEnrollmentMetadata with transcriptSource: .manual for an untouched generation script or an empty transcript, bypassing VoiceClipTranscriber.preparedVoiceEnrollmentMetadata and the shared… | Roadmap DA-10. |
-| A9-01 | `TTSEngineStore.swift:368` | The two host-layer generation-admission refusals are English literals wrapped in TTSEngineError.generationFailed(String); GenerationFailurePresentationReason maps that case to code "generation.failed", which init?(typedCode:) rejects, so… | Roadmap DA-03. |
-| A9-02 | `localization-unlocalized-baseline.json:28` | The baseline carries a record for a Text literal in Sources/iOS/IOSStudioCanvas.swift that no longer exists (the literal was "\(script.count) / \(charLimit)", last present at commit 82843da6), and localization_contract.py only fails when a current count… | Roadmap DA-03. |
-| A9-03 | `GenerationDrafts.swift:225` | The shared VoiceCloningReadiness.describe with ten English-only title/detail strings is referenced nowhere in Sources or Tests; the Mac re-implements the same decision order in MacVoiceCloningReadiness with catalog keys and documents the shared copy as… | Roadmap DA-03. |
-| A9-04 | `ModelManagerViewModel.swift:111` | The iPhone model inventory emits English computed statuses with a hand-rolled plural ("Installation incomplete: missing N required file/files.") and "Missing asset descriptor" (duplicating the already-localized IOSInterfaceText.missingDescriptor), and… | Roadmap DA-03. |
+| A8-02 | `IOSGenerationModeViews.swift:759` | The iOS 'Save generated voice' path hand-builds PreparedVoiceEnrollmentMetadata with transcriptSource: .manual for an untouched generation script or an empty transcript, bypassing VoiceClipTranscriber.preparedVoiceEnrollmentMetadata and the shared… | Fixed in `8e8d5556`. |
+| A9-01 | `TTSEngineStore.swift:368` | The two host-layer generation-admission refusals are English literals wrapped in TTSEngineError.generationFailed(String); GenerationFailurePresentationReason maps that case to code "generation.failed", which init?(typedCode:) rejects, so… | Fixed in `1662434c`. |
+| A9-02 | `localization-unlocalized-baseline.json:28` | The baseline carries a record for a Text literal in Sources/iOS/IOSStudioCanvas.swift that no longer exists (the literal was "\(script.count) / \(charLimit)", last present at commit 82843da6), and localization_contract.py only fails when a current count… | Fixed in `53e77deb`. |
+| A9-03 | `GenerationDrafts.swift:225` | The shared VoiceCloningReadiness.describe with ten English-only title/detail strings is referenced nowhere in Sources or Tests; the Mac re-implements the same decision order in MacVoiceCloningReadiness with catalog keys and documents the shared copy as… | Fixed in `1662434c`. |
+| A9-04 | `ModelManagerViewModel.swift:111` | The iPhone model inventory emits English computed statuses with a hand-rolled plural ("Installation incomplete: missing N required file/files.") and "Missing asset descriptor" (duplicating the already-localized IOSInterfaceText.missingDescriptor), and… | Fixed in `1662434c`. |
 
 ### Tooling, CI, release, docs and website
 
@@ -501,13 +501,13 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | T1-12 | `privacy_scan.py:29` | The scanner's home-path rule needs a separator after the user name, and its `sk-` rule needs 32 consecutive alphanumerics right after the prefix. | Fixed in `09f3ebd4`. |
 | T1-13 | `settings.json:154` | The deny rules for stashing, broad staging, `commit -a` and release.sh are literal prefixes with no hook behind them. | Fixed in `09f3ebd4`. |
 | T1-58 | `xcresult-triage.md:4` | The xcresult-triage subagent is described as read-only but is granted unrestricted `Bash`; the only enforcement is the parent's permission rules and hooks, and SubagentTests.test_project_subagents_are_read_only asserts only that no Edit tool is listed, so… | Roadmap DA-12. |
-| T2-01 | `release.yml:228` | The signing jobs check out the mutable tag ref again instead of the commit that source-authority authorized. source-authority exports no commit, and the package job's only source check compares the tag to its own HEAD, so a tag that moves between the two jobs… | Roadmap DA-11. |
-| T2-04 | `release_source_authority.py:72` | The required-check selection matches only name, head_sha and the github-actions app, then takes the newest by completion time. ci.yml also produces a check named `CI required` on `pull_request` runs, where it aggregates the Linux lanes only and attaches to… | Roadmap DA-11. |
-| T2-06 | `classify_changes.py:102` | A Swift deterministic test reads scripts/tests/fixtures/audio_qc_codec_loop.json and asserts byte parity with the Python builder, but that fixture is missing from SWIFT_PARITY_FIXTURES, so changing it routes only the Python lane. | Roadmap DA-11. |
-| T2-07 | `classify_changes.py:349` | When the run-history fetch fails, routing silently falls back to the previous-push diff instead of running every lane. | Roadmap DA-11. |
-| T2-08 | `release.yml:960` | In archive-ios the App Store Connect .p8 (two copies), the unlocked distribution keychain and the provisioning profile stay on disk through the attestation and artifact-upload actions and are removed only by the job's last step. | Roadmap DA-11. |
-| T2-09 | `promote-release.yml:22` | The job that makes a release public has no `environment:` (the reviewer gate covers candidate production only) and verifies nothing outside the draft itself. | Roadmap DA-11. |
-| T2-10 | `release.yml:205` | The team ID, notary key ID and issuer ID secrets are set in job-level env, so every step of the package job receives them, including release.sh's build and test run and the attest and upload actions, although only release.sh and the verify scripts use them. | Roadmap DA-11. |
+| T2-01 | `release.yml:228` | The signing jobs check out the mutable tag ref again instead of the commit that source-authority authorized. source-authority exports no commit, and the package job's only source check compares the tag to its own HEAD, so a tag that moves between the two jobs… | Fixed in `e45d3ad2`. |
+| T2-04 | `release_source_authority.py:72` | The required-check selection matches only name, head_sha and the github-actions app, then takes the newest by completion time. ci.yml also produces a check named `CI required` on `pull_request` runs, where it aggregates the Linux lanes only and attaches to… | Fixed in `e45d3ad2`. |
+| T2-06 | `classify_changes.py:102` | A Swift deterministic test reads scripts/tests/fixtures/audio_qc_codec_loop.json and asserts byte parity with the Python builder, but that fixture is missing from SWIFT_PARITY_FIXTURES, so changing it routes only the Python lane. | Fixed in `e45d3ad2`. |
+| T2-07 | `classify_changes.py:349` | When the run-history fetch fails, routing silently falls back to the previous-push diff instead of running every lane. | Fixed in `e45d3ad2`. |
+| T2-08 | `release.yml:960` | In archive-ios the App Store Connect .p8 (two copies), the unlocked distribution keychain and the provisioning profile stay on disk through the attestation and artifact-upload actions and are removed only by the job's last step. | Fixed in `e45d3ad2`. |
+| T2-09 | `promote-release.yml:22` | The job that makes a release public has no `environment:` (the reviewer gate covers candidate production only) and verifies nothing outside the draft itself. | Fixed in `e45d3ad2`. |
+| T2-10 | `release.yml:205` | The team ID, notary key ID and issuer ID secrets are set in job-level env, so every step of the package job receives them, including release.sh's build and test run and the attest and upload actions, although only release.sh and the verify scripts use them. | Fixed in `e45d3ad2`. |
 | T3-03 | `macos_test.sh:1476` | `${coverage:+--enable-code-coverage}` expands whenever `coverage` is non-empty, and it is initialised to the string `0`. | Roadmap DA-12. |
 | T3-04 | `check_ios_catalog.sh:54` | The EXIT trap decides 'is this my temp file' by the path prefix `/tmp/*`. | Roadmap DA-12. |
 | T3-05 | `ios_device.sh:2921` | The launch-spec temp file holds the exact user script text and is promised to be ephemeral, but it is removed only on three guarded failures and at line 2953. | Roadmap DA-12. |
@@ -556,16 +556,16 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 A refuter found a partial guard or could not finish the trace, or the two verification passes disagreed. None of these enters the fix phase.
 
 - **A10-04 (P2, plausible)** `Sources/ContentView.swift:26`: On Mac, `MacAppModel` holds the three StudioGenerationCoordinators, the line-batch runner and the long-form coordinator. Everything on the repo side matches the claim, and I found nothing that breaks the chain: no `onDisappear`, `willClose` or `deinit` in ContentView, MacAppModel or StudioGenerationCoordinator cancels the take, and a repo-wide grep for `applicationShouldTerminateAfterLastWindowClosed` and `applicationShouldHandleReopen`… **Action:** Roadmap DA-02 (the second pass could not settle SwiftUI's window-state behavior without running the app).
-- **A13-52 (P2, plausible)** `Sources/SharedSupport/Views/VocelloGlassSurface.swift:19`: The gate is expressed as an if/else that wraps the caller's `content` in a different branch for each state. Every repo-side step is real: the if/else over `content`, the gate flipping on generation start/stop (every generation on macOS liquid builds; fixed-refresh iPhones on iOS), and focused TextFields plus whole edge-sheet panels sitting under the gate with no guard against being open when a take finishes. **Action:** Roadmap DA-03.
-- **A12-01 (P3, plausible)** `Sources/SharedSupport/Views/VocelloCapsuleSelector.swift:81`: The shared capsule selector (Studio mode selector on both platforms) has a hard fixed outer height (44 pt horizontal, 136 pt vertical) and single-line labels, so at accessibility Dynamic Type sizes the scaled labels can be truncated or clipped. What survives: on iOS only, at AX5 (and at AX4 if SwiftUI does not shrink the single-line Text for height), the vertical rail is 16 to 42 pt taller than its fixed 136 pt slot. **Action:** Roadmap DA-03.
-- **A13-06 (P3, plausible)** `Sources/iOS/IOSDesignSystemPrimitives.swift:617`: In the ungated branch the edge-to-edge sheet panel is pure `.regular` glass with only a 6% tint (`glassTint(tint, intensity: 0.45)`). The structure is as described (tint-only glass with no solid base in the ungated branch, 10 pt tertiary headers on it, no contrast check anywhere), but whether contrast actually falls below 4.5:1 is a measurement question the system glass material may or may not resolve. **Action:** Roadmap DA-03.
-- **A3-01 (P3, plausible)** `Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift:142`: The automatic Files-folder copy deletes any same-named file in the user's folder with try?, then copies straight to the final name with try?. A failed copy therefore loses the user's earlier file. the two passes agree on the code and disagree on reach: exported names are millisecond-unique, so losing a user's file needs a pre-placed file with the exact name **Action:** Roadmap DA-08 (hardening only).
-- **A3-02 (P3, disputed)** `Sources/QwenVoiceCore/DocumentIO.swift:182`: Two helpers use delete-then-copy with no staging. Both code facts hold, but the reach is narrower than claimed. 1) Platform is iOS only, not both. **Action:** Roadmap DA-08.
+- **A13-52 (P2, plausible)** `Sources/SharedSupport/Views/VocelloGlassSurface.swift:19`: The gate is expressed as an if/else that wraps the caller's `content` in a different branch for each state. Every repo-side step is real: the if/else over `content`, the gate flipping on generation start/stop (every generation on macOS liquid builds; fixed-refresh iPhones on iOS), and focused TextFields plus whole edge-sheet panels sitting under the gate with no guard against being open when a take finishes. **Action:** Fixed in `2b2b7bf4`, `201194a6`.
+- **A12-01 (P3, plausible)** `Sources/SharedSupport/Views/VocelloCapsuleSelector.swift:81`: The shared capsule selector (Studio mode selector on both platforms) has a hard fixed outer height (44 pt horizontal, 136 pt vertical) and single-line labels, so at accessibility Dynamic Type sizes the scaled labels can be truncated or clipped. What survives: on iOS only, at AX5 (and at AX4 if SwiftUI does not shrink the single-line Text for height), the vertical rail is 16 to 42 pt taller than its fixed 136 pt slot. **Action:** Fixed in `e62747f0`.
+- **A13-06 (P3, plausible)** `Sources/iOS/IOSDesignSystemPrimitives.swift:617`: In the ungated branch the edge-to-edge sheet panel is pure `.regular` glass with only a 6% tint (`glassTint(tint, intensity: 0.45)`). The structure is as described (tint-only glass with no solid base in the ungated branch, 10 pt tertiary headers on it, no contrast check anywhere), but whether contrast actually falls below 4.5:1 is a measurement question the system glass material may or may not resolve. **Action:** Roadmap DA-03: a contrast question that needs a device measurement.
+- **A3-01 (P3, plausible)** `Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift:142`: The automatic Files-folder copy deletes any same-named file in the user's folder with try?, then copies straight to the final name with try?. A failed copy therefore loses the user's earlier file. the two passes agree on the code and disagree on reach: exported names are millisecond-unique, so losing a user's file needs a pre-placed file with the exact name **Action:** Fixed in `21ea84ab`.
+- **A3-02 (P3, disputed)** `Sources/QwenVoiceCore/DocumentIO.swift:182`: Two helpers use delete-then-copy with no staging. Both code facts hold, but the reach is narrower than claimed. 1) Platform is iOS only, not both. **Action:** Fixed in `dde11229`.
 - **E3-02 (P3, plausible)** `Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift:272`: A subscription created by `stream(for:)` whose producer never calls `beginGeneration`/yields a terminal is never removed from `active`: `consumerTerminated` only nils the channel, and `snapshot(consuming:)` only prunes `completed`. Confirmed, but reach is narrower than 'one entry per refused generate'. **Action:** Roadmap DA-06.
 - **E4-04 (P3, disputed)** `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift:300`: For a multi-token step on a non-empty KV cache the talker builds a `[seqLen, seqLen]` causal mask that ignores `cache.offset`, unlike the speech-tokenizer DecoderTransformer which slices the mask to `[seqLen, offset + seqLen]`; production only prefills on an… The static description is accurate (talker builds `createAdditiveCausalMask(seqLen)` while Qwen3TTSSpeechTokenizer.swift:491-496 slices to offset + seqLen), but no code path forwards more than one embedding on a non-empty talker cache. **Action:** Roadmap DA-04.
-- **E7-01 (P3, plausible)** `Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift:47`: Two of the three tests in the 'streaming contract' suite exercise no production code. Claim holds as read. **Action:** Roadmap DA-09.
-- **E7-04 (P3, disputed)** `Tests/VocelloCoreTests/TTSEngineStoreTests.swift:168`: The fake engine behind the store and runner suites does not mirror the real terminal-event contract. The divergence is real, but the consequence is narrower than the failure scenario says. **Action:** Roadmap DA-09.
-- **E7-05 (P3, plausible)** `Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift:420`: The token cap is asserted only if the seeded random-weight talker happens to reach it. Structural claim confirmed by reading; whether the current seed yields 2 or 3 frames cannot be settled without running it, so the failure scenario is conditional, as the finding itself says. **Action:** Roadmap DA-09.
+- **E7-01 (P3, plausible)** `Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift:47`: Two of the three tests in the 'streaming contract' suite exercise no production code. Claim holds as read. **Action:** Fixed in `89896465`.
+- **E7-04 (P3, disputed)** `Tests/VocelloCoreTests/TTSEngineStoreTests.swift:168`: The fake engine behind the store and runner suites does not mirror the real terminal-event contract. The divergence is real, but the consequence is narrower than the failure scenario says. **Action:** Declined: the store drops every non-chunk event, so a terminal-yielding fake changes nothing a store test can see; terminal order is now tested at the engine and adapter (`89896465`).
+- **E7-05 (P3, plausible)** `Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift:420`: The token cap is asserted only if the seeded random-weight talker happens to reach it. Structural claim confirmed by reading; whether the current seed yields 2 or 3 frames cannot be settled without running it, so the failure scenario is conditional, as the finding itself says. **Action:** Fixed in `89896465`.
 - **T1-15 (P3, plausible)** `.claude/settings.json:18`: Both command guards are wired only to the tool named `Bash`. The repo-side chain holds in full; the one step I could not read is the harness's hook dispatch, which lives outside the repository. - **Confirmed by reading:** the matcher is exactly `^Bash$` and cannot match the string `Monitor`. **Action:** Roadmap DA-12.
 - **T3-08 (P3, plausible)** `scripts/regenerate_project.sh:37`: The entitlements backup uses the predictable path /tmp/QwenVoice.entitlements.backup.$$ instead of mktemp. Reach is narrower than the scenario states. **Action:** Roadmap DA-12.
 - **T4-02 (P3, plausible)** `scripts/ci/classify_changes.py:255`: Research-marked tests are not triggered by several inputs they consume: scripts/qc/** modules, config/audio-qc-*.json and scripts/check_delivery_instructions.py route to the Python lane only, and the Python lane runs `-m "not research"`. Could not break the chain; no other job covers these consumers (grep finds test_audio_qc.py as the only Python reader of audio-qc-stage0-calibration.json). **Action:** Roadmap DA-12.
@@ -681,23 +681,38 @@ Reported by an auditor and disproved by a refuter. Listed so they are not raised
 
 Each Swift batch went through the project's Swift review and the guard batch through an adversarial review; both found real problems in the first version of the fixes (a History rebase that could rewrite rows of an unmounted Mac output folder, an integrity change that hid a wrong-size file, a commit lint that a multi-line message could still bypass), and the fixes above include their corrections.
 
-**Deliberately not fixed in this pass.** A5-01 (iPhone model delete under a running engine) needs the Mac deletion sequence shared with iOS and new copy. E1-02 (cancelled prewarm) changes when the engine unloads and needs a model run. A8-01 (saved-voice deletion) is a deletion path with no test seam yet. The remaining P3 items marked for fixing were moved to their roadmap items so the pass stayed within what could be verified.
+**Deliberately not fixed in the first pass.** A5-01, E1-02 and A8-01 waited for shared code, a model run or a test seam; A5-01 and A8-01 were fixed in the second pass below, and E1-02 is still DA-06.
+
+**Second pass (same day, items DA-02, DA-03 and DA-08 to DA-12).** Five agents worked in isolated worktrees; every branch was integrated on `main`, built and tested there, and reviewed (Swift review on every Swift change, an adversarial review of the release path). The reviews found real problems in the first versions (a warm retry that could reload weights right after a memory-relief unload, a promotion attestation check that any `release.yml` run would pass, an English failure inside a localized alert, a banner that rebuilt and re-announced at every generation start), and the commits below include their corrections.
+
+| Commit | Findings |
+| --- | --- |
+| `04bec09a` | T3-01 (the build lock fails fast under an unwritable folder), T5-01 (archived done items need evidence) |
+| `2b7c49ba`, `dde11229`, `21ea84ab`, `6306e841` | A8-01 (a deleted voice's clone cache goes with it), A3-01, A3-02 (staged copies), A4-01, A4-02 (folder copies held for access, Restore cancellation) |
+| `89896465`, `6306e841` | E7-01, E7-02, E7-03, E7-05 (tests drive the shipped take choreography and cancellation wiring); E7-04 declined with its reason |
+| `1662434c`, `e62747f0`, `2b2b7bf4`, `53e77deb`, `201194a6` | A9-01 to A9-04, A2-03, A12-01 to A12-11, A12-51, A13-01 to A13-05, A13-52 (localization, Dynamic Type, hit regions, VoiceOver, one view tree per gated surface) |
+| `8ad9723c`, `86fd0afe` | A5-01, A5-03, A5-04, A5-05 (iPhone model removal coordinated with the engine), A2-02, A2-04 (damaged History records can be set aside; a single delete is journaled) |
+| `8e8d5556`, `105bdac3`, `5186f914`, `303ad901` | A10-01, A10-02, A10-04, A10-05, A10-06, A14-01, A14-03, A14-04, A14-05, A14-06, A14-08, A14-53, A14-55, A8-02 (Studio state with its take, one mode-switch rule, warm retries that never undo an unload) |
+| `e45d3ad2` | T2-01 to T2-04, T2-06 to T2-10, T5-02 (signing jobs and promotion bound to the authorized commit and tag; attestations, exact assets, reviewer environment; promotion scope) |
+
+Still open from these items: A10-04 needs one run of the Mac app to settle; the A12 and A13 layouts were read from code and need a device check, A13-06 a contrast measurement; the release changes are proven by the rehearsal and first meet `release.yml` and `promote-release.yml` end to end at the next release. Smaller follow-ups the reviews found are DA-13.
 
 **Roadmap.** Everything else is an item of plan `project-audit-2026-10`:
 
-| Item | Scope | Findings |
-| --- | --- | --- |
-| DA-02 | Studio state and window ownership | A10-01, A10-02, A10-04, A10-05, A10-06, A14-01, A14-03, A14-04, A14-05, A14-06, A14-08, A14-53 |
-| DA-03 | Accessibility, localization and glass gating | A12-*, A13-*, A9-*, A2-03 |
-| DA-04 | Engine edge inputs | E4-01 (needs one model run), E4-02, E4-03, E4-04 |
-| DA-05 | macOS memory relief and the process-global caches | E2-01 (maintainer decision), E2-02 |
-| DA-06 | Engine, delivery and telemetry hygiene | E3-*, E5-02, E5-04, E5-05, A16-01, A16-02 |
-| DA-07 | Playback and recording | A7-02, A7-03, A7-05 |
-| DA-08 | History and model-management dead ends | A2-02, A2-04, A3-01, A3-02, A5-03, A5-05 |
-| DA-09 | Test quality and coverage | E7-*, the test gaps of section 7 (PA-19 is related) |
-| DA-10 | Commerce and provenance | A4-01, A8-02 |
-| DA-11 | Release and promotion hardening | T2-01, T2-02, T2-03, T2-04, T2-08, T2-09, T2-10, T5-02 |
-| DA-12 | Guard, tooling, docs and website hygiene | the remaining T1, T3, T4, T5, T6, T7 and A15 findings |
+| Item | Scope | Findings | Status |
+| --- | --- | --- | --- |
+| DA-02 | Studio state and window ownership | A10-01, A10-02, A10-04, A10-05, A10-06, A14-01, A14-03, A14-04, A14-05, A14-06, A14-08, A14-53 | fixed in code; one Mac app run |
+| DA-03 | Accessibility, localization and glass gating | A12-*, A13-*, A9-*, A2-03 | fixed in code; device check, A13-06 |
+| DA-04 | Engine edge inputs | E4-01 (needs one model run), E4-02, E4-03, E4-04 | open |
+| DA-05 | macOS memory relief and the process-global caches | E2-01 (maintainer decision), E2-02 | open |
+| DA-06 | Engine, delivery and telemetry hygiene | E3-*, E5-02, E5-04, E5-05, A16-01, A16-02 | open |
+| DA-07 | Playback and recording | A7-02, A7-03, A7-05 | open |
+| DA-08 | History and model-management dead ends | A2-02, A2-04, A3-01, A3-02, A5-03, A5-05 | done |
+| DA-09 | Test quality and coverage | E7-*, the test gaps of section 7 (PA-19 is related) | done |
+| DA-10 | Commerce and provenance | A4-01, A8-02 | done |
+| DA-11 | Release and promotion hardening | T2-01, T2-02, T2-03, T2-04, T2-08, T2-09, T2-10, T5-02 | done |
+| DA-12 | Guard, tooling, docs and website hygiene | the remaining T1, T3, T4, T5, T6, T7 and A15 findings | T3-01, T5-01 done; rest open |
+| DA-13 | Follow-ups from the second pass | the reviews' smaller findings | open |
 
 **Never without the maintainer's explicit request:** device, UI, model or benchmark lanes, releases and promotion. Findings that need one of those to settle say so in their action.
 

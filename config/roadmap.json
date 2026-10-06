@@ -345,7 +345,7 @@
       "id": "DA-02",
       "plan": "project-audit-2026-10",
       "title": "Studio state and window ownership",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Each finding has a fix or a recorded decision: Save as voice state lives with the attempt (A10-01), programmatic routes cannot switch mode during a take (A10-02), a Mac take survives or is stopped by a window close (A10-04, needs one run of the app to settle), an engine-cancelled line batch closes its attempt (A14-01), a cancel during clone priming is honoured (A14-03), the footer drops a stale error (A14-04), Navigate is disabled during batch and long-form work (A14-05), and the P3 items A10-05, A10-06, A14-06, A14-08, A14-53.",
       "sourceOfTruth": [
@@ -355,13 +355,13 @@
       ],
       "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "PA-08 and AUD-03 are related. Most of these need a macOS UI lane to verify, which only the maintainer can request."
+      "notes": "Fixed in code on 2026-10-06 (8e8d5556, 105bdac3, 5186f914, 303ad901), each finding with a test where one fits, reviewed and green in CI. Left: A10-04 (a window closed mid-take) needs one run of the Mac app; the Mac drafts still belong to the window, so a reopened window starts blank and withholds Save for the earlier take (DA-13). PA-08 and AUD-03 are related."
     },
     {
       "id": "DA-03",
       "plan": "project-audit-2026-10",
       "title": "Accessibility, localization and glass gating",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "The A12, A13, A9 findings and A2-03 are fixed or declined with a reason: large-text layouts for onboarding, the recording overlay, the capsule selector and filter chips; VoiceOver state and announcements; controls under 44 pt; English literals reaching VoiceOver and error cards; glass applied outside the gated modifier; token drift between the iOS and shared themes.",
       "sourceOfTruth": [
@@ -371,7 +371,7 @@
       ],
       "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "PA-20 owns accessibility and localization reach; these are the new instances. Visual defects were read from code, not seen, so each needs a device check."
+      "notes": "Fixed in code on 2026-10-06 (1662434c, e62747f0, 2b2b7bf4, 53e77deb, 201194a6, 86fd0afe), reviewed and green in CI. Left: the layouts were read from code and need a device check; A13-06 (contrast over the edge-to-edge sheet) needs a device measurement; that Glass.identity under the generation gate costs nothing is Apple's documented behavior, unmeasured here (next consented gate or ui-perf run). PA-20 owns accessibility and localization reach."
     },
     {
       "id": "DA-04",
@@ -437,70 +437,6 @@
       "notes": "A7-02 needs a new catalog key in ten languages; A7-03 needs a forced underrun on a device."
     },
     {
-      "id": "DA-08",
-      "plan": "project-audit-2026-10",
-      "title": "History and model-management dead ends",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "iPhone model delete refuses while the engine is busy and unloads first, as the Mac does (A5-01); an unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02); a single delete is as durable as Clear All (A2-04); the Files-folder and reference copies stage before replacing (A3-01, A3-02); and the iPhone dead ends A5-03, A5-04 and A5-05 are fixed.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-06-deep-audit.md",
-        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
-        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
-      ],
-      "updated": "2026-10-06",
-      "unparkWhen": null,
-      "notes": "A5-01 needs MacModelDeletionSequence shared with iOS (project.yml paths) and busy-state copy in ten languages; PA-33 keeps the engine-side lease. A2-02 needs new copy and a confirmation step; F-06 is related."
-    },
-    {
-      "id": "DA-09",
-      "plan": "project-audit-2026-10",
-      "title": "Test quality and coverage",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "The tests that exercise no production code or only a test-only type are rewritten against the product path (E7-01, E7-02, E7-03, E7-05), and the highest-value gaps of the report's section 7 have deterministic tests.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-06-deep-audit.md",
-        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
-      ],
-      "updated": "2026-10-06",
-      "unparkWhen": null,
-      "notes": "PA-19 owns orchestrator coverage; this item adds the test-quality defects and the gap list."
-    },
-    {
-      "id": "DA-10",
-      "plan": "project-audit-2026-10",
-      "title": "Commerce, provenance and saved-voice deletion",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Deleting a saved voice also removes its normalized reference audio and transcript from the cache, with a test (A8-01); a paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01); Restore maps a user cancellation like Purchase does (A4-02); and the iOS save path builds enrollment metadata through the shared helper (A8-02).",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-06-deep-audit.md",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
-      ],
-      "updated": "2026-10-06",
-      "unparkWhen": null,
-      "notes": "Free export of pre-provenance voices (A8-03) is a documented decision and stays."
-    },
-    {
-      "id": "DA-11",
-      "plan": "project-audit-2026-10",
-      "title": "Release and promotion hardening",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Signing jobs check out the authorized commit, not the tag ref (T2-01); the promotion base is bound to the previous published release (T2-02); release.yml has a concurrency group and can archive iOS alone (T2-03); the required check is filtered by event (T2-04); the iOS signing material is removed before third-party steps (T2-08); promotion runs under a reviewer environment and verifies attestations (T2-09); secrets leave job-level env (T2-10); every product file sits in a promotion class (T5-02).",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-06-deep-audit.md",
-        ".github/workflows/release.yml",
-        ".github/workflows/promote-release.yml",
-        "scripts/quality_promotion.py"
-      ],
-      "updated": "2026-10-06",
-      "unparkWhen": null,
-      "notes": "PA-05 and PA-10 are related. Workflow changes are verified by the rehearsal run; no release is run for them."
-    },
-    {
       "id": "DA-12",
       "plan": "project-audit-2026-10",
       "title": "Guard, tooling, docs and website hygiene",
@@ -514,7 +450,24 @@
       ],
       "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "Mostly P3: shell portability, test determinism, schema drift, stale docs and website copy."
+      "notes": "T3-01 and T5-01, the two P2s, fixed in 04bec09a. Open: T3-02 (P2, a UI lane's EXIT trap can mask its result) and the P3s: shell portability, test determinism, schema drift, stale docs and website copy."
+    },
+    {
+      "id": "DA-13",
+      "plan": "project-audit-2026-10",
+      "title": "Follow-ups from the audit's second fix pass",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Each follow-up the second pass's reviews found is fixed with a test or declined with a reason: the iPhone download-cancel dead ends (a final cancel record that cannot be written leaves Retry, which reinstalls; the kept-cancellable message is overwritten by the next progress tick and is English), a corrupt clear-History marker with no exit, set-aside History records kept forever, a blocked iPhone deletion losing its partial download, Mac drafts owned by the window, an engine-cancelled batch that does not say why, a refused Voices tap with no announcement, untyped English busy refusals in the engine, the voice-picker filter row at large text sizes, staging files left in a Files folder by a killed copy, the normalized clone cache outside the voice-store lock, and the release group's queued-run replacement.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/ContentView.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Test gaps DA-09 left: a cancel after the terminal or after publish (needs the real streaming path), the CLI Batch, Bench and Models commands (not compiled into VocelloCoreTests), the trim early return when the prewarm slot throws, and the glue inside GenerationOutputAdapter.run around the tested choreography."
     },
     {
       "id": "F-15",

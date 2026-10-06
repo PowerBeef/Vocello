@@ -24,7 +24,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
-| `project-audit-2026-10` | active | backend-and-platform | 1/12 (8%) |
+| `project-audit-2026-10` | active | backend-and-platform | 5/13 (38%) |
 | `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
@@ -510,24 +510,21 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `DA-02` | planned | Studio state and window ownership | — |
-| `DA-03` | planned | Accessibility, localization and glass gating | — |
+| `DA-02` | in-flight | Studio state and window ownership | — |
+| `DA-03` | in-flight | Accessibility, localization and glass gating | — |
 | `DA-04` | planned | Engine edge inputs | — |
 | `DA-05` | planned | macOS memory relief and the process-global Qwen3 caches | — |
 | `DA-06` | planned | Engine, delivery and telemetry hygiene | — |
 | `DA-07` | planned | Playback and recording defects that need a device | — |
-| `DA-08` | planned | History and model-management dead ends | — |
-| `DA-09` | planned | Test quality and coverage | — |
-| `DA-10` | planned | Commerce, provenance and saved-voice deletion | — |
-| `DA-11` | planned | Release and promotion hardening | — |
 | `DA-12` | planned | Guard, tooling, docs and website hygiene | — |
+| `DA-13` | planned | Follow-ups from the audit's second fix pass | — |
 
 ### Open items in detail
 
-- **`DA-02`** (planned) — Studio state and window ownership.
+- **`DA-02`** (in-flight) — Studio state and window ownership.
   gate: Each finding has a fix or a recorded decision: Save as voice state lives with the attempt (A10-01), programmatic routes cannot switch mode during a take (A10-02), a Mac take survives or is stopped by a window close (A10-04, needs one run of the app to settle), an engine-cancelled line batch closes its attempt (A14-01), a cancel during clone priming is honoured (A14-03), the footer drops a stale error (A14-04), Navigate is disabled during batch and long-form work (A14-05), and the P3 items A10-05, A10-06, A14-06, A14-08, A14-53.
 
-- **`DA-03`** (planned) — Accessibility, localization and glass gating.
+- **`DA-03`** (in-flight) — Accessibility, localization and glass gating.
   gate: The A12, A13, A9 findings and A2-03 are fixed or declined with a reason: large-text layouts for onboarding, the recording overlay, the capsule selector and filter chips; VoiceOver state and announcements; controls under 44 pt; English literals reaching VoiceOver and error cards; glass applied outside the gated modifier; token drift between the iOS and shared themes.
 
 - **`DA-04`** (planned) — Engine edge inputs.
@@ -542,20 +539,11 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 - **`DA-07`** (planned) — Playback and recording defects that need a device.
   gate: A failed recording start shows a localized status on iOS (A7-02), the live preview playhead does not jump after a pause or an underrun (A7-03, verified by listening), and A7-05 is settled.
 
-- **`DA-08`** (planned) — History and model-management dead ends.
-  gate: iPhone model delete refuses while the engine is busy and unloads first, as the Mac does (A5-01); an unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02); a single delete is as durable as Clear All (A2-04); the Files-folder and reference copies stage before replacing (A3-01, A3-02); and the iPhone dead ends A5-03, A5-04 and A5-05 are fixed.
-
-- **`DA-09`** (planned) — Test quality and coverage.
-  gate: The tests that exercise no production code or only a test-only type are rewritten against the product path (E7-01, E7-02, E7-03, E7-05), and the highest-value gaps of the report's section 7 have deterministic tests.
-
-- **`DA-10`** (planned) — Commerce, provenance and saved-voice deletion.
-  gate: Deleting a saved voice also removes its normalized reference audio and transcript from the cache, with a test (A8-01); a paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01); Restore maps a user cancellation like Purchase does (A4-02); and the iOS save path builds enrollment metadata through the shared helper (A8-02).
-
-- **`DA-11`** (planned) — Release and promotion hardening.
-  gate: Signing jobs check out the authorized commit, not the tag ref (T2-01); the promotion base is bound to the previous published release (T2-02); release.yml has a concurrency group and can archive iOS alone (T2-03); the required check is filtered by event (T2-04); the iOS signing material is removed before third-party steps (T2-08); promotion runs under a reviewer environment and verifies attestations (T2-09); secrets leave job-level env (T2-10); every product file sits in a promotion class (T5-02).
-
 - **`DA-12`** (planned) — Guard, tooling, docs and website hygiene.
   gate: The remaining T1, T3, T4, T5, T6, T7 and A15 findings are fixed or declined with a reason, first the two P2s: the native build lock no longer spins when its parent is not writable (T3-01) and the done-item evidence rule of the roadmap validator actually runs (T5-01).
+
+- **`DA-13`** (planned) — Follow-ups from the audit's second fix pass.
+  gate: Each follow-up the second pass's reviews found is fixed with a test or declined with a reason: the iPhone download-cancel dead ends (a final cancel record that cannot be written leaves Retry, which reinstalls; the kept-cancellable message is overwritten by the next progress tick and is English), a corrupt clear-History marker with no exit, set-aside History records kept forever, a blocked iPhone deletion losing its partial download, Mac drafts owned by the window, an engine-cancelled batch that does not say why, a refused Voices tap with no announcement, untyped English busy refusals in the engine, the voice-picker filter row at large text sizes, staging files left in a Files folder by a killed copy, the normalized clone cache outside the voice-store lock, and the release group's queued-run replacement.
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 

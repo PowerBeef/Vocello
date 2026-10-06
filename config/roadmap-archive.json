@@ -4526,6 +4526,90 @@
         "commit:5b3ebba2",
         "commit:09f3ebd4"
       ]
+    },
+    {
+      "id": "DA-08",
+      "plan": "project-audit-2026-10",
+      "title": "History and model-management dead ends",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "iPhone model delete refuses while the engine is busy and unloads first, as the Mac does (A5-01); an unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02); a single delete is as durable as Clear All (A2-04); the Files-folder and reference copies stage before replacing (A3-01, A3-02); and the iPhone dead ends A5-03, A5-04 and A5-05 are fixed.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06: A5-01 (iPhone removal runs the shared deletion sequence through the engine, with a busy alert), A5-03, A5-04, A5-05, A2-02 (damaged records set aside after confirmation), A2-04 (a single delete is journaled) in 8ad9723c and 86fd0afe; A3-01, A3-02 (staged copies) in 21ea84ab and dde11229. Reviewed; the review follow-ups are in 86fd0afe. Smaller follow-ups are DA-13; PA-33 keeps the engine-side lease.",
+      "evidence": [
+        "commit:8ad9723c",
+        "commit:86fd0afe",
+        "commit:21ea84ab",
+        "commit:dde11229"
+      ]
+    },
+    {
+      "id": "DA-09",
+      "plan": "project-audit-2026-10",
+      "title": "Test quality and coverage",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The tests that exercise no production code or only a test-only type are rewritten against the product path (E7-01, E7-02, E7-03, E7-05), and the highest-value gaps of the report's section 7 have deterministic tests.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06: E7-01, E7-02, E7-03, E7-05 in 89896465 (the take choreography runs through one seam the product uses, the shutdown-reason tests drive the real engine), throwing cleanup pinned in 6306e841; new gap tests for terminal emission, trimMemory, the pressure monitor, the start gate and the CLI first-chunk wait. E7-04 declined: the store drops non-chunk events, so the fake's terminal is invisible to store tests. Gaps left are DA-13.",
+      "evidence": [
+        "commit:89896465",
+        "commit:6306e841"
+      ]
+    },
+    {
+      "id": "DA-10",
+      "plan": "project-audit-2026-10",
+      "title": "Commerce, provenance and saved-voice deletion",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Deleting a saved voice also removes its normalized reference audio and transcript from the cache, with a test (A8-01); a paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01); Restore maps a user cancellation like Purchase does (A4-02); and the iOS save path builds enrollment metadata through the shared helper (A8-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06: A8-01 in 2b7c49ba; A4-01 and A4-02 in 21ea84ab, with an earlier folder failure kept on the row in 6306e841; A8-02 in 8e8d5556. A8-03 (free export of pre-provenance voices) stays a documented decision.",
+      "evidence": [
+        "commit:2b7c49ba",
+        "commit:21ea84ab",
+        "commit:6306e841",
+        "commit:8e8d5556"
+      ]
+    },
+    {
+      "id": "DA-11",
+      "plan": "project-audit-2026-10",
+      "title": "Release and promotion hardening",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Signing jobs check out the authorized commit, not the tag ref (T2-01); the promotion base is bound to the previous published release (T2-02); release.yml has a concurrency group and can archive iOS alone (T2-03); the required check is filtered by event (T2-04); the iOS signing material is removed before third-party steps (T2-08); promotion runs under a reviewer environment and verifies attestations (T2-09); secrets leave job-level env (T2-10); every product file sits in a promotion class (T5-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        ".github/workflows/release.yml",
+        ".github/workflows/promote-release.yml",
+        "scripts/quality_promotion.py"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06 in e45d3ad2 after an adversarial review whose P1 (an attestation any release.yml run would pass) and P2s are fixed in the same commit. Proven by unit tests and the rehearsal; release.yml and promote-release.yml first run end to end at the next release. The release environment exists with a required reviewer and a v* deployment policy. Left as residuals: iOS has no public release to bind its promotion base to, and a newly queued run in the release group replaces a pending one (DA-13).",
+      "evidence": [
+        "commit:e45d3ad2",
+        "run:37522428199"
+      ]
     }
   ]
 }

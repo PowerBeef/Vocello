@@ -209,7 +209,7 @@ struct ContentView: View {
             if let selectedItem = appModel.selectedItem {
                 VStack(spacing: 0) {
                     if selectedItem.generationMode != nil {
-                        MacStudioModeSelector(selection: sidebarSelectionBinding)
+                        MacStudioModeSelector(selection: sidebarSelectionBinding, busyMode: appModel.studioBusyMode)
                             .padding(.horizontal, MacStudioMetrics.horizontalInset)
                             .padding(.top, MacTheme.Spacing.tight)
                             .padding(.bottom, MacTheme.Spacing.snug)
@@ -250,16 +250,17 @@ struct ContentView: View {
                     guard let seedValue = generation.samplingSeed else { return }
                     // Pin into the take's own mode and surface that mode so
                     // the composer chip makes the new state visible.
+                    // A refused switch pins nothing (A10-02).
                     switch generation.mode {
                     case GenerationMode.custom.rawValue:
+                        guard selectDestination(.customVoice) else { return }
                         customVoiceDraft.pinnedSeed = seedValue
-                        selectDestination(.customVoice)
                     case GenerationMode.design.rawValue:
+                        guard selectDestination(.voiceDesign) else { return }
                         voiceDesignDraft.pinnedSeed = seedValue
-                        selectDestination(.voiceDesign)
                     case GenerationMode.clone.rawValue:
+                        guard selectDestination(.voiceCloning) else { return }
                         voiceCloningDraft.pinnedSeed = seedValue
-                        selectDestination(.voiceCloning)
                     default:
                         break
                     }
@@ -297,6 +298,8 @@ struct ContentView: View {
     // MARK: - Inline closure methods
 
     private func startSavedVoiceCloningHandoff(_ plan: SavedVoiceCloneHandoffPlan) {
+        // A refused switch stages and primes nothing (A10-02, AUD-10).
+        guard selectDestination(.voiceCloning) else { return }
         pendingVoiceCloningHandoff = plan.handoff
         Task {
             await Self.beginSavedVoiceClonePreloadIfPossible(
@@ -304,7 +307,6 @@ struct ContentView: View {
                 engineStore: ttsEngineStore
             )
         }
-        selectDestination(.voiceCloning)
     }
 
     static func beginSavedVoiceClonePreloadIfPossible(
@@ -371,9 +373,18 @@ struct ContentView: View {
         // which presents its sheet (A14-05).
         if appModel.isBatchWorkActive { return false }
         // Like iOS, a missing model leaves its Studio accessible with an Install
-        // action. Only switching generation modes during a take is blocked.
-        if item.generationMode != nil, item != appModel.lastStudioItem,
-           ttsEngineStore.hasActiveGeneration { return false }
+        // action. Only switching generation modes during a take is blocked, by
+        // the rule iOS follows (StudioModeSwitchPolicy, A10-02): the mode that
+        // owns the take, priming, finalizing or cancelling included, stays the
+        // only one reachable. Engine work no coordinator owns keeps the Studio
+        // where it was.
+        if let target = item.generationMode, item != appModel.lastStudioItem {
+            if let busy = appModel.studioBusyMode {
+                if busy != target { return false }
+            } else if ttsEngineStore.hasActiveGeneration {
+                return false
+            }
+        }
         AppPerformanceSignposts.emit("Sidebar Selection")
         appModel.selectedItem = item
         return true

@@ -87,6 +87,7 @@ struct IOSGenerateContainerView: View {
 struct IOSGenerationModeSelector: View {
     @Binding var selectedSection: IOSGenerationSection
     @EnvironmentObject private var ttsEngine: TTSEngineStore
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
         IOSCapsuleSelector(
@@ -94,7 +95,10 @@ struct IOSGenerationModeSelector: View {
             selection: $selectedSection,
             title: \.compactTitle,
             selectedTint: \.primaryActionTint,
-            isSelectionDisabled: ttsEngine.hasActiveGeneration,
+            // The switch rule's own state (a take priming, finalizing or
+            // cancelling, a project between segments), so a refused mode
+            // reads as disabled, not as a tap that does nothing (A10-02).
+            isSelectionDisabled: ttsEngine.hasActiveGeneration || appModel.studioBusyMode != nil,
             controlAccessibilityIdentifier: "generateSectionPicker",
             itemAccessibilityIdentifier: { "generateSection_\($0.rawValue)" }
         )

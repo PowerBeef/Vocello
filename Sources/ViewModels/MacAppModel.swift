@@ -75,6 +75,15 @@ final class MacAppModel {
         lineBatch.isProcessing || longForm.isProcessing
     }
 
+    /// The mode whose take or project holds the Studio, if any: the same rule
+    /// as iOS (`StudioModeSwitchPolicy`, A10-02).
+    var studioBusyMode: GenerationMode? {
+        StudioModeSwitchPolicy.busyMode(
+            coordinators: [customCoordinator, designCoordinator, cloneCoordinator],
+            longFormMode: longForm.isProcessing ? longForm.lastMode : nil
+        )
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = AppDefaults.store) {

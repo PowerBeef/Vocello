@@ -100,15 +100,21 @@ final class AppModel {
         guard StudioModeSwitchPolicy.allows(
             switchingTo: mode.mode,
             from: selectedStudioMode.mode,
-            busyMode: StudioModeSwitchPolicy.busyMode(
-                coordinators: studioCoordinators,
-                longFormMode: longForm.isProcessing ? longForm.lastMode : nil
-            )
+            busyMode: studioBusyMode
         ) else { return false }
         if selectedStudioMode != mode {
             selectedStudioMode = mode
         }
         return true
+    }
+
+    /// The mode whose take or project holds the Studio, if any (A10-02); the
+    /// capsule selector disables the other modes while it is set.
+    var studioBusyMode: GenerationMode? {
+        StudioModeSwitchPolicy.busyMode(
+            coordinators: studioCoordinators,
+            longFormMode: longForm.isProcessing ? longForm.lastMode : nil
+        )
     }
 
     // MARK: - Drafts

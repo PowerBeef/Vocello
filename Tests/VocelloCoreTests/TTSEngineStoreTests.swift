@@ -936,9 +936,39 @@ final class TTSEngineStoreTests: XCTestCase {
         XCTAssertEqual(engine.prefetchCount, 1, "The unload sticks on \(deviceClass)")
     }
 
-    /// A14-08: an intent that arrives while the engine is busy is not dropped:
-    /// the next idle snapshot warms it, with no further draft change.
-    func testAnIntentThatArrivesWhileTheEngineIsBusyWarmsOnceItIsIdle() async throws {
+    /// A14-08: an intent that arrives while the engine is starting at launch
+    /// is not dropped: the first ready snapshot warms it, with no further
+    /// draft change.
+    func testAnIntentKeptWhileTheEngineStartsWarmsOnceItIsReady() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.isReady = false
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+
+        await waitUntil("the starting engine to reach the store") { !store.snapshot.isReady }
+        coordinator.scheduleWarmupIfNeeded(
+            context: customWarmContext(.mid16GBMac),
+            snapshot: store.snapshot,
+            ttsEngineStore: store
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 0, "Nothing warms while the engine starts")
+
+        engine.isReady = true
+        await waitUntil("the kept intent to warm once the engine is ready") { engine.prefetchCount == 1 }
+        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+        XCTAssertEqual(engine.prefetchSawCancellation, [false])
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 1, "The retried intent warms once")
+    }
+
+    /// A14-08: an intent that arrives during a take warms when the take ends
+    /// with its model still loaded.
+    func testAnIntentKeptDuringATakeWarmsWhenTheTakeEndsLoaded() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
         let engine = try makeEngine()
         engine.prefetchLoadsModel = true
@@ -947,7 +977,7 @@ final class TTSEngineStoreTests: XCTestCase {
         let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
         defer { subscription.cancel() }
 
-        engine.loadState = .running(modelID: nil, label: "Generating", fraction: nil)
+        engine.loadState = .running(modelID: "pro_custom", label: "Generating", fraction: nil)
         await waitUntil("the busy engine to reach the store") { store.hasActiveGeneration }
         coordinator.scheduleWarmupIfNeeded(
             context: customWarmContext(.mid16GBMac),
@@ -955,14 +985,47 @@ final class TTSEngineStoreTests: XCTestCase {
             ttsEngineStore: store
         )
         try await Task.sleep(for: .milliseconds(30))
-        XCTAssertEqual(engine.prefetchCount, 0, "Nothing warms while the engine is busy")
+        XCTAssertEqual(engine.prefetchCount, 0, "Nothing warms during the take")
 
-        engine.loadState = .idle
-        await waitUntil("the kept intent to warm once the engine is idle") { engine.prefetchCount == 1 }
-        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
-        XCTAssertEqual(engine.prefetchSawCancellation, [false])
-        try await Task.sleep(for: .milliseconds(30))
-        XCTAssertEqual(engine.prefetchCount, 1, "The retried intent warms once")
+        engine.loadState = .loaded(modelID: "pro_custom")
+        await waitUntil("the kept intent to warm once the take ends") { engine.prefetchCount == 1 }
+    }
+
+    /// AUD-10 holds for a kept intent: a busy period that ends in an unload
+    /// (the store's critical-band relief during a take, or the idle unload,
+    /// which closes admission while the model is still loaded) drops it, so
+    /// the retry never reloads what was just released.
+    func testAKeptIntentNeverUndoesAnUnloadThatEndsTheBusyPeriod() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        for (label, busy) in [
+            ("a take relieved by a full unload", (ready: true, state: EngineLoadState.running(modelID: "pro_custom", label: "Generating", fraction: nil))),
+            ("the idle unload", (ready: false, state: EngineLoadState.loaded(modelID: "pro_custom"))),
+        ] {
+            let engine = try makeEngine()
+            engine.prefetchLoadsModel = true
+            let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+            let coordinator = warmupCoordinator(.mid16GBMac)
+            let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+
+            engine.loadState = busy.state
+            engine.isReady = busy.ready
+            await waitUntil("\(label): the busy engine to reach the store") {
+                store.loadState == busy.state && store.snapshot.isReady == busy.ready
+            }
+            coordinator.scheduleWarmupIfNeeded(
+                context: customWarmContext(.mid16GBMac),
+                snapshot: store.snapshot,
+                ttsEngineStore: store
+            )
+            engine.loadState = .idle
+            engine.isReady = true
+            await waitUntil("\(label): the unload to reach the store") {
+                store.loadState == .idle && store.snapshot.isReady
+            }
+            try await Task.sleep(for: .milliseconds(50))
+            XCTAssertEqual(engine.prefetchCount, 0, "\(label): the unload sticks")
+            subscription.cancel()
+        }
     }
 
     /// A14-53: a warm the store refused (its memory band) while the model was

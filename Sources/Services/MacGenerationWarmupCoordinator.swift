@@ -116,17 +116,21 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     private var completedContext: WarmupContext?
     /// A Studio intent the engine could not take because it was busy (not
     /// ready, a take, load or prime running). `observe(snapshot:)` schedules
-    /// it once, when the engine leaves that busy state for idle or loaded
-    /// (A14-08). Only that transition retries: an idle unload (`.loaded` to
-    /// `.idle`) never does, so a retry cannot undo the unload, and a warm that
-    /// was refused or failed is never kept here (it is simply not complete, so
-    /// the next draft or destination change warms it, A14-53).
+    /// it once, when that busy period ends with the model loaded, or idle
+    /// with no model resident at any point of it (the engine starting at
+    /// launch) (A14-08). A period that ends idle after a model was resident
+    /// ended in an unload (the idle unload, the store's critical-band relief,
+    /// a failed take's unload), and the retry is dropped so it cannot undo
+    /// it. A warm that was refused or failed is never kept here (it is simply
+    /// not complete, so the next draft or destination change warms it, A14-53).
     private var retryIntent: WarmupContext?
     /// The store the latest intent was scheduled against, for a retry.
     private weak var warmStore: TTSEngineStore?
     /// Whether the last engine state seen was busy; a retry waits for it to
     /// end.
     private var engineWasBusy = false
+    /// Whether a model was resident at any point of the current busy period.
+    private var modelResidentWhileBusy = false
     private var revision: UInt64 = 0
 
     private struct DeferredIntent {
@@ -191,7 +195,7 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         if Self.isBusy(snapshot) {
             cancelPendingWarmup()
             retryIntent = context
-            engineWasBusy = true
+            noteBusy(snapshot)
             return
         }
 
@@ -238,7 +242,7 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                     self.pendingTask = nil
                     if !Task.isCancelled, Self.isBusy(ttsEngineStore.snapshot) {
                         self.retryIntent = plan.context
-                        self.engineWasBusy = true
+                        self.noteBusy(ttsEngineStore.snapshot)
                     }
                 }
                 return
@@ -354,6 +358,21 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         }
     }
 
+    private static func hasResidentModel(_ snapshot: TTSEngineSnapshot) -> Bool {
+        switch snapshot.loadState {
+        case .loaded, .running:
+            return true
+        case .idle, .starting, .failed:
+            return false
+        }
+    }
+
+    private func noteBusy(_ snapshot: TTSEngineSnapshot) {
+        if !engineWasBusy { modelResidentWhileBusy = false }
+        engineWasBusy = true
+        if Self.hasResidentModel(snapshot) { modelResidentWhileBusy = true }
+    }
+
     func observe(snapshot: TTSEngineSnapshot) {
         // While a dispatched warm runs, the busy and idle states are mostly
         // its own (a cold load, a clone prime, a transition's unload), the
@@ -370,11 +389,17 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             cancelPendingWarmup()
         }
         let busyWorkEnded = engineWasBusy && !isBusy
-        engineWasBusy = isBusy
-        if busyWorkEnded {
+        let residentWhileBusy = modelResidentWhileBusy
+        if isBusy {
+            noteBusy(snapshot)
+        } else {
+            engineWasBusy = false
+            modelResidentWhileBusy = false
+        }
+        if busyWorkEnded, Self.retryFollows(snapshot, modelResidentWhileBusy: residentWhileBusy) {
             retryIntentIfReady(snapshot: snapshot)
         } else if !isBusy {
-            // Any other change (an idle unload, a failure) drops a kept intent.
+            // Any other end (an unload, a failure) drops a kept intent.
             clearRetryIntent()
         }
 
@@ -399,9 +424,22 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         }
     }
 
+    /// A busy period that ends loaded, or idle with no model ever resident in
+    /// it, is work that finished; idle after a resident model is an unload.
+    private static func retryFollows(_ snapshot: TTSEngineSnapshot, modelResidentWhileBusy: Bool) -> Bool {
+        switch snapshot.loadState {
+        case .loaded:
+            return true
+        case .idle:
+            return !modelResidentWhileBusy
+        case .starting, .running, .failed:
+            return false
+        }
+    }
+
     /// A14-08: the intent the busy engine could not take is scheduled once that
-    /// work ends with the engine idle or loaded; it is consumed here, so only
-    /// a new busy period keeps it again.
+    /// work ends with the engine loaded, or idle at launch; it is consumed
+    /// here, so only a new busy period keeps it again.
     private func retryIntentIfReady(snapshot: TTSEngineSnapshot) {
         guard let intent = retryIntent else { return }
         clearRetryIntent()

@@ -25,12 +25,6 @@
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
     },
     {
-      "call": "Text",
-      "count": 1,
-      "literalSha256": "f6f8cc42775ed105a898cbb7a8e436c51c3dac8af3f3435180354b012089a0f1",
-      "path": "Sources/iOS/IOSStudioCanvas.swift"
-    },
-    {
       "call": "Button",
       "count": 2,
       "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",

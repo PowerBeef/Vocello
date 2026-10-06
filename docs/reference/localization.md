@@ -128,9 +128,10 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 
 `config/localization-unlocalized-baseline.json` records content-addressed identities for existing
 direct string-literal arguments to common SwiftUI presentation APIs under `Sources/iOS`,
-`Sources/Views`, and `Sources/SharedSupport`. After the 2026-09-14 macOS migration it holds eleven iOS records
+`Sources/Views`, and `Sources/SharedSupport`. It holds ten iOS records (the stale Studio counter record left on 2026-10-06)
 and no macOS exception since 2026-09-15 (the empty keyboard-shortcut bridge button left with the legacy composer, the wordless starters-label key with the legacy brief editor). The validator permits removal but rejects a new or
-additional occurrence. It is an incremental migration boundary, not proof that every indirect or
+additional occurrence; it does not report a record whose literal is gone, so refresh the baseline in
+the change that removes a baselined literal. It is an incremental migration boundary, not proof that every indirect or
 computed string is localized.
 
 Prefer a typed catalog entry. If an exceptional direct literal is deliberate, review it and then

@@ -23,6 +23,9 @@ public struct HistoryDeletionEngine: Sendable {
     public enum SingleOutcome: Equatable, Sendable {
         case deleted
         case databaseFailure(String)
+        /// The audio removal could not be recorded, so nothing was deleted;
+        /// the database itself is fine.
+        case removalUnrecorded
         case audioCleanupFailure(String)
     }
 
@@ -48,7 +51,13 @@ public struct HistoryDeletionEngine: Sendable {
         self.withdrawAudioRemoval = withdrawAudioRemoval
     }
 
-    public func deleteSingle(recordID: Int64?, audioPath: String) -> SingleOutcome {
+    /// `describe` turns a failure into the text a screen shows; the apps pass
+    /// their interface-language mapping, the default is the error's own text.
+    public func deleteSingle(
+        recordID: Int64?,
+        audioPath: String,
+        describe: (any Error) -> String = { $0.localizedDescription }
+    ) -> SingleOutcome {
         guard let recordID else {
             return .databaseFailure("Missing generation identifier.")
         }
@@ -57,14 +66,14 @@ public struct HistoryDeletionEngine: Sendable {
             do {
                 try recordAudioRemoval(audioPath)
             } catch {
-                return .databaseFailure(error.localizedDescription)
+                return .removalUnrecorded
             }
         }
         do {
             try deleteRecord(recordID)
         } catch {
             if hasAudio { withdrawAudioRemoval(audioPath) }
-            return .databaseFailure(error.localizedDescription)
+            return .databaseFailure(describe(error))
         }
         guard hasAudio else {
             return .deleted

@@ -73,8 +73,8 @@
       "path": "Sources/iOS/History/HistoryScreen.swift",
       "screen": "History",
       "scenario": "stateful",
-      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified is confirmed first (A2-02); only naturally damaged records may be inspected on user devices.",
-      "interactiveOccurrenceCount": 19
+      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified is confirmed first (A2-02); only naturally damaged records may be inspected on user devices. A single delete that could not record its audio removal reports that nothing was deleted.",
+      "interactiveOccurrenceCount": 21
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",
@@ -526,7 +526,7 @@
     },
     {
       "id": "history-surface",
-      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|RetryButton|Recovery_retry|Recovery_export|Recovery_discard|Recovery_discardConfirm|Recovery_discardCancel|ShowMoreButton)",
+      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|DeleteRefusedDismiss|RetryButton|Recovery_retry|Recovery_export|Recovery_discard|Recovery_discardConfirm|Recovery_discardCancel|ShowMoreButton)",
       "sourceToken": "historySearchField",
       "screen": "History",
       "prerequisite": "History tab",

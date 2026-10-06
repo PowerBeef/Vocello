@@ -73242,6 +73242,138 @@
           }
         }
       }
+    },
+    "vocello.history.delete_failed_title": {
+      "comment": "History: alert title when a single take could not be deleted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Deleted"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non supprimé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No eliminado"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht gelöscht"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non eliminato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não excluído"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未删除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除されませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제되지 않음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалено"
+          }
+        }
+      }
+    },
+    "vocello.history.removal_unrecorded": {
+      "comment": "History: a take's audio could not be listed for removal, so neither the take nor its audio was deleted; the database is fine and the user can retry.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing was deleted: Vocello couldn't record this take's audio for removal. Try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n’a été supprimé : Vocello n’a pas pu noter l’audio de ce clip pour le retirer. Réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se eliminó nada: Vocello no pudo registrar el audio de este clip para quitarlo. Inténtalo de nuevo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nichts wurde gelöscht: Vocello konnte das Audio dieses Clips nicht zum Entfernen vormerken. Versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato eliminato nulla: Vocello non è riuscito a registrare l’audio di questo clip per rimuoverlo. Riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada foi excluído: o Vocello não conseguiu registrar o áudio deste clipe para remoção. Tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未删除任何内容：Vocello 无法记录此音频以便移除。请重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "何も削除されませんでした。Vocello はこの音声を削除対象として記録できませんでした。もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아무것도 삭제되지 않았습니다. Vocello가 이 오디오를 삭제 대상으로 기록하지 못했습니다. 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ничего не удалено: Vocello не удалось отметить звук этой записи для удаления. Повторите попытку."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

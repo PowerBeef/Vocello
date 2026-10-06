@@ -200,6 +200,30 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(outcome.snapshot, .empty)
     }
 
+    /// A set-aside record still names its take's audio, which no row does: the
+    /// iPhone's leftover review keeps that audio, and stays closed while a
+    /// set-aside record cannot be read.
+    func testSetAsideRecordsKeepTheirAudioOutOfTheLeftoverReview() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let strayURL = fixture.store.rootURL.appendingPathComponent("copied-in.json")
+        try encode(GenerationHistoryOutboxEntry(operation: .append, generation: fixture.generation))
+            .write(to: strayURL)
+        let first = try await coordinator.setAsideUnverifiableRecords()
+        XCTAssertEqual(first, 1)
+        let referenced = await coordinator.withReferencedAudioPaths { $0 }
+        XCTAssertEqual(referenced?.contains(fixture.generation.audioPath), true, "Its audio is not a leftover")
+
+        try Data("not-json".utf8).write(
+            to: fixture.store.rootURL.appendingPathComponent("\(UUID().uuidString.lowercased()).json")
+        )
+        let second = try await coordinator.setAsideUnverifiableRecords()
+        XCTAssertEqual(second, 1)
+        let closed = await coordinator.withReferencedAudioPaths { $0 }
+        XCTAssertNil(closed, "An unreadable set-aside record keeps the review closed")
+    }
+
     /// Only records that cannot be verified are set aside: a valid queued take
     /// stays queued, and a store with nothing damaged sets nothing aside.
     func testSettingAsideKeepsEveryVerifiableRecord() async throws {
@@ -1145,7 +1169,9 @@ final class GenerationHistoryOutboxTests: XCTestCase {
             fileExists: { FileManager.default.fileExists(atPath: $0) }
         )
 
-        let outcome = await coordinator.deleteSingle(recordID: saved.id, audioPath: audioPath, using: engine)
+        let outcome = await coordinator.deleteSingle(
+            recordID: saved.id, audioPath: audioPath, using: engine, localization: VocelloLocalization()
+        )
 
         guard case .audioCleanupFailure = outcome else {
             return XCTFail("Expected the interrupted removal, got \(outcome)")
@@ -1183,14 +1209,16 @@ final class GenerationHistoryOutboxTests: XCTestCase {
 
         let kept = try state.commit(fixture.generation)
         let failed = await coordinator.deleteSingle(
-            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: true)
+            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: true),
+            localization: VocelloLocalization()
         )
         guard case .databaseFailure = failed else { return XCTFail("Expected the database failure, got \(failed)") }
         XCTAssertEqual(try store.loadPendingAudioRemovals(), [], "The row stayed, so its audio is not listed")
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
 
         let deleted = await coordinator.deleteSingle(
-            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: false)
+            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: false),
+            localization: VocelloLocalization()
         )
         XCTAssertEqual(deleted, .deleted)
         XCTAssertEqual(try store.loadPendingAudioRemovals(), [])

@@ -48,8 +48,15 @@ enum GenerationHistoryRecovery {
     /// cannot be removed is a warning outcome, which the screens report and
     /// hand to `retainAudioRemoval(_:)`. Off the main actor: a synchronous
     /// SQLite write and a file removal.
-    static func deleteSingle(recordID: Int64?, audioPath: String) async -> HistoryDeletionEngine.SingleOutcome {
-        await coordinator.deleteSingle(recordID: recordID, audioPath: audioPath, using: deletionEngine)
+    /// A failure reads in `localization`, the caller's interface language.
+    static func deleteSingle(
+        recordID: Int64?,
+        audioPath: String,
+        localization: VocelloLocalization
+    ) async -> HistoryDeletionEngine.SingleOutcome {
+        await coordinator.deleteSingle(
+            recordID: recordID, audioPath: audioPath, using: deletionEngine, localization: localization
+        )
     }
 
     /// A deleted row's audio, removed only when nothing else uses it

@@ -260,6 +260,18 @@ struct VocelloPresentationText: Sendable {
             comment: "Number of recovery files that failed a user-directed local export; originals remain retained."), count)
     }
 
+    var historyDeleteFailedTitle: String {
+        localization.string(localized: "vocello.history.delete_failed_title",
+               defaultValue: "Not Deleted",
+               comment: "History: alert title when a single take could not be deleted. Presentation only.")
+    }
+
+    var historyRemovalUnrecorded: String {
+        localization.string(localized: "vocello.history.removal_unrecorded",
+               defaultValue: "Nothing was deleted: Vocello couldn't record this take's audio for removal. Try again.",
+               comment: "History: a take's audio could not be listed for removal, so neither the take nor its audio was deleted; the database is fine and the user can retry.")
+    }
+
     var historyUnqueuedTitle: String {
         localization.string(localized: "vocello.history.unqueued_title",
                defaultValue: "Audio ready — History not saved",

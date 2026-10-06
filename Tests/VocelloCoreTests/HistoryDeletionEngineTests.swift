@@ -91,7 +91,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
         let log = EffectLog()
         let engine = makeEngine(log: log, recordFails: true, existingPaths: ["/a.wav"])
         let outcome = engine.deleteSingle(recordID: 7, audioPath: "/a.wav")
-        XCTAssertEqual(outcome, .databaseFailure("list unwritable"))
+        XCTAssertEqual(outcome, .removalUnrecorded, "the database is fine; only the removal list failed")
         XCTAssertEqual(log.snapshot, ["record(/a.wav)"])
     }
 

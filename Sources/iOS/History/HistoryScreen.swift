@@ -187,6 +187,9 @@ private struct IOSHistoryLibrarySection: View {
     /// deleted (PA-21, AUD-05). Never silent; `audioNotDeletedMessage` says which.
     @State private var isAudioNotDeletedPresented = false
     @State private var audioNotDeletedMessage = ""
+    /// A single delete that could not record its audio removal deleted
+    /// nothing; the user is told and can retry (the database is fine).
+    @State private var isDeleteRefusedPresented = false
     /// A clear that was refused or failed is never silent (PA-30); the message
     /// is the typed error, which says what was preserved.
     @State private var isClearFailurePresented = false
@@ -227,6 +230,12 @@ private struct IOSHistoryLibrarySection: View {
                     .accessibilityIdentifier("historyClearIncompleteDismiss")
             } message: {
                 Text(audioNotDeletedMessage)
+            }
+            .alert(IOSAppLanguage.shared.presentation.historyDeleteFailedTitle, isPresented: $isDeleteRefusedPresented) {
+                Button(IOSInterfaceText.ok, role: .cancel) {}
+                    .accessibilityIdentifier("historyDeleteRefusedDismiss")
+            } message: {
+                Text(IOSAppLanguage.shared.presentation.historyRemovalUnrecorded)
             }
 
             IOSHistoryFilterChips(selection: $modeFilter)
@@ -764,7 +773,9 @@ private struct IOSHistoryLibrarySection: View {
         let recordID = item.id
         let audioPath = item.audioPath
         Task {
-            let outcome = await GenerationHistoryRecovery.deleteSingle(recordID: recordID, audioPath: audioPath)
+            let outcome = await GenerationHistoryRecovery.deleteSingle(
+                recordID: recordID, audioPath: audioPath, localization: IOSAppLanguage.shared.localization
+            )
             switch outcome {
             case .deleted:
                 reload()
@@ -779,6 +790,8 @@ private struct IOSHistoryLibrarySection: View {
             case .databaseFailure(let message):
                 databaseUnavailable = true
                 errorMessage = message
+            case .removalUnrecorded:
+                isDeleteRefusedPresented = true
             }
         }
     }

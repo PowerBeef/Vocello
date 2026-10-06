@@ -910,6 +910,11 @@ private extension MacHistoryScreen {
                 title: MacInterfaceText.historyDeleteError,
                 message: MacInterfaceText.historyDeleteErrorMessage(message)
             )
+        case .removalUnrecorded:
+            presentActionAlert(
+                title: MacInterfaceText.historyDeleteError,
+                message: MacInterfaceText.presentation.historyRemovalUnrecorded
+            )
         case .audioCleanupFailure(let message):
             presentActionAlert(
                 title: MacInterfaceText.historyDeleteWarning,
@@ -928,13 +933,17 @@ private extension MacHistoryScreen {
     func deleteItem(_ item: MacHistoryListItem) async -> HistoryDeletionEngine.SingleOutcome {
         let recordID = item.generation.id
         let audioPath = item.generation.audioPath
-        let outcome = await GenerationHistoryRecovery.deleteSingle(recordID: recordID, audioPath: audioPath)
+        let outcome = await GenerationHistoryRecovery.deleteSingle(
+            recordID: recordID, audioPath: audioPath, localization: MacInterfaceLanguage.current
+        )
 
         if case .databaseFailure = outcome {
             databaseUnavailable = true
             return outcome
         }
         databaseUnavailable = false
+        // Nothing was deleted and the database is fine: the row stays.
+        if case .removalUnrecorded = outcome { return outcome }
         if case .audioCleanupFailure = outcome {
             _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
             refreshRecoveryState()

@@ -605,6 +605,22 @@ struct GenerationHistoryOutboxStore: Sendable {
 
     private static let unverifiableExtension = "unverifiable"
 
+    /// The audio paths the set-aside records name, or nil when the folder or
+    /// one of them cannot be read. A set-aside take's audio is named by no row,
+    /// entry or removal list, yet it is the user's: the iPhone's leftover
+    /// review must keep it, and cannot tell it apart when a record is unreadable.
+    func setAsideAudioPaths() -> Set<String>? {
+        guard let urls = try? FileManager.default.contentsOfDirectory(
+            at: rootURL, includingPropertiesForKeys: nil
+        ) else { return nil }
+        var paths = Set<String>()
+        for url in urls where url.pathExtension == Self.unverifiableExtension {
+            guard let entry: GenerationHistoryOutboxEntry = try? decode(url) else { return nil }
+            paths.insert(entry.generation.audioPath)
+        }
+        return paths
+    }
+
     private func isVerifiableEntry(at url: URL, filenameID: UUID?) -> Bool {
         guard let entry: GenerationHistoryOutboxEntry = try? decode(url) else { return false }
         return (try? validate(entry, filenameID: filenameID)) != nil
@@ -867,7 +883,8 @@ actor GenerationHistoryRecoveryCoordinator {
     func deleteSingle(
         recordID: Int64?,
         audioPath: String,
-        using engine: HistoryDeletionEngine
+        using engine: HistoryDeletionEngine,
+        localization: VocelloLocalization
     ) -> HistoryDeletionEngine.SingleOutcome {
         var journaled = engine
         let outbox = self.store
@@ -879,7 +896,9 @@ actor GenerationHistoryRecoveryCoordinator {
             }
         }
         journaled.withdrawAudioRemoval = { path in _ = try? outbox.withdrawPendingAudioRemoval(path) }
-        return journaled.deleteSingle(recordID: recordID, audioPath: audioPath)
+        return journaled.deleteSingle(recordID: recordID, audioPath: audioPath) {
+            HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
+        }
     }
 
     /// Runs `decide` with every audio path History still uses: every row,
@@ -905,7 +924,9 @@ actor GenerationHistoryRecoveryCoordinator {
         // commit inserts its row before it removes its entry.
         let scan = store.scan()
         guard scan.issueCount == 0 else { return nil }
-        var referenced = Set(scan.entries.map(\.generation.audioPath))
+        // Set-aside records keep their takes' audio (A2-02).
+        guard let setAside = store.setAsideAudioPaths() else { return nil }
+        var referenced = Set(scan.entries.map(\.generation.audioPath)).union(setAside)
         referenced.formUnion(committingAudioPaths.keys)
         let rows: [Generation]
         do {

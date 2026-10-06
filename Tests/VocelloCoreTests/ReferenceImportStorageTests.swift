@@ -102,6 +102,54 @@ final class ReferenceImportStorageTests: XCTestCase {
         XCTAssertFalse(exists(copiedSidecar), "An earlier copy of the sidecar is not presented as this import's")
     }
 
+    /// A3-02: re-importing the same unchanged file maps to the same
+    /// materialized name, which a review may still be reading. A copy that
+    /// fails keeps the earlier materialization and leaves no staging file.
+    func testAFailedReimportKeepsTheEarlierMaterialization() throws {
+        try XCTSkipIf(getuid() == 0, "The superuser reads any file")
+        let source = root.appendingPathComponent("voice.m4a")
+        try Data("audio".utf8).write(to: source)
+        let imported = root.appendingPathComponent("imported", isDirectory: true)
+        let documentIO = LocalDocumentIO(importedReferenceDirectory: imported)
+        let first = try documentIO.importReferenceAudio(from: source)
+
+        // Permissions change the inode's change time, not the fingerprinted
+        // size or modification time, so the re-import targets the same name.
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: source.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.path) }
+        XCTAssertThrowsError(try documentIO.importReferenceAudio(from: source)) { error in
+            XCTAssertEqual(error as? DocumentIOError, .failedToCopy(first.materializedPath))
+        }
+
+        XCTAssertEqual(try Data(contentsOf: first.materializedURL), Data("audio".utf8))
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: imported.path),
+            [first.materializedURL.lastPathComponent]
+        )
+    }
+
+    /// A3-02: an export whose copy fails leaves an existing destination as it
+    /// was; one that succeeds replaces it whole.
+    func testAFailedExportKeepsTheExistingDestination() throws {
+        try XCTSkipIf(getuid() == 0, "The superuser reads any file")
+        let source = root.appendingPathComponent("take.wav")
+        try Data("new take".utf8).write(to: source)
+        let exports = root.appendingPathComponent("exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+        let destination = exports.appendingPathComponent("take.wav")
+        try Data("earlier export".utf8).write(to: destination)
+        let documentIO = LocalDocumentIO(importedReferenceDirectory: root.appendingPathComponent("imported"))
+
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: source.path)
+        XCTAssertThrowsError(try documentIO.exportGeneratedAudio(from: source, to: destination))
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.path)
+        XCTAssertEqual(try Data(contentsOf: destination), Data("earlier export".utf8))
+
+        _ = try documentIO.exportGeneratedAudio(from: source, to: destination)
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new take".utf8))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: exports.path), ["take.wav"])
+    }
+
     // MARK: - Saved voices in formats the store does not name (MAC-09)
 
     func testOnlyFormatsTheStoreDoesNotNameAreConverted() {

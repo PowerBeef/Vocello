@@ -74,6 +74,31 @@ public struct ExportedDocument: Hashable, Codable, Sendable {
     }
 }
 
+/// A copy that never removes an existing destination before the new bytes are
+/// complete: they land in a hidden staging file beside the destination, which
+/// then replaces it (or takes its name when there is none). A failed copy
+/// leaves any destination exactly as it was and removes only its own staging
+/// file (A3-01, A3-02).
+public enum StagedFileCopy {
+    public static func copy(from source: URL, to destination: URL, fileManager: FileManager = .default) throws {
+        let staging = destination.deletingLastPathComponent().appendingPathComponent(
+            ".\(destination.lastPathComponent).vocello-copy-\(UUID().uuidString)",
+            isDirectory: false
+        )
+        do {
+            try fileManager.copyItem(at: source, to: staging)
+            if fileManager.fileExists(atPath: destination.path) {
+                _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try fileManager.moveItem(at: staging, to: destination)
+            }
+        } catch {
+            try? fileManager.removeItem(at: staging)
+            throw error
+        }
+    }
+}
+
 public protocol DocumentIO: Sendable {
     func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio
     func exportGeneratedAudio(from sourceURL: URL, to destinationURL: URL) throws -> ExportedDocument
@@ -168,10 +193,7 @@ public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
         }
 
         do {
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
-            }
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try StagedFileCopy.copy(from: sourceURL, to: destinationURL, fileManager: fileManager)
         } catch {
             throw DocumentIOError.failedToCopy(destinationURL.path)
         }
@@ -179,17 +201,16 @@ public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
         return ExportedDocument(sourcePath: sourceURL.path, destinationPath: destinationURL.path)
     }
 
+    /// A re-import of the same file maps to the same materialized name, which a
+    /// review may still be reading: it is replaced in one step, never removed
+    /// first, and a failed copy keeps the earlier materialization (A3-02).
     private static func copyReplacingIfNeeded(_ sourceURL: URL, to destinationURL: URL) throws {
-        let fileManager = FileManager.default
         if sourceURL.standardizedFileURL == destinationURL.standardizedFileURL {
             return
         }
 
         do {
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
-            }
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try StagedFileCopy.copy(from: sourceURL, to: destinationURL)
         } catch {
             throw DocumentIOError.failedToCopy(destinationURL.path)
         }

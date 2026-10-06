@@ -79,7 +79,7 @@ def load(root: pathlib.Path) -> dict:
 
 
 def load_archive(root: pathlib.Path) -> dict:
-    """Finished work; never validated, only counted."""
+    """Finished work, counted toward progress. `validate_archive` checks its done items."""
     path = root / ARCHIVE_PATH
     if not path.exists():
         return {"plans": [], "items": []}
@@ -161,7 +161,37 @@ def resolve_evidence(root: pathlib.Path, reference: str) -> str | None:
         return resolve_doc(root, value)
     if kind == "file":
         return None if (root / value).exists() else f"file not found: {value}"
-    return f"unknown evidence kind {kind!r} (benchmark|commit|doc|file)"
+    if kind == "run":
+        return None  # a lane run ID; its artifacts stay untracked, so only the shape is checked
+    return f"unknown evidence kind {kind!r} (benchmark|commit|doc|file|run)"
+
+
+# Archived items keep the evidence they closed with. Files and doc anchors move after an
+# item closes, so only the references that stay true forever are resolved there: a
+# commit on main and a published benchmark record. Every reference must still have a
+# known kind, and every done item must cite something.
+ARCHIVE_RESOLVED_KINDS = ("commit", "benchmark")
+
+
+def validate_archive(root: pathlib.Path) -> list[str]:
+    errors: list[str] = []
+    for item in load_archive(root).get("items", []):
+        if item.get("status") != "done":
+            continue
+        iid = item.get("id", "?")
+        evidence = item.get("evidence") or []
+        if not evidence:
+            errors.append(f"archived item {iid}: done requires evidence")
+        for reference in evidence:
+            kind, _, value = str(reference).partition(":")
+            if not value or kind not in ("benchmark", "commit", "doc", "file", "run"):
+                errors.append(f"archived item {iid}: evidence must be '<kind>:<value>' with a known kind, "
+                              f"got {reference!r}")
+            elif kind in ARCHIVE_RESOLVED_KINDS:
+                problem = resolve_evidence(root, reference)
+                if problem:
+                    errors.append(f"archived item {iid}: evidence {problem}")
+    return errors
 
 
 # --------------------------------------------------------------------------
@@ -314,6 +344,8 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
             )
 
         warnings.extend(f"item {iid}: {f}" for f in staleness_findings(root, item, today))
+
+    errors.extend(validate_archive(root))
 
     # Dependency integrity, resolved after every item is known. A blocker that
     # finished and moved to the archive is satisfied.

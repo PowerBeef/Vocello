@@ -88,7 +88,7 @@ _native_lock_reclaim() {
 
 acquire_native_lock() {
     local label="${1:-native}" lock_dir="${QVOICE_NATIVE_LOCK:-}"
-    local waited=0 owner="" holder_label="" holder_checkout=""
+    local waited=0 vanished=0 owner="" holder_label="" holder_checkout=""
     [[ -n "$lock_dir" ]] || {
         echo "error: QVOICE_NATIVE_LOCK is not set (build-output policy not loaded)" >&2
         return 1
@@ -113,11 +113,16 @@ acquire_native_lock() {
             return 0
         fi
         if [[ ! -d "$lock_dir" ]]; then
-            if [[ -e "$lock_dir" ]] || ! mkdir -p "$(dirname "$lock_dir")" 2>/dev/null; then
+            # Released between our mkdir and this check: try again, a few times. A
+            # lock that can never be created (an unwritable parent) fails instead
+            # of spinning.
+            vanished=$((vanished + 1))
+            if [[ -e "$lock_dir" ]] || ! mkdir -p "$(dirname "$lock_dir")" 2>/dev/null \
+                || [[ ! -w "$(dirname "$lock_dir")" ]] || (( vanished > 5 )); then
                 echo "error: cannot create the native lock: $lock_dir" >&2
                 return 1
             fi
-            continue  # released between our mkdir and this check; try again
+            continue
         fi
         owner="$(cat "$lock_dir/pid" 2>/dev/null || true)"
         if [[ -n "$owner" ]] && ! native_lock_is_live "$lock_dir"; then

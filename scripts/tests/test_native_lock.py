@@ -126,6 +126,18 @@ class NativeLockTests(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 10)
         self.assertIn("cannot create", result.stderr)
 
+    def test_a_lock_under_an_unwritable_folder_fails_fast_instead_of_spinning(self) -> None:
+        parent = self.base / "read-only cache"
+        parent.mkdir()
+        parent.chmod(0o555)
+        self.addCleanup(parent.chmod, 0o755)
+        started = time.monotonic()
+        result = self.bash("acquire_native_lock blocked", QVOICE_NATIVE_LOCK=str(parent / "native.lock"),
+                           QVOICE_NATIVE_LOCK_WAIT_SECONDS="30")
+        self.assertEqual(result.returncode, 1)
+        self.assertLess(time.monotonic() - started, 10)
+        self.assertIn("cannot create", result.stderr)
+
     def test_an_ownerless_lock_is_reclaimed_only_once_it_is_old(self) -> None:
         self.lock.mkdir(parents=True)
         young = self.bash("acquire_native_lock waiter")

@@ -109,6 +109,42 @@ class AccuracyTests(Harness):
     def test_evidence_must_be_kind_prefixed(self):
         self.assertIn("evidence must be", self.errors_from(self._done_with(["c14651c"])))
 
+    def test_a_lane_run_id_is_known_evidence(self):
+        self.assertEqual(self.errors_except_archive_rule(self._done_with(
+            ["run:macos-xcui-smoke-20260915-040350-f374335f", "commit:c14651c"])), [])
+
+
+class ArchiveTests(Harness):
+    """Moving a done item to the archive must not end its evidence checks."""
+
+    def archived(self, **item):
+        entry = {"id": "A-7", "plan": "p1", "title": "finished", "status": "done", "updated": "2026-08-01"}
+        entry.update(item)
+        with mock.patch.object(roadmap, "load_archive", return_value={"items": [entry]}):
+            return " | ".join(self.check()["errors"])
+
+    def test_an_archived_done_item_must_cite_evidence(self):
+        self.assertIn("archived item A-7: done requires evidence", self.archived())
+        self.assertIn("archived item A-7: done requires evidence", self.archived(evidence=[]))
+
+    def test_archived_commits_and_benchmarks_resolve(self):
+        self.assertIn("commit does not exist", self.archived(evidence=["commit:deadbee"]))
+        self.assertIn("benchmark record not found", self.archived(evidence=["benchmark:not-a-real-run"]))
+        self.assertEqual(self.archived(evidence=["commit:c14651c"]), "")
+
+    def test_archived_files_and_docs_are_checked_for_shape_only(self):
+        # Files and anchors move after an item closes; the claim stays what it was.
+        self.assertEqual(self.archived(evidence=["file:Sources/Retired.swift", "doc:docs/gone.md#x",
+                                                 "run:ios-xcui-smoke-1", "commit:c14651c"]), "")
+        self.assertIn("known kind", self.archived(evidence=["vibes:it-feels-done"]))
+        self.assertIn("known kind", self.archived(evidence=["c14651c"]))
+
+    def test_declined_and_superseded_archive_items_need_no_evidence(self):
+        self.assertEqual(self.archived(status="declined", reason="not needed"), "")
+
+    def test_the_real_archive_passes(self):
+        self.assertEqual(roadmap.validate_archive(REPO_ROOT), [])
+
 
 class ObligationTests(Harness):
     def test_declined_requires_a_reason(self):

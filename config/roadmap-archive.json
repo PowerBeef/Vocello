@@ -3981,8 +3981,9 @@
       "updated": "2026-09-24",
       "notes": "Closed 2026-09-24. The CLI owns its playback children (an injected launcher; afplay is terminated and reaped on signal or forced exit, and a failed launch is balanced and reported), signal handling is armed before any command work starts, and a genuine generation failure that coincides with a signal is classified as a failure by type, not as a cancellation; the forced exit path alone exits. Deterministic CLIExecutionTests cover each, including a real /bin/sleep child under TSan.",
       "evidence": [
-        "commit:776d8ccb",
-        "commit:788204fc",
+        "commit:31cc8b01",
+        "commit:73ac0b7c",
+        "commit:64fb9b7c",
         "file:Tests/VocelloCoreTests/CLIExecutionTests.swift"
       ]
     },
@@ -4038,7 +4039,10 @@
       ],
       "notes": "Closed 2026-09-24. Deletion: a delete whose audio cannot be removed says so and keeps the path on a durable removal list every reconcile retries (regular files only, never a path a row or queued take uses); clear-all hands its audio to that list before its marker retires and counts only what stays listed. Contention: with no long-form journal pending, History reads are read transactions. Paging: both platforms read bounded pages (filter and search reach every row) with Show More. Data-loss fix after two adversarial reviews: the clear marker records the highest row id it saw and a resume deletes only rows up to it (ids are AUTOINCREMENT, tested on real SQLite); a clear with a marker pending finishes it, then clears what is visible; a keep-files request never escalates; the clear read fails rather than withholding long-form rows; a marker from before the bound is abandoned. Leftovers moved to PA-30.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:8ef5e8e9"
+      ]
     },
     {
       "id": "AUD-08",
@@ -4051,7 +4055,12 @@
       ],
       "notes": "Closed 2026-09-24. One privacy helper (QwenVoiceCore DiagnosticPrivacy) keeps a typed summary (error code and classification, type, domain and code chain, stage, HTTP status) and redacts URLs, e-mail addresses, quoted spans, absolute and home paths and content-keyed values. Every persisted or exported diagnostic that could carry a path, prompt or transcript goes through it: model-download diagnostics, the iOS device-diagnostics manifest, action messages and sentinels, engine native-events, the commerce error record (schema 2), crash-observer exception reasons and MetricKit reasons. Generation failures and telemetry already stored only codes or digests. Regression tests feed synthetic path, prompt and transcript failures and prove none is retained; the privacy docs state the scan scope. Left elsewhere: console-only prints (not persisted) on PA-26, error text shown in the UI on PA-20, ENG-08 (user text in an owned-package error message) on PA-26.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:4eff69d2",
+        "commit:12248d3e",
+        "commit:f6320f49"
+      ]
     },
     {
       "id": "AUD-10",
@@ -4065,7 +4074,10 @@
       ],
       "notes": "Closed 2026-09-25 (maintainer decision 2026-09-24: unload after idle, warm by intent). The high-memory Mac now unloads after 30 minutes idle (floor 2, mid 10 unchanged) and answers kernel memory pressure (soft and hard trims, warm admission deferred under pressure) like the other tiers; navigation alone never warms (only entering Studio or generating does), and PA-31's coordinator keeps an idle unload from being undone. The engine now settles a cancelled cold prefetch and a cancelled clone prime through the runtime and re-arms idle unload, instead of reporting .idle over resident weights. Lifecycle tests cover the per-tier windows, both cancelled paths and navigation without intent. 1800 s is a policy value, not yet measured on real hardware. Leftover: a failed, non-cancelled model operation leaves weights resident with no idle unload (PA-32).",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-25"
+      "updated": "2026-09-25",
+      "evidence": [
+        "commit:b22104df"
+      ]
     },
     {
       "id": "BT-02",
@@ -4081,7 +4093,10 @@
         "benchmarks/baselines/mac-gate-bench.json"
       ],
       "notes": "Closed 2026-09-25. Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Maintainer decisions 2026-09-25: five warm takes and a stricter per-take load limit. Landed 2026-09-25: a seeded gate with governed pooled seeding (at least three seeded runs on one clean commit) and identity read from the evidence, memory tier bound; five warm takes; spread-floored thresholds printed; a preflight that stops a missing model within seconds with a finalized ledger; INCONCLUSIVE from the busiest judged take and from low power; a take above the core count marks its engine record exploratory; Clone prewarm before the warm takes; no duplicate core tests or full pytest in the gate; the bench's telemetry-off arm truly off; the sidecar budget sized to the run; forced memory-class rows refused and a refused identity never truncates a baseline. The M6 re-seed landed as AV-17 step 1 (ce66096c: three seeded runs from 848e140a, thresholds printed); test_compare_baseline replays flag a synthetic +6% RTF with no false regression; a post-wave-8 compare passed (4de385ef).",
-      "updated": "2026-09-25"
+      "updated": "2026-09-25",
+      "evidence": [
+        "commit:53e1cdad"
+      ]
     },
     {
       "id": "AQ-01",
@@ -4095,7 +4110,11 @@
       ],
       "notes": "Closed 2026-09-26 (wave 10; maintainer decisions 1a, 2a, 3a, 7). config/audio-qc-judges.json registers 12 judges with pins, weight and data licenses, tier, independence and an output/envelope identity split, plus 23 exclusions and a use restriction; its validator runs in the contract gate. NISQA (CC BY-NC-SA weights), UTMOSv2 and the SER are retired from every QC, gate, guardrail and selection path; legacy promotion inputs still load. A load-time require_loadable gate replaces an import scan that broke the rule against reading other scripts; ECAPA pins all 10 snapshot files from the Hub tree. Identity v4 binds the command template, runtime versions and host, re-hashes the adapter source and keeps the supervisor as envelope provenance (replay: a supervisor-only change keeps caches). Adoption reads two clean canonical-host runs. Per-judge memory ceilings stay provisional for AQ-06; DistilHuBERT retirement is AQ-05.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-26"
+      "updated": "2026-09-26",
+      "evidence": [
+        "commit:84103692",
+        "commit:ca388b72"
+      ]
     },
     {
       "id": "AQ-03",
@@ -4109,7 +4128,12 @@
       ],
       "notes": "Closed 2026-09-26 (wave 10; decisions 5a and 7). scripts/lib/qc_qualification: exact Clopper-Pearson bounds, family resampling, correlated-failure audit, threshold derivation from clean clips, persisted pre-registration and confirm-once; 17 seeded injector families with identity shams and golden digests; a pure verdict composer; config/audio-qc-qualification-policy.json (A1-A10, Bonferroni per-language confidence); Swift .abstained, which the bench reports as inconclusive; Stage 0 constants pinned to config/audio-qc-stage0-calibration.json. M1 on Fast QC v8: 0/60 clean false alarms and no sham departs, but realistic clicks, sub-full-scale clipping, noise, truncation, word deletion, pitch breaks and identity swaps go undetected; an adversarial review removed construction artifacts first. Follow-ups: a tracked qc-calibration record kind (AQ-07/AQ-09) and keeping failed-run archives when the bench is inconclusive.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-26"
+      "updated": "2026-09-26",
+      "evidence": [
+        "commit:489daeb8",
+        "commit:750a1a50",
+        "commit:4adacb30"
+      ]
     },
     {
       "id": "PA-32",
@@ -4123,7 +4147,10 @@
         "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
       ],
       "notes": "Closed 2026-09-26 (wave 11; maintainer decision 2026-09-25). A non-cancelled failure that leaves a model resident (failed load, ensure-load, prewarm, prefetch, clone prime, either generation path) arms the normal per-tier idle unload; from .failed (or the .idle a dismiss leaves) it releases the weights under the admission gate and keeps the failed state, message, latest event and a failed clone preparation until the user's next action (dismiss, a take, a load or leaving Clone); a stale .primed resets. Relief reopening admission re-arms it, and a cancelled take now re-arms idle unload too. Captured MLX failures and cancellations never arm it; the Mac warmup coordinator still does not warm from .failed, so after a failure a mode change warms only once the user dismisses or generates. Tests over the real engine behind the store (TTSEngineStoreTests) cover each failure kind, the next action, cancellation and the snapshot bridge.",
-      "updated": "2026-09-26"
+      "updated": "2026-09-26",
+      "evidence": [
+        "commit:111f37f7"
+      ]
     },
     {
       "id": "AQ-04",
@@ -4140,7 +4167,11 @@
       ],
       "notes": "Closed 2026-09-26 (wave 11; decision 8a keeps QC v8). Stage 0 adds observational fields only, in AudioQCReport.signal (its own algorithmVersion 1): BS.1770-4 integrated, short-term maximum and LRA, 4x true peak, p10 noise floor, WADA-SNR, effective bandwidth, clustered flux events per second, the 12.5 Hz modulation index, a seam z-score at chunk seams and the repetition stripe (600 ms, cos 0.95). The Python mirror (scripts/lib/audio_qc_observations.py) matches Swift natively on shared fixtures pinned by config/audio-qc-stage0-observations.json; verdicts are unchanged. Engine introspection (codec-token cycles, EOS trajectory, entropy, seams) runs on a compiled scalar graph inside the step's own evaluation; a review fix makes a failed compiled call reach the typed MLX failure and keeps one trace per generation. The seeded M6 gate bench measured the cost: RTF +0.46%, first chunk +1.4%, tokens/s -0.14%, footprint flat and generated tokens identical (mac-gate-bench-20260926-180734-fe43583b), so the fields stay on in every take and no measurement version moves.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-26"
+      "updated": "2026-09-26",
+      "evidence": [
+        "commit:57d96c72",
+        "commit:eaf7989f"
+      ]
     },
     {
       "id": "AQ-05",
@@ -4157,7 +4188,11 @@
       ],
       "notes": "Closed 2026-09-26 (wave 11; decision 9a). One orchestrator (scripts/audio_qc_orchestrator.py) runs Stages 1-3 after the generator exits with one persistent worker per judge per run (scripts/audio_qc_worker.py), admitted by a budgeted semaphore (10 GiB provisional, one MLX GPU worker beside at most two CPU workers, registry ceilings enforced live on the worker's process group) under one host-wide analysis lock; an L0-L2 cache keyed by output identities with verdicts never cached; take-evidence/1 records and an untracked private bundle; DistilHuBERT and the fitted heads retired from every QC path. An adversarial review found nine defects (host-wide lock, orphaned worker, crash isolation, process-group ceilings, timeout scaling, trivially satisfiable binding evidence, cache keys, concurrent adoption); all were fixed with tests. First real run 2026-09-26: 19 lang-bench takes through the whisper-small worker reproduce witness_verdict exactly (status, expectation, error rates, channels, reasons). The child-attributed recovery rule stays report-only (candidateBinding false) until committed M6 recovery reports bind it.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-26"
+      "updated": "2026-09-26",
+      "evidence": [
+        "commit:71dbbf20",
+        "commit:d251c8e6"
+      ]
     },
     {
       "id": "AQ-06",
@@ -4177,6 +4212,11 @@
       "blockedBy": [
         "AQ-01",
         "AQ-05"
+      ],
+      "evidence": [
+        "commit:9918999e",
+        "commit:90f3adce",
+        "commit:88226278"
       ]
     },
     {
@@ -4194,7 +4234,12 @@
       ],
       "notes": "Closed 2026-09-27. P2a (wave 10): normalization v2 with byte-exact Python/Swift parity (Korean syllable CER, NFKC and casefold, Latin folds, tag stripping, bracket and filler safety, space-free CER, ten-language tables), a corpus lint refusing digits, symbols and abbreviations, language measurement v4. P2b: v3 folds Traditional to Simplified for Chinese through a committed 3,079-entry ICU Hant-Hans table (measurement v5, languageASR gate 7), clearing the design-zh false fail; lang-bench v5 published. The CC0 script pool (config/audio-qc-script-pool.json, scripts/audio_qc_script_pool.py) holds 120 Common Voice Sentence Collector sentences per language from a pinned commit, split 60 calibration and 60 confirmation, with an auditable filter funnel (Chinese is the limiting source: 136 candidates). Not needed: cn2an, num2words and fugashi (the lint admits no digits, the pool no unsegmented edge cases). Deferred to AQ-07: the hard-case and digits diagnostic pools; human recordings come from FLEURS (N1), never committed.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-27"
+      "updated": "2026-09-27",
+      "evidence": [
+        "commit:02ef24d0",
+        "commit:8c03abdb",
+        "commit:912940da"
+      ]
     },
     {
       "id": "QC-01",
@@ -4206,7 +4251,11 @@
       ],
       "notes": "Closed 2026-10-02, lean by the maintainer's decision: only what the external reports recommend. Kept: Whisper large-v3 and Qwen3-ASR 1.7B (two transcription families, consensus), ZIPA and wav2vec2-xlsr-espeak (phones, agreeing), espeak-ng + PanPhon G2P, and for clones only FCPE, SwiftF0 and ReDimNet2+. All eight scored the 300 human controls and batch-1 on the M6; ReDimNet2+ peaked at 3.58 GiB on 11-20 s clips (budget 4 GB). Removed: the Gemma 4 and Qwen2.5-Omni judges with llama.cpp, the forced aligner, UTMOSv2, Audiobox Aesthetics and the 8-bit alternates (24e8b715); `qc.py models prune` deleted their files.",
       "plan": "qc-v2-2026-10",
-      "updated": "2026-10-02"
+      "updated": "2026-10-02",
+      "evidence": [
+        "commit:24e8b715",
+        "commit:aa5e108a"
+      ]
     },
     {
       "id": "QC-05",
@@ -4218,7 +4267,12 @@
       ],
       "notes": "Closed 2026-10-02. The v1 code, configs, records, docs, tests and CI routes were deleted (c44d0205, efe548d8, 45421df2). build_cleanup.py --qc-v1 ran after a reviewed dry run (the maintainer approved deletion): about 43 GiB of v1 judge models, analysis caches, unused corpora and evidence runs, then 2.1 GiB of v1 model copies once qc.py models prune had removed the dropped v2 models (7.8 GB). Free disk went from 54 GB to 107 GB. MLS, LibriTTS-R, the speaker cohorts and the qc-takes pools stay.",
       "plan": "qc-v2-2026-10",
-      "updated": "2026-10-02"
+      "updated": "2026-10-02",
+      "evidence": [
+        "commit:c44d0205",
+        "commit:efe548d8",
+        "commit:45421df2"
+      ]
     },
     {
       "id": "AQ-09",
@@ -4420,7 +4474,12 @@
       ],
       "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "Closed 2026-10-06 by the maintainer's decision. 39 blind confirmations in chat (confirm-1 to confirm-7, 2026-10-05/06; eval-v1 at 0b38f0f5): flagged takes were unusable 9 of 29 times (31%, bounds 15-51%), lone flags 4 of 16, agreeing flags 5 of 13, and unflagged takes shuffled in blind 2 of 5. The flags do not beat the base rate, no detector approaches fail (17 at a lower bound of 0.8), and more batches cannot make them precise. fr-0101--dylan stays labelled in batch-1 (three severe defects)."
+      "notes": "Closed 2026-10-06 by the maintainer's decision. 39 blind confirmations in chat (confirm-1 to confirm-7, 2026-10-05/06; eval-v1 at 0b38f0f5): flagged takes were unusable 9 of 29 times (31%, bounds 15-51%), lone flags 4 of 16, agreeing flags 5 of 13, and unflagged takes shuffled in blind 2 of 5. The flags do not beat the base rate, no detector approaches fail (17 at a lower bound of 0.8), and more batches cannot make them precise. fr-0101--dylan stays labelled in batch-1 (three severe defects).",
+      "evidence": [
+        "commit:93c2fde6",
+        "commit:1c46e823",
+        "commit:0b38f0f5"
+      ]
     },
     {
       "id": "QC-03",
@@ -4439,6 +4498,11 @@
         "AQ-07",
         "AQ-08",
         "DP-29"
+      ],
+      "evidence": [
+        "commit:5c8dc11a",
+        "commit:465f6dd8",
+        "commit:66ecb85b"
       ]
     },
     {

@@ -17,10 +17,31 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 5 — QC v2 calibrated on human speech; first confirmations sent
+### October 6 — QC v2 closed as a report-only diagnostic; back to the release plan
 
-Labelling 106 clips by ear was too slow for the maintainer, so QC v2 now calibrates on human
-controls and the ear only confirms flagged takes in chat (`qc.py calibrate`, `qc.py confirm`).
+Thirty-nine blind confirmations by ear (confirm-1 to confirm-7, eval-v1 at 0b38f0f5) settled QC v2:
+flagged takes were unusable 9 of 29 times (31%, bounds 15-51%; lone flags 4 of 16, agreeing flags 5
+of 13), unflagged takes shuffled in blind 2 of 5. The flags do not beat the base rate: what the
+maintainer hears as unusable sits inside the human range, and the detectors mostly catch accent and
+pacing the maintainer often accepts. The maintainer closed the QC work there (QC-02, QC-03 archived).
+
+- **QC v2 stays as a report-only diagnostic** (`docs/reference/qc.md`, `.claude/rules/release.md`): a
+  warn means unusual for human read speech, never fails a lane, and no release decision leans on it.
+- **The real finding is take quality:** about one French or English take in three is unusable by ear,
+  flagged or not. RF-14 holds the release decision (ship as a recorded known limitation, or land QC-06
+  follow-ups first, judged on blind batches).
+- **primaryPlan** is the release-first plan again.
+
+**Next.**
+1. RF-14: the maintainer's take-quality decision for 3.0.
+2. The release critical path as parked: RF-13 needs the paired iPhone, then RF-09 freezes, the ICA
+   campaign runs and RF-12 prepares submission; RF-02 waits on the maintainer's Apple metadata.
+3. QC lanes (QC-04), Fast QC v9 (QC-08) and CONV-21 only on request.
+
+### October 5 — QC v2 calibrated on human speech; confirmations by ear
+
+Labelling 106 clips by ear was too slow for the maintainer, so QC v2 calibrates on human controls
+and the ear confirms flagged takes in chat (`qc.py calibrate`, `qc.py confirm`).
 
 - **Controls:** 1,600 human recordings (MLS fr/de/es/it/pt, LibriTTS-R en, AISHELL-3 zh, Zeroth ko;
   200 each). Japanese and Russian have none and stay report-only.
@@ -29,21 +50,8 @@ controls and the ear only confirms flagged takes in chat (`qc.py calibrate`, `qc
   languages.
 - **French and English pool** (957 takes): 164 flag at warn. `fr-0101--dylan` is not flagged: its
   three heard defects (confirmed severe by ear on 2026-10-05) sit inside the human range.
-
-- **Confirmations:** confirm-1 to confirm-5 answered (27 takes; eval-v1 at b575d1d6). Agreeing flags
-  were unusable 4 of 9 times, lone flags 4 of 13: detectors pile up on accented takes the maintainer
-  still hears as usable. Rounds now mix agreeing and lone flags (`--mix-agreement`, b5ea864b) and blind
-  unflagged takes (`--unflagged K`, d79030a6): the base rate a flag must beat, reported as agreement
-  bucket `0` beside `1` and `2+`.
-
-**Next.**
-1. More rounds: `qc.py confirm next --run qc-takes-20261005-214936-eb0a --n 4 --mix-agreement
-   --unflagged 2` (confirm-6 sent), answers with
-   `qc.py confirm record`, then `qc.py eval --runs qc-takes-20261005-214936-eb0a --batches confirm-…`.
-   Keep warn only if flagged takes are unusable clearly more often than unflagged ones; warn on
-   agreeing flags only if agreement holds; otherwise toward 17 per detector for fail.
-2. Re-calibrate only with new controls.
-3. One real qc-takes queue, one clone-lane run and the language bench, on request.
+- **Confirmation batches** mix agreeing and lone flags (`--mix-agreement`) and blind unflagged takes
+  (`--unflagged K`), and `eval` reports the unusable rate by agreement bucket (`0`, `1`, `2+`).
 
 ### October 2, morning — QC v2 cut to the external reports; 53 GB freed; ready for labels
 

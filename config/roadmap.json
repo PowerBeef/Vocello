@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "qc-v2-2026-10",
+  "primaryPlan": "release-first-3-0-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
     {
@@ -122,11 +122,11 @@
     },
     {
       "id": "qc-v2-2026-10",
-      "title": "Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels",
+      "title": "Vocello QC v2: lean audio QC calibrated on human speech (report-only)",
       "status": "active",
       "owner": "backend-mlx",
       "adopted": "2026-10-01",
-      "goal": "Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every rule is checked on human controls; detectors are fit on the maintainer's listening labels out of fold, with thresholds frozen before evaluation. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.",
+      "goal": "Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every detector is calibrated on human controls and checked by the maintainer's blind confirmations. Outcome (2026-10-06): its flags did not predict unusable takes, so QC v2 is a report-only diagnostic; what remains is lane runs on request, the in-app Fast QC follow-up and the product follow-ups. The v1 stack and its data are deleted.",
       "authority": "docs/reference/qc.md"
     }
   ],
@@ -316,6 +316,21 @@
       "updated": "2026-09-24",
       "notes": "2026-09-24 (paired iPhone, local StoreKit only, no live purchase): the September 21 cancellation blocker is resolved. An internal-build diagnostic (IOSCommerceErrorDiagnostics) showed a runner-injected purchase error reaches the app as StoreKitError.unknown whatever case is injected, so the app's generic failure notice was correct; the lane's arm now proves the failure path (phase purchase_failed) and the StoreKit adapter also maps thrown user cancellations to cancelled (unit-tested). Lifecycle PASS: ios-xcui-purchase-20260924-073512-c7d44217 (all ten phases, cleanup verified). Exports scenario ios-xcui-purchase-20260924-073819-32d98675 passed 14 phases through owned_design_history, then timed out on 'internal playback stays available': the failure screenshot shows the player had autoplayed a one-second Design clip to the end (Play, 0:01 of 0:01), a test assumption fixed in bbd8434f (longest row; playing or finished both count); cleanup verified. Next: rerun --scenario exports on the phone, then true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json.",
       "unparkWhen": "Rerun scripts/ui_test.sh ios purchase --scenario exports on the paired iPhone, then the remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization."
+    },
+    {
+      "id": "RF-14",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Decide the 3.0 bar for take quality by ear (about one take in three unusable)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The maintainer decides how 3.0 ships against the take quality heard by ear: either a recorded risk decision that ships the current rate as a known limitation, or the product changes from QC-06 (register anchoring, regenerate-on-outlier, the fr-0101 defect classes) that land before RF-09 freeze, each measured by blind listening against the current rate. Models, seeds, prompts and QC stay unchanged without that evidence.",
+      "sourceOfTruth": [
+        "benchmarks/qc/eval-v1.json",
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "From QC v2's blind confirmations (2026-10-05/06): 11 of 34 decisive answers on French and English Built-in and Design takes were unusable (32%, bounds 17-51%), flagged or not. Heard reasons: a whispered syllable, a false start, over-linked liaison, delivery and pacing, pauses, and a heavy accent (often still usable). QC v2 cannot find these takes automatically, so any fix is judged by ear on blind batches (qc.py confirm --unflagged)."
     },
     {
       "id": "F-15",
@@ -1392,39 +1407,6 @@
       "updated": "2026-09-26"
     },
     {
-      "id": "QC-02",
-      "plan": "qc-v2-2026-10",
-      "title": "Maintainer confirmations",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The maintainer confirms flagged takes by ear in chat (qc.py confirm next/record; blind, clones never sent): enough confirmations per detector to measure its precision (17 at a lower bound of 0.8 for fail); labels stay under build/private/qc.",
-      "sourceOfTruth": [
-        "docs/reference/qc.md"
-      ],
-      "updated": "2026-10-05",
-      "unparkWhen": null,
-      "notes": "2026-10-05: listening to all of batch-1 on the label page was too slow for the maintainer; calibration moved to human controls and the ear now confirms only flagged takes. fr-0101--dylan is labelled (three severe defects); the label page and batch-1 stay for later labelling. 15 confirmations so far (confirm-1 to 3); later rounds mix agreeing and lone flags (--mix-agreement) to test warning only on agreement."
-    },
-    {
-      "id": "QC-03",
-      "plan": "qc-v2-2026-10",
-      "title": "Detectors, thresholds and evaluation",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The lean detectors are calibrated on human controls (qc.py calibrate: per language, a cut beyond the calibration speakers' 99th percentile, checked on held-out speakers), thresholds-v<N> is committed, and qc.py eval gives warn where the held-out human false-alarm rate is at most 2% (upper bound 6%) and fail only with 17+ maintainer confirmations at a precision lower bound of 0.8.",
-      "sourceOfTruth": [
-        "docs/reference/qc.md"
-      ],
-      "updated": "2026-10-05",
-      "unparkWhen": null,
-      "notes": "Calibration moved from the maintainer's labels to human controls on 2026-10-05. Controls (controls-2): MLS French, German, Spanish, Italian and Portuguese, LibriTTS-R English, AISHELL-3 Chinese and Zeroth Korean, 200 each; Japanese and Russian have none and stay report-only. thresholds-v1 (5c8dc11a) and eval-v1 (465f6dd8): every lean detector warns in four to six of the eight languages; French warns on cut-off, content (ASR), pause and rate, while wrong-language and phone-level content stay report-only there (held-out human French false alarms 3% and 2%). On the 957 French and English pool takes, 164 flag at warn. fr-0101--dylan is not flagged: its whisper, 0.84 s pause and over-linked liaison all sit inside the human range, so subtle defects need the maintainer's ear. Precision comes from chat confirmations (confirm-1 sent 2026-10-05). The supervised out-of-fold fit stays for when labels accumulate.",
-      "legacyIds": [
-        "AQ-07",
-        "AQ-08",
-        "DP-29"
-      ]
-    },
-    {
       "id": "QC-04",
       "plan": "qc-v2-2026-10",
       "title": "Lanes on QC v2",
@@ -1436,9 +1418,9 @@
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-02",
+      "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "Wired: lang-bench (Qwen3-ASR + Whisper, language version 6) and qc-takes run asrA, asrB, g2p, phones, phonesB; the clone lane (version 5) and voice-reliability run speaker, pitchA, pitchB, and the clone detectors gate only in the clone lane. The one real run of each waits on thresholds-v1.",
+      "notes": "Wired: lang-bench (Qwen3-ASR + Whisper, language version 6) and qc-takes run asrA, asrB, g2p, phones, phonesB; the clone lane (version 5) and voice-reliability run speaker, pitchA, pitchB, and the clone detectors gate only in the clone lane. QC v2 is report-only since 2026-10-06 (QC-03): its warn never fails a lane. One real run of each only when the maintainer asks for it.",
       "legacyIds": [
         "BT-05"
       ]
@@ -1455,9 +1437,9 @@
       "sourceOfTruth": [
         "docs/reference/qc.md"
       ],
-      "updated": "2026-10-05",
+      "updated": "2026-10-06",
       "unparkWhen": null,
-      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The maintainer rates all three severe: the take is unusable. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC."
+      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The maintainer rates all three severe: the take is unusable. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC. 2026-10-06: the blind confirmations put about a third of heard takes at unusable, flagged or not; RF-14 owns the release decision on that rate, and these follow-ups are its candidates."
     },
     {
       "id": "QC-08",

@@ -4407,6 +4407,39 @@
       ],
       "notes": "The delivery bench and the voice-reliability lane survived the v1 deletion with their own analyzers; their pYIN-based prosody and the retired speaker scorer move onto the QC v2 runners once the lanes run on QC v2. QC v2 keeps pitch and speaker identity for clones only (maintainer decision 2026-10-02); emotion adherence is not measured (the reports leave delivery to the listener).",
       "reason": "Lean scope (maintainer decision 2026-10-02): QC v2 measures pitch and speaker identity for clones only and has no naturalness model; voice-reliability already scores clone identity and pitch with QC v2 (qc.fidelity), and the delivery bench keeps its own analyzers because the external reports leave delivery and emotion to the listener."
+    },
+    {
+      "id": "QC-02",
+      "plan": "qc-v2-2026-10",
+      "title": "Maintainer confirmations",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The maintainer confirms flagged takes by ear in chat (qc.py confirm next/record; blind, clones never sent): enough confirmations per detector to measure its precision (17 at a lower bound of 0.8 for fail); labels stay under build/private/qc.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06 by the maintainer's decision. 39 blind confirmations in chat (confirm-1 to confirm-7, 2026-10-05/06; eval-v1 at 0b38f0f5): flagged takes were unusable 9 of 29 times (31%, bounds 15-51%), lone flags 4 of 16, agreeing flags 5 of 13, and unflagged takes shuffled in blind 2 of 5. The flags do not beat the base rate, no detector approaches fail (17 at a lower bound of 0.8), and more batches cannot make them precise. fr-0101--dylan stays labelled in batch-1 (three severe defects)."
+    },
+    {
+      "id": "QC-03",
+      "plan": "qc-v2-2026-10",
+      "title": "Detectors, thresholds and evaluation",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The lean detectors are calibrated on human controls (qc.py calibrate: per language, a cut beyond the calibration speakers' 99th percentile, checked on held-out speakers), thresholds-v<N> is committed, and qc.py eval gives warn where the held-out human false-alarm rate is at most 2% (upper bound 6%) and fail only with 17+ maintainer confirmations at a precision lower bound of 0.8.",
+      "sourceOfTruth": [
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06 as a report-only diagnostic. thresholds-v1 (5c8dc11a) calibrates every lean detector on 1,600 human recordings (MLS fr/de/es/it/pt, LibriTTS-R en, AISHELL-3 zh, Zeroth ko); eval-v1 gives warn in four to six languages per detector from the held-out human false alarms. The confirmations (QC-02) showed a warn means unusual for human read speech, not defective: what the maintainer hears as unusable sits inside the human range. A warn never fails a lane; fail stays out of reach. The supervised fit on listening labels stays available if labels accumulate.",
+      "legacyIds": [
+        "AQ-07",
+        "AQ-08",
+        "DP-29"
+      ]
     }
   ]
 }

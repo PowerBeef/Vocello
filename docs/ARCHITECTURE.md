@@ -536,7 +536,8 @@ saved under a visible "Unusual pacing" notice; on iOS the player also offers "Ge
 reuses the visible request. Vocello never silently retries, changes the seed or chooses among hidden
 takes.
 A take can match its delivery and still have pathological spacing, or the reverse. Offline audio
-QC of generated takes (models, labels, detectors and lane gates) is QC v2:
+QC of generated takes (models, labels, detectors and lane gates) is QC v2, a report-only diagnostic
+since its flags did not predict the takes the maintainer hears as unusable:
 [`docs/reference/qc.md`](reference/qc.md).
 
 ### 4.11 Spoken-text and long-form planning status

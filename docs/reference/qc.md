@@ -9,6 +9,8 @@ QC v2 is the audio QC harness, rebuilt on 2026-10-01. It is calibrated on human 
 
 The maintainer cannot label a hundred clips by ear, so on 2026-10-05 the calibration moved from labels to human controls; the supervised fit stays for later.
 
+**Status (2026-10-06): a report-only diagnostic.** Thirty-nine blind confirmations (confirm-1 to confirm-7, `benchmarks/qc/eval-v1.json`) found the flags no better than chance. Flagged takes were unusable 9 of 29 times (31%, 95% bounds 15-51%): lone flags 4 of 16 and agreeing flags 5 of 13. Unflagged takes shuffled in blind were unusable 2 of 5 times. About a third of the takes the maintainer heard were unusable, flagged or not. What makes a take unusable to the maintainer (a whispered syllable, a false start, over-linking, delivery, a heavy accent) sits inside the human range, while the detectors mostly catch accent and pacing the maintainer often accepts. A warn therefore means "unusual for human read speech", not "defective": it never fails a lane, no detector can reach fail at this precision, and no release decision leans on it. The maintainer closed the confirmation work there; take quality is judged by ear, and the product follow-ups are open roadmap items.
+
 Everything runs locally on the Mac, one model at a time, and no model weights enter Git.
 
 ## Why v2
@@ -248,7 +250,7 @@ The confirmations measure each detector's precision (see [Levels](#levels)). The
 
 ## Levels
 
-`run` takes each flag's level from the evaluation of exactly the thresholds file it scored with. Without one, every flag is report-only, so `gate` passes. Under human-reference thresholds, a flag of a language without a reference (the provisional rule) stays report-only.
+`run` takes each flag's level from the evaluation of exactly the thresholds file it scored with. Without one, every flag is report-only, so `gate` passes. The lanes stop only on fail; a warn is unproven (see the status in the introduction). Under human-reference thresholds, a flag of a language without a reference (the provisional rule) stays report-only.
 
 **A calibration's evaluation.** `eval` on a human-reference file re-measures the check half on the controls runs the file names, and refuses them if their digest changed or they no longer reproduce the recorded rates. It reads the confirm batches' labels (`--batches`, `--rater`) and scores each confirmed take on its newest features (`--runs`, of the file's scoring and model identities). Each detector earns a level per language:
 - **warn:** the check half's human false-alarm rate is at most 2% and its Clopper-Pearson upper bound at most 6% (`levels.humanReference.warnFalseAlarmRate` and `warnFalseAlarmUpper` in `config/qc/detectors.json`).

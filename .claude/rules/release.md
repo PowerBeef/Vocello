@@ -113,22 +113,21 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   failing), zero capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`;
   contract-v1 records keep their ≥95% coverage rule. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
-- **Audio QA is calibrated on the maintainer's ears (QC v2, `docs/reference/qc.md`).** Fixed seeds
-  and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 detectors are
-  calibrated on human recordings (`qc.py controls`, `qc.py calibrate`: a take flags only beyond what
-  held-out human speakers do, per language), and the maintainer confirms flagged takes by ear in chat
-  (`qc.py confirm`), which measures precision; `qc.py fit` on listening labels stays for when labels
-  accumulate. Thresholds freeze in `config/qc/thresholds-v<N>.json`, bound to the scoring code and
-  norms, and are committed before `qc.py eval` sets their levels. A model, feature or threshold change
-  is a new version. A
-  detector warns or fails a lane only for the languages and classes its evaluation covers, and
-  reports elsewhere. Listening labels takes
-  but never clears a machine failure; a heard defect no detector flags joins the next labelling
-  batch. Language verdicts name their recognizer families (Apple Speech in the iPhone app, QC v2's
-  two ASR families on the Mac); one family is one witness, two must agree for consensus, and shared
-  metrics live in `scripts/lib/language_metrics.py` and `scripts/lib/audio_qc.py`. Labels,
-  transcripts and take paths stay under `build/private/qc`; Git holds aggregates and digests. Every
-  QC model's weights carry a commercial-use license (`config/qc/models.json`).
+- **Audio QA: Fast QC gates, QC v2 reports, the maintainer's ear judges (`docs/reference/qc.md`).**
+  Fixed seeds and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 is
+  a report-only diagnostic: its detectors are calibrated on human recordings (`qc.py controls`,
+  `qc.py calibrate`: a take flags only beyond what held-out human speakers do, per language), and 39
+  blind confirmations by ear (`qc.py confirm`, 2026-10-06) found flagged takes no more often unusable
+  than unflagged ones. Its warn means unusual, not defective: it never fails a lane, no detector
+  reaches fail, and no release decision leans on it. Thresholds freeze in
+  `config/qc/thresholds-v<N>.json`, bound to the scoring code and norms, and are committed before
+  `qc.py eval` sets their levels; a model, feature or threshold change is a new version. A listening
+  verdict never clears a machine failure. Language verdicts name their recognizer families (Apple
+  Speech in the iPhone app, QC v2's two ASR families on the Mac); one family is one witness, two must
+  agree for consensus, and shared metrics live in `scripts/lib/language_metrics.py` and
+  `scripts/lib/audio_qc.py`. Labels, transcripts and take paths stay under `build/private/qc`; Git
+  holds aggregates and digests. Every QC model's weights carry a commercial-use license
+  (`config/qc/models.json`).
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
   a contract calibrated with its run IDs fails a run. ui-perf ceilings stay warn-only; a

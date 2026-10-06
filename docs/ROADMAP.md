@@ -4,7 +4,7 @@
 > Open work lives in `config/roadmap.json`; finished items and completed plans are in
 > `config/roadmap-archive.json` and only count toward progress here.
 
-**Current execution plan: Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels** (`qc-v2-2026-10`).
+**Current execution plan: Vocello 3.0 — release-first execution plan** (`release-first-3-0-2026-09`).
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `qc-v2-2026-10` | active | backend-mlx | 3/8 (38%) |
+| `release-first-3-0-2026-09` | active | release-qa | 6/16 (38%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 2/6 (33%) |
@@ -24,41 +24,69 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
-| `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
+| `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
-## Vocello QC v2: clean-slate audio QC calibrated on the maintainer's labels
+## Vocello 3.0 — release-first execution plan
 
-`qc-v2-2026-10` · **active** · backend-mlx · adopted 2026-10-01
+`release-first-3-0-2026-09` · **active** · release-qa · adopted 2026-09-04
 
-Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every rule is checked on human controls; detectors are fit on the maintainer's listening labels out of fold, with thresholds frozen before evaluation. It flags the heard defect classes with time-localized evidence, gates the lanes, and queues the takes worth listening to. The v1 stack and its data are deleted.
+September 6 accelerated iOS submission order: RF-01 queue, RF-02 external packet alongside engineering, RF-06 bounded audio corrections, RF-09 platform applicability/candidate route and authorized freeze, ICA-04/ICA-05 (formerly RF-11) targeted acceptance then all 201 takes, RF-12 processed-candidate acceptance and submission materials. RF-03/04/05/07 implementation stays done. Park RF-08/RF-10 Mac/CLI-only qualification and broad research off the iOS critical path; preserve original defect gates. Existing F/ASR/ICA/VLR/AV authorities remain. Implementation, candidate proof and submission authorization differ. No account mutation, candidate operation, upload or uninstall is implicitly authorized.
 
-Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
+Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](reference/release-first-execution-2026-09.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `QC-02` | in-flight | Maintainer confirmations | — |
-| `QC-03` | in-flight | Detectors, thresholds and evaluation | — |
-| `QC-04` | planned | Lanes on QC v2 | `QC-03` |
-| `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
-| `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
+| `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
+| `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
+| `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
+| `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
+| `RF-08` | parked | package the downloadable optimized CLI | — |
+| `RF-09` | parked | verify the coherent tree and freeze the 3.0.0 candidate | `RF-13` |
+| `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
+| `RF-12` | parked | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
+| `RF-13` | parked | implement the one-time iOS Design and Clone export unlock before freeze | — |
+| `RF-14` | planned | Decide the 3.0 bar for take quality by ear (about one take in three unusable) | — |
 
 ### Open items in detail
 
-- **`QC-02`** (in-flight) — Maintainer confirmations.
-  gate: The maintainer confirms flagged takes by ear in chat (qc.py confirm next/record; blind, clones never sent): enough confirmations per detector to measure its precision (17 at a lower bound of 0.8 for fail); labels stay under build/private/qc.
+- **`CONV-20`** (parked) — Device re-verification of the frozen iOS behavior.
+  gate: On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.
+  unparkWhen: Current production models are Ready and the remaining control-audit fixture/preservation prerequisites are satisfied; phone availability is no longer the blocker.
 
-- **`QC-03`** (in-flight) — Detectors, thresholds and evaluation.
-  gate: The lean detectors are calibrated on human controls (qc.py calibrate: per language, a cut beyond the calibration speakers' 99th percentile, checked on held-out speakers), thresholds-v<N> is committed, and qc.py eval gives warn where the held-out human false-alarm rate is at most 2% (upper bound 6%) and fail only with 17+ maintainer confirmations at a precision lower bound of 0.8.
+- **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
+  gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
 
-- **`QC-04`** (planned) — Lanes on QC v2.
-  gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
+- **`RF-02`** (parked) — complete Apple prerequisites and the consolidated qualified-decision packet.
+  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
+  unparkWhen: The maintainer supplies the Apple metadata, availability, agreements and the qualified legal/privacy decisions; the repository side is done.
 
-- **`QC-06`** (planned) — Product follow-ups surfaced by QC.
-  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).
+- **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
+  gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
+  unparkWhen: ICA-04's frozen campaign starts (it measures incidence), or causal research on the English long-form failure is re-authorized.
 
-- **`QC-08`** (planned) — In-app Fast QC v9: relative silence, ending fade and loudness.
-  gate: Fast QC measures silence in 20 ms frames relative to the take's median speech level (20 dB under it), keeping the -60 dBFS floor for true dropouts, so a pause holding breath or low noise feeds the existing cadence:excess warning; single takes get a short fade and a fixed tail, and a loudness gain toward -23 LUFS. Each change is first measured on QC v2's human controls; fastqc@9 ships with a new calibration record, the Swift, Python mirror and record edited together, and a re-seeded benchmark lineage.
+- **`RF-08`** (parked) — package the downloadable optimized CLI.
+  gate: In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
+  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+
+- **`RF-09`** (parked) — verify the coherent tree and freeze the 3.0.0 candidate.
+  gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and App Store Connect shows build 24 unused on a fresh read-only look (web portal or the asc-* skills) (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.
+  unparkWhen: RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it.
+
+- **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
+  gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
+  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+
+- **`RF-12`** (parked) — verify the distribution iOS candidate and finish submission preparation.
+  gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
+  unparkWhen: ICA-05 closes the frozen campaign and RF-02 supplies the App Store Connect account setup for the processed-candidate purchase proof.
+
+- **`RF-13`** (parked) — implement the one-time iOS Design and Clone export unlock before freeze.
+  gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
+  unparkWhen: Rerun scripts/ui_test.sh ios purchase --scenario exports on the paired iPhone, then the remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization.
+
+- **`RF-14`** (planned) — Decide the 3.0 bar for take quality by ear (about one take in three unusable).
+  gate: The maintainer decides how 3.0 ships against the take quality heard by ear: either a recorded risk decision that ships the current rate as a known limitation, or the product changes from QC-06 (register anchoring, regenerate-on-outlier, the fr-0101 defect classes) that land before RF-09 freeze, each measured by blind listening against the current rate. Models, seeds, prompts and QC stay unchanged without that evidence.
 
 ## Specialist-audit remediation
 
@@ -471,62 +499,30 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-33`** (planned) — Engine-side lease for model deletion.
   gate: Deleting a model's files takes an engine-side lease that refuses or waits out every load, warm (including a model-only warm that publishes no state) and generation of that model until the files are gone, with tests over the engine's operation gate.
 
-## Vocello 3.0 — release-first execution plan
+## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 
-`release-first-3-0-2026-09` · **active** · release-qa · adopted 2026-09-04
+`qc-v2-2026-10` · **active** · backend-mlx · adopted 2026-10-01
 
-September 6 accelerated iOS submission order: RF-01 queue, RF-02 external packet alongside engineering, RF-06 bounded audio corrections, RF-09 platform applicability/candidate route and authorized freeze, ICA-04/ICA-05 (formerly RF-11) targeted acceptance then all 201 takes, RF-12 processed-candidate acceptance and submission materials. RF-03/04/05/07 implementation stays done. Park RF-08/RF-10 Mac/CLI-only qualification and broad research off the iOS critical path; preserve original defect gates. Existing F/ASR/ICA/VLR/AV authorities remain. Implementation, candidate proof and submission authorization differ. No account mutation, candidate operation, upload or uninstall is implicitly authorized.
+Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every detector is calibrated on human controls and checked by the maintainer's blind confirmations. Outcome (2026-10-06): its flags did not predict unusable takes, so QC v2 is a report-only diagnostic; what remains is lane runs on request, the in-app Fast QC follow-up and the product follow-ups. The v1 stack and its data are deleted.
 
-Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](reference/release-first-execution-2026-09.md)
+Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
-| `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
-| `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
-| `RF-08` | parked | package the downloadable optimized CLI | — |
-| `RF-09` | parked | verify the coherent tree and freeze the 3.0.0 candidate | `RF-13` |
-| `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
-| `RF-12` | parked | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
-| `RF-13` | parked | implement the one-time iOS Design and Clone export unlock before freeze | — |
+| `QC-04` | planned | Lanes on QC v2 | `QC-03` |
+| `QC-06` | planned | Product follow-ups surfaced by QC | `QC-03` |
+| `QC-08` | planned | In-app Fast QC v9: relative silence, ending fade and loudness | `QC-03` |
 
 ### Open items in detail
 
-- **`CONV-20`** (parked) — Device re-verification of the frozen iOS behavior.
-  gate: On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.
-  unparkWhen: Current production models are Ready and the remaining control-audit fixture/preservation prerequisites are satisfied; phone availability is no longer the blocker.
+- **`QC-04`** (planned) — Lanes on QC v2.
+  gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
 
-- **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
-  gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
+- **`QC-06`** (planned) — Product follow-ups surfaced by QC.
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).
 
-- **`RF-02`** (parked) — complete Apple prerequisites and the consolidated qualified-decision packet.
-  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
-  unparkWhen: The maintainer supplies the Apple metadata, availability, agreements and the qualified legal/privacy decisions; the repository side is done.
-
-- **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
-  gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
-  unparkWhen: ICA-04's frozen campaign starts (it measures incidence), or causal research on the English long-form failure is re-authorized.
-
-- **`RF-08`** (parked) — package the downloadable optimized CLI.
-  gate: In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
-  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
-
-- **`RF-09`** (parked) — verify the coherent tree and freeze the 3.0.0 candidate.
-  gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and App Store Connect shows build 24 unused on a fresh read-only look (web portal or the asc-* skills) (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.
-  unparkWhen: RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it.
-
-- **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
-  gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
-  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
-
-- **`RF-12`** (parked) — verify the distribution iOS candidate and finish submission preparation.
-  gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
-  unparkWhen: ICA-05 closes the frozen campaign and RF-02 supplies the App Store Connect account setup for the processed-candidate purchase proof.
-
-- **`RF-13`** (parked) — implement the one-time iOS Design and Clone export unlock before freeze.
-  gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
-  unparkWhen: Rerun scripts/ui_test.sh ios purchase --scenario exports on the paired iPhone, then the remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization.
+- **`QC-08`** (planned) — In-app Fast QC v9: relative silence, ending fade and loudness.
+  gate: Fast QC measures silence in 20 ms frames relative to the take's median speech level (20 dB under it), keeping the -60 dBFS floor for true dropouts, so a pause holding breath or low noise feeds the existing cadence:excess warning; single takes get a short fade and a fixed tail, and a loudness gain toward -23 LUFS. Each change is first measured on QC v2's human controls; fastqc@9 ships with a new calibration record, the Swift, Python mirror and record edited together, and a re-seeded benchmark lineage.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

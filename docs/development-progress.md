@@ -17,6 +17,26 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 6, later — deep audit: one P1, 40 P2, 111 P3 confirmed; fix phase open
+
+A read-only audit of the whole project at 66ecb85b
+([report](audits/2026-10-06-deep-audit.md)): 30 auditors, every finding re-verified by two blind
+refuters, 60 findings verified twice. The core is sound (engine lifecycle, fail-closed delivery,
+commerce, diagnostics privacy, target wiring); the defects are at the edges.
+
+- **P1:** History rows store absolute audio paths, so a restore or device migration shows every take's
+  audio as missing (A2-01).
+- **P2, most urgent:** a silent, permanent Mac engine-start failure (A14-02); a Stop during the History
+  commit still persists the take (A1-01, A14-52); iPhone model delete under a running engine (A5-01);
+  a cancelled prewarm unloads the model (E1-02); saved-voice deletion leaves reference audio in the
+  cache (A8-01); an unrecoverable HTTP 416 download loop (E5-01); commit-lint and guard bypasses (T1).
+- **Plan `project-audit-2026-10`:** DA-01 tracks the fix phase (64 findings, no lane needed); DA-02 to
+  DA-12 hold what needs a decision, new copy or a device.
+
+**Next.**
+1. DA-01: fix the confirmed defects, each with a deterministic test, in scoped commits.
+2. RF-14 (take quality) and the release critical path, as below.
+
 ### October 6 — QC v2 closed as a report-only diagnostic; back to the release plan
 
 Thirty-nine blind confirmations by ear (confirm-1 to confirm-7, eval-v1 at 0b38f0f5) settled QC v2:

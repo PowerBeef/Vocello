@@ -128,6 +128,15 @@
       "adopted": "2026-10-01",
       "goal": "Replace the v1 audio QC stack with a lean harness built only from the external reports' recommendations: two transcription families with consensus (Whisper large-v3, Qwen3-ASR), two phone recognizers that must agree (ZIPA, wav2vec2-espeak) against espeak-ng G2P, WAV signal measures, per-language norms, and for clones only FCPE, SwiftF0 and ReDimNet2+. Every detector is calibrated on human controls and checked by the maintainer's blind confirmations. Outcome (2026-10-06): its flags did not predict unusable takes, so QC v2 is a report-only diagnostic; what remains is lane runs on request, the in-app Fast QC follow-up and the product follow-ups. The v1 stack and its data are deleted.",
       "authority": "docs/reference/qc.md"
+    },
+    {
+      "id": "project-audit-2026-10",
+      "title": "Deep audit follow-ups, October 2026",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-10-06",
+      "goal": "Close the confirmed findings of the October 6 deep audit (30 read-only auditors at 66ecb85b, each finding re-verified by two blind refuters): fix the confirmed defects that need no product decision, and decide or schedule the rest. One P1 (History audio paths break when the app container moves), 40 P2 and 111 P3 confirmed; no P0.",
+      "authority": "docs/audits/2026-10-06-deep-audit.md"
     }
   ],
   "items": [
@@ -331,6 +340,197 @@
       "updated": "2026-10-06",
       "unparkWhen": null,
       "notes": "From QC v2's blind confirmations (2026-10-05/06): 11 of 34 decisive answers on French and English Built-in and Design takes were unusable (32%, bounds 17-51%), flagged or not. Heard reasons: a whispered syllable, a false start, over-linked liaison, delivery and pacing, pauses, and a heavy accent (often still usable). QC v2 cannot find these takes automatically, so any fix is judged by ear on blind batches (qc.py confirm --unflagged)."
+    },
+    {
+      "id": "DA-01",
+      "plan": "project-audit-2026-10",
+      "title": "Fix the confirmed defects that need no product decision",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "Every finding the report marks \"Fix phase\" is fixed on main with a deterministic test where the behavior is testable, or moved to another DA item with the reason: History path resolver (A2-01), Mac engine start (A14-02), Stop-during-save (A1-01, A14-52), iPhone model delete and incomplete install (A5-01, A5-02), cancelled prewarm (E1-02), saved-voice deletion (A8-01), HTTP 416 loop and fail-open digest (E5-01, E5-03), commit lint and command guards (T1-01, T1-02, T1-03, T1-06, T1-07, T1-55), CI routing (T4-51, T2-05), build-lock spin (T3-01), roadmap evidence rule (T5-01) and the marked P3 items.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/iOSSupport/Models/Generation.swift",
+        "Sources/QwenVoiceApp.swift",
+        "scripts/privacy_scan.py"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "64 findings are marked for the fix phase. No device, UI, model or benchmark lane is needed for any of them."
+    },
+    {
+      "id": "DA-02",
+      "plan": "project-audit-2026-10",
+      "title": "Studio state and window ownership",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Each finding has a fix or a recorded decision: Save as voice state lives with the attempt (A10-01), programmatic routes cannot switch mode during a take (A10-02), a Mac take survives or is stopped by a window close (A10-04, needs one run of the app to settle), an engine-cancelled line batch closes its attempt (A14-01), a cancel during clone priming is honoured (A14-03), the footer drops a stale error (A14-04), Navigate is disabled during batch and long-form work (A14-05), and the P3 items A10-05, A10-06, A14-06, A14-08, A14-53.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/ContentView.swift",
+        "Sources/Services/MacLineBatchRunner.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "PA-08 and AUD-03 are related. Most of these need a macOS UI lane to verify, which only the maintainer can request."
+    },
+    {
+      "id": "DA-03",
+      "plan": "project-audit-2026-10",
+      "title": "Accessibility, localization and glass gating",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The A12, A13, A9 findings and A2-03 are fixed or declined with a reason: large-text layouts for onboarding, the recording overlay, the capsule selector and filter chips; VoiceOver state and announcements; controls under 44 pt; English literals reaching VoiceOver and error cards; glass applied outside the gated modifier; token drift between the iOS and shared themes.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
+        "Sources/iOS/IOSShellPrimitives.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "PA-20 owns accessibility and localization reach; these are the new instances. Visual defects were read from code, not seen, so each needs a device check."
+    },
+    {
+      "id": "DA-04",
+      "plan": "project-audit-2026-10",
+      "title": "Engine edge inputs",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "E4-01 is a two-line change but cannot be proven without loading a model, which is a consent-bound run."
+    },
+    {
+      "id": "DA-05",
+      "plan": "project-audit-2026-10",
+      "title": "macOS memory relief and the process-global Qwen3 caches",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The maintainer decides whether macOS clears the resident speech tokenizer and prefix caches at the critical band or keeps them for speed after idle (E2-01); code, comments and native.md then say the same thing, and the allocator seam is complete or documented as partial (E2-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        ".claude/rules/native.md"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Four contract texts say a full unload frees the model; on macOS a few hundred MB stay resident by design. Recommendation: clear at the critical band only."
+    },
+    {
+      "id": "DA-06",
+      "plan": "project-audit-2026-10",
+      "title": "Engine, delivery and telemetry hygiene",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The P3 findings E3-01 to E3-04, E5-02, E5-04, E5-05, A16-01 and A16-02 are fixed or declined with a reason.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift",
+        "Sources/QwenVoiceCore/ModelAssets.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "None is reachable on a shipped path today; each is a latent trap for the next change."
+    },
+    {
+      "id": "DA-07",
+      "plan": "project-audit-2026-10",
+      "title": "Playback and recording defects that need a device",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "A failed recording start shows a localized status on iOS (A7-02), the live preview playhead does not jump after a pause or an underrun (A7-03, verified by listening), and A7-05 is settled.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
+        "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "A7-02 needs a new catalog key in ten languages; A7-03 needs a forced underrun on a device."
+    },
+    {
+      "id": "DA-08",
+      "plan": "project-audit-2026-10",
+      "title": "History and model-management dead ends",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "An unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02), a single delete is as durable as Clear All (A2-04), the Files-folder and reference copies stage before replacing (A3-01, A3-02), and the iPhone cancel and install dead ends A5-03 and A5-05 are fixed.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "F-06 is related. A2-02 needs new copy and a confirmation step."
+    },
+    {
+      "id": "DA-09",
+      "plan": "project-audit-2026-10",
+      "title": "Test quality and coverage",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The tests that exercise no production code or only a test-only type are rewritten against the product path (E7-01, E7-02, E7-03, E7-05), and the highest-value gaps of the report's section 7 have deterministic tests.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "PA-19 owns orchestrator coverage; this item adds the test-quality defects and the gap list."
+    },
+    {
+      "id": "DA-10",
+      "plan": "project-audit-2026-10",
+      "title": "Commerce and provenance",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "A paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01), and the iOS save path builds enrollment metadata through the shared helper (A8-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Free export of pre-provenance voices (A8-03) is a documented decision and stays."
+    },
+    {
+      "id": "DA-11",
+      "plan": "project-audit-2026-10",
+      "title": "Release and promotion hardening",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Signing jobs check out the authorized commit, not the tag ref (T2-01); the promotion base is bound to the previous published release (T2-02); release.yml has a concurrency group and can archive iOS alone (T2-03); the required check is filtered by event (T2-04); the iOS signing material is removed before third-party steps (T2-08); promotion runs under a reviewer environment and verifies attestations (T2-09); secrets leave job-level env (T2-10); every product file sits in a promotion class (T5-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        ".github/workflows/release.yml",
+        ".github/workflows/promote-release.yml",
+        "scripts/quality_promotion.py"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "PA-05 and PA-10 are related. Workflow changes are verified by the rehearsal run; no release is run for them."
+    },
+    {
+      "id": "DA-12",
+      "plan": "project-audit-2026-10",
+      "title": "Guard, tooling, docs and website hygiene",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The remaining T1, T3, T4, T5, T6, T7 and A15 findings not fixed under DA-01 are fixed or declined with a reason.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "scripts/hooks/policy_guard.sh",
+        "project.yml"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Mostly P3: shell portability, test determinism, schema drift, stale docs and website copy."
     },
     {
       "id": "F-15",

@@ -735,17 +735,19 @@ private struct IOSHistoryLibrarySection: View {
 
     /// DP-15: pin the take's recorded seed into its mode's draft and land the
     /// user in that studio mode so the seed chip makes the state visible.
+    /// While a take runs in another mode the switch is refused (A10-02), and
+    /// the seed is not pinned into a draft the user would not see.
     private func pinSeed(_ seedValue: UInt64, mode: String) {
         switch mode.lowercased() {
         case GenerationMode.custom.rawValue:
+            guard appModel.requestStudioMode(.custom) else { return }
             appModel.customVoiceDraft.pinnedSeed = seedValue
-            appModel.studioMode = .custom
         case GenerationMode.design.rawValue:
+            guard appModel.requestStudioMode(.design) else { return }
             appModel.voiceDesignDraft.pinnedSeed = seedValue
-            appModel.studioMode = .design
         case GenerationMode.clone.rawValue:
+            guard appModel.requestStudioMode(.clone) else { return }
             appModel.voiceCloningDraft.pinnedSeed = seedValue
-            appModel.studioMode = .clone
         default:
             return
         }

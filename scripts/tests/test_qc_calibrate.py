@@ -405,22 +405,28 @@ class HumanReferenceEvalTests(unittest.TestCase):
         self.commit(self.path)
         self.evaluate()
         # The first ten pool takes also lose two seconds of audio: content.asr and signal.artifacts both flag.
+        # The last ten read like people: no detector flags them.
         features = store.read_json(self.pool / "features.json")
         for row in features["takes"][:10]:
             row["features"]["signal.dropout_seconds"] = feature(2.0)
+        for row in features["takes"][20:]:
+            row["features"]["asr.phonetic_error_min"] = feature(0.1)
         store.write_json_atomic(self.pool / "features.json", features)
         self.flag_pool()
-        result = confirm.next_batch(self.layout, "pool-1", n=6, mix_agreement=True)
+        result = confirm.next_batch(self.layout, "pool-1", n=6, mix_agreement=True, unflagged=2)
         items = label.load_batch(self.layout, result["batch"])["items"]
-        self.assertEqual(sorted(len(item["reasons"]) for item in items), [1, 1, 1, 2, 2, 2])
-        # Agreeing flags unusable, lone flags usable, one lone flag unsure (counted on neither side).
+        self.assertEqual(sorted(len(item["reasons"]) for item in items), [0, 0, 1, 1, 1, 2, 2, 2])
+        # Agreeing flags unusable, lone flags usable, one lone flag unsure (counted on neither side),
+        # one unflagged take of two unusable.
         lone = [k for k, item in enumerate(items, 1) if len(item["reasons"]) == 1]
-        confirm.record(self.layout, result["batch"], ",".join(
-            f"{k}={'u' if len(item['reasons']) == 1 else 'x'}" if k != lone[0] else f"{k}=?"
-            for k, item in enumerate(items, 1)))
+        clean = [k for k, item in enumerate(items, 1) if not item["reasons"]]
+        answers = {k: "x" if len(item["reasons"]) == 2 else "u" for k, item in enumerate(items, 1)}
+        answers.update({lone[0]: "?", clean[0]: "x"})
+        confirm.record(self.layout, result["batch"], ",".join(f"{k}={value}" for k, value in answers.items()))
         agreement = self.evaluate()["agreement"]["detectorsFlagging"]
         self.assertEqual((agreement["2+"]["n"], agreement["2+"]["rate"]), (3, 1.0))
         self.assertEqual((agreement["1"]["n"], agreement["1"]["rate"]), (2, 0.0))
+        self.assertEqual((agreement["0"]["n"], agreement["0"]["rate"]), (2, 0.5))
 
     def test_eval_refuses_other_scoring_or_controls(self):
         self.commit(self.path)
@@ -583,6 +589,33 @@ class ConfirmTests(unittest.TestCase):
         self.assertEqual(sorted(len(item["reasons"]) for item in batch["items"]), [1, 2])
         self.assertFalse(label.load_batch(self.layout, confirm.next_batch(self.layout, "pool-1", n=1)["batch"])
                          ["params"]["mixAgreement"])
+
+    def test_unflagged_takes_join_the_batch_blind_never_clones_controls_or_takes_sent_before(self):
+        clone, _ = self.take("fr-0014--n", "french", [], mode="clone", reference="ref.wav")
+        control, _ = self.take("fr-0015--o", "french", [], control=True)
+        for item in (clone, control):
+            self.takes[item["takeID"]] = (item, [])
+        self.write_flags("pool-1", "qc-takes")
+        # fr-0006 (loudness only, advisory) and fr-0008 are the only unflagged takes that can be sent.
+        result = confirm.next_batch(self.layout, "pool-1", n=2, name="u1", unflagged=3)
+        batch = label.load_batch(self.layout, "u1")
+        self.assertEqual(batch["params"]["unflagged"], 3)
+        unflagged = {item["takeToken"] for item in batch["items"] if not item["reasons"]}
+        self.assertEqual(unflagged, {self.token("fr-0006--f"), self.token("fr-0008--h")})
+        self.assertEqual(len(result["takes"]), 4)
+        self.assertTrue(all(item["enriched"] == bool(item["reasons"]) for item in batch["items"]))
+        self.assertNotIn("level.loudness", "\n".join(confirm.next_lines(result)))
+        again = confirm.next_batch(self.layout, "pool-1", n=1, name="u2", unflagged=2)
+        self.assertEqual([item["reasons"] != [] for item in label.load_batch(self.layout, "u2")["items"]], [True])
+        self.assertEqual(len(again["takes"]), 1)
+        with self.assertRaisesRegex(confirm.ConfirmError, "unflagged"):
+            confirm.next_batch(self.layout, "pool-1", unflagged=-1)
+        # Seeded: the same name draws the same unflagged takes.
+        pool = [{"token": f"t{k}", "language": "french" if k % 2 else "english", "flags": []} for k in range(9)]
+        self.assertEqual(confirm.pick_unflagged(pool, 3, ["french"], seed="s"),
+                         confirm.pick_unflagged(list(reversed(pool)), 3, ["french"], seed="s"))
+        self.assertTrue(all(item["language"] == "french" for item in confirm.pick_unflagged(pool, 4, ["french"])))
+        self.assertEqual(len(confirm.pick_unflagged(pool, 6, ["french"])), 6)
 
     def test_controls_runs_and_runs_without_sendable_takes_are_refused(self):
         self.write_flags("controls-1", "controls")

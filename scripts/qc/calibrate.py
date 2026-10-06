@@ -525,9 +525,9 @@ def evaluate(layout: Layout, thresholds: Path, document: dict[str, Any], output:
             "languages": languages,
         }
     # Precision pooled over detectors by how many of them flagged the take: does agreement predict
-    # an unusable take better than a lone flag?
+    # an unusable take better than a lone flag, and does either beat the takes no detector flagged?
     agreement: dict[str, Any] = {}
-    for bucket, minimum, maximum in (("1", 1, 1), ("2+", 2, None)):
+    for bucket, minimum, maximum in (("0", 0, 0), ("1", 1, 1), ("2+", 2, None)):
         bucket_hits = [row["label"].get("verdict") == "objectionable" for row in scored
                        if row["label"].get("verdict") != "uncertain"
                        and len(flagged_by.get(row["token"], ())) >= minimum

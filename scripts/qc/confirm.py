@@ -7,7 +7,8 @@ clones are internal-only and are never sent) and every take an earlier confirm b
 or not (an unanswered take stays answerable in its own batch).
 It prefers `--languages` (French and English) and spreads over detectors: round-robin by
 detector, the highest score first; `--mix-agreement` takes half the batch from takes two or more
-detectors flagged and half from lone flags, in a shuffled order. It writes a `kind: "confirm"` label batch
+detectors flagged and half from lone flags, and `--unflagged K` adds K takes no detector flagged
+(the base rate the flags must beat), every mixed batch in a shuffled order. It writes a `kind: "confirm"` label batch
 (`build/private/qc/batches/<name>.json`), copies each WAV to
 `build/private/qc/confirm/<name>/<k>.wav` under a neutral name, and lists, per take, the file, the
 language and the script, never a detector, score or voice: the maintainer judges blind.
@@ -136,13 +137,31 @@ def pick(candidates: list[dict[str, Any]], n: int, languages: Iterable[str], *,
     return chosen
 
 
+def pick_unflagged(candidates: list[dict[str, Any]], count: int, languages: Iterable[str], *,
+                   seed: str = "") -> list[dict[str, Any]]:
+    """`count` takes no detector flagged, drawn at random (seeded), the preferred languages first."""
+
+    preferred = set(languages)
+    rng = random.Random(f"vocello.qc.confirm.unflagged/1:{seed}")
+    chosen: list[dict[str, Any]] = []
+    for group in ([c for c in candidates if c["language"] in preferred],
+                  [c for c in candidates if c["language"] not in preferred]):
+        group = sorted(group, key=lambda candidate: candidate["token"])
+        rng.shuffle(group)
+        chosen += group[:count - len(chosen)]
+    return chosen
+
+
 def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: Iterable[str] = DEFAULT_LANGUAGES,
-               name: str | None = None, mix_agreement: bool = False) -> dict[str, Any]:
+               name: str | None = None, mix_agreement: bool = False, unflagged: int = 0) -> dict[str, Any]:
     """Write the next confirm batch from a generated run's flags and copy its WAVs under neutral
-    names; return what the maintainer is shown: per take its number, file, language and script."""
+    names; return what the maintainer is shown: per take its number, file, language and script.
+    `unflagged` adds that many takes no detector flagged, shuffled among the flagged ones."""
 
     if not isinstance(n, int) or isinstance(n, bool) or n < 1:
         raise ConfirmError("--n must be at least 1")
+    if not isinstance(unflagged, int) or isinstance(unflagged, bool) or unflagged < 0:
+        raise ConfirmError("--unflagged must be zero or more")
     directory = layout.runs / run_id
     if not run_id or Path(run_id).name != run_id or not (directory / "flags.json").is_file() \
             or not (directory / "takes.json").is_file():
@@ -153,19 +172,23 @@ def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: It
     preferred = [store.normalize_language(language) for language in languages]
     takes = {take["token"]: take for take in store.read_json(directory / "takes.json").get("takes", [])}
     sent = sent_takes(layout)
-    candidates = []
+    candidates, clean = [], []
     for entry in flags.get("takes", []):
         take = takes.get(entry["token"])
         if take is None or entry.get("control") or take.get("control") or is_clone(take) or entry["token"] in sent:
             continue
         flagged = [flag for flag in entry.get("flags") or [] if flag.get("class")]
-        if not flagged or not take.get("audio") or not Path(take["audio"]).is_file():
+        if not take.get("audio") or not Path(take["audio"]).is_file():
             continue
-        candidates.append({"token": entry["token"], "language": take.get("language"), "flags": flagged, "take": take})
+        (candidates if flagged else clean).append({"token": entry["token"], "language": take.get("language"),
+                                                   "flags": flagged, "take": take})
     name = name or _default_name(layout)
     if label.batch_path(layout, name).exists():
         raise FileExistsError(f"batch {name} exists; choose another name")
     chosen = pick(candidates, n, preferred, mix_agreement=mix_agreement, seed=name)
+    if chosen and unflagged:
+        chosen += pick_unflagged(clean, unflagged, preferred, seed=name)
+        random.Random(f"vocello.qc.confirm/1:{name}").shuffle(chosen)
     if not chosen:
         raise ConfirmError(f"run {run_id} flagged no take that can be sent (controls, clones and takes already sent "
                            "are never sent)")
@@ -179,14 +202,15 @@ def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: It
         items.append({
             "token": label.label_token(name, 0, take["token"], 0), "takeToken": take["token"], "repeatOf": None,
             "split": label.split_for_family(str(take.get("family") or take.get("takeID") or take["token"])),
-            "inclusionProbability": None, "stratum": label.stratum(take), "enriched": True,
+            "inclusionProbability": None, "stratum": label.stratum(take), "enriched": bool(candidate["flags"]),
             "reasons": sorted({flag["detector"] for flag in candidate["flags"]}), "order": position,
         })
         listing.append({"k": position + 1, "path": str(target), "language": take.get("language"),
                         "text": " ".join(str(take.get("text") or "").split())})
     label.write_batch(layout, {
         "schema": label.BATCH_SCHEMA, "batch": name, "kind": CONFIRM_KIND, "createdAt": label.utc_now(),
-        "params": {"run": run_id, "n": n, "languages": preferred, "mixAgreement": mix_agreement}, "items": items,
+        "params": {"run": run_id, "n": n, "languages": preferred, "mixAgreement": mix_agreement,
+                   "unflagged": unflagged}, "items": items,
         "takes": {item["takeToken"]: takes[item["takeToken"]] for item in items},
     })
     return {"batch": name, "takes": listing}

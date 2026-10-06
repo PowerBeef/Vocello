@@ -2,38 +2,38 @@
  "agreement": {
   "detectorsFlagging": {
    "0": {
-    "lower": 0.1581,
-    "n": 2,
-    "rate": 1.0,
-    "upper": 1.0
+    "lower": 0.0527,
+    "n": 5,
+    "rate": 0.4,
+    "upper": 0.8534
    },
    "1": {
-    "lower": 0.0779,
-    "n": 15,
-    "rate": 0.2667,
-    "upper": 0.551
+    "lower": 0.0727,
+    "n": 16,
+    "rate": 0.25,
+    "upper": 0.5238
    },
    "2+": {
-    "lower": 0.1675,
-    "n": 11,
-    "rate": 0.4545,
-    "upper": 0.7662
+    "lower": 0.1386,
+    "n": 13,
+    "rate": 0.3846,
+    "upper": 0.6842
    }
   }
  },
- "commit": "c5e5a5d93a325ecbd9d1714f8e11909bacdae460",
- "createdAt": "2026-10-06T04:47:39Z",
+ "commit": "6c88beb6d42dde780e99a815daa72f2fd9cafce7",
+ "createdAt": "2026-10-06T05:16:49Z",
  "detectors": {
   "boundary.cutoff": {
    "class": "cutoff",
    "confirmations": {
     "failReady": false,
-    "flagged": 7,
+    "flagged": 8,
     "precision": {
-     "lower": 0.1181,
-     "n": 6,
-     "rate": 0.5,
-     "upper": 0.8819
+     "lower": 0.099,
+     "n": 7,
+     "rate": 0.4286,
+     "upper": 0.8159
     },
     "uncertain": 1
    },
@@ -118,12 +118,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 11,
+    "flagged": 12,
     "precision": {
-     "lower": 0.1675,
-     "n": 11,
-     "rate": 0.4545,
-     "upper": 0.7662
+     "lower": 0.1517,
+     "n": 12,
+     "rate": 0.4167,
+     "upper": 0.7233
     },
     "uncertain": 0
    },
@@ -208,12 +208,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 15,
+    "flagged": 17,
     "precision": {
-     "lower": 0.1922,
-     "n": 13,
-     "rate": 0.4615,
-     "upper": 0.7487
+     "lower": 0.1634,
+     "n": 15,
+     "rate": 0.4,
+     "upper": 0.6771
     },
     "uncertain": 2
    },
@@ -304,12 +304,12 @@
    "class": "wrong-language",
    "confirmations": {
     "failReady": false,
-    "flagged": 9,
+    "flagged": 10,
     "precision": {
-     "lower": 0.1181,
-     "n": 6,
-     "rate": 0.5,
-     "upper": 0.8819
+     "lower": 0.099,
+     "n": 7,
+     "rate": 0.4286,
+     "upper": 0.8159
     },
     "uncertain": 3
    },
@@ -400,12 +400,12 @@
    "class": "pause",
    "confirmations": {
     "failReady": false,
-    "flagged": 5,
+    "flagged": 6,
     "precision": {
-     "lower": 0.0084,
-     "n": 3,
-     "rate": 0.3333,
-     "upper": 0.9057
+     "lower": 0.0063,
+     "n": 4,
+     "rate": 0.25,
+     "upper": 0.8059
     },
     "uncertain": 2
    },
@@ -586,12 +586,12 @@
    "class": "artifact",
    "confirmations": {
     "failReady": false,
-    "flagged": 3,
+    "flagged": 4,
     "precision": {
      "lower": 0.0,
-     "n": 3,
+     "n": 4,
      "rate": 0.0,
-     "upper": 0.7076
+     "upper": 0.6024
     },
     "uncertain": 0
    },
@@ -680,9 +680,10 @@
    "confirm-3",
    "confirm-4",
    "confirm-5",
-   "confirm-6"
+   "confirm-6",
+   "confirm-7"
   ],
-  "confirmations": 33,
+  "confirmations": 39,
   "controls": {
    "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
    "runs": [
@@ -690,9 +691,9 @@
    ],
    "takes": 1600
   },
-  "takes": 33
+  "takes": 39
  },
- "labelSetDigest": "54eef58179e5951c6a918ae6e9928b4629dc356600e926056c0510b2908e20d2",
+ "labelSetDigest": "c29f74400c5a73ab7f01bfe4012cfdc4cffc39f9d197ed3ce3e43e866cf1ba17",
  "levels": {
   "failPrecisionLower": 0.8,
   "humanReference": {
@@ -710,8 +711,8 @@
  "norms": "norms-v1.json",
  "rater": "maintainer",
  "replaces": {
-  "createdAt": "2026-10-06T04:09:37Z",
-  "labelSetDigest": "8dbe6d703465d0fd572ad02a378b0b200a404c3aadd7f206cf8eb18b1863444d"
+  "createdAt": "2026-10-06T04:47:39Z",
+  "labelSetDigest": "54eef58179e5951c6a918ae6e9928b4629dc356600e926056c0510b2908e20d2"
  },
  "schema": "vocello.qc.eval/2",
  "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",

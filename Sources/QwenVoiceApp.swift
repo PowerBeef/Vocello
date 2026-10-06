@@ -18,9 +18,10 @@ struct QwenVoiceApp: App {
     @StateObject private var generationLibraryEvents = GenerationLibraryEvents.shared
     @StateObject private var appStartupCoordinator = AppStartupCoordinator()
     /// The shell model lives as long as the engine store and the player it
-    /// drives (A10-04): its Studio coordinators, line batch and long-form
-    /// project outlive the window, so a window closed during a take reopens
-    /// on that take with its Stop, not on idle coordinators over a busy engine.
+    /// drives (A10-04): its Studio coordinators outlive the window, so a window
+    /// closed during a take reopens on that take with its Stop, not on idle
+    /// coordinators over a busy engine. A line batch or long-form project still
+    /// stops with its sheet when the window closes, and keeps its outcome.
     @State private var appModel: MacAppModel
 
     init() {

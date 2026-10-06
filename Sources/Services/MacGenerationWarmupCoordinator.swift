@@ -114,15 +114,19 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     /// that warm ends if it differs from the warm's own context.
     private var intentWhileDispatched: DeferredIntent?
     private var completedContext: WarmupContext?
-    /// A Studio intent that did not warm: the engine was not ready or busy
-    /// when it arrived, the admission gate deferred it, or the store refused
-    /// it (thermal or memory band). `observe(snapshot:)` schedules it once,
-    /// the next time the engine is ready and idle or loaded (A14-08, A14-53).
-    /// A completed warm is never retried this way: re-warming after an idle
-    /// unload would undo the unload.
+    /// A Studio intent the engine could not take because it was busy (not
+    /// ready, a take, load or prime running). `observe(snapshot:)` schedules
+    /// it once, when the engine leaves that busy state for idle or loaded
+    /// (A14-08). Only that transition retries: an idle unload (`.loaded` to
+    /// `.idle`) never does, so a retry cannot undo the unload, and a warm that
+    /// was refused or failed is never kept here (it is simply not complete, so
+    /// the next draft or destination change warms it, A14-53).
     private var retryIntent: WarmupContext?
     /// The store the latest intent was scheduled against, for a retry.
     private weak var warmStore: TTSEngineStore?
+    /// Whether the last engine state seen was busy; a retry waits for it to
+    /// end.
+    private var engineWasBusy = false
     private var revision: UInt64 = 0
 
     private struct DeferredIntent {
@@ -181,11 +185,13 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             clearRetryIntent()
             return
         }
-        // An engine that cannot take the warm now (not ready, a take or load
-        // running, a failure on screen) keeps the intent for its next idle state.
-        guard snapshot.isReady, shouldAllowAnyNavigationWarmup(snapshot: snapshot) else {
+        // An engine that cannot take the warm now because it is busy keeps the
+        // intent until that work ends (A14-08). A failure on screen drops it,
+        // as before: the user's next action decides what warms.
+        if Self.isBusy(snapshot) {
             cancelPendingWarmup()
             retryIntent = context
+            engineWasBusy = true
             return
         }
 
@@ -225,13 +231,14 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                     context: plan.context
                   ) == plan.action else {
                 // A plan that no newer one replaced leaves, so the same intent
-                // can schedule again once the engine is ready for it: the next
-                // idle or loaded snapshot retries it (A14-08).
+                // can schedule again once the engine is ready for it; one the
+                // engine became busy for is retried when that work ends (A14-08).
                 if self.revision == scheduledRevision {
                     self.pendingPlan = nil
                     self.pendingTask = nil
-                    if !Task.isCancelled {
+                    if !Task.isCancelled, Self.isBusy(ttsEngineStore.snapshot) {
                         self.retryIntent = plan.context
+                        self.engineWasBusy = true
                     }
                 }
                 return
@@ -240,16 +247,14 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             // Warm-admission gate (every Mac tier, AUD-10): defer proactive warms
             // while the system is under memory pressure — checked at dispatch
             // time (after the debounce) so the freshest pressure level wins.
-            // The deferred intent is kept, so the next idle or loaded snapshot
-            // (or a draft change) reschedules it once pressure releases. User
-            // generations are never routed through this coordinator and stay
-            // ungated.
+            // Clearing pendingPlan lets the next draft or destination change
+            // reschedule once pressure releases. User generations are never
+            // routed through this coordinator and stay ungated.
             if case .deferred = self.admissionPolicy.admit(
                 contextDescription: "\(plan.context.mode.rawValue)/\(plan.context.purpose)"
             ) {
                 self.pendingPlan = nil
                 self.pendingTask = nil
-                self.retryIntent = plan.context
                 return
             }
 
@@ -262,9 +267,10 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             self.pendingTask = nil
             // Every exit reconciles: only a warm the store performed, that ran
             // to the end with its model loaded, is complete (a cancelled one
-            // skipped its prewarm or prime even when the weights loaded, and a
-            // refused one never ran), and an intent that changed meanwhile is
-            // scheduled now. A refused warm is kept for a retry (A14-53).
+            // skipped its prewarm or prime even when the weights loaded, and
+            // one the store refused never ran, A14-53), and an intent that
+            // changed meanwhile is scheduled now. An incomplete warm stays
+            // incomplete, so the same intent warms on its next request.
             var warmPerformed = false
             var warmCompleted = false
             defer {
@@ -272,9 +278,6 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                     self.dispatchedContext = nil
                     self.dispatchedTask = nil
                     self.completedContext = warmCompleted ? plan.context : nil
-                    if !warmPerformed, !Task.isCancelled {
-                        self.retryIntent = plan.context
-                    }
                     let deferred = self.intentWhileDispatched
                     self.intentWhileDispatched = nil
                     // Also after a cancelled warm: an intent that flipped away
@@ -339,20 +342,41 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         retryIntent = nil
     }
 
+    /// Not ready, or a take, load or prime running: work the engine finishes
+    /// on its own, after which a kept intent may warm.
+    private static func isBusy(_ snapshot: TTSEngineSnapshot) -> Bool {
+        guard snapshot.isReady else { return true }
+        switch snapshot.loadState {
+        case .starting, .running:
+            return true
+        case .idle, .loaded, .failed:
+            return false
+        }
+    }
+
     func observe(snapshot: TTSEngineSnapshot) {
         // While a dispatched warm runs, the busy and idle states are mostly
         // its own (a cold load, a clone prime, a transition's unload), the
         // engine serializes a user take behind it, and its task owns both
         // contexts until it ends (PA-31).
         guard dispatchedContext == nil else { return }
+        let isBusy = Self.isBusy(snapshot)
         if !shouldAllowAnyNavigationWarmup(snapshot: snapshot) {
-            // A debounced warm the engine became busy for is kept for a retry.
-            if let interrupted = pendingPlan?.context {
+            // A debounced warm the engine became busy for is kept until that
+            // work ends (A14-08); a failure drops it.
+            if isBusy, let interrupted = pendingPlan?.context {
                 retryIntent = interrupted
             }
             cancelPendingWarmup()
         }
-        defer { retryIntentIfReady(snapshot: snapshot) }
+        let busyWorkEnded = engineWasBusy && !isBusy
+        engineWasBusy = isBusy
+        if busyWorkEnded {
+            retryIntentIfReady(snapshot: snapshot)
+        } else if !isBusy {
+            // Any other change (an idle unload, a failure) drops a kept intent.
+            clearRetryIntent()
+        }
 
         switch snapshot.loadState {
         case .loaded(let modelID):
@@ -375,17 +399,15 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         }
     }
 
-    /// A14-08: the intent that could not warm when it arrived is scheduled once
-    /// the engine is ready and idle or loaded, with nothing pending; it is
-    /// consumed here, so only a new refusal records it again.
+    /// A14-08: the intent the busy engine could not take is scheduled once that
+    /// work ends with the engine idle or loaded; it is consumed here, so only
+    /// a new busy period keeps it again.
     private func retryIntentIfReady(snapshot: TTSEngineSnapshot) {
-        guard dispatchedContext == nil,
-              pendingPlan == nil,
-              snapshot.isReady,
-              shouldAllowAnyNavigationWarmup(snapshot: snapshot),
-              let intent = retryIntent,
-              let store = warmStore else { return }
+        guard let intent = retryIntent else { return }
         clearRetryIntent()
+        guard pendingPlan == nil,
+              shouldAllowAnyNavigationWarmup(snapshot: snapshot),
+              let store = warmStore else { return }
         scheduleWarmupIfNeeded(context: intent, snapshot: snapshot, ttsEngineStore: store)
     }
 
@@ -501,7 +523,8 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     /// Runs the warm and returns whether the store performed it. A prefetch
     /// the store refused (thermal or memory band, a busy model slot) returns
     /// no diagnostics, and a prime it refused leaves the reference unprimed;
-    /// neither counts as a completed warm (A14-53).
+    /// neither counts as a completed warm (A14-53). A refused model load
+    /// leaves the model unloaded, which the completion check already sees.
     private func performWarmup(
         _ decision: WarmupDecision,
         ttsEngineStore: TTSEngineStore

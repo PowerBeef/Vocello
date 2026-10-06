@@ -1291,7 +1291,7 @@ struct IOSVoiceDesignView: View {
         // save candidate; the completed take publishes its own (A10-01).
         savedDesignedResult = nil
         appModel.designSavedVoiceCandidate = nil
-        let appModel = appModel
+        let shellModel = appModel
         let candidateVoiceDescription = draft.voiceDescription
         let candidateEmotion = draft.emotion
         let candidateText = draft.text
@@ -1347,7 +1347,7 @@ struct IOSVoiceDesignView: View {
                 if accepted {
                     // The take's own audio, script and brief, held beside the
                     // completed take so a remount keeps the Save action (A10-01).
-                    appModel.designSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
+                    shellModel.designSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
                         audioPath: result.audioPath,
                         transcript: candidateTranscript,
                         voiceDescription: candidateVoiceDescription,

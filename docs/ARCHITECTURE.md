@@ -722,8 +722,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `NavigationSplitView` with a `SidebarItem` enum (`Sources/Models/SidebarItem.swift`):
   `customVoice`, `voiceDesign`, `voiceCloning`, `history`, `voices`, `settings`. Shell state
   (selection, toolbar state, pending Settings highlight) lives in `MacAppModel`, which
-  `QwenVoiceApp` owns beside the engine store and the player so a running take, line batch or
-  long-form project outlives a closed window; the sidebar,
+  `QwenVoiceApp` owns beside the engine store and the player so a running take and the Studio
+  state outlive a closed window (a line batch or long-form project stops with its sheet); the sidebar,
   inline player card, status strip, window toolbar and startup diagnostics live under
   `Sources/Views/{Sidebar,Shell}` and read the shared `VocelloTheme` tokens through `MacTheme`
   (`Sources/Views/Theme`). Dark-only, like iOS. Settings (`Sources/Views/Settings`) hosts the

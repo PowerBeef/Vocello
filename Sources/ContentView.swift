@@ -24,8 +24,8 @@ struct ContentView: View {
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
     /// App-scoped (A10-04): `QwenVoiceApp` owns it beside the engine store and
-    /// the player, so a take, line batch or long-form project outlives a
-    /// closed window. Observation tracks it through the reads in `body`.
+    /// the player, so a take and the Studio state outlive a closed window.
+    /// Observation tracks it through the reads in `body`.
     private let appModel: MacAppModel
     /// Tracks sidebar visibility while each Studio mode owns its inline transport.
     @State private var sidebarColumnVisibility: NavigationSplitViewVisibility = .all

@@ -617,6 +617,20 @@ class ConfirmTests(unittest.TestCase):
         self.assertTrue(all(item["language"] == "french" for item in confirm.pick_unflagged(pool, 4, ["french"])))
         self.assertEqual(len(confirm.pick_unflagged(pool, 6, ["french"])), 6)
 
+    def test_a_take_labelled_in_another_batch_is_never_sent(self):
+        heard, unheard = self.token("fr-0008--h"), self.token("fr-0006--f")
+        label.write_batch(self.layout, {"schema": label.BATCH_SCHEMA, "batch": "s0", "kind": "sample", "createdAt": "x",
+                                        "params": {}, "takes": {},
+                                        "items": [{"token": "l-heard", "takeToken": heard},
+                                                  {"token": "l-unheard", "takeToken": unheard}]})
+        store.append_jsonl(label.labels_path(self.layout, "s0"), {"token": "l-heard", "verdict": "objectionable"})
+        self.assertIn(heard, confirm.sent_takes(self.layout))
+        self.assertNotIn(unheard, confirm.sent_takes(self.layout))
+        confirm.next_batch(self.layout, "pool-1", n=1, name="h1", unflagged=2)
+        tokens = [item["takeToken"] for item in label.load_batch(self.layout, "h1")["items"]]
+        self.assertIn(unheard, tokens)
+        self.assertNotIn(heard, tokens)
+
     def test_controls_runs_and_runs_without_sendable_takes_are_refused(self):
         self.write_flags("controls-1", "controls")
         with self.assertRaisesRegex(confirm.ConfirmError, "never sent"):

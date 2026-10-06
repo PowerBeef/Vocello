@@ -3,8 +3,8 @@
 `qc.py confirm next --run <generated run>` picks up to `--n` (5) takes the run flagged, with any
 detector that has a class (the advisory loudness flag alone never sends a take). It leaves out
 human controls, every clone take (mode `clone`, or a take with a reference clip: corpus-voice
-clones are internal-only and are never sent) and every take an earlier confirm batch sent, answered
-or not (an unanswered take stays answerable in its own batch).
+clones are internal-only and are never sent), every take an earlier confirm batch sent, answered
+or not (an unanswered take stays answerable in its own batch), and every take labelled elsewhere.
 It prefers `--languages` (French and English) and spreads over detectors: round-robin by
 detector, the highest score first; `--mix-agreement` takes half the batch from takes two or more
 detectors flagged and half from lone flags, and `--unflagged K` adds K takes no detector flagged
@@ -57,14 +57,18 @@ def is_clone(take: dict[str, Any]) -> bool:
 
 
 def sent_takes(layout: Layout) -> set[str]:
-    """The takes any confirm batch has sent, answered or not: an unanswered take stays answerable in
-    its own batch, so it is never sent twice."""
+    """The takes never to send again: every take a confirm batch has sent, answered or not (an
+    unanswered take stays answerable in its own batch), and every take labelled in any other batch
+    (the maintainer has heard it, so it is no longer blind)."""
 
     sent: set[str] = set()
     for name in label.batch_names(layout):
         batch = label.load_batch(layout, name)
         if batch.get("kind") == CONFIRM_KIND:
             sent.update(item["takeToken"] for item in batch["items"])
+            continue
+        tokens = {row.get("token") for row in store.read_jsonl(label.labels_path(layout, name)) if isinstance(row, dict)}
+        sent.update(item["takeToken"] for item in batch["items"] if item["token"] in tokens)
     return sent
 
 

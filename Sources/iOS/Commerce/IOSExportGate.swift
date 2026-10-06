@@ -170,6 +170,14 @@ struct IOSExportPurchaseSheet: View {
             await store.refresh()
             await store.loadProduct()
         }
+        // A12-04: a purchase or restore outcome appears below the buttons,
+        // away from VoiceOver focus; say it once when it changes.
+        .onChange(of: store.notice) { _, notice in
+            guard let notice else { return }
+            StudioGenerationAnnouncer.post(
+                IOSAppLanguage.shared.presentation.exportPurchaseNotice(notice, access: store.access)
+            )
+        }
     }
 }
 #endif

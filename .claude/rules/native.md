@@ -78,7 +78,7 @@ requested.
 
 - **The engine runs in-process on the shared store.** `MacEngineBootstrap` builds `MLXTTSEngine` through
   `NativeRuntimeFactory` (bundled contract → macOS-expanded registry, floor-tier prewarm policy) and wraps
-  it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen except the shared consent admission and the PA-31 snapshot bridge). No XPC service,
+  it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen except the shared consent admission, the PA-31 snapshot bridge and its typed admission refusals, A9-01). No XPC service,
   no service retirement, no wire protocol; a separate engine process must not be reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
   `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
 - **Memory relief is in-process.** The engine's own kernel-pressure responder trims caches and never
@@ -142,7 +142,7 @@ requested.
 - **Resources are `sources:` entries with `buildPhase: resources`** in `project.yml` (XcodeGen 2.45+
   otherwise drops iOS resources); never a `resources:` key.
 - **UI conventions.** `IOSScrollView` for vertical scroll surfaces; mode color pairs with icon, label or
-  position; all glass routes through `IOSGatedGlassModifier`; Reduce Motion / Reduce Transparency honored;
+  position; all glass routes through `IOSGatedGlassModifier` (system glass button styles through `IOSGlassGate`); Reduce Motion / Reduce Transparency honored;
   identifiers stable and governed with `config/ios-control-audit.json`; no hidden test UI.
 - **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile

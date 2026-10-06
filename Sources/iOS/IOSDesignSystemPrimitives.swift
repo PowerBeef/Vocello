@@ -1071,6 +1071,10 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
                 Capsule(style: .continuous)
                     .stroke(isSelected ? Color.white.opacity(0.18) : Color.white.opacity(0.10), lineWidth: 0.5)
             }
+            // The capsule stays 32 pt; the tap region is the 44 pt target the
+            // control audit declares for this family.
+            .frame(minHeight: Theme.HitTarget.minimum)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(accessibilityIdentifier?(option) ?? "")

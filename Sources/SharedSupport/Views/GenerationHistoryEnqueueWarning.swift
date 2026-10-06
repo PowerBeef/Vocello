@@ -10,19 +10,28 @@ struct GenerationHistoryEnqueueWarning: View {
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    /// The copy follows the app's own interface language, not the system's.
+    private var text: VocelloPresentationText {
+        #if os(iOS)
+        IOSAppLanguage.shared.presentation
+        #else
+        MacInterfaceText.presentation
+        #endif
+    }
+
     var body: some View {
         if !state.records.isEmpty {
             VStack(alignment: .leading, spacing: VocelloTheme.Spacing.sm) {
-                Label(VocelloPresentationText.historyUnqueuedTitle, systemImage: "exclamationmark.triangle")
+                Label(text.historyUnqueuedTitle, systemImage: "exclamationmark.triangle")
                     .font(.headline)
-                Text(VocelloPresentationText.historyUnqueuedDetail)
+                Text(text.historyUnqueuedDetail)
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 let layout = dynamicTypeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: VocelloTheme.Spacing.sm))
                     : AnyLayout(HStackLayout(spacing: VocelloTheme.Spacing.md))
                 layout {
-                    Button(VocelloPresentationText.retryHistorySave) {
+                    Button(text.retryHistorySave) {
                         isRetrying = true
                         Task {
                             let result = await GenerationHistoryRecovery.reconcile()
@@ -47,14 +56,14 @@ struct GenerationHistoryEnqueueWarning: View {
                         // Never trap retained user audio behind a purchase on storage failure.
                         exportGate.share(urls: urls, provenance: urls.map { _ in .recoveryRecord })
                     } label: {
-                        Label(VocelloPresentationText.exportAudio, systemImage: "square.and.arrow.up")
+                        Label(text.exportAudio, systemImage: "square.and.arrow.up")
                     }
                     .disabled(state.availableAudioURLs.isEmpty)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("historyUnqueued_export")
                     #else
                     ShareLink(items: state.availableAudioURLs) {
-                        Label(VocelloPresentationText.exportAudio, systemImage: "square.and.arrow.up")
+                        Label(text.exportAudio, systemImage: "square.and.arrow.up")
                     }
                     .disabled(state.availableAudioURLs.isEmpty)
                     .frame(minHeight: 44)
@@ -68,10 +77,12 @@ struct GenerationHistoryEnqueueWarning: View {
             .modifier(GatedBannerSurface())
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("historyUnqueued_banner")
-            // A12-04: the banner appears off any VoiceOver focus; say once
-            // that the take is ready but History did not save it.
-            .onAppear {
-                StudioGenerationAnnouncer.post(VocelloPresentationText.historyUnqueuedTitle)
+            // A12-04: the banner appears off any VoiceOver focus; say once, and
+            // again only when another take joins it, that History did not save it.
+            .onChange(of: state.records.count, initial: true) { previous, count in
+                if count >= previous {
+                    StudioGenerationAnnouncer.post(text.historyUnqueuedTitle)
+                }
             }
             #if os(iOS)
             .iosExportPresentation(exportGate)
@@ -94,22 +105,18 @@ struct GenerationHistoryEnqueueWarning: View {
 ///
 /// The ungated branch keeps `.regularMaterial` rather than adopting glass: the
 /// fix here is the gate, not a redesign of a warning the user did not ask to
-/// see.
+/// see. The gate decides only the background's style, so the banner keeps one
+/// view tree (and VoiceOver focus) when a generation starts or ends (A13-52).
 private struct GatedBannerSurface: ViewModifier {
-    #if os(iOS)
-    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
-    @Environment(\.iosGenerationPerformanceGate) private var performanceGate
-    #else
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-    #endif
-
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if reduceTransparency || performanceGate {
-            content.background(VocelloTheme.Surface.banner)
-        } else {
-            content.background(.regularMaterial)
-        }
+        #if os(iOS)
+        IOSGlassGate { isGated in styled(content, isGated: isGated) }
+        #else
+        GatedGlass { isGated in styled(content, isGated: isGated) }
+        #endif
+    }
+
+    private func styled(_ content: Content, isGated: Bool) -> some View {
+        content.background(isGated ? AnyShapeStyle(VocelloTheme.Surface.banner) : AnyShapeStyle(.regularMaterial))
     }
 }

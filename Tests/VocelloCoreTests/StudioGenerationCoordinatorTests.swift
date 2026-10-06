@@ -103,6 +103,29 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.lastCompletedOutput)
     }
 
+    /// A1-01: a Stop that arrives while the finished take is being saved is refused,
+    /// so the attempt completes with its card instead of announcing a stop.
+    func testAFinalizingAttemptRefusesCancellationAndCompletesWithItsTake() throws {
+        let coordinator = StudioGenerationCoordinator(mode: .custom)
+        let attempt = try XCTUnwrap(coordinator.start(live: liveItem()))
+
+        XCTAssertTrue(coordinator.beginFinalization(attempt: attempt))
+        XCTAssertFalse(coordinator.isAttemptRunning)
+        XCTAssertNil(coordinator.requestCancellation(), "The take exists; it can no longer be stopped")
+        XCTAssertFalse(coordinator.isCancellationRequested(for: attempt))
+        XCTAssertTrue(coordinator.isGenerating)
+
+        let item = completedItem()
+        XCTAssertTrue(coordinator.complete(item, attempt: attempt))
+        XCTAssertEqual(coordinator.lastCompletedOutput, item)
+        XCTAssertFalse(coordinator.isGenerating)
+
+        // A cancellation accepted first keeps the terminal: finalization is refused.
+        let second = try XCTUnwrap(coordinator.start())
+        XCTAssertEqual(coordinator.requestCancellation(), second)
+        XCTAssertFalse(coordinator.beginFinalization(attempt: second))
+    }
+
     func testTaskInstalledForAnAttemptThatIsNoLongerRunningIsCancelled() throws {
         let coordinator = StudioGenerationCoordinator(mode: .clone)
         let finished = try XCTUnwrap(coordinator.start())

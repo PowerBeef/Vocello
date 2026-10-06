@@ -15,12 +15,15 @@ struct StudioGenerationAttemptToken: Hashable, Sendable {
 
 /// Pure transition authority for the iOS Studio lifecycle.
 ///
-/// Generation completion/failure is accepted only while running. Once cancellation is requested,
-/// only the cancellation barrier may make the attempt terminal. Every stale or mismatched event is
-/// rejected without changing the current attempt.
+/// Generation completion/failure is accepted while running or finalizing. Once cancellation is
+/// requested, only the cancellation barrier may make the attempt terminal. Once the engine has
+/// returned the take and its completion (History, export) has begun, the attempt is finalizing and
+/// a cancellation is refused: a take the user was told is stopped must never land in History.
+/// Every stale or mismatched event is rejected without changing the current attempt.
 struct StudioGenerationAttemptAuthority: Sendable {
     enum Phase: String, Equatable, Sendable {
         case running
+        case finalizing
         case cancelling
     }
 
@@ -54,15 +57,22 @@ struct StudioGenerationAttemptAuthority: Sendable {
         case .running:
             phase = .cancelling
             return true
-        case .cancelling:
+        case .finalizing, .cancelling:
             return false
         case nil:
             return false
         }
     }
 
-    mutating func finishGeneration(_ token: StudioGenerationAttemptToken) -> Bool {
+    /// The engine returned the take; its completion starts now and can no longer be cancelled.
+    mutating func beginFinalization(_ token: StudioGenerationAttemptToken) -> Bool {
         guard isRunning(token) else { return false }
+        phase = .finalizing
+        return true
+    }
+
+    mutating func finishGeneration(_ token: StudioGenerationAttemptToken) -> Bool {
+        guard currentToken == token, phase == .running || phase == .finalizing else { return false }
         clear()
         return true
     }

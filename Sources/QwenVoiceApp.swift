@@ -225,14 +225,20 @@ struct QwenVoiceApp: App {
     }
 
     private func startSelectedTTSEngineIfNeeded() {
-        guard let ttsEngineStore, !didInitializeSelectedTTSEngine else { return }
+        // While a failed start is on screen, only its Retry starts the engine again
+        // (the window's onAppear fires each time the content switches).
+        guard let ttsEngineStore, !didInitializeSelectedTTSEngine, engineBootstrapDiagnostics == nil else { return }
         didInitializeSelectedTTSEngine = true
 
         Task {
             do {
                 try await ttsEngineStore.initialize(appSupportDirectory: Self.appSupportDir)
             } catch {
-                // The engine publishes its own failure state through the store.
+                // The engine publishes no failure state for a failed start, so the
+                // app would sit on "Starting engine…" for good. Show the launch
+                // diagnostics instead; Retry starts the engine again.
+                didInitializeSelectedTTSEngine = false
+                engineBootstrapDiagnostics = Self.engineBootstrapDiagnostics(for: error)
             }
         }
     }
@@ -242,7 +248,15 @@ struct QwenVoiceApp: App {
     /// on screen however often Retry was pressed.
     private func retryLaunchPreflight() {
         appStartupCoordinator.refreshLaunchDiagnostics()
-        guard ttsEngineStore == nil else { return }
+        guard ttsEngineStore == nil else {
+            // The store exists, so what failed was its start.
+            if engineBootstrapDiagnostics != nil {
+                engineBootstrapDiagnostics = nil
+                appStartupCoordinator.setupAppSupport()
+                startSelectedTTSEngineIfNeeded()
+            }
+            return
+        }
         do {
             let store = try MacEngineBootstrap.makeEngineStore()
             modelManager.attachEngine(store)

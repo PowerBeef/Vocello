@@ -120,6 +120,37 @@ final class IOSSingleTakeGenerationExecutorTests: XCTestCase {
         }
     }
 
+    /// A1-01: completion starts only after the attempt owner closed the
+    /// cancellation window, and a cancellation that won that race discards the take.
+    func testFinalizationIsClaimedBeforeCompletionAndALostRaceDiscardsTheTake() async throws {
+        let plan = try makePlan()
+        let hooks = Hooks()
+        var eventsAtFinalization: [Hooks.Event] = []
+
+        _ = try await IOSSingleTakeGenerationExecutor.run(
+            plan: plan,
+            hooks: hooks,
+            beginFinalization: {
+                eventsAtFinalization = hooks.events
+                return true
+            }
+        )
+        XCTAssertEqual(eventsAtFinalization, [.submitted, .generated], "Claimed after the take, before completion")
+        XCTAssertEqual(hooks.events, [.submitted, .generated, .completed])
+
+        let refused = Hooks()
+        do {
+            _ = try await IOSSingleTakeGenerationExecutor.run(
+                plan: plan,
+                hooks: refused,
+                beginFinalization: { false }
+            )
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {
+            XCTAssertEqual(refused.events, [.submitted, .generated, .cancelled(materialized: true)])
+        }
+    }
+
     func testRequestedCancellationBeforeTaskCancelDiscardsMaterializedResult() async throws {
         let plan = try makePlan()
         let hooks = Hooks()

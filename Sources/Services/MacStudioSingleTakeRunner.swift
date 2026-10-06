@@ -68,7 +68,8 @@ enum MacStudioSingleTakeRunner {
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,
-                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) }
+                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) },
+                    beginFinalization: { coordinator.beginFinalization(attempt: attempt) }
                 )
                 if coordinator.complete(hooks.inlinePlayerItem(for: result, plan: plan), attempt: attempt) {
                     onCompleted(result)

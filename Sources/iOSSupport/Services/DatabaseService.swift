@@ -13,9 +13,9 @@ import QwenVoiceCore
 /// previously the synchronous save on `@MainActor` introduced a 5-30ms
 /// hitch right after every generation completed.
 ///
-/// This is the iOS copy (mirrors `Sources/Services/DatabaseService.swift`); it
-/// resolves its database file under the iOS App Group container via `AppPaths`,
-/// which is itself platform-specific.
+/// Both apps compile this file; it resolves its database file under
+/// `AppPaths.appSupportDir`, which is platform-specific (the App Group container
+/// on iPhone).
 final class DatabaseService: @unchecked Sendable {
     /// Process-wide singleton. GRDB serializes queue access and the coordinator
     /// serializes the explicit reopen transition.
@@ -37,7 +37,7 @@ final class DatabaseService: @unchecked Sendable {
             rootURL: rootDirectory.appendingPathComponent("history-outbox/long-form", isDirectory: true)
         )
         self.store = RecoverableStoreCoordinator(
-            openStore: { try Self.openQueue(at: dbPath) },
+            openStore: { try Self.openQueue(at: dbPath, rootDirectory: rootDirectory) },
             classify: { HistoryPersistenceError.classify($0, operation: .initialize) }
         )
     }
@@ -46,7 +46,7 @@ final class DatabaseService: @unchecked Sendable {
         GenerationMigrations.makeMigrator()
     }
 
-    private static func openQueue(at path: String) throws -> DatabaseQueue {
+    private static func openQueue(at path: String, rootDirectory: URL) throws -> DatabaseQueue {
         // IOS-11: on iPhone the database lives in the App Group container, and
         // iOS terminates an app that is suspended while holding a lock on a
         // shared file (0xDEAD10CC). The app suspends the queue just before it can
@@ -64,9 +64,63 @@ final class DatabaseService: @unchecked Sendable {
         }
         do {
             try makeMigrator().migrate(queue)
-            return queue
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .migrate)
+        }
+        // A repair, not a precondition: History opens even when it cannot run.
+        _ = try? rebaseMovedAudioPaths(in: queue, rootDirectory: rootDirectory)
+        return queue
+    }
+
+    /// Rows store absolute audio paths, and on iPhone the root is the App Group
+    /// container, whose path changes with the install. After a restore or a
+    /// device migration the files and the database arrive together under a new
+    /// root, so every row would point at a path that no longer exists. A row is
+    /// rewritten onto `rootDirectory` only when its stored root is gone and its
+    /// audio exists at the rebased path: a folder that is merely unavailable (an
+    /// unmounted volume holding a custom macOS output folder) keeps its rows.
+    /// Returns the number of rows rewritten.
+    @discardableResult
+    static func rebaseMovedAudioPaths(
+        in queue: DatabaseQueue,
+        rootDirectory: URL,
+        fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) throws -> Int {
+        // Built as the writers build it (`AppPaths.outputsDir`), so a rebased row
+        // matches the path a new take of the same file would record.
+        let currentRoot = rootDirectory.path
+        let marker = "/outputs/"
+        let storedRoots = try queue.read { db in
+            try String.fetchSet(
+                db,
+                sql: """
+                    SELECT DISTINCT substr(audioPath, 1, instr(audioPath, '/outputs/') - 1)
+                    FROM generations WHERE instr(audioPath, '/outputs/') > 1
+                    """
+            )
+        }
+        let movedRoots = storedRoots.filter { $0 != currentRoot && !fileExists($0) }
+        guard !movedRoots.isEmpty else { return 0 }
+        return try queue.write { db in
+            var rewritten = 0
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT id, audioPath FROM generations WHERE instr(audioPath, '/outputs/') > 1"
+            )
+            for row in rows {
+                let id: Int64 = row["id"]
+                let stored: String = row["audioPath"]
+                guard let range = stored.range(of: marker),
+                      movedRoots.contains(String(stored[..<range.lowerBound])) else { continue }
+                let rebased = currentRoot + stored[range.lowerBound...]
+                guard fileExists(rebased) else { continue }
+                try db.execute(
+                    sql: "UPDATE generations SET audioPath = ? WHERE id = ?",
+                    arguments: [rebased, id]
+                )
+                rewritten += 1
+            }
+            return rewritten
         }
     }
 

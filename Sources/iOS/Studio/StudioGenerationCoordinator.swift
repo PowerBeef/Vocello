@@ -140,6 +140,14 @@ final class StudioGenerationCoordinator {
         return attempt
     }
 
+    /// The engine returned the take and its completion is about to start: from here a
+    /// cancellation is refused, so a stopped attempt never leaves a take in History.
+    /// Returns false when a cancellation was accepted first.
+    @discardableResult
+    func beginFinalization(attempt: StudioGenerationAttemptToken) -> Bool {
+        attemptAuthority.beginFinalization(attempt)
+    }
+
     /// Cancels the retained Swift generation task (see `requestCancellation(cancelsTask:)`).
     func cancelGenerationTask() {
         generationTask?.cancel()

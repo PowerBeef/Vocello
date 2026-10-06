@@ -513,7 +513,8 @@ struct IOSCustomVoiceView: View {
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,
-                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) }
+                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) },
+                    beginFinalization: { coordinator.beginFinalization(attempt: attempt) }
                 )
                 let accepted = coordinator.complete(
                     hooks.inlinePlayerItem(for: result, plan: plan),
@@ -1279,7 +1280,8 @@ struct IOSVoiceDesignView: View {
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,
-                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) }
+                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) },
+                    beginFinalization: { coordinator.beginFinalization(attempt: attempt) }
                 )
                 saveSheetAudioPath = result.audioPath
                 let accepted = coordinator.complete(
@@ -2036,7 +2038,8 @@ struct IOSVoiceCloningView: View {
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,
-                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) }
+                    isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) },
+                    beginFinalization: { coordinator.beginFinalization(attempt: attempt) }
                 )
                 let accepted = coordinator.complete(
                     hooks.inlinePlayerItem(for: result, plan: plan),

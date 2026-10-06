@@ -233,6 +233,49 @@ final class DatabaseServiceTests: XCTestCase {
         )
     }
 
+    /// A2-01: a restore or device migration moves the container, and the rows
+    /// still name the old one.
+    func testRowsUnderARootThatMovedAreRebasedWhenHistoryOpens() throws {
+        let oldRoot = try makeRoot()
+        let fileManager = FileManager.default
+        let takes = oldRoot.appendingPathComponent("outputs/CustomVoice", isDirectory: true)
+        try fileManager.createDirectory(at: takes, withIntermediateDirectories: true)
+        let moved = takes.appendingPathComponent("take.wav")
+        try Data("RIFF".utf8).write(to: moved)
+        // A folder that still exists must keep its rows: a custom output folder, a diagnostics root.
+        let elsewhere = try makeRoot().appendingPathComponent("outputs/kept.wav")
+        try fileManager.createDirectory(at: elsewhere.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        do {
+            let service = DatabaseService(rootDirectory: oldRoot)
+            // The last row sits under a root that is gone and whose audio did not come along
+            // (an unmounted volume): it must not be rewritten.
+            let paths = [moved.path, elsewhere.path, "/nonexistent/take.wav", "/unmounted-volume/outputs/kept.wav"]
+            for (index, path) in paths.enumerated() {
+                var generation = row(path, at: Double(index))
+                try service.saveGeneration(&generation)
+            }
+        }
+
+        let newRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("DatabaseService-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: newRoot) }
+        try fileManager.moveItem(at: oldRoot, to: newRoot)
+
+        let reopened = DatabaseService(rootDirectory: newRoot)
+        let paths = Set(try reopened.fetchAllGenerations().map(\.audioPath))
+        let rebased = newRoot.path + "/outputs/CustomVoice/take.wav"
+        XCTAssertEqual(
+            paths,
+            [rebased, elsewhere.path, "/nonexistent/take.wav", "/unmounted-volume/outputs/kept.wav"]
+        )
+        XCTAssertTrue(fileManager.fileExists(atPath: rebased), "The rebased row reaches the audio that moved with it")
+
+        // Opening again changes nothing.
+        let again = DatabaseService(rootDirectory: newRoot)
+        XCTAssertEqual(Set(try again.fetchAllGenerations().map(\.audioPath)), paths)
+    }
+
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {
         // The directory does not exist yet, so SQLite cannot create the database.
         let root = try makeRoot(creatingDirectory: false)

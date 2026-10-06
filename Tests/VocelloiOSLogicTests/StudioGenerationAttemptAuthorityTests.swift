@@ -44,6 +44,27 @@ final class StudioGenerationAttemptAuthorityTests: XCTestCase {
         XCTAssertEqual(authority.begin(token: second), second)
     }
 
+    /// A1-01: once the take exists and its completion has begun, a Stop is refused.
+    func testFinalizingAttemptRefusesCancellationAndStillFinishes() {
+        var authority = StudioGenerationAttemptAuthority()
+
+        XCTAssertEqual(authority.begin(token: first), first)
+        XCTAssertFalse(authority.beginFinalization(second), "A stale token cannot finalize")
+        XCTAssertTrue(authority.beginFinalization(first))
+        XCTAssertFalse(authority.isRunning(first))
+        XCTAssertFalse(authority.requestCancellation(first), "Completion cannot be overtaken by a cancellation")
+        XCTAssertFalse(authority.isCancelling(first))
+        XCTAssertNil(authority.begin(token: second))
+        XCTAssertTrue(authority.finishGeneration(first))
+        XCTAssertNil(authority.currentToken)
+
+        // A cancellation accepted first wins: finalization is refused.
+        XCTAssertEqual(authority.begin(token: second), second)
+        XCTAssertTrue(authority.requestCancellation(second))
+        XCTAssertFalse(authority.beginFinalization(second))
+        XCTAssertTrue(authority.completeCancellation(second))
+    }
+
     func testCancellationFailureIsTerminalOnlyForMatchingAttempt() {
         var authority = StudioGenerationAttemptAuthority()
 

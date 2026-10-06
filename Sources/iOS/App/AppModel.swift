@@ -192,6 +192,8 @@ final class AppModel {
             guard longForm.isProcessing else { return .singleTake }
             return longForm.isRegeneratingSegment ? .segmentRegeneration : .longForm
         }
+        // A cancellation barrier is pending, or a finished take is being saved
+        // (finalizing): either way there is nothing left to interrupt.
         if longForm.isProcessing || studioCoordinators.contains(where: { $0.isGenerating }) {
             return .cancelling
         }

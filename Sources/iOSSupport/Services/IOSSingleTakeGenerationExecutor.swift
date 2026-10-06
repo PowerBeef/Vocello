@@ -103,17 +103,23 @@ enum IOSSingleTakeGenerationExecutor {
     /// the engine barrier first and cancels the task afterwards, so the take must
     /// honour the accepted cancellation even when `Task.isCancelled` is still
     /// false: it is discarded, never completed, persisted or reported as failed.
+    ///
+    /// `beginFinalization` closes that window from the other side: it runs once
+    /// the take exists and no cancellation was accepted, and the attempt owner
+    /// refuses cancellation from then on, so completion (History, export) cannot
+    /// be overtaken by a Stop. It returns false when a cancellation won the race.
     static func run(
         plan: IOSSingleTakeGenerationPlan,
         hooks: any IOSSingleTakeGenerationExecutionHooks,
-        isCancellationRequested: @MainActor () -> Bool = { false }
+        isCancellationRequested: @MainActor () -> Bool = { false },
+        beginFinalization: @MainActor () -> Bool = { true }
     ) async throws -> GenerationResult {
         await hooks.generationSubmitted(plan)
         var cancellationWasHandled = false
 
         do {
             let result = try await hooks.generate(plan.request)
-            if Task.isCancelled || isCancellationRequested() {
+            if Task.isCancelled || isCancellationRequested() || !beginFinalization() {
                 cancellationWasHandled = true
                 await hooks.generationCancelled(
                     materializedResult: result,

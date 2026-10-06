@@ -798,10 +798,10 @@ private extension MacHistoryScreen {
                     if hasExistingItems {
                         presentActionAlert(
                             title: MacInterfaceText.historyRefreshFailed,
-                            message: error.localizedDescription
+                            message: MacInterfaceText.historyFailureMessage(error)
                         )
                     } else {
-                        loadError = error.localizedDescription
+                        loadError = MacInterfaceText.historyFailureMessage(error)
                     }
                     isLoading = false
                     finishReload(wallStart: wallStart, interval: interval)

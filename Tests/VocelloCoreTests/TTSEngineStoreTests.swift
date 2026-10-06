@@ -367,9 +367,9 @@ final class TTSEngineStoreTests: XCTestCase {
         }
     }
 
-    private static func isGenerationFailure(_ error: TTSEngineError) -> Bool {
-        if case .generationFailed = error { return true }
-        return false
+    /// A9-01: the busy refusal is typed, so the apps localize it.
+    private static func isEngineBusyRefusal(_ error: TTSEngineError) -> Bool {
+        error == .generationAdmissionRefused(.engineBusy)
     }
 
     private static func isInsufficientMemory(_ error: TTSEngineError) -> Bool {
@@ -392,7 +392,7 @@ final class TTSEngineStoreTests: XCTestCase {
         XCTAssertTrue(store.hasActiveGeneration)
         // The store mints the generation identity the engine events are keyed by.
         XCTAssertNotNil(engine.generateRequests.first?.generationID)
-        await assertGenerationRefused(by: store, request(), where: Self.isGenerationFailure)
+        await assertGenerationRefused(by: store, request(), where: Self.isEngineBusyRefusal)
         XCTAssertEqual(engine.generateRequests.count, 1, "An overlapping take never reaches the engine")
 
         engine.releaseGeneration()
@@ -429,7 +429,7 @@ final class TTSEngineStoreTests: XCTestCase {
 
         engine.loadState = .running(modelID: "pro_custom", label: "Generating", fraction: nil)
         await waitUntil("the store to mirror backend activity") { store.hasActiveGeneration }
-        await assertGenerationRefused(by: store, request(), where: Self.isGenerationFailure)
+        await assertGenerationRefused(by: store, request(), where: Self.isEngineBusyRefusal)
         XCTAssertTrue(engine.generateRequests.isEmpty)
 
         engine.loadState = .running(
@@ -485,7 +485,7 @@ final class TTSEngineStoreTests: XCTestCase {
         }
         XCTAssertEqual(engine.cancellationReasons, [.user])
         XCTAssertTrue(store.hasActiveGeneration, "Ownership stays until termination is proven")
-        await assertGenerationRefused(by: store, request(), where: Self.isGenerationFailure)
+        await assertGenerationRefused(by: store, request(), where: Self.isEngineBusyRefusal)
 
         engine.releaseGeneration()
         _ = try await generation.value

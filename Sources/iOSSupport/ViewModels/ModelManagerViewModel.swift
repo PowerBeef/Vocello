@@ -22,6 +22,9 @@ protocol ModelStatusProviding: AnyObject {
 @MainActor
 final class LocalModelStatusProvider: ModelStatusProviding {
     private let modelAssetStore: any ModelAssetStore
+    /// The interface-language copy for computed statuses (A9-04), read at
+    /// status time so a language change applies on the next refresh.
+    private let presentation: @MainActor () -> VocelloPresentationText
 
     /// Bundled production catalog for the stale-artifact probe. A missing or
     /// malformed catalog disables update detection only; the authenticated
@@ -34,8 +37,12 @@ final class LocalModelStatusProvider: ModelStatusProviding {
         return try? ProductionModelCatalog(contentsOf: url)
     }()
 
-    init(modelAssetStore: any ModelAssetStore) {
+    init(
+        modelAssetStore: any ModelAssetStore,
+        presentation: @escaping @MainActor () -> VocelloPresentationText = { IOSAppLanguage.shared.presentation }
+    ) {
         self.modelAssetStore = modelAssetStore
+        self.presentation = presentation
     }
 
     /// Byte-count staleness probe against the current catalog identity.
@@ -58,30 +65,32 @@ final class LocalModelStatusProvider: ModelStatusProviding {
     }
 
     func initialStatuses(for models: [TTSModel]) -> [String: ModelInventoryStatus] {
-        Dictionary(uniqueKeysWithValues: models.map { model in
+        let text = presentation()
+        return Dictionary(uniqueKeysWithValues: models.map { model in
             let status: ModelInventoryStatus
             guard let descriptor = modelAssetStore.descriptor(id: model.id) else {
-                status = .error(message: "Missing asset descriptor")
+                status = .error(message: text.modelDescriptorMissing)
                 return (model.id, status)
             }
             switch modelAssetStore.state(for: descriptor) {
             case .available:
                 status = .checking
             default:
-                status = Self.status(from: modelAssetStore.state(for: descriptor))
+                status = Self.status(from: modelAssetStore.state(for: descriptor), presentation: text)
             }
             return (model.id, status)
         })
     }
 
     func refreshStatuses(for models: [TTSModel]) async -> [String: ModelInventoryStatus] {
-        Dictionary(uniqueKeysWithValues: models.map { model in
+        let text = presentation()
+        return Dictionary(uniqueKeysWithValues: models.map { model in
             let status: ModelInventoryStatus
             guard let descriptor = modelAssetStore.descriptor(id: model.id) else {
-                status = .error(message: "Missing asset descriptor")
+                status = .error(message: text.modelDescriptorMissing)
                 return (model.id, status)
             }
-            status = Self.status(from: modelAssetStore.state(for: descriptor))
+            status = Self.status(from: modelAssetStore.state(for: descriptor), presentation: text)
             if case .installed(let sizeBytes) = status {
                 let stale = staleCatalogPaths(for: model)
                 if !stale.isEmpty {
@@ -102,17 +111,23 @@ final class LocalModelStatusProvider: ModelStatusProviding {
         return false
     }
 
-    static func status(from assetState: ModelAssetState) -> ModelInventoryStatus {
+    /// Maps the asset state to the inventory status; computed messages come
+    /// from `presentation`, so they follow the interface language and its
+    /// plural rules (A9-04).
+    static func status(
+        from assetState: ModelAssetState,
+        presentation: VocelloPresentationText
+    ) -> ModelInventoryStatus {
         switch assetState {
         case .notInstalled:
             return .notInstalled
         case .available(let integrity):
             return .installed(sizeBytes: Int(clamping: integrity.sizeBytes))
         case .incomplete(let integrity):
-            let missingCount = integrity.missingRelativePaths.count
-            let noun = missingCount == 1 ? "file" : "files"
             return .incomplete(
-                message: "Installation incomplete: missing \(missingCount) required \(noun).",
+                message: presentation.modelInstallationIncomplete(
+                    missingFileCount: integrity.missingRelativePaths.count
+                ),
                 sizeBytes: Int(clamping: integrity.sizeBytes)
             )
         case .downloading:

@@ -624,6 +624,14 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.error.engine_not_ready",
                 defaultValue: "The voice engine is still starting. Try again in a moment.",
                 comment: "Error when generation was requested before the voice engine finished starting.")
+        case .engineBusy:
+            return localization.string(localized: "vocello.error.engine_busy",
+                defaultValue: "The voice engine is busy with another take or freeing memory. Wait for it to finish, then try again.",
+                comment: "Error when a take was requested while another take was generating or the app was freeing memory. Nothing was lost; retrying once the engine is idle succeeds.")
+        case .engineReleasingMemory:
+            return localization.string(localized: "vocello.error.engine_releasing_memory",
+                defaultValue: "The voice engine started freeing memory before this take could begin. Wait a moment, then try again.",
+                comment: "Error when the app began freeing memory just as a take was about to start, so the take was not started. Nothing was lost; retrying shortly succeeds.")
         case .savedVoiceStoreBusy:
             return savedVoicesStoreBusy
         case .modelUnavailable:
@@ -704,6 +712,23 @@ struct VocelloPresentationText: Sendable {
     var announceGenerationStopped: String {
         localization.string(localized: "vocello.presentation.announceGenerationStopped", defaultValue: "Generation stopped.",
                comment: "VoiceOver announcement when Studio generation was stopped.")
+    }
+
+    /// iPhone model inventory status for an installed model whose required
+    /// files are missing (A9-04).
+    func modelInstallationIncomplete(missingFileCount count: Int) -> String {
+        let format = localization.string(localized: "vocello.models.installation_incomplete",
+            defaultValue: "Installation incomplete: missing %lld required files.",
+            comment: "Status under an iPhone voice model whose installed folder lacks required files; the count is how many files are missing. Repairing the model downloads them again."
+        )
+        return localization.format(format, count)
+    }
+
+    /// iPhone model inventory status when a listed model has no asset
+    /// descriptor (A9-04; also the installer's copy).
+    var modelDescriptorMissing: String {
+        localization.string(localized: "vocello.ui.missingDescriptor", defaultValue: "Missing model descriptor.",
+               comment: "iOS interface: Missing model descriptor.. Presentation only.")
     }
 
     /// Representative plural contract. Product surfaces can adopt the same

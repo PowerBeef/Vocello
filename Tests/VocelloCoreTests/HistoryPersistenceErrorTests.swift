@@ -6,6 +6,28 @@ import Synchronization
 import XCTest
 
 final class HistoryPersistenceErrorTests: XCTestCase {
+    /// A2-03: the storage guidance reaches the interface language; the
+    /// English description stays for logs and the CLI.
+    func testInterfaceMessageFollowsTheInterfaceLanguage() {
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloLocalization(bundle: bundle, language: "en")
+        let french = VocelloLocalization(bundle: bundle, language: "fr")
+        let failures: [HistoryPersistenceFailure] = [
+            .unavailable, .corrupt, .locked, .permissionDenied, .storageFull, .migrationFailed,
+        ]
+        for failure in failures {
+            let error = HistoryPersistenceError(operation: .read, failure: failure)
+            XCTAssertEqual(error.interfaceMessage(english), error.errorDescription, failure.rawValue)
+            XCTAssertNotEqual(error.interfaceMessage(french), error.errorDescription, failure.rawValue)
+            XCTAssertEqual(
+                HistoryPersistenceError.interfaceMessage(for: error, localization: french),
+                error.interfaceMessage(french)
+            )
+        }
+        let untyped = NSError(domain: "Fixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Host copy"])
+        XCTAssertEqual(HistoryPersistenceError.interfaceMessage(for: untyped, localization: french), "Host copy")
+    }
+
     func testClassifiesStorageAndPermissionFailuresWithoutLeakingSourceText() {
         let full = HistoryPersistenceError.classify(
             NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC)),

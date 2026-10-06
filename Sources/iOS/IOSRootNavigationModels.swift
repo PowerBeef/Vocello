@@ -457,9 +457,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.promptLabel", defaultValue: "Prompt",
                comment: "iOS interface: Prompt. Presentation only.")
     }
+    /// Bound once in `VocelloPresentationText`, which the iPhone model
+    /// inventory also reads (A9-04).
     static var missingDescriptor: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.missingDescriptor", defaultValue: "Missing model descriptor.",
-               comment: "iOS interface: Missing model descriptor.. Presentation only.")
+        IOSAppLanguage.shared.presentation.modelDescriptorMissing
     }
     static var modelUnavailable: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.modelUnavailable", defaultValue: "This model is not available on iPhone yet, and the local files are incomplete.",

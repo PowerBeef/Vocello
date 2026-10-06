@@ -147,25 +147,42 @@ final class ModelInventoryManagerTests: XCTestCase {
             )
         }
 
-        XCTAssertEqual(LocalModelStatusProvider.status(from: .notInstalled), .notInstalled)
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))
+        func status(_ state: ModelAssetState) -> ModelInventoryStatus {
+            LocalModelStatusProvider.status(from: state, presentation: english)
+        }
+
+        XCTAssertEqual(status(.notInstalled), .notInstalled)
         XCTAssertEqual(
-            LocalModelStatusProvider.status(from: .available(integrity(missing: [], size: 1_234))),
+            status(.available(integrity(missing: [], size: 1_234))),
             .installed(sizeBytes: 1_234)
         )
         XCTAssertEqual(
-            LocalModelStatusProvider.status(from: .incomplete(integrity(missing: ["a", "b"], size: 99))),
+            status(.incomplete(integrity(missing: ["a", "b"], size: 99))),
             .incomplete(message: "Installation incomplete: missing 2 required files.", sizeBytes: 99)
         )
         XCTAssertEqual(
-            LocalModelStatusProvider.status(from: .incomplete(integrity(missing: ["a"], size: 9))),
+            status(.incomplete(integrity(missing: ["a"], size: 9))),
             .incomplete(message: "Installation incomplete: missing 1 required file.", sizeBytes: 9)
         )
         XCTAssertEqual(
-            LocalModelStatusProvider.status(from: .downloading(downloadedBytes: 1, totalBytes: 2)),
+            status(.downloading(downloadedBytes: 1, totalBytes: 2)),
             .checking
         )
-        XCTAssertEqual(LocalModelStatusProvider.status(from: .deleting), .checking)
-        XCTAssertEqual(LocalModelStatusProvider.status(from: .failed(message: "disk")), .error(message: "disk"))
+        XCTAssertEqual(status(.deleting), .checking)
+        XCTAssertEqual(status(.failed(message: "disk")), .error(message: "disk"))
+
+        // A9-04: the computed status follows the interface language and its plural rules.
+        let french = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "fr"))
+        XCTAssertEqual(
+            LocalModelStatusProvider.status(from: .incomplete(integrity(missing: ["a"], size: 9)), presentation: french),
+            .incomplete(message: "Installation incomplète : 1 fichier requis manquant.", sizeBytes: 9)
+        )
+        XCTAssertEqual(
+            LocalModelStatusProvider.status(from: .incomplete(integrity(missing: ["a", "b"], size: 9)), presentation: french),
+            .incomplete(message: "Installation incomplète : 2 fichiers requis manquants.", sizeBytes: 9)
+        )
     }
 
     func testLocalProviderInventoriesARealModelDirectory() async throws {

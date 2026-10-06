@@ -366,18 +366,14 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         // ownership, memory admission, cold-unload or event subscription work.
         try backend.admitVoiceCloning(for: request)
         guard generationOwnership.admitsGeneration(hasActiveGeneration: hasActiveGeneration) else {
-            throw MLXTTSEngineError.generationFailed(
-                "The engine is already generating audio or releasing memory. Wait for it to finish before starting another generation."
-            )
+            throw MLXTTSEngineError.generationAdmissionRefused(.engineBusy)
         }
         try await guardModelAdmission(shouldSurfaceError: true, reason: "generation_admission")
         // Admission captures live memory asynchronously. Revalidate ownership
         // because a critical-pressure action may have claimed the runtime while
         // that snapshot was in flight.
         guard generationOwnership.admitsGeneration(hasActiveGeneration: hasActiveGeneration) else {
-            throw MLXTTSEngineError.generationFailed(
-                "The engine began releasing memory before generation could start. Wait for it to finish and try again."
-            )
+            throw MLXTTSEngineError.generationAdmissionRefused(.releasingMemory)
         }
         generationOwnership.enterGeneration()
         hasActiveGeneration = generationOwnership.ownsGenerationScope

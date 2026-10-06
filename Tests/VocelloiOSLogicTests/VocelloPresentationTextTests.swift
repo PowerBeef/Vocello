@@ -77,6 +77,15 @@ final class VocelloPresentationTextTests: XCTestCase {
         )
         // An untyped error keeps its own description: host copy is already localized.
         XCTAssertEqual(text.generationFailureMessage(TTSEngineError.unsupportedRequest("Host copy")), "Host copy")
+        // A9-01: the store's admission refusals present catalog copy, not the engine's English.
+        XCTAssertEqual(
+            text.generationFailureMessage(TTSEngineError.generationAdmissionRefused(.engineBusy)),
+            text.generationFailureMessage(.engineBusy)
+        )
+        XCTAssertEqual(
+            text.generationFailureMessage(TTSEngineError.generationAdmissionRefused(.releasingMemory)),
+            text.generationFailureMessage(.engineReleasingMemory)
+        )
     }
 
     /// PA-20 (IOS-12): one short VoiceOver sentence per generation state change.

@@ -1,10 +1,10 @@
 import Foundation
 
-/// The Voice Cloning readiness line on the desktop: the same decision order as
-/// the shared `VoiceCloningReadiness` (whose copy is English only), read from
-/// the catalog through `MacInterfaceText` so French follows the interface
-/// language. It returns the shared descriptor. One deliberate difference: the
-/// script check trims whitespace before deciding "Add a script".
+/// The Voice Cloning readiness line on the desktop, read from the catalog
+/// through `MacInterfaceText` so the copy follows the interface language. It
+/// returns the shared `VoiceCloningReadinessDescriptor`; the English-only
+/// shared twin was removed as dead code (A9-03). The script check trims
+/// whitespace before deciding "Add a script".
 enum MacVoiceCloningReadiness {
     static func describe(
         engineReady: Bool,

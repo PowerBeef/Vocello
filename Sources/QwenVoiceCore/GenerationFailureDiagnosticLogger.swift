@@ -199,6 +199,10 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: "memory.insufficient", classification: .memory)
             case .savedVoiceStoreBusy:
                 return ErrorMetadata(code: "saved_voices.store_busy", classification: .storage)
+            case .generationAdmissionRefused(.engineBusy):
+                return ErrorMetadata(code: "engine.busy", classification: .runtime)
+            case .generationAdmissionRefused(.releasingMemory):
+                return ErrorMetadata(code: "engine.releasing_memory", classification: .runtime)
             }
         }
 
@@ -400,6 +404,8 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     case audioQualityRejected = "audio.quality_rejected"
     case insufficientMemory = "memory.insufficient"
     case engineNotReady = "engine.not_initialized"
+    case engineBusy = "engine.busy"
+    case engineReleasingMemory = "engine.releasing_memory"
     case savedVoiceStoreBusy = "saved_voices.store_busy"
     case modelUnavailable = "model.unavailable"
     case referenceAudioMissing = "audio.input_missing"
@@ -487,6 +493,8 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
         switch code {
         case "memory.insufficient": self = .insufficientMemory
         case "engine.not_initialized": self = .engineNotReady
+        case "engine.busy": self = .engineBusy
+        case "engine.releasing_memory": self = .engineReleasingMemory
         case "saved_voices.store_busy": self = .savedVoiceStoreBusy
         case "model.unavailable", "model.unknown": self = .modelUnavailable
         case "audio.input_missing": self = .referenceAudioMissing

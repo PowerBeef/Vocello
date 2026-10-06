@@ -71376,6 +71376,738 @@
           }
         }
       }
+    },
+    "vocello.history.storage_locked": {
+      "comment": "History storage error: the History database is briefly in use by another Vocello operation. Nothing changed; retrying shortly succeeds.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History is temporarily busy. Your existing history was not changed. Wait for other Vocello operations to finish, then retry."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique des générations est temporairement occupé. Votre historique n’a pas été modifié. Attendez la fin des autres opérations de Vocello, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El historial de generaciones está ocupado temporalmente. Tu historial no se modificó. Espera a que terminen otras operaciones de Vocello y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf ist vorübergehend belegt. Dein Verlauf wurde nicht geändert. Warte, bis andere Vorgänge in Vocello abgeschlossen sind, und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cronologia delle generazioni è temporaneamente occupata. La cronologia esistente non è stata modificata. Attendi che le altre operazioni di Vocello finiscano, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O histórico de gerações está temporariamente ocupado. Seu histórico não foi alterado. Aguarde a conclusão de outras operações do Vocello e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成历史记录暂时繁忙。现有历史记录未被更改。请等待其他 Vocello 操作完成后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成履歴は一時的に使用中です。既存の履歴は変更されていません。ほかの Vocello の処理が終わるのを待ってから、再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 기록이 일시적으로 사용 중입니다. 기존 기록은 변경되지 않았습니다. 다른 Vocello 작업이 끝날 때까지 기다린 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "История генераций временно занята. Существующая история не изменена. Дождитесь завершения других операций Vocello и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.history.storage_full": {
+      "comment": "History storage error: the disk is full, so History could not be updated. Nothing changed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History couldn't be updated because storage is full. Free some space, then retry. Your existing history was not changed."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de mettre à jour l’historique des générations, car le stockage est plein. Libérez de l’espace, puis réessayez. Votre historique n’a pas été modifié."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo actualizar el historial de generaciones porque el almacenamiento está lleno. Libera espacio y vuelve a intentarlo. Tu historial no se modificó."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf konnte nicht aktualisiert werden, weil der Speicher voll ist. Gib Speicherplatz frei und versuche es dann erneut. Dein Verlauf wurde nicht geändert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare la cronologia delle generazioni perché lo spazio di archiviazione è pieno. Libera spazio, poi riprova. La cronologia esistente non è stata modificata."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível atualizar o histórico de gerações porque o armazenamento está cheio. Libere espaço e tente novamente. Seu histórico não foi alterado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存储空间已满，无法更新生成历史记录。请释放一些空间后重试。现有历史记录未被更改。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ストレージがいっぱいのため、生成履歴を更新できませんでした。空き容量を増やしてから、再試行してください。既存の履歴は変更されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장 공간이 가득 차 생성 기록을 업데이트할 수 없습니다. 공간을 확보한 후 다시 시도하세요. 기존 기록은 변경되지 않았습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось обновить историю генераций: хранилище заполнено. Освободите место и повторите попытку. Существующая история не изменена."
+          }
+        }
+      }
+    },
+    "vocello.error.engine_releasing_memory": {
+      "comment": "Error when the app began freeing memory just as a take was about to start, so the take was not started. Nothing was lost; retrying shortly succeeds.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The voice engine started freeing memory before this take could begin. Wait a moment, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal a commencé à libérer de la mémoire avant le début de cette prise. Patientez un instant, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz empezó a liberar memoria antes de que pudiera comenzar esta toma. Espera un momento y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine hat begonnen, Speicher freizugeben, bevor diese Aufnahme starten konnte. Warte einen Moment und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale ha iniziato a liberare memoria prima che questo take potesse partire. Attendi un momento, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz começou a liberar memória antes que esta tomada pudesse começar. Aguarde um momento e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音引擎在此音频开始前已开始释放内存。请稍候片刻后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このテイクが始まる前に、音声エンジンがメモリの解放を始めました。しばらく待ってから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 테이크가 시작되기 전에 음성 엔진이 메모리 확보를 시작했습니다. 잠시 기다린 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Голосовой движок начал освобождать память до начала этого дубля. Подождите немного и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.models.installation_incomplete": {
+      "comment": "Status under an iPhone voice model whose installed folder lacks required files; the count is how many files are missing. Repairing the model downloads them again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation incomplete: missing %lld required file."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation incomplete: missing %lld required files."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation incomplète : %lld fichier requis manquant."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation incomplète : %lld fichiers requis manquants."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation incomplète : %lld fichiers requis manquants."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalación incompleta: falta %lld archivo necesario."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalación incompleta: faltan %lld archivos necesarios."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalación incompleta: faltan %lld archivos necesarios."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation unvollständig: %lld erforderliche Datei fehlt."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installation unvollständig: %lld erforderliche Dateien fehlen."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installazione incompleta: manca %lld file necessario."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installazione incompleta: mancano %lld file necessari."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Installazione incompleta: mancano %lld file necessari."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalação incompleta: falta %lld arquivo necessário."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalação incompleta: faltam %lld arquivos necessários."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Instalação incompleta: faltam %lld arquivos necessários."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "安装不完整：缺少 %lld 个必需文件。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "インストールが不完全です：必要なファイルが %lld 個ありません。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "설치가 완료되지 않았습니다: 필요한 파일 %lld개가 없습니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Установка не завершена: отсутствует %lld обязательный файл."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Установка не завершена: отсутствуют %lld обязательных файла."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Установка не завершена: отсутствуют %lld обязательных файлов."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Установка не завершена: отсутствуют %lld обязательного файла."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.error.engine_busy": {
+      "comment": "Error when a take was requested while another take was generating or the app was freeing memory. Nothing was lost; retrying once the engine is idle succeeds.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The voice engine is busy with another take or freeing memory. Wait for it to finish, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal est occupé par une autre prise ou libère de la mémoire. Attendez qu’il ait terminé, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz está ocupado con otra toma o liberando memoria. Espera a que termine y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine ist mit einer anderen Aufnahme beschäftigt oder gibt Speicher frei. Warte, bis sie fertig ist, und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale è occupato con un altro take o sta liberando memoria. Attendi che finisca, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz está ocupado com outra tomada ou liberando memória. Aguarde a conclusão e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音引擎正在处理另一条音频或释放内存。请等待完成后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声エンジンは別のテイクを処理中か、メモリを解放しています。完了するまで待ってから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성 엔진이 다른 테이크를 처리하거나 메모리를 확보하는 중입니다. 완료될 때까지 기다린 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Голосовой движок занят другим дублем или освобождает память. Дождитесь завершения и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.history.storage_migration_failed": {
+      "comment": "History storage error: upgrading the History database to the new app version failed; the old database is kept unchanged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History couldn't be upgraded safely. The existing database was preserved. Retry before changing or deleting history."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de mettre à niveau l’historique des générations en toute sécurité. La base de données existante a été conservée. Réessayez avant de modifier ou de supprimer l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo actualizar el historial de generaciones de forma segura. Se conservó la base de datos existente. Vuelve a intentarlo antes de modificar o eliminar el historial."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf konnte nicht sicher aktualisiert werden. Die vorhandene Datenbank wurde beibehalten. Versuche es erneut, bevor du den Verlauf änderst oder löschst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare in sicurezza la cronologia delle generazioni. Il database esistente è stato conservato. Riprova prima di modificare o eliminare la cronologia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível atualizar o histórico de gerações com segurança. O banco de dados existente foi preservado. Tente novamente antes de alterar ou apagar o histórico."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安全升级生成历史记录。现有数据库已保留。请先重试，再更改或删除历史记录。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成履歴を安全にアップグレードできませんでした。既存のデータベースは保持されています。履歴を変更または削除する前に、再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 기록을 안전하게 업그레이드할 수 없습니다. 기존 데이터베이스는 보존되었습니다. 기록을 변경하거나 삭제하기 전에 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось безопасно обновить историю генераций. Существующая база данных сохранена. Повторите попытку, прежде чем изменять или удалять историю."
+          }
+        }
+      }
+    },
+    "vocello.history.storage_unavailable": {
+      "comment": "History storage error with no more specific cause. The existing History database is kept unchanged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History is unavailable. The existing database was preserved. Retry before changing or deleting history."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique des générations est indisponible. La base de données existante a été conservée. Réessayez avant de modifier ou de supprimer l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El historial de generaciones no está disponible. Se conservó la base de datos existente. Vuelve a intentarlo antes de modificar o eliminar el historial."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf ist nicht verfügbar. Die vorhandene Datenbank wurde beibehalten. Versuche es erneut, bevor du den Verlauf änderst oder löschst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cronologia delle generazioni non è disponibile. Il database esistente è stato conservato. Riprova prima di modificare o eliminare la cronologia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O histórico de gerações não está disponível. O banco de dados existente foi preservado. Tente novamente antes de alterar ou apagar o histórico."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成历史记录不可用。现有数据库已保留。请先重试，再更改或删除历史记录。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成履歴を利用できません。既存のデータベースは保持されています。履歴を変更または削除する前に、再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 기록을 사용할 수 없습니다. 기존 데이터베이스는 보존되었습니다. 기록을 변경하거나 삭제하기 전에 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "История генераций недоступна. Существующая база данных сохранена. Повторите попытку, прежде чем изменять или удалять историю."
+          }
+        }
+      }
+    },
+    "vocello.history.storage_permission_denied": {
+      "comment": "History storage error: the app lacks permission to open the History database. Nothing changed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History is unavailable because Vocello can't access its database. Your existing history was not changed. Check storage permissions, then retry."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique des générations est indisponible, car Vocello ne peut pas accéder à sa base de données. Votre historique n’a pas été modifié. Vérifiez les autorisations de stockage, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El historial de generaciones no está disponible porque Vocello no puede acceder a su base de datos. Tu historial no se modificó. Revisa los permisos de almacenamiento y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf ist nicht verfügbar, weil Vocello nicht auf seine Datenbank zugreifen kann. Dein Verlauf wurde nicht geändert. Prüfe die Speicherberechtigungen und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cronologia delle generazioni non è disponibile perché Vocello non può accedere al suo database. La cronologia esistente non è stata modificata. Controlla i permessi di archiviazione, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O histórico de gerações não está disponível porque o Vocello não consegue acessar o banco de dados. Seu histórico não foi alterado. Verifique as permissões de armazenamento e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成历史记录不可用，因为 Vocello 无法访问其数据库。现有历史记录未被更改。请检查存储权限后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello がデータベースにアクセスできないため、生成履歴を利用できません。既存の履歴は変更されていません。ストレージのアクセス権を確認してから、再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 데이터베이스에 접근할 수 없어 생성 기록을 사용할 수 없습니다. 기존 기록은 변경되지 않았습니다. 저장 공간 권한을 확인한 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "История генераций недоступна: Vocello не может открыть её базу данных. Существующая история не изменена. Проверьте разрешения на доступ к хранилищу и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.history.storage_corrupt": {
+      "comment": "History storage error: the History database looks damaged. Nothing was deleted; the user retries, then recovers or exports before changing anything.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation History couldn't be read because its database appears damaged. Your existing files were not deleted. Retry, then use recovery or export tools before making changes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire l’historique des générations, car sa base de données semble endommagée. Vos fichiers existants n’ont pas été supprimés. Réessayez, puis utilisez les outils de récupération ou d’exportation avant toute modification."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer el historial de generaciones porque su base de datos parece dañada. Tus archivos no se eliminaron. Vuelve a intentarlo y luego usa las herramientas de recuperación o exportación antes de hacer cambios."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungsverlauf konnte nicht gelesen werden, weil seine Datenbank beschädigt zu sein scheint. Deine vorhandenen Dateien wurden nicht gelöscht. Versuche es erneut und nutze dann die Wiederherstellungs- oder Exportwerkzeuge, bevor du Änderungen vornimmst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile leggere la cronologia delle generazioni perché il suo database sembra danneggiato. I file esistenti non sono stati eliminati. Riprova, poi usa gli strumenti di recupero o esportazione prima di apportare modifiche."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível ler o histórico de gerações porque o banco de dados parece danificado. Seus arquivos não foram apagados. Tente novamente e use as ferramentas de recuperação ou exportação antes de fazer alterações."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取生成历史记录，其数据库似乎已损坏。现有文件未被删除。请重试，然后在进行更改前使用恢复或导出工具。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データベースが破損しているようなため、生成履歴を読み込めませんでした。既存のファイルは削除されていません。再試行してから、変更する前に復元またはエクスポートのツールを使用してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데이터베이스가 손상된 것으로 보여 생성 기록을 읽을 수 없습니다. 기존 파일은 삭제되지 않았습니다. 다시 시도한 후, 변경하기 전에 복구 또는 내보내기 도구를 사용하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось прочитать историю генераций: похоже, её база данных повреждена. Существующие файлы не удалены. Повторите попытку, а затем воспользуйтесь восстановлением или экспортом, прежде чем что-либо менять."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

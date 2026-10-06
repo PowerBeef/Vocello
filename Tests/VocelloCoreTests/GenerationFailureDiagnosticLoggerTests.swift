@@ -242,6 +242,21 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         )
     }
 
+    /// A9-01: the store's admission refusals carry typed codes and reasons, so
+    /// the apps present catalog copy instead of the English CLI text.
+    func testAdmissionRefusalsResolveToTypedCodesAndReasons() {
+        typealias Reason = GenerationFailurePresentationReason
+        let busy = TTSEngineError.generationAdmissionRefused(.engineBusy)
+        let releasing = TTSEngineError.generationAdmissionRefused(.releasingMemory)
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: busy).code, "engine.busy")
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: releasing).code, "engine.releasing_memory")
+        XCTAssertEqual(Reason(busy), .engineBusy)
+        XCTAssertEqual(Reason(releasing), .engineReleasingMemory)
+        // The CLI and diagnostics keep the English description.
+        XCTAssertEqual(busy.errorDescription, GenerationAdmissionRefusal.engineBusy.message)
+        XCTAssertEqual(releasing.errorDescription, GenerationAdmissionRefusal.releasingMemory.message)
+    }
+
     func testPresentationReasonSelectsTheAudioQualityRejectionFromItsFlags() {
         typealias Reason = GenerationFailurePresentationReason
         let cases: [([String], Reason)] = [

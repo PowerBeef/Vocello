@@ -42,6 +42,44 @@ struct HistoryPersistenceError: LocalizedError, Equatable, Sendable {
         }
     }
 
+    /// The same guidance in the interface language (A2-03). `errorDescription`
+    /// stays English for logs and the CLI; every surface that shows a History
+    /// storage failure to a person reads this instead.
+    func interfaceMessage(_ localization: VocelloLocalization) -> String {
+        switch failure {
+        case .corrupt:
+            return localization.string(localized: "vocello.history.storage_corrupt",
+                defaultValue: "Generation History couldn't be read because its database appears damaged. Your existing files were not deleted. Retry, then use recovery or export tools before making changes.",
+                comment: "History storage error: the History database looks damaged. Nothing was deleted; the user retries, then recovers or exports before changing anything.")
+        case .locked:
+            return localization.string(localized: "vocello.history.storage_locked",
+                defaultValue: "Generation History is temporarily busy. Your existing history was not changed. Wait for other Vocello operations to finish, then retry.",
+                comment: "History storage error: the History database is briefly in use by another Vocello operation. Nothing changed; retrying shortly succeeds.")
+        case .permissionDenied:
+            return localization.string(localized: "vocello.history.storage_permission_denied",
+                defaultValue: "Generation History is unavailable because Vocello can't access its database. Your existing history was not changed. Check storage permissions, then retry.",
+                comment: "History storage error: the app lacks permission to open the History database. Nothing changed.")
+        case .storageFull:
+            return localization.string(localized: "vocello.history.storage_full",
+                defaultValue: "Generation History couldn't be updated because storage is full. Free some space, then retry. Your existing history was not changed.",
+                comment: "History storage error: the disk is full, so History could not be updated. Nothing changed.")
+        case .migrationFailed:
+            return localization.string(localized: "vocello.history.storage_migration_failed",
+                defaultValue: "Generation History couldn't be upgraded safely. The existing database was preserved. Retry before changing or deleting history.",
+                comment: "History storage error: upgrading the History database to the new app version failed; the old database is kept unchanged.")
+        case .unavailable:
+            return localization.string(localized: "vocello.history.storage_unavailable",
+                defaultValue: "Generation History is unavailable. The existing database was preserved. Retry before changing or deleting history.",
+                comment: "History storage error with no more specific cause. The existing History database is kept unchanged.")
+        }
+    }
+
+    /// Interface copy for any History failure: the typed storage guidance in
+    /// the interface language, otherwise the error's own description.
+    static func interfaceMessage(for error: Error, localization: VocelloLocalization) -> String {
+        (error as? HistoryPersistenceError)?.interfaceMessage(localization) ?? error.localizedDescription
+    }
+
     func replacingOperation(_ operation: HistoryPersistenceOperation) -> HistoryPersistenceError {
         HistoryPersistenceError(operation: operation, failure: failure)
     }

@@ -21,6 +21,10 @@ public enum TTSEngineError: LocalizedError, Equatable {
     /// root) holds the Saved Voice store's cross-process lock. Retryable;
     /// interface copy comes from `VocelloPresentationText`.
     case savedVoiceStoreBusy
+    /// The host store refused to start a generation while the engine was busy
+    /// (A9-01). Typed so the apps present it in the interface language; the
+    /// description keeps the English text for the CLI and diagnostics.
+    case generationAdmissionRefused(GenerationAdmissionRefusal)
 
     public var errorDescription: String? {
         switch self {
@@ -28,6 +32,8 @@ public enum TTSEngineError: LocalizedError, Equatable {
             return "The native MLX engine has not been initialized yet."
         case .savedVoiceStoreBusy:
             return PreparedVoiceRepositoryError.storeBusy.errorDescription
+        case .generationAdmissionRefused(let refusal):
+            return refusal.message
         case .unknownModel(let modelID):
             return "The native MLX engine could not find model '\(modelID)'."
         case .modelUnavailable(let message),
@@ -35,6 +41,26 @@ public enum TTSEngineError: LocalizedError, Equatable {
              .generationFailed(let message),
              .insufficientMemory(let message):
             return message
+        }
+    }
+}
+
+/// Why the host store refused to admit a generation (A9-01). Retryable once
+/// the engine is idle again; nothing was started or lost.
+public enum GenerationAdmissionRefusal: String, Equatable, Sendable {
+    /// Another generation or a memory-relief action already owns the engine.
+    case engineBusy = "engine_busy"
+    /// A critical memory-relief action claimed the engine while admission
+    /// was still sampling memory.
+    case releasingMemory = "releasing_memory"
+
+    /// English text for the CLI and diagnostics; the apps present catalog copy.
+    public var message: String {
+        switch self {
+        case .engineBusy:
+            return "The engine is already generating audio or releasing memory. Wait for it to finish before starting another generation."
+        case .releasingMemory:
+            return "The engine began releasing memory before generation could start. Wait for it to finish and try again."
         }
     }
 }

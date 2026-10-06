@@ -19,6 +19,11 @@ enum MacInterfaceText {
     static func generationFailureMessage(_ error: Error) -> String {
         presentation.generationFailureMessage(error)
     }
+    /// A History storage failure in the interface language (A2-03); see
+    /// `HistoryPersistenceError.interfaceMessage(for:localization:)`.
+    static func historyFailureMessage(_ error: Error) -> String {
+        HistoryPersistenceError.interfaceMessage(for: error, localization: localization)
+    }
     static func studioModeTitle(_ mode: GenerationMode) -> String {
         let text = VocelloPresentationText(localization: localization)
         return switch mode {

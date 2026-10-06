@@ -496,7 +496,7 @@ class ConfirmTests(unittest.TestCase):
     def token(self, take_id):
         return self.takes[take_id][0]["token"]
 
-    def test_next_sends_flagged_takes_blind_never_clones_controls_or_answered_takes(self):
+    def test_next_sends_flagged_takes_blind_never_clones_controls_or_takes_sent_before(self):
         # fr-0007 was answered in an earlier confirm batch.
         earlier = confirm.next_batch(self.layout, "pool-1", n=1, languages=["french"], name="earlier")
         self.assertEqual([item["takeToken"] for item in label.load_batch(self.layout, "earlier")["items"]],
@@ -529,10 +529,11 @@ class ConfirmTests(unittest.TestCase):
             self.assertNotIn(hidden, lines)
         self.assertIn(str(folder / "1.wav"), lines)
         self.assertIn("english: Texte numéro 0005.", lines)
-        # With more room, the other languages follow; clones and controls never.
+        # With more room, the other languages follow; clones and controls never, nor a take confirm-001
+        # sent and nobody answered yet (it stays answerable there).
         more = confirm.next_batch(self.layout, "pool-1", n=10)
-        self.assertEqual([item["takeToken"] for item in label.load_batch(self.layout, more["batch"])["items"]][-1],
-                         self.token("zh-0009--i"))
+        self.assertEqual([item["takeToken"] for item in label.load_batch(self.layout, more["batch"])["items"]],
+                         [self.token("zh-0009--i")])
         self.assertEqual(more["batch"], "confirm-002")
         with self.assertRaisesRegex(FileExistsError, "exists"):
             confirm.next_batch(self.layout, "pool-1", name="confirm-002")

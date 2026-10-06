@@ -3,7 +3,8 @@
 `qc.py confirm next --run <generated run>` picks up to `--n` (5) takes the run flagged, with any
 detector that has a class (the advisory loudness flag alone never sends a take). It leaves out
 human controls, every clone take (mode `clone`, or a take with a reference clip: corpus-voice
-clones are internal-only and are never sent) and every take already answered in a confirm batch.
+clones are internal-only and are never sent) and every take an earlier confirm batch sent, answered
+or not (an unanswered take stays answerable in its own batch).
 It prefers `--languages` (French and English) and spreads over detectors: round-robin by
 detector, the highest score first; `--mix-agreement` takes half the batch from takes two or more
 detectors flagged and half from lone flags, in a shuffled order. It writes a `kind: "confirm"` label batch
@@ -54,17 +55,16 @@ def is_clone(take: dict[str, Any]) -> bool:
     return take.get("mode") == "clone" or bool(take.get("reference"))
 
 
-def confirmed_takes(layout: Layout) -> set[str]:
-    """The takes any rater has answered in a confirm batch."""
+def sent_takes(layout: Layout) -> set[str]:
+    """The takes any confirm batch has sent, answered or not: an unanswered take stays answerable in
+    its own batch, so it is never sent twice."""
 
-    answered: set[str] = set()
+    sent: set[str] = set()
     for name in label.batch_names(layout):
         batch = label.load_batch(layout, name)
-        if batch.get("kind") != CONFIRM_KIND:
-            continue
-        tokens = {row.get("token") for row in store.read_jsonl(label.labels_path(layout, name)) if isinstance(row, dict)}
-        answered.update(item["takeToken"] for item in batch["items"] if item["token"] in tokens)
-    return answered
+        if batch.get("kind") == CONFIRM_KIND:
+            sent.update(item["takeToken"] for item in batch["items"])
+    return sent
 
 
 def _default_name(layout: Layout) -> str:
@@ -152,23 +152,23 @@ def next_batch(layout: Layout, run_id: str, *, n: int = DEFAULT_N, languages: It
         raise ConfirmError(f"run {run_id} is a {CONTROLS_LANE} run: human recordings are never sent for confirmation")
     preferred = [store.normalize_language(language) for language in languages]
     takes = {take["token"]: take for take in store.read_json(directory / "takes.json").get("takes", [])}
-    answered = confirmed_takes(layout)
+    sent = sent_takes(layout)
     candidates = []
     for entry in flags.get("takes", []):
         take = takes.get(entry["token"])
-        if take is None or entry.get("control") or take.get("control") or is_clone(take) or entry["token"] in answered:
+        if take is None or entry.get("control") or take.get("control") or is_clone(take) or entry["token"] in sent:
             continue
         flagged = [flag for flag in entry.get("flags") or [] if flag.get("class")]
         if not flagged or not take.get("audio") or not Path(take["audio"]).is_file():
             continue
         candidates.append({"token": entry["token"], "language": take.get("language"), "flags": flagged, "take": take})
     name = name or _default_name(layout)
-    chosen = pick(candidates, n, preferred, mix_agreement=mix_agreement, seed=name)
-    if not chosen:
-        raise ConfirmError(f"run {run_id} flagged no take that can be sent (controls, clones and answered takes "
-                           "are never sent)")
     if label.batch_path(layout, name).exists():
         raise FileExistsError(f"batch {name} exists; choose another name")
+    chosen = pick(candidates, n, preferred, mix_agreement=mix_agreement, seed=name)
+    if not chosen:
+        raise ConfirmError(f"run {run_id} flagged no take that can be sent (controls, clones and takes already sent "
+                           "are never sent)")
     folder = confirm_directory(layout, name)
     folder.mkdir(parents=True, exist_ok=True)
     items, listing = [], []

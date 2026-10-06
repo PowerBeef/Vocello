@@ -1,33 +1,39 @@
 {
  "agreement": {
   "detectorsFlagging": {
+   "0": {
+    "lower": 0.1581,
+    "n": 2,
+    "rate": 1.0,
+    "upper": 1.0
+   },
    "1": {
-    "lower": 0.0909,
-    "n": 13,
-    "rate": 0.3077,
-    "upper": 0.6143
+    "lower": 0.0779,
+    "n": 15,
+    "rate": 0.2667,
+    "upper": 0.551
    },
    "2+": {
-    "lower": 0.137,
-    "n": 9,
-    "rate": 0.4444,
-    "upper": 0.788
+    "lower": 0.1675,
+    "n": 11,
+    "rate": 0.4545,
+    "upper": 0.7662
    }
   }
  },
- "commit": "7cd1884216966e73b63430f064458266a22090ab",
- "createdAt": "2026-10-06T04:09:37Z",
+ "commit": "c5e5a5d93a325ecbd9d1714f8e11909bacdae460",
+ "createdAt": "2026-10-06T04:47:39Z",
  "detectors": {
   "boundary.cutoff": {
    "class": "cutoff",
    "confirmations": {
     "failReady": false,
-    "flagged": 6,
+    "flagged": 7,
     "precision": {
-     "lower": 0.1466,
-     "n": 5,
-     "rate": 0.6,
-     "upper": 0.9473
+     "lower": 0.1181,
+     "n": 6,
+     "rate": 0.5,
+     "upper": 0.8819
     },
     "uncertain": 1
    },
@@ -112,12 +118,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 9,
+    "flagged": 11,
     "precision": {
-     "lower": 0.137,
-     "n": 9,
-     "rate": 0.4444,
-     "upper": 0.788
+     "lower": 0.1675,
+     "n": 11,
+     "rate": 0.4545,
+     "upper": 0.7662
     },
     "uncertain": 0
    },
@@ -202,12 +208,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 12,
+    "flagged": 15,
     "precision": {
-     "lower": 0.1871,
-     "n": 10,
-     "rate": 0.5,
-     "upper": 0.8129
+     "lower": 0.1922,
+     "n": 13,
+     "rate": 0.4615,
+     "upper": 0.7487
     },
     "uncertain": 2
    },
@@ -673,9 +679,10 @@
    "confirm-2",
    "confirm-3",
    "confirm-4",
-   "confirm-5"
+   "confirm-5",
+   "confirm-6"
   ],
-  "confirmations": 27,
+  "confirmations": 33,
   "controls": {
    "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
    "runs": [
@@ -683,9 +690,9 @@
    ],
    "takes": 1600
   },
-  "takes": 27
+  "takes": 33
  },
- "labelSetDigest": "8dbe6d703465d0fd572ad02a378b0b200a404c3aadd7f206cf8eb18b1863444d",
+ "labelSetDigest": "54eef58179e5951c6a918ae6e9928b4629dc356600e926056c0510b2908e20d2",
  "levels": {
   "failPrecisionLower": 0.8,
   "humanReference": {
@@ -703,8 +710,8 @@
  "norms": "norms-v1.json",
  "rater": "maintainer",
  "replaces": {
-  "createdAt": "2026-10-06T03:59:28Z",
-  "labelSetDigest": "e3fd3c0ff05dac1b93a950fc49cfbbd2e9c09635b740105442e212b54f934c34"
+  "createdAt": "2026-10-06T04:09:37Z",
+  "labelSetDigest": "8dbe6d703465d0fd572ad02a378b0b200a404c3aadd7f206cf8eb18b1863444d"
  },
  "schema": "vocello.qc.eval/2",
  "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",

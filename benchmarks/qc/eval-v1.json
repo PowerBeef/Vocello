@@ -2,32 +2,32 @@
  "agreement": {
   "detectorsFlagging": {
    "1": {
-    "lower": 0.0667,
-    "n": 10,
-    "rate": 0.3,
-    "upper": 0.6525
+    "lower": 0.0909,
+    "n": 13,
+    "rate": 0.3077,
+    "upper": 0.6143
    },
    "2+": {
-    "lower": 0.1841,
-    "n": 7,
-    "rate": 0.5714,
-    "upper": 0.901
+    "lower": 0.137,
+    "n": 9,
+    "rate": 0.4444,
+    "upper": 0.788
    }
   }
  },
- "commit": "5e616c06419b3f95bad0332b8caa878544347871",
- "createdAt": "2026-10-06T03:59:28Z",
+ "commit": "7cd1884216966e73b63430f064458266a22090ab",
+ "createdAt": "2026-10-06T04:09:37Z",
  "detectors": {
   "boundary.cutoff": {
    "class": "cutoff",
    "confirmations": {
     "failReady": false,
-    "flagged": 5,
+    "flagged": 6,
     "precision": {
-     "lower": 0.1941,
-     "n": 4,
-     "rate": 0.75,
-     "upper": 0.9937
+     "lower": 0.1466,
+     "n": 5,
+     "rate": 0.6,
+     "upper": 0.9473
     },
     "uncertain": 1
    },
@@ -112,12 +112,12 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 6,
+    "flagged": 9,
     "precision": {
-     "lower": 0.2228,
-     "n": 6,
-     "rate": 0.6667,
-     "upper": 0.9567
+     "lower": 0.137,
+     "n": 9,
+     "rate": 0.4444,
+     "upper": 0.788
     },
     "uncertain": 0
    },
@@ -202,14 +202,14 @@
    "class": "stutter",
    "confirmations": {
     "failReady": false,
-    "flagged": 9,
+    "flagged": 12,
     "precision": {
-     "lower": 0.157,
-     "n": 8,
+     "lower": 0.1871,
+     "n": 10,
      "rate": 0.5,
-     "upper": 0.843
+     "upper": 0.8129
     },
-    "uncertain": 1
+    "uncertain": 2
    },
    "languages": {
     "chinese": {
@@ -298,14 +298,14 @@
    "class": "wrong-language",
    "confirmations": {
     "failReady": false,
-    "flagged": 7,
+    "flagged": 9,
     "precision": {
-     "lower": 0.1466,
-     "n": 5,
-     "rate": 0.6,
-     "upper": 0.9473
+     "lower": 0.1181,
+     "n": 6,
+     "rate": 0.5,
+     "upper": 0.8819
     },
-    "uncertain": 2
+    "uncertain": 3
    },
    "languages": {
     "chinese": {
@@ -394,12 +394,12 @@
    "class": "pause",
    "confirmations": {
     "failReady": false,
-    "flagged": 4,
+    "flagged": 5,
     "precision": {
-     "lower": 0.0126,
-     "n": 2,
-     "rate": 0.5,
-     "upper": 0.9874
+     "lower": 0.0084,
+     "n": 3,
+     "rate": 0.3333,
+     "upper": 0.9057
     },
     "uncertain": 2
    },
@@ -490,12 +490,12 @@
    "class": "unnatural",
    "confirmations": {
     "failReady": false,
-    "flagged": 4,
+    "flagged": 5,
     "precision": {
-     "lower": 0.0943,
-     "n": 3,
-     "rate": 0.6667,
-     "upper": 0.9916
+     "lower": 0.0676,
+     "n": 4,
+     "rate": 0.5,
+     "upper": 0.9324
     },
     "uncertain": 1
    },
@@ -580,12 +580,12 @@
    "class": "artifact",
    "confirmations": {
     "failReady": false,
-    "flagged": 2,
+    "flagged": 3,
     "precision": {
      "lower": 0.0,
-     "n": 2,
+     "n": 3,
      "rate": 0.0,
-     "upper": 0.8419
+     "upper": 0.7076
     },
     "uncertain": 0
    },
@@ -672,9 +672,10 @@
    "confirm-1",
    "confirm-2",
    "confirm-3",
-   "confirm-4"
+   "confirm-4",
+   "confirm-5"
   ],
-  "confirmations": 21,
+  "confirmations": 27,
   "controls": {
    "digest": "f0a3fb29ae3f1b0e4164d9985629b362c5ef7b1fde3238b2aad5ba0981bbe320",
    "runs": [
@@ -682,9 +683,9 @@
    ],
    "takes": 1600
   },
-  "takes": 21
+  "takes": 27
  },
- "labelSetDigest": "e3fd3c0ff05dac1b93a950fc49cfbbd2e9c09635b740105442e212b54f934c34",
+ "labelSetDigest": "8dbe6d703465d0fd572ad02a378b0b200a404c3aadd7f206cf8eb18b1863444d",
  "levels": {
   "failPrecisionLower": 0.8,
   "humanReference": {
@@ -702,8 +703,8 @@
  "norms": "norms-v1.json",
  "rater": "maintainer",
  "replaces": {
-  "createdAt": "2026-10-05T22:27:55Z",
-  "labelSetDigest": "66be58961ff7392dbff84e9a2b9f0634d572e040f78086db1b2869c708ba66d0"
+  "createdAt": "2026-10-06T03:59:28Z",
+  "labelSetDigest": "e3fd3c0ff05dac1b93a950fc49cfbbd2e9c09635b740105442e212b54f934c34"
  },
  "schema": "vocello.qc.eval/2",
  "scoringSHA256": "2738c18a6095ff6ea9468d620a4f9358bd8e1021a1cf7aaaa07cbeb829b15b5c",

@@ -1584,10 +1584,11 @@
       "status": "planned",
       "gate": "Deleting a model's files takes an engine-side lease that refuses or waits out every load, warm (including a model-only warm that publishes no state) and generation of that model until the files are gone, with tests over the engine's operation gate.",
       "sourceOfTruth": [
-        "Sources/Services/MacModelDeletionSequence.swift",
+        "Sources/SharedSupport/Services/ModelDeletionSequence.swift",
+        "Sources/iOS/IOSModelInstallerViewModel.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
       ],
-      "notes": "Found by the PA-26 B3 review on 2026-09-26. MacModelDeletionSequence unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation.",
+      "notes": "Found by the PA-26 B3 review on 2026-09-26. The deletion sequence (ModelDeletionSequence, shared by both apps since DA-08) unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation.",
       "updated": "2026-09-26"
     },
     {

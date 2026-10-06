@@ -78,6 +78,11 @@ on:
         required: false
         type: boolean
         default: false
+      package_macos:
+        description: 'Build, sign, notarize and upload the macOS DMG (false for an iOS-only archive dispatch)'
+        required: false
+        type: boolean
+        default: true
       upload_to_testflight:
         description: 'After export, upload the IPA to TestFlight (requires ASC API key secrets)'
         required: false
@@ -89,6 +94,12 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+
+# One run per tag at a time, in the same group as promote-release.yml: a dispatch
+# never races the tag-push run, or a promotion, on the draft Release's assets.
+concurrency:
+  group: release-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   # Refuse, within seconds, a run that is not the tag's own workflow (a
@@ -131,20 +142,30 @@ jobs:
     permissions:
       contents: read
       checks: read
+      actions: read
+    # Later jobs check out this commit, never the tag ref again: a tag moved
+    # after this job cannot reach a signing job.
+    outputs:
+      commit: ${{ steps.authority.outputs.commit }}
     steps:
       - name: Checkout exact tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          ref: ${{ github.event_name == 'push' && github.ref || format('refs/tags/{0}', inputs.tag) }}
           persist-credentials: false
 
       - name: Require signed tag and exact-SHA CI verdict
+        id: authority
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
+          # The Security job scanned this run's commit; a tag moved since then
+          # is refused rather than built unscanned.
+          [ "$commit" = "$GITHUB_SHA" ] \
+            || { echo "::error::the tag no longer names this run's commit"; exit 1; }
           git fetch --quiet origin main
           git merge-base --is-ancestor "$commit" origin/main \
             || { echo "::error::release commit is not contained in origin/main"; exit 1; }
@@ -168,20 +189,28 @@ jobs:
           gh api --paginate --slurp \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=latest&per_page=100" \
+            "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=all&per_page=100" \
             > "$RUNNER_TEMP/release-check-runs.json"
+          gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${commit}&event=push&branch=main&per_page=100" \
+            > "$RUNNER_TEMP/release-push-runs.json"
           python3 scripts/release_source_authority.py \
             --tag "$RELEASE_TAG" \
             --commit "$commit" \
             --tag-ref "$RUNNER_TEMP/release-tag-ref.json" \
             --tag-object "$RUNNER_TEMP/release-tag-object.json" \
-            --check-runs "$RUNNER_TEMP/release-check-runs.json"
+            --check-runs "$RUNNER_TEMP/release-check-runs.json" \
+            --push-runs "$RUNNER_TEMP/release-push-runs.json"
           python3 scripts/release_evidence.py verify-source \
             --tag "$RELEASE_TAG" --commit "$commit"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
   package:
     name: Build + sign + notarize + DMG
     needs: source-authority
+    if: ${{ github.event_name == 'push' || inputs.package_macos }}
     runs-on: macos-26
     timeout-minutes: 150
     # Signing secrets belong to the tag-restricted `release` environment; a job
@@ -202,20 +231,16 @@ jobs:
       # execute the packaged-app startup smoke on both the staged app
       # and the app copied back out of the notarized DMG.
       QWENVOICE_SIGNING_MODE: developer-id
-      QWENVOICE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
       QWENVOICE_NOTARIZE: "1"
       # Tighten the bundle-verify gate now that the DMG is properly
       # signed + notarized — verify_release_bundle.sh and
       # verify_packaged_dmg.sh both honor these.
       QWENVOICE_EXPECT_SIGNED_RELEASE: "1"
       QWENVOICE_EXPECT_NOTARIZED_DMG: "1"
-      QWENVOICE_EXPECT_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      # notarytool reads these env vars via release.sh (--key, --key-id,
-      # --issuer). The .p8 file itself is written to disk by the "Write
-      # API key file" step; this var is exported from that step.
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
-      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # The team ID, notary key ID and issuer ID are step-scoped: only the key
+      # file, release.sh and the packaged-DMG verification read them, so the
+      # attestation and upload actions never receive them.
+      AUTHORIZED_COMMIT: ${{ needs.source-authority.outputs.commit }}
       RELEASE_SOURCE_IDENTITY: build/artifacts/macos/release/source-identity.json
       RELEASE_STEP_LEDGER: build/artifacts/macos/release/required-steps.json
     steps:
@@ -223,9 +248,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Deep checkout so `git rev-parse HEAD` in scripts/release.sh
-          # resolves a real commit SHA for release-metadata.txt.
+          # resolves a real commit SHA for release-metadata.txt, and the tag
+          # is present for verify-source.
           fetch-depth: 0
-          ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          ref: ${{ needs.source-authority.outputs.commit }}
           persist-credentials: false
 
       # Fail before any build work if the curated notes for this tag are
@@ -248,6 +274,8 @@ jobs:
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
+          # The commit source-authority approved, and the tag still names it.
+          [ "$commit" = "$AUTHORIZED_COMMIT" ] || { echo "::error::checkout is not the authorized commit"; exit 1; }
           python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
           python3 scripts/release_evidence.py capture-source-identity \
             --commit "$commit" --output "$RELEASE_SOURCE_IDENTITY"
@@ -339,6 +367,7 @@ jobs:
         # $RUNNER_TEMP and export its path. Deleted by Cleanup step.
         env:
           NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
         run: |
           set +x
           set -euo pipefail
@@ -367,10 +396,10 @@ jobs:
       # by another ref must not feed sources into a Developer ID-signed build.
       # release.sh resolves packages cold from Package.resolved.
       - name: Run scripts/release.sh (Developer ID + notarized DMG)
-        # QWENVOICE_SIGNING_MODE / SIGNING_IDENTITY / DEVELOPMENT_TEAM /
-        # NOTARIZE / EXPECT_SIGNED_RELEASE /
-        # EXPECT_NOTARIZED_DMG / CODESIGN_KEYCHAIN come from job-level env
-        # plus the two previous steps' $GITHUB_ENV exports.
+        # QWENVOICE_SIGNING_MODE / NOTARIZE / EXPECT_SIGNED_RELEASE /
+        # EXPECT_NOTARIZED_DMG come from job-level env, SIGNING_IDENTITY and
+        # CODESIGN_KEYCHAIN from the two previous steps' $GITHUB_ENV exports,
+        # and the team and notary identifiers from this step's env.
         # APPLE_API_KEY_PATH + APPLE_API_KEY_ID + APPLE_API_ISSUER_ID
         # are consumed by `xcrun notarytool submit --wait` inside
         # release.sh. Wall-clock ~30-45 min (build + sign + notarize); the
@@ -379,6 +408,11 @@ jobs:
         # never interpolated into the script.
         env:
           OUTPUT_NAME: ${{ inputs.output_name }}
+          QWENVOICE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          QWENVOICE_EXPECT_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
           command=(./scripts/release.sh --preflight none)
@@ -435,6 +469,9 @@ jobs:
         # this also checks `xcrun stapler validate` and the codesign
         # team-id seals — see scripts/verify_packaged_dmg.sh and
         # verify_release_bundle.sh for the per-flag behaviour.
+        env:
+          QWENVOICE_EXPECT_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           python3 scripts/required_step_ledger.py run \
             --ledger "$RELEASE_STEP_LEDGER" --step artifact-verification \
@@ -614,7 +651,7 @@ jobs:
         with:
           # Project-input validation verifies historical evidence commits.
           fetch-depth: 0
-          ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          ref: ${{ needs.source-authority.outputs.commit }}
           persist-credentials: false
 
       - name: Install and validate pinned toolchain
@@ -686,6 +723,7 @@ jobs:
       id-token: write
       attestations: write
     env:
+      AUTHORIZED_COMMIT: ${{ needs.source-authority.outputs.commit }}
       RELEASE_SOURCE_IDENTITY: build/artifacts/ios/release/source-identity.json
       RELEASE_STEP_LEDGER: build/artifacts/ios/release/required-steps.json
     steps:
@@ -694,7 +732,7 @@ jobs:
         with:
           # Project-input validation verifies historical evidence commits.
           fetch-depth: 0
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.source-authority.outputs.commit }}
           persist-credentials: false
 
       - name: Install and validate pinned release toolchain
@@ -707,6 +745,7 @@ jobs:
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
+          [ "$commit" = "$AUTHORIZED_COMMIT" ] || { echo "::error::checkout is not the authorized commit"; exit 1; }
           python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
           python3 scripts/release_evidence.py capture-source-identity \
             --commit "$commit" --output "$RELEASE_SOURCE_IDENTITY"
@@ -792,7 +831,7 @@ jobs:
 
           echo "$IOS_DIST_CERT_P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
           security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$IOS_DIST_CERT_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/security
+            -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
 
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
@@ -957,6 +996,40 @@ jobs:
           python3 scripts/release_evidence.py validate --output-dir build/dist/ios
           echo "IOS_IPA_PATH=$ipa" >> "$GITHUB_ENV"
 
+      # The upload precedes the IPA attestation so the signing material is
+      # removed before any later action runs; TestFlight builds are Apple's
+      # chain, and the attestation covers the IPA kept as a workflow artifact.
+      - name: Upload to TestFlight
+        if: ${{ inputs.upload_to_testflight }}
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA=$(ls build/dist/ios/export/*.ipa | head -1)
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
+
+      - name: Cleanup iOS signing material
+        # Right after the last step that uses the key, and always: the
+        # attestation and artifact upload below never run while the
+        # distribution keychain, the profile or the App Store Connect key exists.
+        if: always()
+        run: |
+          set +x
+          set +e
+          cleanup_result=0
+          if [ -n "${IOS_KEYCHAIN_PATH:-}" ] && [ -f "$IOS_KEYCHAIN_PATH" ]; then
+            security delete-keychain "$IOS_KEYCHAIN_PATH" || cleanup_result=1
+          fi
+          if [ -n "${IOS_PROFILE_PATH:-}" ]; then rm -f "$IOS_PROFILE_PATH" || cleanup_result=1; fi
+          if [ -n "${IOS_API_KEY_PATH:-}" ]; then
+            rm -f "$IOS_API_KEY_PATH" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" || cleanup_result=1
+            rmdir "$RUNNER_TEMP/asc" 2>/dev/null || true
+          fi
+          if [ -n "${IOS_API_KEY_COPY_PATH:-}" ]; then rm -f "$IOS_API_KEY_COPY_PATH" || cleanup_result=1; fi
+          exit "$cleanup_result"
+
       - name: Attest verified IPA provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
@@ -976,31 +1049,3 @@ jobs:
             build/dist/ios/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload to TestFlight
-        if: ${{ inputs.upload_to_testflight }}
-        env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
-        run: |
-          set -euo pipefail
-          IPA=$(ls build/dist/ios/export/*.ipa | head -1)
-          xcrun altool --upload-app -f "$IPA" -t ios \
-            --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
-
-      - name: Cleanup iOS signing material
-        if: always()
-        run: |
-          set +x
-          set +e
-          cleanup_result=0
-          if [ -n "${IOS_KEYCHAIN_PATH:-}" ] && [ -f "$IOS_KEYCHAIN_PATH" ]; then
-            security delete-keychain "$IOS_KEYCHAIN_PATH" || cleanup_result=1
-          fi
-          if [ -n "${IOS_PROFILE_PATH:-}" ]; then rm -f "$IOS_PROFILE_PATH" || cleanup_result=1; fi
-          if [ -n "${IOS_API_KEY_PATH:-}" ]; then
-            rm -f "$IOS_API_KEY_PATH" "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" || cleanup_result=1
-            rmdir "$RUNNER_TEMP/asc" 2>/dev/null || true
-          fi
-          if [ -n "${IOS_API_KEY_COPY_PATH:-}" ]; then rm -f "$IOS_API_KEY_COPY_PATH" || cleanup_result=1; fi
-          exit "$cleanup_result"

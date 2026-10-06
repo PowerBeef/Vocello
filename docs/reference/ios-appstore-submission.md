@@ -311,11 +311,13 @@ Add these repo **Secrets** (Settings → Secrets and variables → Actions):
 | `ASC_API_KEY_ID` / `ASC_API_ISSUER_ID` / `ASC_API_KEY_P8` | App Store Connect API key (id, issuer, base64 of `.p8`) |
 
 Then run the **Release** workflow from the Actions tab, choosing the version tag itself under
-"Use workflow from" and entering the same `tag`, with `archive_ios = true` and optionally
-`upload_to_testflight = true` to push straight to TestFlight (from the CLI:
-`gh workflow run release.yml --ref <tag> -f tag=<tag> -f archive_ios=true`). A dispatch from any
-other ref is refused by the `release-trigger` job.
-This job is gated to manual dispatch only, so it never affects the macOS DMG release. The workflow
+"Use workflow from" and entering the same `tag`, with `archive_ios = true`, `package_macos = false`
+and optionally `upload_to_testflight = true` to push straight to TestFlight (from the CLI:
+`gh workflow run release.yml --ref <tag> -f tag=<tag> -f archive_ios=true -f package_macos=false`).
+A dispatch from any other ref is refused by the `release-trigger` job. With `package_macos = false`
+the dispatch leaves the macOS draft and its DMGs untouched; left at its default (true) it rebuilds,
+re-notarizes and re-uploads the macOS candidate, replacing every asset on the draft. Runs for one
+tag, including promotion, never overlap (`concurrency` group `release-<tag>`). The workflow
 first executes `scripts/macos_test.sh gate` plus the generic iOS device-SDK compile as one
 contract-bound `platform-readiness` subprocess. Only then does it archive `VocelloiOS`, assert the
 bundled catalog, export via `ExportOptions-appstore.plist`, and run the release-blocking

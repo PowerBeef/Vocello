@@ -22,10 +22,13 @@ All commands and authority paths below are relative to the repository root.
 2. The script has no network route: fetch the tag ref (`gh api --method GET repos/<owner>/<repo>/git/ref/tags/<tag>`),
    the annotated tag object it points at (`gh api --method GET repos/<owner>/<repo>/git/tags/<sha>`) and the latest
    check runs of the tagged commit (`gh api --method GET --paginate --slurp
-   repos/<owner>/<repo>/commits/<sha>/check-runs?filter=latest&per_page=100`) into
+   repos/<owner>/<repo>/commits/<sha>/check-runs?filter=all&per_page=100`) and the push runs on
+   main for that commit (`gh api --method GET
+   "repos/<owner>/<repo>/actions/runs?head_sha=<sha>&event=push&branch=main&per_page=100"`) into
    `build/scratch/transient/release-evidence/<tag>/` (the governed invocation-local scratch), then run `python3 scripts/release_source_authority.py --tag <tag> --commit <sha>
-   --tag-ref <ref.json> --tag-object <tag.json> --check-runs <checks.json>`. It passes only for an
-   annotated tag whose signature GitHub verified and whose latest `CI required` run succeeded; check
+   --tag-ref <ref.json> --tag-object <tag.json> --check-runs <checks.json> --push-runs <runs.json>`.
+   It passes only for an annotated tag whose signature GitHub verified and whose latest `CI required`
+   run from a push to main succeeded (a pull-request run of the same name never counts); check
    containment yourself with `git tag -l <tag> --merged origin/main` (the release workflow uses
    `git merge-base --is-ancestor`). Security runs inside `release.yml`, not as a pre-existing check.
 3. `python3 scripts/check_release_notes.py "$0"` for curated notes.

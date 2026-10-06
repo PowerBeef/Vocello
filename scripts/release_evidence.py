@@ -782,7 +782,19 @@ def validate_cli_artifact_verification(payload: dict[str, Any], release: dict[st
         raise ValueError("CLI artifact smoke must not claim generation qualification")
 
 
-def validate(output_dir: Path) -> dict[str, Any]:
+def validate(
+    output_dir: Path,
+    source_root: Path | None = None,
+    exact_extra: list[str] | None = None,
+) -> dict[str, Any]:
+    """Validate release evidence against itself; with `source_root`, also against that checkout.
+
+    The evidence, its checksums and the contract copies bundled in it only prove each other. A
+    promotion that has the tagged source checked out passes `source_root`: the evidence must
+    name that commit, and the bundled contracts must equal the checkout's, byte for byte. With
+    `exact_extra`, the directory must hold exactly the files the evidence names, SHA256SUMS and
+    those extra names, so nothing it did not check is published beside them.
+    """
     output_dir = output_dir.resolve()
     evidence_path = output_dir / EVIDENCE_NAME
     checksum_path = output_dir / CHECKSUM_NAME
@@ -893,7 +905,54 @@ def validate(output_dir: Path) -> dict[str, Any]:
         actual[name] = match.group(1)
     if actual != expected:
         raise ValueError("SHA256SUMS does not exactly match release evidence")
+    if exact_extra is not None:
+        allowed = set(expected) | {CHECKSUM_NAME} | {_safe_name(name) for name in exact_extra}
+        present = {entry.name for entry in output_dir.iterdir()}
+        if present != allowed:
+            raise ValueError(
+                "release assets differ from the evidence: "
+                f"unexpected={sorted(present - allowed)!r} missing={sorted(allowed - present)!r}"
+            )
+    if source_root is not None:
+        _validate_against_checkout(release, bundle, source_root.resolve())
     return evidence
+
+
+def _validate_against_checkout(release: dict[str, Any], bundle: dict[str, Any], root: Path) -> None:
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True)
+    if head.returncode != 0 or head.stdout.strip() != release["commitSHA"]:
+        raise ValueError("release evidence does not name the checked-out commit")
+    for relative, key, label in ((CONTRACT_RELATIVE, "contractText", "release evidence contract"),
+                                 (ORCHESTRATION_RELATIVE, "orchestrationContractText", "orchestration contract")):
+        try:
+            checkout_text = (root / relative).read_text(encoding="utf-8")
+        except OSError as error:
+            raise ValueError(f"cannot read the checkout's {label}: {error}") from error
+        if bundle[key] != checkout_text:
+            raise ValueError(f"the bundled {label} differs from the checked-out source")
+
+
+def match_assets(listing: dict[str, Any], output_dir: Path) -> list[str]:
+    """Require a Release asset listing (`gh release view --json assets`) to name exactly the
+    files in `output_dir`, each with that file's SHA-256, so what was checked is what is listed."""
+    assets = listing.get("assets")
+    if not isinstance(assets, list):
+        raise ValueError("release asset listing is malformed")
+    digests: dict[str, str] = {}
+    for asset in assets:
+        if not isinstance(asset, dict):
+            raise ValueError("release asset listing is malformed")
+        name = _safe_name(asset.get("name"))
+        if "/" in name or name in digests:
+            raise ValueError(f"release asset name is unsafe or repeated: {name!r}")
+        digests[name] = str(asset.get("digest", ""))
+    present = sorted(entry.name for entry in output_dir.iterdir())
+    if sorted(digests) != present:
+        raise ValueError(f"release assets differ from the checked files: listed={sorted(digests)!r} checked={present!r}")
+    for name, digest in digests.items():
+        if digest != f"sha256:{digest_file(output_dir / name)}":
+            raise ValueError(f"release asset {name!r} differs from the checked file")
+    return present
 
 
 def main() -> int:
@@ -921,6 +980,13 @@ def main() -> int:
     create_parser.add_argument("--allow-missing-tag-ref", action="store_true", help=argparse.SUPPRESS)
     validate_parser = sub.add_parser("validate")
     validate_parser.add_argument("--output-dir", type=Path, required=True)
+    validate_parser.add_argument("--source-root", type=Path,
+                                 help="also require the evidence to match this checkout (commit and contracts)")
+    validate_parser.add_argument("--exact-assets", nargs="*", metavar="EXTRA",
+                                 help="require exactly the evidence's files, SHA256SUMS and these extra names")
+    match_parser = sub.add_parser("match-assets")
+    match_parser.add_argument("--listing", type=Path, required=True)
+    match_parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
     if args.command == "verify-source":
@@ -937,8 +1003,11 @@ def main() -> int:
             require_tag_ref=not args.allow_missing_tag_ref,
         )
         print(json.dumps({"evidence": str(evidence), "checksums": str(checksums)}, sort_keys=True))
+    elif args.command == "match-assets":
+        names = match_assets(load_json(args.listing), args.output_dir.resolve())
+        print(json.dumps({"status": "matched", "assets": len(names)}, sort_keys=True))
     else:
-        evidence = validate(args.output_dir)
+        evidence = validate(args.output_dir, args.source_root, args.exact_assets)
         print(json.dumps({"status": "passed", "tag": evidence["release"]["tag"]}, sort_keys=True))
     return 0
 

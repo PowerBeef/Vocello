@@ -360,7 +360,7 @@
     }
   },
   "promotionRouting": {
-    "note": "Paths changed since the previous release select the capability lanes a public promotion must prove. Every platform always needs its platformMinimumEvidence; a class adds requiredEvidence and capabilities when any changed path matches one of its include globs and none of its exclude globs (fnmatch, ** matches whole subtrees). Paths matching no class add nothing.",
+    "note": "Paths changed since the previous release select the capability lanes a public promotion must prove. Every platform always needs its platformMinimumEvidence; a class adds requiredEvidence and capabilities when any changed path matches one of its include globs and none of its exclude globs (fnmatch, ** matches whole subtrees). Paths matching no class add nothing. Every tracked product file under Sources, the engine package sources and project.yml routes to a class or is listed in unrouted with its reason; validate-contract enforces it. App services, History persistence and telemetry route to platform-ui by tree, so a new file there routes without an edit; files with a narrower lane also sit in that class.",
     "classes": [
       {
         "id": "model-catalog-and-delivery",
@@ -393,7 +393,10 @@
           "config/model-artifact-receipts.json",
           "scripts/check_ios_catalog.sh",
           "scripts/check_ios_model_management.py",
-          "scripts/model_catalog_contract.py"
+          "scripts/model_catalog_contract.py",
+          "Sources/iOSSupport/Models/TTSContract.swift",
+          "Sources/iOSSupport/Models/TTSModel.swift",
+          "Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift"
         ],
         "requiredEvidence": [
           "macos-model-download-lifecycle",
@@ -416,7 +419,13 @@
           "Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift",
           "config/memory-qualification-policy.json",
           "scripts/benchmark_memory.py",
-          "scripts/ios_memory_field_report.py"
+          "scripts/ios_memory_field_report.py",
+          "Sources/Services/MacMemoryBudgetPolicy.swift",
+          "Sources/Services/MacWarmupAdmissionPolicy.swift",
+          "Sources/Services/MacGenerationWarmupCoordinator.swift",
+          "Sources/Services/TTSEngineStore+Mac.swift",
+          "Sources/Services/MacEngineBootstrap.swift",
+          "Sources/iOSSupport/Services/IOSMetricKitMemoryReporter.swift"
         ],
         "requiredEvidence": [
           "macos-retained-memory",
@@ -433,8 +442,8 @@
         "include": [
           "Sources/Views/**",
           "Sources/iOS/**",
-        "Sources/Services/MacStudio*.swift",
-        "Sources/Services/MacLineBatchRunner.swift",
+          "Sources/Services/MacStudio*.swift",
+          "Sources/Services/MacLineBatchRunner.swift",
           "Sources/iOSSupport/Services/*UIPerf*.swift",
           "Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift",
           "Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift",
@@ -445,7 +454,26 @@
           "config/ui-perf-thresholds-ios.json",
           "scripts/check_macos_ui_perf.py",
           "scripts/check_ios_ui_perf.py",
-          "scripts/lib/ui_perf_thresholds.py"
+          "scripts/lib/ui_perf_thresholds.py",
+          "Sources/SharedSupport/Views/**",
+          "Sources/SharedSupport/ViewModels/**",
+          "Sources/SharedSupport/Theme/**",
+          "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
+          "Sources/SharedSupport/Services/AudioPlaybackResumePolicy.swift",
+          "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
+          "Sources/ContentView.swift",
+          "Sources/QwenVoiceApp.swift",
+          "Sources/Models/**",
+          "Sources/ViewModels/MacAppModel.swift",
+          "Sources/ViewModels/GenerationPerformanceGateModel.swift",
+          "Sources/Services/UIPerf*.swift",
+          "Sources/**/AppPerformanceSignposts.swift",
+          "Sources/Services/**",
+          "Sources/ViewModels/**",
+          "Sources/iOSSupport/**",
+          "Sources/SharedSupport/Services/**",
+          "Sources/SharedSupport/Database/**",
+          "Sources/SharedSupport/Telemetry/**"
         ],
         "requiredEvidence": [
           "macos-ui-performance",
@@ -474,13 +502,11 @@
           "config/language-normalization/**",
           "scripts/lib/audio_qc.py",
           "scripts/qc/language.py",
-          "scripts/*speaker_similarity*.py",
           "scripts/*fidelity*.py",
           "scripts/check_marking_peak_equality.py",
           "config/language-bench-*.json",
           "config/delivery-*.json",
           "config/voice-identity-language-reliability.json",
-          "config/*prosody*.json",
           "config/marking-peak-equality.json",
           "config/audio-qc-*.json",
           "scripts/audio_qc_*.py",
@@ -516,7 +542,9 @@
           "config/quality-promotion-contract.json",
           "config/memory-qualification-policy.json",
           "config/macos-ui-stall-gate.json",
-          "config/ui-perf-thresholds*.json"
+          "config/ui-perf-thresholds*.json",
+          "Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift",
+          "Sources/Services/GenerationTelemetryMerger.swift"
         ],
         "requiredEvidence": [
           "macos-ui-benchmark",
@@ -542,7 +570,8 @@
         "include": [
           "Sources/QwenVoiceBackendCore/**",
           "Sources/QwenVoiceCore/**",
-          "Packages/VocelloQwen3Core/**"
+          "Packages/VocelloQwen3Core/**",
+          "Sources/Services/LongTextGenerationRouter.swift"
         ],
         "exclude": [
           "Packages/VocelloQwen3Core/README.md",
@@ -562,6 +591,44 @@
           "multilingual-output",
           "delivery-evaluation"
         ]
+      }
+    ],
+    "unrouted": [
+      {
+        "paths": [
+          "Sources/Assets.xcassets/**",
+          "Sources/Resources/voice-previews/**"
+        ],
+        "reason": "Artwork and bundled voice previews: reviewed on screen and in the App Store screenshots; no lane measures them."
+      },
+      {
+        "paths": [
+          "Sources/Resources/Localizable.xcstrings",
+          "Sources/InfoPlist.xcstrings",
+          "Sources/Resources/third_party_attributions.json"
+        ],
+        "reason": "Copy and attributions: the localization and attribution contracts gate them in CI."
+      },
+      {
+        "paths": [
+          "Sources/Info.plist",
+          "Sources/PrivacyInfo.xcprivacy",
+          "Sources/QwenVoice.entitlements",
+          "project.yml"
+        ],
+        "reason": "Build configuration and manifests: the project-input, entitlement and privacy contracts and release readiness gate them."
+      },
+      {
+        "paths": [
+          "Sources/VocelloCLI/**"
+        ],
+        "reason": "The CLI has no promotion lane; its downloadable package is qualified separately (RF-10). Its generation and model commands route through their classes."
+      },
+      {
+        "paths": [
+          "Packages/VocelloQwen3Core/Sources/**/README.md"
+        ],
+        "reason": "Engine documentation, already excluded from engine-runtime."
       }
     ]
   },

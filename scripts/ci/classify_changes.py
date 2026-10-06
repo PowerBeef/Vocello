@@ -101,6 +101,7 @@ PACKAGE_MANIFESTS = ("Package.swift", "Package.resolved")
 # Swift copy to it entry for entry.
 SWIFT_PARITY_FIXTURES = ("scripts/tests/fixtures/language_normalization.json",
                          "scripts/tests/fixtures/audio_qc_stage0_observations.json",
+                         "scripts/tests/fixtures/audio_qc_codec_loop.json",
                          "config/language-normalization/hant-hans-v1.txt")
 BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capability-matrix.json",
                  "config/toolchain.json")
@@ -310,16 +311,24 @@ def diff_paths(base: str, head: str, cwd: str | None = None) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
-def load_history(path: str | None) -> list[dict] | None:
-    """Recent runs of this workflow on this branch: [{headSha, jobs: {name: conclusion}}]."""
+# The workflow writes this marker when it could not fetch the run history. That
+# is not "no previous run": the per-lane green bases are unknown, so every lane runs.
+HISTORY_UNAVAILABLE = "unavailable"
+
+
+def load_history(path: str | None) -> list[dict] | str | None:
+    """Recent runs of this workflow on this branch: [{headSha, jobs: {name: conclusion}}],
+    HISTORY_UNAVAILABLE when the fetch failed, or None without a history file."""
     if not path or not os.path.isfile(path):
         return None
     try:
         with open(path, encoding="utf-8") as handle:
             history = json.load(handle)
     except (OSError, json.JSONDecodeError):
-        return None
-    return history if isinstance(history, list) else None
+        return HISTORY_UNAVAILABLE
+    if isinstance(history, dict) and history.get("unavailable") is True:
+        return HISTORY_UNAVAILABLE
+    return history if isinstance(history, list) else HISTORY_UNAVAILABLE
 
 
 def lane_bases(history: list[dict], head: str, cwd: str | None = None) -> dict[str, str | None]:
@@ -346,8 +355,11 @@ def lane_bases(history: list[dict], head: str, cwd: str | None = None) -> dict[s
     return bases
 
 
-def route_push(head: str, before: str, history: list[dict] | None, cwd: str | None = None) -> tuple[dict[str, bool], str]:
+def route_push(head: str, before: str, history: list[dict] | str | None,
+               cwd: str | None = None) -> tuple[dict[str, bool], str]:
     """Lanes for a push and the reason, using per-lane green bases when known."""
+    if history == HISTORY_UNAVAILABLE:
+        return classify([]), "run history unavailable, every lane runs"
     if history:
         bases = lane_bases(history, head, cwd)
         lanes = {lane: False for lane in LANES}

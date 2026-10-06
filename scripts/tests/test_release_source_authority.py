@@ -65,7 +65,14 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
             "completed_at": f"2026-08-26T12:00:0{identifier}Z",
             "details_url": f"https://github.com/example/actions/runs/{identifier}",
             "app": {"slug": "github-actions"},
+            "check_suite": {"id": 100 + identifier},
         }
+
+    def push_runs(self, *suites: int, event: str = "push", branch: str = "main",
+                  path: str = ".github/workflows/ci.yml") -> dict:
+        runs = [{"id": 900 + index, "event": event, "head_branch": branch, "head_sha": self.commit,
+                 "path": path, "check_suite_id": suite} for index, suite in enumerate(suites or (101, 102))]
+        return {"total_count": len(runs), "workflow_runs": runs}
 
     def test_valid_signed_tag_and_exact_sha_checks_pass(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
@@ -74,7 +81,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
             commit=self.commit,
             tag_ref=tag_ref,
             tag_object=tag_object,
-            check_runs=checks,
+            check_runs=checks, push_runs=self.push_runs(),
         )
         self.assertEqual(result["status"], "passed")
         encoded = json.dumps(result)
@@ -87,7 +94,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "annotated signed tag"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=checks,
+                tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
 
     def test_unsigned_or_invalid_tag_fails_closed(self) -> None:
@@ -96,7 +103,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsigned"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=checks,
+                tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
 
     def test_signed_tag_must_target_exact_commit(self) -> None:
@@ -105,7 +112,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not target"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=checks,
+                tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
 
     def test_missing_or_cross_sha_check_fails_closed(self) -> None:
@@ -114,7 +121,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "CI required"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=checks,
+                tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
 
     def test_latest_check_must_be_complete_and_successful(self) -> None:
@@ -123,10 +130,11 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         checks["check_runs"].append(
             self.check(3, "CI required", status="completed", conclusion="failure")
         )
+        # A re-run of the push: a second push run on main for the same commit.
         with self.assertRaisesRegex(ValueError, "failure"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=checks,
+                tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(101, 102, 103),
             )
 
     def test_paginated_response_must_be_complete(self) -> None:
@@ -135,14 +143,42 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             module.validate(
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
-                tag_object=tag_object, check_runs=pages,
+                tag_object=tag_object, check_runs=pages, push_runs=self.push_runs(),
             )
+
+    def test_only_a_push_run_on_main_authorizes_the_release(self) -> None:
+        # The push run's `CI required` failed; a later pull-request aggregate of the
+        # same name on the same commit (Linux lanes only) passed.
+        tag_ref, tag_object, checks = self.fixtures()
+        checks["check_runs"] = [self.check(1, "CI required", conclusion="failure"),
+                                self.check(5, "CI required")]
+        with self.assertRaisesRegex(ValueError, "failure"):
+            module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
+                            check_runs=checks, push_runs=self.push_runs(101))
+        # With no push run at all, nothing authorizes it.
+        # Nor does a push run of another workflow that names a job the same way.
+        for runs in (self.push_runs(105, event="pull_request"), self.push_runs(101, branch="topic"),
+                     self.push_runs(101, path=".github/workflows/release-rehearsal.yml"),
+                     {"total_count": 0, "workflow_runs": []}):
+            with self.subTest(runs=runs), self.assertRaisesRegex(ValueError, "from a push to main"):
+                module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
+                                check_runs={"total_count": 1, "check_runs": [self.check(1, "CI required")]},
+                                push_runs=runs)
+
+    def test_paginated_run_response_must_be_complete(self) -> None:
+        tag_ref, tag_object, checks = self.fixtures()
+        runs = self.push_runs(101)
+        runs["total_count"] = 3
+        with self.assertRaisesRegex(ValueError, "workflow-run response is incomplete"):
+            module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
+                            check_runs=checks, push_runs=runs)
 
     def test_cli_output_is_privacy_safe(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name, value in (("ref", tag_ref), ("tag", tag_object), ("checks", checks)):
+            for name, value in (("ref", tag_ref), ("tag", tag_object), ("checks", checks),
+                                ("runs", self.push_runs())):
                 (root / f"{name}.json").write_text(json.dumps(value), encoding="utf-8")
             result = subprocess.run(
                 [
@@ -150,6 +186,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
                     "--tag-ref", str(root / "ref.json"),
                     "--tag-object", str(root / "tag.json"),
                     "--check-runs", str(root / "checks.json"),
+                    "--push-runs", str(root / "runs.json"),
                 ],
                 check=False,
                 text=True,

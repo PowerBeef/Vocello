@@ -149,8 +149,11 @@ release-readiness and artifact checks.
    [`quality-promotion.md`](quality-promotion.md) on the clean tag checkout. Produce the canonical
    Mac generation matrix and every path-classified engine, retained-memory, UI-performance, or
    model-delivery lane; assemble and validate `quality-promotion.json`; then upload it to the draft.
-   Dispatch `promote-release.yml` with the exact tag. That workflow revalidates the downloaded
-   deterministic candidate and the promotion manifest before changing the draft to public. Device
+   Dispatch `promote-release.yml` from the tag itself (`gh workflow run promote-release.yml --ref
+   <tag> -f tag=<tag>`; any other ref is refused). It runs under the reviewer-gated `release`
+   environment, verifies both DMGs against their build attestations from `release.yml`, requires
+   the release evidence to name the checked-out commit and carry its contracts, and revalidates the
+   promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
    notarization, attestation, or draft upload.
 

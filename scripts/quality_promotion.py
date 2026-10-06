@@ -240,6 +240,40 @@ def validate_contract(contract: dict[str, Any], *, root: Path = ROOT) -> None:
             raise PromotionError(
                 f"promotionRouting class {identity} references undefined capabilities: " + ", ".join(unknown_capabilities)
             )
+    if version == CONTRACT_SCHEMA_VERSION:
+        validate_routing_coverage(classes, routing.get("unrouted"), root)
+
+
+# Every tracked product file either routes to a class or is named as deliberately
+# unrouted, with the reason: a new product area cannot silently add no evidence.
+ROUTED_ROOTS = ("Sources", "Packages/VocelloQwen3Core/Sources", "project.yml")
+
+
+def validate_routing_coverage(classes: list[dict[str, Any]], unrouted: Any, root: Path) -> None:
+    if not isinstance(unrouted, list) or not unrouted:
+        raise PromotionError("promotionRouting.unrouted must list the product paths no class covers")
+    patterns: list[str] = []
+    for entry in unrouted:
+        paths = entry.get("paths") if isinstance(entry, dict) else None
+        if (not isinstance(paths, list) or not paths or any(not isinstance(item, str) or not item for item in paths)
+                or not isinstance(entry.get("reason"), str) or not entry["reason"].strip()):
+            raise PromotionError("promotionRouting.unrouted entries need non-empty paths and a reason")
+        patterns.extend(paths)
+    listed = subprocess.run(["git", "ls-files", "--", *ROUTED_ROOTS], cwd=root, text=True,
+                            capture_output=True, check=False)
+    if listed.returncode != 0:
+        raise PromotionError("cannot list the tracked product files")
+    files = [line for line in listed.stdout.splitlines() if line]
+    if not files:
+        return
+    uncovered = [path for path in files if not any(_class_matches(path, item) for item in classes)
+                 and not any(_matches(path, pattern) for pattern in patterns)]
+    if uncovered:
+        raise PromotionError("product paths route to no promotion class and are not listed as unrouted: "
+                             + ", ".join(uncovered[:10]) + (" ..." if len(uncovered) > 10 else ""))
+    dead = [pattern for pattern in patterns if not any(_matches(path, pattern) for path in files)]
+    if dead:
+        raise PromotionError("promotionRouting.unrouted names paths that match no tracked file: " + ", ".join(dead))
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -304,6 +338,34 @@ def release_identity(path: Path, platform: str, tag: str, root: Path) -> tuple[d
     if not isinstance(identity_digest, str) or DIGEST_RE.fullmatch(identity_digest) is None:
         raise PromotionError("release source identity digest is invalid")
     return evidence, commit
+
+
+PUBLIC_FACTS_PATH = "config/public-product-facts.json"
+
+
+def previous_public_release(root: Path, commit: str) -> tuple[str, str]:
+    """The previous public macOS release, as the candidate's own public facts name it: its tag
+    and commit. Every lane a candidate must prove is derived from the paths changed since it, so
+    the base cannot be a nearer commit the manifest author picks."""
+    try:
+        facts = json.loads(git(root, "show", f"{commit}:{PUBLIC_FACTS_PATH}"))
+    except (PromotionError, json.JSONDecodeError) as error:
+        raise PromotionError(f"cannot read the previous public release from {PUBLIC_FACTS_PATH} at the candidate") from error
+    release = facts.get("stableMacRelease") if isinstance(facts, dict) else None
+    tag = release.get("tag") if isinstance(release, dict) else None
+    if not isinstance(tag, str) or TAG_RE.fullmatch(tag) is None:
+        raise PromotionError(f"{PUBLIC_FACTS_PATH} names no previous public macOS release tag")
+    return tag, resolve_commit(root, f"refs/tags/{tag}")
+
+
+def require_public_base(root: Path, platform: str, base_commit: str, commit: str) -> None:
+    # iOS has no public App Store release yet (the facts name only a TestFlight beta), so its
+    # base stays the manifest author's choice until the facts name a previous public iOS release.
+    if platform != "macos":
+        return
+    tag, expected = previous_public_release(root, commit)
+    if base_commit != expected:
+        raise PromotionError(f"promotion base must be the previous public macOS release {tag} ({expected[:12]})")
 
 
 def changed_paths(root: Path, base: str, commit: str) -> tuple[str, list[str]]:
@@ -523,6 +585,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     validate_contract(contract, root=root)
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
     base_commit, paths = changed_paths(root, args.base, commit)
+    require_public_base(root, args.platform, base_commit, commit)
     impact_result = classify_paths(contract, paths)
     required = required_evidence(contract, impact_result, args.platform)
     capabilities, unsupported_dimensions = capability_coverage(
@@ -623,6 +686,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     }:
         raise PromotionError("quality promotion manifest differs from release evidence")
     base_commit, paths = changed_paths(root, str(manifest.get("baseCommit", "")), commit)
+    require_public_base(root, args.platform, base_commit, commit)
     impact_result = classify_paths(contract, paths)
     impact = manifest.get("impact")
     expected_impact = impact_result

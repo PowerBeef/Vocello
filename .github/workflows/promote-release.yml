@@ -3,7 +3,11 @@ name: Promote verified release
 # Public macOS promotion is intentionally separate from candidate production.
 # The candidate workflow may build, sign, notarize, attest, and upload a draft
 # without models or devices. This workflow alone can make that draft public,
-# and only after an exact-tag quality-promotion manifest validates.
+# and only after an exact-tag quality-promotion manifest validates. It is
+# dispatched from the tag itself (`gh workflow run promote-release.yml --ref
+# <tag> -f tag=<tag>`), runs under the reviewer-gated `release` environment, and
+# checks the draft's DMGs against their build attestations and the tag's
+# checked-out contracts, so the draft cannot vouch for itself.
 on:
   workflow_dispatch:
     inputs:
@@ -18,20 +22,39 @@ permissions:
 env:
   RELEASE_TAG: ${{ inputs.tag }}
 
+# The same group as release.yml: a promotion never runs beside a candidate run
+# that resets the same draft's assets.
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   promote-macos:
     name: Validate quality evidence + publish draft
     runs-on: macos-26
     timeout-minutes: 15
+    environment: release
     permissions:
       contents: write
       checks: read
+      actions: read
+      attestations: read
     steps:
+      - name: Require the tag's own workflow
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # A dispatch runs the workflow file of the ref it names; only the tag's
+          # own copy may publish it.
+          [ "$WORKFLOW_REF" = "refs/tags/$RELEASE_TAG" ] \
+            || { echo "::error::dispatch promote-release.yml with --ref $RELEASE_TAG"; exit 1; }
+
       - name: Checkout exact tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
 
       - name: Verify tag and draft state
@@ -65,14 +88,20 @@ jobs:
           gh api --paginate --slurp \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=latest&per_page=100" \
+            "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?filter=all&per_page=100" \
             > "$RUNNER_TEMP/release-check-runs.json"
+          gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${commit}&event=push&branch=main&per_page=100" \
+            > "$RUNNER_TEMP/release-push-runs.json"
           python3 scripts/release_source_authority.py \
             --tag "$RELEASE_TAG" \
             --commit "$commit" \
             --tag-ref "$RUNNER_TEMP/release-tag-ref.json" \
             --tag-object "$RUNNER_TEMP/release-tag-object.json" \
-            --check-runs "$RUNNER_TEMP/release-check-runs.json"
+            --check-runs "$RUNNER_TEMP/release-check-runs.json" \
+            --push-runs "$RUNNER_TEMP/release-push-runs.json"
           python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
           gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release-state.json"
           python3 - "$RUNNER_TEMP/release-state.json" <<'PY'
@@ -88,10 +117,30 @@ jobs:
           set -euo pipefail
           remote="$RUNNER_TEMP/release-assets"
           mkdir -p "$remote"
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets.json"
           gh release download "$RELEASE_TAG" --dir "$remote"
+          # The downloaded files are exactly the draft's listed assets, digest for digest.
+          python3 scripts/release_evidence.py match-assets \
+            --listing "$RUNNER_TEMP/release-assets.json" --output-dir "$remote"
           test -f "$remote/quality-promotion.json" \
             || { echo "::error::draft is missing quality-promotion.json"; exit 1; }
-          python3 scripts/release_evidence.py validate --output-dir "$remote"
+          # The evidence names this checkout's commit and carries its contracts,
+          # and the draft holds nothing else but the promotion manifest.
+          python3 scripts/release_evidence.py validate --output-dir "$remote" --source-root . \
+            --exact-assets quality-promotion.json
+          # Each DMG is the one release.yml built and attested for this tag and
+          # commit on a GitHub-hosted runner, not an artifact of another run.
+          commit="$(git rev-parse HEAD)"
+          dmgs=("$remote"/*.dmg)
+          [ -f "${dmgs[0]}" ] || { echo "::error::draft carries no DMG"; exit 1; }
+          for dmg in "${dmgs[@]}"; do
+            gh attestation verify "$dmg" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+              --source-ref "refs/tags/$RELEASE_TAG" \
+              --source-digest "$commit" \
+              --deny-self-hosted-runners
+          done
           python3 scripts/quality_promotion.py validate \
             --platform macos \
             --tag "$RELEASE_TAG" \
@@ -103,10 +152,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          remote="$RUNNER_TEMP/release-assets"
           publish_flags=(--draft=false)
           if [[ "$RELEASE_TAG" == *-* ]]; then
             publish_flags+=(--prerelease)
           else
             publish_flags+=(--latest)
           fi
+          # The draft still holds exactly the assets checked above, before and
+          # after it turns public; a change in between returns it to draft.
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets-before.json"
+          python3 scripts/release_evidence.py match-assets \
+            --listing "$RUNNER_TEMP/release-assets-before.json" --output-dir "$remote"
           gh release edit "$RELEASE_TAG" "${publish_flags[@]}"
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets-after.json"
+          if ! python3 scripts/release_evidence.py match-assets \
+              --listing "$RUNNER_TEMP/release-assets-after.json" --output-dir "$remote"; then
+            gh release edit "$RELEASE_TAG" --draft=true || true
+            echo "::error::the Release assets changed while it was published; it is a draft again"
+            exit 1
+          fi

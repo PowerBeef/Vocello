@@ -67,8 +67,9 @@ jobs:
 
       # Each lane is diffed against the last run on this branch in which its job
       # passed, so a run cancelled by a superseding push cannot leave a lane
-      # unrun behind a later docs-only push. Best effort: without history the
-      # classifier falls back to the previous push, then to every lane.
+      # unrun behind a later docs-only push. With no earlier run the classifier
+      # diffs against the previous push; when the history cannot be read, every
+      # lane runs.
       - name: Recent runs of this workflow on this branch
         if: github.event_name == 'push'
         env:
@@ -78,9 +79,15 @@ jobs:
           : > ci-history.json
           # Pull-request runs skip every native job, so they never prove a lane
           # (a fork PR's head branch may itself be named main).
-          ids="$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --limit 15 \
+          # A failed fetch is not an empty history: it leaves a marker that makes
+          # every lane run, never a green run that skipped lanes on a guessed base.
+          if ! ids="$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --limit 15 \
             --json databaseId,status,event \
-            --jq '.[] | select(.status == "completed" and .event != "pull_request") | .databaseId' || true)"
+            --jq '.[] | select(.status == "completed" and .event != "pull_request") | .databaseId')"; then
+            echo '{"unavailable": true}' > ci-history.json
+            echo "::warning::CI run history is unavailable; every lane runs"
+            exit 0
+          fi
           python3 - $ids <<'PY' > ci-history.json
           import json, subprocess, sys
           runs = []
@@ -90,7 +97,11 @@ jobs:
                   capture_output=True, text=True, check=False,
               )
               if view.returncode:
-                  continue
+                  # A run that cannot be read is a gap, not an absence: an
+                  # empty history would route on the previous push alone.
+                  json.dump({"unavailable": True}, sys.stdout)
+                  print("::warning::a CI run could not be read; every lane runs", file=sys.stderr)
+                  raise SystemExit(0)
               payload = json.loads(view.stdout)
               runs.append({
                   "headSha": payload.get("headSha"),
@@ -100,7 +111,7 @@ jobs:
               })
           json.dump(runs, sys.stdout)
           PY
-          echo "history: $(python3 -c 'import json,sys; print(len(json.load(open("ci-history.json"))))' 2>/dev/null || echo 0) completed run(s)"
+          echo "history: $(python3 -c 'import json; h = json.load(open("ci-history.json")); print(len(h) if isinstance(h, list) else "unavailable,")' 2>/dev/null || echo 0) completed run(s)"
 
       - name: Classify changed paths
         id: classify

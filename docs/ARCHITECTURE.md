@@ -1139,8 +1139,12 @@ run weekly and on the exact tagged commit inside the release workflow, while pus
 deterministic website/native checks. `Security required` is the stable security aggregate. Direct
 administrator development on `main` remains an explicit workflow residual, so release authority
 begins only when `scripts/release_source_authority.py` proves a GitHub-verified annotated tag,
-containment in `origin/main`, a successful latest `CI required` run on the tagged commit, and the
-release workflow's own Security job. Release candidates produce SPDX and
+containment in `origin/main`, a successful latest `CI required` run of a push to main on the tagged
+commit, and the release workflow's own Security job on that same commit; every later job builds the
+authorized commit, not the tag ref. Promotion runs from the tag under the reviewer-gated `release`
+environment and publishes only a draft whose assets are exactly the evidence's, whose DMGs carry
+`release.yml` attestations for that tag and commit, and whose evidence names the checked-out source.
+Release candidates produce SPDX and
 CycloneDX SBOMs, checksums, provenance/attestation, and a validated
 `config/release-evidence-contract.json` evidence set before a draft Release is created. The emitted
 schema-v2 `release-evidence.json` binds the clean tracked-and-untracked source identity, required

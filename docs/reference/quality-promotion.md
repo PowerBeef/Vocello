@@ -20,8 +20,9 @@ candidate-validation steps; external TestFlight distribution, App Review submiss
 App Store release require a validated iOS promotion manifest.
 
 Before either platform can promote, release-source authority also requires the exact candidate
-commit to be contained in `origin/main`, an annotated GitHub-verified tag, and successful latest
-`CI required` check run on that exact SHA plus the release workflow's own Security job. Quality evidence cannot repair
+commit to be contained in `origin/main`, an annotated GitHub-verified tag, and a successful latest
+`CI required` check run of a push to main on that exact SHA (the pull-request aggregate of the same
+name never counts) plus the release workflow's own Security job. Quality evidence cannot repair
 an untrusted or unverified release source.
 
 ## What the manifest binds
@@ -56,7 +57,13 @@ undefined evidence id or capability. `python3 scripts/quality_promotion.py class
 [--platform macos|ios]` runs the same classification over the paths changed since the previous
 release commit (committed `<base>..HEAD` only: the base must be a distinct ancestor and uncommitted
 edits are invisible, so commit first), and `create` embeds that result in the manifest, so the lanes it demands can be
-audited from the contract and the diff alone.
+audited from the contract and the diff alone. For macOS, `create` and `validate` accept only the
+previous public release as the base: the tag `stableMacRelease` names in the candidate's own
+`config/public-product-facts.json`. A nearer base would shrink the evidence a candidate must prove.
+iOS has no public App Store release yet, so its base stays the manifest author's choice until the
+facts name one.
+Every tracked product file routes to a class or is listed in `promotionRouting.unrouted` with the
+reason it needs no promotion lane; `validate-contract` fails on a file that is neither.
 
 Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive
 changes add the smallest platform-specific set declared by the contract: applicable Quality

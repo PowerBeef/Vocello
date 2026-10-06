@@ -44,8 +44,12 @@ class QualityPromotionTests(unittest.TestCase):
         self.git("config", "user.email", "fixture@example.invalid")
         self.git("config", "user.name", "Fixture")
         (self.root / "README.md").write_text("base\n", encoding="utf-8")
-        self.git("add", "README.md")
+        # The candidate's public facts name the previous public release, which is the base.
+        self.write_json(self.root / "config/public-product-facts.json",
+                        {"stableMacRelease": {"version": "2.3.0", "tag": "v2.3.0"}})
+        self.git("add", "README.md", "config/public-product-facts.json")
         self.git("commit", "-qm", "base")
+        self.git("tag", "v2.3.0")
         self.base = self.git("rev-parse", "HEAD")
         (self.root / "README.md").write_text("candidate\n", encoding="utf-8")
         self.git("add", "README.md")
@@ -142,6 +146,58 @@ class QualityPromotionTests(unittest.TestCase):
             validated["lanes"]["macos-ui-benchmark"]["hardwareProfileID"],
             "mac-mini-m2-8gb",
         )
+
+    def test_the_base_is_the_previous_public_release_not_a_nearer_commit(self) -> None:
+        # A nearer base shrinks the evidence a candidate must prove to the platform minimum.
+        nearer = self.commit
+        (self.root / "README.md").write_text("candidate, again\n", encoding="utf-8")
+        self.git("add", "README.md")
+        self.git("commit", "-qm", "candidate, again")
+        self.commit = self.git("rev-parse", "HEAD")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "previous public macOS release v2.3.0"):
+            PROMOTION.require_public_base(self.root, "macos", nearer, self.commit)
+        PROMOTION.require_public_base(self.root, "macos", self.base, self.commit)
+        # A manifest re-signed onto the nearer base is refused at validation too.
+        self.git("tag", "-f", "v2.4.0")
+        self.release["release"]["commitSHA"] = self.commit
+        self.release["sourceIdentity"]["gitCommit"] = self.commit
+        self.write_json(self.release_path, self.release)
+        self.rebind_record()
+        manifest = PROMOTION.create(self.create_args())
+        manifest["baseCommit"] = nearer
+        manifest["digest"] = PROMOTION.digest_value({key: value for key, value in manifest.items() if key != "digest"})
+        path = self.root / "quality-promotion.json"
+        self.write_json(path, manifest)
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "previous public macOS release v2.3.0"):
+            PROMOTION.validate_manifest(self.validation_args(path))
+
+    def test_every_product_file_routes_to_a_class_or_is_listed_unrouted(self) -> None:
+        classes = [{"id": "platform-ui", "include": ["Sources/Views/**"]}]
+        for name in ("Sources/Views/Studio.swift", "Sources/Info.plist"):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text("x\n", encoding="utf-8")
+        self.git("add", "Sources")
+        listed = [path for path in self.git("ls-files", "--", *PROMOTION.ROUTED_ROOTS).splitlines()
+                  if not path.startswith("Sources/Views/")]
+        unrouted = [{"paths": listed, "reason": "build manifest and fixture contract"}]
+        PROMOTION.validate_routing_coverage(classes, unrouted, self.root)
+        (self.root / "Sources/Services").mkdir(parents=True)
+        (self.root / "Sources/Services/NewService.swift").write_text("x\n", encoding="utf-8")
+        self.git("add", "Sources/Services/NewService.swift")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "Sources/Services/NewService.swift"):
+            PROMOTION.validate_routing_coverage(classes, unrouted, self.root)
+        stale = unrouted + [{"paths": ["Sources/Gone.swift"], "reason": "removed"}]
+        classes.append({"id": "app", "include": ["Sources/Services/**"]})
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "match no tracked file: Sources/Gone.swift"):
+            PROMOTION.validate_routing_coverage(classes, stale, self.root)
+        PROMOTION.validate_routing_coverage(classes, unrouted, self.root)
+
+    def test_facts_that_name_no_previous_release_fail_closed(self) -> None:
+        self.write_json(self.root / "config/public-product-facts.json", {"stableMacRelease": {}})
+        self.git("add", "config/public-product-facts.json")
+        self.git("commit", "-qm", "facts without a release")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "names no previous public macOS release"):
+            PROMOTION.previous_public_release(self.root, self.git("rev-parse", "HEAD"))
 
     def test_changed_paths_route_to_lanes_through_the_contract(self) -> None:
         contract = PROMOTION.load_contract(self.root)

@@ -71,8 +71,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the
   manifest to its branch; CI never writes back.
 - **Exact-source releases.** `release_source_authority.py` proves a GitHub-verified annotated `v*` tag on
-  the checked-out commit, containment in `origin/main` and a successful latest `CI required` run; the
-  release workflow runs Security on that commit first. Lightweight tags, cross-SHA checks and incomplete
+  the checked-out commit, containment in `origin/main` and a successful latest `CI required` run of a
+  push to main; the release workflow runs Security on that commit first, and every later job builds
+  that authorized commit, never the tag ref again. Promotion runs from the tag under the `release`
+  environment and verifies each DMG's build attestation from `release.yml`. Lightweight tags, cross-SHA checks and incomplete
   check-run pagination fail closed. Every release step matches its `config/orchestration-contract.json`
   template; schema-v2 release evidence accepts only a clean full-tree identity and same-invocation step
   manifests. Never restore a `release.published` trigger; `--generate-notes` is banned and

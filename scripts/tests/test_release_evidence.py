@@ -171,6 +171,54 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.assertEqual({item["status"] for item in evidence["verification"]}, {"passed"})
         self.assertTrue((self.output / release_evidence.VERIFICATION_BUNDLE_NAME).is_file())
 
+    def test_promotion_binds_the_evidence_to_the_checked_out_source(self) -> None:
+        self.create()
+        release_evidence.validate(self.output, source_root=self.root)
+        # A contract that differs from the checkout's, though consistent with its own digests.
+        original = self.release_contract.read_text(encoding="utf-8")
+        self.release_contract.write_text(original + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "differs from the checked-out source"):
+            release_evidence.validate(self.output, source_root=self.root)
+        self.release_contract.write_text(original, encoding="utf-8")
+        # Evidence for another commit than the one checked out.
+        subprocess.run(["git", "-C", str(self.root), "commit", "-q", "--allow-empty", "-m", "later"], check=True)
+        with self.assertRaisesRegex(ValueError, "does not name the checked-out commit"):
+            release_evidence.validate(self.output, source_root=self.root)
+
+    def test_promotion_publishes_only_assets_the_evidence_names(self) -> None:
+        self.create()
+        (self.output / "quality-promotion.json").write_text("{}\n", encoding="utf-8")
+        release_evidence.validate(self.output, exact_extra=["quality-promotion.json"])
+        stray = self.output / "Vocello.zip"
+        stray.write_bytes(b"never checked")
+        with self.assertRaisesRegex(ValueError, "unexpected=\\['Vocello.zip'\\]"):
+            release_evidence.validate(self.output, exact_extra=["quality-promotion.json"])
+        stray.unlink()
+        (self.output / "quality-promotion.json").unlink()
+        with self.assertRaisesRegex(ValueError, "missing=\\['quality-promotion.json'\\]"):
+            release_evidence.validate(self.output, exact_extra=["quality-promotion.json"])
+
+    def test_listed_assets_must_be_the_checked_files_digest_for_digest(self) -> None:
+        self.create()
+        names = sorted(entry.name for entry in self.output.iterdir())
+        listing = {"assets": [
+            {"name": name, "digest": "sha256:" + release_evidence.digest_file(self.output / name)}
+            for name in names
+        ]}
+        self.assertEqual(release_evidence.match_assets(listing, self.output), names)
+        swapped = json.loads(json.dumps(listing))
+        swapped["assets"][0]["digest"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "differs from the checked file"):
+            release_evidence.match_assets(swapped, self.output)
+        extra = json.loads(json.dumps(listing))
+        extra["assets"].append({"name": "late.dmg", "digest": "sha256:" + "1" * 64})
+        with self.assertRaisesRegex(ValueError, "differ from the checked files"):
+            release_evidence.match_assets(extra, self.output)
+        repeated = json.loads(json.dumps(listing))
+        repeated["assets"].append(dict(listing["assets"][0]))
+        with self.assertRaisesRegex(ValueError, "repeated"):
+            release_evidence.match_assets(repeated, self.output)
+
     def test_source_identity_rejects_untracked_source_before_release_work(self) -> None:
         untracked = self.root / "unexpected-source.swift"
         untracked.write_text("// must fail closed\n", encoding="utf-8")

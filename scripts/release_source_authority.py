@@ -4,8 +4,10 @@
 The network boundary stays in the workflow's authenticated ``gh api`` calls.
 This module consumes those untracked responses, rejects lightweight or
 unverified tags, and requires the latest named GitHub Actions checks for the
-tagged commit to have completed successfully. Raw signatures and payloads are
-never copied into the privacy-safe result.
+tagged commit to have completed successfully. Only checks of a push run on main
+count: ci.yml also names its pull-request aggregate `CI required`, and that run
+checks the Linux lanes alone. Raw signatures and payloads are never copied into
+the privacy-safe result.
 """
 
 from __future__ import annotations
@@ -63,24 +65,64 @@ def _flatten_check_runs(value: Any) -> list[dict[str, Any]]:
     return list(runs.values())
 
 
+CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
+
+
+def _push_check_suites(value: Any, commit: str) -> set[int]:
+    """Check-suite ids of the CI workflow's push runs on main for the commit (`actions/runs` pages)."""
+    pages = value if isinstance(value, list) else [value]
+    if not pages:
+        raise ValueError("workflow-run response contains no pages")
+    suites: set[int] = set()
+    collected: set[int] = set()
+    advertised = 0
+    for index, raw_page in enumerate(pages):
+        page = _object(raw_page, f"workflow-run page {index}")
+        total = page.get("total_count")
+        rows = page.get("workflow_runs")
+        if not isinstance(total, int) or total < 0 or not isinstance(rows, list):
+            raise ValueError(f"workflow-run page {index} has an invalid result envelope")
+        advertised = max(advertised, total)
+        for row in rows:
+            run = _object(row, "workflow run")
+            identifier = run.get("id")
+            if not isinstance(identifier, int) or identifier <= 0:
+                raise ValueError("workflow run has an invalid id")
+            collected.add(identifier)
+            suite = run.get("check_suite_id")
+            if (run.get("event") == "push" and run.get("head_branch") == "main"
+                    and run.get("head_sha") == commit and run.get("path") == CI_WORKFLOW_PATH
+                    and isinstance(suite, int)):
+                suites.add(suite)
+    if len(collected) < advertised:
+        raise ValueError(
+            f"workflow-run response is incomplete ({len(collected)} collected, {advertised} advertised)"
+        )
+    return suites
+
+
 def _latest_required_check(
     rows: list[dict[str, Any]],
     *,
     name: str,
     commit: str,
+    push_suites: set[int],
 ) -> dict[str, Any]:
     candidates = []
     for row in rows:
         app = row.get("app")
+        suite = row.get("check_suite")
         if (
             row.get("name") == name
             and row.get("head_sha") == commit
             and isinstance(app, dict)
             and app.get("slug") == "github-actions"
+            and isinstance(suite, dict)
+            and suite.get("id") in push_suites
         ):
             candidates.append(row)
     if not candidates:
-        raise ValueError(f"missing exact-SHA GitHub Actions check {name!r}")
+        raise ValueError(f"missing exact-SHA GitHub Actions check {name!r} from a push to main")
     latest = max(
         candidates,
         key=lambda row: (
@@ -103,6 +145,7 @@ def validate(
     tag_ref: Any,
     tag_object: Any,
     check_runs: Any,
+    push_runs: Any,
     required_checks: tuple[str, ...] = DEFAULT_REQUIRED_CHECKS,
 ) -> dict[str, Any]:
     if TAG.fullmatch(tag) is None:
@@ -137,9 +180,10 @@ def validate(
             raise ValueError(f"verified tag response is missing {field}")
 
     rows = _flatten_check_runs(check_runs)
+    push_suites = _push_check_suites(push_runs, commit)
     checks: dict[str, dict[str, Any]] = {}
     for name in required_checks:
-        row = _latest_required_check(rows, name=name, commit=commit)
+        row = _latest_required_check(rows, name=name, commit=commit, push_suites=push_suites)
         checks[name] = {
             "id": row["id"],
             "completedAt": row.get("completed_at"),
@@ -166,6 +210,8 @@ def main() -> int:
     parser.add_argument("--tag-ref", type=Path, required=True)
     parser.add_argument("--tag-object", type=Path, required=True)
     parser.add_argument("--check-runs", type=Path, required=True)
+    parser.add_argument("--push-runs", type=Path, required=True,
+                        help="actions/runs?head_sha=<commit>&event=push&branch=main pages")
     parser.add_argument("--required-check", action="append", dest="required_checks")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -177,6 +223,7 @@ def main() -> int:
             tag_ref=_load_json(args.tag_ref),
             tag_object=_load_json(args.tag_object),
             check_runs=_load_json(args.check_runs),
+            push_runs=_load_json(args.push_runs),
             required_checks=tuple(args.required_checks or DEFAULT_REQUIRED_CHECKS),
         )
         encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"

@@ -78,6 +78,19 @@ class RoutingTests(unittest.TestCase):
         self.assertFalse(lanes["website"], reason)
         self.assertFalse(lanes["workflows"], reason)
 
+    def test_an_unavailable_history_runs_every_lane(self) -> None:
+        lanes, reason = MODULE.route_push(self.head, self.shas["c2"], MODULE.HISTORY_UNAVAILABLE, cwd=str(self.repo))
+        self.assertTrue(all(lanes.values()), reason)
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "ci-history.json"
+            marker.write_text('{"unavailable": true}', encoding="utf-8")
+            self.assertEqual(MODULE.load_history(str(marker)), MODULE.HISTORY_UNAVAILABLE)
+            marker.write_text("not json", encoding="utf-8")
+            self.assertEqual(MODULE.load_history(str(marker)), MODULE.HISTORY_UNAVAILABLE)
+            marker.write_text("[]", encoding="utf-8")
+            self.assertEqual(MODULE.load_history(str(marker)), [])
+            self.assertIsNone(MODULE.load_history(str(Path(directory) / "absent.json")))
+
     def test_previous_push_routing_would_have_skipped_everything(self) -> None:
         lanes, _ = MODULE.route_push(self.head, self.shas["c2"], None, cwd=str(self.repo))
         self.assertFalse(any(lanes[lane] for lane in ("swift", "ios", "python", "website")))
@@ -242,6 +255,7 @@ class ClassificationTests(unittest.TestCase):
             "config/test-quarantine.json": {"swift", "python"},
             "config/ios-memory-budget-policy.json": {"swift", "python"},
             "scripts/tests/fixtures/language_normalization.json": {"swift", "python"},
+            "scripts/tests/fixtures/audio_qc_codec_loop.json": {"swift", "python", "research"},
             "config/language-normalization/hant-hans-v1.txt": {"swift", "python"},
             "config/audio-qc-stage0-calibration.json": {"swift", "python"},
             "config/audio-qc-stage0-observations.json": {"swift", "python"},

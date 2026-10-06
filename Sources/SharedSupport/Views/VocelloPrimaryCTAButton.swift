@@ -49,6 +49,11 @@ struct VocelloPrimaryCTAButton: View {
         var compactHorizontalPadding: CGFloat
         /// The desktop caps the title at one line; the phone does not.
         var titleLineLimit: Int?
+        /// A12-06: the dock capsule keeps its fixed height (the Studio dock
+        /// slot is sized for it), so on the phone a title that wraps at large
+        /// text sizes shrinks to fit the capsule instead of losing its last
+        /// line to an ellipsis. 1 never shrinks (the desktop's fixed type).
+        var titleMinimumScaleFactor: CGFloat
         /// The phone keeps the tinted glow on a disabled button (over the
         /// dimmer fill); the desktop drops it with the enabled state.
         var glowsWhenDisabled: Bool
@@ -66,6 +71,7 @@ struct VocelloPrimaryCTAButton: View {
             dockHorizontalPadding: 0,
             compactHorizontalPadding: 0,
             titleLineLimit: nil,
+            titleMinimumScaleFactor: 0.5,
             glowsWhenDisabled: true,
             hitTestsCapsule: false,
             dockHeight: 56,
@@ -76,6 +82,7 @@ struct VocelloPrimaryCTAButton: View {
             dockHorizontalPadding: 20,
             compactHorizontalPadding: 18,
             titleLineLimit: 1,
+            titleMinimumScaleFactor: 1,
             glowsWhenDisabled: false,
             hitTestsCapsule: true,
             dockHeight: 48,
@@ -194,6 +201,8 @@ struct VocelloPrimaryCTAButton: View {
                 .tracking(size.titleTracking)
                 .foregroundStyle(foregroundInk)
                 .lineLimit(traits.titleLineLimit)
+                .minimumScaleFactor(traits.titleMinimumScaleFactor)
+                .multilineTextAlignment(.center)
         }
         .padding(.horizontal, traits.horizontalPadding(for: size))
         .frame(maxWidth: size.spansWidth ? .infinity : nil)

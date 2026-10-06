@@ -149,6 +149,9 @@ struct IOSDeliveryPickerSheet: View {
                             Capsule(style: .continuous)
                                 .stroke(tint.opacity(0.35), lineWidth: 0.8)
                         }
+                        // A12-07: a 40 pt capsule that catches 44.
+                        .frame(minHeight: Theme.HitTarget.minimum)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("deliveryPicker_confirm")
@@ -537,6 +540,9 @@ struct IOSDeliveryPickerSheet: View {
                     Capsule(style: .continuous)
                         .stroke(isSelected ? tint.opacity(0.32) : Color.white.opacity(0.10), lineWidth: 0.8)
                 }
+                // A12-07: the 36 pt capsule catches a 44 pt target.
+                .frame(minHeight: Theme.HitTarget.minimum)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("deliveryPickerIntensity_\(level)")
@@ -591,6 +597,9 @@ struct IOSQwenLanguagePickerSheet: View {
                             Capsule(style: .continuous)
                                 .stroke(tint.opacity(0.35), lineWidth: 0.8)
                         }
+                        // A12-07: a 40 pt capsule that catches 44.
+                        .frame(minHeight: Theme.HitTarget.minimum)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("languagePicker_confirm")
@@ -846,6 +855,9 @@ struct IOSVoicePickerSheet: View {
                             Capsule(style: .continuous)
                                 .stroke(tint.opacity(0.35), lineWidth: 0.8)
                         }
+                        // A12-07: a 40 pt capsule that catches 44.
+                        .frame(minHeight: Theme.HitTarget.minimum)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("voicePicker_confirm")
@@ -898,6 +910,10 @@ struct IOSVoicePickerSheet: View {
             ForEach(availableFilters, id: \.id) { filter in
                 IOSVoicePickerFilterChip(
                     label: filter.label,
+                    // A12-10: the identifier comes from the stable filter id
+                    // ("all" or the contract's language tag), never from the
+                    // label, which follows the App Language.
+                    identifierSuffix: filter.id == IOSVoicePickerSheet.allFilterID ? "all" : filter.id,
                     isActive: selectedFilter == filter.id,
                     action: {
                         selectedFilter = filter.id
@@ -989,6 +1005,9 @@ struct IOSVoicePickerSheet: View {
                     size: 40,
                     symbolSize: 16
                 )
+                // A12-07: the 40 pt chrome catches a 44 pt target.
+                .frame(width: Theme.HitTarget.minimum, height: Theme.HitTarget.minimum)
+                .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPreviewing ? IOSInterfaceText.stopPreview : IOSInterfaceText.previewVoice)
@@ -1034,6 +1053,8 @@ struct IOSVoicePickerSheet: View {
 /// background when inactive, white-elevated background when active.
 private struct IOSVoicePickerFilterChip: View {
     let label: String
+    /// Stable, language-independent suffix of the accessibility identifier.
+    let identifierSuffix: String
     let isActive: Bool
     let action: () -> Void
 
@@ -1057,9 +1078,12 @@ private struct IOSVoicePickerFilterChip: View {
                             lineWidth: 0.5
                         )
                 }
+                // A12-07: the 32 pt pill catches a 44 pt target.
+                .frame(minHeight: Theme.HitTarget.minimum)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("voicePickerFilterChip_\(label)")
+        .accessibilityIdentifier("voicePickerFilterChip_\(identifierSuffix)")
         .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }

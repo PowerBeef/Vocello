@@ -68,6 +68,11 @@ struct GenerationHistoryEnqueueWarning: View {
             .modifier(GatedBannerSurface())
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("historyUnqueued_banner")
+            // A12-04: the banner appears off any VoiceOver focus; say once
+            // that the take is ready but History did not save it.
+            .onAppear {
+                StudioGenerationAnnouncer.post(VocelloPresentationText.historyUnqueuedTitle)
+            }
             #if os(iOS)
             .iosExportPresentation(exportGate)
             #endif

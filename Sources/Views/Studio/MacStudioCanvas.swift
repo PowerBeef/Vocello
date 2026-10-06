@@ -336,7 +336,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(readiness.title)
-        .accessibilityValue(readiness.isReady ? "Ready" : "Waiting")
+        .accessibilityValue(readiness.isReady ? MacInterfaceText.readinessValueReady : MacInterfaceText.readinessValueWaiting)
         .accessibilityHint(readiness.detail)
         .accessibilityIdentifier(readiness.accessibilityIdentifier)
     }

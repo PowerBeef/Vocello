@@ -379,6 +379,21 @@
       "availability": "conditional"
     },
     {
+      "id": "speaker-filters",
+      "identifierPattern": "voicePickerFilterChip_{dynamic}",
+      "sourceToken": "voicePickerFilterChip_",
+      "screen": "Built-in Voice picker",
+      "prerequisite": "Built-in Voice selected",
+      "role": "filter option",
+      "action": "Select the All filter",
+      "expectedResult": "Speaker list filter changes without changing the selection",
+      "expectedSemantics": "Filter name and selected state",
+      "minimumTargetPoints": 44,
+      "mutationClass": "reversible",
+      "scenario": "inventory",
+      "availability": "required"
+    },
+    {
       "id": "delivery-options",
       "identifierPattern": "deliveryPickerPreset_{value}",
       "sourceToken": "deliveryPickerPreset_",
@@ -443,7 +458,7 @@
     },
     {
       "id": "studio-chips",
-      "identifierPattern": "studioChip_(voice|voiceBrief|reference|delivery|language)",
+      "identifierPattern": "studioChip_(voice|voiceBrief|reference|delivery|language|bankDelivery|seedPin)",
       "sourceToken": "studioChip_",
       "screen": "Studio",
       "prerequisite": "Matching mode selected",
@@ -488,7 +503,7 @@
     },
     {
       "id": "voices-surface",
-      "identifierPattern": "(screen_voices|voicesSearchField|voicesFilterButton|voicesImportAudioFile|voicesSaveNewVoice|voices_errorState|voices_retryButton)",
+      "identifierPattern": "(screen_voices|voicesSearchField|voicesFilter_{dynamic}|voices_importAudioFile|voices_saveNewVoice|voices_errorState|voices_retryButton)",
       "sourceToken": "voicesSearchField",
       "screen": "Voices",
       "prerequisite": "Voices tab",
@@ -533,7 +548,7 @@
     },
     {
       "id": "history-rows",
-      "identifierPattern": "history(Row|RowTap|RowPinSeed|RowMenu|RowExport|RowDeleteConfirm|longFormSegmentsToggle)_{dynamic}",
+      "identifierPattern": "history(Row|RowTap|RowPinSeed|RowMenu|RowExport|RowDeleteConfirm|_longFormSegmentsToggle)_{dynamic}",
       "sourceToken": "historyRow_",
       "screen": "History",
       "prerequisite": "Run-owned History row exists",

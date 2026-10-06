@@ -392,12 +392,15 @@ struct IOSVoicesView: View {
             Spacer(minLength: 8)
 
             if let tag = IOSVoicePickerLanguage.tag(for: speaker.nativeLanguage) {
+                // A12-11: the row's only language cue scales with Dynamic
+                // Type like its neighbours (the voice picker's pill recipe).
                 Text(tag)
-                    .font(.system(size: 10, weight: .semibold))
+                    .iosScaledFont(size: 10, weight: .semibold, relativeTo: .caption2)
                     .tracking(0.4)
                     .foregroundStyle(Theme.Text.secondary)
                     .padding(.horizontal, 8)
-                    .frame(height: 20)
+                    .padding(.vertical, 4)
+                    .frame(minHeight: 20)
                     .background {
                         Capsule(style: .continuous)
                             .fill(Color.white.opacity(0.08))

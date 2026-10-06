@@ -68,6 +68,25 @@ struct MacStatusStrip: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sidebar_generationStatus")
         .appAnimation(MacTheme.Motion.easeOut, value: descriptor.stateKey)
+        // A12-04: an engine error or stop is announced once when it appears;
+        // progress and the routine states stay silent.
+        .onChange(of: errorAnnouncement) { _, announcement in
+            if let announcement {
+                StudioGenerationAnnouncer.post(announcement)
+            }
+        }
+    }
+
+    /// The VoiceOver announcement for the error and crashed states, `nil` otherwise.
+    private var errorAnnouncement: String? {
+        switch status {
+        case .error, .crashed:
+            let descriptor = descriptor
+            guard let message = descriptor.message, !message.isEmpty else { return descriptor.title }
+            return MacInterfaceText.statusAnnouncement(title: descriptor.title, message: message)
+        case .idle, .standby, .starting, .running:
+            return nil
+        }
     }
 
     private func strip(_ descriptor: Descriptor) -> some View {

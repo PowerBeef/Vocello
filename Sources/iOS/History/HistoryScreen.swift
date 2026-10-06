@@ -658,16 +658,26 @@ private struct IOSHistoryLibrarySection: View {
                     expandedProjects.insert(projectID)
                 }
             } label: {
+                // A12-03, mirroring the macOS twin: the state is a VoiceOver
+                // value rather than an unlabeled chevron, and the 44 pt hit
+                // region lives inside the label.
                 HStack(spacing: 6) {
                     Image(systemName: "rectangle.stack")
+                        .accessibilityHidden(true)
                     Text(IOSInterfaceText.segmentCount(segments.count))
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .accessibilityHidden(true)
                 }
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Theme.Text.secondary)
+                .frame(minHeight: Theme.HitTarget.minimum)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 28)
+            .accessibilityValue(
+                isExpanded ? IOSInterfaceText.historySegmentsExpanded : IOSInterfaceText.historySegmentsCollapsed
+            )
             .accessibilityIdentifier("history_longFormSegmentsToggle_\(digestPrefix)")
             if isExpanded {
                 ForEach(segments) { segment in

@@ -1124,6 +1124,21 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.readiness.engineStarting", defaultValue: "Engine starting",
                comment: "macOS interface: readiness title while the engine starts. Presentation only.")
     }
+    /// A12-08: VoiceOver value of the Studio readiness caption.
+    static var readinessValueReady: String {
+        localization.string(localized: "vocello.mac.readiness.valueReady", defaultValue: "Ready",
+               comment: "macOS interface: VoiceOver value of the Studio readiness line when a take can be generated. Presentation only.")
+    }
+    static var readinessValueWaiting: String {
+        localization.string(localized: "vocello.mac.readiness.valueWaiting", defaultValue: "Waiting",
+               comment: "macOS interface: VoiceOver value of the Studio readiness line while something must happen first (engine, model, reference or script). Presentation only.")
+    }
+    /// A12-04: one VoiceOver announcement for an engine error in the sidebar
+    /// status strip: the strip title, then its message.
+    static func statusAnnouncement(title: String, message: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.status.announcement", defaultValue: "%1$@. %2$@",
+               comment: "macOS interface: VoiceOver announcement when the engine reports an error; %1$@ is the short status title (for example \"Engine stopped\"), %2$@ the full message sentence. Presentation only."), title, message)
+    }
     static var readinessEngineStartingDetail: String {
         localization.string(localized: "vocello.mac.readiness.engineStartingDetail", defaultValue: "The engine is still preparing.",
                comment: "macOS interface: readiness detail while the engine starts. Presentation only.")

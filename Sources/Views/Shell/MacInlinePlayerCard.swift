@@ -79,7 +79,8 @@ struct MacInlinePlayerCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel(audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
             .accessibilityIdentifier("sidebarPlayer_playPause")
-            .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
+            // A12-08: no value; the label already names the action, and the
+            // former English "pause"/"play" value contradicted it.
             .disabled(!audioPlayer.hasAudio)
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {

@@ -46,7 +46,9 @@ struct IOSGenerateContainerView: View {
             // tab dock. Plain VStack reinstates that flow.
             VStack(alignment: .leading, spacing: 0) {
                 IOSGenerationModeSelector(selectedSection: $selectedSection)
-                    .frame(height: selectorRailHeight)
+                    // A minimum, so the vertical rail can grow with its rows
+                    // at the largest accessibility sizes (A12-01).
+                    .frame(minHeight: selectorRailHeight)
                     .padding(.horizontal, 16)
                     .padding(.top, 6)
                     .padding(.bottom, 10)

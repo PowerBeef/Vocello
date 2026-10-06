@@ -43,36 +43,47 @@ struct IOSOnboardingFlow: View {
             Spacer()
 
             if page < totalPages - 1 {
-                Button(IOSInterfaceText.skip) {
-                    complete()
+                // A12-02: the frame and content shape live inside the label,
+                // which is the plain button's hit region, so the whole 44 pt
+                // target responds instead of only the word.
+                Button(action: complete) {
+                    Text(IOSInterfaceText.skip)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.Text.secondary)
+                        .frame(minWidth: Theme.HitTarget.minimum, minHeight: Theme.HitTarget.minimum)
+                        .contentShape(Rectangle())
                 }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(Theme.Text.secondary)
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("onboarding_skip")
             }
         }
-        .frame(height: 44)
+        .frame(minHeight: 44)
         .padding(.top, 12)
     }
 
     // MARK: - Pages
 
-    @ViewBuilder
+    /// A12-51: the page scrolls when its content outgrows the space between
+    /// the top bar and the pagination (accessibility text sizes); while it
+    /// fits, the minimum height keeps it centered exactly as before.
     private var pages: some View {
-        Group {
-            switch page {
-            case 0:
-                IOSOnboardingWelcomePage()
-            case 1:
-                IOSOnboardingInstallPage()
-            default:
-                IOSOnboardingReadyPage()
+        GeometryReader { proxy in
+            IOSScrollView(bottomFadeHeight: 0) {
+                Group {
+                    switch page {
+                    case 0:
+                        IOSOnboardingWelcomePage()
+                    case 1:
+                        IOSOnboardingInstallPage()
+                    default:
+                        IOSOnboardingReadyPage()
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
+                .transition(.opacity)
+                .iosAppAnimation(Theme.Motion.easeOut, value: page)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .transition(.opacity)
-        .iosAppAnimation(Theme.Motion.easeOut, value: page)
     }
 
     // MARK: - Pagination dots
@@ -134,6 +145,8 @@ struct IOSOnboardingFlow: View {
 // MARK: - Page 1: Welcome
 
 private struct IOSOnboardingWelcomePage: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(spacing: 0) {
             IOSOnboardingIcon(symbol: "sparkles", colors: [Theme.Brand.gold, Theme.Brand.modeClone])
@@ -170,7 +183,8 @@ private struct IOSOnboardingWelcomePage: View {
                     detail: nil
                 )
             }
-            .frame(width: 280, alignment: .leading)
+            // A12-51: the fixed column widens to the page at accessibility sizes.
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 280, alignment: .leading)
             .padding(.top, 32)
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -180,6 +194,8 @@ private struct IOSOnboardingWelcomePage: View {
 // MARK: - Page 2: Install
 
 private struct IOSOnboardingInstallPage: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(spacing: 0) {
             IOSOnboardingIcon(symbol: "arrow.down.circle.fill", colors: [Theme.Brand.modeDesign, Theme.Brand.gold])
@@ -225,7 +241,7 @@ private struct IOSOnboardingInstallPage: View {
                     detail: IOSInterfaceText.cloneDetail
                 )
             }
-            .frame(width: 300, alignment: .leading)
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 300, alignment: .leading)
             .padding(.top, 32)
         }
         .frame(maxWidth: .infinity, alignment: .center)

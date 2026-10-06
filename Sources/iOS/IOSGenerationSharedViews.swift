@@ -410,7 +410,7 @@ private struct IOSGenerateMiniPlayerProgressRail: View {
         .frame(height: railHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(canSeek ? IOSInterfaceText.previewProgress : IOSInterfaceText.liveProgress)
-        .accessibilityValue("\(playbackProgress.formattedCurrentTime) of \(durationText)")
+        .accessibilityValue(IOSInterfaceText.playbackPosition(playbackProgress.formattedCurrentTime, of: durationText))
         .accessibilityIdentifier("generate_miniPlayer_seekRail")
         .accessibilityAdjustableAction { direction in
             guard canSeek else { return }

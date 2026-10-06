@@ -78,7 +78,10 @@ struct VocelloCapsuleSelector<Item: Identifiable & Hashable>: View {
             Capsule(style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
         }
-        .frame(height: stacksVertically ? 136 : 44)
+        // The horizontal rail stays exactly 44. The vertical rail (iOS
+        // accessibility sizes) is at least three 44 pt rows but grows with
+        // them at the largest sizes instead of spilling past its slot (A12-01).
+        .frame(minHeight: stacksVertically ? 136 : 44, maxHeight: stacksVertically ? nil : 44)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(controlAccessibilityIdentifier)
     }

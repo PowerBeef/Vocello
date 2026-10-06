@@ -96,7 +96,7 @@ private final class IOSControlAuditRecorder {
     // These are the machine-readable contract families owned by this test.
     // scripts/ios_control_audit.py rejects drift in either direction.
     static let ownedControlFamilies = [
-        "root-tabs", "studio-modes", "composer", "speaker-options", "speaker-previews",
+        "root-tabs", "studio-modes", "composer", "speaker-options", "speaker-previews", "speaker-filters",
         "delivery-options", "delivery-editor", "language-options", "variation-options",
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
         "saved-voice-rows", "history-surface", "history-unqueued", "startup-recovery", "history-rows",
@@ -307,6 +307,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
         select(mode: .custom)
         auditSpeakerOptions()
+        auditSpeakerFilters()
         auditDeliveryOptions()
         auditLanguageOptions()
         auditCustomDeliveryEditor()
@@ -1233,6 +1234,21 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             )
         }
         selectSpeaker("aiden")
+    }
+
+    /// A12-10: the voice picker's filter chips carry language-independent
+    /// identifiers ("all" or the contract's language tag), so this locator
+    /// holds under any App Language. Selecting All leaves the speaker as is.
+    private func auditSpeakerFilters() {
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_voice"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicePickerFilterChip_all"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicePicker_confirm"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(element("voicePicker_confirm"), timeout: 20))
+        recorder.record(
+            scenario: "inventory", controlID: "speaker-filters",
+            expected: "The All filter is selectable by its stable identifier",
+            actual: "Selected through voicePickerFilterChip_all and confirmed without a stale modal"
+        )
     }
 
     private func auditDeliveryOptions() {

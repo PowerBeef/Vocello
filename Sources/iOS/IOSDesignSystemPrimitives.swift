@@ -1005,6 +1005,8 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
     let leading: ((Option) -> AnyView)?
     let accessibilityIdentifier: ((Option) -> String)?
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     init(
         options: [Option],
         selection: Binding<Option>,
@@ -1022,7 +1024,13 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        // A12-05: equal-width single-line chips truncate at accessibility
+        // sizes, so the row stacks full-width chips there (the Studio capsule
+        // selector's adaptation); AnyLayout keeps each chip's identity.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        layout {
             ForEach(options) { option in
                 chip(for: option)
             }
@@ -1047,8 +1055,9 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
                 }
                 Text(label(option))
                     .iosScaledFont(size: 13, weight: .semibold, relativeTo: .caption)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     .minimumScaleFactor(0.85)
+                    .multilineTextAlignment(.center)
             }
             .foregroundStyle(isSelected ? Theme.Text.primary : Theme.Text.secondary)
             .frame(maxWidth: .infinity)
@@ -1166,6 +1175,10 @@ struct IOSPrimaryCTAButton: View {
             reduceTransparency: reduceTransparency,
             action: action
         )
+        // A12-06: the 56 pt capsule sits in fixed Studio, onboarding and
+        // recording slots. Capped here, a title that wraps still fits two
+        // shrink-to-fit lines instead of truncating (like the tab dock's cap).
+        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         .iosAppAnimation(Theme.Motion.stateChange, value: isEnabled)
     }
 }

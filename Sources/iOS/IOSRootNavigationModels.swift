@@ -236,6 +236,19 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.segmentCount", defaultValue: "%1$lld segments",
                    comment: "iOS complete message: segmentCount. Substitutions retain original user content and numeric values."), count)
     }
+    static var historySegmentsExpanded: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historySegmentsExpanded", defaultValue: "Expanded",
+               comment: "iOS interface: VoiceOver value of an open long-form segment list in History. Presentation only.")
+    }
+    static var historySegmentsCollapsed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historySegmentsCollapsed", defaultValue: "Collapsed",
+               comment: "iOS interface: VoiceOver value of a closed long-form segment list in History. Presentation only.")
+    }
+    /// A12-08: the mini-player seek rail's VoiceOver value, "<elapsed> of <duration>".
+    static func playbackPosition(_ elapsed: String, of duration: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.playbackPositionValue", defaultValue: "%1$@ of %2$@",
+                   comment: "iOS interface: VoiceOver value of the playback position; %1$@ is the elapsed time and %2$@ the total duration, both already formatted."), elapsed, duration)
+    }
     static func pinSeed(_ seed: String) -> String {
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.pinSeed", defaultValue: "Pin seed %1$@ for new takes",
                    comment: "iOS complete message: pinSeed. Substitutions retain original user content and numeric values."), seed)

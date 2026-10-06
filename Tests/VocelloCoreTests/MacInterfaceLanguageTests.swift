@@ -40,6 +40,25 @@ final class MacInterfaceLanguageTests: XCTestCase {
         XCTAssertTrue(MacInterfaceLanguage.availableLanguages.contains(.french))
     }
 
+    /// A12-08, A12-04, A2-03: VoiceOver values, announcements and History
+    /// storage failures follow the interface language instead of English.
+    func testVoiceOverAndHistoryFailureCopyFollowTheInterfaceLanguage() {
+        let storage = HistoryPersistenceError(operation: .read, failure: .locked)
+        XCTAssertEqual(MacInterfaceText.readinessValueWaiting, "Waiting")
+        XCTAssertEqual(MacInterfaceText.statusAnnouncement(title: "Error", message: "Detail."), "Error. Detail.")
+        XCTAssertEqual(MacInterfaceText.historyFailureMessage(storage), storage.errorDescription)
+
+        MacInterfaceLanguage.select(IOSUILanguage.french.rawValue)
+        defer { MacInterfaceLanguage.select(IOSAppLanguage.system) }
+        XCTAssertEqual(MacInterfaceText.readinessValueReady, "Prêt")
+        XCTAssertEqual(MacInterfaceText.readinessValueWaiting, "En attente")
+        XCTAssertNotEqual(MacInterfaceText.historyFailureMessage(storage), storage.errorDescription)
+        XCTAssertEqual(
+            MacInterfaceText.historyFailureMessage(storage),
+            storage.interfaceMessage(MacInterfaceLanguage.current)
+        )
+    }
+
     func testSelectionPublishesToEveryContext() async {
         MacInterfaceLanguage.select(IOSUILanguage.french.rawValue)
         XCTAssertEqual(MacInterfaceLanguage.selection, "fr")

@@ -34,8 +34,20 @@ struct IOSRecordingOverlay: View {
 
             VStack(spacing: 0) {
                 topBar
-                captureStage
-                Spacer()
+                // A12-51: the original layout while it fits; at accessibility
+                // text sizes, where the guidance and status outgrow the
+                // screen, the stage scrolls between the pinned top bar and
+                // controls instead of clipping.
+                ViewThatFits(in: .vertical) {
+                    VStack(spacing: 0) {
+                        captureStage
+                        Spacer()
+                    }
+                    IOSScrollView(bottomFadeHeight: 0) {
+                        captureStage
+                            .padding(.vertical, 12)
+                    }
+                }
                 controls
             }
             .padding(.horizontal, 24)
@@ -232,16 +244,22 @@ struct IOSRecordingOverlay: View {
                 )
                 .accessibilityIdentifier("iosRecord_stop")
             } else if recorder.elapsed > 0 {
-                Button(IOSInterfaceText.retake) {
-                    recorder.reset()
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.Text.secondary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background {
-                    Capsule(style: .continuous)
-                        .fill(Theme.Surface.glassSurfaceMuted)
+                // A12-02: the capsule, its size and the content shape live
+                // inside the label (the plain button's hit region), so the
+                // whole drawn capsule responds, not only the word.
+                Button(action: { recorder.reset() }) {
+                    Text(IOSInterfaceText.retake)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.Text.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 52)
+                        .background {
+                            Capsule(style: .continuous)
+                                .fill(Theme.Surface.glassSurfaceMuted)
+                        }
+                        .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("iosRecord_retake")

@@ -95,6 +95,14 @@ struct IOSEngineLifecycleToast: View {
         }
         errorMessage = ttsEngine.visibleErrorMessage
         visibleState = newState
+        // A12-04: SwiftUI does not announce an inserted view, and the
+        // informational states leave after four seconds. Say what changed once
+        // per state change, in the same words the toast shows.
+        if let descriptor = Self.descriptor(for: newState) {
+            StudioGenerationAnnouncer.post(
+                descriptor.isError ? (errorMessage ?? descriptor.message) : descriptor.message
+            )
+        }
         dismissTask?.cancel()
         // Error toasts persist until the engine state changes or the user taps to
         // dismiss — a real failure must not vanish before it can be read/acted on.

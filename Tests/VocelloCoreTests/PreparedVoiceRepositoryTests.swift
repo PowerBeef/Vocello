@@ -665,6 +665,82 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Persona.clone_prompt").path))
     }
 
+    /// A8-01: the 24 kHz copy and mirrored transcript cloning derived from a
+    /// voice's audio go with the voice. "Alice" and "Alice!" share a sanitized
+    /// stem and their audio, so they derive the same files, which stay until
+    /// neither voice is left; nothing else in the directory is touched.
+    func testDeleteRemovesTheNormalizedCopyClonedFromTheVoice() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let source = try writeSource(named: "memo.m4a", bytes: [7, 7, 7])
+        for name in ["Alice", "Alice!", "Bob"] {
+            let candidate = try await repository.prepare(
+                name: name,
+                audioURL: source,
+                transcript: "a private transcript",
+                qualityWarnings: [],
+                replacingVoiceID: nil
+            )
+            _ = try await repository.commit(id: candidate.id)
+        }
+        let alice = try writeDerivedCloneReference(forVoice: "Alice")
+        XCTAssertEqual(try derivedCloneReferenceURL(forVoice: "Alice!"), alice)
+        let bob = try writeDerivedCloneReference(forVoice: "Bob")
+        let unrelated = MLXTTSEngine.normalizedCloneReferenceDirectory(in: root)
+            .appendingPathComponent("Other_\(String(repeating: "0", count: 64)).wav")
+        try Data([1]).write(to: unrelated)
+
+        try await repository.delete(id: "Bob")
+        XCTAssertFalse(exists(bob))
+        XCTAssertFalse(exists(sidecar(of: bob)))
+
+        try await repository.delete(id: "Alice")
+        XCTAssertTrue(exists(alice), "\"Alice!\" still derives the same copy")
+        XCTAssertTrue(exists(sidecar(of: alice)))
+
+        try await repository.delete(id: "Alice!")
+        XCTAssertFalse(exists(alice))
+        XCTAssertFalse(exists(sidecar(of: alice)))
+        XCTAssertTrue(exists(unrelated))
+    }
+
+    /// A8-01: a replacement retires the old audio's derived copy, and keeps it
+    /// when the replacement publishes the same name and audio.
+    func testReplacementRemovesTheReplacedVoicesNormalizedCopy() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let first = try await repository.prepare(
+            name: "Alice",
+            audioURL: try writeSource(named: "first.m4a", bytes: [1, 2, 3]),
+            transcript: "old",
+            qualityWarnings: [],
+            replacingVoiceID: nil
+        )
+        _ = try await repository.commit(id: first.id)
+        let original = try writeDerivedCloneReference(forVoice: "Alice")
+
+        let sameAudio = try await repository.prepare(
+            name: "Alice",
+            audioURL: try writeSource(named: "same.m4a", bytes: [1, 2, 3]),
+            transcript: "edited",
+            qualityWarnings: [],
+            replacingVoiceID: "Alice"
+        )
+        _ = try await repository.commit(id: sameAudio.id)
+        XCTAssertTrue(exists(original), "the republished voice still derives it")
+
+        let newAudio = try await repository.prepare(
+            name: "Alice",
+            audioURL: try writeSource(named: "new.m4a", bytes: [9, 8, 7]),
+            transcript: nil,
+            qualityWarnings: [],
+            replacingVoiceID: "Alice"
+        )
+        _ = try await repository.commit(id: newAudio.id)
+        XCTAssertFalse(exists(original))
+        XCTAssertFalse(exists(sidecar(of: original)))
+    }
+
     func testReconcileExpiresCandidatesAndRemovesPartialAndDeleteTombstones() async throws {
         let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
         let repository = PreparedVoiceRepository(
@@ -857,6 +933,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             at: root.appendingPathComponent("voices/Delete Me.clone_prompt"),
             withIntermediateDirectories: true
         )
+        let derived = try writeDerivedCloneReference(forVoice: "Delete Me", extension: "wav")
 
         let transactionDirectory = root.appendingPathComponent(
             "voice-transactions/delete-interrupted",
@@ -884,6 +961,8 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Delete Me.wav").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Delete Me.clone_prompt").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: transactionDirectory.path))
+        XCTAssertFalse(exists(derived), "a resumed delete also removes the derived copy")
+        XCTAssertFalse(exists(sidecar(of: derived)))
     }
 
     private func makeRepository() -> PreparedVoiceRepository {
@@ -891,6 +970,32 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             appSupportDirectory: root,
             supportedAudioExtensions: extensions
         )
+    }
+
+    private func exists(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+    }
+
+    private func sidecar(of url: URL) -> URL {
+        url.deletingPathExtension().appendingPathExtension("txt")
+    }
+
+    /// Where cloning normalizes a committed voice's audio, named as the clone
+    /// cache names it.
+    private func derivedCloneReferenceURL(forVoice id: String, extension pathExtension: String = "m4a") throws -> URL {
+        let audio = root.appendingPathComponent("voices/\(id).\(pathExtension)")
+        return MLXTTSEngine.normalizedCloneReferenceDirectory(in: root).appendingPathComponent(
+            try NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(for: audio)
+        )
+    }
+
+    /// Stands in for a clone take: the normalized copy and its mirrored transcript.
+    private func writeDerivedCloneReference(forVoice id: String, extension pathExtension: String = "m4a") throws -> URL {
+        let url = try derivedCloneReferenceURL(forVoice: id, extension: pathExtension)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: url)
+        try "a private transcript".write(to: sidecar(of: url), atomically: true, encoding: .utf8)
+        return url
     }
 
     private func writeSource(

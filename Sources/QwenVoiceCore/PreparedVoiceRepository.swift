@@ -104,6 +104,7 @@ actor PreparedVoiceRepository {
     private let candidatesDirectory: URL
     private let transactionsDirectory: URL
     private let quarantineDirectory: URL
+    private let normalizedCloneReferenceDirectory: URL
     private let supportedAudioExtensions: Set<String>
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
@@ -121,6 +122,7 @@ actor PreparedVoiceRepository {
         candidatesDirectory = appSupportDirectory.appendingPathComponent("voice-candidates", isDirectory: true)
         transactionsDirectory = appSupportDirectory.appendingPathComponent("voice-transactions", isDirectory: true)
         quarantineDirectory = appSupportDirectory.appendingPathComponent("voice-transactions-quarantine", isDirectory: true)
+        normalizedCloneReferenceDirectory = MLXTTSEngine.normalizedCloneReferenceDirectory(in: appSupportDirectory)
         self.supportedAudioExtensions = supportedAudioExtensions
         self.fileManager = fileManager
         self.now = now
@@ -441,6 +443,7 @@ actor PreparedVoiceRepository {
             throw PreparedVoiceRepositoryError.recoveryRequired
         }
         // All assets are tombstoned: a cleanup failure cannot resurrect them.
+        removeDerivedCloneReferences(ofVoiceAudioIn: transactionDirectory)
         try? removeTransaction(transactionDirectory)
     }
 
@@ -554,7 +557,53 @@ actor PreparedVoiceRepository {
     private func finishCommittedCandidate(_ candidate: URL, transactionDirectory: URL) throws {
         try fault(.beforeCandidateCleanup)
         if fileManager.fileExists(atPath: candidate.path) { try fileManager.removeItem(at: candidate) }
+        // A replaced voice's audio sits in the backup until the cleanup below.
+        removeDerivedCloneReferences(ofVoiceAudioIn: transactionDirectory)
         try removeTransaction(transactionDirectory)
+    }
+
+    /// A8-01: cloning a voice whose audio is not canonical WAV leaves a 24 kHz
+    /// copy and a mirrored transcript in `cache/normalized_clone_refs/`, named
+    /// from the voice file as `<stem>_<SHA-256>.wav` and `.txt`. Once a delete
+    /// or a replacement has tombstoned a voice's audio, those go with it, so no
+    /// copy of a removed voice stays behind. Best effort and fail closed: only
+    /// those exact regular files are removed, and they stay whenever a live
+    /// voice derives the same name (two voice names can share a sanitized stem
+    /// and the same audio) or a live voice's audio cannot be read.
+    private func removeDerivedCloneReferences(ofVoiceAudioIn tombstone: URL) {
+        let extensions = supportedAudioExtensions
+        let isAudio = { (url: URL) in extensions.contains(url.pathExtension.lowercased()) }
+        guard let tombstonedAudio = try? directoryContents(at: tombstone).filter(isAudio),
+              !tombstonedAudio.isEmpty,
+              let liveAudio = try? directoryContents(at: voicesDirectory).filter(isAudio) else {
+            return
+        }
+        for audioURL in tombstonedAudio {
+            guard let fingerprint = try? NativePreparedCloneConditioningCache
+                .stableCloneReferenceFingerprint(for: audioURL) else { continue }
+            let name = NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(
+                for: audioURL,
+                referenceFingerprint: fingerprint
+            )
+            let stillDerived = liveAudio.contains { liveURL in
+                guard NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(
+                    for: liveURL,
+                    referenceFingerprint: fingerprint
+                ) == name else { return false }
+                let liveFingerprint = try? NativePreparedCloneConditioningCache
+                    .stableCloneReferenceFingerprint(for: liveURL)
+                return liveFingerprint == nil || liveFingerprint == fingerprint
+            }
+            guard !stillDerived else { continue }
+            let normalizedURL = normalizedCloneReferenceDirectory.appendingPathComponent(name)
+            for url in [normalizedURL, normalizedURL.deletingPathExtension().appendingPathExtension("txt")] {
+                // Never a directory, or a link left in a file's place
+                // (the attributes describe the link, not its target).
+                let type = (try? fileManager.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType
+                guard type == .typeRegular else { continue }
+                try? fileManager.removeItem(at: url)
+            }
+        }
     }
 
     private func createRoots() throws {
@@ -780,6 +829,7 @@ actor PreparedVoiceRepository {
         // after journaling but before every move, finish moving any remaining
         // audio/transcript/prompt assets into the tombstone, then remove it.
         try moveVoiceAssets(id: manifest.voiceID, into: transactionDirectory)
+        removeDerivedCloneReferences(ofVoiceAudioIn: transactionDirectory)
         try removeTransaction(transactionDirectory)
     }
 

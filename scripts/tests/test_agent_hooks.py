@@ -111,6 +111,11 @@ class EditGuardTests(unittest.TestCase):
                                 capture_output=True, timeout=20, env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
         self.assertIn("regenerate_project.sh --fast", result.stdout)
 
+    def test_case_variants_of_a_generated_path_are_the_same_file(self):
+        for path in ("docs/roadmap.md", "DOCS/ROADMAP.MD", "qwenvoice.xcodeproj/project.pbxproj"):
+            with self.subTest(path=path):
+                self.assertEqual(invoke("generated_file_guard.sh", edit("Write", path)).returncode, 2)
+
     def test_ordinary_files_are_allowed(self):
         for path in ("CLAUDE.md", ".claude/rules/native.md", "docs/ordinary file.md",
                      "scripts/tool.py", "benchmarks/README.md"):
@@ -288,6 +293,70 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("Physical iPhone only", result.stderr)
 
+    def test_other_spellings_of_unsupported_destinations_are_blocked(self):
+        sdk = "iphone" + SIM.lower()
+        for command in (
+            f"xcodebuild -scheme VocelloiOS -sdk {sdk} build",
+            f"xcodebuild build -destination 'platform=iOS{SIM}'",
+            f"swift build --triple arm64-apple-ios26.0-{SIM.lower()}",
+            f"open -a {SIM}", f"open -g -a '{SIM}'",
+            "xcrun simctl --set /tmp/devices boot 1234",
+        ):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("Physical iPhone only", result.stderr)
+        self.assertEqual(self.guard("xcodebuild -scheme VocelloiOS -sdk iphoneos build").returncode, 0)
+        for command in (
+            f"xcodebuild -destination platform=iOS\\ {SIM},name=iPhone\\ 17",
+            f"xcodebuild -destination 'platform=visionOS {SIM}'",
+            f"open -na {SIM}", f"open /Applications/Xcode.app/Contents/Developer/Applications/{SIM}.app",
+            "xcrun simctl bootstatus 1234 -b", "xcrun simctl spawn booted log stream",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 2)
+        # A pattern never reaches across a line or a separator, and prose is not a destination.
+        for command in ("xcrun simctl list\nnpm install", "xcrun simctl list devices\necho boot done",
+                        "xcrun simctl list devices | grep Booted; echo install done",
+                        f"gh issue list --search 'ios-{SIM.lower()} crash'", "echo open -a Preview"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0)
+
+    def test_whole_cache_deletion_is_blocked_in_every_spelling(self):
+        for command in ("rm -r -f build", "rm --recursive --force build", 'rm -rf "build"', "rm -rf build/*",
+                        "rm -rf ./build/.", 'rm -rf "$PWD/build"', "rm -fr tmp build/cache", "sudo rm -rf build",
+                        "find build -delete", "find ./build/cache -type f -delete",
+                        "ls && rm -rf build/cache/xcode"):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("clean_build_caches.sh", result.stderr)
+        for command in ("rm -rf tmp && ls build", "rm build/notes.txt", "rm -rf build/artifacts/old-run",
+                        "find build -name '*.log'", "rm -rf rebuild"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0)
+
+    def test_build_output_paths_are_resolved_not_matched_as_text(self):
+        root = str(ROOT)
+        for command in (f'rm -rf "{root}/build"', 'rm -rf "$CLAUDE_PROJECT_DIR/build"', "rm -rf ../Vocello/build"
+                        if ROOT.name == "Vocello" else "rm -rf ./build", "cd build && rm -rf cache",
+                        "cd build && rm -rf ./cache/xcode", "rm -rf build/c*", "rm -rf build/{cache,artifacts}",
+                        "rm -rf build//cache", "rm -rf build/artifacts/../cache", "bash -c 'rm -rf build'",
+                        "find build -exec rm -rf {} +", "find build/cache -type f -exec rm {} \\;",
+                        "mv build /tmp/gone", "/bin/rm -rf build"):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("clean_build_caches.sh", result.stderr)
+        heredoc_note = "bash scripts/x.sh <<'EOF'\nnote: never rm -rf build\nEOF\n"
+        message = "git com" "mit -m 'note\n\nfind build -delete\n'"
+        for command in ("cd website && rm -rf build", "git log --grep='rm -rf build/cache'",
+                        "rm -rf build/cache-old-notes.txt", "find build -name '*.log' -newer x -delete",
+                        "find build -type d -empty -delete", 'rm -rf "$TMPDIR/build"', heredoc_note, message,
+                        "python3 - <<'EOF'\nimport shutil  # rm -rf build\nEOF\n"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0)
+
     def test_whole_cache_deletion_is_blocked_but_scratch_is_not(self):
         for command in ("rm -rf build/cache", "rm -rf build/cache/xcode/macos", "rm -rf build", "rm -Rf ./build/"):
             with self.subTest(command=command):
@@ -394,6 +463,42 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("regenerate_project.sh", result.stderr)
 
+    def test_copies_onto_pbxproj_are_blocked_but_copies_from_it_are_not(self):
+        for command in ("cp /tmp/edited.pbxproj QwenVoice.xcodeproj/project.pbxproj",
+                        "mv x QwenVoice.xcodeproj/project.pbxproj && echo done"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 2)
+        self.assertEqual(self.guard("cp QwenVoice.xcodeproj/project.pbxproj /tmp/backup").returncode, 0)
+        target = "QwenVoice.xcodeproj/project.pbxproj"
+        for command in (f"cp /tmp/x {target}\nls", f"mv /tmp/x {target} 2>/dev/null", f"cp /tmp/x {target} # restore",
+                        f"(cp /tmp/x {target})", f"/bin/cp /tmp/x {target}", "cp /tmp/project.pbxproj QwenVoice.xcodeproj/",
+                        f"rsync /tmp/x {target}", f"dd if=/tmp/x of={target}",
+                        "cd QwenVoice.xcodeproj && cp /tmp/x project.pbxproj"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 2)
+        commit = "git com" "mit"
+        for command in (f"pip install x\nwc -l {target}", f"cp a b\ngit diff --stat -- {target}",
+                        f"mv a b\ngrep -c PBX {target}", f'{commit} -m "docs: cp over project.pbxproj"'):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0)
+
+    def test_a_heredoc_fed_to_a_shell_is_commands(self):
+        for body in ("rm -rf build/cache", f"xcodebuild -destination 'platform=iOS {SIM}'",
+                     "echo x >> QwenVoice.xcodeproj/project.pbxproj"):
+            with self.subTest(body=body):
+                self.assertEqual(self.guard(f"bash <<'EOF'\n{body}\nEOF\n").returncode, 2)
+                self.assertEqual(self.guard(f"cat > notes.txt <<'EOF'\n{body}\nEOF\n").returncode, 0)
+
+    def test_git_lookups_and_mid_word_hashes_do_not_hide_a_command(self):
+        push = "pu" "sh"
+        for command in (f"$(which git) {push} --force origin main", f'"$(command -v git)" {push} -f origin main',
+                        f"`which git` {push} --force origin main",
+                        f"echo issue#12 && git {push} --force origin main",
+                        f"git log --grep=fix#3; git {push} origin topic"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 2)
+        self.assertEqual(self.guard("echo issue#12 && git status").returncode, 0)
+
     def test_heredoc_bodies_are_data_not_commands(self):
         # A commit message or generated file may mention guarded patterns.
         heredoc = ("git com" "mit -F - <<'EOF'\nExplain rm -rf build/cache and git push --force\n"
@@ -460,6 +565,107 @@ class CommitLintTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
             result = self.lint(root)
             self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class CommitContentLintTests(CommitLintTests):
+    """A commit that records more than the index holds when the hook runs is checked on the working tree."""
+
+    PRIVATE = "logs live in " + "/Users/" + "someone/Library\n"
+
+    def committed(self, root: Path) -> None:
+        self.repo(root)
+        (root / "notes.md").write_text("ok\n")
+        subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"], check=True)
+
+    def test_the_staged_blob_is_scanned_not_the_working_copy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            (root / "notes.md").write_text(self.PRIVATE)
+            subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+            (root / "notes.md").write_text("cleaned in the working copy only\n")
+            result = self.lint(root)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("staged content", result.stderr)
+            # The reverse: a private working copy that is not staged does not block a plain commit.
+            subprocess.run(["git", "-C", str(root), "reset", "-q", "--hard"], check=True)
+            (root / "other.md").write_text("ok\n")
+            subprocess.run(["git", "-C", str(root), "add", "other.md"], check=True)
+            (root / "notes.md").write_text(self.PRIVATE)
+            self.assertEqual(self.lint(root).returncode, 0)
+
+    def test_commits_that_take_working_tree_content_are_scanned_there(self):
+        commit = "com" "mit"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            (root / "notes.md").write_text(self.PRIVATE)
+            for command in (f"git {commit} --all -m x", f"git {commit} -am x", f"git {commit} -qa -m x",
+                            f"git {commit} -m x notes.md", f"git {commit} -m x -- notes.md",
+                            f"git {commit} --only notes.md -m x", f"git add notes.md && git {commit} -m x",
+                            f"git add -A; git {commit} -q -F -"):
+                with self.subTest(command=command):
+                    result = self.lint(root, command)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("working-tree file", result.stderr)
+            # An untracked file a chained add would take in is scanned too.
+            subprocess.run(["git", "-C", str(root), "checkout", "-q", "--", "notes.md"], check=True)
+            (root / "new.md").write_text(self.PRIVATE)
+            self.assertEqual(self.lint(root, f"git add new.md && git {commit} -m x").returncode, 2)
+            (root / "new.md").write_text("ok \n")
+            subprocess.run(["git", "-C", str(root), "add", "-N", "new.md"], check=True)
+            result = self.lint(root, f"git {commit} -am x")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("whitespace", result.stderr)
+            (root / "new.md").write_text("ok\n")
+            self.assertEqual(self.lint(root, f"git add new.md && git {commit} -m x").returncode, 0)
+            self.assertEqual(self.lint(root, f"git {commit} -m 'a message' --author 'A <a@example.invalid>'").returncode, 0)
+
+    def test_a_message_that_spans_lines_does_not_hide_what_follows_it(self):
+        commit = "com" "mit"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            (root / "notes.md").write_text(self.PRIVATE)
+            heredoc = "$(cat <<'EOF'\nsubject\n\nbody\nEOF\n)"
+            for command in (f'git {commit} -m "subject\n\nbody" -a', f'git {commit} -m "subject\n\nbody" notes.md',
+                            f'git {commit} -m "{heredoc}" notes.md', f'git {commit} -m "{heredoc}" --all',
+                            f"git {commit} -vam x", f"git -c x=y {commit} -a -m x"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.lint(root, command).returncode, 2)
+            # Attached option values are not flags, and a redirection is not a pathspec.
+            for command in (f"git {commit} -Spatrice -m x", f"git {commit} -uno -m x",
+                            f'git {commit} -m "fix: handle -a flag"', f"git {commit} -m x >| /dev/null",
+                            f"git {commit} --amend --no-edit", f"git {commit} -qm -a"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.lint(root, command).returncode, 0)
+
+    def test_the_scan_follows_what_the_commit_takes_and_nothing_else(self):
+        commit = "com" "mit"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            (root / ".gitignore").write_text("out/\n*.log\n")
+            (root / "a.py").write_text("ok\n")
+            # Unrelated work in the tree never blocks a commit of named paths.
+            (root / "scratch.txt").write_text(self.PRIVATE)
+            (root / "notes.md").write_text("unrelated trailing space \n")
+            result = self.lint(root, f"git add a.py .gitignore && git {commit} -q -F - <<'EOF'\nmsg\nEOF")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(self.lint(root, f"git {commit} -m x a.py").returncode, 0)
+            # But a directory, `-u` and `-A` take what they reach.
+            self.assertEqual(self.lint(root, f"git add . && git {commit} -m x").returncode, 2)
+            self.assertEqual(self.lint(root, f"git add -u && git {commit} -m x").returncode, 2)  # the whitespace
+            self.assertEqual(self.lint(root, f"git add -A && git {commit} -m x").returncode, 2)
+            # A force-added ignored file is scanned although git does not list it.
+            (root / "out").mkdir()
+            (root / "out/evidence.json").write_text(self.PRIVATE)
+            (root / "run.log").write_text(self.PRIVATE)
+            for command in (f"git add -f out/evidence.json && git {commit} -m x",
+                            f"git add --force run.log && git {commit} -m x"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.lint(root, command).returncode, 2)
 
 
 class WorktreeCommitLintTests(unittest.TestCase):

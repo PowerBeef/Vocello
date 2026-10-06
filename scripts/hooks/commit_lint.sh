@@ -15,8 +15,10 @@
 # `worktree-*` branch, which the lead session later integrates into main.
 # Pushes are allowed only from the main checkout on `main`. Commits also need
 # clean whitespace in the staged diff and no private path or credential in the
-# target's staged files. It finishes in seconds and never builds or tests
-# anything: CI on push is the gate.
+# staged blobs; a commit that takes more than the index holds when the hook runs
+# (an earlier `git add` in the same command, `-a`, `--only`, a pathspec) is also
+# checked on the working tree's changed and untracked files. It finishes in
+# seconds and never builds or tests anything: CI on push is the gate.
 
 set -euo pipefail
 
@@ -37,6 +39,19 @@ tab=$'\t'
 while IFS= read -r line; do
   action="${line%%"$tab"*}"
   target="${line#*"$tab"}"
+  # A commit that records more than the index holds now (an earlier `git add` in
+  # the same command, `-a`, `--only`, a pathspec) is also checked on the working
+  # tree, scoped to what it takes: `paths` (literal pathspecs), `tracked` changes
+  # or `all` changed and untracked files.
+  scope=index
+  taken_paths=()
+  if [[ "$action" == commit-worktree ]]; then
+    IFS="$tab" read -r -a fields <<< "$line"
+    action=commit
+    target="${fields[1]}"
+    scope="${fields[2]}"
+    taken_paths=("${fields[@]:3}")
+  fi
   if [[ "$action" == unresolved ]]; then
     block "cannot tell which checkout this commit or push acts on: $target." \
       "Run git from the checkout itself or with a literal git -C path."
@@ -89,6 +104,27 @@ while IFS= read -r line; do
   if ! python3 "$HOOK_DIR/../privacy_scan.py" --root "$top" --staged; then
     block "staged content contains a private path or credential-shaped token." "Remove it from the staged files."
   fi
+
+  whitespace_ok=1
+  private_ok=1
+  case "$scope" in
+    all)
+      git -C "$top" diff --check >/dev/null 2>&1 || whitespace_ok=0
+      python3 "$HOOK_DIR/../privacy_scan.py" --root "$top" --changes || private_ok=0 ;;
+    tracked)
+      git -C "$top" diff --check >/dev/null 2>&1 || whitespace_ok=0
+      python3 "$HOOK_DIR/../privacy_scan.py" --root "$top" --tracked-changes || private_ok=0 ;;
+  esac
+  if [[ "$scope" != index && "$scope" != all ]] && (( ${#taken_paths[@]} > 0 )); then
+    git -C "$target" diff --check -- "${taken_paths[@]}" >/dev/null 2>&1 || whitespace_ok=0
+    python3 "$HOOK_DIR/../privacy_scan.py" --root "$target" --worktree-paths "${taken_paths[@]}" || private_ok=0
+  fi
+  (( whitespace_ok )) || block \
+    "working-tree changes this commit records contain whitespace errors (git diff --check)." \
+    "Fix the whitespace."
+  (( private_ok )) || block \
+    "a working-tree file this commit records contains a private path or credential-shaped token." \
+    "Remove it from the file."
 done <<< "$actions"
 
 exit 0

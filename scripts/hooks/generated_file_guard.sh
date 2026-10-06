@@ -22,6 +22,8 @@ block() {
   exit 2
 }
 
+# The checkout is on a case-insensitive volume: docs/roadmap.md is docs/ROADMAP.md.
+shopt -s nocasematch
 while IFS= read -r file_path; do
   relative="${file_path#"$root"/}"
   if [[ "$relative" == .claude/worktrees/*/* ]]; then

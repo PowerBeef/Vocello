@@ -223,6 +223,8 @@ class ClassificationTests(unittest.TestCase):
     def test_compile_and_contract_inputs_still_route(self) -> None:
         expected = {
             "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/X.swift": {"swift", "ios"},
+            "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift": {"swift"},
+            "config/public-product-facts.json": {"python", "website"},
             "Packages/VocelloQwen3Core/Package.resolved": {"swift", "ios"},
             "Packages/VocelloQwen3Core/Package.swift": {"swift", "ios"},
             "Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json": {"python"},

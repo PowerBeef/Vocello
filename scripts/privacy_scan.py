@@ -37,31 +37,77 @@ SECRETS = (
     re.compile(r"\bnpm_[A-Za-z0-9]{36,}\b"),
     re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
     re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b"),
+    re.compile(r"\bsk-ant-[A-Za-z0-9_-]{24,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
 )
 CREDENTIAL_SUFFIXES = (".p8", ".p12", ".pem", ".mobileprovision", ".keychain-db")
 SELF = Path(__file__).resolve()
 
 
-def _text(path: Path) -> str | None:
-    try:
-        data = path.read_bytes()
-    except OSError:
-        return None
-    if b"\0" in data[:8192]:
+def _decode(data: bytes | None) -> str | None:
+    if data is None or b"\0" in data[:8192]:
         return None
     return data.decode("utf-8", errors="replace")
 
 
-def scan(root: Path, paths: list[str]) -> list[str]:
+def _working_tree(root: Path, relative: str) -> bytes | None:
+    path = root / relative
+    if not path.is_file():
+        return None
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+class _StagedBlobs:
+    """The content `git commit` will record for a path, not the working-tree copy, read
+    through one `git cat-file --batch` process however many paths are staged."""
+
+    def __init__(self, root: Path) -> None:
+        self.process = subprocess.Popen(["git", "-C", str(root), "cat-file", "--batch"],
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    def __call__(self, root: Path, relative: str) -> bytes | None:
+        if "\n" in relative or self.process.stdin is None or self.process.stdout is None:
+            return None
+        self.process.stdin.write(f":{relative}\n".encode("utf-8", "surrogateescape"))
+        self.process.stdin.flush()
+        header = self.process.stdout.readline().split()
+        if len(header) != 3 or not header[2].isdigit():
+            return None                                  # "<object> missing"
+        data = self.process.stdout.read(int(header[2]))
+        self.process.stdout.read(1)                      # the newline after the content
+        return data if header[1] == b"blob" else None
+
+    def close(self) -> None:
+        if self.process.stdin is not None:
+            self.process.stdin.close()
+        self.process.wait()
+
+
+def _worktree_paths(root: Path, pathspecs: list[str]) -> list[str]:
+    """The working-tree files the pathspecs select: a named file itself (also when ignored, as
+    `git add -f` takes it), and the changed or untracked files under a named directory."""
+    paths = {spec for spec in pathspecs if (root / spec).is_file()}
+    listed = subprocess.run(["git", "-C", str(root), "ls-files", "--modified", "--others", "--exclude-standard",
+                             "-z", "--", *pathspecs], capture_output=True)
+    if listed.returncode == 0:
+        paths.update(p.decode("utf-8", "surrogateescape") for p in listed.stdout.split(b"\0") if p)
+    return sorted(paths)
+
+
+def scan(root: Path, paths: list[str], read=_working_tree) -> list[str]:
     findings: list[str] = []
     for relative in paths:
         path = root / relative
-        if path.resolve() == SELF or not path.is_file():
+        if path.resolve() == SELF:
             continue
         if path.suffix in CREDENTIAL_SUFFIXES:
-            findings.append(f"{relative}: credential file must never be committed")
+            if read(root, relative) is not None:
+                findings.append(f"{relative}: credential file must never be committed")
             continue
-        text = _text(path)
+        text = _decode(read(root, relative))
         if text is None:
             continue
         # A header alone is prose or a fixture; a header with its footer is a key.
@@ -84,17 +130,35 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--staged", action="store_true")
+    mode.add_argument("--staged", action="store_true", help="the staged blobs, as a commit will record them")
+    mode.add_argument("--changes", action="store_true",
+                      help="working-tree files with unstaged changes, and untracked files")
+    mode.add_argument("--tracked-changes", action="store_true",
+                      help="working-tree files with unstaged changes (what `git commit -a` records)")
+    mode.add_argument("--worktree-paths", nargs="+", metavar="PATHSPEC",
+                      help="the working-tree files these literal pathspecs select, relative to --root")
     mode.add_argument("--paths", nargs="+")
     args = parser.parse_args(argv)
     root = args.root.resolve()
+    read = _working_tree
+    staged: _StagedBlobs | None = None
     if args.paths:
         paths = args.paths
     elif args.staged:
         paths = _git_paths(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR")
+        read = staged = _StagedBlobs(root)
+    elif args.changes:
+        paths = sorted(set(_git_paths(root, "diff", "--name-only", "--diff-filter=ACMR"))
+                       | set(_git_paths(root, "ls-files", "--others", "--exclude-standard")))
+    elif args.tracked_changes:
+        paths = _git_paths(root, "diff", "--name-only", "--diff-filter=ACMR")
+    elif args.worktree_paths:
+        paths = _worktree_paths(root, args.worktree_paths)
     else:
         paths = _git_paths(root, "ls-files")
-    findings = scan(root, paths)
+    findings = scan(root, paths, read)
+    if staged is not None:
+        staged.close()
     for finding in findings:
         print(f"error: {finding}", file=sys.stderr)
     if findings:

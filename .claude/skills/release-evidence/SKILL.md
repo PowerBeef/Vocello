@@ -3,7 +3,7 @@ name: release-evidence
 description: Read-only report of release readiness for a tag — source authority (annotated tag on origin/main, exact-SHA `CI required`), quality-promotion evidence and what still blocks a public promotion. Never publishes, signs or dispatches workflows. User-invoked only.
 argument-hint: "<tag, e.g. v3.0.0>"
 disable-model-invocation: true
-allowed-tools: Bash(python3 scripts/release_source_authority.py *), Bash(python3 scripts/quality_promotion.py validate*), Bash(python3 scripts/check_release_notes.py *), Bash(gh api *), Bash(gh run list*), Bash(gh release view*), Bash(gh release download*), Bash(git tag*), Bash(git log*), Read, Grep
+allowed-tools: Bash(python3 scripts/release_source_authority.py *), Bash(python3 scripts/quality_promotion.py validate*), Bash(python3 scripts/check_release_notes.py *), Bash(gh api --method GET *), Bash(gh run list*), Bash(gh release view*), Bash(gh release download*), Bash(git tag -l *), Bash(git log*), Read, Grep
 ---
 
 # Release evidence (read-only)
@@ -19,9 +19,9 @@ All commands and authority paths below are relative to the repository root.
 
 1. Require a tag as the argument. `git tag -l "$0" -n1` and `git log -1 "$0"` to confirm it exists and
    which commit it targets.
-2. The script has no network route: fetch the tag ref (`gh api repos/<owner>/<repo>/git/ref/tags/<tag>`),
-   the annotated tag object it points at (`gh api repos/<owner>/<repo>/git/tags/<sha>`) and the latest
-   check runs of the tagged commit (`gh api --paginate --slurp
+2. The script has no network route: fetch the tag ref (`gh api --method GET repos/<owner>/<repo>/git/ref/tags/<tag>`),
+   the annotated tag object it points at (`gh api --method GET repos/<owner>/<repo>/git/tags/<sha>`) and the latest
+   check runs of the tagged commit (`gh api --method GET --paginate --slurp
    repos/<owner>/<repo>/commits/<sha>/check-runs?filter=latest&per_page=100`) into
    `build/scratch/transient/release-evidence/<tag>/` (the governed invocation-local scratch), then run `python3 scripts/release_source_authority.py --tag <tag> --commit <sha>
    --tag-ref <ref.json> --tag-object <tag.json> --check-runs <checks.json>`. It passes only for an

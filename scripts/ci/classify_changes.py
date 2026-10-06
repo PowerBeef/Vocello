@@ -198,7 +198,8 @@ def _is_swift(path: str) -> bool:
     if path == "project.yml" or path.endswith("Package.resolved"):
         return True
     if path.startswith("Packages/"):
-        return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
+        # The macOS job compiles and runs the owned package's tests too.
+        return "/Sources/" in path or "/Tests/" in path or path.endswith(PACKAGE_MANIFESTS)
     # Swift tests pin the shipping iPhone memory bands (V-4), the Fast QC
     # Stage 0 constants (audio QC audit 5.5) and the Stage 0 observational
     # measures (AQ-04) to these records.
@@ -274,7 +275,8 @@ def classify(paths: list[str]) -> dict[str, bool]:
         if _is_workflow_input(path):
             lanes["workflows"] = True
             lanes["swift"] = lanes["ios"] = lanes["python"] = True
-        if path.startswith("website/"):
+        # The website contract checks its release mirror against the public facts.
+        if path.startswith("website/") or path == "config/public-product-facts.json":
             lanes["website"] = True
         if _is_swift(path):
             lanes["swift"] = True

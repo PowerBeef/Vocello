@@ -42,6 +42,15 @@ UNSAFE_CONFIG = re.compile(
     re.I,
 )
 REDIRECT = re.compile(r"^[0-9]*[<>]")
+# `$(which git)`, `"$(command -v git)"`, `` `type -P git` ``: spellings of the git binary itself.
+GIT_LOOKUP = re.compile(r"""["']?(?:\$\(\s*(?:which|command\s+-v|type\s+-P)\s+git\s*\)|`\s*(?:which|command\s+-v|type\s+-P)\s+git\s*`)["']?""")
+# What a later commit in the same command may record beyond the index the hook sees.
+ADD_COMMANDS = {"add", "stage"}
+INDEX_REWRITERS = {"apply", "update-index", "stash"}
+COMMIT_VALUE_OPTIONS = {"--message", "--file", "--reuse-message", "--reedit-message", "--fixup", "--squash",
+                        "--author", "--date", "--template", "--cleanup", "--trailer"}
+COMMIT_VALUE_SHORT = "mFCct"
+UNSCOPED_PATH = re.compile(r"[*?\[\]{}$`]|^:")
 # Commands that can leave a later commit or push on another branch or a detached HEAD.
 BRANCH_CHANGERS = {"checkout", "switch", "rebase", "bisect", "symbolic-ref"}
 
@@ -101,6 +110,7 @@ def _resolve(base: Path | None, value: str) -> Path | None:
 def _tokens(line: str) -> list[str]:
     lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
+    lexer.commenters = ""                            # bash starts a comment only at a word start
     try:
         return list(lexer)
     except ValueError:
@@ -113,7 +123,7 @@ def _without_redirections(tokens: list[str]) -> list[str]:
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if set(token) <= set("<>&") and ("<" in token or ">" in token):
+        if set(token) <= set("<>&|") and ("<" in token or ">" in token):   # `>|` too
             if result and result[-1].isdigit():
                 result.pop()                         # the fd number before the operator
             index += 2                               # the operator and its target
@@ -137,6 +147,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
         return found
     text = re.sub(r"\\\n", " ", command)            # line continuations
     text = text.replace("$'", "'")                   # ANSI-C quoting reads as plain quoting here
+    text = GIT_LOOKUP.sub("git", text)               # `$(which git) push` is `git push`
     text, heredocs = strip_heredocs(text)
     for prefix, body in heredocs:
         words = _tokens(prefix)
@@ -145,6 +156,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
     for body in _substitutions(text):
         found.extend(git_invocations(body, cwd, depth + 1))
     text = re.sub(r"`[^`]*`", "SUBST", text)
+    text = join_quoted_newlines(text)                # a message that spans lines is one word
 
     tokens: list[str] = []
     for line in text.splitlines():
@@ -420,6 +432,124 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
     elif sub == "symbolic-ref" and len([a for a in args if not a.startswith("-")]) >= 2:
         return "ref", "`git symbolic-ref <name> <ref>` moves HEAD to another branch"
     return "", ""
+
+
+def join_quoted_newlines(text: str) -> str:
+    """Newlines inside quotes become spaces, so a quoted word that spans lines stays one word
+    for the per-line tokenizer. A comment is copied as it is: its apostrophes open no quote."""
+    out: list[str] = []
+    quote = ""
+    index = 0
+    word_start = True
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if char == "\\" and quote == '"' and index + 1 < len(text):
+                out.append(text[index:index + 2])
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+            out.append(" " if char == "\n" else char)
+            index += 1
+            continue
+        if char == "\\" and index + 1 < len(text):
+            out.append(text[index:index + 2])
+            index += 2
+            word_start = False
+            continue
+        if char == "#" and word_start:
+            end = text.find("\n", index)
+            end = len(text) if end < 0 else end
+            out.append(text[index:end])
+            index = end
+            continue
+        if char in "'\"":
+            quote = char
+        out.append(char)
+        word_start = char in " \t\n;&|("
+        index += 1
+    return "".join(out)
+
+
+def _scoped(mode: str, paths: list[str]) -> tuple[str, list[str]]:
+    """Literal pathspecs keep their scope; a glob, a variable or pathspec magic widens it."""
+    if any(UNSCOPED_PATH.search(path) for path in paths):
+        return "all", []
+    return mode, paths
+
+
+def add_selection(invocation: GitInvocation) -> tuple[str, list[str]]:
+    """What a `git add` moves into the index: `("paths", [...])` for literal pathspecs,
+    `("tracked", [...])` for `-u`, `-p`, `-i`, `-e`, or `("all", [])`."""
+    mode, paths, only_paths = "paths", [], False
+    args = invocation.args
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if only_paths:
+            paths.append(argument)
+        elif argument == "--":
+            only_paths = True
+        elif argument.startswith("--"):
+            name = argument.split("=", 1)[0]
+            if name in ("--all", "--no-ignore-removal", "--pathspec-from-file"):
+                mode = "all"
+            elif name in ("--update", "--patch", "--interactive", "--edit") and mode != "all":
+                mode = "tracked"
+            if name in ("--pathspec-from-file", "--chmod") and "=" not in argument:
+                index += 1
+        elif argument.startswith("-") and len(argument) > 1:
+            if "A" in argument:
+                mode = "all"
+            elif any(letter in argument for letter in "upie") and mode != "all":
+                mode = "tracked"
+        else:
+            paths.append(argument)
+    return ("all", []) if mode == "all" else _scoped(mode, paths)
+
+
+def commit_selection(invocation: GitInvocation) -> tuple[str, list[str]]:
+    """What a `git commit` records beyond the index it starts from: `("index", [])` for nothing,
+    `("tracked", [...])` for `-a` or interactive selection, `("paths", [...])` for pathspecs
+    (`--only` and `--include` take them), or `("all", [])` when the selection cannot be read."""
+    mode, paths = "index", []
+    args = invocation.args
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if argument == "--":
+            paths.extend(args[index:])
+            break
+        if set(argument) <= set("<>&|"):
+            index += 1                                   # a redirection operator and its target
+            continue
+        if argument.startswith("--"):
+            name = argument.split("=", 1)[0]
+            if name in ("--all", "--interactive", "--patch"):
+                mode = "tracked"
+            elif name in ("--pathspec-from-file", "--pathspec-file-nul"):
+                return "all", []
+            if name in COMMIT_VALUE_OPTIONS and "=" not in argument:
+                index += 1
+            continue
+        if argument.startswith("-") and len(argument) > 1:
+            for position, letter in enumerate(argument[1:], 1):
+                if letter in "ap":
+                    mode = "tracked"
+                elif letter in "Su":
+                    break                                # `-S<keyid>`, `-u<mode>`: the rest is a value
+                elif letter in COMMIT_VALUE_SHORT:
+                    if position == len(argument) - 1:
+                        index += 1                       # the value is the next word
+                    break
+            continue
+        paths.append(argument)
+    if paths and mode == "index":
+        mode = "paths"
+    return _scoped(mode, paths)
 
 
 def changes_branch(invocation: GitInvocation) -> bool:

@@ -46,6 +46,15 @@ class PrivacyScanTests(unittest.TestCase):
         self.assertTrue(any("credential-shaped token" in f for f in findings), findings)
         self.assertTrue(any("credential file" in f for f in findings), findings)
 
+    def test_anthropic_and_google_api_keys_are_rejected(self) -> None:
+        samples = {
+            "anthropic.txt": "sk" + "-ant-api03-" + "aB3_dE-" * 6,
+            "google.txt": "AI" + "za" + "Sy" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q",
+        }
+        paths = [self.write(name, f"key = {value}\n") for name, value in samples.items()]
+        findings = MODULE.scan(self.root, paths)
+        self.assertEqual(sorted(f.split(":")[0] for f in findings), sorted(samples), findings)
+
     def test_hugging_face_npm_and_fine_grained_github_tokens_are_rejected(self) -> None:
         # SEC-11: prefixes assembled at runtime so this file never holds a token shape.
         samples = {

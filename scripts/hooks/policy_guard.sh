@@ -25,7 +25,8 @@ set -euo pipefail
 
 # Heredoc bodies are data, not commands: a commit message or a generated file that
 # merely mentions a guarded pattern must not trip the guard. They are stripped
-# before matching; everything else in the command line is inspected verbatim.
+# before matching, except a body fed to a shell (`bash <<EOF`), which is commands;
+# everything else in the command line is inspected verbatim.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 payload="$(cat)"
 command_text="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" policy-command)"
@@ -44,20 +45,28 @@ lower_command="$(printf '%s' "$command_text" | tr '[:upper:]' '[:lower:]')"
 lower_sim="$(printf '%s' "$sim_word" | tr '[:upper:]' '[:lower:]')"
 
 # 1. Physical iPhone only.
-re_sim_destination="platform=ios[[:space:]]${lower_sim}"
-re_simctl_lifecycle="simctl[[:space:]]+(boot|create|erase|launch|install|shutdown)"
+# A pattern never reaches across a command separator or a line.
+nl=$'\n'
+same_command="[^;&|${nl}]*"
+re_sim_destination="platform=(ios|watchos|tvos|visionos|xros)\\\\?[[:space:]]*${lower_sim}"
+re_sim_sdk="(iphone${lower_sim}|apple-(ios|watchos|tvos|xros)[0-9.]*-${lower_sim}([^a-z]|$))"
+re_sim_app="open[[:space:]]${same_command}(-[a-z]*a[[:space:]]+[\"']?([^[:space:]]*/)?${lower_sim}|${lower_sim}\\.app|core${lower_sim})"
+re_simctl_lifecycle="simctl[[:space:]]+(${same_command}[[:space:]])?(boot|bootstatus|create|erase|launch|install|uninstall|shutdown|spawn|openurl|io|delete|clone|terminate)([[:space:]]|$)"
 re_sim_tools="(build_run|test|launch|boot|install_app)${sim_suffix}([^a-z_]|$)"
 if [[ "$lower_command" =~ $re_sim_destination ]] \
+  || [[ "$lower_command" =~ $re_sim_sdk ]] \
+  || [[ "$lower_command" =~ $re_sim_app ]] \
   || [[ "$lower_command" =~ $re_simctl_lifecycle ]] \
   || [[ "$lower_command" =~ $re_sim_tools ]]; then
   block "Simulator destinations are unsupported (CLAUDE.md: Physical iPhone only)." \
     "Use the paired iPhone through scripts/ui_test.sh ios <lane> or scripts/ios_device.sh, or the macOS lanes."
 fi
 
-# 2. Owned output: no whole-cache deletion.
-re_rm_cache='rm[[:space:]]+-[A-Za-z]*[rR][A-Za-z]*[[:space:]][^|;&]*build/cache'
-re_rm_build='rm[[:space:]]+-[A-Za-z]*[rR][A-Za-z]*[[:space:]]+(\./)?build/?([[:space:]]|$)'
-if [[ "$command_text" =~ $re_rm_cache ]] || [[ "$command_text" =~ $re_rm_build ]]; then
+# 2. Owned output: no whole-cache deletion. agent_hook_input.py judges each simple
+# command on its words (rm, find -delete, mv), resolving paths against the
+# directory it runs in; it also reports a copy onto the generated project file.
+file_violation="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" file-policy)"
+if [[ "$file_violation" == build ]]; then
   block "whole build-output deletion bypasses config/build-output-policy.json (CLAUDE.md: Owned output)." \
     "Use scripts/clean_build_caches.sh with one selective --cache target, or the retention pruning it owns."
 fi
@@ -84,7 +93,7 @@ fi
 
 # 4. Generated project.
 re_pbxproj_write='(sed[[:space:]]+-[A-Za-z]*i|perl[[:space:]]+-[A-Za-z]*i|tee[[:space:]]|>>?[[:space:]]*)[^|;&]*project\.pbxproj'
-if [[ "$command_text" =~ $re_pbxproj_write ]]; then
+if [[ "$command_text" =~ $re_pbxproj_write ]] || [[ "$file_violation" == pbxproj ]]; then
   block "QwenVoice.xcodeproj/project.pbxproj is generated (CLAUDE.md: Generated project)." \
     "Edit project.yml and run ./scripts/regenerate_project.sh --fast."
 fi

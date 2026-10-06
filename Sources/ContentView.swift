@@ -146,6 +146,8 @@ struct ContentView: View {
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar(removing: .title)
         .environment(appModel)
+        // Inside the gate below, so the banner's glass decision sees it.
+        .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
         // Generation performance gate (OPTIMIZATION.md §K): while the engine
         // generates, glass surfaces fall back to the solid-fill design so the
         // material's continuous compositor work stops competing with MLX for

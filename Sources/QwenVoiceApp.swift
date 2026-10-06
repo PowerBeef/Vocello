@@ -171,7 +171,6 @@ struct QwenVoiceApp: App {
                 )
             } else if let ttsEngineStore {
                 ContentView(ttsEngineStore: ttsEngineStore, appModel: appModel)
-                    .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
                     .environmentObject(ttsEngineStore)
                     .environmentObject(audioPlayer)
                     .environmentObject(audioPlayer.playbackProgress)

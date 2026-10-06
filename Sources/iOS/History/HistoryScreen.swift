@@ -791,7 +791,9 @@ private struct IOSHistoryLibrarySection: View {
                 databaseUnavailable = true
                 errorMessage = message
             case .removalUnrecorded:
+                // The failed append may have set an unreadable list aside.
                 isDeleteRefusedPresented = true
+                refreshRecoveryState()
             }
         }
     }

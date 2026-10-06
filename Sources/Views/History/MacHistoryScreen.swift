@@ -942,8 +942,13 @@ private extension MacHistoryScreen {
             return outcome
         }
         databaseUnavailable = false
-        // Nothing was deleted and the database is fine: the row stays.
-        if case .removalUnrecorded = outcome { return outcome }
+        // Nothing was deleted and the database is fine: the row stays. The
+        // failed append may have set an unreadable list aside, which the
+        // recovery banner reports.
+        if case .removalUnrecorded = outcome {
+            refreshRecoveryState()
+            return outcome
+        }
         if case .audioCleanupFailure = outcome {
             _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
             refreshRecoveryState()

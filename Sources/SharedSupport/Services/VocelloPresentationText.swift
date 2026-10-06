@@ -268,7 +268,7 @@ struct VocelloPresentationText: Sendable {
 
     var historyRemovalUnrecorded: String {
         localization.string(localized: "vocello.history.removal_unrecorded",
-               defaultValue: "Nothing was deleted: Vocello couldn't record this take's audio for removal. Try again.",
+               defaultValue: "Nothing was deleted: Vocello couldn't mark this take's audio for removal. Try again.",
                comment: "History: a take's audio could not be listed for removal, so neither the take nor its audio was deleted; the database is fine and the user can retry.")
     }
 

@@ -81,7 +81,7 @@ public struct HistoryDeletionEngine: Sendable {
         do {
             try removeFile(audioPath)
         } catch {
-            return .audioCleanupFailure(error.localizedDescription)
+            return .audioCleanupFailure(describe(error))
         }
         withdrawAudioRemoval(audioPath)
         return .deleted

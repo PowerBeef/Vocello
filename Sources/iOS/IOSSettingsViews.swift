@@ -565,6 +565,8 @@ struct IOSModelRow: View {
                 id: "iosModelRetry_\(model.id)",
                 action: requestInstall
             )
+            // A failed repair leaves the incomplete install on disk: it stays removable.
+            if case .incomplete = status { removalAction }
         }
     }
 
@@ -628,7 +630,10 @@ struct IOSModelRow: View {
             case .installed, .notInstalled, .error: return 1
             }
         case .installed, .available, .queued, .waitingForConnectivity,
-             .downloading, .retrying, .failed:
+             .downloading, .retrying:
+            return 1
+        case .failed:
+            if case .incomplete = status { return 2 }
             return 1
         case .unavailable:
             if case .incomplete = status { return 1 }

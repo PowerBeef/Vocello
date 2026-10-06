@@ -2276,7 +2276,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             try? fileManager.removeItem(at: partialURL)
             try? fileManager.removeItem(at: singleStreamSidecarURL)
         }
-        let completedBytes = Self.fileSizeIfPresent(at: partialURL)
+        var completedBytes = Self.fileSizeIfPresent(at: partialURL)
+        if completedBytes > 0,
+           Self.resumableBytes(partialSize: completedBytes, expectedSize: expectedSize) == 0 {
+            try? fileManager.removeItem(at: partialURL)
+            try? fileManager.removeItem(at: resumeDataURL)
+            completedBytes = 0
+        }
         let downloaded = try await downloadTemporaryFile(
             from: url,
             existingBytes: completedBytes,
@@ -3345,6 +3351,16 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             .replacingOccurrences(of: "/", with: "__")
             .replacingOccurrences(of: ":", with: "_")
         return root.appendingPathComponent("\(safeName).resume")
+    }
+
+    /// The leading bytes of a single-stream partial that a Range request may
+    /// resume from. A partial already at or past the expected size has nothing
+    /// left to fetch: it is only here because it failed validation, and a Range
+    /// from its end can only answer HTTP 416 on every retry, so it restarts clean.
+    static func resumableBytes(partialSize: Int64, expectedSize: Int64) -> Int64 {
+        guard partialSize > 0 else { return 0 }
+        if expectedSize > 0, partialSize >= expectedSize { return 0 }
+        return partialSize
     }
 
     private static func fileSizeIfPresent(at url: URL) -> Int64 {

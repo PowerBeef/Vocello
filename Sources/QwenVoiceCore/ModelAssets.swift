@@ -375,6 +375,11 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
             }
         }
 
+        // A content check that cannot hash a required file has not verified it.
+        // The files are still checked for presence, kind and size first.
+        let lacksDigest = depth == .contentDigest
+            && entries.contains(where: { Self.normalizedSHA256($0.sha256) == nil })
+
         var failures: [String] = []
         for entry in entries {
             let url = root.appendingPathComponent(entry.path, isDirectory: false)
@@ -405,6 +410,9 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                 ? "One installed model file failed deep integrity verification."
                 : "\(failures.count) installed model files failed deep integrity verification."
             return .failed(message: message, failedRelativePaths: failures.sorted())
+        }
+        guard !lacksDigest else {
+            return .unavailable(reason: "manifest has no usable digest for a required file")
         }
         return .verified(checkedFiles: entries.count)
     }

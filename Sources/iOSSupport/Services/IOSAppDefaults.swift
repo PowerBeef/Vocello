@@ -7,7 +7,6 @@ public enum IOSAppDefaults {
 
     private enum Keys {
         static let hasCompletedOnboarding = "vocello.ios.hasCompletedOnboarding"
-        static let autoplayCompletions = "vocello.ios.autoplayCompletions"
         static let lastTab = "vocello.ios.lastTab"
     }
 
@@ -26,18 +25,6 @@ public enum IOSAppDefaults {
     public static var hasCompletedOnboarding: Bool {
         get { defaults.bool(forKey: Keys.hasCompletedOnboarding) }
         set { defaults.set(newValue, forKey: Keys.hasCompletedOnboarding) }
-    }
-
-    /// True if generations should auto-play their preview as soon as the
-    /// audio is ready. Default true.
-    public static var autoplayCompletions: Bool {
-        get {
-            if defaults.object(forKey: Keys.autoplayCompletions) == nil {
-                return true
-            }
-            return defaults.bool(forKey: Keys.autoplayCompletions)
-        }
-        set { defaults.set(newValue, forKey: Keys.autoplayCompletions) }
     }
 
     /// App-level Reduce Motion override used by the in-app Settings toggle.

@@ -176,6 +176,17 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     // MARK: - Range response validation and per-range retry policy
 
+    /// E5-01: a full-size partial that failed validation restarts clean instead of
+    /// asking for an empty range, which the server answers with HTTP 416 on every retry.
+    func testAFullSizePartialIsNeverResumed() {
+        XCTAssertEqual(HuggingFaceDownloader.resumableBytes(partialSize: 0, expectedSize: 100), 0)
+        XCTAssertEqual(HuggingFaceDownloader.resumableBytes(partialSize: 40, expectedSize: 100), 40)
+        XCTAssertEqual(HuggingFaceDownloader.resumableBytes(partialSize: 100, expectedSize: 100), 0)
+        XCTAssertEqual(HuggingFaceDownloader.resumableBytes(partialSize: 130, expectedSize: 100), 0)
+        // An unknown expected size cannot tell a full partial from a short one.
+        XCTAssertEqual(HuggingFaceDownloader.resumableBytes(partialSize: 40, expectedSize: 0), 40)
+    }
+
     func testRangeResponseVerdictSeparatesShortBodiesFromIgnoredRanges() {
         let range = ChunkRange(start: 100, end: 199)
         func verdict(

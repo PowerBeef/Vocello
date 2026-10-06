@@ -58,6 +58,26 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
         )
     }
 
+    /// E5-03: a manifest entry without a usable digest must not read as verified content.
+    func testContentDepthIsUnavailableWhenTheManifestHasNoUsableDigest() throws {
+        let (store, descriptor, _) = try install(bytes: Data("real bytes".utf8), manifestSHA: "not-a-digest")
+        XCTAssertEqual(store.deepIntegrity(for: descriptor, depth: .manifestSizes), .verified(checkedFiles: 1))
+        XCTAssertEqual(
+            store.deepIntegrity(for: descriptor, depth: .contentDigest),
+            .unavailable(reason: "manifest has no usable digest for a required file")
+        )
+
+        // A missing digest never hides a file that fails the checks which need none.
+        let (wrongSize, wrongSizeDescriptor, _) = try install(
+            bytes: Data("real bytes".utf8), manifestSize: 999, manifestSHA: "not-a-digest"
+        )
+        XCTAssertEqual(
+            wrongSize.deepIntegrity(for: wrongSizeDescriptor, depth: .contentDigest),
+            .failed(message: "One installed model file failed deep integrity verification.",
+                    failedRelativePaths: ["weights.bin"])
+        )
+    }
+
     func testManifestSizesDepthPassesEvenWhenTheFileCannotBeRead() throws {
         // Stronger than a digest mismatch: an unreadable file still passes the
         // shallow depth, so it never opens file contents at all.

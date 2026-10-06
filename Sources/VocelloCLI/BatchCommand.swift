@@ -196,14 +196,14 @@ enum BatchCommand {
 
         note("loading \(modelID)…")
         note("generating \(requests.count) clip(s), one model load…")
-        let wallStart = Date()
+        let wallStart = ContinuousClock.now
         let outcome = await CLIBatchExecution.run(requests, progress: { index, total in
             noteVerbose("item \(index + 1)/\(total)")
         }) { request in
             return try await runtime.generate(request)
         }
         let results = outcome.results
-        let wall = Date().timeIntervalSince(wallStart)
+        let wall = wallStart.elapsedSeconds
         if !outcome.passed {
             if args.flag("json") {
                 emitJSON(FailedBatchJSON(mode: mode.rawValue, variant: quality ? "quality" : "speed",

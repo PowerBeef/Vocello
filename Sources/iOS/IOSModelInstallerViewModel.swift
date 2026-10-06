@@ -100,7 +100,9 @@ final class IOSModelInstallerViewModel: ObservableObject {
                 return .failed(message)
             }
             if IOSNativeDeviceFeatureGate.allowsModelDownloads(for: descriptor) {
-                return .failed(message)
+                // Not a delivery failure: the row's own incomplete branch offers
+                // Repair and Remove, so a broken install can always be deleted.
+                return .idle
             }
             return .unavailable(IOSInterfaceText.modelUnavailable)
         case .error(let message):

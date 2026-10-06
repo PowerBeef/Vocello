@@ -137,8 +137,10 @@ extension QVoiceiOSApp {
     static func cloneCapableLoadProfile() -> NativeQwenPreparedLoadProfile {
         let limitBytes = IOSMemorySnapshot.capture(role: .app).impliedProcessLimitBytes ?? 0
         let enabled = limitBytes >= cloneCapableMinimumProcessLimitBytes
-        print("[bootstrap] clone gate: entitled per-app limit ≈ \(limitBytes / 1_048_576) MB → "
-              + (enabled ? "fullCapabilities (clone ON)" : "withoutCloneEncoders (clone OFF)"))
+        if TelemetryGate.resolvedEnabled {
+            print("[bootstrap] clone gate: entitled per-app limit ≈ \(limitBytes / 1_048_576) MB → "
+                  + (enabled ? "fullCapabilities (clone ON)" : "withoutCloneEncoders (clone OFF)"))
+        }
         return enabled ? .fullCapabilities : .iOSProductionDefault
     }
 

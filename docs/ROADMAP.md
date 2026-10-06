@@ -24,7 +24,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
-| `project-audit-2026-10` | active | backend-and-platform | 0/12 (0%) |
+| `project-audit-2026-10` | active | backend-and-platform | 1/12 (8%) |
 | `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
@@ -504,13 +504,12 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 `project-audit-2026-10` · **active** · backend-and-platform · adopted 2026-10-06
 
-Close the confirmed findings of the October 6 deep audit (30 read-only auditors at 66ecb85b, each finding re-verified by two blind refuters): fix the confirmed defects that need no product decision, and decide or schedule the rest. One P1 (History audio paths break when the app container moves), 40 P2 and 111 P3 confirmed; no P0.
+Close the confirmed findings of the October 6 deep audit (30 read-only auditors at 66ecb85b, each finding re-verified by two blind refuters): one P1, 40 P2 and 111 P3 confirmed, no P0. The P1 and 23 other findings were fixed the same day (DA-01); DA-02 to DA-12 hold what needs a decision, new copy, a device or a model run.
 
 Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-deep-audit.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `DA-01` | in-flight | Fix the confirmed defects that need no product decision | — |
 | `DA-02` | planned | Studio state and window ownership | — |
 | `DA-03` | planned | Accessibility, localization and glass gating | — |
 | `DA-04` | planned | Engine edge inputs | — |
@@ -519,14 +518,11 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 | `DA-07` | planned | Playback and recording defects that need a device | — |
 | `DA-08` | planned | History and model-management dead ends | — |
 | `DA-09` | planned | Test quality and coverage | — |
-| `DA-10` | planned | Commerce and provenance | — |
+| `DA-10` | planned | Commerce, provenance and saved-voice deletion | — |
 | `DA-11` | planned | Release and promotion hardening | — |
 | `DA-12` | planned | Guard, tooling, docs and website hygiene | — |
 
 ### Open items in detail
-
-- **`DA-01`** (in-flight) — Fix the confirmed defects that need no product decision.
-  gate: Every finding the report marks "Fix phase" is fixed on main with a deterministic test where the behavior is testable, or moved to another DA item with the reason: History path resolver (A2-01), Mac engine start (A14-02), Stop-during-save (A1-01, A14-52), iPhone model delete and incomplete install (A5-01, A5-02), cancelled prewarm (E1-02), saved-voice deletion (A8-01), HTTP 416 loop and fail-open digest (E5-01, E5-03), commit lint and command guards (T1-01, T1-02, T1-03, T1-06, T1-07, T1-55), CI routing (T4-51, T2-05), build-lock spin (T3-01), roadmap evidence rule (T5-01) and the marked P3 items.
 
 - **`DA-02`** (planned) — Studio state and window ownership.
   gate: Each finding has a fix or a recorded decision: Save as voice state lives with the attempt (A10-01), programmatic routes cannot switch mode during a take (A10-02), a Mac take survives or is stopped by a window close (A10-04, needs one run of the app to settle), an engine-cancelled line batch closes its attempt (A14-01), a cancel during clone priming is honoured (A14-03), the footer drops a stale error (A14-04), Navigate is disabled during batch and long-form work (A14-05), and the P3 items A10-05, A10-06, A14-06, A14-08, A14-53.
@@ -541,25 +537,25 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
   gate: The maintainer decides whether macOS clears the resident speech tokenizer and prefix caches at the critical band or keeps them for speed after idle (E2-01); code, comments and native.md then say the same thing, and the allocator seam is complete or documented as partial (E2-02).
 
 - **`DA-06`** (planned) — Engine, delivery and telemetry hygiene.
-  gate: The P3 findings E3-01 to E3-04, E5-02, E5-04, E5-05, A16-01 and A16-02 are fixed or declined with a reason.
+  gate: A cancelled prewarm keeps the resident model and the published load state stays true (E1-02, verified by one model run on request), and the P3 findings E1-03, E3-01 to E3-04, E5-02, E5-04, E5-05, E6-02, A16-01 and A16-02 are fixed or declined with a reason.
 
 - **`DA-07`** (planned) — Playback and recording defects that need a device.
   gate: A failed recording start shows a localized status on iOS (A7-02), the live preview playhead does not jump after a pause or an underrun (A7-03, verified by listening), and A7-05 is settled.
 
 - **`DA-08`** (planned) — History and model-management dead ends.
-  gate: An unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02), a single delete is as durable as Clear All (A2-04), the Files-folder and reference copies stage before replacing (A3-01, A3-02), and the iPhone cancel and install dead ends A5-03 and A5-05 are fixed.
+  gate: iPhone model delete refuses while the engine is busy and unloads first, as the Mac does (A5-01); an unreadable outbox entry can be discarded after confirmation so Clear All works again (A2-02); a single delete is as durable as Clear All (A2-04); the Files-folder and reference copies stage before replacing (A3-01, A3-02); and the iPhone dead ends A5-03, A5-04 and A5-05 are fixed.
 
 - **`DA-09`** (planned) — Test quality and coverage.
   gate: The tests that exercise no production code or only a test-only type are rewritten against the product path (E7-01, E7-02, E7-03, E7-05), and the highest-value gaps of the report's section 7 have deterministic tests.
 
-- **`DA-10`** (planned) — Commerce and provenance.
-  gate: A paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01), and the iOS save path builds enrollment metadata through the shared helper (A8-02).
+- **`DA-10`** (planned) — Commerce, provenance and saved-voice deletion.
+  gate: Deleting a saved voice also removes its normalized reference audio and transcript from the cache, with a test (A8-01); a paid clip skipped by the automatic Files copy while access is still checking is retried or reported (A4-01); Restore maps a user cancellation like Purchase does (A4-02); and the iOS save path builds enrollment metadata through the shared helper (A8-02).
 
 - **`DA-11`** (planned) — Release and promotion hardening.
   gate: Signing jobs check out the authorized commit, not the tag ref (T2-01); the promotion base is bound to the previous published release (T2-02); release.yml has a concurrency group and can archive iOS alone (T2-03); the required check is filtered by event (T2-04); the iOS signing material is removed before third-party steps (T2-08); promotion runs under a reviewer environment and verifies attestations (T2-09); secrets leave job-level env (T2-10); every product file sits in a promotion class (T5-02).
 
 - **`DA-12`** (planned) — Guard, tooling, docs and website hygiene.
-  gate: The remaining T1, T3, T4, T5, T6, T7 and A15 findings not fixed under DA-01 are fixed or declined with a reason.
+  gate: The remaining T1, T3, T4, T5, T6, T7 and A15 findings are fixed or declined with a reason, first the two P2s: the native build lock no longer spins when its parent is not writable (T3-01) and the done-item evidence rule of the roadmap validator actually runs (T5-01).
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 

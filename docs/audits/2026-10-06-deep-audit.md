@@ -15,6 +15,8 @@ sourceOfTruth:
 
 **Verdict.** The core is sound. The engine's lease, reservation and terminal design left no reachable hang or double terminal; model delivery is fail-closed on every shipped path; the token loop, sampling and cancellation cadence hold; commerce has one StoreKit owner and verified-only grants; the diagnostics privacy work holds; target wiring, pins and the localization catalog are consistent. The defects are at the edges: what happens to History after a device migration, a few stuck or misleading states, guard scripts that match one spelling, and a release path whose last step is less protected than its first.
 
+**Since the audit:** 24 findings are fixed on `main`, including the P1 and five of the P2 items listed below; section 9 has the commits and what was deliberately left.
+
 **One P1 defect.**
 
 - **History loses its audio after a restore or device migration (A2-01).** Every History row stores an absolute path inside the App Group container. The container path changes on a new install, so every restored row shows its audio as missing, although the files came back with the backup. Both verification passes confirmed it.
@@ -64,7 +66,7 @@ sourceOfTruth:
 - **How it fails:** 1. The Mac warmup coordinator's dispatched warm is running prewarmVoiceDesign (or the user cancels a take during Preparing). 2. The intent changes or the user cancels, so Task.cancel reaches engine.prewarm, whose trailing Task.checkCancellation() throws CancellationError. 3. The runtime catch runs loadCoordinator.unloadModel() and sets activeModelID = nil, so the resident model is gone. 4. For a cancelled take, generate sets loadState = .loaded(modelID:) while runtime.loadedModelID() is nil; the UI shows a ready model until the idle unload fires, and the next take or warm pays a full cold load.
 - **Fix:** In the three runtime catch blocks, skip the unload and cache reset when NativeGenerationTerminalClassifier.disposition(of: error) == .cancellation and the engine did not record a runtime failure, and rethrow. In MLXTTSEngine.generate's two cancel branches, derive loadState from runtime.loadedModelID() (the settleCancelledModelOperation pattern) instead of assuming .loaded.
 - **Notes:** confirmed by both verification passes; relates to AUD-10.
-- **Action:** Fix phase.
+- **Action:** Roadmap DA-06: it changes when the engine unloads, which needs one model run to verify.
 
 #### E2-01 (P2): macOS unload paths never clear the process-global Qwen3 caches, against four contract texts
 
@@ -111,7 +113,7 @@ sourceOfTruth:
 - **How it fails:** 1. A user with 200 takes restores an iPhone from backup onto a new device; history.sqlite and outputs/ return, but the App Group container has a new UUID. 2. HistoryScreen.loadPage runs fileExists on the stored absolute paths, marks every row audio-unavailable and disables Play and Share; the player sheet opens a dead URL. 3. Deleting a row hits deleteSingle, sees fileExists(stale) false and returns .deleted, so the real WAV in the new container stays as an unreachable orphan. 4. Queued outbox entries and journals keep stale paths and report missingAudio forever, so the recovery banner never clears.
 - **Fix:** Resolve the stored path at read time: if the stored absolute path is missing, try appSupportDir plus the portion from 'outputs/' onward. Better, add migration v8 that rewrites in-root rows to relative paths (or rebases them to the current container on launch when the old root is absent), and make removeUnreferenced, the outbox and the journal resolve through the same helper. Keep absolute paths only for diagnostics-override roots. Rebase the long-form journal manifestURL the same way.
 - **Notes:** confirmed by both verification passes; candidate A-6; relates to ASR-06.
-- **Action:** Fix phase (read-time resolver with tests).
+- **Action:** Fixed in `64ad6677`.
 
 #### A1-01 (P2): A Stop accepted while the finished take is being saved still lands it in History and the Files folder (iOS)
 
@@ -121,7 +123,7 @@ sourceOfTruth:
 - **Fix:** Add a `.finalizing` phase to StudioGenerationAttemptAuthority (and a coordinator method the executor calls right after hooks.generate returns, before generationCompleted) in which requestCancellation returns false so the Stop button and the PA-15 interrupt are refused once the engine has produced the take; the attempt then completes normally with its card. Mirror it in IOSLongFormProjectRunner around acceptLongFormProject. Add an IOSSingleTakeGenerationExecutorTests case whose fake hook flips the cancellation flag inside generationCompleted and a StudioGenerationCoordinatorTests case asserting requestCancellation is rejected in the finalizing phase.
 - **Rule:** .claude/rules/native.md: "Every start returns one attempt token; stale callbacks, overlapping starts and duplicate cancellations are rejected; a cancelled take never lands in History."
 - **Notes:** confirmed by both verification passes; candidate A-3; relates to AUD-03; the window is the History commit, tens of milliseconds.
-- **Action:** Fix phase (a finalizing phase in the attempt authority).
+- **Action:** Fixed in `64ad6677`.
 
 #### A10-01 (P2): iOS Design "Save as voice" depends on view-local state the generation task writes
 
@@ -200,7 +202,7 @@ sourceOfTruth:
 - **How it fails:** 1) Launch with an app-support tree where the engine cannot create its voices, stream-session or normalized-reference directory (unwritable folder, a file at that path, full disk on first launch); setupAppSupport hides the same failure with try?. 2) initialize() throws from the directory-creation task before isInitialized is set. 3) The catch discards it; no visibleErrorMessage, loadState stays idle. 4) Sidebar shows 'Starting…' forever, Studio shows engine-starting, no diagnostics screen and no Retry. Rated P2 for the rare trigger; the rubric's 'hang on an error path' would make it P1.
 - **Fix:** On failure, reset didInitializeSelectedTTSEngine and surface an AppLaunchDiagnosticsSnapshot (a new issue case) so the existing diagnostics view and Retry cover it; let retryLaunchPreflight re-run initialize when the store exists but is not ready. Correct the comment.
 - **Notes:** confirmed by both verification passes; candidate A-2; relates to MAC-04; also reported as A10-03; the first pass rated it P1; the trigger needs an abnormal Application Support state or a full disk.
-- **Action:** Fix phase.
+- **Action:** Fixed in `64ad6677`.
 
 #### A14-03 (P2): A Mac cancel accepted during clone priming is not rechecked before the take starts
 
@@ -244,7 +246,7 @@ sourceOfTruth:
 - **How it fails:** 1. iPhone Studio is generating a Custom take (engine loadState.currentModelID == pro_custom, weights resident). 2. User opens Settings > Voice Models and taps Remove, confirms the sheet. 3. coordinator.delete tombstones the model folder immediately (SharedModelComponentStore.deleteModel) and publishes .deleted; no alert, unlike the Mac's 'Generation in Progress'. 4. Inventory now says not installed while the engine still reports the model loaded with gigabytes of weights resident; Studio flips to 'install the model' while the memory stays held until idle unload, and a later Install of an updated artifact is served by the stale weights until the engine unloads.
 - **Fix:** Move MacModelDeletionSequence (it already only needs a MacModelEngineCoordinating value) into Sources/iOSSupport/Services as a shared deletion sequence, make the iOS TTSEngineStore conform (it already publishes hasActiveGeneration, hasSustainedPerformanceActivity, loadState, clonePreparationState and has unloadModel), give IOSModelInstallerViewModel/coordinator the engine reference from IOSAppDependenciesContainer, and show the busy outcome in VoiceModelsScreen like MacSettingsScreen does. When PA-33's engine-side lease lands, the iOS coordinator must take it too; PA-33's sourceOfTruth lists only the Mac files.
 - **Notes:** confirmed by both verification passes; candidate A-1; relates to PA-33 (also MAC-20): what is new is that the iOS path has no gate at all, not even the store-level sequence the Mac got for MAC-20, and PA-33 as scoped (Mac sequence + MLXTTSEngine) would not reach the iOS delete unless the iOS coordinator is wired to the lease.
-- **Action:** Fix phase (refuse while generating, unload first); PA-33 keeps the engine-side lease.
+- **Action:** Roadmap DA-08: the fix shares the Mac deletion sequence with iOS and needs new busy-state copy; PA-33 keeps the engine-side lease.
 
 #### A5-02 (P2): An incomplete install cannot be removed from the iPhone UI
 
@@ -253,7 +255,7 @@ sourceOfTruth:
 - **How it fails:** 1. An installed model loses or corrupts a required file (LocalModelAssetStore.state(for:) returns .incomplete). 2. The Voice Models row shows 'Retry needed' with a single Retry button. 3. Retry runs install, which needs Wi-Fi and a multi-hundred-MB to multi-GB transfer; if that fails or is unwanted the user has no way to delete the partial folder and reclaim storage. 4. The code's own intent (Repair + Remove for .incomplete, a delete sheet size label for .incomplete) never renders.
 - **Fix:** Return .idle (or a dedicated .repairable) from state(for:) for .incomplete so the row's existing Repair + Remove branch renders; keep .failed for genuine delivery failures.
 - **Notes:** confirmed by both verification passes.
-- **Action:** Fix phase.
+- **Action:** Fixed in `5b3ebba2`.
 
 #### A7-02 (P2): A failed recording start is invisible on iOS
 
@@ -280,7 +282,7 @@ sourceOfTruth:
 - **How it fails:** 1) iPhone: import a friend's .m4a voice memo as a saved voice named Alice (stored as voices/Alice.m4a; supportedSavedVoiceAudioExtensions keeps m4a as is). 2) Generate one Clone take: NativePreparedCloneConditioningCache.normalizeCloneReference writes cache/normalized_clone_refs/Alice_<sha256>.wav and copies Alice.txt beside it. 3) Delete Alice in Voices: PreparedVoiceRepository.delete moves only voices/Alice.* into the tombstone; deletePreparedVoice clears in-memory caches only. 4) Alice_<sha256>.wav and Alice_<sha256>.txt remain on disk forever (no sweep names them; the only sweep removes .converting-*/saved-voice-import-* temporaries), although the user asked for the voice to be deleted and privacy-storage.md says each voice is individually deletable.
 - **Fix:** In deletePreparedVoice (or repository.delete via a hook) remove cache/normalized_clone_refs/<id>_*.wav/.txt (fingerprint of the deleted audio is computable before the move), or key normalized outputs for saved voices under voices/<id>.clone_prompt/ so the existing tombstone carries them. Document the normalized cache lifecycle in privacy-storage.md and add a repository/engine test that a deleted non-canonical voice leaves nothing in the normalized directory.
 - **Notes:** confirmed by both verification passes; relates to ASR-06 (backup classification of cache/; this is deletion retention, not backup).
-- **Action:** Fix phase.
+- **Action:** Roadmap DA-10: a deletion path with no test seam yet; it lands with its test.
 
 ### Tooling, CI, release, docs and website
 
@@ -291,7 +293,7 @@ sourceOfTruth:
 - **How it fails:** 1) A new file notes.md contains a developer home path or a token. 2) The agent runs one Bash call: `git add notes.md && git commit -F - <<'EOF' ... EOF` (both parts auto-allowed by `Bash(git add *)` and `Bash(git commit *)`). 3) The PreToolUse hook runs first; the index is still empty, so `git diff --cached --check` and `privacy_scan.py --staged` pass on 0 paths. 4) The command then stages and commits the file; it reaches origin on the next push and only CI's full-tree scan notices, after publication. Same outcome with `git commit -m x docs/file.md`, `git commit --all -m x` or `git commit -m x -a` on an unstaged tracked file.
 - **Fix:** In git_actions, report a commit as unresolved when an index-mutating git command (add, rm, mv, apply, reset, restore, stash, checkout -- paths) precedes it in the same command, as is already done for branch changers. For commits carrying -a/--all/-i/--include/-o/--only or a pathspec, also scan the paths from `git diff HEAD --name-only`. Alternatively run the two checks from a real git pre-commit hook, where the index is final.
 - **Notes:** candidate T-12; also reported as T1-51.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-02 (P2): The staged privacy scan reads the working tree, not the blob being committed
 
@@ -300,7 +302,7 @@ sourceOfTruth:
 - **How it fails:** 1) `git add cfg.json` with a token in it; the lint blocks the commit. 2) The agent removes the token in the working tree but does not re-stage. 3) `git commit` is retried; the scan reads the cleaned working file and passes. 4) The commit records the staged blob that still holds the token. Variant: delete the working copy after staging, `not path.is_file()` skips it and the blob is committed.
 - **Fix:** In --staged mode read content with `git -C root show :<path>` (or `git cat-file --batch`) instead of the working tree, and treat an unreadable staged blob as a failure rather than a skip.
 - **Notes:** candidate T-12.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-03 (P2): The git tokenizer treats a mid-word `#` as a comment and drops the rest of the command
 
@@ -308,7 +310,7 @@ sourceOfTruth:
 - **Defect:** The tokenizer uses shlex with its default comment character, which treats an unquoted `#` in the middle of a word as a comment and drops the rest of the line. Bash only starts a comment at the beginning of a word. Every git command after such a word on the same line is invisible to both the policy guard and the commit lint.
 - **How it fails:** Strings that pass both hooks with no invocation seen (verified on the pure parser): `[ $# -gt 0 ] && git checkout -b topic`; `echo ${x#y} && git commit -m x`; `open https://example.com/a#frag && git push origin topic`; `: a#b; git push --force origin main`. Bash runs the git command in each; the guard sees tokens only up to the `#`.
 - **Fix:** Set `lexer.commenters = ''` and strip comments explicitly only where `#` starts a word (preceded by whitespace or a separator and outside quotes).
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-06 (P2): The cache-deletion and pbxproj guards match one spelling each
 
@@ -317,7 +319,7 @@ sourceOfTruth:
 - **How it fails:** Pass the cache guard (verified): `rm -rf <repo>/build` (any absolute or `$PWD/` path), `rm -rf "build"`, `rm -rf build/*`, `rm -r -f build`, `rm --recursive --force build`, `rm -rf -- build`, `(rm -rf build)`, `bash -c 'rm -rf build'`, `cd build && rm -rf cache`, `find build -delete`. `rm -r -f build/cache` and absolute `.../build/cache` are blocked. Pass the pbxproj guard: `cp /tmp/p QwenVoice.xcodeproj/project.pbxproj`, `mv`, `sed -E -i ''`, `sed --in-place`, `perl -0pi`, `python3 -c "open(...,'w')"`, `dd of=`. Only the first three exact deny rules in settings.json back this up, and none covers an absolute path.
 - **Fix:** Judge `rm` on tokens like git: resolve each operand against the payload cwd and block when it equals `<root>/build` or lies at or above `<root>/build/cache`, with any flag spelling. For pbxproj, block any non-read command whose operand or redirect target resolves to project.pbxproj, or drop the regex and rely on the project gate's generation stamp.
 - **Notes:** confirmed by both verification passes; candidate T-10.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-07 (P2): The Simulator guard matches one destination spelling and six simctl verbs
 
@@ -325,7 +327,7 @@ sourceOfTruth:
 - **Defect:** The Simulator guard matches one destination spelling and six lifecycle verbs written directly after the tool name. The most common phone-free Simulator build spelling and launching the Simulator app both pass.
 - **How it fails:** A build that selects the Simulator SDK by name instead of by destination, a destination written with different spacing, the Simulator app opened by name, or a lifecycle verb preceded by an option all pass the guard, so a Simulator build or launch can start although the project is physical-iPhone only.
 - **Fix:** Match the Simulator SDK name and target triples, the app launch by name, and lifecycle verbs after any options; add each spelling to scripts/tests/test_agent_hooks.py, building the strings from fragments as the tests already do.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-09 (P2): The read-only release-evidence skill pre-approves `gh api *` and `git tag*`
 
@@ -334,7 +336,7 @@ sourceOfTruth:
 - **How it fails:** While the skill is active these run without a prompt and pass both hooks: `gh api -X PATCH repos/<owner>/<repo>/releases/<id> -f draft=false` (publishes the draft, skipping promote-release.yml and quality-promotion validation); `gh api -X PATCH repos/<owner>/<repo>/git/refs/heads/main -f sha=<sha> -F force=true` (a force move of main without git); `gh api -X DELETE .../git/refs/tags/<tag>`. The parser returned no invocation for the `gh api` string.
 - **Fix:** Narrow the grant to the three GET shapes the steps use, e.g. `Bash(gh api repos/*/git/ref/tags/*)`, `Bash(gh api repos/*/git/tags/*)`, `Bash(gh api --paginate --slurp repos/*/commits/*/check-runs*)`, and `Bash(git tag -l *)`. Have the test reject a bare `Bash` or `Bash(gh api *)` for anything described as read-only.
 - **Notes:** confirmed by both verification passes; candidate T-13.
-- **Action:** Fix phase (lead: narrow the allowed tools).
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-10 (P2): `Bash(gh run *)` also auto-approves rerun, cancel and delete
 
@@ -342,7 +344,7 @@ sourceOfTruth:
 - **Defect:** `Bash(gh run *)` is pre-approved so CI can be watched, but it also auto-approves `gh run rerun`, `gh run cancel` and `gh run delete`. Re-running a release or promotion run is a release action that the same file puts behind a prompt when spelled `gh workflow run`.
 - **How it fails:** 1) A release.yml or promote-release.yml run fails. 2) The agent, following a failed run, issues `gh run rerun <run-id> --failed`. 3) The command matches the allow rule, no hook inspects `gh`, and it runs without a prompt. 4) The signing/draft-upload jobs or the publish step (`gh release edit ... --draft=false`) execute again without an explicit request. `gh run delete <id>` likewise removes a run record unprompted.
 - **Fix:** Replace the rule with `Bash(gh run list*)`, `Bash(gh run view *)`, `Bash(gh run watch *)` and `Bash(gh run download *)`, and add `Bash(gh run rerun*)`, `Bash(gh run cancel*)`, `Bash(gh run delete*)` to `ask`. Extend the consent test to assert no allow rule matches `gh run rerun`.
-- **Action:** Fix phase (lead: allow only view, list and watch).
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T1-55 (P2): `$(which git) push --force` and similar spellings are not recognised as git
 
@@ -350,7 +352,7 @@ sourceOfTruth:
 - **Defect:** Git is recognised only when a token's basename is literally `git`, and backtick bodies are replaced by `SUBST` after parsing, so `$(which git) push --force origin main`, `"$(command -v git)" push -f origin main`, `` `which git` push --force origin main ``, `` git `echo push` --force origin main `` and the brace-expansion spelling `{git,push,--force,origin,main}` produce no judged push; the same spellings make `commit` invisible to commit_lint (no branch check, no privacy scan). The push remote is also never judged (`git push https://host/other.git main` is allowed).
 - **How it fails:** 1) Agent runs `$(which git) push --force origin main`. 2) Tokens become `$`, `(`, `which`, `git`, `)`, `push`, ...; the `git` token is taken as an invocation whose subcommand is `)`, so policy_violation returns nothing and policy_guard exits 0; the deny prefix `Bash(git push --force*)` does not match the leading `$(`. 3) The force push proceeds if the user approves the prompt (no allow rule matches), i.e. the hook that is meant to block force pushes 'regardless of intent' is silent. Same for `$(which git) commit -m x` -> commit_lint sees no commit and skips the branch, whitespace and privacy checks.
 - **Fix:** Treat `$(which git)`, `$(command -v git)`, `"$(type -P git)"` and their backtick forms as the git token (detect `which\|command -v\|type -P` followed by `git` inside a substitution and splice `git` into the token stream); treat a `SUBST`/`$`-bearing subcommand or any `{...,...}` token containing `git` as computed and fail closed; optionally restrict `push` to the `origin` remote or the configured remote name. Add these spellings to test_git_spellings_do_not_bypass_the_main_only_rules.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T2-02 (P2): The promotion diff base is whatever the manifest author passed
 
@@ -377,7 +379,7 @@ sourceOfTruth:
 - **How it fails:** 1. After promotion a commit bumps stableMacRelease to 3.0.0 in config/public-product-facts.json and the README link (which the Python contract demands), leaving website/src/data/release.js at 2.4.0. 2. Routing yields website=false; `CI required` is green. 3. The site keeps offering the 2.4.0 DMG as the stable download. 4. The next unrelated website commit fails `site-contract.mjs` and is blamed for a break it did not cause.
 - **Fix:** Route `config/public-product-facts.json` to the website lane in classify() (a WEBSITE_INPUTS tuple beside the `website/` prefix test).
 - **Notes:** confirmed by both verification passes; candidate T-7.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T3-01 (P2): The native build lock spins forever when its parent directory is not writable
 
@@ -385,7 +387,7 @@ sourceOfTruth:
 - **Defect:** When the lock directory cannot be created but its parent exists (parent not writable), the acquire loop takes the `continue` branch forever: no sleep, no `waited` increment, no timeout, no error. Every native build or test then burns a core silently instead of failing.
 - **How it fails:** 1. The lock parent (~/Library/Caches/Vocello) exists but is not writable for this process (root-owned after one sudo build, read-only volume, or a write-restricted agent sandbox). 2. Run scripts/dev.sh test or build -> xcb_run -> acquire_native_lock. 3. `mkdir "$lock_dir"` fails, `-d` is false, `-e` is false, `mkdir -p` of the existing parent returns 0, so the code hits `continue`. 4. The loop repeats at 100% CPU indefinitely; QVOICE_NATIVE_LOCK_WAIT_SECONDS never applies and 'cannot create the native lock' is never printed.
 - **Fix:** Count the `continue` branch against the wait budget: sleep and increment `waited` there, or allow one immediate retry and then fail with 'cannot create the native lock' when mkdir fails while the path still does not exist. Add a test with a chmod 555 parent.
-- **Action:** Fix phase.
+- **Action:** Roadmap DA-12.
 
 #### T3-02 (P2): A macOS UI lane's EXIT trap can exit 1 and mask the lane's real result
 
@@ -401,7 +403,7 @@ sourceOfTruth:
 - **Defect:** A change under Packages/VocelloQwen3Core/Tests/ routes to no lane, although the macOS job's `scripts/macos_test.sh test` is what compiles and runs those Qwen3RuntimeTests, so a runtime-test-only push skips the only lane that executes it and the skip is then recorded as proven for every later diff.
 - **How it fails:** 1. Push a commit that only edits Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift (commit 5619004c is exactly such a commit). 2. classify_changes reports swift=false (verified: `--paths` prints `swift=false ios=false python=false ...`), so ci.yml skips 'Run deterministic macOS tests' and the run is green. 3. lane_bases() treats the skipped job inside a green run as proven at that head, so the next swift-lane diff starts after this commit. 4. A broken or newly failing runtime test (or a compile error in the test target, which fails `swift build --build-tests` and thus the whole macOS lane) lands on main green and is first seen by nightly or by an unrelated later Swift change.
 - **Fix:** In `_is_swift`, route `Packages/*/Tests/` (or any path under a package that is not prose) to the swift lane: e.g. `if path.startswith("Packages/"): return "/Sources/" in path or "/Tests/" in path or path.endswith(PACKAGE_MANIFESTS)`; add the path to test_classify_changes.ClassificationTests.test_compile_and_contract_inputs_still_route with expected {"swift"}.
-- **Action:** Fix phase.
+- **Action:** Fixed in `09f3ebd4`.
 
 #### T5-01 (P2): The rule that a done roadmap item cites resolvable evidence never runs
 
@@ -409,7 +411,7 @@ sourceOfTruth:
 - **Defect:** The roadmap's rule that a done item must cite resolvable evidence never runs. A done item is rejected in config/roadmap.json and must move to config/roadmap-archive.json, which is never validated. 15 of 213 archived done items have no evidence at all (QC-01, QC-02, QC-03, QC-05, BT-02, PA-32, AUD-05, AUD-08, AUD-10, AQ-01 to AQ-06). A further 58 references use a 'run:' kind the resolver rejects as unknown.
 - **How it fails:** 1. Move an item to roadmap-archive.json with status done and no evidence, as QC-03 was on 2026-10-06. 2. roadmap.py validate and render --check pass. 3. Its dependants (QC-04, QC-06, QC-08 on QC-03; AV-17 on BT-02) count as unblocked and the plan's progress percentage rises, on an unverified self-assertion.
 - **Fix:** Validate archived done items for non-empty evidence. Resolve evidence at closure, for example for archive items whose updated date falls inside a recent window, or record a resolved-at commit. Add 'run' as a known kind or convert those references.
-- **Action:** Fix phase.
+- **Action:** Roadmap DA-12.
 
 #### T5-02 (P2): Promotion routing leaves 188 of 446 product files in no class
 
@@ -427,20 +429,20 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 
 | ID | Where | Defect | Action |
 | --- | --- | --- | --- |
-| E1-03 | `Qwen3TTS.swift:2355` | The four legacy AsyncThrowingStream producers start with guard let self else { return } and never call continuation.finish(). | Fix phase. |
+| E1-03 | `Qwen3TTS.swift:2355` | The four legacy AsyncThrowingStream producers start with guard let self else { return } and never call continuation.finish(). | Roadmap DA-06. |
 | E2-02 | `MLXTTSEngine.swift:1468` | NativeMLXAllocatorControl is documented as the process-wide MLX allocator side effects of the engine's memory lifecycle, and .inert is meant to keep the ThreadSanitizer-run core test bundle off MLX. It covers only trimMemory's clearCache and… | Roadmap DA-05. |
 | E3-01 | `LatestEventCoalescer.swift:43` | If the drain task is already cancelled when `withTaskCancellationHandler` is entered, the handler runs before the body installs the waiter, so the continuation is installed with nobody left to resume it; the comment's no-leak claim does not hold for that… | Roadmap DA-06. |
 | E3-03 | `AudioQCSignalObserver.swift:444` | When the frame hop exceeds the FFT size (sample rates above 102,400 Hz that are multiples of 100, e.g. 176,400 or 192,000), `start` can exceed `pending.count` after the last analyzed frame and `pending.removeFirst(start)` traps. | Roadmap DA-06. |
 | E3-04 | `GenerationOutputAdapter.swift:429` | The stream-session directory is keyed by a per-process `requestID` counter under a root the macOS app and the `vocello` CLI share (`QwenVoice/cache/stream_sessions`), so one process's `makeSessionDirectory` removes another process's `session_%04d` directory… | Roadmap DA-06. |
 | E4-02 | `Qwen3TTS.swift:3240` | Loading falls back to a default talker config when config.json has no `talker_config`, but generation and prewarm force-unwrap `config.talkerConfig!`, so a checkpoint that loads successfully traps on its first generate/prewarm instead of failing closed at… | Roadmap DA-04. |
 | E4-03 | `Qwen3TTS.swift:3213` | The `memoryClearCadence` parameter is discarded (`_: Int?`) and the loop always uses `memoryPolicy.tokenMemoryClearCadence`, so the quality-first entry points' `productionFullResultMemoryClearCadence = 0` ('no cadence clears') is silently ignored and… | Roadmap DA-04. |
-| E5-01 | `HuggingFaceDownloader.swift:2279` | A staging partial that is already at the catalog size but fails the SHA-256 check is kept after a `.fail` disposition, and every later single-stream attempt resumes it with `Range: bytes=<size>-`, which the server answers with HTTP 416; 416 is classified… | Fix phase. |
+| E5-01 | `HuggingFaceDownloader.swift:2279` | A staging partial that is already at the catalog size but fails the SHA-256 check is kept after a `.fail` disposition, and every later single-stream attempt resumes it with `Range: bytes=<size>-`, which the server answers with HTTP 416; 416 is classified… | Fixed in `5b3ebba2`. |
 | E5-02 | `ModelAssets.swift:348` | Installed-artifact identity is never compared with the descriptor's pinned repo/revision: `deepIntegrity` verifies files only against the manifest's own recorded sizes/digests (it checks `targetFolder` and the required path set, never… | Roadmap DA-06. |
-| E5-03 | `ModelAssets.swift:394` | A manifest entry or RepoFile whose `sha256` is nil or not 64 lowercase hex silently skips hashing: `deepIntegrity(.contentDigest)` returns `.verified(checkedFiles:)` and `validateDownloadedFile` returns without hashing (and skips the size check when… | Fix phase. |
+| E5-03 | `ModelAssets.swift:394` | A manifest entry or RepoFile whose `sha256` is nil or not 64 lowercase hex silently skips hashing: `deepIntegrity(.contentDigest)` returns `.verified(checkedFiles:)` and `validateDownloadedFile` returns without hashing (and skips the size check when… | Fixed in `5b3ebba2`. |
 | E5-04 | `ModelAssets.swift:267` | `LocalModelAssetStore.init(modelRegistry:)` silently `removeItem`s every folder in `legacyInstallFolderNames` that the supplied registry does not list, and those three names are exactly the current macOS Quality artifact folders (`…-CustomVoice-8bit`,… | Roadmap DA-06. |
 | E5-05 | `ProductionModelCatalog.swift:561` | The catalog validator (Swift `isSafeRelativePath`, schema v2 `relativePath: minLength 1`, and `IOSModelDeliverySupport.validate`) accept a path component that starts with '.', but the downloader rejects every dot-prefixed component as `invalidRemotePath`; a… | Roadmap DA-06. |
-| E6-01 | `BatchCommand.swift:199` | The short-form `vocello batch` throughput figure (`wallSeconds` in the JSON summary and the "Xs audio in Ys" note) is measured with `Date()` although native.md requires `ContinuousClock` for any throughput wall time; the same file's long-form branch,… | Fix phase. |
-| E6-02 | `Support.swift:38` | A bare flag that is followed by a positional token silently consumes that token as its value, so the flag reads as unset and the positional disappears; the parser only documents the inverse limitation (a value cannot begin with `--`), and the explicit… | Fix phase. |
+| E6-01 | `BatchCommand.swift:199` | The short-form `vocello batch` throughput figure (`wallSeconds` in the JSON summary and the "Xs audio in Ys" note) is measured with `Date()` although native.md requires `ContinuousClock` for any throughput wall time; the same file's long-form branch,… | Fixed in `5b3ebba2`. |
+| E6-02 | `Support.swift:38` | A bare flag that is followed by a positional token silently consumes that token as its value, so the flag reads as unset and the positional disappears; the parser only documents the inverse limitation (a value cannot begin with `--`), and the explicit… | Roadmap DA-06. |
 
 ### iOS and macOS apps
 
@@ -451,7 +453,7 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | A12-06 | `VocelloPrimaryCTAButton.swift:196` | The primary CTA scales its .headline title but forces a fixed 56 pt (phone) frame height and sits in a fixed 64 pt Studio dock slot. | Roadmap DA-03. |
 | A12-07 | `IOSBottomSheets.swift:143` | Several sheet controls are below 44 pt, although the control-audit contract lists 44 pt as the minimum for the sheet-navigation family. | Roadmap DA-03. |
 | A12-08 | `MacInlinePlayerCard.swift:82` | Three VoiceOver values are hard-coded English literals in an app that ships French. | Roadmap DA-03. |
-| A12-09 | `ios-control-audit.json:491` | Several control-family identifier patterns name identifiers that no longer exist in code, and the validator cannot notice. voices-surface lists voicesFilterButton, voicesImportAudioFile and voicesSaveNewVoice. | Fix phase. |
+| A12-09 | `ios-control-audit.json:491` | Several control-family identifier patterns name identifiers that no longer exist in code, and the validator cannot notice. voices-surface lists voicesFilterButton, voicesImportAudioFile and voicesSaveNewVoice. | Roadmap DA-03. |
 | A12-10 | `IOSBottomSheets.swift:1062` | The voice-picker filter chip identifier is built from the localized visible label. | Roadmap DA-03. |
 | A12-11 | `IOSVoicesView.swift:394` | The language tag pill (EN, ZH, ...) on every Built-in Voices row uses a fixed 10 pt non-scaling system font inside a fixed 20 pt frame, while all neighbouring text scales. | Roadmap DA-03. |
 | A13-01 | `IOSShellPrimitives.swift:859` | The iOS utility buttons apply the system glass button styles (.glassProminent / .glass) directly, outside IOSGatedGlassModifier. | Roadmap DA-03. |
@@ -460,31 +462,31 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | A13-04 | `Theme.swift:22` | Theme claims to forward to the shared VocelloTheme but re-declares a large set by value: Brand.goldSoft/goldGlow, Surface.glassSurface/glassSurfaceMuted/glassFloating/hairline/glassOuterStroke/glassInnerStroke, accentSurface/Stroke/Wash, glassTint,… | Roadmap DA-03. |
 | A13-05 | `ThemeModifiers.swift:122` | Several design-system helpers have no callers: `ThemeShape`, `Color.themeOnAccent`/`themeOnAccentPressed`, `ThemeFeedback.Selection`, `View.iosDockGlass`, `View.iosSectionGlass` (whose comment says studio dock and section group use them),… | Roadmap DA-03. |
 | A14-06 | `MacStudioGenerationRequestFactory.swift:19` | The Voice Design and Voice Cloning factories omit streamingInterval while Built-in Voice, the iOS views, long-form segments and the warmup coordinator's Design request all pass GenerationSemantics.appStreamingInterval, so on 16 GB and larger Macs Design and… | Roadmap DA-02. |
-| A14-07 | `IOSAppDefaults.swift:33` | The vocello.ios.autoplayCompletions preference accessor has no reader or writer anywhere; the live autoplay setting on both platforms is the autoPlay key. | Fix phase. |
+| A14-07 | `IOSAppDefaults.swift:33` | The vocello.ios.autoplayCompletions preference accessor has no reader or writer anywhere; the live autoplay setting on both platforms is the autoPlay key. | Fixed in `5b3ebba2`. |
 | A14-08 | `MacGenerationWarmupCoordinator.swift:166` | A warm intent that arrives while the engine is not ready or busy, or that the admission gate defers, is dropped, and nothing schedules it again when the engine state changes: the shell's snapshot handler only calls observe(), which never schedules, although… | Roadmap DA-02. |
-| A14-52 | `MacStudioSingleTakeGenerationHooks.swift:40` | On macOS a Stop (⌘. or the Studio Cancel) accepted while generationCompleted is suspended in History persistence still lands the take in History (and announces "stopped"), because the executor's cancellation check runs only before generationCompleted and the… | Fix phase, with A1-01 (shared authority). |
+| A14-52 | `MacStudioSingleTakeGenerationHooks.swift:40` | On macOS a Stop (⌘. or the Studio Cancel) accepted while generationCompleted is suspended in History persistence still lands the take in History (and announces "stopped"), because the executor's cancellation check runs only before generationCompleted and the… | Fixed in `64ad6677`. |
 | A14-53 | `MacGenerationWarmupCoordinator.swift:289` | A prefetch or clone prime the store refused (thermal or memory-band gate inside allowsProactiveWarmOperations) is recorded as a completed warm whenever the model is already loaded, so the same Studio intent is never re-warmed after the gate clears and the… | Roadmap DA-02. |
-| A14-55 | `MacWarmupAdmissionPolicy.swift:21` | The type's doc comment still says the warm gate defaults to `records` while validating, but Mode.fromEnvironment defaults to `.enforce` (flipped 2026-06-09 per the inline comment), so the header misdescribes shipped behavior. | Fix phase. |
+| A14-55 | `MacWarmupAdmissionPolicy.swift:21` | The type's doc comment still says the warm gate defaults to `records` while validating, but Mode.fromEnvironment defaults to `.enforce` (flipped 2026-06-09 per the inline comment), so the header misdescribes shipped behavior. | Roadmap DA-02. |
 | A15-01 | `project.yml:304` | The two diagnostics compile capabilities are injected through build settings that project.yml never defines, so their value in a distribution build is whatever the xcodebuild process environment supplies. | Roadmap DA-12. |
-| A15-02 | `project.yml:366` | The VocelloiOS target carries a `resources:` key, which native.md forbids outright, and the project's own comment 35 lines above says entries under that key are silently dropped. | Fix phase. |
+| A15-02 | `project.yml:366` | The VocelloiOS target carries a `resources:` key, which native.md forbids outright, and the project's own comment 35 lines above says entries under that key are silently dropped. | Roadmap DA-12. |
 | A15-03 | `project.yml:149` | Because the macOS target globs all of Sources/ and excludes only retired paths, the Mac app's Resources phase carries iPhone-only material that no Mac code reads: the nine voice-preview WAVs (about 1.5 MB), qwenvoice_ios_model_catalog.json, and the developer… | Roadmap DA-12. |
 | A15-04 | `project.yml:683` | VocelloiOSUITests turns warnings-as-errors off for the whole bundle, while native.md and the workflow doc both state that every owned target treats warnings as errors. | Roadmap DA-12. |
 | A15-05 | `project.yml:532` | VocelloCoreTests compiles the iOS copies of TTSContract, TTSModel, AppPaths, AppPerformanceSignposts and ModelManagerViewModel (and neither AudioService), so the macOS copies cannot join any unit-test target. | Roadmap DA-12. |
-| A15-52 | `project.yml:353` | The developer-facing `Sources/Resources/voice-previews/README.md` is bundled into both shipping app bundles because the voice-previews folder is added as a resource folder on iOS and the QwenVoice `Sources/Resources` resource glob excludes only… | Fix phase. |
+| A15-52 | `project.yml:353` | The developer-facing `Sources/Resources/voice-previews/README.md` is bundled into both shipping app bundles because the voice-previews folder is added as a resource folder on iOS and the QwenVoice `Sources/Resources` resource glob excludes only… | Roadmap DA-12. |
 | A16-01 | `GenerationTelemetryJSONLSink.swift:69` | The QWENVOICE_DIAGNOSTICS_MAX_MB knob is clamped from below (max(1, n)) but not from above, and the result is multiplied with Swift's trapping Int operator. | Roadmap DA-06. |
 | A16-02 | `IOSCrashObserver.swift:85` | Crash and hang payloads from one MetricKit delivery are written under a name built from a one-second-resolution timestamp, so a batch of two or more diagnostic payloads overwrites itself and only the last survives. | Roadmap DA-06. |
 | A2-03 | `HistoryPersistenceError.swift:28` | The typed History storage errors have English-only literal descriptions. | Roadmap DA-08. |
 | A2-04 | `HistoryDeletionEngine.swift:43` | A single delete commits the row deletion before any durable record of the audio removal exists. | Roadmap DA-08. |
 | A4-01 | `IOSSavedOutputsDestination+Commerce.swift:8` | The automatic Files-folder copy reads the purchase state synchronously at completion. | Roadmap DA-10. |
-| A4-02 | `IOSExportPurchaseState.swift:144` | Purchase maps a thrown user cancellation to `.cancelled` through `isUserCancellation`, but Restore does not. | Fix phase. |
+| A4-02 | `IOSExportPurchaseState.swift:144` | Purchase maps a thrown user cancellation to `.cancelled` through `isUserCancellation`, but Restore does not. | Roadmap DA-10. |
 | A5-03 | `IOSModelDownloadCoordinator.swift:274` | When the durable cancel intent cannot be written for an active download, the coordinator publishes .failed with a message telling the user to 'Retry Cancel' while the transfer keeps running in inflight; the row in .failed state shows only Retry, and Retry… | Roadmap DA-08. |
-| A5-04 | `IOSModelDownloadCoordinator.swift:239` | Cancelling a queued (pending) model calls stopDiagnosticsHeartbeat(), which cancels the single diagnosticsHeartbeat task that belongs to the different model currently downloading, so that model's heartbeat events stop for the rest of its transfer. | Fix phase. |
+| A5-04 | `IOSModelDownloadCoordinator.swift:239` | Cancelling a queued (pending) model calls stopDiagnosticsHeartbeat(), which cancels the single diagnosticsHeartbeat task that belongs to the different model currently downloading, so that model's heartbeat events stop for the rest of its transfer. | Roadmap DA-08. |
 | A5-05 | `IOSAppBootstrap.swift:212` | The installer's onModelInstalled hook is documented as the engine preload after an install, but the only assignment sets it to nil, so the post-install preload path described in the view model does not exist and the documentation is drift. | Roadmap DA-08. |
-| A6-01 | `IOSAppBootstrap.swift:140` | The clone-gate decision is written with an unconditional `print` on every app launch and every startup Retry, while every other log line in the iOS lifecycle files is gated by `TelemetryGate.resolvedEnabled` or compiled out under `QVOICE_DEVICE_DIAGNOSTICS`. | Fix phase. |
-| A7-04 | `IOSStudioInlinePlayerCard.swift:813` | In adoption mode the display-link tick mirrors the shared player's state and returns early, so the ~15 fps CADisplayLink keeps firing after the shared player has stopped or finished; only the own-player branch invalidates the link. | Fix phase. |
+| A6-01 | `IOSAppBootstrap.swift:140` | The clone-gate decision is written with an unconditional `print` on every app launch and every startup Retry, while every other log line in the iOS lifecycle files is gated by `TelemetryGate.resolvedEnabled` or compiled out under `QVOICE_DEVICE_DIAGNOSTICS`. | Fixed in `5b3ebba2`. |
+| A7-04 | `IOSStudioInlinePlayerCard.swift:813` | In adoption mode the display-link tick mirrors the shared player's state and returns early, so the ~15 fps CADisplayLink keeps firing after the shared player has stopped or finished; only the own-player branch invalidates the link. | Roadmap DA-07. |
 | A8-02 | `IOSGenerationModeViews.swift:759` | The iOS 'Save generated voice' path hand-builds PreparedVoiceEnrollmentMetadata with transcriptSource: .manual for an untouched generation script or an empty transcript, bypassing VoiceClipTranscriber.preparedVoiceEnrollmentMetadata and the shared… | Roadmap DA-10. |
 | A9-01 | `TTSEngineStore.swift:368` | The two host-layer generation-admission refusals are English literals wrapped in TTSEngineError.generationFailed(String); GenerationFailurePresentationReason maps that case to code "generation.failed", which init?(typedCode:) rejects, so… | Roadmap DA-03. |
-| A9-02 | `localization-unlocalized-baseline.json:28` | The baseline carries a record for a Text literal in Sources/iOS/IOSStudioCanvas.swift that no longer exists (the literal was "\(script.count) / \(charLimit)", last present at commit 82843da6), and localization_contract.py only fails when a current count… | Fix phase. |
+| A9-02 | `localization-unlocalized-baseline.json:28` | The baseline carries a record for a Text literal in Sources/iOS/IOSStudioCanvas.swift that no longer exists (the literal was "\(script.count) / \(charLimit)", last present at commit 82843da6), and localization_contract.py only fails when a current count… | Roadmap DA-03. |
 | A9-03 | `GenerationDrafts.swift:225` | The shared VoiceCloningReadiness.describe with ten English-only title/detail strings is referenced nowhere in Sources or Tests; the Mac re-implements the same decision order in MacVoiceCloningReadiness with catalog keys and documents the shared copy as… | Roadmap DA-03. |
 | A9-04 | `ModelManagerViewModel.swift:111` | The iPhone model inventory emits English computed statuses with a hand-rolled plural ("Installation incomplete: missing N required file/files.") and "Missing asset descriptor" (duplicating the already-localized IOSInterfaceText.missingDescriptor), and… | Roadmap DA-03. |
 
@@ -493,12 +495,12 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | ID | Where | Defect | Action |
 | --- | --- | --- | --- |
 | T1-04 | `git_commands.py:27` | Two parser desyncs hide real commands. | Roadmap DA-12. |
-| T1-05 | `policy_guard.sh:31` | The policy guard strips every heredoc body before the Simulator, cache-deletion and pbxproj regexes run, including bodies fed to a shell. | Roadmap DA-12. |
-| T1-08 | `generated_file_guard.sh:26` | The generated-file guard compares paths case-sensitively, but the checkout is on a case-insensitive volume and the path adapter does not fold case. | Fix phase. |
+| T1-05 | `policy_guard.sh:31` | The policy guard strips every heredoc body before the Simulator, cache-deletion and pbxproj regexes run, including bodies fed to a shell. | Fixed in `09f3ebd4`. |
+| T1-08 | `generated_file_guard.sh:26` | The generated-file guard compares paths case-sensitively, but the checkout is on a case-insensitive volume and the path adapter does not fold case. | Fixed in `09f3ebd4`. |
 | T1-11 | `git_commands.py:365` | The git policy blocks `git config` writes to remote URL, mirror and push keys but has no case for `git remote`, which writes the same keys. | Roadmap DA-12. |
-| T1-12 | `privacy_scan.py:29` | The scanner's home-path rule needs a separator after the user name, and its `sk-` rule needs 32 consecutive alphanumerics right after the prefix. | Fix phase. |
-| T1-13 | `settings.json:154` | The deny rules for stashing, broad staging, `commit -a` and release.sh are literal prefixes with no hook behind them. | Fix phase. |
-| T1-58 | `xcresult-triage.md:4` | The xcresult-triage subagent is described as read-only but is granted unrestricted `Bash`; the only enforcement is the parent's permission rules and hooks, and SubagentTests.test_project_subagents_are_read_only asserts only that no Edit tool is listed, so… | Fix phase. |
+| T1-12 | `privacy_scan.py:29` | The scanner's home-path rule needs a separator after the user name, and its `sk-` rule needs 32 consecutive alphanumerics right after the prefix. | Fixed in `09f3ebd4`. |
+| T1-13 | `settings.json:154` | The deny rules for stashing, broad staging, `commit -a` and release.sh are literal prefixes with no hook behind them. | Fixed in `09f3ebd4`. |
+| T1-58 | `xcresult-triage.md:4` | The xcresult-triage subagent is described as read-only but is granted unrestricted `Bash`; the only enforcement is the parent's permission rules and hooks, and SubagentTests.test_project_subagents_are_read_only asserts only that no Edit tool is listed, so… | Roadmap DA-12. |
 | T2-01 | `release.yml:228` | The signing jobs check out the mutable tag ref again instead of the commit that source-authority authorized. source-authority exports no commit, and the package job's only source check compares the tag to its own HEAD, so a tag that moves between the two jobs… | Roadmap DA-11. |
 | T2-04 | `release_source_authority.py:72` | The required-check selection matches only name, head_sha and the github-actions app, then takes the newest by completion time. ci.yml also produces a check named `CI required` on `pull_request` runs, where it aggregates the Linux lanes only and attaches to… | Roadmap DA-11. |
 | T2-06 | `classify_changes.py:102` | A Swift deterministic test reads scripts/tests/fixtures/audio_qc_codec_loop.json and asserts byte parity with the Python builder, but that fixture is missing from SWIFT_PARITY_FIXTURES, so changing it routes only the Python lane. | Roadmap DA-11. |
@@ -507,47 +509,47 @@ Hygiene, latent or narrow-reach defects. Each was reproduced by reading and has 
 | T2-09 | `promote-release.yml:22` | The job that makes a release public has no `environment:` (the reviewer gate covers candidate production only) and verifies nothing outside the draft itself. | Roadmap DA-11. |
 | T2-10 | `release.yml:205` | The team ID, notary key ID and issuer ID secrets are set in job-level env, so every step of the package job receives them, including release.sh's build and test run and the attest and upload actions, although only release.sh and the verify scripts use them. | Roadmap DA-11. |
 | T3-03 | `macos_test.sh:1476` | `${coverage:+--enable-code-coverage}` expands whenever `coverage` is non-empty, and it is initialised to the string `0`. | Roadmap DA-12. |
-| T3-04 | `check_ios_catalog.sh:54` | The EXIT trap decides 'is this my temp file' by the path prefix `/tmp/*`. | Fix phase. |
+| T3-04 | `check_ios_catalog.sh:54` | The EXIT trap decides 'is this my temp file' by the path prefix `/tmp/*`. | Roadmap DA-12. |
 | T3-05 | `ios_device.sh:2921` | The launch-spec temp file holds the exact user script text and is promised to be ephemeral, but it is removed only on three guarded failures and at line 2953. | Roadmap DA-12. |
-| T3-06 | `build_cache.sh:657` | On the interactive path (xcbeautify installed, stdout a TTY) xcb_run runs `set -o pipefail` then `set +o pipefail`, which turns pipefail off for the calling script for the rest of its run. | Fix phase. |
-| T3-07 | `permissions_doctor.sh:105` | The mktemp template has a suffix after the Xs. | Fix phase. |
-| T3-09 | `install_pinned_tools.sh:46` | `$MANIFEST` (the repo path) and `$tool` (a command-line argument) are pasted into Python source inside single quotes. | Fix phase. |
-| T3-10 | `check_project_inputs.sh:23` | A value-taking flag given last exits 1 with no message: `--python` shifts once in its arm and the loop shifts again with nothing left, which fails under set -e. | Fix phase. |
+| T3-06 | `build_cache.sh:657` | On the interactive path (xcbeautify installed, stdout a TTY) xcb_run runs `set -o pipefail` then `set +o pipefail`, which turns pipefail off for the calling script for the rest of its run. | Roadmap DA-12. |
+| T3-07 | `permissions_doctor.sh:105` | The mktemp template has a suffix after the Xs. | Roadmap DA-12. |
+| T3-09 | `install_pinned_tools.sh:46` | `$MANIFEST` (the repo path) and `$tool` (a command-line argument) are pasted into Python source inside single quotes. | Roadmap DA-12. |
+| T3-10 | `check_project_inputs.sh:23` | A value-taking flag given last exits 1 with no message: `--python` shifts once in its arm and the loop shifts again with nothing left, which fails under set -e. | Roadmap DA-12. |
 | T3-11 | `repo_invariants.sh:50` | The invariant greps cannot tell 'no match' from 'the tool failed'. | Roadmap DA-12. |
 | T3-12 | `verify_ios_release_archive.sh:53` | Under `set -euo pipefail`, a grep that finds nothing inside a command substitution fails the assignment and ends the script before the purpose-written error on the next line. | Roadmap DA-12. |
 | T3-13 | `verify_release_bundle.sh:69` | Three build and verify paths kill by process name, so they terminate any running Vocello: the maintainer's installed release app as well as the build under test. verify_release_bundle.sh does it in its EXIT trap even when the launch smoke was skipped, and… | Roadmap DA-12. |
 | T3-14 | `ios_device.sh:717` | The launch helper forwards every host variable starting with QWENVOICE_ or QVOICE_ into the iPhone app's environment. ios_device.sh sources build_paths.sh, which exports about 26 QVOICE_* variables holding absolute host paths (home directory, checkout path,… | Roadmap DA-12. |
-| T3-15 | `verify_packaged_dmg.sh:103` | The attach-error formatter uses the GNU-only BRE operator `\+`, which BSD sed on macOS (the only platform this script runs on) treats literally, so whitespace is never squeezed. | Fix phase. |
-| T4-01 | `classify_changes.py:251` | A change to the root .gitignore routes to no CI lane and no local Python selection, although two Python tests read the real .gitignore to prove credential files and the private QC store stay ignored. | Fix phase. |
+| T3-15 | `verify_packaged_dmg.sh:103` | The attach-error formatter uses the GNU-only BRE operator `\+`, which BSD sed on macOS (the only platform this script runs on) treats literally, so whitespace is never squeezed. | Roadmap DA-12. |
+| T4-01 | `classify_changes.py:251` | A change to the root .gitignore routes to no CI lane and no local Python selection, although two Python tests read the real .gitignore to prove credential files and the private QC store stay ignored. | Roadmap DA-12. |
 | T4-04 | `required_step_ledger.py:459` | A second SIGINT/SIGTERM/SIGHUP that arrives while the first is being handled raises ManagedTermination inside the except block; it escapes run_managed_step and main, so the child is never SIGKILLed and no step manifest or ledger result is written. | Roadmap DA-12. |
-| T4-05 | `test_qc_runners_speech.py:412` | The test swallows every exception and asserts nothing, so it passes whether the engine constructors raise ImportError, raise anything else, or succeed. | Fix phase. |
-| T4-06 | `classify_changes.py:126` | Three research prefixes name scripts deleted with the QC v1 stack: run_local_delivery, prepare_delivery and independent_asr match no file under scripts/. | Fix phase. |
-| T4-07 | `development_workflow.py:100` | The local Python selection ignores inputs that CI routes to the Python lane (pytest.ini, Sources/Resources/**, .github/workflows/**, Packages/**.json) and treats conftest.py as an ordinary module, so `scripts/dev.sh check` runs no or almost no Python tests… | Fix phase. |
+| T4-05 | `test_qc_runners_speech.py:412` | The test swallows every exception and asserts nothing, so it passes whether the engine constructors raise ImportError, raise anything else, or succeed. | Roadmap DA-12. |
+| T4-06 | `classify_changes.py:126` | Three research prefixes name scripts deleted with the QC v1 stack: run_local_delivery, prepare_delivery and independent_asr match no file under scripts/. | Roadmap DA-12. |
+| T4-07 | `development_workflow.py:100` | The local Python selection ignores inputs that CI routes to the Python lane (pytest.ini, Sources/Resources/**, .github/workflows/**, Packages/**.json) and treats conftest.py as an ordinary module, so `scripts/dev.sh check` runs no or almost no Python tests… | Roadmap DA-12. |
 | T4-08 | `test_qc_detectors.py:249` | Several phone-feature tests pass the default `Layout()` (the real repository root), so they read the developer's fetched QC model cache and shared G2P text cache under build/cache/qc; the same test computes with PanPhon distances on a Mac that has fetched… | Roadmap DA-12. |
 | T4-09 | `test_required_step_ledger.py:479` | The test sends SIGTERM after a fixed 0.4 s sleep with no readiness handshake, so on a loaded runner the signal can arrive before the tool has installed its handlers. | Roadmap DA-12. |
-| T5-03 | `concurrency-safety.json:122` | C10 confirmed. | Fix phase. |
-| T5-04 | `ios-control-audit-schema-v1.json:54` | config/ios-control-audit.json does not conform to the schema it declares in $schema. | Fix phase. |
-| T5-05 | `build-output-policy.json:12` | The UI-result retention list names 10 lanes, but scripts/ui_test.sh runs 13 and can also stamp 'candidate-smoke'. | Fix phase. |
-| T5-06 | `roadmap.py:454` | The generated docs/ROADMAP.md lists archived, finished items in the 'Blocked by' column as if they still block. | Fix phase. |
+| T5-03 | `concurrency-safety.json:122` | C10 confirmed. | Roadmap DA-12. |
+| T5-04 | `ios-control-audit-schema-v1.json:54` | config/ios-control-audit.json does not conform to the schema it declares in $schema. | Roadmap DA-12. |
+| T5-05 | `build-output-policy.json:12` | The UI-result retention list names 10 lanes, but scripts/ui_test.sh runs 13 and can also stamp 'candidate-smoke'. | Roadmap DA-12. |
+| T5-06 | `roadmap.py:454` | The generated docs/ROADMAP.md lists archived, finished items in the 'Blocked by' column as if they still block. | Roadmap DA-12. |
 | T5-07 | `runtime_security_contract.py:440` | The knob contract registers 23 device-diagnostics keys as behavior-mutating and 'unavailable-without-diagnostics-compilation-condition', but enforces nothing about them. | Roadmap DA-12. |
 | T5-08 | `model_catalog_contract.py:371` | config/model-catalog-schema-v2.json is never used to validate the catalog; the tool checks only its $id and hashes its bytes. | Roadmap DA-12. |
 | T5-09 | `public-product-facts.json:3` | The facts file says it is validated against project.yml and README, but only the marketing version, the stable DMG link and the canonical benchmark profiles are checked. ios.minimumOS, ios.minimumDevice, ios.testflightPublicLink, minimumMac.memoryBytes and… | Roadmap DA-12. |
 | T5-10 | `generate_readme_charts.py:496` | The generated architecture chart embedded in README.md contains an em dash in visible text. | Roadmap DA-12. |
 | T5-11 | `refresh_derived_artifacts.py:31` | The build-output policy table in docs/reference/privacy-storage.md is a generated block the contract gate checks for freshness, but it is not registered for regeneration, has no command that writes it, and is not covered by the generated-file guard. | Roadmap DA-12. |
-| T5-12 | `roadmap.py:343` | Cycle detection follows only the first blocker of each item, so a cycle that passes through a second or later blockedBy entry is not detected. | Fix phase. |
-| T5-54 | `runtime-debug-knobs.json:8` | scripts/build_ui_test_bundles.sh compiles with -DVOCELLO_INTERNAL_DIAGNOSTICS but is not listed in enabledBuildRoutes, and the contract validator only checks that listed enabled routes contain the condition and listed distributed routes do not, so an unlisted… | Fix phase. |
+| T5-12 | `roadmap.py:343` | Cycle detection follows only the first blocker of each item, so a cycle that passes through a second or later blockedBy entry is not detected. | Roadmap DA-12. |
+| T5-54 | `runtime-debug-knobs.json:8` | scripts/build_ui_test_bundles.sh compiles with -DVOCELLO_INTERNAL_DIAGNOSTICS but is not listed in enabledBuildRoutes, and the contract validator only checks that listed enabled routes contain the condition and listed distributed routes do not, so an unlisted… | Roadmap DA-12. |
 | T5-57 | `runtime_security_contract.py:16` | The concurrency registry is enforced with a single-line regex ([^\n{]* between the type name and @unchecked Sendable), so a declaration whose conformance list is wrapped onto the next line (common once a long list is reformatted, e.g. | Roadmap DA-12. |
-| T6-01 | `macos-testing.md:407` | Three reference docs still say the macOS retained-memory-v2 bound and the M6 unobserved-gap bound are uncalibrated and gate nothing. | Fix phase. |
-| T6-02 | `benchmarking-procedure.md:731` | benchmarking-procedure.md still describes the stall contract as a provisional 250 ms limit that only reports and never fails a run. | Fix phase. |
-| T6-03 | `CONTRIBUTING.md:36` | CONTRIBUTING.md tells contributors ci.yml has no pull-request lane, so a fork's change only gets a verdict after a maintainer pushes it to main. | Fix phase. |
-| T6-04 | `README.md:128` | README line 128 still says the published Mac figures were measured on the retired M2, and that 'the pinned Mac record' is the M2 record 379db820. | Fix phase. |
-| T6-05 | `development-progress.md:334` | Commit 4051f87b deleted two dated docs that development-progress.md still links: the 2026-09-25 audio QC audit and the 2026-09-21 French delivery pilot. | Fix phase. |
-| T6-53 | `SECURITY.md:36` | SECURITY.md says the signing jobs grant only codesign access to the temporary keychain. release.yml's partition lists also grant apple-tool: and apple: (the iOS job omits codesign: entirely), and the iOS import trusts /usr/bin/security. | Fix phase. |
+| T6-01 | `macos-testing.md:407` | Three reference docs still say the macOS retained-memory-v2 bound and the M6 unobserved-gap bound are uncalibrated and gate nothing. | Roadmap DA-12. |
+| T6-02 | `benchmarking-procedure.md:731` | benchmarking-procedure.md still describes the stall contract as a provisional 250 ms limit that only reports and never fails a run. | Roadmap DA-12. |
+| T6-03 | `CONTRIBUTING.md:36` | CONTRIBUTING.md tells contributors ci.yml has no pull-request lane, so a fork's change only gets a verdict after a maintainer pushes it to main. | Roadmap DA-12. |
+| T6-04 | `README.md:128` | README line 128 still says the published Mac figures were measured on the retired M2, and that 'the pinned Mac record' is the M2 record 379db820. | Roadmap DA-12. |
+| T6-05 | `development-progress.md:334` | Commit 4051f87b deleted two dated docs that development-progress.md still links: the 2026-09-25 audio QC audit and the 2026-09-21 French delivery pilot. | Roadmap DA-12. |
+| T6-53 | `SECURITY.md:36` | SECURITY.md says the signing jobs grant only codesign access to the temporary keychain. release.yml's partition lists also grant apple-tool: and apple: (the iOS job omits codesign: entirely), and the iOS import trusts /usr/bin/security. | Roadmap DA-12. |
 | T7-01 | `Listen.jsx:21` | Starting a second sample while the first is still loading leaves the page showing nothing playing while the second sample is audible. | Roadmap DA-12. |
 | T7-02 | `Engineering.jsx:113` | The website performance chart never says it measures the Speed (4-bit) models. | Roadmap DA-12. |
-| T7-03 | `samples.js:12` | The Voice Design 'British narrator' row is labelled 0:08, but its WAV is 6.4 seconds long. | Fix phase. |
+| T7-03 | `samples.js:12` | The Voice Design 'British narrator' row is labelled 0:08, but its WAV is 6.4 seconds long. | Roadmap DA-12. |
 | T7-04 | `site-contract.mjs:86` | Public facts reach the site only through a hand mirror, and the contract checks just the version and tag of the stable and fallback releases. | Roadmap DA-12. |
-| T7-07 | `samples.js:66` | DELIVERY_COLORS is exported but imported nowhere. | Fix phase. |
+| T7-07 | `samples.js:66` | DELIVERY_COLORS is exported but imported nowhere. | Roadmap DA-12. |
 
 ## 5. Plausible or disputed, not confirmed
 
@@ -667,9 +669,19 @@ Reported by an auditor and disproved by a refuter. Listed so they are not raised
 - **T2-11** `scripts/check_project_inputs.sh:61`: No gate, workflow or script runs `model_catalog_contract.py validate --require-complete`; the contract gate runs plain `validate`, which passes a `staged` catalog. Disproved by: self.assertTrue(result["complete"])
 - **T2-58** `scripts/verify_release_bundle.sh:158`: The 'isolated native mode' launch smoke sets HOME, QWENVOICE_DEBUG=1 and QWENVOICE_APP_SUPPORT_DIR only on the `/usr/bin/open -n` process; LaunchServices does not forward the caller's environment to… Disproved by: open(1) man page on this host (Darwin 27), DESCRIPTION: `Opened applications inherit environment variables just as if you had launched the application directly through its full path.
 
-## 9. What happens next
+## 9. Fix status
 
-**Fix phase.** Confirmed defects with a code-local fix and no product decision are fixed in scoped commits on `main`, each with a deterministic test where the behavior is testable: the History path resolver (A2-01), the Mac engine start (A14-02), the Stop-during-save race (A1-01, A14-52), iPhone model delete and the incomplete-install dead end (A5-01, A5-02), the cancelled prewarm (E1-02), saved-voice deletion (A8-01), the HTTP 416 loop and the fail-open digest check (E5-01, E5-03), the commit lint and command guards (T1-01, T1-02, T1-03, T1-06, T1-07, T1-55), the CI routing gaps (T4-51, T2-05), the build-lock spin (T3-01), the roadmap evidence rule (T5-01), and the P3 items marked "Fix phase" above. `config/roadmap.json` item DA-01 tracks them.
+**Fixed on `main` (item DA-01), each with tests and a green `CI required`:**
+
+| Commit | Findings |
+| --- | --- |
+| `64ad6677` | A2-01 (History audio rebased when the container moved), A1-01 and A14-52 (a Stop is refused once the take is being saved), A14-02 (a failed Mac engine start shows the launch diagnostics, and Retry works) |
+| `5b3ebba2` | E5-01 (a full-size bad partial restarts clean), E5-03 (the digest check no longer reads as verified without a digest), A5-02 (an incomplete install is removable on iPhone), E6-01, A6-01, A14-07 |
+| `09f3ebd4` | T1-01, T1-02, T1-03, T1-05, T1-06, T1-07, T1-08, T1-09, T1-10, T1-12, T1-13, T1-55 (commit lint and command guards), T4-51 and T2-05 (CI routing) |
+
+Each Swift batch went through the project's Swift review and the guard batch through an adversarial review; both found real problems in the first version of the fixes (a History rebase that could rewrite rows of an unmounted Mac output folder, an integrity change that hid a wrong-size file, a commit lint that a multi-line message could still bypass), and the fixes above include their corrections.
+
+**Deliberately not fixed in this pass.** A5-01 (iPhone model delete under a running engine) needs the Mac deletion sequence shared with iOS and new copy. E1-02 (cancelled prewarm) changes when the engine unloads and needs a model run. A8-01 (saved-voice deletion) is a deletion path with no test seam yet. The remaining P3 items marked for fixing were moved to their roadmap items so the pass stayed within what could be verified.
 
 **Roadmap.** Everything else is an item of plan `project-audit-2026-10`:
 

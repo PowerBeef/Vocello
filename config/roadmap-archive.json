@@ -4440,6 +4440,28 @@
         "AQ-08",
         "DP-29"
       ]
+    },
+    {
+      "id": "DA-01",
+      "plan": "project-audit-2026-10",
+      "title": "Fix the confirmed defects that need no product decision",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The confirmed defects that need no product decision, no new copy and no lane are fixed on main with deterministic tests: the History path rebase (A2-01), the Mac engine start (A14-02), Stop-during-save (A1-01, A14-52), the HTTP 416 loop and the digest check (E5-01, E5-03), the incomplete install on iPhone (A5-02), the commit lint and command guards (T1-01 to T1-13, T1-55), CI routing (T4-51, T2-05) and E6-01, A6-01, A14-07. The findings first marked for fixing that could not be verified here moved to DA-06, DA-08, DA-10 and DA-12 with the reason.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/iOSSupport/Models/Generation.swift",
+        "Sources/QwenVoiceApp.swift",
+        "scripts/privacy_scan.py"
+      ],
+      "updated": "2026-10-06",
+      "unparkWhen": null,
+      "notes": "Closed 2026-10-06: 24 findings fixed in 64ad6677, 5b3ebba2 and 09f3ebd4, each batch reviewed (swift-review; an adversarial review for the hooks) and green in CI. The reviews found defects in the first version of three fixes, which the commits include. Not fixed here: A5-01 (needs the Mac deletion sequence shared with iOS and new copy), E1-02 (changes engine unload, needs a model run), A8-01 (no test seam yet).",
+      "evidence": [
+        "commit:64ad6677",
+        "commit:5b3ebba2",
+        "commit:09f3ebd4"
+      ]
     }
   ]
 }

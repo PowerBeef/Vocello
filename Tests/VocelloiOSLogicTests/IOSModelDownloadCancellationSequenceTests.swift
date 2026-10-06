@@ -4,6 +4,7 @@ import XCTest
 final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
     private enum Step: Equatable {
         case persistIntent
+        case keepCancellable
         case publishCancelling
         case drainStarted
         case drainFinished
@@ -23,6 +24,7 @@ final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
         var steps: [Step] = []
         let outcome = await IOSModelDownloadCancellationSequence.cancelActive(
             persistIntent: { steps.append(.persistIntent); return intent },
+            keepCancellable: { steps.append(.keepCancellable) },
             publishCancelling: { steps.append(.publishCancelling) },
             drainTask: {
                 steps.append(.drainStarted)
@@ -44,6 +46,7 @@ final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
         var steps: [Step] = []
         let outcome = IOSModelDownloadCancellationSequence.cancelPending(
             persistIntent: { steps.append(.persistIntent); return intent },
+            keepCancellable: { steps.append(.keepCancellable) },
             dequeue: { steps.append(.dequeue) },
             persistTombstone: { steps.append(.persistTombstone); return tombstone },
             discardStaging: { steps.append(.discardStaging) },
@@ -70,12 +73,13 @@ final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
         ])
     }
 
-    /// A failed intent write stops before the downloader or task is touched, so the caller can
-    /// publish the failure against the still-recoverable generation.
-    func testActiveIntentPersistenceFailureStopsBeforeTheTaskIsCancelled() async {
+    /// A failed intent write stops before the downloader or task is touched. The transfer keeps
+    /// running, so it is shown again as running, with its Cancel control: a failure row would
+    /// offer only Retry, which cannot act on a download still in flight (A5-03).
+    func testActiveIntentPersistenceFailureStopsBeforeTheTaskIsCancelledAndStaysCancellable() async {
         let (outcome, steps) = await runActive(intent: false)
         XCTAssertEqual(outcome, .intentPersistenceFailed)
-        XCTAssertEqual(steps, [.persistIntent])
+        XCTAssertEqual(steps, [.persistIntent, .keepCancellable])
     }
 
     /// A target that completed during cancellation and could not be rolled back is never
@@ -103,10 +107,41 @@ final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
         XCTAssertEqual(steps, [.persistIntent, .dequeue, .persistTombstone, .discardStaging, .publishDeleted])
     }
 
-    func testPendingIntentPersistenceFailureLeavesTheQueueUntouched() {
+    /// The request stays queued, so it is shown queued again, with Cancel (A5-03).
+    func testPendingIntentPersistenceFailureLeavesTheQueueUntouchedAndStaysCancellable() {
         let (outcome, steps) = runPending(intent: false)
         XCTAssertEqual(outcome, .intentPersistenceFailed)
-        XCTAssertEqual(steps, [.persistIntent])
+        XCTAssertEqual(steps, [.persistIntent, .keepCancellable])
+    }
+
+    /// Only an intent that could not be recorded restores the cancellable state; every later
+    /// failure has already stopped or dequeued the request.
+    func testOnlyAFailedIntentWriteRestoresTheCancellableState() async {
+        for (_, steps) in [
+            await runActive(), await runActive(rollback: false), await runActive(tombstone: false),
+        ] {
+            XCTAssertFalse(steps.contains(.keepCancellable))
+        }
+        for (_, steps) in [runPending(), runPending(tombstone: false)] {
+            XCTAssertFalse(steps.contains(.keepCancellable))
+        }
+    }
+
+    /// A5-04: cancelling a queued model never stops the heartbeat of the download in flight;
+    /// only that download's own cancellation does.
+    func testOnlyTheTransferThatOwnsTheHeartbeatStopsIt() {
+        var heartbeat = IOSModelDownloadHeartbeatOwnership()
+        heartbeat.claim(for: "pro_custom")
+
+        XCTAssertFalse(heartbeat.release(for: "pro_design"), "A queued model's cancellation")
+        XCTAssertEqual(heartbeat.modelID, "pro_custom")
+
+        XCTAssertTrue(heartbeat.release(for: "pro_custom"))
+        XCTAssertNil(heartbeat.modelID)
+        XCTAssertFalse(heartbeat.release(for: "pro_custom"), "Already stopped")
+
+        heartbeat.claim(for: "pro_design")
+        XCTAssertEqual(heartbeat.modelID, "pro_design", "The next transfer takes it over")
     }
 
     func testPendingTombstoneFailurePreservesStagingAndNeverClaimsDeleted() {

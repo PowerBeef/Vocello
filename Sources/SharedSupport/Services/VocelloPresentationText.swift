@@ -332,6 +332,38 @@ struct VocelloPresentationText: Sendable {
                comment: "History recovery banner detail: a private list of audio files waiting for deletion was unreadable, so those files stay on the device; Retry dismisses the notice and deletes no audio.")
     }
 
+    /// A2-02: queued History records that cannot be read or verified block a
+    /// clear until the user discards them.
+    func historyUnverifiableRecords(_ count: Int) -> String {
+        localization.format(localization.string(localized: "vocello.history.unverifiable_records_detail",
+            defaultValue: "%lld recovery records can't be verified, so History can't be cleared and the audio of deleted takes stays on this device. Retry, or discard the damaged records.",
+            comment: "History recovery banner detail; %lld is the number of damaged recovery records. They block clearing History and removing audio of deleted takes until the user retries or discards them."), count)
+    }
+
+    var discardUnverifiableRecords: String {
+        localization.string(localized: "vocello.history.discard_unverifiable_records",
+               defaultValue: "Discard…",
+               comment: "History recovery banner button that asks to confirm setting aside damaged recovery records; a confirmation follows.")
+    }
+
+    func discardUnverifiableRecordsTitle(_ count: Int) -> String {
+        localization.format(localization.string(localized: "vocello.history.discard_unverifiable_records_title",
+            defaultValue: "Discard %lld damaged records?",
+            comment: "Confirmation title before damaged History recovery records are set aside; %lld is their number."), count)
+    }
+
+    var discardUnverifiableRecordsDetail: String {
+        localization.string(localized: "vocello.history.discard_unverifiable_records_detail",
+               defaultValue: "Vocello can't read this recovery data, so the takes it describes can't be added to History. Discarding sets it aside so History can be cleared again. No audio is deleted.",
+               comment: "Confirmation message before damaged History recovery records are set aside: their takes stay out of History, clearing works again, and no audio file is deleted.")
+    }
+
+    var discardUnverifiableRecordsConfirm: String {
+        localization.string(localized: "vocello.history.discard_unverifiable_records_confirm",
+               defaultValue: "Discard",
+               comment: "Destructive confirmation button that sets aside damaged History recovery records; no audio is deleted.")
+    }
+
     var longFormSegmentGenerated: String {
         localization.string(localized: "vocello.long_form.segment_generated",
                defaultValue: "Generated",

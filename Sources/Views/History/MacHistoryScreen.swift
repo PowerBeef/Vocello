@@ -288,9 +288,12 @@ struct MacHistoryScreen: View {
                             || recoverySnapshot.pendingAudioRemovalCount > 0
                             || recoverySnapshot.unreadableAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
+                        canDiscard: recoverySnapshot.notice == .unverifiedRecord
+                            && recoverySnapshot.unverifiableRecordCount > 0,
                         onRetry: { retryRecovery() },
                         onReveal: { MacHistoryFileActions.revealRecoveryAudio(recoveryAudioURLs) },
-                        onExport: exportPendingAudio
+                        onExport: exportPendingAudio,
+                        onDiscard: confirmDiscardUnverifiableRecords
                     )
                 }
 
@@ -568,7 +571,11 @@ struct MacHistoryScreen: View {
         case .unqueued:
             return VocelloPresentationText.historyUnqueuedDetail
         case .unverifiedRecord:
-            return MacInterfaceText.historyRecoveryUnverified
+            // A2-02: a damaged record the user can set aside is counted.
+            let count = recoverySnapshot.unverifiableRecordCount
+            return count > 0
+                ? MacInterfaceText.presentation.historyUnverifiableRecords(count)
+                : MacInterfaceText.historyRecoveryUnverified
         case .clearPending:
             return MacInterfaceText.presentation.historyClearPendingDetail
         case .queuedTakes(let count):
@@ -873,6 +880,27 @@ private extension MacHistoryScreen {
         }
     }
 
+    /// A2-02: nothing is set aside without this confirmation.
+    func confirmDiscardUnverifiableRecords() {
+        let presentation = MacInterfaceText.presentation
+        actionAlert = MacHistoryActionAlert(
+            title: presentation.discardUnverifiableRecordsTitle(recoverySnapshot.unverifiableRecordCount),
+            message: presentation.discardUnverifiableRecordsDetail,
+            confirmTitle: presentation.discardUnverifiableRecordsConfirm,
+            onConfirm: { discardUnverifiableRecords() }
+        )
+    }
+
+    /// The records are set aside, no audio is deleted, and Clear All and the
+    /// removal of deleted takes' audio can run again.
+    func discardUnverifiableRecords() {
+        Task {
+            await GenerationHistoryRecovery.setAsideUnverifiableRecords()
+            NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+            reloadHistory(reopenFailedStore: true)
+        }
+    }
+
     func confirmDelete(_ item: MacHistoryListItem) async {
         switch await deleteItem(item) {
         case .deleted:
@@ -893,16 +921,14 @@ private extension MacHistoryScreen {
     /// Off the main actor, because the work behind this is a synchronous SQLite
     /// write followed by a file removal, and both were running on the thread
     /// drawing the list. The engine stays pure and synchronous -- its rules are
-    /// tested in `QwenVoiceCore` and are worth keeping that way -- so the hop
-    /// happens here, at the one place that knows it is on the main actor.
-    /// Audio that could not be removed is kept for a later reconcile (AUD-05).
+    /// tested in `QwenVoiceCore` and are worth keeping that way -- and runs on
+    /// the History recovery coordinator, which lists the audio removal before
+    /// the row goes (A2-04). Audio that could not be removed is kept for a
+    /// later reconcile (AUD-05).
     func deleteItem(_ item: MacHistoryListItem) async -> HistoryDeletionEngine.SingleOutcome {
-        let engine = GenerationHistoryRecovery.deletionEngine
         let recordID = item.generation.id
         let audioPath = item.generation.audioPath
-        let outcome = await Task.detached(priority: .userInitiated) {
-            engine.deleteSingle(recordID: recordID, audioPath: audioPath)
-        }.value
+        let outcome = await GenerationHistoryRecovery.deleteSingle(recordID: recordID, audioPath: audioPath)
 
         if case .databaseFailure = outcome {
             databaseUnavailable = true

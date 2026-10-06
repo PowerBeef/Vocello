@@ -6,7 +6,8 @@ final class IOSModelInstallerViewModel: ObservableObject {
     enum OperationState: Equatable {
         case idle
         case available(estimatedBytes: Int64?)
-        case queued
+        /// `message` explains a cancellation that could not be recorded (A5-03).
+        case queued(message: String?)
         case waitingForConnectivity(downloadedBytes: Int64, totalBytes: Int64?)
         case downloading(
             progress: Double?, downloadedBytes: Int64, totalBytes: Int64?,
@@ -26,9 +27,14 @@ final class IOSModelInstallerViewModel: ObservableObject {
     }
 
     @Published private(set) var states: [String: OperationState] = [:]
+    /// A model whose removal the engine refused because it was busy; the Voice
+    /// Models screen explains it in the localized busy alert (A5-01).
+    @Published private(set) var blockedDeletionModelID: String?
 
     private let modelAssetStore: LocalModelAssetStore?
     private let modelManager: ModelManagerViewModel
+    /// The in-process engine a model removal coordinates with (A5-01), as on macOS.
+    private weak var engine: (any ModelDeletionEngineCoordinating)?
     private let backgroundSessionIdentifier: String
     private let diagnosticsStore: ModelDownloadDiagnosticsStore
     private var coordinator: IOSModelDownloadCoordinator?
@@ -36,15 +42,14 @@ final class IOSModelInstallerViewModel: ObservableObject {
     private var lastDiagnosticSnapshotTrace:
         [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
 
-    /// Called after a model install completes so the engine can preload it in the background.
-    var onModelInstalled: ((_ modelID: String) -> Void)?
-
     init(
         modelAssetStore: LocalModelAssetStore?,
-        modelManager: ModelManagerViewModel
+        modelManager: ModelManagerViewModel,
+        engine: (any ModelDeletionEngineCoordinating)?
     ) {
         self.modelAssetStore = modelAssetStore
         self.modelManager = modelManager
+        self.engine = engine
         let deliveryConfiguration = IOSModelDeliveryConfiguration.default()
         self.backgroundSessionIdentifier = deliveryConfiguration.backgroundSessionIdentifier
         self.diagnosticsStore = ModelDownloadDiagnosticsStore(
@@ -155,6 +160,10 @@ final class IOSModelInstallerViewModel: ObservableObject {
         }
     }
 
+    /// A5-01: never removes files the engine is using, as on macOS
+    /// (`ModelDeletionSequence`). A take, a long-form project, or a load, warm or
+    /// prime keeps the files and raises the busy alert; unless another model is
+    /// loaded the engine is unloaded first, and a refused unload keeps the files.
     func delete(_ model: TTSModel) {
         if IOSNativeDeviceFeatureGate.unavailableMessage(for: model) != nil {
             return
@@ -165,11 +174,44 @@ final class IOSModelInstallerViewModel: ObservableObject {
         }
 
         Task {
-            do {
-                try await coordinator.delete(model: model)
+            var removalError: (any Error)?
+            let outcome = await ModelDeletionSequence.run(
+                modelID: model.id,
+                engine: engine,
+                stopDownloads: { await coordinator.stopDownloadBeforeDeletion(modelID: model.id) },
+                removeFiles: {
+                    do {
+                        return try coordinator.removeInstalledFiles(of: model)
+                    } catch {
+                        removalError = error
+                        return false
+                    }
+                },
+                unloadFailed: { error in
+                    diagnosticsStore.recordFailure(classification: "delete-unload", error: error)
+                }
+            )
+            switch outcome {
+            case .deleted:
                 await refreshModelInventory(modelID: model.id, event: "delete-refresh")
                 states.removeValue(forKey: model.id)
-            } catch {
+            case .blockedByActiveGeneration, .failed(.engineRelease):
+                // The files are intact; the busy alert says why.
+                diagnosticsStore.recordEvent(
+                    layer: "view-model",
+                    event: "delete-blocked",
+                    modelID: model.id,
+                    outcome: "engine-busy"
+                )
+                blockedDeletionModelID = model.id
+            case .failed(.downloadStop):
+                // The model's download could not be cancelled durably, so its
+                // files stay; the coordinator already published the row's state.
+                break
+            case .failed(.fileRemoval):
+                // Without an error the files were kept for a download that started
+                // meanwhile, which the row shows.
+                guard let removalError else { return }
                 let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
                 lastAcceptedGeneration[model.id] = generation
                 apply(
@@ -179,12 +221,16 @@ final class IOSModelInstallerViewModel: ObservableObject {
                         downloadedBytes: 0,
                         totalBytes: nil,
                         estimatedBytes: model.estimatedDownloadBytes,
-                        message: error.localizedDescription,
+                        message: removalError.localizedDescription,
                         operationGeneration: generation
                     )
                 )
             }
         }
+    }
+
+    func dismissBlockedDeletion() {
+        blockedDeletionModelID = nil
     }
 
     @discardableResult
@@ -230,7 +276,7 @@ final class IOSModelInstallerViewModel: ObservableObject {
 
         switch snapshot.phase {
         case .queued:
-            states[snapshot.modelID] = .queued
+            states[snapshot.modelID] = .queued(message: snapshot.message)
         case .waitingForConnectivity:
             states[snapshot.modelID] = .waitingForConnectivity(
                 downloadedBytes: snapshot.downloadedBytes,
@@ -276,7 +322,6 @@ final class IOSModelInstallerViewModel: ObservableObject {
             let modelID = snapshot.modelID
             Task {
                 await refreshModelInventory(modelID: modelID, event: "installed-refresh")
-                onModelInstalled?(modelID)
             }
         case .deleting:
             states[snapshot.modelID] = .deleting

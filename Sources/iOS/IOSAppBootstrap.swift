@@ -207,11 +207,13 @@ extension QVoiceiOSApp {
                 }
             )
         )
+        // A5-01: removing a model coordinates with the engine, as on macOS. An
+        // install never preloads its model: warms follow Studio intent (AUD-10).
         let modelInstaller = IOSModelInstallerViewModel(
             modelAssetStore: modelAssetStore,
-            modelManager: modelManager
+            modelManager: modelManager,
+            engine: engineStore
         )
-        modelInstaller.onModelInstalled = nil
         return SelectedBackend(
             engineStore: engineStore,
             modelManager: modelManager,

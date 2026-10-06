@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import QwenVoiceCore
 import XCTest
 
 final class GenerationHistoryOutboxTests: XCTestCase {
@@ -141,6 +142,87 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertTrue(scan.entries.isEmpty)
         XCTAssertEqual(scan.issueCount, 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: corruptURL.path))
+    }
+
+    /// A2-02: a record that cannot be read or verified blocks a clear and the
+    /// removal of deleted takes' audio, and Retry cannot repair it. Nothing is
+    /// discarded until the user confirms; then it is set aside, not deleted,
+    /// and the clear and the removal proceed.
+    func testUnverifiableRecordBlocksClearingUntilTheUserSetsItAside() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let corruptURL = fixture.store.rootURL.appendingPathComponent("\(UUID().uuidString.lowercased()).json")
+        try Data("not-json".utf8).write(to: corruptURL)
+        // A stray file whose name is no entry identity cannot be verified either.
+        let strayURL = fixture.store.rootURL.appendingPathComponent("copied-in.json")
+        try encode(GenerationHistoryOutboxEntry(operation: .append, generation: fixture.generation))
+            .write(to: strayURL)
+        let deletedTake = try makeAudio(in: fixture, named: "deleted.wav")
+        try await coordinator.retainAudioRemoval(deletedTake.path)
+
+        let blocked = await coordinator.reconcile()
+        XCTAssertEqual(blocked.snapshot.notice, .unverifiedRecord)
+        XCTAssertEqual(blocked.snapshot.unverifiableRecordCount, 2)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: deletedTake.path), "Removal fails closed")
+        do {
+            _ = try await coordinator.clearAll(deleteAudio: true)
+            XCTFail("The clear must fail closed on the damaged records")
+        } catch {
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .clearUnavailable)
+        }
+        let retried = await coordinator.reconcile()
+        XCTAssertEqual(retried.snapshot.unverifiableRecordCount, 2, "Retry alone never discards them")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: corruptURL.path))
+        XCTAssertEqual(state.counts.rows, 1)
+
+        let setAside = try await coordinator.setAsideUnverifiableRecords()
+
+        XCTAssertEqual(setAside, 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: corruptURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: strayURL.path))
+        let asideNames = try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path)
+            .filter { $0.hasSuffix(".unverifiable") }
+        XCTAssertEqual(asideNames.count, 2, "Set aside, not deleted")
+        let asideData = try asideNames.map {
+            try Data(contentsOf: fixture.store.rootURL.appendingPathComponent($0))
+        }
+        XCTAssertTrue(asideData.contains(Data("not-json".utf8)), "Contents are kept as they were")
+        XCTAssertEqual(fixture.store.scan().issueCount, 0, "Never read again")
+
+        let reconciled = await coordinator.reconcile()
+        XCTAssertNil(reconciled.snapshot.notice)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: deletedTake.path), "The removal proceeds")
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+        XCTAssertEqual(outcome.failedFileRemovals, 0)
+        XCTAssertEqual(state.counts.rows, 0, "The clear proceeds")
+        XCTAssertEqual(outcome.snapshot, .empty)
+    }
+
+    /// Only records that cannot be verified are set aside: a valid queued take
+    /// stays queued, and a store with nothing damaged sets nothing aside.
+    func testSettingAsideKeepsEveryVerifiableRecord() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        state.setFailure(true) // keep the valid take queued
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
+
+        let nothing = try await coordinator.setAsideUnverifiableRecords()
+        XCTAssertEqual(nothing, 0)
+
+        try Data("not-json".utf8).write(
+            to: fixture.store.rootURL.appendingPathComponent("\(UUID().uuidString.lowercased()).json")
+        )
+        let setAside = try await coordinator.setAsideUnverifiableRecords()
+        XCTAssertEqual(setAside, 1)
+        let scan = fixture.store.scan()
+        XCTAssertEqual(scan.entries.map(\.id), [entry.id])
+        XCTAssertEqual(scan.issueCount, 0)
+        let snapshot = await coordinator.snapshot()
+        XCTAssertEqual(snapshot.unverifiableRecordCount, 0)
+        XCTAssertEqual(snapshot.notice, .queuedTakes(1))
     }
 
     func testInterruptedEntryWriteIsPromotedOnScan() throws {
@@ -1041,6 +1123,80 @@ final class GenerationHistoryOutboxTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path), "The interrupted take uses it")
         XCTAssertTrue(FileManager.default.fileExists(atPath: writing.path), "Left for the coordinator")
+    }
+
+    /// A2-04: a single delete lists its audio before the row goes, as a clear
+    /// records its intent first. A process that dies after the row and before
+    /// the unlink (here the removal never happens, and the screen's later
+    /// retain never runs) still leaves the path for the next reconcile.
+    func testSingleDeleteListsItsAudioBeforeTheRowSoAnInterruptedDeleteIsRetried() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let saved = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let store = fixture.store
+        let audioPath = fixture.audioURL.path
+        let engine = HistoryDeletionEngine(
+            deleteRecord: { id in
+                XCTAssertEqual(try store.loadPendingAudioRemovals(), [audioPath], "Listed before the row goes")
+                _ = try state.delete(throughID: id)
+            },
+            removeFile: { _ in throw StubError() }, // the process dies before the unlink
+            fileExists: { FileManager.default.fileExists(atPath: $0) }
+        )
+
+        let outcome = await coordinator.deleteSingle(recordID: saved.id, audioPath: audioPath, using: engine)
+
+        guard case .audioCleanupFailure = outcome else {
+            return XCTFail("Expected the interrupted removal, got \(outcome)")
+        }
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertEqual(try store.loadPendingAudioRemovals(), [audioPath], "Still listed with no row left")
+        let retried = await coordinator.reconcile()
+        XCTAssertEqual(retried.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: audioPath), "The orphan is removed")
+    }
+
+    /// A completed single delete leaves nothing listed; one whose row stays
+    /// withdraws its listing and keeps the audio.
+    func testSingleDeleteWithdrawsItsListingOnceSettled() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let store = fixture.store
+        func engine(deleteFails: Bool) -> HistoryDeletionEngine {
+            HistoryDeletionEngine(
+                deleteRecord: { id in
+                    if deleteFails { throw StubError() }
+                    _ = try state.delete(throughID: id)
+                },
+                removeFile: { path in
+                    try GenerationHistoryAudioFile.removeUnreferenced(
+                        atPath: path,
+                        outbox: store,
+                        referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+                    )
+                },
+                fileExists: { FileManager.default.fileExists(atPath: $0) }
+            )
+        }
+
+        let kept = try state.commit(fixture.generation)
+        let failed = await coordinator.deleteSingle(
+            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: true)
+        )
+        guard case .databaseFailure = failed else { return XCTFail("Expected the database failure, got \(failed)") }
+        XCTAssertEqual(try store.loadPendingAudioRemovals(), [], "The row stayed, so its audio is not listed")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+
+        let deleted = await coordinator.deleteSingle(
+            recordID: kept.id, audioPath: fixture.audioURL.path, using: engine(deleteFails: false)
+        )
+        XCTAssertEqual(deleted, .deleted)
+        XCTAssertEqual(try store.loadPendingAudioRemovals(), [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        let snapshot = await coordinator.snapshot()
+        XCTAssertEqual(snapshot, .empty)
     }
 
     /// Only a missing file is absent. A path that cannot be examined (here a

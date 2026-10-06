@@ -73,8 +73,8 @@
       "path": "Sources/iOS/History/HistoryScreen.swift",
       "screen": "History",
       "scenario": "stateful",
-      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here.",
-      "interactiveOccurrenceCount": 15
+      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified is confirmed first (A2-02); only naturally damaged records may be inspected on user devices.",
+      "interactiveOccurrenceCount": 19
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",
@@ -164,8 +164,8 @@
       "path": "Sources/iOS/Settings/VoiceModelsScreen.swift",
       "screen": "Voice Models",
       "scenario": "stateful",
-      "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls.",
-      "interactiveOccurrenceCount": 3
+      "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls. A removal the busy engine refused raises its own alert (A5-01).",
+      "interactiveOccurrenceCount": 5
     },
     {
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
@@ -526,7 +526,7 @@
     },
     {
       "id": "history-surface",
-      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|RetryButton|Recovery_retry|Recovery_export|ShowMoreButton)",
+      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|RetryButton|Recovery_retry|Recovery_export|Recovery_discard|Recovery_discardConfirm|Recovery_discardCancel|ShowMoreButton)",
       "sourceToken": "historySearchField",
       "screen": "History",
       "prerequisite": "History tab",
@@ -601,7 +601,7 @@
     },
     {
       "id": "model-rows",
-      "identifierPattern": "iosModel(Row|Status|Menu|Download|Delete|Cancel|Retry|Repair|Update|Progress|PhaseActivity|ProgressDetail)_{value}",
+      "identifierPattern": "iosModel(Row|Status|Menu|Download|Delete|Cancel|Retry|Repair|Update|Progress|PhaseActivity|ProgressDetail|RemoveBusyDismiss)_{value}",
       "sourceToken": "iosModelRow_",
       "expandFrom": "models",
       "screen": "Voice Models",

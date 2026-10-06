@@ -7,9 +7,13 @@ struct MacHistoryRecoveryBanner: View {
     let message: String
     let canReveal: Bool
     let canExport: Bool
+    /// Records that cannot be verified may be set aside, after a confirmation
+    /// (A2-02); the action shows only then.
+    let canDiscard: Bool
     let onRetry: () -> Void
     let onReveal: () -> Void
     let onExport: () -> Void
+    let onDiscard: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: VocelloTheme.Spacing.snug) {
@@ -29,6 +33,10 @@ struct MacHistoryRecoveryBanner: View {
                 Button(VocelloPresentationText.exportRecoveryFiles, action: onExport)
                     .disabled(!canExport)
                     .accessibilityIdentifier("historyRecovery_export")
+                if canDiscard {
+                    Button(MacInterfaceText.presentation.discardUnverifiableRecords, role: .destructive, action: onDiscard)
+                        .accessibilityIdentifier("historyRecovery_discard")
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

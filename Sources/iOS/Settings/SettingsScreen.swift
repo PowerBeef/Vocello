@@ -89,6 +89,17 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownloadDetail", defaultValue: "Canceling removes the downloaded data. You can download it again from scratch.",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
+    /// A5-01: the engine was generating, running a long-form project, or loading
+    /// a model, so a removal kept the model's files.
+    static var removeModelBusyTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.removeModelBusyTitle", defaultValue: "Generation in Progress",
+               comment: "Alert title when a voice model cannot be removed because a generation or model load is running. Presentation only.")
+    }
+    static var removeModelBusyMessage: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.removeModelBusyMessage",
+               defaultValue: "Wait for the current generation to finish, or cancel it, before removing a model.",
+               comment: "Alert message when a voice model cannot be removed because a generation or model load is running; nothing was removed. Presentation only.")
+    }
     static var checking: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.checking", defaultValue: "Checking…",
                comment: "Settings and model management presentation; no change to stored identities.")

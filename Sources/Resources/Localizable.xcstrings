@@ -5233,6 +5233,138 @@
         }
       }
     },
+    "vocello.settings.polish.removeModelBusyTitle": {
+      "comment": "Alert title when a voice model cannot be removed because a generation or model load is running. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation in Progress"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Génération en cours"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generación en curso"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generierung läuft"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generazione in corso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geração em andamento"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成中です"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 진행 중"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Идёт генерация"
+          }
+        }
+      }
+    },
+    "vocello.settings.polish.removeModelBusyMessage": {
+      "comment": "Alert message when a voice model cannot be removed because a generation or model load is running; nothing was removed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current generation to finish, or cancel it, before removing a model."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendez la fin de la génération en cours, ou annulez-la, avant de supprimer un modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espera a que termine la generación en curso, o cancélala, antes de eliminar un modelo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warte, bis die aktuelle Generierung abgeschlossen ist, oder brich sie ab, bevor du ein Modell entfernst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendi la fine della generazione in corso, o annullala, prima di rimuovere un modello."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aguarde o fim da geração em andamento, ou cancele-a, antes de remover um modelo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请等待当前生成完成或将其取消，然后再移除模型。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルを削除する前に、現在の生成が完了するのを待つか、生成をキャンセルしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델을 제거하기 전에 현재 생성이 끝날 때까지 기다리거나 생성을 취소하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прежде чем удалять модель, дождитесь окончания текущей генерации или отмените её."
+          }
+        }
+      }
+    },
     "vocello.settings.polish.checking": {
       "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
       "extractionState": "manual",
@@ -11895,6 +12027,612 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vocello не удалось прочитать список аудиофайлов удалённых дублей, поэтому они не удалены. Повторите, чтобы скрыть это уведомление."
+          }
+        }
+      }
+    },
+    "vocello.history.unverifiable_records_detail": {
+      "comment": "History recovery banner detail; %lld is the number of damaged recovery records. They block clearing History and removing audio of deleted takes until the user retries or discards them.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld recovery record can't be verified, so History can't be cleared and the audio of deleted takes stays on this device. Retry, or discard the damaged record."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld recovery records can't be verified, so History can't be cleared and the audio of deleted takes stays on this device. Retry, or discard the damaged records."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld enregistrement de récupération ne peut pas être vérifié : l’historique ne peut donc pas être effacé et l’audio des prises supprimées reste sur cet appareil. Réessayez ou écartez l’enregistrement endommagé."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld enregistrements de récupération ne peuvent pas être vérifiés : l’historique ne peut donc pas être effacé et l’audio des prises supprimées reste sur cet appareil. Réessayez ou écartez les enregistrements endommagés."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld enregistrements de récupération ne peuvent pas être vérifiés : l’historique ne peut donc pas être effacé et l’audio des prises supprimées reste sur cet appareil. Réessayez ou écartez les enregistrements endommagés."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se puede verificar %lld registro de recuperación, así que no se puede vaciar el historial y el audio de las tomas eliminadas sigue en este dispositivo. Reintenta o descarta el registro dañado."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pueden verificar %lld registros de recuperación, así que no se puede vaciar el historial y el audio de las tomas eliminadas sigue en este dispositivo. Reintenta o descarta los registros dañados."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pueden verificar %lld registros de recuperación, así que no se puede vaciar el historial y el audio de las tomas eliminadas sigue en este dispositivo. Reintenta o descarta los registros dañados."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Wiederherstellungsdatensatz kann nicht geprüft werden. Daher lässt sich der Verlauf nicht leeren, und das Audio gelöschter Aufnahmen bleibt auf diesem Gerät. Versuche es erneut oder verwirf den beschädigten Datensatz."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Wiederherstellungsdatensätze können nicht geprüft werden. Daher lässt sich der Verlauf nicht leeren, und das Audio gelöschter Aufnahmen bleibt auf diesem Gerät. Versuche es erneut oder verwirf die beschädigten Datensätze."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossibile verificare %lld record di recupero, quindi non puoi svuotare la cronologia e l’audio dei take eliminati resta su questo dispositivo. Riprova o scarta il record danneggiato."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossibile verificare %lld record di recupero, quindi non puoi svuotare la cronologia e l’audio dei take eliminati resta su questo dispositivo. Riprova o scarta i record danneggiati."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Impossibile verificare %lld record di recupero, quindi non puoi svuotare la cronologia e l’audio dei take eliminati resta su questo dispositivo. Riprova o scarta i record danneggiati."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível verificar %lld registro de recuperação, então o histórico não pode ser limpo e o áudio de tomadas excluídas continua neste dispositivo. Tente novamente ou descarte o registro danificado."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível verificar %lld registros de recuperação, então o histórico não pode ser limpo e o áudio de tomadas excluídas continua neste dispositivo. Tente novamente ou descarte os registros danificados."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível verificar %lld registros de recuperação, então o histórico não pode ser limpo e o áudio de tomadas excluídas continua neste dispositivo. Tente novamente ou descarte os registros danificados."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "有 %lld 条恢复记录无法验证，因此无法清空历史记录，已删除条目的音频也会保留在此设备上。请重试，或丢弃损坏的记录。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 件の復旧記録を検証できないため、履歴を消去できず、削除したテイクの音声もこのデバイスに残ります。再試行するか、破損した記録を破棄してください。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "복구 기록 %lld개를 검증할 수 없어 기록을 지울 수 없으며, 삭제한 테이크의 오디오가 이 기기에 남아 있습니다. 다시 시도하거나 손상된 기록을 폐기하세요."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удаётся проверить %lld запись восстановления, поэтому историю нельзя очистить, а аудио удалённых дублей остаётся на этом устройстве. Повторите попытку или отбросьте повреждённую запись."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удаётся проверить %lld записи восстановления, поэтому историю нельзя очистить, а аудио удалённых дублей остаётся на этом устройстве. Повторите попытку или отбросьте повреждённые записи."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удаётся проверить %lld записей восстановления, поэтому историю нельзя очистить, а аудио удалённых дублей остаётся на этом устройстве. Повторите попытку или отбросьте повреждённые записи."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удаётся проверить %lld записи восстановления, поэтому историю нельзя очистить, а аудио удалённых дублей остаётся на этом устройстве. Повторите попытку или отбросьте повреждённые записи."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.history.discard_unverifiable_records": {
+      "comment": "History recovery banner button that asks to confirm setting aside damaged recovery records; a confirmation follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écarter…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwerfen…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarta…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "丢弃…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "破棄…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폐기…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отбросить…"
+          }
+        }
+      }
+    },
+    "vocello.history.discard_unverifiable_records_title": {
+      "comment": "Confirmation title before damaged History recovery records are set aside; %lld is their number.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Discard %lld damaged record?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Discard %lld damaged records?"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Écarter %lld enregistrement endommagé ?"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Écarter %lld enregistrements endommagés ?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Écarter %lld enregistrements endommagés ?"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Descartar %lld registro dañado?"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Descartar %lld registros dañados?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "¿Descartar %lld registros dañados?"
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld beschädigten Datensatz verwerfen?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld beschädigte Datensätze verwerfen?"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Scartare %lld record danneggiato?"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Scartare %lld record danneggiati?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Scartare %lld record danneggiati?"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Descartar %lld registro danificado?"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Descartar %lld registros danificados?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Descartar %lld registros danificados?"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "要丢弃 %lld 条损坏的记录吗？"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "破損した記録 %lld 件を破棄しますか？"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "손상된 기록 %lld개를 폐기할까요?"
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Отбросить %lld повреждённую запись?"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Отбросить %lld повреждённые записи?"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Отбросить %lld повреждённых записей?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Отбросить %lld повреждённой записи?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.history.discard_unverifiable_records_detail": {
+      "comment": "Confirmation message before damaged History recovery records are set aside: their takes stay out of History, clearing works again, and no audio file is deleted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello can't read this recovery data, so the takes it describes can't be added to History. Discarding sets it aside so History can be cleared again. No audio is deleted."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ne peut pas lire ces données de récupération : les prises qu’elles décrivent ne peuvent donc pas être ajoutées à l’historique. Les écarter les met de côté pour que l’historique puisse de nouveau être effacé. Aucun audio n’est supprimé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no puede leer estos datos de recuperación, así que las tomas que describen no se pueden añadir al historial. Al descartarlos se apartan para que el historial se pueda vaciar de nuevo. No se elimina ningún audio."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello kann diese Wiederherstellungsdaten nicht lesen, daher lassen sich die beschriebenen Aufnahmen nicht zum Verlauf hinzufügen. Beim Verwerfen werden sie beiseitegelegt, damit sich der Verlauf wieder leeren lässt. Es wird kein Audio gelöscht."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non riesce a leggere questi dati di recupero, quindi i take che descrivono non possono essere aggiunti alla cronologia. Scartandoli vengono messi da parte, così potrai di nuovo svuotare la cronologia. Nessun audio viene eliminato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não consegue ler estes dados de recuperação, então as tomadas que eles descrevem não podem ser adicionadas ao histórico. Descartá-los os coloca de lado para que o histórico possa ser limpo novamente. Nenhum áudio é excluído."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法读取这些恢复数据，因此其中描述的条目无法添加到历史记录。丢弃后这些数据会被移到一旁，历史记录即可再次清空。不会删除任何音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はこの復旧データを読み取れないため、記載されたテイクを履歴に追加できません。破棄するとデータは別に保管され、履歴を再び消去できるようになります。音声は削除されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 이 복구 데이터를 읽을 수 없어 데이터에 기록된 테이크를 기록에 추가할 수 없습니다. 폐기하면 데이터를 따로 보관하므로 기록을 다시 지울 수 있습니다. 오디오는 삭제되지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не может прочитать эти данные восстановления, поэтому описанные в них дубли нельзя добавить в историю. При отбрасывании данные откладываются в сторону, и историю снова можно очистить. Аудио не удаляется."
+          }
+        }
+      }
+    },
+    "vocello.history.discard_unverifiable_records_confirm": {
+      "comment": "Destructive confirmation button that sets aside damaged History recovery records; no audio is deleted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écarter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwerfen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "丢弃"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "破棄"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폐기"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отбросить"
           }
         }
       }

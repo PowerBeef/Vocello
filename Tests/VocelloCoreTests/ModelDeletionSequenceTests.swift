@@ -2,15 +2,16 @@ import Foundation
 import QwenVoiceCore
 import XCTest
 
-/// MAC-20: a model deletion never removes files the engine is using. A take, a
-/// line batch or long-form project between two takes, or a published load, warm
-/// or prime blocks it; unless another model is loaded the engine is unloaded
-/// first (a model-only warm publishes nothing, and weights a failure left
-/// resident name no model); a refused unload keeps the files; and the engine is
+/// MAC-20 (and the iPhone since A5-01): a model deletion never removes files
+/// the engine is using. A take, a line batch or long-form project between two
+/// takes, or a published load, warm or prime blocks it; unless another model is
+/// loaded the engine is unloaded first (a model-only warm publishes nothing, and
+/// weights a failure left resident name no model); a refused unload keeps the
+/// files; a download that could not be stopped keeps them too; and the engine is
 /// read again after every await, so a take or warm that starts meanwhile keeps
 /// the files too.
 @MainActor
-final class MacModelDeletionSequenceTests: XCTestCase {
+final class ModelDeletionSequenceTests: XCTestCase {
     private struct UnloadRefused: Error {}
 
     private let modelID = "pro_custom_speed"
@@ -51,10 +52,10 @@ final class MacModelDeletionSequenceTests: XCTestCase {
 
     func testWithoutAnEngineTheFilesAreRemoved() async {
         var removed = false
-        let outcome = await MacModelDeletionSequence.run(
+        let outcome = await ModelDeletionSequence.run(
             modelID: modelID,
             engine: nil,
-            stopDownloads: {},
+            stopDownloads: { true },
             removeFiles: { removed = true; return true }
         )
 
@@ -105,10 +106,10 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         engine.unloadError = UnloadRefused()
         var reported: (any Error)?
 
-        let outcome = await MacModelDeletionSequence.run(
+        let outcome = await ModelDeletionSequence.run(
             modelID: modelID,
             engine: engine,
-            stopDownloads: { engine.log.append("stopDownloads") },
+            stopDownloads: { engine.log.append("stopDownloads"); return true },
             removeFiles: { engine.log.append("removeFiles"); return true },
             unloadFailed: { reported = $0 }
         )
@@ -168,10 +169,10 @@ final class MacModelDeletionSequenceTests: XCTestCase {
     func testARemovalFailureIsReportedOnTheRowNotAsBusy() async {
         let engine = FakeDeletionEngine(loadedModelID: nil)
 
-        let outcome = await MacModelDeletionSequence.run(
+        let outcome = await ModelDeletionSequence.run(
             modelID: modelID,
             engine: engine,
-            stopDownloads: {},
+            stopDownloads: { true },
             removeFiles: { false }
         )
 
@@ -179,11 +180,31 @@ final class MacModelDeletionSequenceTests: XCTestCase {
         XCTAssertFalse(outcome.showsEngineBusyAlert)
     }
 
+    /// A5-01: the iPhone stops a model's download by recording its cancellation
+    /// first. When that record cannot be written the download keeps running,
+    /// so its files stay, the engine is left alone, and the row (not the busy
+    /// alert) says why.
+    func testADownloadThatCouldNotBeStoppedKeepsTheFilesAndTheEngine() async {
+        let engine = FakeDeletionEngine(loadedModelID: modelID)
+
+        let outcome = await ModelDeletionSequence.run(
+            modelID: modelID,
+            engine: engine,
+            stopDownloads: { engine.log.append("stopDownloads"); return false },
+            removeFiles: { engine.log.append("removeFiles"); return true }
+        )
+
+        XCTAssertEqual(outcome, .failed(.downloadStop))
+        XCTAssertEqual(engine.log, ["stopDownloads"], "No unload and no removal")
+        XCTAssertEqual(engine.loadedModelID, modelID)
+        XCTAssertFalse(outcome.showsEngineBusyAlert)
+    }
+
     // MARK: - The store's model-operation read
 
     func testTheStoreReadsLoadingWarmingAndPrimingAsAModelOperation() {
         func reads(_ state: EngineLoadState, _ phase: ClonePreparationPhase = .idle) -> Bool {
-            MacModelDeletionSequence.showsModelOperation(loadState: state, clonePreparationPhase: phase)
+            ModelDeletionSequence.showsModelOperation(loadState: state, clonePreparationPhase: phase)
         }
         XCTAssertTrue(reads(.starting), "A cold load names no model")
         XCTAssertTrue(reads(.running(modelID: modelID, label: nil, fraction: nil)))
@@ -200,13 +221,14 @@ final class MacModelDeletionSequenceTests: XCTestCase {
     private func run(
         engine: FakeDeletionEngine,
         whileStoppingDownloads: () -> Void = {}
-    ) async -> MacModelDeletionSequence.Outcome {
-        await MacModelDeletionSequence.run(
+    ) async -> ModelDeletionSequence.Outcome {
+        await ModelDeletionSequence.run(
             modelID: modelID,
             engine: engine,
             stopDownloads: {
                 engine.log.append("stopDownloads")
                 whileStoppingDownloads()
+                return true
             },
             removeFiles: {
                 engine.log.append("removeFiles")
@@ -217,7 +239,7 @@ final class MacModelDeletionSequenceTests: XCTestCase {
 }
 
 @MainActor
-private final class FakeDeletionEngine: MacModelEngineCoordinating {
+private final class FakeDeletionEngine: ModelDeletionEngineCoordinating {
     var hasActiveGeneration = false
     var hasSustainedPerformanceActivity = false
     var hasModelOperationInFlight = false

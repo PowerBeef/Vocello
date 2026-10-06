@@ -779,6 +779,8 @@ struct IOSModelRow: View {
         switch operationState {
         case .waitingForConnectivity, .downloading, .retrying, .verifying, .installing, .failed:
             return true
+        case .queued(let message?) where !message.isEmpty:
+            return true
         default:
             if case .incomplete = status { return true }
             if case .error = status { return true }
@@ -820,6 +822,9 @@ struct IOSModelRow: View {
             modelProgressPresentation(.init(indicator: .indeterminate,
                 detail: IOSAppLanguage.shared.presentation.status(.makingModelAvailableOffline) + "."))
         case .failed(let message):
+            detailText(message, color: .red)
+        case .queued(let message?):
+            // A5-03: a cancellation that could not be recorded; Cancel stays offered.
             detailText(message, color: .red)
         default:
             switch status {

@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 
 enum GenerationHistoryOutboxOperation: String, Codable, Sendable {
     case append
@@ -130,6 +131,10 @@ struct GenerationHistoryPendingAudioRemovals: Codable, Equatable, Sendable {
 struct GenerationHistoryOutboxScan: Sendable {
     let entries: [GenerationHistoryOutboxEntry]
     let issueCount: Int
+    /// Entry files that cannot be read or verified (A2-02): the issues the
+    /// user may set aside. A listing that failed counts as an issue but names
+    /// no file, since a retry can clear it.
+    var unverifiableEntryURLs: [URL] = []
 }
 
 enum GenerationHistoryOutboxError: LocalizedError, Equatable, Sendable {
@@ -139,6 +144,9 @@ enum GenerationHistoryOutboxError: LocalizedError, Equatable, Sendable {
     case missingAudio
     case databaseUnavailable
     case clearUnavailable
+    /// A single delete could not list its audio for removal, so it deleted
+    /// nothing (A2-04).
+    case removalUnrecorded
 
     var errorDescription: String? {
         switch self {
@@ -152,6 +160,8 @@ enum GenerationHistoryOutboxError: LocalizedError, Equatable, Sendable {
             return "The finished take is waiting to be added to History. Retry from History when storage is available."
         case .clearUnavailable:
             return "History could not be cleared safely. Existing rows and pending recovery records were preserved."
+        case .removalUnrecorded:
+            return "History could not record the audio removal, so nothing was deleted."
         }
     }
 }
@@ -176,6 +186,10 @@ struct GenerationHistoryRecoverySnapshot: Equatable, Sendable {
     /// audio, and the files they named stay where they are. Reported until the
     /// user retries from that notice, which discards the lists.
     var unreadableAudioRemovalCount: Int = 0
+    /// Queued records that cannot be read or verified (A2-02), among the
+    /// issues. They block a clear and the removal of deleted takes' audio until
+    /// the user confirms setting them aside.
+    var unverifiableRecordCount: Int = 0
 
     var needsAttention: Bool {
         notice != nil
@@ -212,7 +226,8 @@ enum GenerationHistoryRecoveryNotice: Equatable, Sendable {
     case longFormRecovery
     /// Finished audio whose History record could not even be queued.
     case unqueued
-    /// A queued record or the clear marker could not be verified.
+    /// A queued record or the clear marker could not be verified. A record the
+    /// user can set aside is counted in `unverifiableRecordCount` (A2-02).
     case unverifiedRecord
     /// A clear of History has not finished; Retry resumes it.
     case clearPending
@@ -237,7 +252,8 @@ struct GenerationHistoryClearOutcome: Equatable, Sendable {
 /// File-backed, app-support-local persistence intent store. Final `.json` entries
 /// appear only after an atomic same-directory rename. A valid interrupted
 /// `.writing` file is promoted on the next scan; corrupt or identity-mismatched
-/// files remain in place and are counted instead of being silently discarded.
+/// files remain in place and are counted instead of being silently discarded,
+/// until the user confirms setting them aside (A2-02).
 struct GenerationHistoryOutboxStore: Sendable {
     let rootURL: URL
 
@@ -304,6 +320,7 @@ struct GenerationHistoryOutboxStore: Sendable {
             )
             var entries: [GenerationHistoryOutboxEntry] = []
             var issues = 0
+            var unverifiable: [URL] = []
             let reserved = reservedFileNames
             for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
                 if reserved.contains(url.lastPathComponent) {
@@ -335,6 +352,11 @@ struct GenerationHistoryOutboxStore: Sendable {
                             entries.append(promoted)
                         } else {
                             issues += 1
+                            // A valid file whose promotion failed is not damaged.
+                            if FileManager.default.fileExists(atPath: url.path),
+                               !isVerifiableEntry(at: url, filenameID: writingFileID(url)) {
+                                unverifiable.append(url)
+                            }
                         }
                     }
                 } else if url.pathExtension == "json", url != clearTransactionURL {
@@ -347,6 +369,7 @@ struct GenerationHistoryOutboxStore: Sendable {
                         // gone, not damaged.
                         if FileManager.default.fileExists(atPath: url.path) {
                             issues += 1
+                            unverifiable.append(url)
                         }
                     }
                 }
@@ -355,7 +378,11 @@ struct GenerationHistoryOutboxStore: Sendable {
                 if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
                 return $0.id.uuidString < $1.id.uuidString
             }
-            return GenerationHistoryOutboxScan(entries: entries, issueCount: issues)
+            return GenerationHistoryOutboxScan(
+                entries: entries,
+                issueCount: issues,
+                unverifiableEntryURLs: unverifiable
+            )
         } catch {
             return GenerationHistoryOutboxScan(entries: [], issueCount: 1)
         }
@@ -540,6 +567,47 @@ struct GenerationHistoryOutboxStore: Sendable {
         } catch {
             throw GenerationHistoryOutboxError.unavailable
         }
+    }
+
+    /// Drops one path from the pending list once its file is gone, or once a
+    /// single delete that listed it first kept its row (A2-04).
+    func withdrawPendingAudioRemoval(_ audioPath: String) throws {
+        let pending = try loadPendingAudioRemovals()
+        guard pending.contains(audioPath) else { return }
+        try writePendingAudioRemovals(pending.filter { $0 != audioPath })
+    }
+
+    /// Sets aside the entry files that cannot be read or verified, once the
+    /// user has confirmed it (A2-02). Each is renamed, never deleted, and never
+    /// read again, since `scan()` reads only `.json` and `.writing` files; the
+    /// takes they described stay out of History, and their audio stays where
+    /// it is. Returns how many were set aside.
+    func setAsideUnverifiableEntries() throws -> Int {
+        let fileManager = FileManager.default
+        var setAside = 0
+        for url in scan().unverifiableEntryURLs {
+            let asideURL = rootURL.appendingPathComponent(
+                "\(url.lastPathComponent)-\(UUID().uuidString.lowercased()).\(Self.unverifiableExtension)",
+                isDirectory: false
+            )
+            do {
+                try fileManager.moveItem(at: url, to: asideURL)
+                setAside += 1
+            } catch {
+                // A file removed since the scan is not a failure.
+                if fileManager.fileExists(atPath: url.path) {
+                    throw GenerationHistoryOutboxError.unavailable
+                }
+            }
+        }
+        return setAside
+    }
+
+    private static let unverifiableExtension = "unverifiable"
+
+    private func isVerifiableEntry(at url: URL, filenameID: UUID?) -> Bool {
+        guard let entry: GenerationHistoryOutboxEntry = try? decode(url) else { return false }
+        return (try? validate(entry, filenameID: filenameID)) != nil
     }
 
     /// Replaces the pending list; an empty list removes it.
@@ -769,7 +837,8 @@ actor GenerationHistoryRecoveryCoordinator {
             issueCount: scan.issueCount + missing + clearIssueCount,
             clearRecoveryPending: clearPending,
             pendingAudioRemovalCount: removalCount,
-            unreadableAudioRemovalCount: unreadableRemovals
+            unreadableAudioRemovalCount: unreadableRemovals,
+            unverifiableRecordCount: scan.unverifiableEntryURLs.count
         )
     }
 
@@ -777,6 +846,40 @@ actor GenerationHistoryRecoveryCoordinator {
     /// read: the lists go, the audio they named stays (PA-30).
     func discardUnreadableAudioRemovals() throws {
         try store.discardUnreadableAudioRemovals()
+    }
+
+    /// The user confirmed discarding the queued records that cannot be read or
+    /// verified (A2-02). Until then every clear and every removal of deleted
+    /// takes' audio fails closed on them, and Retry cannot repair them. They
+    /// are set aside, not deleted, and no audio is touched. Returns how many.
+    func setAsideUnverifiableRecords() async throws -> Int {
+        await acquireClear()
+        defer { releaseClear() }
+        return try store.setAsideUnverifiableEntries()
+    }
+
+    /// A single History delete (A2-04), as durable as a clear: the audio
+    /// removal is on the pending list before the row goes, so a process that
+    /// dies between the row and the file leaves the path for a later
+    /// reconcile instead of an orphan no row, entry or list names. It runs in
+    /// one turn of this actor, with no await, so no reconcile reads the list
+    /// in between, and the path leaves it once its file is gone.
+    func deleteSingle(
+        recordID: Int64?,
+        audioPath: String,
+        using engine: HistoryDeletionEngine
+    ) -> HistoryDeletionEngine.SingleOutcome {
+        var journaled = engine
+        let outbox = self.store
+        journaled.recordAudioRemoval = { path in
+            do {
+                try outbox.appendPendingAudioRemovals([path])
+            } catch {
+                throw GenerationHistoryOutboxError.removalUnrecorded
+            }
+        }
+        journaled.withdrawAudioRemoval = { path in _ = try? outbox.withdrawPendingAudioRemoval(path) }
+        return journaled.deleteSingle(recordID: recordID, audioPath: audioPath)
     }
 
     /// Runs `decide` with every audio path History still uses: every row,
@@ -992,7 +1095,8 @@ actor GenerationHistoryRecoveryCoordinator {
 
     /// A single delete removed the row but not its audio file: keep the path so
     /// a later reconcile retries the removal instead of leaving the file behind
-    /// silently (AUD-05).
+    /// silently (AUD-05). `deleteSingle` lists the path before the row goes
+    /// (A2-04); this keeps it listed even if that list was set aside since.
     func retainAudioRemoval(_ audioPath: String) throws {
         try store.appendPendingAudioRemovals([audioPath])
     }

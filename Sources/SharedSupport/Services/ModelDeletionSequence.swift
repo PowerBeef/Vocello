@@ -1,9 +1,9 @@
 import Foundation
 import QwenVoiceCore
 
-/// What a model deletion needs from the in-process engine (MAC-20).
+/// What a model deletion needs from the in-process engine (MAC-20, A5-01).
 @MainActor
-protocol MacModelEngineCoordinating: AnyObject {
+protocol ModelDeletionEngineCoordinating: AnyObject {
     /// A take is generating.
     var hasActiveGeneration: Bool { get }
     /// A line batch or long-form project holds the engine for its whole run,
@@ -21,9 +21,11 @@ protocol MacModelEngineCoordinating: AnyObject {
     func unloadModel() async throws
 }
 
-extension TTSEngineStore: MacModelEngineCoordinating {
+/// Both apps host the engine on this store, so both hand it to their model
+/// deletion: the Mac's model manager and the iPhone's model installer.
+extension TTSEngineStore: ModelDeletionEngineCoordinating {
     var hasModelOperationInFlight: Bool {
-        MacModelDeletionSequence.showsModelOperation(
+        ModelDeletionSequence.showsModelOperation(
             loadState: loadState,
             clonePreparationPhase: clonePreparationState.phase
         )
@@ -32,8 +34,8 @@ extension TTSEngineStore: MacModelEngineCoordinating {
     var loadedModelID: String? { loadState.currentModelID }
 }
 
-/// The engine side of a model deletion (MAC-20), driven over a fake engine in
-/// `VocelloCoreTests`.
+/// The engine side of a model deletion on both platforms (MAC-20; the iPhone
+/// since A5-01), driven over a fake engine in `VocelloCoreTests`.
 ///
 /// A model's files are never removed while the engine generates, holds a line
 /// batch or long-form project between two takes, or loads, warms or primes a
@@ -44,8 +46,12 @@ extension TTSEngineStore: MacModelEngineCoordinating {
 /// are removed in the same main-actor turn as the read after the unload. A
 /// model-only warm that starts after the unload returns stays invisible to the
 /// store; closing that needs an engine-side deletion lease.
-enum MacModelDeletionSequence {
+enum ModelDeletionSequence {
     enum Failure: Equatable, Sendable {
+        /// The model's download could not be stopped (the iPhone could not
+        /// record its cancellation); the download and the files were kept, and
+        /// the model's row already shows why.
+        case downloadStop
         /// The engine refused to release the model's weights (a generation got
         /// there first); the files were kept.
         case engineRelease
@@ -61,13 +67,13 @@ enum MacModelDeletionSequence {
         case failed(Failure)
 
         /// A busy engine, including an unload it refused, shows the localized
-        /// "Generation in Progress" alert. A removal failure is reported on the
-        /// model's row instead.
+        /// "Generation in Progress" alert. A download or removal failure is
+        /// reported on the model's row instead.
         var showsEngineBusyAlert: Bool {
             switch self {
             case .blockedByActiveGeneration, .failed(.engineRelease):
                 true
-            case .deleted, .failed(.fileRemoval):
+            case .deleted, .failed(.downloadStop), .failed(.fileRemoval):
                 false
             }
         }
@@ -85,7 +91,7 @@ enum MacModelDeletionSequence {
     }
 
     @MainActor
-    static func gate(for modelID: String, engine: (any MacModelEngineCoordinating)?) -> EngineGate {
+    static func gate(for modelID: String, engine: (any ModelDeletionEngineCoordinating)?) -> EngineGate {
         guard let engine else { return .clear }
         if engine.hasActiveGeneration
             || engine.hasSustainedPerformanceActivity
@@ -120,8 +126,9 @@ enum MacModelDeletionSequence {
     ///
     /// - Parameters:
     ///   - stopDownloads: stops the model's download; runs only once the engine
-    ///     allowed the deletion. Staging belongs in `removeFiles`, so a blocked
-    ///     deletion keeps a partial download.
+    ///     allowed the deletion. `false` means the download could not be
+    ///     stopped: nothing else happens. Staging belongs in `removeFiles`, so a
+    ///     blocked deletion keeps a partial download.
     ///   - removeFiles: removes the staging and the installed files and reports
     ///     whether that worked; runs synchronously right after the last engine
     ///     read.
@@ -129,14 +136,14 @@ enum MacModelDeletionSequence {
     @MainActor
     static func run(
         modelID: String,
-        engine: (any MacModelEngineCoordinating)?,
-        stopDownloads: () async -> Void,
+        engine: (any ModelDeletionEngineCoordinating)?,
+        stopDownloads: () async -> Bool,
         removeFiles: () -> Bool,
         unloadFailed: (any Error) -> Void = { _ in }
     ) async -> Outcome {
         // Before anything changes: a busy engine leaves everything as it was.
         guard gate(for: modelID, engine: engine) != .busy else { return .blockedByActiveGeneration }
-        await stopDownloads()
+        guard await stopDownloads() else { return .failed(.downloadStop) }
         let gateAfterDownloads = gate(for: modelID, engine: engine)
         guard gateAfterDownloads != .busy else { return .blockedByActiveGeneration }
         if gateAfterDownloads == .mayHoldWeights, let engine {

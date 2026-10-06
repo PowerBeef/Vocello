@@ -122,6 +122,20 @@ struct VoiceModelsScreen: View {
         } message: {
             Text(IOSSettingsText.cancelDownloadDetail)
         }
+        // A5-01: a removal the busy engine refused kept the model's files.
+        .alert(
+            IOSSettingsText.removeModelBusyTitle,
+            isPresented: Binding(
+                get: { modelInstaller.blockedDeletionModelID != nil },
+                set: { if !$0 { modelInstaller.dismissBlockedDeletion() } }
+            ),
+            presenting: modelInstaller.blockedDeletionModelID
+        ) { modelID in
+            Button(IOSInterfaceText.ok, role: .cancel) {}
+                .accessibilityIdentifier("iosModelRemoveBusyDismiss_\(modelID)")
+        } message: { _ in
+            Text(IOSSettingsText.removeModelBusyMessage)
+        }
     }
 
     private var compactHeader: some View {

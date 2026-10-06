@@ -30,6 +30,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
     private func makeEngine(
         log: EffectLog,
         deleteRecordFails: Bool = false,
+        recordFails: Bool = false,
         paths: [String] = [],
         existingPaths: Set<String>? = nil,
         failingRemovals: Set<String> = []
@@ -45,6 +46,13 @@ final class HistoryDeletionEngineTests: XCTestCase {
             },
             fileExists: { path in
                 (existingPaths ?? Set(paths)).contains(path)
+            },
+            recordAudioRemoval: { path in
+                log.append("record(\(path))")
+                if recordFails { throw StubError(message: "list unwritable") }
+            },
+            withdrawAudioRemoval: { path in
+                log.append("withdraw(\(path))")
             }
         )
     }
@@ -57,20 +65,34 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(log.snapshot, [])
     }
 
+    /// The row stays, so the removal recorded for it is withdrawn.
     func testSingleDeleteDatabaseFailureAbortsBeforeFileRemoval() {
         let log = EffectLog()
         let engine = makeEngine(log: log, deleteRecordFails: true, existingPaths: ["/a.wav"])
         let outcome = engine.deleteSingle(recordID: 7, audioPath: "/a.wav")
         XCTAssertEqual(outcome, .databaseFailure("db down"))
-        XCTAssertEqual(log.snapshot, ["deleteRecord(7)"])
+        XCTAssertEqual(log.snapshot, ["record(/a.wav)", "deleteRecord(7)", "withdraw(/a.wav)"])
     }
 
-    func testSingleDeleteRemovesRowThenFile() {
+    /// A2-04: the removal is recorded before the row goes, as a clear records
+    /// its intent first, and withdrawn once the file is gone.
+    func testSingleDeleteRecordsTheRemovalThenRemovesRowThenFile() {
         let log = EffectLog()
         let engine = makeEngine(log: log, existingPaths: ["/a.wav"])
         let outcome = engine.deleteSingle(recordID: 7, audioPath: "/a.wav")
         XCTAssertEqual(outcome, .deleted)
-        XCTAssertEqual(log.snapshot, ["deleteRecord(7)", "removeFile(/a.wav)"])
+        XCTAssertEqual(log.snapshot, [
+            "record(/a.wav)", "deleteRecord(7)", "removeFile(/a.wav)", "withdraw(/a.wav)",
+        ])
+    }
+
+    /// A2-04: a removal that cannot be recorded deletes nothing.
+    func testSingleDeleteThatCannotRecordTheRemovalTouchesNothing() {
+        let log = EffectLog()
+        let engine = makeEngine(log: log, recordFails: true, existingPaths: ["/a.wav"])
+        let outcome = engine.deleteSingle(recordID: 7, audioPath: "/a.wav")
+        XCTAssertEqual(outcome, .databaseFailure("list unwritable"))
+        XCTAssertEqual(log.snapshot, ["record(/a.wav)"])
     }
 
     func testSingleDeleteMissingAudioSkipsRemoval() {
@@ -81,6 +103,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(log.snapshot, ["deleteRecord(7)"])
     }
 
+    /// The removal stays recorded, for a later reconcile to retry.
     func testSingleDeleteFileFailureIsWarningNotRollback() {
         let log = EffectLog()
         let engine = makeEngine(
@@ -88,6 +111,6 @@ final class HistoryDeletionEngineTests: XCTestCase {
         )
         let outcome = engine.deleteSingle(recordID: 7, audioPath: "/a.wav")
         XCTAssertEqual(outcome, .audioCleanupFailure("locked: /a.wav"))
-        XCTAssertEqual(log.snapshot, ["deleteRecord(7)", "removeFile(/a.wav)"])
+        XCTAssertEqual(log.snapshot, ["record(/a.wav)", "deleteRecord(7)", "removeFile(/a.wav)"])
     }
 }

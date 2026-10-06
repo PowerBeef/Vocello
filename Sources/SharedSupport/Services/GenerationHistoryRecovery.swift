@@ -33,15 +33,24 @@ enum GenerationHistoryRecovery {
         }
     )
 
-    /// Single-row delete for both History screens. The sequencing rules live
-    /// tested in `QwenVoiceCore.HistoryDeletionEngine`: the row goes first, and
-    /// an audio file that then cannot be removed is a warning outcome, which
-    /// the screens report and hand to `retainAudioRemoval(_:)`.
-    static let deletionEngine = HistoryDeletionEngine(
+    /// The single-row delete's database and file side. The sequencing rules
+    /// live tested in `QwenVoiceCore.HistoryDeletionEngine`; it runs only
+    /// through `deleteSingle`, which records the audio removal first.
+    private static let deletionEngine = HistoryDeletionEngine(
         deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
         removeFile: { try removeUnreferencedAudio(atPath: $0) },
         fileExists: { FileManager.default.fileExists(atPath: $0) }
     )
+
+    /// Single-row delete for both History screens, on the recovery coordinator
+    /// (A2-04): the audio removal is listed before the row goes, so a process
+    /// that dies in between leaves it for a later reconcile. An audio file that
+    /// cannot be removed is a warning outcome, which the screens report and
+    /// hand to `retainAudioRemoval(_:)`. Off the main actor: a synchronous
+    /// SQLite write and a file removal.
+    static func deleteSingle(recordID: Int64?, audioPath: String) async -> HistoryDeletionEngine.SingleOutcome {
+        await coordinator.deleteSingle(recordID: recordID, audioPath: audioPath, using: deletionEngine)
+    }
 
     /// A deleted row's audio, removed only when nothing else uses it
     /// (`GenerationHistoryAudioFile.removeUnreferenced`).
@@ -97,7 +106,8 @@ enum GenerationHistoryRecovery {
             issueCount: durable.issueCount, clearRecoveryPending: durable.clearRecoveryPending,
             unqueuedCount: unqueuedCount, longFormRecoveryPending: longFormStore.hasPendingRecovery,
             pendingAudioRemovalCount: durable.pendingAudioRemovalCount,
-            unreadableAudioRemovalCount: durable.unreadableAudioRemovalCount)
+            unreadableAudioRemovalCount: durable.unreadableAudioRemovalCount,
+            unverifiableRecordCount: durable.unverifiableRecordCount)
     }
 
     /// Retry on the notice about removal lists that could not be read (PA-30):
@@ -105,6 +115,13 @@ enum GenerationHistoryRecovery {
     /// is not deleted. A failure leaves the notice for another Retry.
     static func discardUnreadableAudioRemovals() async {
         try? await coordinator.discardUnreadableAudioRemovals()
+    }
+
+    /// The user confirmed discarding the queued records that cannot be read
+    /// or verified (A2-02): they are set aside, never deleted, and no audio is
+    /// touched. A failure leaves the notice and its Discard action in place.
+    static func setAsideUnverifiableRecords() async {
+        _ = try? await coordinator.setAsideUnverifiableRecords()
     }
 
     static func pendingAudioURLs() async -> [URL] {

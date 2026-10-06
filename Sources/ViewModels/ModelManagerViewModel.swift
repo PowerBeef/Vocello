@@ -163,7 +163,7 @@ final class ModelManagerViewModel {
     /// for them, so they cannot cancel the downloads it starts (MAC-19).
     @ObservationIgnored private var recommendedSetupCancellation: Task<Void, Never>?
     /// The in-process engine a model deletion coordinates with (MAC-20).
-    @ObservationIgnored private weak var engine: (any MacModelEngineCoordinating)?
+    @ObservationIgnored private weak var engine: (any ModelDeletionEngineCoordinating)?
     private var lastFailureMessages: [String: String] = [:]
     /// Maximum number of models downloaded at the same time. Each model runs its own
     /// downloader/URLSession (4 concurrent files), so this bounds the total bandwidth
@@ -872,27 +872,28 @@ final class ModelManagerViewModel {
 
     /// Connects the in-process engine, so deleting a model neither pulls files
     /// from under a running generation nor leaves the weights loaded (MAC-20).
-    func attachEngine(_ engine: any MacModelEngineCoordinating) {
+    func attachEngine(_ engine: any ModelDeletionEngineCoordinating) {
         self.engine = engine
     }
 
-    typealias DeletionOutcome = MacModelDeletionSequence.Outcome
+    typealias DeletionOutcome = ModelDeletionSequence.Outcome
 
     /// MAC-20: never removes files the engine is using. A take, a line batch or
     /// long-form project between two takes, or a load, warm or prime blocks the
     /// deletion; unless another model is loaded the engine is unloaded first,
-    /// and a refused unload keeps the files (`MacModelDeletionSequence`).
+    /// and a refused unload keeps the files (`ModelDeletionSequence`).
     @discardableResult
     func delete(_ model: TTSModel) async -> DeletionOutcome {
         let modelDir = model.installDirectory(in: modelsDirectory)
         var stoppedDownloads = false
         var removalError: (any Error)?
-        let outcome = await MacModelDeletionSequence.run(
+        let outcome = await ModelDeletionSequence.run(
             modelID: model.id,
             engine: engine,
             stopDownloads: {
                 await stopAndClear(for: model.id)
                 stoppedDownloads = true
+                return true
             },
             removeFiles: {
                 // Staging first: its reuse pins would otherwise keep the blobs
@@ -924,7 +925,7 @@ final class ModelManagerViewModel {
             lastFailureMessages[model.id] = removalError?.localizedDescription
             await handleMutationCompletion(for: model.id)
             return outcome
-        case .blockedByActiveGeneration, .failed(.engineRelease):
+        case .blockedByActiveGeneration, .failed(.engineRelease), .failed(.downloadStop):
             // The files are intact; a download this deletion stopped reports
             // the package's state again.
             if stoppedDownloads {

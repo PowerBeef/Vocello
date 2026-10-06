@@ -117,6 +117,8 @@ final class IOSModelDownloadCoordinator {
     /// cancellation while its URLSession task barrier is still draining.
     private var cancellationBarriers: Set<String> = []
     private var diagnosticsHeartbeat: Task<Void, Never>?
+    /// The transfer the heartbeat follows; another model's cancellation never stops it (A5-04).
+    private var diagnosticsHeartbeatOwner = IOSModelDownloadHeartbeatOwnership()
     private var lastDiagnosticProgressTrace:
         [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
     private var lastDiagnosticSnapshotTrace:
@@ -222,6 +224,17 @@ final class IOSModelDownloadCoordinator {
             cancellationBarriers.insert(modelID)
             let outcome = IOSModelDownloadCancellationSequence.cancelPending(
                 persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+                // A5-03: still queued, so still cancellable; the row keeps its Cancel control.
+                keepCancellable: {
+                    publishSnapshot(
+                        modelID: modelID,
+                        phase: .queued,
+                        downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                        totalBytes: modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
+                        message: CancellationPersistenceError.privacySafeMessage,
+                        generation: beginOperation()
+                    )
+                },
                 dequeue: { pending.remove(at: pendingIndex) },
                 persistTombstone: { persistCancellationStatus(modelID: modelID, status: .deleted) },
                 discardStaging: { discardStaging(modelID: modelID) },
@@ -230,13 +243,13 @@ final class IOSModelDownloadCoordinator {
             switch outcome {
             case .intentPersistenceFailed:
                 cancellationBarriers.remove(modelID)
-                publishCancellationPersistenceFailure(modelID: modelID)
                 return false
             case .tombstonePersistenceFailed:
                 publishCancellationPersistenceFailure(modelID: modelID)
                 return false
             case .deleted:
-                stopDiagnosticsHeartbeat()
+                // A queued model never owns the heartbeat of the download in flight (A5-04).
+                stopDiagnosticsHeartbeat(for: modelID)
                 cancellationBarriers.remove(modelID)
                 return true
             }
@@ -249,6 +262,18 @@ final class IOSModelDownloadCoordinator {
         cancellationBarriers.insert(modelID)
         let outcome = await IOSModelDownloadCancellationSequence.cancelActive(
             persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+            // A5-03: the transfer keeps running under its own generation, so the row keeps its
+            // Cancel control and says why; a failure row would offer only Retry, a no-op here.
+            keepCancellable: {
+                publishSnapshot(
+                    modelID: modelID,
+                    phase: .downloading,
+                    downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                    totalBytes: active.totalBytes,
+                    message: CancellationPersistenceError.privacySafeMessage,
+                    generation: active.operationGeneration
+                )
+            },
             publishCancelling: {
                 publishSnapshot(
                     modelID: modelID,
@@ -273,10 +298,6 @@ final class IOSModelDownloadCoordinator {
         switch outcome {
         case .intentPersistenceFailed:
             cancellationBarriers.remove(modelID)
-            publishCancellationPersistenceFailure(
-                modelID: modelID,
-                recoverableGeneration: active.operationGeneration
-            )
             return false
         case .racedInstallationRollbackFailed:
             reconcileInstalledAfterCancellationCleanupFailure(active)
@@ -288,20 +309,27 @@ final class IOSModelDownloadCoordinator {
             return false
         case .deleted:
             traceCurrentState(layer: "coordinator", event: "cancellation-completed", modelID: modelID, outcome: "deleted")
-            stopDiagnosticsHeartbeat()
+            stopDiagnosticsHeartbeat(for: modelID)
             cancellationBarriers.remove(modelID)
             await startPendingDownloads()
             return true
         }
     }
 
-    func delete(model: ModelDescriptor) async throws {
-        traceCurrentState(layer: "coordinator", event: "delete-requested", modelID: model.id)
-        if inflight[model.id] != nil || pending.contains(where: { $0.id == model.id }) {
-            guard await cancel(modelID: model.id) else {
-                throw CancellationPersistenceError()
-            }
-        }
+    /// A deletion's first step, run once the engine allowed it (`ModelDeletionSequence`, A5-01):
+    /// a download of the model is cancelled. `false` means its cancellation could not be recorded;
+    /// the download and the files stay, and the row already shows why.
+    func stopDownloadBeforeDeletion(modelID: String) async -> Bool {
+        traceCurrentState(layer: "coordinator", event: "delete-requested", modelID: modelID)
+        guard hasDownload(for: modelID) else { return true }
+        return await cancel(modelID: modelID)
+    }
+
+    /// A deletion's last step, synchronous so it shares the main-actor turn of the deletion
+    /// sequence's last engine read. Returns `false`, removing nothing, when a download of the
+    /// model started meanwhile: the row shows that download.
+    func removeInstalledFiles(of model: ModelDescriptor) throws -> Bool {
+        guard !hasDownload(for: model.id) else { return false }
         let generation = beginOperation()
         publishSnapshot(
             modelID: model.id,
@@ -321,6 +349,11 @@ final class IOSModelDownloadCoordinator {
         markLedgerTerminal(modelID: model.id, status: .deleted)
         publishTerminal(modelID: model.id, phase: .deleted)
         traceCurrentState(layer: "filesystem", event: "delete-completed", modelID: model.id, outcome: "target-absent")
+        return true
+    }
+
+    private func hasDownload(for modelID: String) -> Bool {
+        inflight[modelID] != nil || pending.contains(where: { $0.id == modelID })
     }
 
     func restoreInFlightDownloadsIfNeeded() async {
@@ -535,10 +568,10 @@ final class IOSModelDownloadCoordinator {
                 message: nil,
                 generation: generation
             )
-            stopDiagnosticsHeartbeat()
+            stopDiagnosticsHeartbeat(for: model.id)
         } catch is CancellationError {
             traceCurrentState(layer: "coordinator", event: "request-cancelled", modelID: model.id, generation: generation)
-            stopDiagnosticsHeartbeat()
+            stopDiagnosticsHeartbeat(for: model.id)
             return
         } catch let error as HuggingFaceDownloader.DownloadError {
             if case .cancelled = error { return }
@@ -558,7 +591,7 @@ final class IOSModelDownloadCoordinator {
                 error: error
             )
             publishFailed(modelID: model.id, message: error.localizedDescription)
-            stopDiagnosticsHeartbeat()
+            stopDiagnosticsHeartbeat(for: model.id)
         } catch {
             guard inflight[model.id]?.operationGeneration == generation,
                   !cancellationBarriers.contains(model.id) else { return }
@@ -576,7 +609,7 @@ final class IOSModelDownloadCoordinator {
                 error: error
             )
             publishFailed(modelID: model.id, message: error.localizedDescription)
-            stopDiagnosticsHeartbeat()
+            stopDiagnosticsHeartbeat(for: model.id)
         }
         await startPendingDownloads()
     }
@@ -1023,10 +1056,7 @@ final class IOSModelDownloadCoordinator {
         }
     }
 
-    private func publishCancellationPersistenceFailure(
-        modelID: String,
-        recoverableGeneration: UInt64? = nil
-    ) {
+    private func publishCancellationPersistenceFailure(modelID: String) {
         publishSnapshot(
             modelID: modelID,
             phase: .failed,
@@ -1034,7 +1064,7 @@ final class IOSModelDownloadCoordinator {
             totalBytes: inflight[modelID]?.totalBytes
                 ?? modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
             message: CancellationPersistenceError.privacySafeMessage,
-            generation: recoverableGeneration ?? beginOperation()
+            generation: beginOperation()
         )
     }
 
@@ -1224,6 +1254,7 @@ final class IOSModelDownloadCoordinator {
 
     private func startDiagnosticsHeartbeat(modelID: String, generation: UInt64) {
         diagnosticsHeartbeat?.cancel()
+        diagnosticsHeartbeatOwner.claim(for: modelID)
         diagnosticsHeartbeat = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 guard let self,
@@ -1241,7 +1272,9 @@ final class IOSModelDownloadCoordinator {
         }
     }
 
-    private func stopDiagnosticsHeartbeat() {
+    /// Stops the heartbeat only when `modelID`'s transfer owns it (A5-04).
+    private func stopDiagnosticsHeartbeat(for modelID: String) {
+        guard diagnosticsHeartbeatOwner.release(for: modelID) else { return }
         diagnosticsHeartbeat?.cancel()
         diagnosticsHeartbeat = nil
     }

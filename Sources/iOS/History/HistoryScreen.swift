@@ -195,6 +195,9 @@ private struct IOSHistoryLibrarySection: View {
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
     @State private var recoveryExportGate = IOSExportGate()
+    /// Queued records that cannot be verified are set aside only after this
+    /// confirmation (A2-02); nothing is discarded by default.
+    @State private var isDiscardConfirmationPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -366,12 +369,39 @@ private struct IOSHistoryLibrarySection: View {
                     .accessibilityIdentifier("historyRecovery_export")
                 }
             }
+            // On its own line, so the row never crowds past the phone's width.
+            if showsDiscardUnverifiableRecords {
+                Button(IOSAppLanguage.shared.presentation.discardUnverifiableRecords, role: .destructive) {
+                    isDiscardConfirmationPresented = true
+                }
+                .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
+                .accessibilityIdentifier("historyRecovery_discard")
+            }
         }
         .padding(14)
         .background(Theme.Surface.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("historyRecovery_banner")
         .iosExportPresentation(recoveryExportGate)
+        .alert(
+            IOSAppLanguage.shared.presentation.discardUnverifiableRecordsTitle(recoverySnapshot.unverifiableRecordCount),
+            isPresented: $isDiscardConfirmationPresented
+        ) {
+            Button(IOSAppLanguage.shared.presentation.discardUnverifiableRecordsConfirm, role: .destructive) {
+                discardUnverifiableRecords()
+            }
+            .accessibilityIdentifier("historyRecovery_discardConfirm")
+            Button(IOSInterfaceText.cancel, role: .cancel) {}
+                .accessibilityIdentifier("historyRecovery_discardCancel")
+        } message: {
+            Text(IOSAppLanguage.shared.presentation.discardUnverifiableRecordsDetail)
+        }
+    }
+
+    /// A2-02: offered only on the notice about records that cannot be verified,
+    /// and only while such a record exists to set aside.
+    private var showsDiscardUnverifiableRecords: Bool {
+        recoverySnapshot.notice == .unverifiedRecord && recoverySnapshot.unverifiableRecordCount > 0
     }
 
     private var recoveryTitle: String {
@@ -395,7 +425,11 @@ private struct IOSHistoryLibrarySection: View {
         case .unqueued:
             return presentation.historyUnqueuedDetail
         case .unverifiedRecord:
-            return IOSInterfaceText.historyRecoveryProblem
+            // A2-02: a damaged record the user can set aside is counted.
+            let count = recoverySnapshot.unverifiableRecordCount
+            return count > 0
+                ? presentation.historyUnverifiableRecords(count)
+                : IOSInterfaceText.historyRecoveryProblem
         case .clearPending:
             return presentation.historyClearPendingDetail
         case .queuedTakes(let count):
@@ -418,6 +452,17 @@ private struct IOSHistoryLibrarySection: View {
             if discardsUnreadableLists {
                 await GenerationHistoryRecovery.discardUnreadableAudioRemovals()
             }
+            reload(reopenFailedStore: true)
+        }
+    }
+
+    /// The user confirmed discarding the records that cannot be verified
+    /// (A2-02): they are set aside, no audio is deleted, and Clear All and the
+    /// removal of deleted takes' audio can run again.
+    private func discardUnverifiableRecords() {
+        Task {
+            await GenerationHistoryRecovery.setAsideUnverifiableRecords()
+            NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reload(reopenFailedStore: true)
         }
     }
@@ -709,17 +754,15 @@ private struct IOSHistoryLibrarySection: View {
     }
 
     /// Off the main thread, as on macOS: a synchronous SQLite write, then a file
-    /// removal. The row goes first (`HistoryDeletionEngine`). Audio that then
-    /// cannot be removed is reported and kept for a later reconcile to remove,
-    /// because nothing can reach it in the App Group once its row is gone (AUD-05).
+    /// removal, after the removal is listed (`HistoryDeletionEngine`, A2-04).
+    /// Audio that then cannot be removed is reported and kept for a later
+    /// reconcile to remove, because nothing can reach it in the App Group once
+    /// its row is gone (AUD-05).
     private func delete(_ item: Generation) {
-        let engine = GenerationHistoryRecovery.deletionEngine
         let recordID = item.id
         let audioPath = item.audioPath
         Task {
-            let outcome = await Task.detached(priority: .userInitiated) {
-                engine.deleteSingle(recordID: recordID, audioPath: audioPath)
-            }.value
+            let outcome = await GenerationHistoryRecovery.deleteSingle(recordID: recordID, audioPath: audioPath)
             switch outcome {
             case .deleted:
                 reload()

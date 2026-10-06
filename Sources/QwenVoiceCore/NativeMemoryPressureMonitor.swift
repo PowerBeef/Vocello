@@ -244,7 +244,8 @@ public final class NativeMemoryPressureMonitor: @unchecked Sendable {
     }
 
     #if os(macOS) || os(iOS)
-    private func handle(event: DispatchSource.MemoryPressureEvent) {
+    /// Internal, not private, so tests can deliver an event without the kernel.
+    func handle(event: DispatchSource.MemoryPressureEvent) {
         // The DispatchSource event mask can deliver multiple flags in one
         // callback (e.g. .warning + .critical). Treat .critical as winning
         // since it implies harder action; .warning maps to soft trim;

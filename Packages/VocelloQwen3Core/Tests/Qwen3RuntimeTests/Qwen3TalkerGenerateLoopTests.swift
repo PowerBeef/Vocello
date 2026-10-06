@@ -417,14 +417,20 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertNotEqual(first.frames, second.frames, "The request seed drives both sampling stages")
     }
 
+    /// DA-09 (E7-05): the EOS hold covers the whole budget from wherever the
+    /// talker first samples EOS, so this take cannot end by EOS and the cap is
+    /// exercised on every run, whatever the seed samples.
     func testTokenCapStopsTheLoop() async throws {
         let model = try Self.makeModel()
-        let take = try await generate(model, seed: 0x5EED_0003, maximumCodecTokens: 3)
-        XCTAssertGreaterThanOrEqual(take.frames.count, 2)
-        XCTAssertLessThanOrEqual(take.frames.count, 3)
-        if take.frames.count == 3 {
-            XCTAssertEqual(take.finishReason, .maxTokens)
-        }
+        let cap = 3
+        let take = try await generate(
+            model,
+            seed: 0x5EED_0003,
+            maximumCodecTokens: cap,
+            eosSuppressionFrames: cap
+        )
+        XCTAssertEqual(take.frames.count, cap, "The token cap bounds the loop exactly")
+        XCTAssertEqual(take.finishReason, .maxTokens)
     }
 
     func testMissingTextTokenizerFailsBeforeTheLoop() async throws {

@@ -13,6 +13,16 @@ private final class TestLockedValue<Value: Sendable>: Sendable {
     }
 }
 
+private final class TestCallLog: Sendable {
+    private let storage = OSAllocatedUnfairLock<[String]>(initialState: [])
+
+    var entries: [String] { storage.withLock { $0 } }
+
+    func append(_ entry: String) {
+        storage.withLock { $0.append(entry) }
+    }
+}
+
 private actor TestGenerationGate {
     private var isOpen = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -440,6 +450,88 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertEqual(state.currentLevel, .hardTrim)
         XCTAssertEqual(state.transition(to: nil), .hardTrim)
         XCTAssertNil(state.currentLevel)
+    }
+
+    /// DA-09: the kernel monitor maps each callback to one trim level, lets
+    /// critical win over warning, emits only on a change, never emits for
+    /// relief, and `stop()` finishes the stream the engine iterates.
+    func testKernelPressureCallbacksEmitTrimLevelsOnlyOnChange() async {
+        let monitor = NativeMemoryPressureMonitor(label: "test.memory-pressure")
+        monitor.handle(event: [.warning, .critical])
+        XCTAssertEqual(monitor.currentLevel, .hardTrim, "critical wins in a combined callback")
+        monitor.handle(event: .critical)
+        monitor.handle(event: .normal)
+        XCTAssertNil(monitor.currentLevel, "relief clears the level")
+        monitor.handle(event: .critical)
+        monitor.handle(event: .warning)
+        XCTAssertEqual(monitor.currentLevel, .softTrim)
+        monitor.stop()
+
+        var emitted: [NativeMemoryTrimLevel] = []
+        for await level in monitor.events {
+            emitted.append(level)
+        }
+        XCTAssertEqual(emitted, [.hardTrim, .hardTrim, .softTrim])
+    }
+
+    /// DA-09: the runtime's caller trims, observed through a recording
+    /// allocator: a soft trim clears the buffer cache only, a hard trim also
+    /// drops prewarm state, and a full unload releases through the coordinator.
+    func testRuntimeTrimLevelsDriveTheAllocatorAndTheModelCoordinator() async {
+        let allocator = TestCallLog()
+        let coordinator = TrimRecordingCoordinator()
+        let runtime = NativeEngineRuntime(
+            loadCoordinator: coordinator,
+            audioPreparationService: NativeAudioPreparationService(),
+            lightweightWarmupText: "Hi.",
+            allocatorControl: NativeMLXAllocatorControl(
+                applyPolicy: { _ in allocator.append("applyPolicy") },
+                clearCache: { allocator.append("clearCache") }
+            )
+        )
+
+        await runtime.trimMemory(level: .softTrim, reason: "test_soft_trim")
+        XCTAssertEqual(allocator.entries, ["clearCache"])
+        let afterSoftTrim = await coordinator.events
+        XCTAssertEqual(afterSoftTrim, [], "a soft trim keeps prewarm state and the model")
+
+        await runtime.trimMemory(level: .hardTrim, reason: "test_hard_trim")
+        XCTAssertEqual(allocator.entries, ["clearCache", "clearCache"])
+        let afterHardTrim = await coordinator.events
+        XCTAssertEqual(afterHardTrim, ["clearPrewarmState"], "a hard trim keeps the model")
+
+        await runtime.trimMemory(level: .fullUnload, reason: "test_full_unload")
+        XCTAssertEqual(allocator.entries, ["clearCache", "clearCache"])
+        let afterFullUnload = await coordinator.events
+        XCTAssertEqual(afterFullUnload, ["clearPrewarmState", "unload"])
+        let loadedModelID = await runtime.loadedModelID()
+        XCTAssertNil(loadedModelID)
+    }
+
+    /// DA-09: `MLXTTSEngine.generate` holds its task behind this gate until
+    /// the coordinator has registered it; no waiter may pass a closed gate.
+    func testGenerationTaskStartGateHoldsEveryWaiterUntilOpened() async {
+        let gate = GenerationTaskStartGate()
+        let passed = TestCallLog()
+        let first = Task {
+            await gate.wait()
+            passed.append("first")
+        }
+        let second = Task {
+            await gate.wait()
+            passed.append("second")
+        }
+        for _ in 0..<50 { await Task.yield() }
+        XCTAssertEqual(passed.entries, [], "no waiter passes a closed gate")
+
+        await gate.open()
+        await first.value
+        await second.value
+        XCTAssertEqual(Set(passed.entries), ["first", "second"])
+
+        // Opening again is harmless, and an open gate admits at once.
+        await gate.open()
+        await gate.wait()
     }
 
     func testWarningKernelPressureSoftTrimsWithoutCancellingGeneration() async {
@@ -957,6 +1049,37 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         ),
         artifactAvailability: .publicArtifact
     )
+}
+
+/// A model coordinator that records the prewarm-state resets and unloads a
+/// caller trim asks of it; no model is ever loaded.
+private actor TrimRecordingCoordinator: MLXModelCoordinating {
+    private(set) var events: [String] = []
+
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
+        throw CancellationError()
+    }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        throw CancellationError()
+    }
+
+    func unloadModel() async {
+        events.append("unload")
+    }
+
+    func isPrewarmed(identityKey: String) async -> Bool { false }
+    func markPrewarmed(identityKey: String) async {}
+
+    func clearPrewarmState() async {
+        events.append("clearPrewarmState")
+    }
+
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
 }
 
 /// A model coordinator whose load suspends until the test releases it, then

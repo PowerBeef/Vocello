@@ -480,6 +480,33 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
         }
     }
 
+    /// DA-09: `vocello generate`'s first-chunk observer subscribes to the
+    /// engine's events and drains them to a terminal. A request refused on
+    /// consent fails before it subscribes, and an admitted take the engine
+    /// refuses ends the drain on the engine's own `.failed` terminal; neither
+    /// may leave the command waiting.
+    func testTheCLIFirstChunkObserverEndsOnARefusedOrFailedStreamingTake() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cli = try makeCLIRuntime(root: root, consent: CLIVoiceCloningConsent.notConfirmed)
+        defer { cli.engine.stop() }
+
+        await assertRefusedAsync(.generation) {
+            _ = try await GenerateCommand.generateObservingFirstChunk(cli, self.streamingRequest(.clone))
+        }
+        await assertReachesEngine {
+            _ = try await GenerateCommand.generateObservingFirstChunk(cli, self.streamingRequest(.custom))
+        }
+    }
+
+    private func streamingRequest(_ mode: GenerationMode) -> GenerationRequest {
+        GenerationRequest(
+            mode: mode, modelID: "pro_\(mode.rawValue)_speed", text: "Consent fixture.",
+            outputPath: "/nonexistent/pa17-output.wav", shouldStream: true,
+            payload: request(mode).payload, generationID: UUID()
+        )
+    }
+
     func testCLIAdmitsCloneAndEnrollmentWithTheConsentFlag() {
         let policy = CLIVoiceCloningConsent.policy(confirmed: true)
         XCTAssertNoThrow(try policy.admitGeneration(mode: .clone))

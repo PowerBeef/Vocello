@@ -19,6 +19,73 @@ protocol GenerationOutputAdapting {
     ) async throws -> GenerationResult
 }
 
+/// The engine-side operations of one reserved take, in the order
+/// `GenerationOutputAdapter.runReservedTake` drives them. `EngineReservedTake`
+/// is the only production conformer.
+protocol GenerationReservedTake: Sendable {
+    associatedtype AudioConsumer: Sendable
+
+    var cancellation: VocelloQwen3CancellationController { get }
+    func claimAudioConsumer() async throws -> AudioConsumer
+    func cancelAudio(_ audio: AudioConsumer, reason: VocelloQwen3CancellationReason) async
+    func open() async throws
+    func waitForModelTermination() async -> VocelloQwen3TerminalEvent
+    func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws
+    func abortReservation(reason: VocelloQwen3CancellationReason) async throws
+    func acknowledgeProductFinalization(
+        _ disposition: VocelloQwen3ProductFinalizationDisposition
+    ) async throws
+}
+
+/// One actor reservation of the loaded model's runtime.
+struct EngineReservedTake: GenerationReservedTake {
+    let engine: VocelloQwen3Engine
+    let reservation: VocelloQwen3GenerationReservation
+    let generationID: UUID
+
+    var cancellation: VocelloQwen3CancellationController {
+        reservation.session.cancellation
+    }
+
+    func claimAudioConsumer() async throws -> VocelloQwen3LosslessAudioSequence {
+        try await reservation.session.claimAudioConsumer()
+    }
+
+    func cancelAudio(
+        _ audio: VocelloQwen3LosslessAudioSequence,
+        reason: VocelloQwen3CancellationReason
+    ) async {
+        await audio.cancel(reason: reason)
+    }
+
+    func open() async throws {
+        try await engine.open(reservation.id)
+    }
+
+    func waitForModelTermination() async -> VocelloQwen3TerminalEvent {
+        await reservation.session.waitForModelTermination()
+    }
+
+    func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
+        try await engine.cancelGeneration(reservation.id, reason: reason)
+    }
+
+    func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
+        try await engine.abortReservation(reservation.id, reason: reason)
+    }
+
+    func acknowledgeProductFinalization(
+        _ disposition: VocelloQwen3ProductFinalizationDisposition
+    ) async throws {
+        _ = try await engine.acknowledgeProductFinalization(
+            generationID: generationID,
+            leaseID: reservation.lease.id,
+            token: reservation.session.finalizationToken,
+            disposition: disposition
+        )
+    }
+}
+
 private enum NativeStreamingSignposts {
     static let signposter = OSSignposter(
         subsystem: "com.qwenvoice.engine",
@@ -185,40 +252,28 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         let telemetryTerminalGate = NativeTelemetryTerminalGate()
         let cloneHandle = preparedCloneHandle
         do {
-            return try await withTaskCancellationHandler {
-                // Cancellation can win after product preparation but before the
-                // actor reservation exists. The typed ingress records that
-                // decision before Task cancellation reaches this adapter.
-                try cancellationIngress.checkCancellation()
-                let chunkCapacity = actorRequest.chunking.pendingFrameLimit * 1_920
-                let currentReservation = try await model.engine.reserveGeneration(
-                    request: actorRequest,
-                    cloneHandle: cloneHandle,
-                    audioCapacityFrames: chunkCapacity
-                )
-                await telemetryRecorder?.mark(
-                    stage: GenerationStartupBoundary.generationReserved.telemetryStage
-                )
-                cancellationIngress.install { reason in
-                    currentReservation.session.cancellation.request(
-                        Self.runtimeCancellationReason(for: reason)
+            return try await Self.runReservedTake(
+                cancellationIngress: cancellationIngress,
+                telemetryRecorder: telemetryRecorder,
+                reserve: { () async throws -> EngineReservedTake in
+                    let chunkCapacity = actorRequest.chunking.pendingFrameLimit * 1_920
+                    let reservation = try await model.engine.reserveGeneration(
+                        request: actorRequest,
+                        cloneHandle: cloneHandle,
+                        audioCapacityFrames: chunkCapacity
                     )
-                }
-                var opened = false
-                var audio: VocelloQwen3LosslessAudioSequence?
-                do {
-                    try cancellationIngress.checkCancellation()
-                    let claimedAudio = try await currentReservation.session.claimAudioConsumer()
-                    await telemetryRecorder?.mark(
-                        stage: GenerationStartupBoundary.audioConsumerClaimed.telemetryStage
+                    return EngineReservedTake(
+                        engine: model.engine,
+                        reservation: reservation,
+                        generationID: generationID
                     )
-                    audio = claimedAudio
-                    try cancellationIngress.checkCancellation()
+                },
+                prepareExecution: { () async throws -> StreamingExecutionContext in
                     let sessionDirectory = try makeSessionDirectory()
                     await telemetryRecorder?.mark(
                         stage: GenerationStartupBoundary.sessionDirectoryCreated.telemetryStage
                     )
-                    let execution = StreamingExecutionContext(
+                    return StreamingExecutionContext(
                         requestID: requestID,
                         generationID: generationID,
                         request: request,
@@ -241,78 +296,23 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         diagnosticAppSupportBox: diagnosticAppSupportBox,
                         markingConfiguration: markingConfiguration
                     )
-                    // The reservation stays inert until its mandatory consumer
-                    // and every fallible product-side setup step are complete.
-                    try cancellationIngress.checkCancellation()
-                    let engineOpenClockMS = telemetryRecorder?.clock.now().0
-                    try await model.engine.open(currentReservation.id)
-                    await telemetryRecorder?.mark(
-                        stage: GenerationStartupBoundary.engineOpened.telemetryStage
-                    )
-                    opened = true
-                    let result = try await execution.run(
-                        audio: claimedAudio,
-                        session: currentReservation.session,
+                },
+                execute: { execution, take, audio, engineOpenClockMS in
+                    try await execution.run(
+                        audio: audio,
+                        session: take.reservation.session,
                         engineOpenClockMS: engineOpenClockMS,
                         chunkSink: chunkSink
                     )
-                    let terminal = await currentReservation.session.waitForModelTermination()
-                    guard case .completed(.endOfSequence) = terminal.outcome else {
-                        throw Self.productError(
-                            for: terminal.outcome,
-                            emittedAudioFrameCount: terminal.emittedAudioFrameCount
-                        )
-                    }
-
-                    // Product completion belongs to the operation lease. Do not
-                    // release actor ownership until the sole public terminal has
-                    // been accepted by the frontend transport.
-                    await chunkSink(.completed(result))
-                    _ = try await model.engine.acknowledgeProductFinalization(
-                        generationID: generationID,
-                        leaseID: currentReservation.lease.id,
-                        token: currentReservation.session.finalizationToken,
-                        disposition: .published
-                    )
+                },
+                chunkSink: chunkSink,
+                afterFinalization: {
                     if let cloneHandle {
                         _ = await model.engine.releaseCloneHandle(cloneHandle)
                     }
                     await stopSamplerIfNeeded()
-                    return result
-                } catch {
-                    let ingressReason = cancellationIngress.reason.map {
-                        Self.runtimeCancellationReason(for: $0)
-                    }
-                    let reason = currentReservation.session.cancellation.reason
-                        ?? ingressReason
-                        ?? .shutdown
-                    currentReservation.session.cancellation.request(reason)
-                    await audio?.cancel(reason: reason)
-                    if opened {
-                        try await model.engine.cancelGeneration(
-                            currentReservation.id,
-                            reason: reason
-                        )
-                        _ = await currentReservation.session.waitForModelTermination()
-                        _ = try await model.engine.acknowledgeProductFinalization(
-                            generationID: generationID,
-                            leaseID: currentReservation.lease.id,
-                            token: currentReservation.session.finalizationToken,
-                            disposition: .aborted(.runtime)
-                        )
-                    } else {
-                        try await model.engine.abortReservation(
-                            currentReservation.id,
-                            reason: reason
-                        )
-                    }
-                    throw error
                 }
-            } onCancel: {
-                // Direct caller cancellation has no richer reason. A reason
-                // already recorded by the admission coordinator wins.
-                cancellationIngress.request(.user)
-            }
+            )
         } catch {
             if let cloneHandle {
                 _ = await model.engine.releaseCloneHandle(cloneHandle)
@@ -323,6 +323,96 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             )
             await stopSamplerIfNeeded()
             throw error
+        }
+    }
+
+    /// The reserve, claim, open, execute and finalize choreography of one take,
+    /// with its catch-path cancel, abort and acknowledge. `run` drives it over
+    /// the actor reservation (`EngineReservedTake`); deterministic tests drive
+    /// the same code over a fake take, since a real reservation needs weights.
+    static func runReservedTake<Take: GenerationReservedTake, Execution>(
+        cancellationIngress: GenerationCancellationIngress,
+        telemetryRecorder: NativeTelemetryRecorder?,
+        reserve: () async throws -> Take,
+        prepareExecution: () async throws -> Execution,
+        execute: (Execution, Take, Take.AudioConsumer, Int?) async throws -> GenerationResult,
+        chunkSink: @Sendable (GenerationEvent) async -> Void,
+        afterFinalization: () async -> Void
+    ) async throws -> GenerationResult {
+        try await withTaskCancellationHandler {
+            // Cancellation can win after product preparation but before the
+            // actor reservation exists. The typed ingress records that
+            // decision before Task cancellation reaches this adapter.
+            try cancellationIngress.checkCancellation()
+            let take = try await reserve()
+            await telemetryRecorder?.mark(
+                stage: GenerationStartupBoundary.generationReserved.telemetryStage
+            )
+            cancellationIngress.install { reason in
+                take.cancellation.request(
+                    Self.runtimeCancellationReason(for: reason)
+                )
+            }
+            var opened = false
+            var audio: Take.AudioConsumer?
+            do {
+                try cancellationIngress.checkCancellation()
+                let claimedAudio = try await take.claimAudioConsumer()
+                await telemetryRecorder?.mark(
+                    stage: GenerationStartupBoundary.audioConsumerClaimed.telemetryStage
+                )
+                audio = claimedAudio
+                try cancellationIngress.checkCancellation()
+                let execution = try await prepareExecution()
+                // The reservation stays inert until its mandatory consumer
+                // and every fallible product-side setup step are complete.
+                try cancellationIngress.checkCancellation()
+                let engineOpenClockMS = telemetryRecorder?.clock.now().0
+                try await take.open()
+                await telemetryRecorder?.mark(
+                    stage: GenerationStartupBoundary.engineOpened.telemetryStage
+                )
+                opened = true
+                let result = try await execute(execution, take, claimedAudio, engineOpenClockMS)
+                let terminal = await take.waitForModelTermination()
+                guard case .completed(.endOfSequence) = terminal.outcome else {
+                    throw Self.productError(
+                        for: terminal.outcome,
+                        emittedAudioFrameCount: terminal.emittedAudioFrameCount
+                    )
+                }
+
+                // Product completion belongs to the operation lease. Do not
+                // release actor ownership until the sole public terminal has
+                // been accepted by the frontend transport.
+                await chunkSink(.completed(result))
+                try await take.acknowledgeProductFinalization(.published)
+                await afterFinalization()
+                return result
+            } catch {
+                let ingressReason = cancellationIngress.reason.map {
+                    Self.runtimeCancellationReason(for: $0)
+                }
+                let reason = take.cancellation.reason
+                    ?? ingressReason
+                    ?? .shutdown
+                take.cancellation.request(reason)
+                if let audio {
+                    await take.cancelAudio(audio, reason: reason)
+                }
+                if opened {
+                    try await take.cancelGeneration(reason: reason)
+                    _ = await take.waitForModelTermination()
+                    try await take.acknowledgeProductFinalization(.aborted(.runtime))
+                } else {
+                    try await take.abortReservation(reason: reason)
+                }
+                throw error
+            }
+        } onCancel: {
+            // Direct caller cancellation has no richer reason. A reason
+            // already recorded by the admission coordinator wins.
+            cancellationIngress.request(.user)
         }
     }
 

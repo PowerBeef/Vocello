@@ -1,6 +1,12 @@
 @testable import MLXAudioTTS
 import XCTest
 
+/// Bounded streaming retention and chunk scheduling. Cancellation and the
+/// final-audio barrier are pinned on the real producers and consumers, not on
+/// a local stream: the lossless channel in `ClassifiedGenerationSessionTests`,
+/// the talker loop in `Qwen3TalkerGenerateLoopTests`, the engine in
+/// `VocelloQwen3FacadeTests` and the product adapter in
+/// `GenerationOutputAdapterChoreographyTests` (DA-09, E7-01).
 final class Qwen3StreamingContractTests: XCTestCase {
     func testPendingRetentionIsBoundedAndFirstLaterSchedulingIsExact() {
         var schedule = Qwen3StreamChunkSchedule(firstChunkSize: 3, laterChunkSize: 7)
@@ -15,52 +21,4 @@ final class Qwen3StreamingContractTests: XCTestCase {
         XCTAssertEqual(schedule.peakPendingCount, 7)
         XCTAssertEqual(schedule.pendingCount, 0)
     }
-
-    func testCancellationStopsConsumerAndRunsTermination() async throws {
-        let terminated = expectation(description: "producer termination")
-        let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.onTermination = { _ in terminated.fulfill() }
-            let producer = Task {
-                var value = 0
-                while !Task.isCancelled {
-                    continuation.yield(value)
-                    value += 1
-                    await Task.yield()
-                }
-                continuation.finish(throwing: CancellationError())
-            }
-            continuation.onTermination = { _ in
-                producer.cancel()
-                terminated.fulfill()
-            }
-        }
-        let consumer = Task {
-            for try await _ in stream {
-                try Task.checkCancellation()
-            }
-        }
-        consumer.cancel()
-        do { try await consumer.value } catch is CancellationError { }
-        await fulfillment(of: [terminated], timeout: 2)
-    }
-
-    func testFinalAudioBarrierOrdersLastChunkBeforeCompletion() async throws {
-        let events = EventOrder()
-        let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.yield(1)
-            continuation.yield(2)
-            continuation.finish()
-        }
-        for try await value in stream {
-            await events.append("chunk-\(value)")
-        }
-        await events.append("completion")
-        let order = await events.values
-        XCTAssertEqual(order, ["chunk-1", "chunk-2", "completion"])
-    }
-}
-
-private actor EventOrder {
-    private(set) var values: [String] = []
-    func append(_ value: String) { values.append(value) }
 }

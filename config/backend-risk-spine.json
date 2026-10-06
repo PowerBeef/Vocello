@@ -119,8 +119,11 @@
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
       "tests": [
         "Qwen3RuntimeTests/Qwen3StreamingContractTests/testPendingRetentionIsBoundedAndFirstLaterSchedulingIsExact",
-        "Qwen3RuntimeTests/Qwen3StreamingContractTests/testCancellationStopsConsumerAndRunsTermination",
-        "Qwen3RuntimeTests/Qwen3StreamingContractTests/testFinalAudioBarrierOrdersLastChunkBeforeCompletion",
+        "Qwen3RuntimeTests/ClassifiedGenerationSessionTests/testCancellationWakesProducerBlockedByBackpressure",
+        "Qwen3RuntimeTests/ClassifiedGenerationSessionTests/testReceiverTaskCancellationTerminatesChannelAndRejectsLaterSends",
+        "Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests/testCancelledRequestStopsWithCancellation",
+        "Qwen3RuntimeTests/VocelloQwen3FacadeTests/testEngineDirectProducerBackpressuresUntilMandatoryConsumerDrains",
+        "VocelloCoreTests/GenerationOutputAdapterChoreographyTests/testACompletedTakePublishesItsTerminalBeforeReleasingTheLease",
         "VocelloCoreTests/AtomicWAVPublicationTests/testStreamingWriterKeepsPartialOutputHiddenUntilTerminalBarrier"
       ],
       "status": "implemented",

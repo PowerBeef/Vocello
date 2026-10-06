@@ -238,12 +238,12 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift",
-      "sha256": "ee746e62b0921fbfdec26d328bf3c603b2ba99e66835d41e6c38e5b108e7d132",
+      "sha256": "11b74fda7d704c3cc00bb3b481d6f6351e383c4bb232e26f49f40bfee20989c1",
       "upstreamStatus": "added"
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "b8b92936eb11a598fef3ced9c0c98d2ca675d70618cbbdda3399ab028a2c8c9d",
+      "sha256": "8e3d7ebed12e84d3475080bf47097e90120bf603b448adacc9a9e99f70f0b0a5",
       "upstreamStatus": "added"
     },
     {

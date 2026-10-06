@@ -11048,61 +11048,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. If purchase access is still being checked, export those clips manually from History afterward."
+            "value": "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. Clips finished while purchase access is still being checked are copied once it is confirmed."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tous les clips restent dans l’historique. Un dossier facultatif dans Fichiers reçoit aussi les nouveaux clips de voix intégrées ; les copies Design et Clone nécessitent le déblocage des exports. Si l’accès à l’achat est encore en cours de vérification, exportez ensuite ces clips manuellement depuis l’historique."
+            "value": "Tous les clips restent dans l’historique. Un dossier facultatif dans Fichiers reçoit aussi les nouveaux clips de voix intégrées ; les copies Design et Clone nécessitent le déblocage des exports. Les clips terminés pendant la vérification de l’accès à l’achat sont copiés dès qu’il est confirmé."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todos los clips permanecen en el historial. Una carpeta opcional de Archivos también recibe los nuevos clips de voz integrada; las copias de diseño y clonación requieren el desbloqueo de exportación. Si aún se está comprobando el acceso a la compra, exporta esos clips manualmente desde el historial después."
+            "value": "Todos los clips permanecen en el historial. Una carpeta opcional de Archivos también recibe los nuevos clips de voz integrada; las copias de diseño y clonación requieren el desbloqueo de exportación. Los clips terminados mientras se comprueba el acceso a la compra se copian en cuanto se confirma."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alle Clips bleiben im Verlauf. Ein optionaler Ordner in Dateien erhält zusätzlich neue Clips integrierter Stimmen; Design- und Klonkopien benötigen die Exportfreischaltung. Falls der Kaufzugriff noch geprüft wird, exportiere diese Clips später manuell aus dem Verlauf."
+            "value": "Alle Clips bleiben im Verlauf. Ein optionaler Ordner in Dateien erhält zusätzlich neue Clips integrierter Stimmen; Design- und Klonkopien benötigen die Exportfreischaltung. Clips, die fertig werden, während der Kaufzugriff noch geprüft wird, werden kopiert, sobald er bestätigt ist."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tutti i clip restano nella cronologia. Una cartella opzionale in File riceve anche i nuovi clip integrati; le copie di design e clonazione richiedono lo sblocco dell’esportazione. Se l’accesso all’acquisto è ancora in verifica, esporta in seguito quei clip manualmente dalla cronologia."
+            "value": "Tutti i clip restano nella cronologia. Una cartella opzionale in File riceve anche i nuovi clip integrati; le copie di design e clonazione richiedono lo sblocco dell’esportazione. I clip completati mentre l’accesso all’acquisto è ancora in verifica vengono copiati appena viene confermato."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todos os clipes permanecem no histórico. Uma pasta opcional em Arquivos também recebe novos clipes de voz integrada; cópias de criação e clonagem exigem o desbloqueio de exportação. Se o acesso à compra ainda estiver sendo verificado, exporte esses clipes manualmente pelo histórico depois."
+            "value": "Todos os clipes permanecem no histórico. Uma pasta opcional em Arquivos também recebe novos clipes de voz integrada; cópias de criação e clonagem exigem o desbloqueio de exportação. Clipes concluídos enquanto o acesso à compra ainda está sendo verificado são copiados assim que ele for confirmado."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有音频都保留在历史记录中。可选的“文件”文件夹也会接收新的内置声音音频；设计和克隆的副本需要解锁导出。如果仍在检查购买权限，请稍后从历史记录手动导出这些音频。"
+            "value": "所有音频都保留在历史记录中。可选的“文件”文件夹也会接收新的内置声音音频；设计和克隆的副本需要解锁导出。在检查购买权限期间完成的音频，会在权限确认后复制。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "すべての音声は履歴に残ります。任意の「ファイル」フォルダには新しい内蔵ボイス音声も保存されます。デザインとクローンのコピーには書き出し解除が必要です。購入権限を確認中の場合は、後で履歴から手動で書き出してください。"
+            "value": "すべての音声は履歴に残ります。任意の「ファイル」フォルダには新しい内蔵ボイス音声も保存されます。デザインとクローンのコピーには書き出し解除が必要です。購入権限の確認中に完成した音声は、確認後にコピーされます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "모든 오디오는 기록에 남습니다. 선택한 파일 앱 폴더에는 새 내장 음성 오디오도 저장됩니다. 디자인 및 복제 사본은 내보내기 해제가 필요합니다. 구매 권한을 확인 중이라면 나중에 기록에서 직접 내보내세요."
+            "value": "모든 오디오는 기록에 남습니다. 선택한 파일 앱 폴더에는 새 내장 음성 오디오도 저장됩니다. 디자인 및 복제 사본은 내보내기 해제가 필요합니다. 구매 권한을 확인하는 동안 완성된 오디오는 확인되면 복사됩니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Все записи остаются в истории. В необязательную папку в «Файлах» также сохраняются новые записи встроенных голосов; копии дизайна и клонов требуют открытия экспорта. Если право покупки ещё проверяется, позже экспортируйте эти записи вручную из истории."
+            "value": "Все записи остаются в истории. В необязательную папку в «Файлах» также сохраняются новые записи встроенных голосов; копии дизайна и клонов требуют открытия экспорта. Записи, готовые во время проверки права покупки, копируются, как только оно подтвердится."
           }
         }
       }

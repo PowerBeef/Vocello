@@ -121,7 +121,8 @@ public enum IOSSavedOutputsDestination {
                 purchases.permits([$0])
             }
         }
-        recordExportIssue(.accessUnverified)
+        // An earlier failure stays reported; the deferred copy below clears it only if it lands.
+        if exportIssue == nil { recordExportIssue(.accessUnverified) }
         let resolvedBookmark = defaults.data(forKey: Keys.bookmark)
         return Task { @MainActor in
             await purchases.refresh()

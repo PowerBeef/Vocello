@@ -91,7 +91,7 @@ extension VocelloPresentationText {
     }
 
     var exportFolderDetail: String {
-        localization.string(localized: "vocello.export.folder_detail", defaultValue: "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. If purchase access is still being checked, export those clips manually from History afterward.",
+        localization.string(localized: "vocello.export.folder_detail", defaultValue: "All clips stay in History. An optional Files folder also receives new Built-in clips; Design and Clone copies require the export unlock. Clips finished while purchase access is still being checked are copied once it is confirmed.",
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
     }
 

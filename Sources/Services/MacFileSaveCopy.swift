@@ -1,10 +1,11 @@
 import Foundation
+import QwenVoiceCore
 
 /// The file copy behind Save As. Choosing the take's own file as the
 /// destination is a no-op rather than a delete-then-copy of the only copy, and
-/// a failed copy never removes an existing destination: the bytes land in a
-/// hidden staging file next to the destination first and replace it only once
-/// they are complete.
+/// a failed copy never removes an existing destination: `StagedFileCopy` lands
+/// the bytes in a hidden staging file next to the destination, replaces it only
+/// once they are complete, and removes its staging file on every failure.
 enum MacFileSaveCopy {
     enum Outcome: Equatable {
         case copied
@@ -13,19 +14,7 @@ enum MacFileSaveCopy {
 
     static func copy(from source: URL, to destination: URL, fileManager: FileManager = .default) throws -> Outcome {
         if isSameFile(source, destination) { return .sameFile }
-        let directory = destination.deletingLastPathComponent()
-        let staging = directory.appendingPathComponent(".\(destination.lastPathComponent).vocello-save-\(UUID().uuidString)")
-        try fileManager.copyItem(at: source, to: staging)
-        do {
-            if fileManager.fileExists(atPath: destination.path) {
-                _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
-            } else {
-                try fileManager.moveItem(at: staging, to: destination)
-            }
-        } catch {
-            try? fileManager.removeItem(at: staging)
-            throw error
-        }
+        try StagedFileCopy.copy(from: source, to: destination, fileManager: fileManager)
         return .copied
     }
 

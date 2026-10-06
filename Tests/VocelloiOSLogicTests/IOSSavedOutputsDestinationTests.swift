@@ -232,6 +232,34 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         XCTAssertEqual(client.purchaseCount, 0)
     }
 
+    /// A failure already on the Settings row is not replaced by the waiting
+    /// report, so a scan that finds no unlock cannot clear it unseen.
+    func testAnEarlierFailureStaysReportedWhileAccessIsChecked() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        let refused = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: try clip("custom_take.wav").path, generationMode: "custom"
+        ) { _ in true })
+        _ = await refused.value
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+
+        let client = FolderCopyExportClient()
+        let purchases = IOSExportPurchaseState(client: client)
+        let entered = expectation(description: "entitlement scan running")
+        client.scanEntered = { entered.fulfill() }
+        let copy = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: try clip("design_take.wav").path, generationMode: "design", purchases: purchases
+        ))
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+        await fulfillment(of: [entered], timeout: 2)
+        client.settleScan()
+        let copied = await copy.value
+        XCTAssertFalse(copied)
+        XCTAssertEqual(purchases.access, .locked)
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+    }
+
     func testPolicySeesTheSavedRowsModeNotAnyCurrentSelection() throws {
         try IOSSavedOutputsDestination.setFolder(folder)
         var seen: [IOSExportProvenance] = []

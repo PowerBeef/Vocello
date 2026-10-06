@@ -132,6 +132,50 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         ])
     }
 
+    /// Today a published acknowledgement that throws (the lease failed
+    /// revalidation) still follows the `.completed` the sink already took:
+    /// the take is cancelled, finalized as aborted and the failure rethrown.
+    func testAPublishedAcknowledgementThatThrowsAbortsAndRethrows() async throws {
+        let log = ChoreographyLog()
+        let take = ScriptedReservedTake(log: log, failing: ["acknowledge(published)"])
+
+        do {
+            _ = try await ChoreographyDriver.run(take, log: log, execute: { _ in Self.completedResult })
+            XCTFail("A refused acknowledgement must surface")
+        } catch let failure as ScriptedTakeFailure {
+            XCTAssertEqual(failure, ScriptedTakeFailure(step: "acknowledge(published)"))
+        }
+
+        XCTAssertEqual(log.entries, [
+            "reserve", "claim", "prepareExecution", "open", "execute",
+            "waitForModelTermination", "sink.completed", "acknowledge(published)",
+            "cancelAudio(shutdown)", "cancelGeneration(shutdown)",
+            "waitForModelTermination", "acknowledge(aborted(runtime))",
+        ])
+        XCTAssertFalse(log.entries.contains("afterFinalization"))
+    }
+
+    /// A cleanup call that throws (the reservation is already invalid) ends
+    /// the cleanup there and its error replaces the original one.
+    func testACancelThatThrowsDuringCleanupSurfacesItsOwnError() async throws {
+        let log = ChoreographyLog()
+        let take = ScriptedReservedTake(log: log, failing: ["cancelGeneration"])
+
+        do {
+            _ = try await ChoreographyDriver.run(take, log: log, execute: { _ in
+                throw ScriptedTakeFailure(step: "sink")
+            })
+            XCTFail("A failed take must surface")
+        } catch let failure as ScriptedTakeFailure {
+            XCTAssertEqual(failure, ScriptedTakeFailure(step: "cancelGeneration"))
+        }
+
+        XCTAssertEqual(log.entries, [
+            "reserve", "claim", "prepareExecution", "open", "execute",
+            "cancelAudio(shutdown)", "cancelGeneration(shutdown)",
+        ])
+    }
+
     func testAPreCancelledTakeNeverReserves() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
@@ -316,7 +360,14 @@ private struct ScriptedReservedTake: GenerationReservedTake {
 
     let log: ChoreographyLog
     var terminal: VocelloQwen3TerminalOutcome = .completed(.endOfSequence)
+    /// Logged steps that throw `ScriptedTakeFailure` after they are logged.
+    var failing: Set<String> = []
     let cancellation = VocelloQwen3CancellationController()
+
+    private func record(_ step: String) throws {
+        log.append(step)
+        if failing.contains(step) { throw ScriptedTakeFailure(step: step) }
+    }
 
     func claimAudioConsumer() async throws -> Int {
         log.append("claim")
@@ -344,6 +395,7 @@ private struct ScriptedReservedTake: GenerationReservedTake {
 
     func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
         log.append("cancelGeneration(\(reason.rawValue))")
+        if failing.contains("cancelGeneration") { throw ScriptedTakeFailure(step: "cancelGeneration") }
     }
 
     func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
@@ -355,9 +407,9 @@ private struct ScriptedReservedTake: GenerationReservedTake {
     ) async throws {
         switch disposition {
         case .published:
-            log.append("acknowledge(published)")
+            try record("acknowledge(published)")
         case .aborted(let code):
-            log.append("acknowledge(aborted(\(code.rawValue)))")
+            try record("acknowledge(aborted(\(code.rawValue)))")
         }
     }
 }

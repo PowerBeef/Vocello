@@ -81,8 +81,35 @@ final class AppModel {
     /// Which mode the unified Studio screen is currently editing.
     /// Cold launch always starts on `.custom`; mode persists only for the
     /// current session (background/foreground). Explicit handoffs (Voices →
-    /// Clone, etc.) still set this in-session.
-    var studioMode: IOSGenerationSection = .custom
+    /// Clone, etc.) still set this in-session. Every write, the capsule
+    /// selector's binding included, goes through `requestStudioMode(_:)`, so a
+    /// refused switch leaves the mode unchanged (A10-02).
+    var studioMode: IOSGenerationSection {
+        get { selectedStudioMode }
+        set { requestStudioMode(newValue) }
+    }
+
+    private var selectedStudioMode: IOSGenerationSection = .custom
+
+    /// The one guarded route to change the Studio mode (A10-02): while a take
+    /// or long-form project runs, only its own mode can be selected, as the
+    /// capsule selector shows. Returns whether the Studio is (now) on `mode`;
+    /// a route that stages work for that mode stages it only then.
+    @discardableResult
+    func requestStudioMode(_ mode: IOSGenerationSection) -> Bool {
+        guard StudioModeSwitchPolicy.allows(
+            switchingTo: mode.mode,
+            from: selectedStudioMode.mode,
+            busyMode: StudioModeSwitchPolicy.busyMode(
+                coordinators: studioCoordinators,
+                longFormMode: longForm.isProcessing ? longForm.lastMode : nil
+            )
+        ) else { return false }
+        if selectedStudioMode != mode {
+            selectedStudioMode = mode
+        }
+        return true
+    }
 
     // MARK: - Drafts
 
@@ -156,6 +183,11 @@ final class AppModel {
     let customCoordinator = StudioGenerationCoordinator(mode: .custom)
     let designCoordinator = StudioGenerationCoordinator(mode: .design)
     let cloneCoordinator = StudioGenerationCoordinator(mode: .clone)
+
+    /// The last designed take that can still become a saved voice; it lives
+    /// beside the Design coordinator's completed take, so leaving and returning
+    /// to Voice Design keeps both or neither (A10-01).
+    var designSavedVoiceCandidate: VoiceDesignSavedVoiceCandidate?
 
     /// One app-wide long-form project coordinator (the engine admits one
     /// generation at a time); scripts above the single-take limit route here.

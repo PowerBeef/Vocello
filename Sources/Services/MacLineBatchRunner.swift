@@ -9,7 +9,8 @@ import QwenVoiceCore
 /// so the canvas locks exactly as during a single take. Owned by `MacAppModel`
 /// like the long-form `IOSLongFormCoordinator`; the batch sheet renders it.
 /// Cancellation goes through the engine barrier the way the long-form
-/// coordinator cancels: the store's typed cancellation closes the attempt.
+/// coordinator cancels: the store's typed cancellation closes the attempt of a
+/// user cancel, and a batch the engine cancelled closes its own (A14-01).
 @MainActor
 @Observable
 final class MacLineBatchRunner {
@@ -233,23 +234,15 @@ final class MacLineBatchRunner {
         isCancelling = false
         runTask = nil
         cancelTask = nil
-        switch outcome {
-        case .completed:
-            self.outcome = outcome
-            // The dock card mirrors what the shared player holds: the last
-            // saved line, exactly like a single take.
-            if let lastSaved {
-                studioCoordinator.complete(lastSaved, attempt: attempt)
-            } else {
-                studioCoordinator.finish(attempt: attempt)
-            }
-        case .failed(_, let message):
-            self.outcome = outcome
-            studioCoordinator.fail(message, attempt: attempt)
-        case .cancelled(let items, _):
-            // The cancel path closed the attempt through the engine barrier.
+        if case .cancelled(let items, _) = outcome {
+            // The barrier stamps a restart failure on a user cancellation.
             self.outcome = .cancelled(items: items, restartFailedMessage: restartFailedMessage)
+        } else {
+            self.outcome = outcome
         }
+        // A user cancellation is closed by the engine barrier; an engine
+        // cancellation (memory pressure) is closed here (A14-01).
+        outcome.closeAttempt(attempt, on: studioCoordinator, lastSaved: lastSaved)
     }
 }
 

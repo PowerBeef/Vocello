@@ -73,3 +73,27 @@ struct IOSStudioCadenceNotice: Equatable {
         guard audioQC?.cadence?.classification == .unusual else { return nil }
     }
 }
+
+/// The designed take of the current brief that can become a saved voice, held
+/// beside the Design coordinator by the app model on both platforms (A10-01):
+/// it carries the take's own audio, script and brief, and stays offered only
+/// while the brief, delivery and script still match the draft.
+struct VoiceDesignSavedVoiceCandidate: Equatable {
+    let audioPath: String
+    let transcript: String
+    let voiceDescription: String
+    let emotion: String
+    let text: String
+    private(set) var savedVoiceName: String?
+
+    var isSaved: Bool { savedVoiceName != nil }
+
+    /// `VoiceDesignDraft` adds `matches(draft:)` over its own fields.
+    func matches(voiceDescription: String, emotion: String, text: String) -> Bool {
+        self.voiceDescription == voiceDescription && self.emotion == emotion && self.text == text
+    }
+
+    mutating func markSaved(as voiceName: String) {
+        savedVoiceName = voiceName
+    }
+}

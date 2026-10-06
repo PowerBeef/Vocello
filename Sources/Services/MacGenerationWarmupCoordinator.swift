@@ -114,6 +114,15 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     /// that warm ends if it differs from the warm's own context.
     private var intentWhileDispatched: DeferredIntent?
     private var completedContext: WarmupContext?
+    /// A Studio intent that did not warm: the engine was not ready or busy
+    /// when it arrived, the admission gate deferred it, or the store refused
+    /// it (thermal or memory band). `observe(snapshot:)` schedules it once,
+    /// the next time the engine is ready and idle or loaded (A14-08, A14-53).
+    /// A completed warm is never retried this way: re-warming after an idle
+    /// unload would undo the unload.
+    private var retryIntent: WarmupContext?
+    /// The store the latest intent was scheduled against, for a retry.
+    private weak var warmStore: TTSEngineStore?
     private var revision: UInt64 = 0
 
     private struct DeferredIntent {
@@ -159,26 +168,38 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             intentWhileDispatched = DeferredIntent(context: context)
             return
         }
+        warmStore = ttsEngineStore
         if Self.isSuppressed {
             cancelPendingWarmup()
+            clearRetryIntent()
             return
         }
         guard let context,
               !context.modelID.isEmpty,
-              context.isModelAvailable,
-              snapshot.isReady else {
+              context.isModelAvailable else {
             cancelPendingWarmup()
+            clearRetryIntent()
+            return
+        }
+        // An engine that cannot take the warm now (not ready, a take or load
+        // running, a failure on screen) keeps the intent for its next idle state.
+        guard snapshot.isReady, shouldAllowAnyNavigationWarmup(snapshot: snapshot) else {
+            cancelPendingWarmup()
+            retryIntent = context
             return
         }
 
         guard let action = warmupAction(snapshot: snapshot, context: context) else {
             cancelPendingWarmup()
+            clearRetryIntent()
             return
         }
         guard completedContext != context else {
             cancelPendingWarmup()
+            clearRetryIntent()
             return
         }
+        clearRetryIntent()
         let plan = WarmupPlan(context: context, action: action)
         guard pendingPlan != plan else { return }
 
@@ -204,10 +225,14 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                     context: plan.context
                   ) == plan.action else {
                 // A plan that no newer one replaced leaves, so the same intent
-                // can schedule again once the engine is ready for it.
+                // can schedule again once the engine is ready for it: the next
+                // idle or loaded snapshot retries it (A14-08).
                 if self.revision == scheduledRevision {
                     self.pendingPlan = nil
                     self.pendingTask = nil
+                    if !Task.isCancelled {
+                        self.retryIntent = plan.context
+                    }
                 }
                 return
             }
@@ -215,13 +240,16 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             // Warm-admission gate (every Mac tier, AUD-10): defer proactive warms
             // while the system is under memory pressure — checked at dispatch
             // time (after the debounce) so the freshest pressure level wins.
-            // Clearing pendingPlan lets the next snapshot/draft change
-            // reschedule once pressure releases. User generations are never
-            // routed through this coordinator and stay ungated.
+            // The deferred intent is kept, so the next idle or loaded snapshot
+            // (or a draft change) reschedules it once pressure releases. User
+            // generations are never routed through this coordinator and stay
+            // ungated.
             if case .deferred = self.admissionPolicy.admit(
                 contextDescription: "\(plan.context.mode.rawValue)/\(plan.context.purpose)"
             ) {
                 self.pendingPlan = nil
+                self.pendingTask = nil
+                self.retryIntent = plan.context
                 return
             }
 
@@ -232,16 +260,21 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             // load's .starting, a clone prime's .running) must not (PA-31).
             self.dispatchedTask = self.pendingTask
             self.pendingTask = nil
-            // Every exit reconciles: only a warm that ran to the end with its
-            // model loaded is complete (a cancelled one skipped its prewarm or
-            // prime even when the weights loaded), and an intent that changed
-            // meanwhile is scheduled now.
+            // Every exit reconciles: only a warm the store performed, that ran
+            // to the end with its model loaded, is complete (a cancelled one
+            // skipped its prewarm or prime even when the weights loaded, and a
+            // refused one never ran), and an intent that changed meanwhile is
+            // scheduled now. A refused warm is kept for a retry (A14-53).
+            var warmPerformed = false
             var warmCompleted = false
             defer {
                 if self.dispatchedContext == plan.context {
                     self.dispatchedContext = nil
                     self.dispatchedTask = nil
                     self.completedContext = warmCompleted ? plan.context : nil
+                    if !warmPerformed, !Task.isCancelled {
+                        self.retryIntent = plan.context
+                    }
                     let deferred = self.intentWhileDispatched
                     self.intentWhileDispatched = nil
                     // Also after a cancelled warm: an intent that flipped away
@@ -260,7 +293,7 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
 
             switch plan.action {
             case .warm(let decision):
-                await self.performWarmup(
+                warmPerformed = await self.performWarmup(
                     decision,
                     ttsEngineStore: ttsEngineStore
                 )
@@ -280,13 +313,14 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                       ) == .warm(decision) else {
                     return
                 }
-                await self.performWarmup(
+                warmPerformed = await self.performWarmup(
                     decision,
                     ttsEngineStore: ttsEngineStore
                 )
             }
 
-            if !Task.isCancelled,
+            if warmPerformed,
+               !Task.isCancelled,
                case .loaded(let loadedModelID) = ttsEngineStore.snapshot.loadState,
                loadedModelID == plan.context.modelID {
                 warmCompleted = true
@@ -301,6 +335,10 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         pendingPlan = nil
     }
 
+    private func clearRetryIntent() {
+        retryIntent = nil
+    }
+
     func observe(snapshot: TTSEngineSnapshot) {
         // While a dispatched warm runs, the busy and idle states are mostly
         // its own (a cold load, a clone prime, a transition's unload), the
@@ -308,8 +346,13 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         // contexts until it ends (PA-31).
         guard dispatchedContext == nil else { return }
         if !shouldAllowAnyNavigationWarmup(snapshot: snapshot) {
+            // A debounced warm the engine became busy for is kept for a retry.
+            if let interrupted = pendingPlan?.context {
+                retryIntent = interrupted
+            }
             cancelPendingWarmup()
         }
+        defer { retryIntentIfReady(snapshot: snapshot) }
 
         switch snapshot.loadState {
         case .loaded(let modelID):
@@ -330,6 +373,20 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             // is a different context that warms normally.
             break
         }
+    }
+
+    /// A14-08: the intent that could not warm when it arrived is scheduled once
+    /// the engine is ready and idle or loaded, with nothing pending; it is
+    /// consumed here, so only a new refusal records it again.
+    private func retryIntentIfReady(snapshot: TTSEngineSnapshot) {
+        guard dispatchedContext == nil,
+              pendingPlan == nil,
+              snapshot.isReady,
+              shouldAllowAnyNavigationWarmup(snapshot: snapshot),
+              let intent = retryIntent,
+              let store = warmStore else { return }
+        clearRetryIntent()
+        scheduleWarmupIfNeeded(context: intent, snapshot: snapshot, ttsEngineStore: store)
     }
 
     func aggressiveness(for context: WarmupContext) -> WarmupAggressiveness {
@@ -441,19 +498,29 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         }
     }
 
+    /// Runs the warm and returns whether the store performed it. A prefetch
+    /// the store refused (thermal or memory band, a busy model slot) returns
+    /// no diagnostics, and a prime it refused leaves the reference unprimed;
+    /// neither counts as a completed warm (A14-53).
     private func performWarmup(
         _ decision: WarmupDecision,
         ttsEngineStore: TTSEngineStore
-    ) async {
+    ) async -> Bool {
         switch decision {
         case .skip:
-            return
+            return false
         case .ensureModelLoaded(let modelID):
             await ttsEngineStore.ensureModelLoadedIfNeeded(id: modelID)
+            return true
         case .prefetchInteractiveReadiness(let request):
-            _ = await ttsEngineStore.prefetchInteractiveReadinessIfNeeded(for: request)
+            return await ttsEngineStore.prefetchInteractiveReadinessIfNeeded(for: request) != nil
         case .primeCloneReference(let modelID, let reference):
             try? await ttsEngineStore.ensureCloneReferencePrimed(
+                modelID: modelID,
+                reference: reference
+            )
+            let state = ttsEngineStore.clonePreparationState
+            return state.isPrimed && state.key == GenerationSemantics.clonePreparationKey(
                 modelID: modelID,
                 reference: reference
             )

@@ -173,4 +173,52 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         }
         XCTAssertNil(deliveryStyle)
     }
+
+    /// A14-06: every Studio mode streams on the app interval, so Design and
+    /// Clone takes (single and line batch) cut their first preview chunk like
+    /// Built-in Voice and the warm request for the same draft, instead of the
+    /// adaptive per-tier interval a missing value falls back to.
+    func testEveryModeStreamsOnTheAppInterval() throws {
+        let design = MacStudioGenerationRequestFactory.voiceDesign(
+            modelID: "design-model",
+            text: "Hello there.",
+            outputPath: "/tmp/design.wav",
+            language: .english,
+            voiceDescription: "A warm narrator.",
+            deliveryStyle: "Speak calmly.",
+            seed: nil,
+            variation: nil
+        )
+        let clone = try XCTUnwrap(MacStudioGenerationRequestFactory.voiceClone(
+            modelID: "clone-model",
+            text: "Hello there.",
+            outputPath: "/tmp/clone.wav",
+            language: .english,
+            referenceAudioPath: "/tmp/reference.wav",
+            referenceTranscript: "Reference.",
+            preparedVoiceID: nil,
+            seed: nil,
+            variation: nil
+        ))
+        let custom = MacStudioGenerationRequestFactory.customVoice(
+            modelID: "custom-model",
+            text: "Hello there.",
+            outputPath: "/tmp/custom.wav",
+            language: .english,
+            speakerID: "ryan",
+            deliveryStyle: nil,
+            deliveryInstructionCellID: nil,
+            seed: nil,
+            variation: nil
+        )
+
+        for request in [design, clone, custom] {
+            XCTAssertTrue(request.shouldStream)
+            XCTAssertEqual(
+                request.streamingInterval,
+                GenerationSemantics.appStreamingInterval,
+                "\(request.mode) streams on the app interval"
+            )
+        }
+    }
 }

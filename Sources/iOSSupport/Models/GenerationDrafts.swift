@@ -136,6 +136,12 @@ struct VoiceDesignDraft: Equatable {
     }
 }
 
+extension VoiceDesignSavedVoiceCandidate {
+    func matches(draft: VoiceDesignDraft) -> Bool {
+        matches(voiceDescription: draft.voiceDescription, emotion: draft.emotion, text: draft.text)
+    }
+}
+
 struct VoiceCloningDraft: Equatable {
     var selectedSavedVoiceID: String?
     var pinnedSeed: UInt64?

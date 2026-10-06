@@ -255,11 +255,13 @@ enum VoiceClipTranscriber {
     /// Produces the privacy-safe enrollment metadata persisted beside a prepared voice.
     /// The evidence digest uses sorted JSON keys so identical typed evidence has one stable
     /// identity on macOS and iOS. The evidence itself remains transient and never stores the
-    /// transcript, source path, or raw framework error.
+    /// transcript, source path, or raw framework error. `generatedSourceMode` records the
+    /// Studio mode of a generated clip saved as a voice (the iOS export provenance).
     static func preparedVoiceEnrollmentMetadata(
         referenceLanguage: Qwen3SupportedLanguage,
         reviewState: ReferenceTranscriptionReviewState,
-        evidence: EnrollmentEvidence?
+        evidence: EnrollmentEvidence?,
+        generatedSourceMode: String? = nil
     ) throws -> PreparedVoiceEnrollmentMetadata {
         let evidenceDigest: String?
         if let evidence {
@@ -277,7 +279,8 @@ enum VoiceClipTranscriber {
             referenceLanguage: referenceLanguage,
             transcriptSource: reviewState.preparedVoiceTranscriptSource,
             automaticTranscriptionOutcome: evidence?.outcome.rawValue,
-            transcriptionEvidenceDigest: evidenceDigest
+            transcriptionEvidenceDigest: evidenceDigest,
+            generatedSourceMode: generatedSourceMode
         )
     }
 

@@ -106,6 +106,47 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         XCTAssertEqual(audioOnlyMetadata.transcriptSource, .audioOnly)
     }
 
+    /// A8-02: a generated Design take saved as a voice goes through the shared
+    /// builder like every other enrollment. Its script is an existing transcript
+    /// (no new recognition evidence, so its source is unknown, as on the Mac),
+    /// an edit is manual, an emptied one needs the audio-only confirmation, and
+    /// the design source survives for the iOS export provenance.
+    func testAGeneratedDesignTakeKeepsItsReviewProvenanceAndItsSourceMode() throws {
+        let script = "A quiet morning by the harbor."
+        var review = ReferenceTranscriptionReviewState(initialTranscript: script, readySource: .existing)
+        XCTAssertTrue(review.allowsSave(transcript: script))
+        let untouched = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .english,
+            reviewState: review,
+            evidence: nil,
+            generatedSourceMode: GenerationMode.design.rawValue
+        )
+        XCTAssertEqual(untouched.transcriptSource, .unknown)
+        XCTAssertEqual(untouched.generatedSourceMode, "design")
+        XCTAssertEqual(untouched.referenceLanguage, .english)
+
+        review.userEditedTranscript("")
+        XCTAssertFalse(review.allowsSave(transcript: ""), "An emptied transcript is not saved silently")
+        XCTAssertTrue(review.offersAudioOnlyConfirmation)
+        review.confirmAudioOnly()
+        XCTAssertTrue(review.allowsSave(transcript: ""))
+        let audioOnly = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .auto,
+            reviewState: review,
+            evidence: nil,
+            generatedSourceMode: GenerationMode.design.rawValue
+        )
+        XCTAssertEqual(audioOnly.transcriptSource, .audioOnly)
+        XCTAssertEqual(audioOnly.generatedSourceMode, "design")
+
+        let personal = try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+            referenceLanguage: .english,
+            reviewState: ReferenceTranscriptionReviewState(initialTranscript: script),
+            evidence: nil
+        )
+        XCTAssertNil(personal.generatedSourceMode, "A recorded or imported reference has no generated source")
+    }
+
     private func attempt(
         status: VoiceClipTranscriber.RecognitionFinalStatus,
         digest: String? = nil

@@ -265,6 +265,35 @@ final class StudioGenerationCoordinator {
     }
 }
 
+/// The one rule every Studio mode switch follows (A10-02): while a take or a
+/// long-form project runs, the Studio stays on (or returns to) the mode that
+/// owns it, so its live card and Stop stay reachable. Each target canvas
+/// renders only its own coordinator, so another mode would show an idle,
+/// disabled Generate with no Stop. iOS routes the capsule selector and every
+/// programmatic route (Voices, recorder, import, History) through
+/// `AppModel.requestStudioMode(_:)`; the Mac shell applies the same rule in its
+/// one destination router.
+enum StudioModeSwitchPolicy {
+    /// The mode whose work holds the engine: a running long-form project's, or
+    /// the coordinator whose attempt is running, finalizing or cancelling.
+    @MainActor
+    static func busyMode(
+        coordinators: [StudioGenerationCoordinator],
+        longFormMode: GenerationMode?
+    ) -> GenerationMode? {
+        if let longFormMode { return longFormMode }
+        return coordinators.first(where: { $0.isGenerating })?.mode
+    }
+
+    static func allows(
+        switchingTo target: GenerationMode,
+        from current: GenerationMode,
+        busyMode: GenerationMode?
+    ) -> Bool {
+        target == current || busyMode == nil || busyMode == target
+    }
+}
+
 /// VoiceOver announcements for Studio generation state changes (PA-20, IOS-12):
 /// one per transition of an attempt (started, take ready, failed, stopped),
 /// never for progress, so a long take or project is not narrated. Focus stays

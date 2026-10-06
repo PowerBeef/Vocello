@@ -2,7 +2,8 @@ import Foundation
 import Observation
 import QwenVoiceCore
 
-/// Shell state of the macOS window, the desktop twin of the iOS `AppModel`:
+/// Shell state of the macOS app, the desktop twin of the iOS `AppModel`, owned
+/// by `QwenVoiceApp` beside the engine store and the player (A10-04):
 /// the selected destination (persisted across launches), the pending Settings
 /// highlight after a disabled mode was clicked, the window-toolbar state the
 /// History and Saved Voices screens read, the per-mode
@@ -67,6 +68,13 @@ final class MacAppModel {
         }
     }
 
+    /// A line batch or long-form project is running. Its sheet is presented by
+    /// its mode's Studio screen, so leaving that screen would dismiss the sheet
+    /// and cancel the run: the shell refuses navigation meanwhile (A14-05).
+    var isBatchWorkActive: Bool {
+        lineBatch.isProcessing || longForm.isProcessing
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = AppDefaults.store) {
@@ -90,26 +98,5 @@ final class MacAppModel {
 
     func persistVoiceCloningSavedVoiceID(_ id: String?) {
         defaults.set(id ?? "", forKey: Self.lastVoiceCloningSavedVoiceIDKey)
-    }
-}
-
-/// The designed take of the current brief that can become a saved voice; it
-/// stays offered only while the brief, delivery and script still match.
-struct VoiceDesignSavedVoiceCandidate: Equatable {
-    let audioPath: String
-    let transcript: String
-    let voiceDescription: String
-    let emotion: String
-    let text: String
-    private(set) var savedVoiceName: String?
-
-    var isSaved: Bool { savedVoiceName != nil }
-
-    func matches(draft: VoiceDesignDraft) -> Bool {
-        voiceDescription == draft.voiceDescription && emotion == draft.emotion && text == draft.text
-    }
-
-    mutating func markSaved(as voiceName: String) {
-        savedVoiceName = voiceName
     }
 }

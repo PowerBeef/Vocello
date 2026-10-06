@@ -4,7 +4,8 @@ import XCTest
 
 /// The pure half of the macOS line batch (`MacLineBatchRequest`, items and
 /// outcome): line splitting, validation, History naming, the per-line engine
-/// request and the retry derivations, all without an engine.
+/// request, the retry derivations and the terminal Studio transition, all
+/// without an engine.
 @MainActor
 final class MacLineBatchRunnerTests: XCTestCase {
     private let suiteName = "vocello.tests.MacLineBatchRunner"
@@ -200,6 +201,65 @@ final class MacLineBatchRunnerTests: XCTestCase {
 
         XCTAssertEqual(MacLineBatchOutcome.completed(items: items).retryFailedLines, ["Failed"])
         XCTAssertEqual(MacLineBatchOutcome.failed(items: items, message: "boom").savedAudioPaths, ["/tmp/saved.wav"])
+    }
+
+    // MARK: - Terminal transition (A14-01)
+
+    /// A batch the engine cancelled itself (memory pressure) never went
+    /// through the runner's cancel, so no barrier will close its attempt: the
+    /// outcome must, or the mode stays generating and refuses every start.
+    func testABatchTheEngineCancelledClosesItsStudioAttempt() throws {
+        let coordinator = StudioGenerationCoordinator(mode: .custom)
+        let attempt = try XCTUnwrap(coordinator.start(live: nil))
+
+        MacLineBatchOutcome.cancelled(items: [], restartFailedMessage: nil)
+            .closeAttempt(attempt, on: coordinator, lastSaved: nil)
+
+        XCTAssertFalse(coordinator.isGenerating)
+        XCTAssertNil(coordinator.activeAttempt)
+        XCTAssertNil(coordinator.errorMessage)
+        XCTAssertNil(coordinator.lastCompletedOutput)
+        XCTAssertNotNil(coordinator.start(live: nil), "The next take is no longer refused as busy")
+    }
+
+    /// A user cancellation stays nonterminal until the engine barrier reports.
+    func testAUserCancelledBatchLeavesItsAttemptToTheEngineBarrier() throws {
+        let coordinator = StudioGenerationCoordinator(mode: .design)
+        let attempt = try XCTUnwrap(coordinator.start(live: nil))
+        XCTAssertEqual(coordinator.requestCancellation(), attempt)
+
+        MacLineBatchOutcome.cancelled(items: [], restartFailedMessage: nil)
+            .closeAttempt(attempt, on: coordinator, lastSaved: nil)
+
+        XCTAssertTrue(coordinator.isGenerating, "Only the barrier ends a user cancellation")
+        XCTAssertTrue(coordinator.completeCancellation(attempt: attempt))
+        XCTAssertFalse(coordinator.isGenerating)
+    }
+
+    func testACompletedBatchShowsItsLastLineAndAFailedOneItsMessage() throws {
+        let completed = StudioGenerationCoordinator(mode: .clone)
+        let completedAttempt = try XCTUnwrap(completed.start(live: nil))
+        let lastSaved = IOSStudioInlinePlayerItem(
+            generationID: UUID(),
+            audioURL: URL(fileURLWithPath: "/nonexistent/batch-line-two.wav"),
+            voiceName: "Ryan",
+            modeLabel: "Voice Cloning",
+            mode: .clone,
+            transcript: "Line two",
+            waveformSeed: 3,
+            autoplay: false
+        )
+        MacLineBatchOutcome.completed(items: []).closeAttempt(completedAttempt, on: completed, lastSaved: lastSaved)
+        XCTAssertFalse(completed.isGenerating)
+        XCTAssertEqual(completed.lastCompletedOutput, lastSaved)
+
+        let failed = StudioGenerationCoordinator(mode: .clone)
+        let failedAttempt = try XCTUnwrap(failed.start(live: nil))
+        MacLineBatchOutcome.failed(items: [], message: "Line two failed.")
+            .closeAttempt(failedAttempt, on: failed, lastSaved: lastSaved)
+        XCTAssertFalse(failed.isGenerating)
+        XCTAssertEqual(failed.errorMessage, "Line two failed.")
+        XCTAssertNil(failed.lastCompletedOutput)
     }
 
     func testProgressFractionIsBoundedByTheTotal() {

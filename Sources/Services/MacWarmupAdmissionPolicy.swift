@@ -18,10 +18,10 @@ import QwenVoiceCore
 /// semantics (`os_proc_available_memory`) that don't translate to a Mac
 /// with a compressor and swap.
 ///
-/// Rollout: `QWENVOICE_MAC_WARM_GATE=off|records|enforce` (default
-/// `records` while validating; flip the default to `enforce` after one
-/// validation cycle). `records` computes + logs the verdict but lets warms
-/// proceed.
+/// Mode: `enforce` by default (a deferred warm does not run; see
+/// `Mode.fromEnvironment`). The registered `QWENVOICE_MAC_WARM_GATE`
+/// diagnostic overrides it with `off`, or with `records`, which computes and
+/// logs the verdict but lets the warm proceed.
 @MainActor
 final class MacWarmupAdmissionPolicy {
     enum Verdict: Equatable {

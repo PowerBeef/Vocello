@@ -3,7 +3,9 @@ import QwenVoiceCore
 
 /// Pure request-boundary assembly shared by the macOS Studio coordinators and their
 /// deterministic tests. Keeping this outside SwiftUI makes the exact language, Clone
-/// conditioning, seed, and variation values observable before the engine call.
+/// conditioning, seed, and variation values observable before the engine call. Every
+/// mode streams on the app interval, like the iOS views, long-form segments and the
+/// warm request for the same draft (A14-06).
 enum MacStudioGenerationRequestFactory {
     static func voiceDesign(
         modelID: String,
@@ -21,6 +23,7 @@ enum MacStudioGenerationRequestFactory {
             text: text,
             outputPath: outputPath,
             shouldStream: true,
+            streamingInterval: GenerationSemantics.appStreamingInterval,
             streamingTitle: String(text.prefix(40)),
             languageHint: language.rawValue,
             payload: .design(
@@ -53,6 +56,7 @@ enum MacStudioGenerationRequestFactory {
             text: text,
             outputPath: outputPath,
             shouldStream: true,
+            streamingInterval: GenerationSemantics.appStreamingInterval,
             streamingTitle: String(text.prefix(40)),
             languageHint: language.rawValue,
             payload: .clone(

@@ -65,6 +65,14 @@ enum MacStudioSingleTakeRunner {
             defer { coordinator.finish(attempt: attempt) }
             do {
                 await prepare()
+                // A14-03: a cancellation accepted while priming ran (its barrier
+                // finds no generation and returns at once) ends the take here,
+                // before it is submitted and claims the shared player, which a
+                // take started meanwhile may already own.
+                guard !Task.isCancelled, coordinator.isAttemptRunning,
+                      coordinator.activeAttempt == attempt else {
+                    throw CancellationError()
+                }
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
                     hooks: hooks,

@@ -4,8 +4,8 @@ import QwenVoiceCore
 struct IOSGenerateContainerView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngine: TTSEngineStore
+    // Only the model manager: an unused engine or player environment object
+    // would re-evaluate this container on every publish (A10-06).
     @EnvironmentObject private var modelManager: ModelManagerViewModel
     private var selectorRailHeight: CGFloat {
         dynamicTypeSize.isAccessibilitySize ? 136 : 44
@@ -18,14 +18,6 @@ struct IOSGenerateContainerView: View {
     @Binding var voiceDesignDraft: VoiceDesignDraft
     @Binding var voiceCloningDraft: VoiceCloningDraft
     @Binding var pendingVoiceCloningHandoff: PendingVoiceCloningHandoff?
-
-    private var hasAnyInstalledModel: Bool {
-        modelManager.statuses.values.contains { status in
-            if case .installed = status { return true }
-            if case .updateAvailable = status { return true }
-            return false
-        }
-    }
 
     var body: some View {
         IOSStudioShellScreen(

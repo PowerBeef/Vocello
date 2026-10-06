@@ -261,4 +261,92 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
             IOSAppLanguage.shared.presentation.backgroundTakeStopped
         )
     }
+
+    // MARK: - Design save candidate (A10-01)
+
+    /// The take's own audio, script and brief stay offered as a saved voice
+    /// only while the draft still asks for that take; once saved it is no
+    /// longer offered.
+    func testTheDesignSaveCandidateMatchesOnlyItsOwnTakeUntilSaved() {
+        var candidate = VoiceDesignSavedVoiceCandidate(
+            audioPath: "/nonexistent/design-take.wav",
+            transcript: "A quiet morning by the harbor.",
+            voiceDescription: "A warm, mature narrator.",
+            emotion: "Speak calmly.",
+            text: "A quiet morning by the harbor."
+        )
+        XCTAssertTrue(candidate.matches(
+            voiceDescription: "A warm, mature narrator.",
+            emotion: "Speak calmly.",
+            text: "A quiet morning by the harbor."
+        ))
+        XCTAssertFalse(candidate.matches(
+            voiceDescription: "A warm, mature narrator.",
+            emotion: "Speak calmly.",
+            text: "An edited script."
+        ), "A script edited after the take never pairs the old audio with new text")
+        XCTAssertFalse(candidate.matches(
+            voiceDescription: "A bright young voice.",
+            emotion: "Speak calmly.",
+            text: "A quiet morning by the harbor."
+        ))
+        XCTAssertFalse(candidate.matches(
+            voiceDescription: "A warm, mature narrator.",
+            emotion: "Speak with urgency.",
+            text: "A quiet morning by the harbor."
+        ))
+
+        XCTAssertFalse(candidate.isSaved)
+        candidate.markSaved(as: "Warm Narrator")
+        XCTAssertTrue(candidate.isSaved)
+        XCTAssertEqual(candidate.savedVoiceName, "Warm Narrator")
+    }
+
+    // MARK: - Mode switching (A10-02)
+
+    /// While a take runs, is cancelling or is being saved, only its own mode
+    /// may be selected, from the capsule selector or any programmatic route;
+    /// once it is terminal every mode is free again.
+    func testOnlyTheBusyModeCanBeSelectedWhileItsAttemptLasts() throws {
+        let custom = StudioGenerationCoordinator(mode: .custom)
+        let design = StudioGenerationCoordinator(mode: .design)
+        let clone = StudioGenerationCoordinator(mode: .clone)
+        let coordinators = [custom, design, clone]
+        func busyMode() -> GenerationMode? {
+            StudioModeSwitchPolicy.busyMode(coordinators: coordinators, longFormMode: nil)
+        }
+        func allows(_ target: GenerationMode, from current: GenerationMode) -> Bool {
+            StudioModeSwitchPolicy.allows(switchingTo: target, from: current, busyMode: busyMode())
+        }
+
+        XCTAssertNil(busyMode())
+        XCTAssertTrue(allows(.clone, from: .design))
+
+        let attempt = try XCTUnwrap(design.start())
+        XCTAssertEqual(busyMode(), .design)
+        XCTAssertFalse(allows(.clone, from: .design), "A Voices tap cannot leave a running take")
+        XCTAssertFalse(allows(.custom, from: .design))
+        XCTAssertTrue(allows(.design, from: .design))
+        XCTAssertTrue(allows(.design, from: .clone), "Returning to the running take stays possible")
+
+        XCTAssertTrue(design.beginFinalization(attempt: attempt))
+        XCTAssertFalse(allows(.clone, from: .design), "A take being saved still owns the Studio")
+        XCTAssertTrue(design.complete(completedItem(), attempt: attempt))
+        XCTAssertNil(busyMode())
+        XCTAssertTrue(allows(.clone, from: .design))
+
+        let cancelled = try XCTUnwrap(clone.start())
+        XCTAssertNotNil(clone.requestCancellation())
+        XCTAssertFalse(allows(.custom, from: .clone), "A pending cancellation barrier still owns the Studio")
+        XCTAssertTrue(clone.completeCancellation(attempt: cancelled))
+        XCTAssertTrue(allows(.custom, from: .clone))
+    }
+
+    func testARunningLongFormProjectOwnsTheStudioMode() {
+        let coordinators = [StudioGenerationCoordinator(mode: .custom)]
+        let busy = StudioModeSwitchPolicy.busyMode(coordinators: coordinators, longFormMode: .clone)
+        XCTAssertEqual(busy, .clone)
+        XCTAssertFalse(StudioModeSwitchPolicy.allows(switchingTo: .custom, from: .clone, busyMode: busy))
+        XCTAssertTrue(StudioModeSwitchPolicy.allows(switchingTo: .clone, from: .custom, busyMode: busy))
+    }
 }

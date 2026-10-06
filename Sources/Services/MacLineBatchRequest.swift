@@ -3,9 +3,10 @@ import QwenVoiceCore
 
 /// Value types of the macOS line batch (`MacLineBatchRunner`): the request the
 /// sheet assembles from a `MacBatchSheetConfiguration`, the per-line item, the
-/// progress the sheet renders and the terminal outcome. Everything here is
-/// pure so the seed, identity, validation and retry derivations are testable
-/// without an engine (the runner file adds the `TTSModel` convenience).
+/// progress the sheet renders and the terminal outcome with the Studio attempt
+/// transition it makes. Everything here runs without an engine, so the seed,
+/// identity, validation, retry and terminal derivations are testable (the
+/// runner file adds the `TTSModel` convenience).
 struct MacLineBatchItem: Identifiable, Equatable {
     enum Status: Equatable {
         case pending
@@ -78,6 +79,32 @@ enum MacLineBatchOutcome: Equatable {
 
     var savedAudioPaths: [String] {
         items.compactMap(\.audioPath)
+    }
+
+    /// Makes the batch's Studio attempt terminal for this outcome: the dock
+    /// card mirrors the last saved line, exactly like a single take; a failure
+    /// surfaces its message. A cancelled batch closes its attempt too (A14-01):
+    /// when the user cancelled, `finish` is a no-op and the engine barrier
+    /// closes the attempt; when the engine cancelled the take itself (memory
+    /// pressure), nothing else would, and the mode would stay generating.
+    @MainActor
+    func closeAttempt(
+        _ attempt: StudioGenerationAttemptToken,
+        on coordinator: StudioGenerationCoordinator,
+        lastSaved: IOSStudioInlinePlayerItem?
+    ) {
+        switch self {
+        case .completed:
+            if let lastSaved {
+                coordinator.complete(lastSaved, attempt: attempt)
+            } else {
+                coordinator.finish(attempt: attempt)
+            }
+        case .failed(_, let message):
+            coordinator.fail(message, attempt: attempt)
+        case .cancelled:
+            coordinator.finish(attempt: attempt)
+        }
     }
 }
 

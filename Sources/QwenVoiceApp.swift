@@ -17,9 +17,15 @@ struct QwenVoiceApp: App {
     @StateObject private var appCommandRouter = AppCommandRouter.shared
     @StateObject private var generationLibraryEvents = GenerationLibraryEvents.shared
     @StateObject private var appStartupCoordinator = AppStartupCoordinator()
+    /// The shell model lives as long as the engine store and the player it
+    /// drives (A10-04): its Studio coordinators, line batch and long-form
+    /// project outlive the window, so a window closed during a take reopens
+    /// on that take with its Stop, not on idle coordinators over a busy engine.
+    @State private var appModel: MacAppModel
 
     init() {
         MacInterfaceLanguage.bootstrap(IOSAppLanguage(defaults: AppDefaults.store))
+        _appModel = State(initialValue: MacAppModel())
         let modelManager = ModelManagerViewModel()
         _modelManager = State(initialValue: modelManager)
         do {
@@ -83,44 +89,50 @@ struct QwenVoiceApp: App {
                 .disabled(!audioPlayer.hasAudio && !appCommandRouter.isGenerationActive)
             }
 
+            // A14-05: a running line batch or long-form project keeps its
+            // Studio screen, which presents its sheet; leaving it would dismiss
+            // the sheet and cancel the run, so navigation waits for it.
             CommandMenu(MacInterfaceText.menuNavigate) {
-                Button(MacInterfaceText.menuBuiltInVoice) {
-                    appCommandRouter.navigate(to: .customVoice)
-                }
-                .keyboardShortcut("1", modifiers: .command)
+                Group {
+                    Button(MacInterfaceText.menuBuiltInVoice) {
+                        appCommandRouter.navigate(to: .customVoice)
+                    }
+                    .keyboardShortcut("1", modifiers: .command)
 
-                Button(MacInterfaceText.menuVoiceDesign) {
-                    appCommandRouter.navigate(to: .voiceDesign)
-                }
-                .keyboardShortcut("2", modifiers: .command)
+                    Button(MacInterfaceText.menuVoiceDesign) {
+                        appCommandRouter.navigate(to: .voiceDesign)
+                    }
+                    .keyboardShortcut("2", modifiers: .command)
 
-                Button(MacInterfaceText.menuVoiceCloning) {
-                    appCommandRouter.navigate(to: .voiceCloning)
-                }
-                .keyboardShortcut("3", modifiers: .command)
+                    Button(MacInterfaceText.menuVoiceCloning) {
+                        appCommandRouter.navigate(to: .voiceCloning)
+                    }
+                    .keyboardShortcut("3", modifiers: .command)
 
-                Button(MacInterfaceText.menuHistory) {
-                    appCommandRouter.navigate(to: .history)
-                }
-                .keyboardShortcut("4", modifiers: .command)
+                    Button(MacInterfaceText.menuHistory) {
+                        appCommandRouter.navigate(to: .history)
+                    }
+                    .keyboardShortcut("4", modifiers: .command)
 
-                Button(MacInterfaceText.menuSavedVoices) {
-                    appCommandRouter.navigate(to: .voices)
-                }
-                .keyboardShortcut("5", modifiers: .command)
+                    Button(MacInterfaceText.menuSavedVoices) {
+                        appCommandRouter.navigate(to: .voices)
+                    }
+                    .keyboardShortcut("5", modifiers: .command)
 
-                // Named for what it opens (MAC-23): the Settings destination.
-                Button(MacInterfaceText.settingsTitle) {
-                    appCommandRouter.navigate(to: .settings)
-                }
-                .keyboardShortcut("6", modifiers: .command)
+                    // Named for what it opens (MAC-23): the Settings destination.
+                    Button(MacInterfaceText.settingsTitle) {
+                        appCommandRouter.navigate(to: .settings)
+                    }
+                    .keyboardShortcut("6", modifiers: .command)
 
-                Divider()
+                    Divider()
 
-                Button(MacInterfaceText.menuSearchHistory) {
-                    appCommandRouter.searchHistory()
+                    Button(MacInterfaceText.menuSearchHistory) {
+                        appCommandRouter.searchHistory()
+                    }
+                    .keyboardShortcut("f", modifiers: .command)
                 }
-                .keyboardShortcut("f", modifiers: .command)
+                .disabled(appCommandRouter.isNavigationLocked)
             }
 
             // File menu additions
@@ -157,7 +169,7 @@ struct QwenVoiceApp: App {
                     minHeight: MacShellMetrics.diagnosticsMinSize.height
                 )
             } else if let ttsEngineStore {
-                ContentView(ttsEngineStore: ttsEngineStore)
+                ContentView(ttsEngineStore: ttsEngineStore, appModel: appModel)
                     .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
                     .environmentObject(ttsEngineStore)
                     .environmentObject(audioPlayer)

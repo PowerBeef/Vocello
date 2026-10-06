@@ -23,7 +23,10 @@ struct ContentView: View {
     @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
-    @State private var appModel: MacAppModel
+    /// App-scoped (A10-04): `QwenVoiceApp` owns it beside the engine store and
+    /// the player, so a take, line batch or long-form project outlives a
+    /// closed window. Observation tracks it through the reads in `body`.
+    private let appModel: MacAppModel
     /// Tracks sidebar visibility while each Studio mode owns its inline transport.
     @State private var sidebarColumnVisibility: NavigationSplitViewVisibility = .all
     @State private var customVoiceDraft = CustomVoiceDraft()
@@ -51,17 +54,16 @@ struct ContentView: View {
         )
     }
 
-    init(ttsEngineStore: TTSEngineStore) {
+    init(ttsEngineStore: TTSEngineStore, appModel: MacAppModel) {
         self.ttsEngineStore = ttsEngineStore
+        self.appModel = appModel
         _gateModel = StateObject(
             wrappedValue: GenerationPerformanceGateModel(store: ttsEngineStore)
         )
-        let appModel = MacAppModel()
         var initialDraft = VoiceCloningDraft()
         if let storedVoiceID = appModel.restoredVoiceCloningSavedVoiceID {
             initialDraft.selectedSavedVoiceID = storedVoiceID
         }
-        _appModel = State(initialValue: appModel)
         _voiceCloningDraft = State(initialValue: initialDraft)
     }
 
@@ -184,11 +186,14 @@ struct ContentView: View {
             )
         }
         .onReceive(appCommandRouter.historySearchRequests) { _ in
-            selectDestination(.history)
+            guard selectDestination(.history) else { return }
             appModel.historySearchFocusRequested = true
         }
         .onChange(of: isAnyGenerationActive, initial: true) { _, isActive in
             appCommandRouter.isGenerationActive = isActive
+        }
+        .onChange(of: appModel.isBatchWorkActive, initial: true) { _, isActive in
+            appCommandRouter.isNavigationLocked = isActive
         }
     }
 
@@ -357,14 +362,21 @@ struct ContentView: View {
 
     // MARK: - Helper methods
 
-    private func selectDestination(_ item: SidebarItem) {
+    /// The one route to a destination; returns whether the shell is (or now
+    /// is) on `item`.
+    @discardableResult
+    private func selectDestination(_ item: SidebarItem) -> Bool {
+        guard appModel.selectedItem != item else { return true }
+        // A running line batch or long-form project keeps its Studio screen,
+        // which presents its sheet (A14-05).
+        if appModel.isBatchWorkActive { return false }
         // Like iOS, a missing model leaves its Studio accessible with an Install
         // action. Only switching generation modes during a take is blocked.
         if item.generationMode != nil, item != appModel.lastStudioItem,
-           ttsEngineStore.hasActiveGeneration { return }
-        guard appModel.selectedItem != item else { return }
+           ttsEngineStore.hasActiveGeneration { return false }
         AppPerformanceSignposts.emit("Sidebar Selection")
         appModel.selectedItem = item
+        return true
     }
 
     private func scheduleGenerationWarmupIfNeeded(

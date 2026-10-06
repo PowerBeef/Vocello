@@ -16,6 +16,9 @@ import QwenVoiceCore
 ///   switch to Custom mode, jump to Studio tab.
 /// - Tap a saved voice → stage `PendingVoiceCloningHandoff`, switch to
 ///   Clone mode, jump to Studio.
+/// - While a take or long-form project runs in another mode the switch is
+///   refused (`AppModel.requestStudioMode`, A10-02): nothing is staged and the
+///   Studio tab shows the running work with its Stop.
 struct VoicesScreen: View {
     @Environment(AppModel.self) private var appModel
 
@@ -27,20 +30,22 @@ struct VoicesScreen: View {
         IOSVoicesView(
             selectedTab: $appModel.tab,
             onSelectBuiltInSpeaker: { speaker in
-                appModel.customVoiceDraft.selectedSpeaker = speaker.id
-                appModel.customVoiceDraft.selectedLanguage = TTSModel.qwenLanguage(forSpeaker: speaker.id)
-                appModel.studioMode = .custom
+                if appModel.requestStudioMode(.custom) {
+                    appModel.customVoiceDraft.selectedSpeaker = speaker.id
+                    appModel.customVoiceDraft.selectedLanguage = TTSModel.qwenLanguage(forSpeaker: speaker.id)
+                }
                 appModel.tab = .studio
             },
             onSelectSavedVoice: { voice in
-                appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
-                    savedVoiceID: voice.id,
-                    wavPath: voice.wavPath,
-                    transcript: (try? voice.loadTranscript()) ?? "",
-                    transcriptLoadError: nil,
-                    referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
-                )
-                appModel.studioMode = .clone
+                if appModel.requestStudioMode(.clone) {
+                    appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
+                        savedVoiceID: voice.id,
+                        wavPath: voice.wavPath,
+                        transcript: (try? voice.loadTranscript()) ?? "",
+                        transcriptLoadError: nil,
+                        referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
+                    )
+                }
                 appModel.tab = .studio
             },
             onRecordNewVoice: { newVoiceFlow = .recording },
@@ -53,14 +58,15 @@ struct VoicesScreen: View {
                     newVoiceFlow = nil
                     // Same staging as tapping a saved voice → Clone mode, pre-loaded; carry the
                     // reference language as conditioning metadata without changing Clone output.
-                    appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
-                        savedVoiceID: voice.id,
-                        wavPath: voice.wavPath,
-                        transcript: transcript,
-                        transcriptLoadError: nil,
-                        referenceLanguage: referenceLanguage
-                    )
-                    appModel.studioMode = .clone
+                    if appModel.requestStudioMode(.clone) {
+                        appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
+                            savedVoiceID: voice.id,
+                            wavPath: voice.wavPath,
+                            transcript: transcript,
+                            transcriptLoadError: nil,
+                            referenceLanguage: referenceLanguage
+                        )
+                    }
                     appModel.tab = .studio
                 },
                 onDismiss: { newVoiceFlow = nil }

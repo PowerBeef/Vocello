@@ -23,36 +23,16 @@ enum MacShellStatus: Equatable {
     case crashed(String)
 }
 
-/// Maps the engine snapshot to the footer status.
+/// Maps the engine snapshot to the footer status. The engine keeps a visible
+/// error until a later operation succeeds or the user dismisses it, so busy
+/// states win over it (A14-04): a retry after a failed take shows its own
+/// activity, not the previous error as a crash or an activity title.
 enum MacShellStatusPresentation {
     static func resolve(
         snapshot: TTSEngineSnapshot,
         prefersInlinePresentation: Bool
     ) -> MacShellStatus {
-        if case .starting = snapshot.loadState {
-            if let visibleErrorMessage = snapshot.visibleErrorMessage,
-               !visibleErrorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return .running(
-                    MacShellActivity(
-                        label: visibleErrorMessage,
-                        fraction: nil,
-                        presentation: .standaloneCard
-                    )
-                )
-            }
-            return .starting
-        }
-
-        if let visibleErrorMessage = snapshot.visibleErrorMessage,
-           !visibleErrorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return snapshot.isReady ? .error(visibleErrorMessage) : .crashed(visibleErrorMessage)
-        }
-
         switch snapshot.loadState {
-        case .idle:
-            return snapshot.isReady ? .standby : .starting
-        case .loaded:
-            return snapshot.isReady ? .idle : .starting
         case .starting:
             if snapshot.isReady {
                 return .running(
@@ -74,6 +54,20 @@ enum MacShellStatusPresentation {
             )
         case .failed(let message):
             return snapshot.isReady ? .error(message) : .crashed(message)
+        case .idle, .loaded:
+            break
+        }
+
+        if let visibleErrorMessage = snapshot.visibleErrorMessage,
+           !visibleErrorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return snapshot.isReady ? .error(visibleErrorMessage) : .crashed(visibleErrorMessage)
+        }
+
+        switch snapshot.loadState {
+        case .loaded:
+            return snapshot.isReady ? .idle : .starting
+        default:
+            return snapshot.isReady ? .standby : .starting
         }
     }
 }

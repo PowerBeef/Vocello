@@ -16,6 +16,9 @@ final class AppCommandRouter: ObservableObject {
     /// shell keeps it current; the Stop command reads it to choose between
     /// cancelling the take and stopping playback.
     @Published var isGenerationActive = false
+    /// Whether a line batch or long-form project is running (A14-05). Its
+    /// sheet belongs to its Studio screen, so the Navigate commands wait.
+    @Published var isNavigationLocked = false
 
     private init() {}
 

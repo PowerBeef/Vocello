@@ -114,14 +114,16 @@ struct RootView: View {
             IOSRecordVoiceSheet(
                 onEnrolled: { voice, transcript, referenceLanguage in
                     appModel.isCloneReferenceRecorderPresented = false
-                    appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
-                        savedVoiceID: voice.id,
-                        wavPath: voice.wavPath,
-                        transcript: transcript,
-                        transcriptLoadError: nil,
-                        referenceLanguage: referenceLanguage
-                    )
-                    appModel.studioMode = .clone
+                    // A10-02: staged only when the Studio may be on Clone.
+                    if appModel.requestStudioMode(.clone) {
+                        appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
+                            savedVoiceID: voice.id,
+                            wavPath: voice.wavPath,
+                            transcript: transcript,
+                            transcriptLoadError: nil,
+                            referenceLanguage: referenceLanguage
+                        )
+                    }
                 },
                 onDismiss: {
                     appModel.cancelCloneReferenceRecording()
@@ -133,14 +135,16 @@ struct RootView: View {
                 importedReference: presentation.reference,
                 onEnrolled: { voice, transcript, referenceLanguage in
                     importedVoicePresentation = nil
-                    appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
-                        savedVoiceID: voice.id,
-                        wavPath: voice.wavPath,
-                        transcript: transcript,
-                        transcriptLoadError: nil,
-                        referenceLanguage: referenceLanguage
-                    )
-                    appModel.studioMode = .clone
+                    // A10-02: staged only when the Studio may be on Clone.
+                    if appModel.requestStudioMode(.clone) {
+                        appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
+                            savedVoiceID: voice.id,
+                            wavPath: voice.wavPath,
+                            transcript: transcript,
+                            transcriptLoadError: nil,
+                            referenceLanguage: referenceLanguage
+                        )
+                    }
                     appModel.tab = .studio
                 },
                 onDismiss: {

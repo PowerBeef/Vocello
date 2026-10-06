@@ -216,6 +216,59 @@ final class MacStudioSingleTakeRunnerTests: XCTestCase {
         XCTAssertTrue(engine.completedResults.isEmpty)
     }
 
+    /// A14-03: a cancellation accepted while on-demand clone priming runs has
+    /// no generation to wait for, so its barrier returns at once and the
+    /// coordinator goes idle while the prime unwinds. The stale take must end
+    /// when priming returns, before it is submitted, so it never takes the
+    /// shared player from a take started meanwhile.
+    func testACancellationAcceptedWhilePrimingEndsTheTakeBeforeItIsSubmitted() async throws {
+        let coordinator = StudioGenerationCoordinator(mode: .clone)
+        let stale = FakeEngine()
+        let next = FakeEngine()
+        let priming = PrimingGate()
+        // Without the recheck the stale take would reach the engine; let it
+        // answer at once so the test fails instead of waiting.
+        stale.finishGeneration(.failure(CancellationError()))
+
+        let plan = try makePlan()
+        XCTAssertTrue(MacStudioSingleTakeRunner.start(
+            plan: plan,
+            estimatedAudioDuration: 4,
+            coordinator: coordinator,
+            hooks: stale,
+            prepare: { await priming.run() },
+            onCompleted: { stale.completedResults.append($0) }
+        ))
+        let staleTask = try XCTUnwrap(coordinator.generationTask)
+        await priming.waitUntilRunning()
+
+        let cancellation = MacStudioSingleTakeRunner.cancel(
+            coordinator: coordinator,
+            stopLivePreview: {},
+            barrier: {}
+        )
+        let barrierTask = try XCTUnwrap(cancellation)
+        await barrierTask.value
+        XCTAssertFalse(coordinator.isGenerating, "The barrier found no generation and closed the attempt")
+
+        XCTAssertTrue(startTake(plan, on: coordinator, engine: next), "A new take starts while the prime unwinds")
+        let nextAttempt = try XCTUnwrap(coordinator.activeAttempt)
+        let nextTask = try XCTUnwrap(coordinator.generationTask)
+
+        priming.finish()
+        await staleTask.value
+        XCTAssertTrue(stale.events.isEmpty, "The cancelled take is never submitted")
+        XCTAssertTrue(stale.requests.isEmpty)
+        XCTAssertTrue(stale.completedResults.isEmpty)
+        XCTAssertEqual(coordinator.activeAttempt, nextAttempt, "The stale take leaves the new attempt alone")
+        XCTAssertTrue(coordinator.isAttemptRunning)
+
+        next.finishGeneration(.success(next.result))
+        await nextTask.value
+        XCTAssertEqual(next.events, [.submitted, .generated, .completed])
+        XCTAssertEqual(next.completedResults, [next.result])
+    }
+
     func testCancelWithoutARunningAttemptTouchesNothing() {
         let coordinator = StudioGenerationCoordinator(mode: .custom)
         var previewStops = 0
@@ -371,6 +424,37 @@ final class MacStudioSingleTakeRunnerTests: XCTestCase {
                 autoplay: false,
                 ownedBySharedPlayer: true
             )
+        }
+    }
+
+    /// On-demand clone priming that runs until the test finishes it.
+    @MainActor
+    private final class PrimingGate {
+        private var isRunning = false
+        private var runningWaiters: [CheckedContinuation<Void, Never>] = []
+        private var waiter: CheckedContinuation<Void, Never>?
+        private var isFinished = false
+
+        func run() async {
+            isRunning = true
+            let waiters = runningWaiters
+            runningWaiters = []
+            for waiter in waiters {
+                waiter.resume()
+            }
+            guard !isFinished else { return }
+            await withCheckedContinuation { waiter = $0 }
+        }
+
+        func waitUntilRunning() async {
+            guard !isRunning else { return }
+            await withCheckedContinuation { runningWaiters.append($0) }
+        }
+
+        func finish() {
+            isFinished = true
+            waiter?.resume()
+            waiter = nil
         }
     }
 

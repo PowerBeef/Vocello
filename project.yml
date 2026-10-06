@@ -465,6 +465,8 @@ targets:
       - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
       - path: Sources/iOS/Studio/StudioGenerationItems.swift
       - path: Sources/Services/MacLineBatchRequest.swift
+      # A14-04: the sidebar footer status over the engine snapshot.
+      - path: Sources/Views/Shell/MacShellStatus.swift
       - path: Sources/Services/MacModelVariantResolution.swift
       - path: Sources/Services/LongTextGenerationRouter.swift
       - path: Sources/Models/ScriptTextState.swift

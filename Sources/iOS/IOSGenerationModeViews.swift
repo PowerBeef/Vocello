@@ -2,6 +2,15 @@ import SwiftUI
 import UniformTypeIdentifiers
 import QwenVoiceCore
 
+/// The recognizer reads the whole script (up to the long-form limit), so after
+/// the typing pause it runs off the main actor, as on the Mac (MAC-22, A10-05).
+enum IOSPromptLanguageDetection {
+    @concurrent
+    static func detect(_ text: String) async -> Qwen3SupportedLanguage {
+        PromptLanguageDetector.detect(text)
+    }
+}
+
 /// Two-letter UPPERCASE abbreviations for the Studio selector pills
 /// (`IOSStudioSetupChip`). Voice/Delivery/brief use the first two letters of
 /// the selected value; Language reuses the standard language-code tag
@@ -197,7 +206,9 @@ struct IOSCustomVoiceView: View {
             .task(id: promptText) {
                 try? await Task.sleep(for: .milliseconds(350))
                 guard !Task.isCancelled else { return }
-                detectedPromptLanguage = PromptLanguageDetector.detect(promptText)
+                let detected = await IOSPromptLanguageDetection.detect(promptText)
+                guard !Task.isCancelled else { return }
+                detectedPromptLanguage = detected
             }
     }
 
@@ -554,10 +565,16 @@ struct IOSVoiceDesignView: View {
     @Binding var selectedTab: IOSAppTab
     @Binding var draft: VoiceDesignDraft
     @State private var isScriptFocused = false
-    @State private var saveSheetAudioPath: String?
+    /// The take the open save sheet enrolls, fixed when the sheet opens. The
+    /// candidate itself lives on `AppModel` beside the coordinator's completed
+    /// take, so a remount keeps both or neither (A10-01).
+    @State private var saveSheetCandidate: VoiceDesignSavedVoiceCandidate?
     @State private var isSaveSheetPresented = false
     @State private var saveSheetSuggestedName = ""
     @State private var saveSheetTranscript = ""
+    /// The shared review of the take's transcript (A8-02): the script is the
+    /// existing transcript; an emptied one needs the audio-only confirmation.
+    @State private var saveSheetReview = ReferenceTranscriptionReviewState(initialTranscript: "")
     @State private var saveError: String?
     /// Voice that was just enrolled but has quality warnings; user is
     /// being asked whether to keep or discard. Mirrors the macOS
@@ -698,8 +715,17 @@ struct IOSVoiceDesignView: View {
         return scriptLimitState.helperMessage
     }
 
+    /// The completed take of this brief, delivery and script that can still
+    /// become a saved voice; editing any of them withdraws it, as on the Mac.
+    private var currentSavedVoiceCandidate: VoiceDesignSavedVoiceCandidate? {
+        guard let candidate = appModel.designSavedVoiceCandidate,
+              candidate.matches(draft: draft),
+              !candidate.isSaved else { return nil }
+        return candidate
+    }
+
     private var canSaveVoice: Bool {
-        ttsEngine.supportsSavedVoiceMutation && saveSheetAudioPath != nil
+        ttsEngine.supportsSavedVoiceMutation && currentSavedVoiceCandidate != nil
     }
 
     private var isGenerationActive: Bool {
@@ -713,7 +739,9 @@ struct IOSVoiceDesignView: View {
             .task(id: promptText) {
                 try? await Task.sleep(for: .milliseconds(350))
                 guard !Task.isCancelled else { return }
-                detectedPromptLanguage = PromptLanguageDetector.detect(promptText)
+                let detected = await IOSPromptLanguageDetection.detect(promptText)
+                guard !Task.isCancelled else { return }
+                detectedPromptLanguage = detected
             }
             .sheet(isPresented: Binding(
                 get: { isSaveSheetPresented },
@@ -726,17 +754,23 @@ struct IOSVoiceDesignView: View {
                     }
                 }
             )) {
-                if let saveSheetAudioPath {
+                if let saveSheetCandidate {
                     IOSSaveVoiceSheet(
                         title: IOSInterfaceText.saveGeneratedVoice,
                         suggestedName: $saveSheetSuggestedName,
                         transcript: $saveSheetTranscript,
+                        transcriptionReview: saveSheetReview,
                         errorMessage: saveError,
                         // A save or a review decision in flight holds the
                         // sheet open, so Cancel never closes a save that still
                         // commits the voice.
                         isSaving: isSavingVoice || isVoiceReviewDecisionInFlight,
-                        clipAudioURL: URL(fileURLWithPath: saveSheetAudioPath),
+                        clipAudioURL: URL(fileURLWithPath: saveSheetCandidate.audioPath),
+                        onTranscriptEdited: { saveSheetReview.userEditedTranscript($0) },
+                        onUseAudioOnly: {
+                            saveSheetTranscript = ""
+                            saveSheetReview.confirmAudioOnly()
+                        },
                         onCancel: {
                             guard !isSavingVoice, !isVoiceReviewDecisionInFlight else { return }
                             isSaveSheetPresented = false
@@ -752,14 +786,21 @@ struct IOSVoiceDesignView: View {
                                 defer { isSavingVoice = false }
                                 saveError = nil
                                 do {
+                                    let transcript = saveSheetTranscript
+                                        .trimmingCharacters(in: .whitespacesAndNewlines)
                                     let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
                                         name: saveSheetSuggestedName,
-                                        audioPath: saveSheetAudioPath,
-                                        transcript: saveSheetTranscript.isEmpty ? nil : saveSheetTranscript,
+                                        audioPath: saveSheetCandidate.audioPath,
+                                        transcript: transcript.isEmpty ? nil : transcript,
                                         replacingVoiceID: nil,
-                                        enrollmentMetadata: PreparedVoiceEnrollmentMetadata(
-                                            referenceLanguage: nil, transcriptSource: .manual,
-                                            generatedSourceMode: "design"
+                                        // The shared builder records the review's
+                                        // provenance (A8-02); the design source
+                                        // keeps the export provenance.
+                                        enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
+                                            referenceLanguage: PromptLanguageDetector.detect(transcript),
+                                            reviewState: saveSheetReview,
+                                            evidence: nil,
+                                            generatedSourceMode: GenerationMode.design.rawValue
                                         )
                                     )
                                     if candidate.qualityWarnings.isEmpty {
@@ -873,6 +914,12 @@ struct IOSVoiceDesignView: View {
 
     private func completeDesignedVoiceSave(_ voice: PreparedVoice) {
         let usedTranscript = saveSheetTranscript
+        // The saved take is no longer offered, as on the Mac.
+        if var candidate = appModel.designSavedVoiceCandidate,
+           candidate.audioPath == saveSheetCandidate?.audioPath {
+            candidate.markSaved(as: voice.name)
+            appModel.designSavedVoiceCandidate = candidate
+        }
         savedVoicesViewModel.insertOrReplace(voice)
         isSaveSheetPresented = false
         saveSheetSuggestedName = ""
@@ -889,21 +936,23 @@ struct IOSVoiceDesignView: View {
         saveError ?? IOSInterfaceText.qualitySummary(candidate.qualityWarnings)
     }
 
-    /// Open the (existing) save-voice sheet for the just-generated designed clip, prefilled with a
-    /// name suggestion from the brief + the script as the transcript.
+    /// Open the (existing) save-voice sheet for the take's own clip, prefilled with a name
+    /// suggestion from its brief and its script as the transcript (A10-01).
     private func presentSaveDesignedVoice() {
-        guard canSaveVoice else { return }
-        if saveSheetSuggestedName.isEmpty {
-            saveSheetSuggestedName = suggestedDesignedVoiceName()
-        }
-        if saveSheetTranscript.isEmpty {
-            saveSheetTranscript = promptText
-        }
+        guard ttsEngine.supportsSavedVoiceMutation, let candidate = currentSavedVoiceCandidate else { return }
+        saveSheetCandidate = candidate
+        saveSheetSuggestedName = suggestedDesignedVoiceName(brief: candidate.voiceDescription)
+        saveSheetTranscript = candidate.transcript
+        saveSheetReview = ReferenceTranscriptionReviewState(
+            initialTranscript: candidate.transcript,
+            readySource: .existing
+        )
+        saveError = nil
         isSaveSheetPresented = true
     }
 
-    private func suggestedDesignedVoiceName() -> String {
-        let brief = draft.voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func suggestedDesignedVoiceName(brief rawBrief: String) -> String {
+        let brief = rawBrief.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !brief.isEmpty else { return IOSInterfaceText.designedMeta }
         let words = brief.split(whereSeparator: { $0 == " " || $0.isNewline }).prefix(3)
         let joined = words.joined(separator: " ")
@@ -919,6 +968,8 @@ struct IOSVoiceDesignView: View {
         guard let voice = savedVoicesViewModel.voices.first(where: { $0.id == result.voice.id }) else {
             return
         }
+        // A10-02: staged only when the Studio may switch to Clone.
+        guard appModel.requestStudioMode(.clone) else { return }
         appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
             savedVoiceID: voice.id,
             wavPath: voice.wavPath,
@@ -926,7 +977,6 @@ struct IOSVoiceDesignView: View {
             transcriptLoadError: nil,
             referenceLanguage: PromptLanguageDetector.detect(result.transcript)
         )
-        appModel.studioMode = .clone
         appModel.tab = .studio
     }
 
@@ -1237,8 +1287,15 @@ struct IOSVoiceDesignView: View {
             waveformSeed: seed,
             estimatedAudioDuration: LivePreviewEstimate(text: promptText)?.estimatedAudioDuration ?? 0
         )) else { return }
-        // A new take replaces the previous take's saved-voice banner.
+        // A new take replaces the previous take's saved-voice banner and its
+        // save candidate; the completed take publishes its own (A10-01).
         savedDesignedResult = nil
+        appModel.designSavedVoiceCandidate = nil
+        let appModel = appModel
+        let candidateVoiceDescription = draft.voiceDescription
+        let candidateEmotion = draft.emotion
+        let candidateText = draft.text
+        let candidateTranscript = promptText
 
         let hooks = IOSStudioSingleTakeGenerationHooks(
             engine: ttsEngine,
@@ -1283,12 +1340,22 @@ struct IOSVoiceDesignView: View {
                     isCancellationRequested: { coordinator.isCancellationRequested(for: attempt) },
                     beginFinalization: { coordinator.beginFinalization(attempt: attempt) }
                 )
-                saveSheetAudioPath = result.audioPath
                 let accepted = coordinator.complete(
                     hooks.inlinePlayerItem(for: result, plan: plan),
                     attempt: attempt
                 )
-                if accepted { IOSHaptics.success() }
+                if accepted {
+                    // The take's own audio, script and brief, held beside the
+                    // completed take so a remount keeps the Save action (A10-01).
+                    appModel.designSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
+                        audioPath: result.audioPath,
+                        transcript: candidateTranscript,
+                        voiceDescription: candidateVoiceDescription,
+                        emotion: candidateEmotion,
+                        text: candidateText
+                    )
+                    IOSHaptics.success()
+                }
             } catch is CancellationError {
                 // The shared executor owns cancellation cleanup and telemetry.
             } catch {
@@ -1573,7 +1640,9 @@ struct IOSVoiceCloningView: View {
             .task(id: promptText) {
                 try? await Task.sleep(for: .milliseconds(350))
                 guard !Task.isCancelled else { return }
-                detectedPromptLanguage = PromptLanguageDetector.detect(promptText)
+                let detected = await IOSPromptLanguageDetection.detect(promptText)
+                guard !Task.isCancelled else { return }
+                detectedPromptLanguage = detected
             }
             .task(id: savedVoices) {
                 await refreshSavedVoiceLanguages()

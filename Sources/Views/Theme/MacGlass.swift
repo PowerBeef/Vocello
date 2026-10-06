@@ -24,22 +24,25 @@ extension EnvironmentValues {
 /// glass sites shipped without the Reduce Transparency check until
 /// 2026-08-05); routing every glass surface through this container makes the
 /// invariant structural instead of remembered.
-struct GatedGlass<Glass: View, Fallback: View>: View {
+///
+/// The decision reaches the content as a value (`isGated`) rather than as two
+/// branches, so a gate flip at a generation start or finish never rebuilds
+/// the wrapped subtree (A13-52).
+struct GatedGlass<Content: View>: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.generationPerformanceGate) private var performanceGate
 
-    @ViewBuilder let glass: () -> Glass
-    @ViewBuilder let fallback: () -> Fallback
+    @ViewBuilder let content: (_ isGated: Bool) -> Content
 
     var body: some View {
+        content(isGated)
+    }
+
+    private var isGated: Bool {
         #if QW_UI_LIQUID
-        if !reduceTransparency, !performanceGate {
-            glass()
-        } else {
-            fallback()
-        }
+        return reduceTransparency || performanceGate
         #else
-        fallback()
+        return true
         #endif
     }
 }
@@ -54,24 +57,14 @@ private struct MacGatedGlassModifier<S: Shape>: ViewModifier {
     let gatedFill: Color?
 
     func body(content: Content) -> some View {
-        GatedGlass {
+        GatedGlass { isGated in
             content.modifier(
                 VocelloGlassSurface(
                     tint: tint,
                     shape: shape,
                     interactive: interactive,
                     gatedFill: gatedFill,
-                    isGated: false
-                )
-            )
-        } fallback: {
-            content.modifier(
-                VocelloGlassSurface(
-                    tint: tint,
-                    shape: shape,
-                    interactive: interactive,
-                    gatedFill: gatedFill,
-                    isGated: true
+                    isGated: isGated
                 )
             )
         }

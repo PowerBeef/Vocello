@@ -41,24 +41,6 @@ struct IOSGenerateModeViewport<Custom: View, Design: View, Clone: View>: View {
     }
 }
 
-struct IOSComposerCardAction: View {
-    let title: String
-    let systemImage: String
-    let tint: Color
-    let accessibilityIdentifier: String?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.footnote.weight(.semibold))
-                .lineLimit(1)
-        }
-        .iosAdaptiveUtilityButtonStyle(tint: tint)
-        .accessibilityIdentifier(accessibilityIdentifier ?? "")
-    }
-}
-
 struct IOSStudioComposerCard<Accessory: View, Setup: View>: View {
     @ScaledMetric(relativeTo: .body) private var sharedPromptLineCount = 3
     @ScaledMetric(relativeTo: .body) private var contentPadding = 12
@@ -317,8 +299,6 @@ struct IOSCompactInlineNotice: View {
     /// `nil` lets the message wrap fully where losing its tail would lose meaning.
     var lineLimit: Int? = 2
 
-    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
-
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
 
@@ -338,11 +318,13 @@ struct IOSCompactInlineNotice: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background {
-            // Solid-fill backing painted unconditionally so Reduce
-            // Transparency sees a real surface instead of a transparent gap.
-            shape.fill(tint.opacity(reduceTransparency ? 0.18 : 0.06))
+            // A 6% wash under the glass in every state.
+            shape.fill(tint.opacity(0.06))
         }
-        .iosGatedGlass(tint: tint.opacity(0.06), in: shape)
+        // A13-03: the gate owns the solid fallback. Its fill composites with
+        // the wash above to the same 18% backing Reduce Transparency showed,
+        // and the performance gate now gets it too instead of the bare wash.
+        .iosGatedGlass(tint: tint.opacity(0.06), in: shape, gatedFill: tint.opacity(0.128))
         .overlay {
             shape
                 .stroke(Color.white.opacity(0.14), lineWidth: 0.75)

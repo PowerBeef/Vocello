@@ -789,33 +789,30 @@ private struct IOSSelectionFieldChromeModifier: ViewModifier {
     }
 }
 
-private struct IOSCompactTextProminentUtilityButtonStyle: ButtonStyle {
-    @ScaledMetric(relativeTo: .body) private var horizontalPadding = 16
-    @ScaledMetric(relativeTo: .body) private var verticalPadding = 8
+/// The utility buttons' system glass styles behind the shared glass gate
+/// (A13-01): while Reduce Transparency or the fixed-refresh generation gate
+/// holds, the same capsule renders as the solid bordered style. These buttons
+/// carry no state, so the style swap at a gate flip loses nothing.
+private struct IOSAdaptiveUtilityButtonStyleModifier: ViewModifier {
+    let prominent: Bool
+    let tint: Color?
 
-    let tint: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        let shape = Capsule(style: .continuous)
-        let foreground = configuration.isPressed ? Theme.Text.onAccentPressed : Theme.Text.onAccent
-
-        return configuration.label
-            .foregroundStyle(foreground)
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, verticalPadding)
-            .iosSubtleGlassSurface(
-                in: shape,
-                tint: tint,
-                fill: tint.opacity(configuration.isPressed ? 0.18 : 0.15),
-                strokeOpacity: configuration.isPressed ? 0.26 : 0.20,
-                interactive: true
-            )
-            .overlay {
-                shape
-                    .stroke(tint.opacity(configuration.isPressed ? 0.34 : 0.28), lineWidth: 0.9)
+    func body(content: Content) -> some View {
+        IOSGlassGate { isGated in
+            if isGated {
+                // The glass styles' capsule, drawn solid.
+                if prominent {
+                    content.buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
+                } else {
+                    content.buttonStyle(.bordered).buttonBorderShape(.capsule)
+                }
+            } else if prominent {
+                content.buttonStyle(.glassProminent)
+            } else {
+                content.buttonStyle(.glass)
             }
-            .opacity(configuration.isPressed ? 0.96 : 1.0)
-            .iosAppAnimation(Theme.Motion.press, value: configuration.isPressed)
+        }
+        .tint(tint)
     }
 }
 
@@ -837,32 +834,7 @@ extension View {
     }
 
     func iosAdaptiveUtilityButtonStyle(prominent: Bool = false, tint: Color? = nil) -> some View {
-        iosAdaptiveUtilityButtonStyle(
-            prominent: prominent,
-            compactTextProminent: false,
-            tint: tint
-        )
-    }
-
-    func iosAdaptiveUtilityButtonStyle(
-        prominent: Bool = false,
-        compactTextProminent: Bool = false,
-        tint: Color? = nil
-    ) -> some View {
-        Group {
-            if compactTextProminent {
-                self.buttonStyle(
-                    IOSCompactTextProminentUtilityButtonStyle(
-                        tint: tint ?? Theme.Brand.gold
-                    )
-                )
-            } else if prominent {
-                self.buttonStyle(.glassProminent)
-            } else {
-                self.buttonStyle(.glass)
-            }
-        }
-        .tint(tint)
+        modifier(IOSAdaptiveUtilityButtonStyleModifier(prominent: prominent, tint: tint))
     }
 }
 
@@ -935,36 +907,4 @@ extension IOSBottomPrimaryActionInset where Accessory == EmptyView {
         self.accessory = EmptyView()
         self.content = content()
     }
-}
-
-// Shared wrappers so the studio dock / section group / capsule selector do not
-// each re-declare their glass parameters. All of these route through
-// `iosSubtleGlassSurface` so material tuning stays in one place.
-extension View {
-    func iosDockGlass(tint: Color, cornerRadius: CGFloat = 30) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return self.iosSubtleGlassSurface(
-            in: shape,
-            tint: tint,
-            fill: Theme.Surface.glassFloating.opacity(0.68),
-            strokeOpacity: 0.12,
-            interactive: true
-        )
-    }
-
-    func iosSectionGlass(tint: Color, cornerRadius: CGFloat = 24) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return self.iosSubtleGlassSurface(
-            in: shape,
-            tint: tint,
-            fill: Theme.Surface.glassSurface.opacity(0.58),
-            strokeOpacity: 0.10
-        )
-    }
-
-    // R2 cleanup (2026-05-21): `iosSelectorPillGlass(tint:)` and
-    // `iosSelectorRailGlass(tint:)` were inlined into `IOSCapsuleSelector`
-    // when its rail / pill recipe was rewritten to match the design's
-    // `.vc-mode-segmented` spec. They had no other callers and have been
-    // removed.
 }

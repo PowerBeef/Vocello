@@ -27,7 +27,7 @@ enum Theme {
         static let gold = VocelloTheme.Brand.gold
 
         /// 18% wash of the brand color used for chip / tab tints.
-        static let goldSoft = gold.opacity(0.18)
+        static let goldSoft = VocelloTheme.Brand.goldSoft
 
         /// Per-mode hues.
         static let modeCustom = gold
@@ -43,7 +43,7 @@ enum Theme {
         static let library = VocelloTheme.Brand.library
 
         /// 12% gold glow behind primary actions.
-        static let goldGlow = gold.opacity(0.12)
+        static let goldGlow = VocelloTheme.Brand.goldGlow
 
         /// 7% warm-white sheen for highlighted chrome.
         static let highlightGlow = VocelloTheme.Brand.highlightGlow
@@ -105,10 +105,10 @@ enum Theme {
         static let selectorStroke = VocelloTheme.Surface.selectorStroke
 
         /// Solid base under glassy card surfaces (was `IOSAppTheme.glassSurfaceFill`).
-        static let glassSurface = panel.opacity(0.82)
+        static let glassSurface = VocelloTheme.Surface.glassSurface
 
         /// Muted sibling for secondary glass surfaces (was `IOSAppTheme.glassSurfaceFillMuted`).
-        static let glassSurfaceMuted = panelMuted.opacity(0.74)
+        static let glassSurfaceMuted = VocelloTheme.Surface.glassSurfaceMuted
 
         /// Tab bar / dock smoke. Shipped truth (D10b): the app has always used
         /// this darker smoke (was `IOSBrandTheme.tabBarBackground`); the
@@ -116,27 +116,27 @@ enum Theme {
         static let dock = VocelloTheme.Surface.dock
 
         /// Glassy floating panel fill (was `IOSAppTheme.glassFloatingFill`).
-        static let glassFloating = dock.opacity(0.66)
+        static let glassFloating = VocelloTheme.Surface.glassFloating
 
         /// Hairline divider between rows on dark surfaces.
-        static let hairline = Color.white.opacity(0.08)
+        static let hairline = VocelloTheme.Surface.hairline
 
         /// Outer stroke on glassy cards.
-        static let glassOuterStroke = Color.white.opacity(0.12)
-        static let glassInnerStroke = Color.white.opacity(0.04)
+        static let glassOuterStroke = VocelloTheme.Surface.glassOuterStroke
+        static let glassInnerStroke = VocelloTheme.Surface.glassInnerStroke
     }
 
     // MARK: - Text colors
 
     enum Text {
-        /// `#F2EFEA` — primary text on dark canvas.
+        /// `#F2F0EB` — primary text on dark canvas.
         static let primary = VocelloTheme.Text.primary
         static let primaryUIColor = UIColor(red: 0.95, green: 0.94, blue: 0.92, alpha: 1)
 
-        /// `#C5BFAE` — warm-tinted secondary text.
+        /// `#C7C2B8` — warm-tinted secondary text.
         static let secondary = VocelloTheme.Text.secondary
 
-        /// `#7E7868` — warm-tinted tertiary text (placeholders, eyebrows).
+        /// `#9E998C` — warm-tinted tertiary text (placeholders, eyebrows).
         static let tertiary = VocelloTheme.Text.tertiary
         /// Cool-gray placeholder text. Lightened from (0.50,0.53,0.58) so it clears
         /// WCAG-AA 4.5:1 on every surface incl. the lightest field fill (was 3.84:1
@@ -159,46 +159,37 @@ enum Theme {
     // MARK: - Accent helpers
 
     /// Accent surface fill (10% opacity tint).
-    static func accentSurface(_ tint: Color) -> Color { tint.opacity(0.10) }
+    static func accentSurface(_ tint: Color) -> Color { VocelloTheme.accentSurface(tint) }
 
     /// Strong mode-tinted stroke. 34% per the May 2026 macOS chip audit.
-    static func accentStroke(_ tint: Color) -> Color { tint.opacity(0.34) }
+    static func accentStroke(_ tint: Color) -> Color { VocelloTheme.accentStroke(tint) }
 
     /// Accent wash for selected chips / pills. 20% per the audit.
-    static func accentWash(_ tint: Color) -> Color { tint.opacity(0.20) }
+    static func accentWash(_ tint: Color) -> Color { VocelloTheme.accentWash(tint) }
 
     /// Mode-aware glass tint. 14% for tinted, 10% for neutral.
     static func glassTint(_ tint: Color? = nil, intensity: Double = 1.0) -> Color {
-        let base = tint ?? Brand.silver
-        let opacity = (tint == nil) ? 0.10 : 0.14
-        return base.opacity(opacity * intensity)
+        VocelloTheme.glassTint(tint, intensity: intensity)
     }
 
     static func accentGradient(_ tint: Color) -> LinearGradient {
-        LinearGradient(
-            colors: [tint, tint.opacity(0.78)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        VocelloTheme.accentGradient(tint)
     }
 
     static func softGradient(for tint: Color) -> LinearGradient {
-        LinearGradient(
-            colors: [tint.opacity(0.92), tint.opacity(0.62)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        VocelloTheme.softGradient(for: tint)
     }
 
-    // MARK: - Corner radii (matches tokens.css)
+    // MARK: - Shared scales (A13-04: forwarded, never re-declared)
 
-    enum Radius {
-        static let chip: CGFloat = 8
-        static let input: CGFloat = 10
-        static let card: CGFloat = 16
-        static let stage: CGFloat = 22
-        static let sheetGrabber: CGFloat = 3
-    }
+    /// Corner radii (matches tokens.css), incl. the shared `row`.
+    typealias Radius = VocelloTheme.Radius
+    /// Border widths.
+    typealias Stroke = VocelloTheme.Stroke
+    /// Named shadow tiers.
+    typealias Elevation = VocelloTheme.Elevation
+    /// Dimming levels.
+    typealias Opacity = VocelloTheme.Opacity
 
     // MARK: - Hit targets
 
@@ -211,58 +202,13 @@ enum Theme {
         static let minimum: CGFloat = 44
     }
 
-    // MARK: - Spacing (4-pt grid)
+    /// Spacing on the 4-pt grid, plus the shared off-grid `tight` and `snug`.
+    typealias Spacing = VocelloTheme.Spacing
 
-    enum Spacing {
-        static let xs: CGFloat = 4
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
-    }
+    /// Motion curves (cubic-bezier 0.22, 1, 0.36, 1): state changes, sheets,
+    /// the selector pill and the selection micro-motion absorbed from
+    /// `IOSSelectionMotion` (D10b).
+    typealias Motion = VocelloTheme.Motion
 
-    // MARK: - Motion (cubic-bezier 0.22, 1, 0.36, 1)
-
-    enum Motion {
-        /// 150ms ease-out for state changes (chip selection, focus).
-        static let stateChange = Animation.easeOut(duration: 0.15)
-        /// 220ms ease-out — the default sheet + state-transition curve.
-        static let easeOut = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.22)
-        /// 320ms ease-out for the mode-segmented pill slide.
-        static let modePillSlide = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.32)
-        /// 360ms ease-out for bottom-sheet slide-up.
-        static let sheetSlideUp = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.36)
-        /// 420ms ease-out for full-screen Player sheet slide-up.
-        static let playerSheetSlideUp = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.42)
-        /// Spring used for the now-playing rail.
-        static let miniPlayerSlide = Animation.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)
-        /// Tap-press response.
-        static let press = Animation.easeOut(duration: 0.09)
-
-        // Selection micro-motion (absorbed from `IOSSelectionMotion`, D10b).
-
-        /// 140ms ease-out for row / chip selection.
-        static let selection = Animation.easeOut(duration: 0.14)
-        /// Snappy slide for the selector pill thumb.
-        static let selectorPill = Animation.snappy(duration: 0.22, extraBounce: 0)
-        /// 120ms ease-out for selector label emphasis.
-        static let selectorLabel = Animation.easeOut(duration: 0.12)
-        /// 100ms ease-out for transient highlights.
-        static let highlight = Animation.easeOut(duration: 0.10)
-        /// 120ms ease-out for disclosure expand / collapse.
-        static let disclosure = Animation.easeOut(duration: 0.12)
-        /// Spring for floating panels (voice picker, popovers).
-        static let floatingPanel = Animation.spring(response: 0.30, dampingFraction: 0.84, blendDuration: 0.12)
-        /// 180ms ease-in-out crossfade between mode content.
-        static let modeCrossfade = Animation.easeInOut(duration: 0.18)
-    }
-
-    // MARK: - Branding
-
-    enum Branding {
-        static let productName = "Vocello"
-        static let headerMarkAssetName = "VocelloHeaderMark"
-    }
+    typealias Branding = VocelloTheme.Branding
 }

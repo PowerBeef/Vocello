@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shape factories over the shared radii (iOS `ThemeShape` forwards here).
+/// Shape factories over the shared radii, read directly by both apps.
 enum VocelloShape {
     /// A shape nested inside another by `inset` points, keeping the two
     /// corners concentric — a segmented control's selected pill inside its

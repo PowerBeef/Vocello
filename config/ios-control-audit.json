@@ -119,13 +119,6 @@
       "interactiveOccurrenceCount": 3
     },
     {
-      "path": "Sources/iOS/IOSGenerationSharedViews.swift",
-      "screen": "Shared generation player",
-      "scenario": "stateful",
-      "reason": "Shared mini-player playback and seek controls are exercised on run-owned audio.",
-      "interactiveOccurrenceCount": 1
-    },
-    {
       "path": "Sources/iOS/IOSSettingsViews.swift",
       "screen": "Settings and model rows",
       "scenario": "stateful",

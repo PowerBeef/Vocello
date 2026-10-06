@@ -2,9 +2,15 @@ import SwiftUI
 
 /// The glass-or-solid body shared by both platforms' gates. The caller owns
 /// the gate decision (`isGated`: Reduce Transparency or the generation
-/// performance gate); this modifier only renders one of the two branches, so
-/// the visual language stays identical on iOS (`IOSGatedGlassModifier`) and
-/// macOS (`GatedGlass`).
+/// performance gate); this modifier only renders it, so the visual language
+/// stays identical on iOS (`IOSGatedGlassModifier`) and macOS (`GatedGlass`).
+///
+/// One view tree for both states (A13-52): the gate varies the glass by value
+/// (`Glass.identity` applies no effect) and the solid backing by a background,
+/// never by branching around `content`. A branch would give the wrapped
+/// subtree a new identity on every gate flip, which happens at each generation
+/// start and finish, and drop its state, focus and keyboard (a text field
+/// in the subtree, or a whole sheet panel).
 struct VocelloGlassSurface<S: Shape>: ViewModifier {
     let tint: Color
     let shape: S
@@ -14,18 +20,19 @@ struct VocelloGlassSurface<S: Shape>: ViewModifier {
     let gatedFill: Color?
     let isGated: Bool
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if isGated {
-            if let gatedFill {
-                content.background { shape.fill(gatedFill) }
-            } else {
-                content
+        content
+            .background {
+                if isGated, let gatedFill {
+                    shape.fill(gatedFill)
+                }
             }
-        } else if interactive {
-            content.glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            content.glassEffect(.regular.tint(tint), in: shape)
-        }
+            .glassEffect(glass, in: shape)
+    }
+
+    private var glass: Glass {
+        guard !isGated else { return .identity }
+        let tinted = Glass.regular.tint(tint)
+        return interactive ? tinted.interactive() : tinted
     }
 }

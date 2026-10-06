@@ -21,21 +21,37 @@ struct IOSGatedGlassModifier<S: Shape>: ViewModifier {
     /// already include a solid backing.
     let gatedFill: Color?
 
+    func body(content: Content) -> some View {
+        // The gate decision stays in `IOSGlassGate`; the shared body renders it
+        // identically on both platforms
+        // (`Sources/SharedSupport/Views/VocelloGlassSurface.swift`).
+        IOSGlassGate { isGated in
+            content.modifier(
+                VocelloGlassSurface(
+                    tint: tint,
+                    shape: shape,
+                    interactive: interactive,
+                    gatedFill: gatedFill,
+                    isGated: isGated
+                )
+            )
+        }
+    }
+}
+
+/// The iOS glass decision itself, the twin of the macOS `GatedGlass`: Reduce
+/// Transparency or the fixed-refresh generation performance gate means no
+/// glass. It hands the decision to its content as a value, so a surface that
+/// is not a `glassEffect` (the system glass button styles, A13-01) follows the
+/// same gate without restating the condition.
+struct IOSGlassGate<Content: View>: View {
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
     @Environment(\.iosGenerationPerformanceGate) private var performanceGate
 
-    func body(content: Content) -> some View {
-        // The gate decision stays here; the shared body renders it identically
-        // on both platforms (`Sources/SharedSupport/Views/VocelloGlassSurface.swift`).
-        content.modifier(
-            VocelloGlassSurface(
-                tint: tint,
-                shape: shape,
-                interactive: interactive,
-                gatedFill: gatedFill,
-                isGated: reduceTransparency || performanceGate
-            )
-        )
+    @ViewBuilder let content: (_ isGated: Bool) -> Content
+
+    var body: some View {
+        content(reduceTransparency || performanceGate)
     }
 }
 
@@ -114,29 +130,4 @@ extension View {
             )
         )
     }
-}
-
-// MARK: - Common shape factories
-
-/// The shared shape factories (`Sources/SharedSupport/Theme/VocelloShape.swift`).
-typealias ThemeShape = VocelloShape
-
-// MARK: - Accent foreground convenience
-
-extension Color {
-    /// The "ink on accent" color used for primary CTA labels.
-    static var themeOnAccent: Color { Theme.Text.onAccent }
-    static var themeOnAccentPressed: Color { Theme.Text.onAccentPressed }
-}
-
-// MARK: - Modern haptics (sensoryFeedback wrapper)
-
-/// Centralized trigger keys for `.sensoryFeedback(...trigger:)`.
-///
-/// Per `references/latest-apis.md` (iOS 17+) views should prefer the
-/// declarative `sensoryFeedback` modifier over imperative
-/// `UISelectionFeedbackGenerator()` calls. Use these enum values as the
-/// trigger payload so the same event fires once per state transition.
-enum ThemeFeedback {
-    enum Selection: Equatable { case fire(UUID) }
 }

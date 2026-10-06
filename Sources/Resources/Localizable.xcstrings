@@ -71244,6 +71244,138 @@
           }
         }
       }
+    },
+    "vocello.export.restore_cancelled": {
+      "comment": "iOS export purchase: the user dismissed the Apple Account prompt during Restore Purchases; access is unchanged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore cancelled. No export access was changed."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration annulée. L’accès aux exports n’a pas changé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauración cancelada. El acceso a la exportación no ha cambiado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellung abgebrochen. Der Exportzugriff wurde nicht geändert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristino annullato. L’accesso all’esportazione non è cambiato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauração cancelada. O acesso à exportação não foi alterado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复已取消。导出权限未改变。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元をキャンセルしました。書き出し権限は変わっていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복원이 취소되었습니다. 내보내기 권한은 바뀌지 않았습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановление отменено. Доступ к экспорту не изменён."
+          }
+        }
+      }
+    },
+    "vocello.settings.refinement.savedOutputsAccessUnverified": {
+      "comment": "Saved outputs row when a Design or Clone take finished before purchase access was verified, so it was not copied to the folder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchase access was still being checked, so the last take stayed in History. Export it from History."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’accès à l’achat était encore en cours de vérification : la dernière prise est restée dans l’historique. Exportez-la depuis l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El acceso a la compra aún se estaba comprobando, así que la última toma se quedó en el historial. Expórtala desde el historial."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Kaufzugriff wurde noch geprüft, daher blieb die letzte Aufnahme im Verlauf. Exportiere sie aus dem Verlauf."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’accesso all’acquisto era ancora in verifica, quindi l’ultimo take è rimasto nella cronologia. Esportalo dalla cronologia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O acesso à compra ainda estava sendo verificado, então a última tomada ficou no histórico. Exporte-a pelo histórico."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "购买权限仍在检查中，因此上一条音频保留在历史记录中。请从历史记录导出。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入権限を確認中だったため、前回のテイクは履歴に残りました。履歴から書き出してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "구매 권한을 확인하는 중이어서 마지막 테이크가 기록에 남았습니다. 기록에서 내보내세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Право покупки ещё проверялось, поэтому последний дубль остался в истории. Экспортируйте его из истории."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

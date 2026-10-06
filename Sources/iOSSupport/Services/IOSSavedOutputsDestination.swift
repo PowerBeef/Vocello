@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 
 /// The user-chosen "Saved outputs" destination for generated clips (iOS).
 ///
@@ -27,6 +28,9 @@ public enum IOSSavedOutputsDestination {
         case folderUnavailable
         /// The folder resolved, but the clip could not be written into it.
         case copyFailed
+        /// A Design or Clone clip finished while purchase access was still being checked, so it
+        /// stayed in History (A4-01). A copy that lands once the check verifies access clears it.
+        case accessUnverified
     }
 
     /// `UserDefaults` key for the chosen folder's display name — exposed so the Settings row can
@@ -101,12 +105,45 @@ public enum IOSSavedOutputsDestination {
         return url
     }
 
+    /// App entry over the one purchase owner. A paid-mode clip that finishes before the launch
+    /// entitlement scan settles is not skipped in silence (A4-01): the Settings row reports that it
+    /// stayed in History, and the copy waits for that scan, a local StoreKit read that never
+    /// prompts or purchases. Verified access copies it (clearing the report); a scan that finds no
+    /// unlock leaves it in History, as any locked paid-mode clip stays, and ends the report.
+    @MainActor @discardableResult
+    static func exportIfConfigured(
+        internalAudioPath: String, generationMode: String,
+        purchases: IOSExportPurchaseState
+    ) -> Task<Bool, Never>? {
+        guard purchases.access == .checking, hasExternalFolder,
+              !purchases.permits([IOSExportProvenance(generationMode: generationMode)]) else {
+            return exportIfConfigured(internalAudioPath: internalAudioPath, generationMode: generationMode) {
+                purchases.permits([$0])
+            }
+        }
+        recordExportIssue(.accessUnverified)
+        let resolvedBookmark = defaults.data(forKey: Keys.bookmark)
+        return Task { @MainActor in
+            await purchases.refresh()
+            // A folder chosen or cleared meanwhile ended this clip's report.
+            guard defaults.data(forKey: Keys.bookmark) == resolvedBookmark else { return false }
+            if let copy = exportIfConfigured(
+                internalAudioPath: internalAudioPath, generationMode: generationMode,
+                permits: { purchases.permits([$0]) }
+            ) {
+                return await copy.value
+            }
+            if purchases.access == .locked, exportIssue == .accessUnverified { recordExportIssue(nil) }
+            return false
+        }
+    }
+
     /// Copy a just-generated clip into the chosen folder. No-op when the destination is "On My
     /// iPhone". Off the main actor; a failure never propagates to the caller, and it is recorded
     /// as `exportIssue` (a landed copy clears it).
     ///
-    /// `permits` is the export policy for the clip's provenance: the app passes the one verified
-    /// StoreKit owner (`IOSSavedOutputsDestination+Commerce.swift`), tests pass a fixture. Returns
+    /// `permits` is the export policy for the clip's provenance: the app reaches it through the
+    /// `purchases:` entry above (`IOSSavedOutputsDestination+Commerce.swift`), tests pass a fixture. Returns
     /// `nil` when nothing leaves the app (no folder, or the policy refuses), otherwise the copy task,
     /// which resolves to whether the file landed in the folder.
     @MainActor @discardableResult
@@ -115,7 +152,8 @@ public enum IOSSavedOutputsDestination {
         permits: (IOSExportProvenance) -> Bool
     ) -> Task<Bool, Never>? {
         // Never start a purchase, change the folder, or fail generation here.
-        // Unknown/checking access keeps paid output in internal History.
+        // Unknown/checking access keeps paid output in internal History (the
+        // `purchases:` entry reports it and copies once access is verified).
         guard permits(IOSExportProvenance(generationMode: generationMode)) else { return nil }
         guard let folder = resolveFolderURL() else {
             if hasExternalFolder { recordExportIssue(.folderUnavailable) }
@@ -134,15 +172,14 @@ public enum IOSSavedOutputsDestination {
             var coordinationError: NSError?
             var copied = false
             // Coordinated write so iCloud-Drive destinations sync cleanly.
+            // A3-01: the bytes are staged beside a same-named file in the user's folder and replace
+            // it only once complete, so a failed copy never costs the user that file.
             NSFileCoordinator().coordinate(
                 writingItemAt: destination,
                 options: .forReplacing,
                 error: &coordinationError
             ) { writeURL in
-                if FileManager.default.fileExists(atPath: writeURL.path) {
-                    try? FileManager.default.removeItem(at: writeURL)
-                }
-                copied = (try? FileManager.default.copyItem(at: source, to: writeURL)) != nil
+                copied = (try? StagedFileCopy.copy(from: source, to: writeURL)) != nil
             }
             let landed = copied && coordinationError == nil
             await MainActor.run {

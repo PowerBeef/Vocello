@@ -28,7 +28,7 @@ private final class GateFixtureExportClient: IOSExportPurchaseClient {
         return .cancelled
     }
 
-    func sync() async throws {}
+    func sync() async throws -> IOSExportSyncResult { .synced }
     func finish(_ transaction: IOSExportTransaction) async {}
     func observe(_ receive: @escaping @MainActor (IOSExportTransaction) async -> Void) async {}
 }

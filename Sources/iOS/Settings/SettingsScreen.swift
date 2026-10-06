@@ -284,6 +284,11 @@ import QwenVoiceCore
                defaultValue: "The last take wasn’t copied to this folder. Choose it again.",
                comment: "Saved outputs row when the last automatic copy into the chosen Files folder failed.")
     }
+    static var savedOutputsAccessUnverified: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsAccessUnverified",
+               defaultValue: "Purchase access was still being checked, so the last take stayed in History. Export it from History.",
+               comment: "Saved outputs row when a Design or Clone take finished before purchase access was verified, so it was not copied to the folder.")
+    }
     static var savedOutputsFolderFailedTitle: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.savedOutputsFolderFailedTitle",
                defaultValue: "Couldn’t use this folder",
@@ -505,6 +510,7 @@ struct SettingsScreen: View {
         switch IOSSavedOutputsDestination.ExportIssue(rawValue: savedOutputsIssue) {
         case .folderUnavailable: IOSSettingsText.savedOutputsFolderUnavailable
         case .copyFailed: IOSSettingsText.savedOutputsCopyFailed
+        case .accessUnverified: IOSSettingsText.savedOutputsAccessUnverified
         case nil: nil
         }
     }

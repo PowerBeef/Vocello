@@ -138,6 +138,100 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
     }
 
+    /// A3-01: a copy that cannot land never costs the user a same-named file
+    /// already in their folder, and a copy that lands replaces it whole,
+    /// leaving no staging file behind.
+    func testAFailedCopyKeepsTheSameNamedFileAlreadyInTheFolder() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let existing = folder.appendingPathComponent("custom_take.wav")
+        let usersFile = Data("the user's own file".utf8)
+        try usersFile.write(to: existing)
+        // The internal take is gone, so no copy can be made.
+        let missing = root.appendingPathComponent("custom_take.wav")
+        let failed = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: missing.path, generationMode: "custom"
+        ) { _ in true })
+        let failedCopied = await failed.value
+        XCTAssertFalse(failedCopied)
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
+        XCTAssertEqual(try Data(contentsOf: existing), usersFile)
+
+        let take = try clip("custom_take.wav")
+        let landed = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true })
+        let landedCopied = await landed.value
+        XCTAssertTrue(landedCopied)
+        XCTAssertEqual(try Data(contentsOf: existing), try Data(contentsOf: take))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), ["custom_take.wav"])
+    }
+
+    /// A4-01: a Design take that finishes while the launch entitlement scan is
+    /// still running is reported on the Settings row instead of being skipped
+    /// in silence, and is copied once the scan verifies the unlock. Nothing
+    /// here buys or restores.
+    func testAPaidTakeFinishedWhileAccessIsCheckedIsReportedThenCopiedOnceVerified() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let client = FolderCopyExportClient()
+        client.entitlements = [IOSExportTransaction(id: 1, productID: IOSExportAccessPolicy.productID,
+                                                    verified: true, nonConsumable: true, revoked: false)]
+        let purchases = IOSExportPurchaseState(client: client)
+        XCTAssertEqual(purchases.access, .checking)
+        let entered = expectation(description: "entitlement scan running")
+        client.scanEntered = { entered.fulfill() }
+        let take = try clip("design_take.wav")
+        let destination = folder.appendingPathComponent("design_take.wav")
+
+        let copy = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "design", purchases: purchases
+        ), "the copy waits for the scan instead of being dropped")
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .accessUnverified)
+        await fulfillment(of: [entered], timeout: 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+
+        client.settleScan()
+        let copied = await copy.value
+        XCTAssertTrue(copied)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue, "the landed copy ends the report")
+        XCTAssertEqual(client.purchaseCount, 0)
+        XCTAssertEqual(client.syncCount, 0)
+    }
+
+    /// A4-01: a scan that finds no unlock leaves the take in History, as any
+    /// locked Design or Clone take stays, and ends the report. A Built-in take
+    /// never waits for the scan.
+    func testAPaidTakeStaysInHistoryWhenTheScanFindsNoUnlock() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let client = FolderCopyExportClient()
+        let purchases = IOSExportPurchaseState(client: client)
+        let entered = expectation(description: "entitlement scan running")
+        client.scanEntered = { entered.fulfill() }
+
+        let builtIn = try clip("custom_take.wav")
+        let free = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: builtIn.path, generationMode: "custom", purchases: purchases
+        ))
+        let freeCopied = await free.value
+        XCTAssertTrue(freeCopied)
+        XCTAssertEqual(client.scanCount, 0, "a free take copies without waiting for access")
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
+
+        let take = try clip("clone_take.wav")
+        let copy = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "clone", purchases: purchases
+        ))
+        XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .accessUnverified)
+        await fulfillment(of: [entered], timeout: 2)
+        client.settleScan()
+        let copied = await copy.value
+        XCTAssertFalse(copied)
+        XCTAssertEqual(purchases.access, .locked)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("clone_take.wav").path))
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue, "a verified lock is the documented History-only outcome")
+        XCTAssertEqual(client.purchaseCount, 0)
+    }
+
     func testPolicySeesTheSavedRowsModeNotAnyCurrentSelection() throws {
         try IOSSavedOutputsDestination.setFolder(folder)
         var seen: [IOSExportProvenance] = []
@@ -152,4 +246,29 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         }
         XCTAssertEqual(seen.count, 4)
     }
+}
+
+/// A StoreKit boundary whose launch entitlement scan the test settles.
+@MainActor
+private final class FolderCopyExportClient: IOSExportPurchaseClient {
+    var entitlements: [IOSExportTransaction] = []
+    var scanEntered: (() -> Void)?
+    private(set) var scanCount = 0
+    private(set) var purchaseCount = 0
+    private(set) var syncCount = 0
+    private var pendingScan: CheckedContinuation<[IOSExportTransaction], Never>?
+
+    func product() async throws -> IOSExportProduct? { nil }
+    func currentEntitlements() async -> [IOSExportTransaction] {
+        scanCount += 1
+        return await withCheckedContinuation { pendingScan = $0; scanEntered?() }
+    }
+    func settleScan() {
+        pendingScan?.resume(returning: entitlements)
+        pendingScan = nil
+    }
+    func purchase() async throws -> IOSExportPurchaseResult { purchaseCount += 1; return .cancelled }
+    func sync() async throws -> IOSExportSyncResult { syncCount += 1; return .synced }
+    func finish(_ transaction: IOSExportTransaction) async {}
+    func observe(_ receive: @escaping @MainActor (IOSExportTransaction) async -> Void) async {}
 }

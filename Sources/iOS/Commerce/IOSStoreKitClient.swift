@@ -47,7 +47,21 @@ final class IOSStoreKitClient: IOSExportPurchaseClient {
         }
     }
 
-    func sync() async throws { try await AppStore.sync() }
+    func sync() async throws -> IOSExportSyncResult {
+        try await Self.syncResult { try await AppStore.sync() }
+    }
+
+    /// `AppStore.sync()` throws when the user dismisses the Apple Account
+    /// prompt. That is the cancellation the user chose, reported as Purchase
+    /// reports one, never an App Store failure (A4-02).
+    static func syncResult(_ sync: () async throws -> Void) async throws -> IOSExportSyncResult {
+        do {
+            try await sync()
+            return .synced
+        } catch where isUserCancellation(error) {
+            return .cancelled
+        }
+    }
 
     func finish(_ transaction: IOSExportTransaction) async {
         guard let native = pending.removeValue(forKey: transaction.id) else { return }

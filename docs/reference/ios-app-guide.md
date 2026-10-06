@@ -35,11 +35,15 @@ through the governed test route, never a shipping unlock or production credentia
 - Settings → **Design & Clone Export** (`iosSettings_exportPurchaseRow`) opens purchase options.
   `exportPurchase_buy` displays the StoreKit-localized one-time price; `exportPurchase_reload` handles
   product unavailability; `exportPurchase_restore` explicitly syncs. Pending, cancellation and
-  verification failures have visible status. `exportPurchase_close` dismisses without export.
+  verification failures have visible status; dismissing the Apple Account prompt during Restore is a
+  cancelled restore, not an App Store failure (A4-02). `exportPurchase_close` dismisses without export.
   Close and request export again after purchase: it never silently shares a previously selected clip.
 - Automatic folder copying never starts a purchase or changes the folder. Without verified access,
-  including startup checking, paid-mode clips remain in History for manual export afterward. The
-  folder explanation states this behavior.
+  paid-mode clips remain in History for manual export afterward. The folder explanation states this
+  behavior. A paid-mode clip that finishes during startup checking waits for that entitlement scan
+  (a local StoreKit read) and is copied if it verifies the unlock; until then the Saved outputs row
+  reports that the take stayed in History (A4-01). The copy stages its bytes beside the destination
+  and replaces a same-named file only once complete (A3-01).
 - New Design-generated Saved Voices retain `generatedSourceMode` in existing enrollment metadata
   through candidate commit and reference playback. Imported/recorded originals remain recoverable
   for free. Legacy Saved Voices lack origin metadata and stay exportable without retrospective

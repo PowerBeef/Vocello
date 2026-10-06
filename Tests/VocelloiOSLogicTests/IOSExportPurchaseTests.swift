@@ -124,6 +124,47 @@ final class IOSExportPurchaseTests: XCTestCase {
         }
     }
 
+    /// A4-02: `AppStore.sync()` throws the user's cancellation when the Apple
+    /// Account prompt is dismissed. Restore reports it as a cancelled restore,
+    /// as Purchase reports a cancelled purchase, never as an App Store failure,
+    /// and owned access is unchanged.
+    func testRestoreDismissedAtSignInIsACancellationNotAFailure() async throws {
+        let dismissals: [any Error] = [
+            StoreKitError.userCancelled,
+            SKError(.paymentCancelled),
+            NSError(domain: "vocello.test.wrapper", code: 1,
+                    userInfo: [NSUnderlyingErrorKey: StoreKitError.userCancelled]),
+        ]
+        for dismissal in dismissals {
+            let result = try await IOSStoreKitClient.syncResult { throw dismissal }
+            XCTAssertEqual(result, .cancelled, "\(dismissal)")
+        }
+        let synced = try await IOSStoreKitClient.syncResult {}
+        XCTAssertEqual(synced, .synced)
+        do {
+            _ = try await IOSStoreKitClient.syncResult { throw StoreKitError.unknown }
+            XCTFail("An App Store failure stays a failure")
+        } catch {
+            XCTAssertFalse(IOSStoreKitClient.isUserCancellation(error))
+        }
+
+        let client = FakeExportClient()
+        client.entitlements = [transaction()]
+        let store = IOSExportPurchaseState(client: client)
+        await store.refresh()
+        let scansBeforeRestore = client.scanCount
+        client.syncOutcome = .cancelled
+        await store.restore()
+        XCTAssertEqual(store.notice, .restoreCancelled)
+        XCTAssertEqual(store.access, .unlocked)
+        XCTAssertEqual(store.operation, .idle)
+        XCTAssertEqual(client.scanCount, scansBeforeRestore, "a dismissed sign-in rescans nothing")
+        XCTAssertNotEqual(
+            VocelloPresentationText.exportPurchaseNotice(.restoreCancelled, access: .unlocked),
+            VocelloPresentationText.exportNoticeFailed
+        )
+    }
+
     func testMissingOrWrongProductRefusesPurchase() async {
         for product in [nil, IOSExportProduct(id: "wrong", displayPrice: "1")] {
             let client = FakeExportClient()
@@ -274,6 +315,7 @@ private final class FakeExportClient: IOSExportPurchaseClient {
     var failProduct = false
     var failPurchase = false
     var failSync = false
+    var syncOutcome: IOSExportSyncResult = .synced
     var suspendScan = false
     var suspendPurchase = false
     var scanEntered: (() -> Void)?
@@ -314,7 +356,11 @@ private final class FakeExportClient: IOSExportPurchaseClient {
         return result
     }
     func resumePurchase() { purchaseContinuation?.resume(); purchaseContinuation = nil }
-    func sync() async throws { syncCount += 1; if failSync { throw Failure.expected } }
+    func sync() async throws -> IOSExportSyncResult {
+        syncCount += 1
+        if failSync { throw Failure.expected }
+        return syncOutcome
+    }
     func finish(_ transaction: IOSExportTransaction) async {
         beforeFinish?(); finished.append(transaction.id)
     }

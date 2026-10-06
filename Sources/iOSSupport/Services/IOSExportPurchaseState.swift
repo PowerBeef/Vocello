@@ -24,12 +24,19 @@ enum IOSExportPurchaseResult: Sendable {
     case pending
 }
 
+/// Restore's App Store sync: completed, or the Apple Account prompt the user
+/// dismissed (A4-02). Every other outcome is a thrown failure.
+enum IOSExportSyncResult: Sendable {
+    case synced
+    case cancelled
+}
+
 @MainActor
 protocol IOSExportPurchaseClient: AnyObject {
     func product() async throws -> IOSExportProduct?
     func currentEntitlements() async -> [IOSExportTransaction]
     func purchase() async throws -> IOSExportPurchaseResult
-    func sync() async throws
+    func sync() async throws -> IOSExportSyncResult
     func finish(_ transaction: IOSExportTransaction) async
     func observe(_ receive: @escaping @MainActor (IOSExportTransaction) async -> Void) async
 }
@@ -40,7 +47,7 @@ protocol IOSExportPurchaseClient: AnyObject {
 final class IOSExportPurchaseState {
     enum Access: Equatable { case checking, locked, unlocked }
     enum Operation: Equatable { case idle, loading, purchasing, restoring }
-    enum Notice: Equatable { case pending, cancelled, failed, unavailable, unverified, restored, notOwned }
+    enum Notice: Equatable { case pending, cancelled, failed, unavailable, unverified, restored, notOwned, restoreCancelled }
 
     private(set) var access: Access = .checking
     private(set) var operation: Operation = .idle
@@ -138,7 +145,12 @@ final class IOSExportPurchaseState {
         defer { operation = .idle }
         do {
             // Only an explicit Restore action may prompt for an Apple Account.
-            try await client.sync()
+            // Dismissing that prompt is the user's choice, not an App Store
+            // failure, and leaves access as it was (A4-02).
+            guard try await client.sync() == .synced else {
+                notice = .restoreCancelled
+                return
+            }
             await refresh()
             notice = access == .unlocked ? .restored : .notOwned
         } catch { notice = .failed }

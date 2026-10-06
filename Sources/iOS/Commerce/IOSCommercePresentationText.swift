@@ -105,6 +105,11 @@ extension VocelloPresentationText {
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
     }
 
+    var exportNoticeRestoreCancelled: String {
+        localization.string(localized: "vocello.export.restore_cancelled", defaultValue: "Restore cancelled. No export access was changed.",
+               comment: "iOS export purchase: the user dismissed the Apple Account prompt during Restore Purchases; access is unchanged.")
+    }
+
     var exportNoticeFailed: String {
         localization.string(localized: "vocello.export.failed", defaultValue: "The App Store operation could not complete. Try again. Your clips remain in History.",
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
@@ -140,6 +145,7 @@ extension VocelloPresentationText {
         case .unverified: exportNoticeUnverified
         case .restored: exportNoticeRestored
         case .notOwned: exportNoticeNotOwned
+        case .restoreCancelled: exportNoticeRestoreCancelled
         }
     }
 }
@@ -168,6 +174,7 @@ extension VocelloPresentationText {
     static var exportFolderDetail: String { Self().exportFolderDetail }
     static var exportNoticePending: String { Self().exportNoticePending }
     static var exportNoticeCancelled: String { Self().exportNoticeCancelled }
+    static var exportNoticeRestoreCancelled: String { Self().exportNoticeRestoreCancelled }
     static var exportNoticeFailed: String { Self().exportNoticeFailed }
     static var exportNoticeUnverified: String { Self().exportNoticeUnverified }
     static var exportNoticeRestored: String { Self().exportNoticeRestored }

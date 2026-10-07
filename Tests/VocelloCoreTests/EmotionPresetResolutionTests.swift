@@ -283,6 +283,7 @@ final class EmotionPresetResolutionTests: XCTestCase {
             "Warm and confident",
             "Only English output takes the sentence"
         )
+    }
 
     /// P02-10: the impersonation guard refuses a named likeness, never an
     /// ordinary character or mood description that shares its wording.

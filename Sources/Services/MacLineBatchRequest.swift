@@ -189,10 +189,13 @@ struct MacLineBatchRequest {
     }
 
     /// One line per non-blank row of the editor, trimmed of surrounding spaces.
+    /// One take per line. A blank line, or one with nothing to speak (a
+    /// separator such as *** or ---), is skipped rather than becoming a take
+    /// the model ends without audio, which would stop the batch there (U29).
     static func lines(from text: String) -> [String] {
         text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+            .filter { !$0.isEmpty && SingleTakeScriptBudget.hasSpeakableContent($0) }
     }
 
     func validationError(isModelAvailable: Bool, recoveryDetail: String) -> String? {

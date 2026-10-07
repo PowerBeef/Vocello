@@ -77,6 +77,13 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertEqual(MacLineBatchRequest.lines(from: "\n \n"), [])
     }
 
+    /// U29: a separator line has nothing to speak; it is skipped instead of
+    /// becoming a take the model ends without audio, which stops the batch.
+    func testSeparatorLinesWithNothingToSpeakAreSkipped() {
+        let lines = MacLineBatchRequest.lines(from: "Chapter one.\n***\n---\n…\nChapter two.\n第二章")
+        XCTAssertEqual(lines, ["Chapter one.", "Chapter two.", "第二章"])
+    }
+
     // MARK: - Validation
 
     func testValidationReportsRecoveryDetailWhenTheModelIsMissing() {

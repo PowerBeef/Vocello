@@ -391,6 +391,35 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertNil(Reason(CancellationError()))
     }
 
+    /// L14-04: a full disk or a read-only volume during a take reaches the
+    /// engine as a POSIX error or an Audio Toolbox status carrying the errno, not
+    /// a Cocoa error; it must still present the storage copy, through the
+    /// engine's wrapping too, instead of the internal-error Retry copy.
+    func testAFullDiskOutsideTheCocoaDomainPresentsTheStorageCopy() {
+        typealias Reason = GenerationFailurePresentationReason
+        XCTAssertEqual(Reason(POSIXError(.ENOSPC)), .storageFull)
+        XCTAssertEqual(Reason(POSIXError(.EDQUOT)), .storageFull)
+        XCTAssertEqual(Reason(POSIXError(.EROFS)), .storageUnavailable)
+        XCTAssertEqual(Reason(NSError(domain: "com.apple.coreaudio.avfaudio", code: Int(ENOSPC))), .storageFull)
+        XCTAssertEqual(Reason(NSError(domain: NSOSStatusErrorDomain, code: Int(ENOSPC))), .storageFull)
+        let wrappedInAudio = NSError(
+            domain: "com.apple.coreaudio.avfaudio",
+            code: -50,
+            userInfo: [NSUnderlyingErrorKey: POSIXError(.ENOSPC) as NSError]
+        )
+        XCTAssertEqual(Reason(wrappedInAudio), .storageFull)
+        XCTAssertEqual(
+            Reason(MLXTTSEngine.surfacedGenerationError(POSIXError(.ENOSPC), allocationRetryAttempted: false)),
+            .storageFull,
+            "the engine's stream-startup wrapping keeps the storage reason"
+        )
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: POSIXError(.ENOSPC)).code, "storage.full")
+        // A permission errno cannot tell a read from a write, so it stays untyped.
+        XCTAssertNil(Reason(POSIXError(.EACCES)))
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: POSIXError(.EACCES)).code, "generation.unknown")
+        XCTAssertNil(Reason(NSError(domain: "com.apple.coreaudio.avfaudio", code: -50)))
+    }
+
     // MARK: - Persisted diagnostics privacy (AUD-08)
 
     func testDiagnosticSummaryKeepsTypedIdentityAndNoErrorText() throws {

@@ -283,6 +283,44 @@ final class EmotionPresetResolutionTests: XCTestCase {
             "Warm and confident",
             "Only English output takes the sentence"
         )
+
+    /// P02-10: the impersonation guard refuses a named likeness, never an
+    /// ordinary character or mood description that shares its wording.
+    func testTheImpersonationGuardRefusesNamedLikenessesOnly() {
+        func customRequest(_ delivery: String) -> GenerationRequest {
+            GenerationRequest(
+                mode: .custom, modelID: "pro_custom", text: "Guard fixture.",
+                outputPath: "/nonexistent/p02-10.wav", shouldStream: false,
+                payload: .custom(speakerID: "aiden", deliveryStyle: delivery)
+            )
+        }
+        func designRequest(_ brief: String) -> GenerationRequest {
+            GenerationRequest(
+                mode: .design, modelID: "pro_design", text: "Guard fixture.",
+                outputPath: "/nonexistent/p02-10.wav", shouldStream: false,
+                payload: .design(voiceDescription: brief, deliveryStyle: nil)
+            )
+        }
+        for allowed in [
+            "Make it sound just like a cozy bedtime story.",
+            "Sounding exactly like an excited sports commentator.",
+        ] {
+            XCTAssertNoThrow(try GenerationSemantics.validateQwenPromptContract(for: customRequest(allowed)), allowed)
+        }
+        XCTAssertNoThrow(try GenerationSemantics.validateQwenPromptContract(
+            for: designRequest("In the voice of an old sea captain, gravelly and warm.")))
+        for refused in [
+            "Impersonate a celebrity announcer.",
+            "Sound just like Morgan Freeman.",
+            "It sounds exactly like my neighbour.",
+            "Imitate the voice of the narrator.",
+        ] {
+            XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(for: customRequest(refused)), refused)
+        }
+        XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(
+            for: designRequest("In the voice of Morgan Freeman, slow and deep.")))
+        XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(
+            for: designRequest("A celebrity radio host.")))
     }
 
     private static func sha256(_ value: String) -> String {

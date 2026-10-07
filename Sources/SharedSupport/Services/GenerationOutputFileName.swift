@@ -10,6 +10,14 @@ import Foundation
 enum GenerationOutputFileName {
     static let fallbackSnippet = "audio"
     static let snippetLength = 20
+    /// P09-03: the snippet's UTF-8 budget. A file name allows 255 characters,
+    /// the staging name adds about 42 and a long-form segment another 37; twenty
+    /// CJK letters (60 bytes) still fit whole.
+    static let snippetUTF8Budget = 80
+    /// Scalars kept per character: a letter and its first marks. ICU `\w` keeps
+    /// combining marks, so a stacked ("zalgo") letter is otherwise one
+    /// character of unbounded size.
+    static let maximumScalarsPerCharacter = 4
 
     static func make(text: String, date: Date = Date(), timeZone: TimeZone = .current) -> String {
         "\(timestamp(for: date, timeZone: timeZone))_\(snippet(from: text)).wav"
@@ -30,14 +38,46 @@ enum GenerationOutputFileName {
 
     /// Letters, digits, `_` and `-` of the script's opening, whitespace runs
     /// (newlines and tabs included) collapsed to one `_`, at most
-    /// `snippetLength` characters, never starting or ending with `_`.
+    /// `snippetLength` characters and `snippetUTF8Budget` bytes, never starting
+    /// or ending with `_`. P09-03: marks, joiners and variation selectors left
+    /// without a letter (the emoji they belonged to is stripped) are dropped,
+    /// and a letter keeps at most `maximumScalarsPerCharacter` scalars, so no
+    /// script can push a take's file name past the file system's limit.
     static func snippet(from text: String) -> String {
         let kept = text.replacingOccurrences(of: #"[^\w\s-]"#, with: "", options: .regularExpression)
         let words = kept.split(whereSeparator: { $0.isWhitespace })
         let joined = words.joined(separator: "_")
-        let clipped = String(joined.prefix(snippetLength))
-            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        var clipped = ""
+        var characters = 0
+        var bytes = 0
+        for character in joined {
+            guard characters < snippetLength else { break }
+            guard let first = character.unicodeScalars.first, !isBaselessExtender(first) else { continue }
+            var piece = String.UnicodeScalarView()
+            piece.append(contentsOf: character.unicodeScalars.prefix(maximumScalarsPerCharacter))
+            let bounded = String(piece)
+            guard bytes + bounded.utf8.count <= snippetUTF8Budget else { break }
+            clipped += bounded
+            characters += 1
+            bytes += bounded.utf8.count
+        }
+        clipped = clipped.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
         return clipped.isEmpty ? fallbackSnippet : clipped
+    }
+
+    /// A scalar that only extends the character before it: a combining mark, a
+    /// zero-width joiner or a variation selector.
+    private static func isBaselessExtender(_ scalar: Unicode.Scalar) -> Bool {
+        let properties = scalar.properties
+        if properties.isGraphemeExtend || properties.isVariationSelector || scalar.value == 0x200D {
+            return true
+        }
+        switch properties.generalCategory {
+        case .nonspacingMark, .spacingMark, .enclosingMark:
+            return true
+        default:
+            return false
+        }
     }
 }
 

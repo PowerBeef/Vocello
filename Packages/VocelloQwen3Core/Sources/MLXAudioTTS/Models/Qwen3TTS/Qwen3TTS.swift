@@ -1517,16 +1517,26 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         guard let talkerConfig = config.talkerConfig else { return nil }
         guard let speaker else { return nil }
 
+        let speakerIDs = try Self.speakerTokenIDs(for: speaker, in: talkerConfig.spkId)
+        let tokenIDs = MLXArray(speakerIDs.map(Int32.init)).reshaped(1, -1)
+        return talker.getInputEmbeddings()(tokenIDs)
+    }
+
+    /// The codec token ids of a CustomVoice speaker. P05-05: an empty or blank
+    /// speaker is refused like an unknown one; returning no token used to build
+    /// the prefix without a speaker slot, an unconditioned voice that still
+    /// reported success.
+    static func speakerTokenIDs(for speaker: String, in table: [String: [Int]]?) throws -> [Int] {
         let normalizedSpeaker = speaker.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalizedSpeaker.isEmpty else { return nil }
-        guard let speakerIDs = talkerConfig.spkId?[normalizedSpeaker], !speakerIDs.isEmpty else {
+        guard !normalizedSpeaker.isEmpty else {
+            throw AudioGenerationError.invalidInput("Qwen3 Custom Voice requires a speaker")
+        }
+        guard let speakerIDs = table?[normalizedSpeaker], !speakerIDs.isEmpty else {
             throw AudioGenerationError.modelNotInitialized(
                 "Unsupported Qwen3 speaker '\(speaker)'"
             )
         }
-
-        let tokenIDs = MLXArray(speakerIDs.map(Int32.init)).reshaped(1, -1)
-        return talker.getInputEmbeddings()(tokenIDs)
+        return speakerIDs
     }
 
     private func prefixCacheKeyForCustomVoice(language: String, speaker: String, instruct: String?) -> String? {

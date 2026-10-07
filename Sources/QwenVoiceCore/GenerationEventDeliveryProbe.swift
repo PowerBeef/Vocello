@@ -60,6 +60,25 @@ private actor BoundedGenerationEventChannel {
             if event.isTerminal { terminalAccepted = true }
             return true
         }
+        if event.isTerminal {
+            // L13-06: a terminal carries no audio and ends the stream, so it is
+            // never dropped for the producer's cancellation. A cancelled take
+            // yields `.cancelled` from its own cancelled task; with the queue
+            // full, the cancellable wait below would drop it and leave the
+            // consumer parked forever once it drained the queue. The terminal is
+            // queued past capacity (by this one event). Behind producers already
+            // waiting it keeps its order, unless its own producer is cancelled:
+            // then it goes first and the waiting sends end unaccepted when the
+            // consumer reaches it. Only the consumer's termination refuses it.
+            if pendingSends.isEmpty || Task.isCancelled {
+                queue.append(event)
+                terminalAccepted = true
+                return true
+            }
+            return await withCheckedContinuation { continuation in
+                pendingSends.append(PendingSend(id: UUID(), event: event, continuation: continuation))
+            }
+        }
 
         let pendingID = UUID()
         return await withTaskCancellationHandler {

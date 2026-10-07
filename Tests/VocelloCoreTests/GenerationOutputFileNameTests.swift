@@ -40,6 +40,32 @@ final class GenerationOutputFileNameTests: XCTestCase {
 
     func testNonLatinLettersAreKept() {
         XCTAssertEqual(GenerationOutputFileName.snippet(from: "こんにちは 世界"), "こんにちは_世界")
+        XCTAssertEqual(GenerationOutputFileName.snippet(from: "नमस्ते दुनिया"), "नमस्ते_दुनिया", "a letter keeps its marks")
+    }
+
+    /// P09-03: the emoji the snippet strips leave their variation selectors and
+    /// joiners behind, and stacked marks make one letter of any size; neither
+    /// may push the staging or long-form segment name past the 255-character
+    /// file-name limit, which would fail every take of that script.
+    func testNoScriptPushesTheTakeNamePastTheFileNameLimit() {
+        let hearts = String(repeating: "\u{2764}\u{FE0F}", count: 200) + " hi"
+        let flags = String(repeating: "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}", count: 100)
+        let zalgo = String(repeating: "a" + String(repeating: "\u{0301}", count: 12), count: 20)
+        let stagingAndSegmentSuffixes = 42 + 37
+        for text in [hearts, flags, zalgo] {
+            let name = GenerationOutputFileName.make(text: text, date: date, timeZone: utc)
+            XCTAssertLessThanOrEqual(name.utf8.count + stagingAndSegmentSuffixes, 255)
+            let snippet = GenerationOutputFileName.snippet(from: text)
+            XCTAssertLessThanOrEqual(snippet.utf8.count, GenerationOutputFileName.snippetUTF8Budget)
+            for character in snippet {
+                XCTAssertLessThanOrEqual(character.unicodeScalars.count, GenerationOutputFileName.maximumScalarsPerCharacter)
+                let first = character.unicodeScalars.first!
+                XCTAssertFalse(first.properties.isGraphemeExtend || first.value == 0x200D, "no lone extender")
+            }
+        }
+        XCTAssertEqual(GenerationOutputFileName.snippet(from: hearts), "hi")
+        XCTAssertEqual(GenerationOutputFileName.snippet(from: flags), GenerationOutputFileName.fallbackSnippet)
+        XCTAssertTrue(GenerationOutputFileName.snippet(from: zalgo).hasPrefix("a\u{0301}\u{0301}\u{0301}"))
     }
 
     // MARK: - IOS-16 output root

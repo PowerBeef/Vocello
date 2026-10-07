@@ -112,6 +112,20 @@ final class AudioSealParityTests: XCTestCase {
         }
     }
 
+    /// P09-04: a non-finite watermark delta leaves its sample unmarked; the
+    /// bare clamp turned it into a full-scale +1 burst (`min(1, .nan)` is 1).
+    func testANonFiniteWatermarkDeltaLeavesTheSampleUnmarked() {
+        let nan = Float.nan
+        XCTAssertEqual(max(Float(-1), min(Float(1), Float(0.25) + nan)), 1, "the clamp this replaces")
+        XCTAssertEqual(AudioSealGenerator.markedSample(0.25, delta: .nan), 0.25)
+        XCTAssertEqual(AudioSealGenerator.markedSample(0.25, delta: .infinity), 0.25)
+        XCTAssertEqual(AudioSealGenerator.markedSample(-0.5, delta: -.infinity), -0.5)
+        XCTAssertTrue(AudioSealGenerator.markedSample(.nan, delta: 0.01).isNaN, "left for the writer's NaN guard")
+        XCTAssertEqual(AudioSealGenerator.markedSample(0.25, delta: 0.01), 0.26, accuracy: 1e-6)
+        XCTAssertEqual(AudioSealGenerator.markedSample(0.995, delta: 0.01), 1, "finite sums still clamp")
+        XCTAssertEqual(AudioSealGenerator.markedSample(-0.995, delta: -0.01), -1)
+    }
+
     func testStreamableConvPaddingPreservesFrameArithmetic() {
         // audiocraft's padding contract: output frames == ceil(T / stride),
         // independent of T alignment. Verify across the generator's stage

@@ -398,11 +398,16 @@ struct Qwen3TTSRuntimeProfile: Hashable, Codable, Sendable {
             "impersonate",
             "imitate the voice",
             "clone the voice",
-            "sound exactly like",
-            "sound just like",
-            "in the voice of",
         ]
-        return markers.contains { normalizedText.contains($0) }
+        if markers.contains(where: { normalizedText.contains($0) }) { return true }
+        // P02-10: a likeness phrase names someone unless an indefinite article
+        // follows it. "In the voice of an old sea captain" and "sound just like
+        // a bedtime story" describe a character or a mood and are allowed; "in
+        // the voice of morgan freeman" and "sounds exactly like my boss" are not.
+        return normalizedText.range(
+            of: #"\b(?:sound(?:s|ing)? (?:exactly|just) like|in the voice of) (?!(?:a|an) )"#,
+            options: .regularExpression
+        ) != nil
     }
 
     private static func readJSONObject(_ url: URL) throws -> [String: Any] {

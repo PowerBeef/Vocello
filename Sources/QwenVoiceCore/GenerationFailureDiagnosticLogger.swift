@@ -292,8 +292,45 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 break
             }
         }
+        if let storage = storageWriteMetadata(cocoaError) {
+            return storage
+        }
 
         return ErrorMetadata(code: "generation.unknown", classification: .unknown)
+    }
+
+    /// L14-04: a full disk or a read-only volume reaches the generation path as
+    /// a POSIX error (the publishing rename), an Audio Toolbox status that
+    /// carries the errno (`AVAudioFile.write`), or either one under
+    /// `NSUnderlyingErrorKey`; only `NSCocoaErrorDomain` was mapped, so the
+    /// storage copy never reached a take. Only write-side errnos are mapped: a
+    /// permission errno cannot tell a read from a write.
+    private static func storageWriteMetadata(_ error: NSError, depth: Int = 0) -> ErrorMetadata? {
+        let carriesErrno = error.domain == NSPOSIXErrorDomain
+            || error.domain == NSOSStatusErrorDomain
+            || error.domain == "com.apple.coreaudio.avfaudio"
+        if carriesErrno {
+            switch Int32(truncatingIfNeeded: error.code) {
+            case ENOSPC, EDQUOT:
+                return ErrorMetadata(code: "storage.full", classification: .storage)
+            case EROFS:
+                return ErrorMetadata(code: "storage.permission_denied", classification: .storage)
+            default:
+                break
+            }
+        }
+        guard depth < 4, let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError else { return nil }
+        if underlying.domain == NSCocoaErrorDomain {
+            switch CocoaError.Code(rawValue: underlying.code) {
+            case .fileWriteOutOfSpace:
+                return ErrorMetadata(code: "storage.full", classification: .storage)
+            case .fileWriteNoPermission, .fileWriteVolumeReadOnly:
+                return ErrorMetadata(code: "storage.permission_denied", classification: .storage)
+            default:
+                break
+            }
+        }
+        return storageWriteMetadata(underlying, depth: depth + 1)
     }
 
     private static func allowlistedStage(_ value: String?) -> String? {

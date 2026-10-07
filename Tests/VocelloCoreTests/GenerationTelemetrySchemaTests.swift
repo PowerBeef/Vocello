@@ -1140,6 +1140,33 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertTrue(cancellation is CancellationError)
     }
 
+    /// L13-09: every terminal catch records a cancellation's v9 product outcome
+    /// as `.cancelled`, agreeing with the row's finish reason, including a Stop
+    /// during marking, QC or publication and a cancelled empty stream.
+    func testAThrownCancellationIsACancelledProductOutcomeAtEveryCatch() {
+        XCTAssertEqual(StreamingExecutionContext.productOutcome(forThrown: CancellationError()), .cancelled)
+        XCTAssertEqual(
+            NativeGenerationTerminalClassifier.reason(for: CancellationError()),
+            .cancelled,
+            "the finish reason the same row records"
+        )
+        let cancelledEmptyStream = StreamingExecutionContext.postStreamTerminalError(
+            totalFramesWritten: 0,
+            isTaskCancelled: true
+        )
+        XCTAssertEqual(cancelledEmptyStream.map(StreamingExecutionContext.productOutcome(forThrown:)), .cancelled)
+        XCTAssertEqual(
+            StreamingExecutionContext.productOutcome(
+                forThrown: MLXTTSEngineError.generationFailed("Marking target is not a RIFF/WAVE file.")
+            ),
+            .failed
+        )
+        XCTAssertEqual(
+            StreamingExecutionContext.productOutcome(forThrown: NativeRuntimeError.maximumTokenLimit()),
+            .failed
+        )
+    }
+
     func testStreamFailureOfCancelledTaskIsCancellationNeverRetried() {
         for framesWritten: Int64 in [0, 24_000] {
             let cancelled = StreamingExecutionContext.streamFailureError(

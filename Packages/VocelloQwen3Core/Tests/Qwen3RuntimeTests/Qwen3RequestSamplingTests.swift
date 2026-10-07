@@ -1,8 +1,27 @@
 import MLX
+import MLXAudioCore
 @testable import MLXAudioTTS
 import XCTest
 
 final class Qwen3RequestSamplingTests: XCTestCase {
+    /// P05-05: an empty or blank CustomVoice speaker fails closed like an
+    /// unknown one, instead of conditioning the take on no speaker at all.
+    func testAnEmptySpeakerIsRefusedLikeAnUnknownOne() throws {
+        let table = ["aiden": [3_001], "ryan": [3_002, 3_003]]
+        XCTAssertEqual(try Qwen3TTSModel.speakerTokenIDs(for: " Aiden ", in: table), [3_001])
+        XCTAssertEqual(try Qwen3TTSModel.speakerTokenIDs(for: "ryan", in: table), [3_002, 3_003])
+        for refused in ["", "   ", "\n"] {
+            XCTAssertThrowsError(try Qwen3TTSModel.speakerTokenIDs(for: refused, in: table), "'\(refused)'") { error in
+                guard case AudioGenerationError.invalidInput = error else {
+                    return XCTFail("an empty speaker is invalid input: \(error)")
+                }
+            }
+        }
+        XCTAssertThrowsError(try Qwen3TTSModel.speakerTokenIDs(for: "nobody", in: table))
+        XCTAssertThrowsError(try Qwen3TTSModel.speakerTokenIDs(for: "aiden", in: nil), "a model without speakers")
+        XCTAssertThrowsError(try Qwen3TTSModel.speakerTokenIDs(for: "aiden", in: ["aiden": []]))
+    }
+
     func testCompatibilityMemoryPolicyPreservesShippingDefaults() {
         let policy = Qwen3RequestMemoryPolicy.compatibilityDefault
         XCTAssertTrue(policy.clearCacheOnStreamChunkEmit)

@@ -104,6 +104,54 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
         XCTAssertTrue(snapshot.accountingIsExact)
     }
 
+    /// L13-06: a cancelled take yields `.cancelled` from its own cancelled task.
+    /// With the consumer a full queue behind, that terminal must still reach it
+    /// after the queued chunks; dropped, the consumer would wait forever and the
+    /// store's `generate` would never return.
+    func testATerminalFromACancelledProducerIsNeverDroppedBehindAFullQueue() async {
+        let router = GenerationScopedEventRouter()
+        let generationID = UUID()
+        let stream = router.stream(for: generationID, capacity: 2)
+        router.beginGeneration(generationID)
+        await router.yield(Self.chunk(index: 0, generationID: generationID), for: generationID)
+        await router.yield(Self.chunk(index: 1, generationID: generationID), for: generationID)
+
+        let terminal = GenerationEvent.cancelled(
+            GenerationCancellationSummary(generationID: generationID, reason: .memoryPressure)
+        )
+        let producer = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await router.yield(terminal, for: generationID)
+        }
+        await producer.value
+
+        let drained = Task { () -> [GenerationEvent] in
+            var received: [GenerationEvent] = []
+            for await event in stream { received.append(event) }
+            return received
+        }
+        // Without the fix the drain parks forever; the watchdog turns that into a failure.
+        let watchdog = Task {
+            try? await Task.sleep(for: .seconds(10))
+            drained.cancel()
+        }
+        let received = await drained.value
+        watchdog.cancel()
+
+        XCTAssertEqual(received, [
+            Self.chunk(index: 0, generationID: generationID),
+            Self.chunk(index: 1, generationID: generationID),
+            terminal,
+        ])
+        let snapshot = router.snapshot(for: generationID)
+        XCTAssertEqual(snapshot.yielded, 3)
+        XCTAssertEqual(snapshot.accepted, 3)
+        XCTAssertEqual(snapshot.terminatedYields, 0)
+        XCTAssertEqual(snapshot.terminalEnqueued, 1)
+        XCTAssertTrue(snapshot.terminalDeliveryComplete)
+        XCTAssertTrue(snapshot.accountingIsExact)
+    }
+
     private static func chunk(index: Int, generationID: UUID) -> GenerationEvent {
         .chunk(
             GenerationChunk(

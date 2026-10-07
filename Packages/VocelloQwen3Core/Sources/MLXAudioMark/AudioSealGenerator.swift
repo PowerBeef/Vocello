@@ -229,6 +229,17 @@ public final class AudioSealGenerator {
 
     static let totalStride = 320  // product of encoder strides
 
+    /// One published sample: the input plus its watermark delta, clamped to
+    /// full scale. P09-04: Swift's `min(1, .nan)` is 1, so the bare clamp turned
+    /// a non-finite delta (a silent numeric fault in the embedder) into a
+    /// full-scale +1 burst that Fast QC, measured before marking, never sees.
+    /// A non-finite delta, or input, leaves that sample unmarked instead.
+    @inline(__always)
+    static func markedSample(_ sample: Float, delta: Float) -> Float {
+        guard sample.isFinite, delta.isFinite else { return sample }
+        return max(-1, min(1, sample + delta))
+    }
+
     /// Sample-rate encoder convolutions: pcm `[1, T, 1]` → pre-LSTM
     /// bottleneck sequence `[1, F, 512]`.
     private func encoderConvs(_ x: MLXArray) -> MLXArray {
@@ -288,7 +299,7 @@ public final class AudioSealGenerator {
         let totalFrames = (pcm.count + stride - 1) / stride
         guard totalFrames > coreFrames + 2 * marginFrames else {
             let delta = watermarkDelta(pcm: pcm)
-            return zip(pcm, delta).map { max(-1, min(1, $0 + $1)) }
+            return zip(pcm, delta).map { Self.markedSample($0, delta: $1) }
         }
 
         // Every stage drains an explicit autoreleasepool: eval commits Metal
@@ -351,7 +362,7 @@ public final class AudioSealGenerator {
                 deltaSlice.eval()
                 let delta = deltaSlice.asArray(Float.self)
                 for i in 0 ..< min(span, delta.count) {
-                    out[coreStart + i] = max(-1, min(1, pcm[coreStart + i] + delta[i]))
+                    out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])
                 }
                 Memory.clearCache()
                 frame = coreEnd

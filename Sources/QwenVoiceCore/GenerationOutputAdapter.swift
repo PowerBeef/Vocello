@@ -2030,7 +2030,7 @@ struct StreamingExecutionContext: Sendable {
                     modelTerminalAtNS: modelTerminalAtNS,
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
-                    productOutcome: error is CancellationError ? .cancelled : .failed
+                    productOutcome: Self.productOutcome(forThrown: error)
                 ),
                 engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
@@ -2079,7 +2079,7 @@ struct StreamingExecutionContext: Sendable {
                     modelTerminalAtNS: modelTerminalAtNS,
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
-                    productOutcome: .failed
+                    productOutcome: Self.productOutcome(forThrown: terminalError)
                 ),
                 engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
@@ -2216,7 +2216,7 @@ struct StreamingExecutionContext: Sendable {
                     modelTerminalAtNS: modelTerminalAtNS,
                     productTerminalAtNS: DispatchTime.now().uptimeNanoseconds,
                     modelOutcome: modelOutcomeV9,
-                    productOutcome: .failed
+                    productOutcome: Self.productOutcome(forThrown: error)
                 ),
                 engineIntrospection: finalizedDiagnostics.introspection.map(GenerationEngineIntrospection.init)
             )
@@ -2419,6 +2419,14 @@ struct StreamingExecutionContext: Sendable {
     /// listener is exact for streaming takes and conservative for
     /// non-streaming takes, whose written frames reach no listener before the
     /// final result.
+    /// The v9 product outcome of a take that threw: a cancellation is
+    /// `.cancelled` at every catch, matching the row's finish reason (L13-09: a
+    /// Stop during marking, QC or publication, and a cancelled empty stream,
+    /// used to record `.failed` beside finish reason `cancelled`).
+    static func productOutcome(forThrown error: Error) -> ProductTerminalOutcomeV9 {
+        error is CancellationError ? .cancelled : .failed
+    }
+
     static func streamFailureError(
         _ error: Error,
         totalFramesWritten: Int64,

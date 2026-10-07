@@ -16,6 +16,9 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+    /// The draft's pinned seed: a long-form project's base seed and a line
+    /// batch's shared seed, as for a single take (U11).
+    let pinnedSeed: UInt64?
     let initialText: String
     let initialSegmentationMode: MacBatchSegmentationMode
 
@@ -38,6 +41,7 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
             refAudio: nil,
             refText: nil,
             preparedVoiceID: nil,
+            pinnedSeed: draft.pinnedSeed,
             initialText: initialText,
             initialSegmentationMode: initialSegmentationMode
         )
@@ -58,6 +62,7 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
             refAudio: nil,
             refText: nil,
             preparedVoiceID: nil,
+            pinnedSeed: draft.pinnedSeed,
             initialText: initialText,
             initialSegmentationMode: initialSegmentationMode
         )
@@ -81,6 +86,7 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
             refAudio: draft.referenceAudioPath,
             refText: draft.trimmedReferenceTranscript,
             preparedVoiceID: draft.selectedSavedVoiceID,
+            pinnedSeed: draft.pinnedSeed,
             initialText: initialText,
             initialSegmentationMode: initialSegmentationMode
         )

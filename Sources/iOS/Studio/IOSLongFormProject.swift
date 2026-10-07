@@ -24,7 +24,11 @@ import QwenVoiceCore
 /// fresh recorded seed, per-segment QC that leaves the prior take untouched on
 /// failure, reassembly around the accepted take, and fail-closed manifest
 /// `replacements`. Regeneration is in-session only — the retained plan is the
-/// identity authority, exactly like resume.
+/// identity authority, exactly like resume. Sampling is seed-deterministic, so
+/// resume gives a segment whose take failed a fresh seed derived from the
+/// failed one (`StudioRetakeSeed`) and records the seed it used (U10); a
+/// pinned Studio seed is the plan's base seed (U11); and Auto resolves one
+/// language for the whole script (`StudioScriptLanguage`, U03).
 
 // MARK: - Platform hooks
 
@@ -123,6 +127,11 @@ struct IOSLongFormSegmentState: Identifiable, Equatable {
     var historyRecord: Generation?
     var qualityReport: AudioQualityGate.Report?
     var generationID: UUID?
+    /// The seed of this segment's take when it is not the plan's sub-seed: a
+    /// resumed segment whose take failed, or a regenerated one. Nil means the
+    /// planned sub-seed. Kept across a cancelled attempt, so a resume repeats
+    /// the take it stopped rather than drawing another one.
+    var seedOverride: UInt64?
 
     var audioPath: String? {
         if case .saved(let audioPath) = status { return audioPath }
@@ -132,6 +141,57 @@ struct IOSLongFormSegmentState: Identifiable, Equatable {
     var isSaved: Bool {
         if case .saved = status { return true }
         return false
+    }
+
+    var isFailed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
+}
+
+// MARK: - Retake seeds and script language
+
+/// Seeds of the takes that replace a failed one. Sampling is seed-deterministic
+/// (the same request and seed reproduce the same take), so a take that failed
+/// on a seed — rejected by QC, or cut off at its generation limit — fails the
+/// same way on it again (U10). A retake derives a fresh seed from the failed
+/// one instead of drawing a random one: a chain of retakes from a pinned seed
+/// still reproduces, and every take records the seed it used. One SplitMix64
+/// step: well mixed, so a retake's seed bears no relation to the failed one.
+enum StudioRetakeSeed {
+    static func after(_ seed: UInt64) -> UInt64 {
+        var mixed = seed &+ 0x9E37_79B9_7F4A_7C15
+        mixed = (mixed ^ (mixed >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        mixed = (mixed ^ (mixed >> 27)) &* 0x94D0_49BB_1331_11EB
+        return mixed ^ (mixed >> 31)
+    }
+}
+
+/// One language for a script that runs as several takes: a long-form project
+/// on both apps and a macOS line batch (U03). Under Auto the engine detects
+/// each take's own text, and a short take of a longer script is misread: a
+/// kanji-only Japanese heading is spoken as Chinese, a three-letter German
+/// "Ja." in English. Auto therefore resolves once, over the whole script,
+/// through the engine's own resolver (`GenerationSemantics.qwenLanguageHint`),
+/// and every take carries that language. An explicit selection is kept as it
+/// is, and a script the resolver cannot place stays Auto, so each take keeps
+/// its own detection.
+enum StudioScriptLanguage {
+    static func resolved(selection: String?, script: String) -> String? {
+        guard Qwen3SupportedLanguage.normalized(selection) == .auto else { return selection }
+        // A Clone probe: its Auto falls back to no language, never to English,
+        // so an undetected script is told apart from a detected English one.
+        let probe = GenerationRequest(
+            mode: .clone,
+            modelID: "",
+            text: script,
+            outputPath: "",
+            shouldStream: false,
+            languageHint: Qwen3SupportedLanguage.auto.rawValue,
+            payload: .clone(reference: CloneReference(audioPath: "", transcript: nil, preparedVoiceID: nil))
+        )
+        let language = Qwen3SupportedLanguage.normalized(GenerationSemantics.qwenLanguageHint(for: probe))
+        return language == .auto ? selection : language.rawValue
     }
 }
 
@@ -185,11 +245,44 @@ struct IOSLongFormProjectRequest {
     let voice: String?
     let emotion: String?
     let deliveryInstructionCellID: String?
+    /// The language every segment request carries: the Studio selection, or
+    /// under Auto the whole script's language, resolved once here (U03). The
+    /// retained request keeps it for resume and regeneration.
     let languageHint: String?
     let voiceDescription: String?
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+
+    /// `languageHint` is the Studio selection; Auto resolves over the script.
+    init(
+        mode: GenerationMode,
+        model: TTSModel,
+        plan: LongFormPlan,
+        voice: String?,
+        emotion: String?,
+        deliveryInstructionCellID: String?,
+        languageHint: String?,
+        voiceDescription: String?,
+        refAudio: String?,
+        refText: String?,
+        preparedVoiceID: String?
+    ) {
+        self.mode = mode
+        self.model = model
+        self.plan = plan
+        self.voice = voice
+        self.emotion = emotion
+        self.deliveryInstructionCellID = deliveryInstructionCellID
+        self.languageHint = StudioScriptLanguage.resolved(
+            selection: languageHint,
+            script: plan.segments.map(\.spokenTextForGeneration).joined(separator: "\n")
+        )
+        self.voiceDescription = voiceDescription
+        self.refAudio = refAudio
+        self.refText = refText
+        self.preparedVoiceID = preparedVoiceID
+    }
 
     var lines: [String] { plan.segments.map(\.spokenTextForGeneration) }
 
@@ -206,6 +299,11 @@ struct IOSLongFormProjectRequest {
         String(format: "segment_%04d_%@", index + 1, String(lines[index].prefix(40)))
     }
 
+    /// The planned sub-seed of a segment, the seed of its first take.
+    func plannedSeed(forSegment index: Int) -> UInt64 {
+        plan.segments[index].evidence.effectiveSubseed
+    }
+
     func makeGenerationRequest(
         segmentIndex: Int,
         outputPath: String,
@@ -214,7 +312,7 @@ struct IOSLongFormProjectRequest {
         seedOverride: UInt64? = nil
     ) -> GenerationRequest {
         let line = lines[segmentIndex]
-        let seed = seedOverride ?? plan.segments[segmentIndex].evidence.effectiveSubseed
+        let seed = seedOverride ?? plannedSeed(forSegment: segmentIndex)
         let payload: GenerationRequest.Payload
         switch mode {
         case .custom:
@@ -349,19 +447,31 @@ final class IOSLongFormCoordinator {
 
     /// A completed project with retained plan identity can regenerate any
     /// single segment; the joined output is reassembled around the new take.
+    /// So can a project that stopped with every segment saved (its joined
+    /// output failed QC or History refused it): a Resume would rebuild the
+    /// same join from the same takes, so replacing a take is the way out (U10).
     var canRegenerateSegments: Bool {
         guard !isProcessing, lastRequest != nil, let outcome else { return false }
-        if case .completed = outcome { return true }
-        return false
+        switch outcome {
+        case .completed:
+            return true
+        case .failed(let segments, _):
+            return !segments.isEmpty && segments.allSatisfy(\.isSaved)
+        case .cancelled:
+            return false
+        }
     }
 
-    static func plan(originalText: String) throws -> LongFormPlan {
+    /// `baseSeed` is the pinned Studio seed, if any (U11): the same script and
+    /// seed plan the same segments on the same sub-seeds, as the CLI's
+    /// `--seed` does. Without one, every project draws its own.
+    static func plan(originalText: String, baseSeed: UInt64? = nil) throws -> LongFormPlan {
         let spokenPlan = try SpokenTextPlanner.plan(originalText: originalText)
         return try LongFormPlanner.plan(
             spokenTextPlan: spokenPlan,
             configuration: LongFormPlanningConfiguration(
                 runtimeTokenLimit: LongFormPlanningConfiguration.shippingRuntimeTokenLimit,
-                baseSeed: UInt64.random(in: UInt64.min ... UInt64.max)
+                baseSeed: baseSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
             )
         )
     }
@@ -530,7 +640,9 @@ final class IOSLongFormCoordinator {
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard !isProcessing, !ttsEngine.hasActiveGeneration else { return }
-        if lastRequest?.plan.evidence.planDigest != request.plan.evidence.planDigest {
+        // A new project starts its own lineage even on the same plan identity
+        // (the same script and pinned seed): only a resume continues one.
+        if prior == nil || lastRequest?.plan.evidence.planDigest != request.plan.evidence.planDigest {
             replacements = []
         }
         guard let attempt = studioCoordinator.start(live: nil) else { return }
@@ -551,10 +663,15 @@ final class IOSLongFormCoordinator {
             services: services
         )
         segments = request.lines.enumerated().map { index, line in
-            if let prior, index < prior.count, prior[index].isSaved, prior[index].line == line {
-                return prior[index]
-            }
-            return IOSLongFormSegmentState(index: index, line: line, status: .pending)
+            var segment = IOSLongFormSegmentState(index: index, line: line, status: .pending)
+            guard let prior, index < prior.count, prior[index].line == line else { return segment }
+            if prior[index].isSaved { return prior[index] }
+            // The same seed would reproduce the failed take, so the retake
+            // derives a fresh one from it (U10); a stopped take keeps its seed.
+            segment.seedOverride = prior[index].isFailed
+                ? StudioRetakeSeed.after(prior[index].seedOverride ?? request.plannedSeed(forSegment: index))
+                : prior[index].seedOverride
+            return segment
         }
         progress = IOSLongFormProgressSnapshot(
             completedCount: segments.count(where: \.isSaved),
@@ -600,18 +717,10 @@ final class IOSLongFormCoordinator {
         switch outcome {
         case .completed(_, let joinedAudioPath, let joinedDurationSeconds):
             let shouldAutoPlay = services.shouldAutoPlay
-            audioPlayer.completeStreamingPreview(
-                result: GenerationResult(
-                    audioPath: joinedAudioPath,
-                    durationSeconds: joinedDurationSeconds,
-                    streamSessionDirectory: nil,
-                    usedStreaming: false
-                ),
-                title: String(request.lines.joined(separator: " ").prefix(40)),
-                shouldAutoPlay: shouldAutoPlay,
-                playbackOperationID: studioAttempt.rawValue
-            )
             let transcript = request.lines.joined(separator: " ")
+            // The attempt finalized before History accepted the project, so
+            // this is accepted; the player takes the joined output only then,
+            // never for an attempt a Stop already ended (U24).
             let accepted = studioCoordinator.complete(
                 IOSStudioInlinePlayerItem(
                     generationID: UUID(),
@@ -626,7 +735,19 @@ final class IOSLongFormCoordinator {
                 ),
                 attempt: studioAttempt
             )
-            if accepted { hooks.notifySuccess() }
+            guard accepted else { return }
+            audioPlayer.completeStreamingPreview(
+                result: GenerationResult(
+                    audioPath: joinedAudioPath,
+                    durationSeconds: joinedDurationSeconds,
+                    streamSessionDirectory: nil,
+                    usedStreaming: false
+                ),
+                title: String(transcript.prefix(40)),
+                shouldAutoPlay: shouldAutoPlay,
+                playbackOperationID: studioAttempt.rawValue
+            )
+            hooks.notifySuccess()
         case .cancelled:
             studioCoordinator.finish(attempt: studioAttempt)
         case .failed(_, let message):
@@ -730,7 +851,7 @@ final class IOSLongFormProjectRunner {
                 qualityReports.append(report)
                 segments[index].qualityReport = report
                 guard report.passed else {
-                    segments[index].status = .failed(message: report.failureSummary)
+                    segments[index].status = .failed(message: hooks.presentation.oldSegmentQC)
                     onSegmentsUpdated(segments)
                     return .failed(
                         segments: segments,
@@ -744,6 +865,7 @@ final class IOSLongFormProjectRunner {
             segments[index].status = .running
             publish(active: index, message: hooks.presentation.generatingSegment(index + 1, total: total))
 
+            let seed = segments[index].seedOverride ?? request.plannedSeed(forSegment: index)
             let generationID = UUID()
             let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
                 subfolder: request.model.outputSubfolder,
@@ -775,7 +897,8 @@ final class IOSLongFormProjectRunner {
                         segmentIndex: index,
                         outputPath: outputPath,
                         generationID: generationID,
-                        variation: hooks.requestVariation()
+                        variation: hooks.requestVariation(),
+                        seedOverride: seed
                     )
                 )
                 let cancellationRequestedAfterTake = await cancellationState.wasRequested()
@@ -803,14 +926,23 @@ final class IOSLongFormProjectRunner {
                 qualityReports.append(report)
                 segments[index].qualityReport = report
                 guard report.passed else {
-                    segments[index].status = .failed(message: report.failureSummary)
+                    let message = hooks.presentation.segmentQCRejected(index + 1)
+                    segments[index].status = .failed(message: message)
                     try? FileManager.default.removeItem(atPath: result.audioPath)
                     audioPlayer.abortLivePreviewIfNeeded()
                     onSegmentsUpdated(segments)
-                    return .failed(
-                        segments: segments,
-                        message: hooks.presentation.segmentQC(index + 1, detail: report.failureSummary)
-                    )
+                    return .failed(segments: segments, message: message)
+                }
+
+                // A Stop accepted while QC ran wins: nothing is queued for
+                // History yet, so the take is discarded like one that finished
+                // after the request, and Resume generates it again (U24).
+                let cancellationRequestedAfterQC = await cancellationState.wasRequested()
+                if Task.isCancelled || cancellationRequestedAfterQC {
+                    try? FileManager.default.removeItem(atPath: result.audioPath)
+                    audioPlayer.abortLivePreviewIfNeeded()
+                    markCancelled(startingAt: index)
+                    return .cancelled(segments: segments)
                 }
 
                 var record = request.makeSegmentHistoryRecord(
@@ -818,10 +950,25 @@ final class IOSLongFormProjectRunner {
                     audioPath: result.audioPath,
                     duration: result.durationSeconds
                 )
-                record.seed = Int64(bitPattern: request.plan.segments[index].evidence.effectiveSubseed)
+                record.seed = Int64(bitPattern: seed)
                 segments[index].historyRecord = record
                 segments[index].generationID = generationID
                 let persistence = await services.persistSegment(record, caller: "IOSLongFormSegment")
+                if persistence == .queuedForRecovery {
+                    // The durable outbox holds the row and commits it on its
+                    // next reconcile, so the take belongs to the project: a
+                    // Resume reuses it instead of saving the segment twice. A
+                    // Stop that cancelled the History write lands here (U24).
+                    segments[index].status = .saved(audioPath: result.audioPath)
+                    audioPlayer.abortLivePreviewIfNeeded()
+                    let cancellationRequested = await cancellationState.wasRequested()
+                    if Task.isCancelled || cancellationRequested {
+                        markCancelled(startingAt: index + 1)
+                        return .cancelled(segments: segments)
+                    }
+                    onSegmentsUpdated(segments)
+                    return .failed(segments: segments, message: hooks.presentation.longFormSegmentHistoryFailed)
+                }
                 try persistence.requireSavedLongFormSegment()
                 segments[index].status = .saved(audioPath: result.audioPath)
                 publish(active: index, message: hooks.presentation.generatedSegmentPending(index + 1, total: total))
@@ -837,7 +984,7 @@ final class IOSLongFormProjectRunner {
                     markCancelled(startingAt: index)
                     return .cancelled(segments: segments)
                 }
-                let message = hooks.presentation.generationFailureMessage(error)
+                let message = failureMessage(for: error, afterGeneration: false)
                 segments[index].status = .failed(message: message)
                 onSegmentsUpdated(segments)
                 return .failed(segments: segments, message: message)
@@ -864,10 +1011,7 @@ final class IOSLongFormProjectRunner {
                 expectedPauseCount: request.joinedOutputPauseBudget
             )
             guard joinedReport.passed else {
-                return .failed(
-                    segments: segments,
-                    message: hooks.presentation.joinedQC(joinedReport.failureSummary)
-                )
+                return .failed(segments: segments, message: hooks.presentation.joinedQCRejected)
             }
             let joinedRecord = request.makeJoinedHistoryRecord(
                 assembly: joined.evidence,
@@ -879,6 +1023,11 @@ final class IOSLongFormProjectRunner {
                 joined: joinedRecord, joinedQCPassed: joinedReport.passed, ownedAudioURLs: [joined.outputURL]
             )
             if await cancellationState.wasRequested() { throw CancellationError() }
+            // The Stop-during-save rule of a single take (A1-01): from here the
+            // attempt refuses a Stop, so the History acceptance runs to its end
+            // and a project that lands in History is never reported stopped or
+            // failed. A Stop accepted first wins, and nothing is saved (U24).
+            guard studioCoordinator.beginFinalization(attempt: studioAttempt) else { throw CancellationError() }
             let saved = try await services.acceptLongFormProject(candidate)
             candidateJoinedURL = nil
             hooks.projectAccepted(saved, joinedAudioPath: joined.outputURL.path)
@@ -894,13 +1043,33 @@ final class IOSLongFormProjectRunner {
             // Recovery keeps, or completes after resume, what it owns (PA-30).
             if acceptanceError?.leavesCandidateToRecovery == true { candidateJoinedURL = nil }
             if error is CancellationError { return .cancelled(segments: segments) }
-            if acceptanceError == .interrupted {
-                return .failed(segments: segments, message: hooks.presentation.longFormAcceptanceInterrupted)
+            return .failed(segments: segments, message: failureMessage(for: error, afterGeneration: true))
+        }
+    }
+
+    /// Interface-language copy for a failed segment, join or acceptance
+    /// (L14-05): typed generation failures through their catalog reason, the
+    /// long-form storage errors through their own copy, and an untyped join
+    /// failure as an actionable line, never an English error description
+    /// that may quote a file name. An untyped engine failure keeps its own
+    /// description, as for a single take.
+    private func failureMessage(for error: Error, afterGeneration: Bool) -> String {
+        switch error {
+        case let acceptance as LongFormAcceptanceError:
+            switch acceptance {
+            case .invalidCandidate: return hooks.presentation.longFormSaveFailed
+            case .recoveryRequired: return hooks.presentation.longFormRecoveryRequired
+            case .interrupted: return hooks.presentation.longFormAcceptanceInterrupted
             }
-            return .failed(
-                segments: segments,
-                message: hooks.presentation.assemblyFailed(error.localizedDescription)
-            )
+        case is LongFormSegmentHistoryError:
+            return hooks.presentation.longFormSegmentHistoryFailed
+        case let runError as RunError:
+            return runError.localizedDescription
+        default:
+            if afterGeneration, GenerationFailurePresentationReason(error) == nil {
+                return hooks.presentation.longFormJoinFailed
+            }
+            return hooks.presentation.generationFailureMessage(error)
         }
     }
 
@@ -1018,13 +1187,12 @@ final class IOSLongFormProjectRunner {
                 expectedPauseCount: PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: line)
             )
             guard report.passed else {
+                // The rejected candidate's live preview stops with it (U09).
+                audioPlayer.abortLivePreviewIfNeeded()
                 segments[segmentIndex] = priorSegment
                 onSegmentsUpdated(segments)
                 return (
-                    .failed(
-                        segments: segments,
-                        message: hooks.presentation.regeneratedQC(report.failureSummary)
-                    ),
+                    .failed(segments: segments, message: hooks.presentation.regeneratedQCRejected),
                     priorReplacements
                 )
             }
@@ -1038,6 +1206,7 @@ final class IOSLongFormProjectRunner {
             segments[segmentIndex].historyRecord = record
             segments[segmentIndex].qualityReport = report
             segments[segmentIndex].generationID = generationID
+            segments[segmentIndex].seedOverride = replacementSeed
             segments[segmentIndex].status = .saved(audioPath: result.audioPath)
 
             var replacements = priorReplacements
@@ -1066,10 +1235,7 @@ final class IOSLongFormProjectRunner {
             guard joinedReport.passed else {
                 onSegmentsUpdated(priorSegments)
                 return (
-                    .failed(
-                        segments: priorSegments,
-                        message: hooks.presentation.regeneratedJoinedQC(joinedReport.failureSummary)
-                    ),
+                    .failed(segments: priorSegments, message: hooks.presentation.regeneratedJoinedQCRejected),
                     priorReplacements
                 )
             }
@@ -1083,6 +1249,9 @@ final class IOSLongFormProjectRunner {
                 joined: joinedRecord, joinedQCPassed: joinedReport.passed, ownedAudioURLs: candidateAudioURLs
             )
             if await cancellationState.wasRequested() { throw CancellationError() }
+            // As in `run`: a Stop is refused once History accepts the
+            // replacement, and one accepted first discards it (U24).
+            guard studioCoordinator.beginFinalization(attempt: studioAttempt) else { throw CancellationError() }
             let saved = try await services.acceptLongFormProject(candidate)
             candidateAudioURLs.removeAll()
             hooks.projectAccepted(saved, joinedAudioPath: joined.outputURL.path)
@@ -1116,9 +1285,7 @@ final class IOSLongFormProjectRunner {
             if error is CancellationError || Task.isCancelled || cancellationRequested {
                 return (.cancelled(segments: segments), priorReplacements)
             }
-            let message = acceptanceError == .interrupted
-                ? hooks.presentation.longFormAcceptanceInterrupted
-                : hooks.presentation.generationFailureMessage(error)
+            let message = failureMessage(for: error, afterGeneration: generationCompleted)
             return (.failed(segments: segments, message: message), priorReplacements)
         }
     }

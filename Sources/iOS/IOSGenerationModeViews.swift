@@ -281,7 +281,7 @@ struct IOSCustomVoiceView: View {
     private func startLongFormProject(model: TTSModel) {
         guard !appModel.longForm.isProcessing else { return }
         do {
-            let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
+            let plan = try IOSLongFormCoordinator.plan(originalText: promptText, baseSeed: draft.pinnedSeed)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
                     IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)
@@ -1114,7 +1114,7 @@ struct IOSVoiceDesignView: View {
     private func startLongFormProject(model: TTSModel) {
         guard !appModel.longForm.isProcessing else { return }
         do {
-            let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
+            let plan = try IOSLongFormCoordinator.plan(originalText: promptText, baseSeed: draft.pinnedSeed)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
                     IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)
@@ -1752,7 +1752,7 @@ struct IOSVoiceCloningView: View {
     private func startLongFormProject(model: TTSModel, refPath: String) {
         guard !appModel.longForm.isProcessing else { return }
         do {
-            let plan = try IOSLongFormCoordinator.plan(originalText: promptText)
+            let plan = try IOSLongFormCoordinator.plan(originalText: promptText, baseSeed: draft.pinnedSeed)
             guard plan.segments.count <= IOSLongFormCoordinator.maxSegments else {
                 coordinator.rejectStart(
                     IOSInterfaceText.tooManySegments(plan.segments.count, maximum: IOSLongFormCoordinator.maxSegments)

@@ -19,12 +19,13 @@ final class VocelloPresentationTextTests: XCTestCase {
 
     func testDynamicPresentationPreservesSubstitutedContentVerbatim() {
         let detail = "A %1$@ — 日本語 / français"
-        XCTAssertEqual(VocelloPresentationText.segmentQC(2, detail: detail),
-                       "Segment 2 failed audio quality checks. " + detail)
         XCTAssertEqual(VocelloPresentationText.playerSubtitle(detail, duration: "1:02"),
                        detail + " · 1:02")
-        XCTAssertEqual(VocelloPresentationText.regeneratedQC(detail),
-                       "The regenerated take failed audio quality checks; the previous take is unchanged. " + detail)
+        // Long-form QC copy carries no raw check detail (L14-05).
+        XCTAssertEqual(
+            VocelloPresentationText.segmentQCRejected(2),
+            "Segment 2 did not pass its audio quality check, so its take was not kept. Resume the project to generate a new take."
+        )
     }
 
     func testTypedStatusesRetainEnglishSourceValues() {

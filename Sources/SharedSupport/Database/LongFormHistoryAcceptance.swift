@@ -305,6 +305,20 @@ struct LongFormHistoryAcceptanceStore: Sendable {
                 try segment.insert(db)
             }
         }
+        // A project lists exactly the takes it was accepted with (U13). A
+        // segment row of the project that the accepted set no longer holds —
+        // the take a regeneration replaced, a stopped take History saved
+        // anyway, an earlier run of the same plan identity — is superseded
+        // like an older joined row: it stays in History, owned and deletable
+        // on its own, but leaves the project's segment list.
+        let acceptedPaths = segments.map(\.audioPath)
+        let keptPaths = acceptedPaths.isEmpty ? "" : " AND audioPath NOT IN (\(databaseQuestionMarks(count: acceptedPaths.count)))"
+        var supersededSegmentArguments: [(any DatabaseValueConvertible)?] = [joined.longFormProjectID]
+        supersededSegmentArguments += acceptedPaths.map { $0 }
+        try db.execute(
+            sql: "UPDATE generations SET longFormRole = 'superseded' WHERE longFormProjectID = ? AND longFormRole = 'segment'" + keptPaths,
+            arguments: StatementArguments(supersededSegmentArguments)
+        )
         try db.execute(sql: "UPDATE generations SET longFormRole = 'superseded' WHERE longFormProjectID = ? AND longFormRole = 'joined'",
                        arguments: [joined.longFormProjectID])
         var joined = joined

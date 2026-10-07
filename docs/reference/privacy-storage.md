@@ -96,7 +96,7 @@ Maintained macOS subtrees and preferences:
   does not repair, quarantine, upload, or delete a journal.
   Completed initial segments are saved individually before the next take/assembly, so abandoning a
   draft or relaunching does not orphan them. Whole-project acceptance still requires joined QC and
-  manifest/database commit. Superseded joined outputs retain visible History rows and are deleted
+  manifest/database commit. Superseded joined outputs and replaced segment takes retain visible History rows and are deleted
   only through ordinary user-directed History deletion; no background garbage collector removes
   audio that might still be playing or exporting.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.

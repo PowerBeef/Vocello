@@ -28,6 +28,9 @@ final class MacLineBatchRunner {
     private(set) var outcome: Outcome?
     /// Mode that started the current/last batch; the sheet of that mode owns it.
     private(set) var lastMode: GenerationMode?
+    /// The request of the current/last batch: a retry of its lines keeps its
+    /// resolved language and derives its seed from it (U03, U10).
+    @ObservationIgnored private(set) var lastRequest: Request?
 
     @ObservationIgnored private var runTask: Task<Void, Never>?
     @ObservationIgnored private var cancelTask: Task<Void, Never>?
@@ -63,6 +66,7 @@ final class MacLineBatchRunner {
         guard !isProcessing, !ttsEngine.hasActiveGeneration, !request.lines.isEmpty else { return false }
         guard let attempt = studioCoordinator.start(live: nil) else { return false }
         lastMode = request.mode
+        lastRequest = request
         outcome = nil
         isProcessing = true
         isCancelling = false
@@ -266,6 +270,8 @@ actor MacLineBatchCancellationState {
 extension MacLineBatchRequest {
     /// The sheet's constructor: scalar model facts from the active package,
     /// the display name the dock shows, and the Settings variation.
+    /// `batchSeed` is the pinned Studio seed or a retry's seed (U11); nil mints
+    /// one for this run.
     init(
         mode: GenerationMode,
         model: TTSModel,
@@ -278,7 +284,8 @@ extension MacLineBatchRequest {
         refAudio: String?,
         refText: String?,
         preparedVoiceID: String?,
-        displayVoiceName: String
+        displayVoiceName: String,
+        batchSeed: UInt64? = nil
     ) {
         self.init(
             mode: mode,
@@ -296,7 +303,8 @@ extension MacLineBatchRequest {
             refText: refText,
             preparedVoiceID: preparedVoiceID,
             displayVoiceName: displayVoiceName,
-            variation: GenerationVariationPreference.requestValue()
+            variation: GenerationVariationPreference.requestValue(),
+            batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
         )
     }
 }

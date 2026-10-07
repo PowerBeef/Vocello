@@ -348,14 +348,14 @@ struct MacBatchGenerationSheet: View {
             } else {
                 if !outcome.retryRemainingLines.isEmpty {
                     Button(MacInterfaceText.batchRetryRemaining) {
-                        retryBatch(with: outcome.retryRemainingLines)
+                        retryBatch(with: outcome.retryRemainingLines, failedLines: false)
                     }
                     .buttonStyle(.bordered)
                 }
 
                 if !outcome.retryFailedLines.isEmpty {
                     Button(MacInterfaceText.batchRetryFailed) {
-                        retryBatch(with: outcome.retryFailedLines)
+                        retryBatch(with: outcome.retryFailedLines, failedLines: true)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -418,7 +418,21 @@ struct MacBatchGenerationSheet: View {
 
     // MARK: - Actions
 
-    private func makeLineBatchRequest(model: TTSModel, lines: [String]) -> MacLineBatchRequest {
+    /// A retry of the last line batch's lines (`failedLines`: the failed ones,
+    /// otherwise the remaining ones).
+    private struct LineBatchRetry {
+        let previous: MacLineBatchRequest
+        let failedLines: Bool
+    }
+
+    /// A batch takes the pinned seed, if any (U11). A retry keeps the earlier
+    /// batch's resolved language and seed, except that failed lines derive a
+    /// fresh seed, since their own would fail the same way again (U10).
+    private func makeLineBatchRequest(
+        model: TTSModel,
+        lines: [String],
+        retrying retry: LineBatchRetry? = nil
+    ) -> MacLineBatchRequest {
         MacLineBatchRequest(
             mode: mode,
             model: model,
@@ -426,16 +440,17 @@ struct MacBatchGenerationSheet: View {
             voice: configuration.voice,
             emotion: configuration.emotion,
             deliveryInstructionCellID: configuration.deliveryInstructionCellID,
-            language: configuration.language,
+            language: retry?.previous.language ?? configuration.language,
             voiceDescription: configuration.voiceDescription,
             refAudio: configuration.refAudio,
             refText: configuration.refText,
             preparedVoiceID: configuration.preparedVoiceID,
-            displayVoiceName: displayVoiceName
+            displayVoiceName: displayVoiceName,
+            batchSeed: retry.map { $0.previous.retrySeed(failedLines: $0.failedLines) } ?? configuration.pinnedSeed
         )
     }
 
-    private func startBatch() {
+    private func startBatch(retrying retry: LineBatchRetry? = nil) {
         guard canStart else { return }
         validationMessage = nil
         guard !ttsEngineStore.hasActiveGeneration else {
@@ -448,20 +463,20 @@ struct MacBatchGenerationSheet: View {
         }
         switch segmentationMode {
         case .lineSeparated:
-            startLineBatch(model: model)
+            startLineBatch(model: model, retrying: retry)
         case .longForm:
             startLongFormProject(model: model)
         }
     }
 
-    private func startLineBatch(model: TTSModel) {
+    private func startLineBatch(model: TTSModel, retrying retry: LineBatchRetry?) {
         let lines = MacLineBatchRunner.lines(from: batchText)
         guard !lines.isEmpty else { return }
         guard lines.count <= MacLineBatchRunner.maxLines else {
             validationMessage = MacInterfaceText.batchTooLarge(String(lines.count), String(MacLineBatchRunner.maxLines))
             return
         }
-        let request = makeLineBatchRequest(model: model, lines: lines)
+        let request = makeLineBatchRequest(model: model, lines: lines, retrying: retry)
         if let error = request.validationError(
             isModelAvailable: modelManager.isAvailable(model),
             recoveryDetail: modelManager.recoveryDetail(for: model)
@@ -485,7 +500,7 @@ struct MacBatchGenerationSheet: View {
     private func startLongFormProject(model: TTSModel) {
         let plan: LongFormPlan
         do {
-            plan = try IOSLongFormCoordinator.plan(originalText: batchText)
+            plan = try IOSLongFormCoordinator.plan(originalText: batchText, baseSeed: configuration.pinnedSeed)
         } catch {
             validationMessage = MacInterfaceText.batchPlanningFailed(error.localizedDescription)
             return
@@ -573,11 +588,11 @@ struct MacBatchGenerationSheet: View {
         }
     }
 
-    private func retryBatch(with lines: [String]) {
+    private func retryBatch(with lines: [String], failedLines: Bool) {
         guard !lines.isEmpty else { return }
         batchText = lines.joined(separator: "\n")
         segmentationMode = .lineSeparated
-        startBatch()
+        startBatch(retrying: lineBatch.lastRequest.map { LineBatchRetry(previous: $0, failedLines: failedLines) })
     }
 
     private func revealOutputs(_ audioPaths: [String]) {

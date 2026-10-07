@@ -270,8 +270,8 @@ after abandoning a draft or relaunching. Segment completion is not project accep
 Both initial completion and segment replacement await the shared `LongFormHistoryAcceptanceStore`:
 QC-checked unique candidate WAVs, throwing manifest serialization, atomic manifest replacement,
 and one journaled SQLite transaction. Failed replacement preserves the previous accepted project;
-recovery runs before History reads/writes. Superseded joined outputs retain individually deletable
-History rows rather than becoming unowned WAVs. Unchanged segments retain their QC, effective seeds,
+recovery runs before History reads/writes. Superseded joined outputs, and segment takes a
+regeneration replaced, retain individually deletable History rows rather than becoming unowned WAVs. Unchanged segments retain their QC, effective seeds,
 and generation identities. Old manifest-v4 files remain readable; this adds no cross-launch
 generation-resume feature. A joined-row commit reloads the complete History project.
 

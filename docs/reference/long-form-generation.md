@@ -60,11 +60,21 @@ check and `vocello generate` use the same predicate:
 6. **Resume and replacement.** In-session resume reuses saved takes (long-form retry never
    degrades to line-separated), and single-segment regeneration appends fail-closed
    accepted-replacement history (revision ≥ 2, strictly increasing, with recorded seeds).
-   This is session-scoped generation continuation, not restart-after-relaunch support.
+   Sampling is seed-deterministic, so resume retakes a segment whose take failed (QC, generation
+   limit) on a fresh seed derived from the failed one, recorded on its History row and in the
+   manifest's execution evidence; a stopped segment keeps its seed. A project that stopped with
+   every segment saved (joined QC or History refused it) can regenerate a segment, since a resume
+   would rebuild the same join. The accepted project lists exactly its takes: a segment row it no
+   longer holds (a replaced take) is superseded like an older joined row. A pinned Studio seed is
+   the plan's base seed, as the CLI's `--seed`; Auto resolves one language over the whole script,
+   so a short segment such as a heading is never detected on its own. Once History acceptance
+   starts, a Stop is refused, as for a single take. This is session-scoped generation
+   continuation, not restart-after-relaunch support.
 
 The ordinary line-separated batch (`MacLineBatchRunner`, macOS only) loops the shared single-take
 executor over the lines with the same QC, telemetry, and preview semantics; only the planning and
-assembly stages are long-form-specific.
+assembly stages are long-form-specific. Its lines share one seed (the pinned one, if any) and one
+language resolved over all lines under Auto; a retry of failed lines derives a fresh seed.
 The sustained performance gate (`TTSEngineStore.hasSustainedPerformanceActivity`) holds across the
 whole run — segments, QC, and assembly — so the UI performance posture matches a single take.
 

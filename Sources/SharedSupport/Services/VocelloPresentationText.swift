@@ -196,22 +196,22 @@ struct VocelloPresentationText: Sendable {
                comment: "User-facing oldSegmentQC message.")
     }
 
-    func segmentQC(_ number: Int, detail: String) -> String {
-        localization.format(localization.string(localized: "vocello.presentation.segmentQC",
-            defaultValue: "Segment %1$lld failed audio quality checks. %2$@",
-            comment: "Complete user-facing segmentQC message. Preserve substitution identities."), number, detail)
+    func segmentQCRejected(_ number: Int) -> String {
+        localization.format(localization.string(localized: "vocello.presentation.segmentQCRejected",
+            defaultValue: "Segment %1$lld did not pass its audio quality check, so its take was not kept. Resume the project to generate a new take.",
+            comment: "Long-form: one segment's new take failed the audio quality check and was discarded; Resume generates it again on a fresh seed. The number is the segment's position."), number)
     }
 
-    func joinedQC(_ detail: String) -> String {
-        localization.format(localization.string(localized: "vocello.presentation.joinedQC",
-            defaultValue: "The joined long-form output failed audio quality checks: %1$@",
-            comment: "Complete user-facing joinedQC message. Preserve substitution identities."), detail)
+    var joinedQCRejected: String {
+        localization.string(localized: "vocello.presentation.joinedQCRejected",
+            defaultValue: "The joined project did not pass its audio quality check, so it was not saved. Regenerate the segment that sounds wrong to join the project again.",
+            comment: "Long-form: the segments passed but their joined output failed the audio quality check; regenerating one segment joins the project again.")
     }
 
-    func assemblyFailed(_ detail: String) -> String {
-        localization.format(localization.string(localized: "vocello.presentation.assemblyFailed",
-            defaultValue: "Long-form assembly failed: %1$@",
-            comment: "Complete user-facing assemblyFailed message. Preserve substitution identities."), detail)
+    var longFormJoinFailed: String {
+        localization.string(localized: "vocello.presentation.longFormJoinFailed",
+            defaultValue: "Vocello couldn't join the segments into one file. The generated segments are kept, so you can try again.",
+            comment: "Long-form: writing the joined output file failed after every segment was generated; the segments are kept and the join can be tried again (Resume, or another regeneration).")
     }
 
     var segmentNotInProject: String {
@@ -219,16 +219,16 @@ struct VocelloPresentationText: Sendable {
                comment: "User-facing segmentNotInProject message.")
     }
 
-    func regeneratedQC(_ detail: String) -> String {
-        localization.format(localization.string(localized: "vocello.presentation.regeneratedQC",
-            defaultValue: "The regenerated take failed audio quality checks; the previous take is unchanged. %1$@",
-            comment: "Complete user-facing regeneratedQC message. Preserve substitution identities."), detail)
+    var regeneratedQCRejected: String {
+        localization.string(localized: "vocello.presentation.regeneratedQCRejected",
+            defaultValue: "The new take did not pass its audio quality check, so the previous take is unchanged. Regenerate the segment to try another take.",
+            comment: "Long-form: a regenerated segment's new take failed the audio quality check; the segment keeps its previous take.")
     }
 
-    func regeneratedJoinedQC(_ detail: String) -> String {
-        localization.format(localization.string(localized: "vocello.presentation.regeneratedJoinedQC",
-            defaultValue: "The joined long-form output failed audio quality checks after regeneration: %1$@",
-            comment: "Complete user-facing regeneratedJoinedQC message. Preserve substitution identities."), detail)
+    var regeneratedJoinedQCRejected: String {
+        localization.string(localized: "vocello.presentation.regeneratedJoinedQCRejected",
+            defaultValue: "After regeneration, the joined project did not pass its audio quality check, so the previous project is unchanged.",
+            comment: "Long-form: after a segment was regenerated, the rejoined output failed the audio quality check; the previously saved project stays as it was.")
     }
 
     func segmentMissing(_ number: Int) -> String {
@@ -845,11 +845,7 @@ extension VocelloPresentationText {
     static func generatingSegment(_ number: Int, total: Int) -> String { Self().generatingSegment(number, total: total) }
     static func generatedSegmentPending(_ number: Int, total: Int) -> String { Self().generatedSegmentPending(number, total: total) }
     static func joiningSegments(_ count: Int) -> String { Self().joiningSegments(count) }
-    static func segmentQC(_ number: Int, detail: String) -> String { Self().segmentQC(number, detail: detail) }
-    static func joinedQC(_ detail: String) -> String { Self().joinedQC(detail) }
-    static func assemblyFailed(_ detail: String) -> String { Self().assemblyFailed(detail) }
-    static func regeneratedQC(_ detail: String) -> String { Self().regeneratedQC(detail) }
-    static func regeneratedJoinedQC(_ detail: String) -> String { Self().regeneratedJoinedQC(detail) }
+    static func segmentQCRejected(_ number: Int) -> String { Self().segmentQCRejected(number) }
     static func segmentMissing(_ number: Int) -> String { Self().segmentMissing(number) }
     static func recoveryExportFailure(_ count: Int) -> String { Self().recoveryExportFailure(count) }
     static func status(_ status: Status) -> String { Self().status(status) }

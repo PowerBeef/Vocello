@@ -195,6 +195,55 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertEqual(deliveryStyle, "Cheerful and bright")
     }
 
+    /// U03: under Auto the batch resolves one language over all its lines, so
+    /// a line too short to detect on its own ("Ja.") is never sent as English.
+    func testAutoResolvesOneLanguageForTheWholeBatch() throws {
+        let lines = [
+            "Ja.",
+            "Nein, danke.",
+            "Wir sehen uns morgen früh am Bahnhof, und danach fahren wir zusammen nach Hause.",
+        ]
+        let request = MacLineBatchRequest(
+            mode: .custom,
+            modelID: "model-custom",
+            modelTier: "speed",
+            outputSubfolder: "batch",
+            supportsInstructionControl: true,
+            lines: lines,
+            voice: "ryan",
+            emotion: nil,
+            deliveryInstructionCellID: nil,
+            language: .auto,
+            voiceDescription: nil,
+            refAudio: nil,
+            refText: nil,
+            preparedVoiceID: nil,
+            displayVoiceName: "Ryan",
+            variation: nil,
+            batchSeed: 42
+        )
+        XCTAssertEqual(request.language, .german)
+        for (index, line) in lines.enumerated() {
+            let lineRequest = try XCTUnwrap(
+                request.generationRequest(line: line, outputPath: "/tmp/\(index).wav")
+            )
+            XCTAssertEqual(lineRequest.languageHint, Qwen3SupportedLanguage.german.rawValue, line)
+        }
+        XCTAssertEqual(makeRequest(mode: .custom).language, .french, "An explicit selection is kept")
+    }
+
+    /// U10: a retry of remaining lines keeps the batch seed; failed lines
+    /// failed on it, so their retry derives a fresh one.
+    func testARetryOfFailedLinesDerivesAFreshSeed() {
+        let request = makeRequest(mode: .design, batchSeed: 7)
+        XCTAssertEqual(request.retrySeed(failedLines: false), 7)
+        let retry = request.retrySeed(failedLines: true)
+        XCTAssertNotEqual(retry, 7)
+        XCTAssertEqual(retry, request.retrySeed(failedLines: true), "The retry seed reproduces")
+        let again = makeRequest(mode: .design, batchSeed: retry).retrySeed(failedLines: true)
+        XCTAssertNotEqual(again, retry, "Retrying again draws again")
+    }
+
     func testCloneLineRequestCarriesTheReferenceAndPreparedVoice() throws {
         let request = try XCTUnwrap(
             makeRequest(mode: .clone).generationRequest(line: "Line one", outputPath: "/tmp/1.wav")

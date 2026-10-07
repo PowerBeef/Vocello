@@ -120,6 +120,9 @@ struct MacLineBatchRequest {
     let voice: String?
     let emotion: String?
     let deliveryInstructionCellID: String?
+    /// The language every line carries: the Studio selection, or under Auto
+    /// the whole batch's language, resolved once over all its lines (U03), so
+    /// a short line ("Ja.") is never detected on its own and misread.
     let language: Qwen3SupportedLanguage
     let voiceDescription: String?
     let refAudio: String?
@@ -131,7 +134,8 @@ struct MacLineBatchRequest {
     let variation: Qwen3SamplingVariation?
     /// One sampling seed shared by every line of the batch (GitHub #30): the
     /// lines of one batch keep a steadier character and pacing than fully
-    /// independent draws. Minted per run, so separate batches still differ.
+    /// independent draws. The pinned Studio seed when there is one (U11);
+    /// otherwise minted per run, so separate batches still differ.
     let batchSeed: UInt64
 
     init(
@@ -162,7 +166,9 @@ struct MacLineBatchRequest {
         self.voice = voice
         self.emotion = emotion
         self.deliveryInstructionCellID = deliveryInstructionCellID
-        self.language = language
+        self.language = Qwen3SupportedLanguage.normalized(
+            StudioScriptLanguage.resolved(selection: language.rawValue, script: lines.joined(separator: "\n"))
+        )
         self.voiceDescription = voiceDescription
         self.refAudio = refAudio
         self.refText = refText
@@ -228,6 +234,17 @@ struct MacLineBatchRequest {
     }
 
     var modeLabel: String { MacInterfaceText.modeName(mode) }
+
+    /// The batch seed of a retry of this batch's lines. Remaining lines never
+    /// produced a take, so they keep the batch's seed. A failed line failed on
+    /// its seed and would fail the same way on it again, so its retry derives
+    /// a fresh one (U10); retrying again derives again. The salt keeps a
+    /// retry's seed off the chain other derived seeds draw from.
+    func retrySeed(failedLines: Bool) -> UInt64 {
+        failedLines ? StudioRetakeSeed.after(batchSeed ^ Self.retrySeedSalt) : batchSeed
+    }
+
+    private static let retrySeedSalt: UInt64 = 0x5245_5452_5953_4544 // "RETRYSED"
 
     /// The engine request for one line through `MacStudioGenerationRequestFactory`
     /// (streaming, the batch seed, the Settings variation, a fresh generation

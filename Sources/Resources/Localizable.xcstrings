@@ -2989,200 +2989,200 @@
         }
       }
     },
-    "vocello.presentation.segmentQC": {
-      "comment": "Complete user-facing segmentQC message. Preserve substitutions.",
+    "vocello.presentation.segmentQCRejected": {
+      "comment": "Long-form: one segment's new take failed the audio quality check and was discarded; Resume generates it again on a fresh seed. The number is the segment's position.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Segment %1$lld failed audio quality checks. %2$@"
+            "value": "Segment %1$lld did not pass its audio quality check, so its take was not kept. Resume the project to generate a new take."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le segment %1$lld a échoué aux contrôles de qualité audio. %2$@"
+            "value": "Le segment %1$lld n’a pas réussi le contrôle de qualité audio, sa prise n’a donc pas été conservée. Reprenez le projet pour générer une nouvelle prise."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El segmento %1$lld no superó las comprobaciones de calidad de audio. %2$@"
+            "value": "El segmento %1$lld no superó la comprobación de calidad de audio, así que su toma no se conservó. Reanuda el proyecto para generar una toma nueva."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abschnitt %1$lld hat die Audioqualitätsprüfung nicht bestanden. %2$@"
+            "value": "Abschnitt %1$lld hat die Audioqualitätsprüfung nicht bestanden, daher wurde seine Aufnahme nicht behalten. Setze das Projekt fort, um eine neue Aufnahme zu erzeugen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il segmento %1$lld non ha superato i controlli di qualità audio. %2$@"
+            "value": "Il segmento %1$lld non ha superato il controllo di qualità audio, quindi il suo take non è stato conservato. Riprendi il progetto per generare un nuovo take."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O segmento %1$lld não passou nas verificações de qualidade do áudio. %2$@"
+            "value": "O segmento %1$lld não passou na verificação de qualidade do áudio, então a tomada dele não foi mantida. Retome o projeto para gerar uma nova tomada."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "第 %1$lld 段未通过音频质量检查。%2$@"
+            "value": "第 %1$lld 段未通过音频质量检查，因此未保留这段音频。请继续项目以生成新的音频。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "区間 %1$lld が音声品質チェックに合格しませんでした。%2$@"
+            "value": "区間 %1$lld が音声品質チェックに合格しなかったため、そのテイクは保持していません。プロジェクトを再開すると新しいテイクを生成します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "구간 %1$lld이(가) 오디오 품질 검사를 통과하지 못했습니다. %2$@"
+            "value": "구간 %1$lld이(가) 오디오 품질 검사를 통과하지 못해 테이크를 보관하지 않았습니다. 프로젝트를 재개하여 새 테이크를 생성하세요."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сегмент %1$lld не прошёл проверку качества звука. %2$@"
+            "value": "Сегмент %1$lld не прошёл проверку качества звука, поэтому его дубль не сохранён. Продолжите проект, чтобы создать новый дубль."
           }
         }
       }
     },
-    "vocello.presentation.joinedQC": {
-      "comment": "Complete user-facing joinedQC message. Preserve substitutions.",
+    "vocello.presentation.joinedQCRejected": {
+      "comment": "Long-form: the segments passed but their joined output failed the audio quality check; regenerating one segment joins the project again.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The joined long-form output failed audio quality checks: %1$@"
+            "value": "The joined project did not pass its audio quality check, so it was not saved. Regenerate the segment that sounds wrong to join the project again."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio assemblé du texte long a échoué aux contrôles de qualité : %1$@"
+            "value": "Le projet assemblé n’a pas réussi le contrôle de qualité audio et n’a pas été enregistré. Régénérez le segment qui sonne mal pour assembler à nouveau le projet."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El audio largo unido no superó las comprobaciones de calidad: %1$@"
+            "value": "El proyecto unido no superó la comprobación de calidad de audio y no se guardó. Regenera el segmento que suena mal para volver a unir el proyecto."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die zusammengefügte Langtextausgabe hat die Audioqualitätsprüfung nicht bestanden: %1$@"
+            "value": "Das zusammengefügte Projekt hat die Audioqualitätsprüfung nicht bestanden und wurde nicht gesichert. Erzeuge den fehlerhaft klingenden Abschnitt neu, um das Projekt erneut zusammenzufügen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio lungo unito non ha superato i controlli di qualità: %1$@"
+            "value": "Il progetto unito non ha superato il controllo di qualità audio e non è stato salvato. Rigenera il segmento che suona male per unire di nuovo il progetto."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O áudio longo unido não passou nas verificações de qualidade: %1$@"
+            "value": "O projeto unido não passou na verificação de qualidade do áudio e não foi salvo. Gere novamente o segmento que soa errado para unir o projeto outra vez."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "合并后的长音频未通过音频质量检查：%1$@"
+            "value": "合并后的项目未通过音频质量检查，因此未保存。请重新生成听起来有问题的片段，以再次合并项目。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "結合した長文音声が品質チェックに合格しませんでした：%1$@"
+            "value": "結合したプロジェクトが音声品質チェックに合格しなかったため、保存されませんでした。おかしく聞こえる区間を再生成すると、プロジェクトをもう一度結合します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "합친 긴 오디오가 품질 검사를 통과하지 못했습니다: %1$@"
+            "value": "합친 프로젝트가 오디오 품질 검사를 통과하지 못해 저장되지 않았습니다. 이상하게 들리는 구간을 다시 생성하면 프로젝트를 다시 합칩니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Объединённая длинная запись не прошла проверку качества: %1$@"
+            "value": "Объединённый проект не прошёл проверку качества звука и не сохранён. Пересоздайте сегмент, который звучит неправильно, чтобы снова объединить проект."
           }
         }
       }
     },
-    "vocello.presentation.assemblyFailed": {
-      "comment": "Complete user-facing assemblyFailed message. Preserve substitutions.",
+    "vocello.presentation.longFormJoinFailed": {
+      "comment": "Long-form: writing the joined output file failed after every segment was generated; the segments are kept and the join can be tried again (Resume, or another regeneration).",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Long-form assembly failed: %1$@"
+            "value": "Vocello couldn't join the segments into one file. The generated segments are kept, so you can try again."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Échec de l’assemblage du texte long : %1$@"
+            "value": "Vocello n’a pas pu assembler les segments en un seul fichier. Les segments générés sont conservés : vous pouvez réessayer."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo unir el audio largo: %1$@"
+            "value": "Vocello no pudo unir los segmentos en un solo archivo. Los segmentos generados se conservan, así que puedes volver a intentarlo."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zusammenfügen des Langtexts fehlgeschlagen: %1$@"
+            "value": "Vocello konnte die Abschnitte nicht zu einer Datei zusammenfügen. Die erzeugten Abschnitte bleiben erhalten, du kannst es also erneut versuchen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Unione dell’audio lungo non riuscita: %1$@"
+            "value": "Vocello non è riuscito a unire i segmenti in un unico file. I segmenti generati sono conservati, quindi puoi riprovare."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Falha ao unir o áudio longo: %1$@"
+            "value": "O Vocello não conseguiu unir os segmentos em um único arquivo. Os segmentos gerados foram mantidos, então você pode tentar novamente."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "长音频合并失败：%1$@"
+            "value": "Vocello 无法将各片段合并为一个文件。已生成的片段均已保留，你可以重试。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "長文音声の結合に失敗しました：%1$@"
+            "value": "Vocello は区間を 1 つのファイルに結合できませんでした。生成した区間は保持されているので、もう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "긴 오디오 결합 실패: %1$@"
+            "value": "Vocello가 구간을 하나의 파일로 합치지 못했습니다. 생성된 구간은 보관되어 있으니 다시 시도할 수 있습니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Не удалось объединить длинную запись: %1$@"
+            "value": "Vocello не удалось объединить сегменты в один файл. Созданные сегменты сохранены, поэтому можно повторить попытку."
           }
         }
       }
@@ -3253,134 +3253,134 @@
         }
       }
     },
-    "vocello.presentation.regeneratedQC": {
-      "comment": "Complete user-facing regeneratedQC message. Preserve substitutions.",
+    "vocello.presentation.regeneratedQCRejected": {
+      "comment": "Long-form: a regenerated segment's new take failed the audio quality check; the segment keeps its previous take.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The regenerated take failed audio quality checks; the previous take is unchanged. %1$@"
+            "value": "The new take did not pass its audio quality check, so the previous take is unchanged. Regenerate the segment to try another take."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La prise régénérée a échoué aux contrôles de qualité audio ; la prise précédente est inchangée. %1$@"
+            "value": "La nouvelle prise n’a pas réussi le contrôle de qualité audio ; la prise précédente est inchangée. Régénérez le segment pour essayer une autre prise."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La toma regenerada no superó las comprobaciones de calidad; la toma anterior sigue intacta. %1$@"
+            "value": "La toma nueva no superó la comprobación de calidad de audio; la toma anterior sigue intacta. Regenera el segmento para probar otra toma."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die neue Aufnahme hat die Audioqualitätsprüfung nicht bestanden; die vorherige bleibt unverändert. %1$@"
+            "value": "Die neue Aufnahme hat die Audioqualitätsprüfung nicht bestanden; die vorherige bleibt unverändert. Erzeuge den Abschnitt erneut, um eine andere Aufnahme zu versuchen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il take rigenerato non ha superato i controlli di qualità; quello precedente è invariato. %1$@"
+            "value": "Il nuovo take non ha superato il controllo di qualità audio; quello precedente è invariato. Rigenera il segmento per provare un altro take."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A nova tomada não passou nas verificações de qualidade; a anterior permanece intacta. %1$@"
+            "value": "A nova tomada não passou na verificação de qualidade do áudio; a anterior permanece intacta. Gere o segmento novamente para tentar outra tomada."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重新生成的音频未通过质量检查；原音频保持不变。%1$@"
+            "value": "新的音频未通过音频质量检查；原音频保持不变。请重新生成该片段以尝试其他音频。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "再生成したテイクが品質チェックに合格しませんでした。以前のテイクは変更していません。%1$@"
+            "value": "新しいテイクが音声品質チェックに合格しなかったため、以前のテイクは変更していません。区間を再生成すると別のテイクを試せます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다시 생성한 테이크가 품질 검사를 통과하지 못했습니다. 이전 테이크는 그대로입니다. %1$@"
+            "value": "새 테이크가 오디오 품질 검사를 통과하지 못해 이전 테이크는 그대로입니다. 구간을 다시 생성하여 다른 테이크를 시도하세요."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новый дубль не прошёл проверку качества; предыдущий не изменён. %1$@"
+            "value": "Новый дубль не прошёл проверку качества звука; предыдущий не изменён. Пересоздайте сегмент, чтобы попробовать другой дубль."
           }
         }
       }
     },
-    "vocello.presentation.regeneratedJoinedQC": {
-      "comment": "Complete user-facing regeneratedJoinedQC message. Preserve substitutions.",
+    "vocello.presentation.regeneratedJoinedQCRejected": {
+      "comment": "Long-form: after a segment was regenerated, the rejoined output failed the audio quality check; the previously saved project stays as it was.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The joined long-form output failed audio quality checks after regeneration: %1$@"
+            "value": "After regeneration, the joined project did not pass its audio quality check, so the previous project is unchanged."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio assemblé du texte long a échoué aux contrôles de qualité après régénération : %1$@"
+            "value": "Après la régénération, le projet assemblé n’a pas réussi le contrôle de qualité audio ; le projet précédent est inchangé."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El audio largo unido no superó las comprobaciones de calidad tras regenerarlo: %1$@"
+            "value": "Tras la regeneración, el proyecto unido no superó la comprobación de calidad de audio; el proyecto anterior sigue intacto."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die zusammengefügte Langtextausgabe hat nach der Neuerzeugung die Audioqualitätsprüfung nicht bestanden: %1$@"
+            "value": "Nach der Neuerzeugung hat das zusammengefügte Projekt die Audioqualitätsprüfung nicht bestanden; das vorherige Projekt bleibt unverändert."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio lungo unito non ha superato i controlli di qualità dopo la rigenerazione: %1$@"
+            "value": "Dopo la rigenerazione, il progetto unito non ha superato il controllo di qualità audio; il progetto precedente è invariato."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O áudio longo unido não passou nas verificações de qualidade após a nova geração: %1$@"
+            "value": "Após gerar novamente, o projeto unido não passou na verificação de qualidade do áudio; o projeto anterior permanece intacto."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重新生成后，合并的长音频未通过质量检查：%1$@"
+            "value": "重新生成后，合并的项目未通过音频质量检查；原项目保持不变。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "再生成後の結合音声が品質チェックに合格しませんでした：%1$@"
+            "value": "再生成後に結合したプロジェクトが音声品質チェックに合格しなかったため、以前のプロジェクトは変更していません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다시 생성한 뒤 합친 오디오가 품질 검사를 통과하지 못했습니다: %1$@"
+            "value": "다시 생성한 후 합친 프로젝트가 오디오 품질 검사를 통과하지 못해 이전 프로젝트는 그대로입니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Объединённая запись не прошла проверку качества после повторной генерации: %1$@"
+            "value": "После пересоздания объединённый проект не прошёл проверку качества звука; предыдущий проект не изменён."
           }
         }
       }

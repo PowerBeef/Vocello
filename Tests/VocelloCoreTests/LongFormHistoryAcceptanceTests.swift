@@ -22,6 +22,39 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertTrue(try journalURLs(f.store).isEmpty)
     }
 
+    /// U13: the accepted project lists exactly its takes. A segment row of the
+    /// project the candidate no longer holds (the take a regeneration replaced)
+    /// is superseded like the older joined row: kept and deletable on its own,
+    /// out of the project's segment list. Other projects' rows are untouched.
+    func testAcceptanceSupersedesTheProjectSegmentRowsItNoLongerHolds() async throws {
+        let f = try fixture()
+        let projectID = try XCTUnwrap(f.input.joined.longFormProjectID)
+        var replaced = f.input.segments[0]
+        replaced.audioPath = f.oldJoined.deletingLastPathComponent().appendingPathComponent("replaced_take.wav").path
+        var otherProject = f.input.segments[0]
+        otherProject.audioPath = f.oldJoined.deletingLastPathComponent().appendingPathComponent("other_take.wav").path
+        otherProject.longFormProjectID = "other-project"
+        var accepted = f.input.segments[1]
+        try syncWrite(f.queue) { db in
+            try replaced.insert(db)
+            try otherProject.insert(db)
+            try accepted.insert(db)
+        }
+
+        _ = try await f.store.commit(f.input, using: f.queue)
+
+        let rows = try f.queue.read { try Generation.fetchAll($0) }
+        func role(of path: String) -> String? { rows.first { $0.audioPath == path }?.longFormRole }
+        XCTAssertEqual(role(of: replaced.audioPath), "superseded")
+        XCTAssertEqual(role(of: otherProject.audioPath), "segment", "Another project's rows are not touched")
+        XCTAssertEqual(
+            Set(rows.filter { $0.longFormProjectID == projectID && $0.longFormRole == "segment" }.map(\.audioPath)),
+            Set(f.input.segments.map(\.audioPath))
+        )
+        XCTAssertEqual(role(of: f.oldJoined.path), "superseded")
+        XCTAssertEqual(role(of: f.input.joined.audioPath), "joined")
+    }
+
     func testDatabaseFailureRestoresPriorManifestAndRows() async throws {
         let f = try fixture()
         try await f.queue.write { db in

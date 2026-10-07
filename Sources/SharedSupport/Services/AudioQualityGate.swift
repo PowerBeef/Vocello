@@ -12,13 +12,6 @@ enum AudioQualityGate {
         let warnings: [String]
         let metrics: [String: Double]
         let checks: [Check]
-
-        var failureSummary: String {
-            if requiredFailures.isEmpty {
-                return "Audio quality check passed."
-            }
-            return "Audio quality check failed: \(requiredFailures.joined(separator: ", "))"
-        }
     }
 
     struct Check: Codable, Equatable {

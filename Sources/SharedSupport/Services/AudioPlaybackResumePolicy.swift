@@ -137,9 +137,6 @@ struct LivePreviewFinalHandoff: Equatable, Sendable {
         guard heardLivePreview else {
             return Self(preserveCurrentTime: 0, shouldAutoPlay: autoPlayEnabled)
         }
-        guard autoPlayEnabled else {
-            return Self(preserveCurrentTime: 0, shouldAutoPlay: false)
-        }
 
         let safeDuration = max(duration, 0)
         let heardTime = max(currentTime, previewDuration)
@@ -149,7 +146,182 @@ struct LivePreviewFinalHandoff: Equatable, Sendable {
               safeCurrentTime < safeDuration - replayThreshold else {
             return Self(preserveCurrentTime: 0, shouldAutoPlay: false)
         }
-        return Self(preserveCurrentTime: safeCurrentTime, shouldAutoPlay: true)
+        // A held take (S3) keeps where it stopped and waits for Play there.
+        return Self(preserveCurrentTime: safeCurrentTime, shouldAutoPlay: autoPlayEnabled)
+    }
+}
+
+/// What a take promoted from the queue does once its buffered chunks are
+/// scheduled again (S2). Long-form segments get no result of their own, so a
+/// take whose stream has ended (a successor already waits behind it) cannot
+/// rely on more chunks to fill its prebuffer.
+enum LivePreviewPromotionPolicy {
+    enum Action: Equatable, Sendable {
+        /// Its stream has ended: play what it has now.
+        case play
+        /// Its stream has ended with nothing to play: the next take starts.
+        case skipToNext
+        /// Playing already, held, or still streaming: nothing to do yet.
+        case wait
+    }
+
+    static func decide(
+        streamEnded: Bool,
+        queuedBuffers: Int,
+        isPlaying: Bool,
+        allowsAutomaticPlayback: Bool
+    ) -> Action {
+        guard streamEnded, !isPlaying else { return .wait }
+        guard queuedBuffers > 0 else { return .skipToNext }
+        return allowsAutomaticPlayback ? .play : .wait
+    }
+}
+
+/// The takes of one generation operation waiting for the take that plays
+/// (U07), in take order. Generic over what the player stores, so its order and
+/// bookkeeping are unit-tested apart from audio.
+///
+/// - A take is admitted by its first chunk, or by a prepared long-form
+///   segment before any chunk; it consumes the pending estimate, which a
+///   later submission then replaces for the take after it.
+/// - A chunk goes to the take of its stream; a take admitted without a name
+///   adopts the first chunk of a stream that is not the current one.
+/// - A result arrives after its take's last chunk and in take order, so it
+///   belongs to the newest waiting take; when that take already has one, the
+///   result is a take that streamed nothing and waits with its file alone.
+/// - The waiting audio is bounded (N1/N2): past `maximumBacklogSeconds`,
+///   counted with what the playing take still has to play, the newcomer stops
+///   buffering its preview (it keeps its result, so a line still plays from
+///   its file) and nothing that plays is cut.
+struct LivePreviewTakeQueue<Chunk, Completion, Details> {
+    struct Take {
+        /// nil until the first chunk names it (a prepared take without a
+        /// generation ID, or a completed take that streamed nothing).
+        fileprivate(set) var sessionID: String?
+        let operationID: UUID?
+        let details: Details
+        let estimate: LivePreviewEstimate?
+        fileprivate(set) var sessionDirectory: String?
+        fileprivate(set) var chunks: [Chunk] = []
+        fileprivate(set) var completion: Completion?
+        fileprivate(set) var queuedSeconds: TimeInterval = 0
+        /// Past the bound: later chunks are dropped, the result is kept.
+        fileprivate(set) var isPreviewTruncated = false
+        fileprivate(set) var hasStoredAudio = false
+
+        var acceptsUnnamedChunks: Bool { sessionID == nil && completion == nil }
+    }
+
+    enum Routing: Equatable, Sendable {
+        /// No waiting take owns the chunk; the player handles it.
+        case notQueued
+        /// Stored; `firstAudio` marks the take's first stored audio.
+        case stored(firstAudio: Bool)
+        /// Its take waits past the bound; the chunk is not kept.
+        case dropped
+    }
+
+    /// About 14 MB of 24 kHz 16-bit mono preview audio.
+    static var maximumBacklogSeconds: TimeInterval { 300 }
+
+    private(set) var takes: [Take] = []
+
+    init() {}
+
+    var isEmpty: Bool { takes.isEmpty }
+    var backlogSeconds: TimeInterval { takes.reduce(0) { $0 + $1.queuedSeconds } }
+
+    /// Admits a take behind the take that plays, consuming the pending
+    /// estimate (or the fallback derived from its title).
+    mutating func admit(
+        sessionID: String?,
+        operationID: UUID?,
+        details: Details,
+        sessionDirectory: String?,
+        pendingEstimate: inout LivePreviewEstimate?,
+        fallbackEstimate: LivePreviewEstimate?,
+        currentBacklogSeconds: TimeInterval
+    ) {
+        var take = Take(
+            sessionID: sessionID,
+            operationID: operationID,
+            details: details,
+            estimate: pendingEstimate ?? fallbackEstimate,
+            sessionDirectory: sessionDirectory
+        )
+        pendingEstimate = nil
+        take.isPreviewTruncated = currentBacklogSeconds + backlogSeconds >= Self.maximumBacklogSeconds
+        takes.append(take)
+    }
+
+    /// Routes a streamed chunk (nil: nothing playable in it) to its waiting
+    /// take.
+    mutating func route(
+        _ chunk: Chunk?,
+        sessionID: String,
+        isCurrentSession: Bool,
+        sessionDirectory: String?,
+        chunkSeconds: TimeInterval,
+        cumulativeDuration: TimeInterval?,
+        currentBacklogSeconds: TimeInterval
+    ) -> Routing {
+        let index: Int
+        if let named = takes.lastIndex(where: { $0.sessionID == sessionID }) {
+            index = named
+        } else if !isCurrentSession, let last = takes.indices.last, takes[last].acceptsUnnamedChunks {
+            index = last
+        } else {
+            return .notQueued
+        }
+        takes[index].sessionID = sessionID
+        if takes[index].sessionDirectory == nil {
+            takes[index].sessionDirectory = sessionDirectory
+        }
+        guard let chunk else { return .stored(firstAudio: false) }
+        guard !takes[index].isPreviewTruncated else { return .dropped }
+        let queued = cumulativeDuration ?? (takes[index].queuedSeconds + chunkSeconds)
+        let increment = max(0, queued - takes[index].queuedSeconds)
+        guard currentBacklogSeconds + backlogSeconds + increment <= Self.maximumBacklogSeconds else {
+            takes[index].isPreviewTruncated = true
+            return .dropped
+        }
+        takes[index].chunks.append(chunk)
+        takes[index].queuedSeconds = max(queued, takes[index].queuedSeconds)
+        let firstAudio = !takes[index].hasStoredAudio
+        takes[index].hasStoredAudio = true
+        return .stored(firstAudio: firstAudio)
+    }
+
+    /// Keeps a result for the newest waiting take; false when none waits.
+    mutating func attach(_ completion: Completion, details: Details) -> Bool {
+        guard let last = takes.indices.last else { return false }
+        if takes[last].completion == nil {
+            takes[last].completion = completion
+        } else {
+            var take = Take(
+                sessionID: nil,
+                operationID: takes[last].operationID,
+                details: details,
+                estimate: nil,
+                sessionDirectory: nil
+            )
+            take.completion = completion
+            takes.append(take)
+        }
+        return true
+    }
+
+    mutating func popFirst() -> Take? {
+        takes.isEmpty ? nil : takes.removeFirst()
+    }
+
+    /// Removes the takes that match (S1: an operation that no longer owns
+    /// playback) and returns them for cleanup.
+    @discardableResult
+    mutating func removeAll(where shouldRemove: (Take) -> Bool) -> [Take] {
+        let removed = takes.filter(shouldRemove)
+        takes.removeAll(where: shouldRemove)
+        return removed
     }
 }
 
@@ -240,12 +412,14 @@ struct LivePreviewAutoplayState: Equatable, Sendable {
         holdsUpcomingSession = false
     }
 
-    /// The listener pressed Play: a hold ends, and later underruns, handoffs
-    /// and the operation's next takes play on their own. Playing other audio
-    /// keeps a submitted take's upcoming hold.
+    /// The listener pressed Play on the shared player: a hold ends, including
+    /// a submitted take's, and later underruns, handoffs and the operation's
+    /// next takes play on their own. Another player starting does not call
+    /// this, so a take it held stays held.
     mutating func play() {
         isHeld = false
         explicitlyPlayed = true
+        holdsUpcomingSession = false
     }
 
     /// The session ended (teardown, or the handoff to its final file). An
@@ -276,18 +450,19 @@ struct LivePreviewAutoplayState: Equatable, Sendable {
 }
 
 /// Whether a new take's live preview starts at once or waits for the take
-/// still playing (U07). Inside one generation operation (a line batch, a
+/// before it (U07). Inside one generation operation (a line batch, a
 /// long-form project) the previous take plays to its end, live tail and final
-/// file alike, and the next take's chunks wait in memory for their turn; a
-/// tail its prebuffer or an underrun was holding back is released first,
-/// because a successor means its stream has ended. A held or silent previous
-/// take, a take of another operation (or of none), or a backlog past the
-/// bound starts the new take at once, as before.
+/// file alike, and the next take waits in `LivePreviewTakeQueue`; a tail its
+/// prebuffer or an underrun was holding back is released first, because a
+/// successor means its stream has ended. A pause holds the whole narration
+/// (S5): the next take waits behind a held take too, and Play resumes the
+/// held take, then the queue. A silent previous take (nothing left to play)
+/// or a take of another operation (or of none) starts the new take at once.
 enum LivePreviewSuccessionPolicy {
     enum PreviousTake: Equatable, Sendable {
-        /// Nothing left that would play on its own.
+        /// Nothing left that would play.
         case silent
-        /// Paused by the listener or the system.
+        /// Paused by the listener or the system, with audio left to resume.
         case held
         /// Audible now (live preview or its final file).
         case playing
@@ -301,22 +476,16 @@ enum LivePreviewSuccessionPolicy {
         case releaseTailThenQueue
     }
 
-    /// About 14 MB of 24 kHz 16-bit mono preview audio waiting behind the
-    /// take that plays; past it the narration skips ahead to the newest take.
-    static let maximumBacklogSeconds: TimeInterval = 300
-
     static func decide(
         incomingOperationID: UUID?,
         previousOperationID: UUID?,
-        previous: PreviousTake,
-        backlogSeconds: TimeInterval
+        previous: PreviousTake
     ) -> Decision {
         guard let incomingOperationID, incomingOperationID == previousOperationID else { return .startNow }
-        guard backlogSeconds < maximumBacklogSeconds else { return .startNow }
         switch previous {
-        case .silent, .held:
+        case .silent:
             return .startNow
-        case .playing:
+        case .held, .playing:
             return .queue
         case .unplayedTail:
             return .releaseTailThenQueue

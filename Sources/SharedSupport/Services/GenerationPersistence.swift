@@ -30,26 +30,18 @@ enum GenerationPersistence {
             return await saveToHistory(generation, caller: caller)
         }
         #endif
-        if result.usedStreaming {
-            audioPlayer.completeStreamingPreview(
-                result: result,
-                title: String(text.prefix(40)),
-                shouldAutoPlay: AudioService.shouldAutoPlay,
-                playbackOperationID: playbackOperationID
-            )
-        } else {
-            let autoplayStart = DispatchTime.now().uptimeNanoseconds
-            audioPlayer.playFile(
-                result.audioPath,
-                title: String(text.prefix(40)),
-                isAutoplay: AudioService.shouldAutoPlay,
-                presentationContext: .generatePreview,
-                generationMode: GenerationMode(rawValue: generation.mode),
-                playbackOperationID: playbackOperationID
-            )
-            if TelemetryGate.resolvedEnabled {
-                print("[Performance][\(caller)] autoplay_start_wall_ms=\(elapsedMs(since: autoplayStart))")
-            }
+        // N7: one handoff for streamed and unstreamed results, so an automatic
+        // play of the final file follows Auto-play and the take's hold, and is
+        // never counted as the listener's Play.
+        let autoplayStart = DispatchTime.now().uptimeNanoseconds
+        audioPlayer.completeStreamingPreview(
+            result: result,
+            title: String(text.prefix(40)),
+            shouldAutoPlay: AudioService.shouldAutoPlay,
+            playbackOperationID: playbackOperationID
+        )
+        if !result.usedStreaming, TelemetryGate.resolvedEnabled {
+            print("[Performance][\(caller)] autoplay_start_wall_ms=\(elapsedMs(since: autoplayStart))")
         }
 
         return await saveToHistory(generation, caller: caller)

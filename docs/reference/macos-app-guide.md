@@ -222,10 +222,11 @@ Closing the global preview or explicitly choosing other audio revokes automatic 
 that entire generation operation, including later batch lines and long-form segments. Generation
 can still complete and save to History. Starting a new generation grants playback ownership again.
 Pausing the preview (or starting a reference recording) holds it the same way until Play: no
-chunk, final-file handoff or later item of the operation starts on its own. Within one operation
-each item's preview plays to its end, live tail and final file, before the next item's starts;
-the next item's chunks wait in memory, and past about five minutes of waiting audio the
-narration skips ahead to the newest item.
+chunk, final-file handoff or later item of the operation starts on its own, and Play resumes the
+paused item, then the items waiting behind it. Within one operation each item's preview plays to
+its end, live tail and final file, before the next item's starts; the next items' chunks wait in
+memory. Past about five minutes of waiting audio a newly waiting item stops buffering its preview
+and keeps only its result, so a line still plays from its file at its turn.
 Internal segment cleanup preserves the joined-output handoff. Studio result errors belong only to
 the file that failed; a stale card cannot display or control another clip's failure.
 

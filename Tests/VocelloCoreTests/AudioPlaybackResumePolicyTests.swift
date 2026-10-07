@@ -247,17 +247,37 @@ final class LivePreviewAutoplayStateTests: XCTestCase {
         state.holdUpcomingSession()
         XCTAssertFalse(state.allowsAutomaticFinalPlayback(operationID: nil, autoplayPreference: true),
                        "a result that did not stream does not autoplay either")
-        state.play()
-        XCTAssertTrue(state.holdsUpcomingSession, "playing other audio keeps the submitted take held")
         state.beginSession(operationID: nil, autoplayPreference: true)
         XCTAssertFalse(state.allowsAutomaticPlayback)
         XCTAssertFalse(state.holdsUpcomingSession)
+        state.play()
+        XCTAssertTrue(state.allowsAutomaticPlayback)
 
         var next = LivePreviewAutoplayState()
         next.holdUpcomingSession()
         next.clearUpcomingHold()
         next.beginSession(operationID: nil, autoplayPreference: true)
         XCTAssertTrue(next.allowsAutomaticPlayback, "a newly submitted take is not held by an earlier one")
+    }
+
+    func testPauseWhileTheLastTakePlaysHoldsTheTakeSubmittedAfterIt() {
+        // S4: take A plays, take B is submitted (no session yet), the
+        // listener pauses A; B's start tears A down, which ends A's own hold.
+        var state = LivePreviewAutoplayState()
+        state.beginSession(operationID: nil, autoplayPreference: true)
+        state.hold()
+        state.holdUpcomingSession()
+        state.endSession()
+        XCTAssertFalse(state.isHeld)
+        state.beginSession(operationID: nil, autoplayPreference: true)
+        XCTAssertFalse(state.allowsAutomaticPlayback, "B waits for Play")
+
+        var resumed = LivePreviewAutoplayState()
+        resumed.beginSession(operationID: nil, autoplayPreference: true)
+        resumed.hold()
+        resumed.holdUpcomingSession()
+        resumed.play()
+        XCTAssertFalse(resumed.holdsUpcomingSession, "Play on the shared player resumes the narration")
     }
 
     func testLoadingOtherAudioForgetsTheOperation() {
@@ -368,6 +388,23 @@ final class LivePreviewFinalHandoffTests: XCTestCase {
         )
     }
 
+    func testHeldPreviewKeepsItsPositionWithoutPlaying() {
+        // S3: a held take's file loads where the listener stopped.
+        XCTAssertEqual(
+            LivePreviewFinalHandoff.resolve(
+                heardLivePreview: true, currentTime: 4, previewDuration: 4, duration: 10, autoPlayEnabled: false
+            ),
+            LivePreviewFinalHandoff(preserveCurrentTime: 4, shouldAutoPlay: false)
+        )
+        XCTAssertEqual(
+            LivePreviewFinalHandoff.resolve(
+                heardLivePreview: true, currentTime: 9.95, previewDuration: 9.95, duration: 10, autoPlayEnabled: false
+            ),
+            LivePreviewFinalHandoff(preserveCurrentTime: 0, shouldAutoPlay: false),
+            "a take held at its end starts over on Play"
+        )
+    }
+
     func testInterruptedPreviewContinuesAtTheHeardPosition() {
         XCTAssertEqual(
             LivePreviewFinalHandoff.resolve(
@@ -383,45 +420,194 @@ final class LivePreviewSuccessionPolicyTests: XCTestCase {
     func testNextTakeOfTheOperationWaitsForTheTakeThatPlays() {
         let operation = UUID()
         XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: operation, previousOperationID: operation, previous: .playing, backlogSeconds: 10
+            incomingOperationID: operation, previousOperationID: operation, previous: .playing
         ), .queue)
         XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: operation, previousOperationID: operation, previous: .unplayedTail, backlogSeconds: 2
+            incomingOperationID: operation, previousOperationID: operation, previous: .unplayedTail
         ), .releaseTailThenQueue, "a segment's sub-prebuffer tail plays before the next segment")
     }
 
-    func testHeldOrSilentPreviousTakeGivesWayAtOnce() {
+    func testPauseHoldsTheWholeNarration() {
         let operation = UUID()
-        for previous in [LivePreviewSuccessionPolicy.PreviousTake.held, .silent] {
-            XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-                incomingOperationID: operation, previousOperationID: operation, previous: previous, backlogSeconds: 10
-            ), .startNow)
-        }
+        XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
+            incomingOperationID: operation, previousOperationID: operation, previous: .held
+        ), .queue, "S5: the next take waits behind a held take; Play resumes it, then the queue")
+    }
+
+    func testSilentPreviousTakeGivesWayAtOnce() {
+        let operation = UUID()
+        XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
+            incomingOperationID: operation, previousOperationID: operation, previous: .silent
+        ), .startNow)
     }
 
     func testAnotherOperationOrALoneTakeReplacesWhatPlays() {
         XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: UUID(), previousOperationID: UUID(), previous: .playing, backlogSeconds: 1
+            incomingOperationID: UUID(), previousOperationID: UUID(), previous: .playing
         ), .startNow)
         XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: nil, previousOperationID: nil, previous: .playing, backlogSeconds: 1
+            incomingOperationID: nil, previousOperationID: nil, previous: .held
         ), .startNow)
         XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: UUID(), previousOperationID: nil, previous: .playing, backlogSeconds: 1
+            incomingOperationID: UUID(), previousOperationID: nil, previous: .playing
         ), .startNow)
     }
+}
 
-    func testBacklogBoundSkipsAheadToTheNewestTake() {
+/// S2: a promoted take whose stream has ended plays what it has.
+final class LivePreviewPromotionPolicyTests: XCTestCase {
+    func testShortSegmentWithASuccessorPlaysWithoutItsPrebuffer() {
+        XCTAssertEqual(LivePreviewPromotionPolicy.decide(
+            streamEnded: true, queuedBuffers: 4, isPlaying: false, allowsAutomaticPlayback: true
+        ), .play)
+    }
+
+    func testEndedTakeWithNothingQueuedGivesWayToTheNext() {
+        XCTAssertEqual(LivePreviewPromotionPolicy.decide(
+            streamEnded: true, queuedBuffers: 0, isPlaying: false, allowsAutomaticPlayback: true
+        ), .skipToNext)
+    }
+
+    func testStreamingPlayingOrHeldTakeWaits() {
+        XCTAssertEqual(LivePreviewPromotionPolicy.decide(
+            streamEnded: false, queuedBuffers: 4, isPlaying: false, allowsAutomaticPlayback: true
+        ), .wait, "a take still streaming fills its prebuffer as usual")
+        XCTAssertEqual(LivePreviewPromotionPolicy.decide(
+            streamEnded: true, queuedBuffers: 4, isPlaying: true, allowsAutomaticPlayback: true
+        ), .wait)
+        XCTAssertEqual(LivePreviewPromotionPolicy.decide(
+            streamEnded: true, queuedBuffers: 4, isPlaying: false, allowsAutomaticPlayback: false
+        ), .wait)
+    }
+}
+
+/// S6, N1, N2: the waiting takes' order and bookkeeping.
+final class LivePreviewTakeQueueTests: XCTestCase {
+    private typealias Queue = LivePreviewTakeQueue<Int, String, String>
+
+    private func admit(
+        _ queue: inout Queue,
+        sessionID: String?,
+        operationID: UUID? = nil,
+        pending: inout LivePreviewEstimate?,
+        currentBacklog: TimeInterval = 0
+    ) {
+        queue.admit(
+            sessionID: sessionID,
+            operationID: operationID,
+            details: sessionID ?? "unnamed",
+            sessionDirectory: nil,
+            pendingEstimate: &pending,
+            fallbackEstimate: LivePreviewEstimate(text: "fallback"),
+            currentBacklogSeconds: currentBacklog
+        )
+    }
+
+    @discardableResult
+    private func route(
+        _ queue: inout Queue,
+        _ chunk: Int,
+        to sessionID: String,
+        isCurrent: Bool = false,
+        cumulative: TimeInterval? = nil,
+        seconds: TimeInterval = 1,
+        currentBacklog: TimeInterval = 0
+    ) -> Queue.Routing {
+        queue.route(
+            chunk,
+            sessionID: sessionID,
+            isCurrentSession: isCurrent,
+            sessionDirectory: nil,
+            chunkSeconds: seconds,
+            cumulativeDuration: cumulative,
+            currentBacklogSeconds: currentBacklog
+        )
+    }
+
+    func testAdmissionConsumesThePendingEstimate() {
+        var queue = Queue()
+        let submitted = LivePreviewEstimate(text: String(repeating: "word ", count: 20))
+        var pending = submitted
+        admit(&queue, sessionID: "line-2", pending: &pending)
+        XCTAssertNil(pending, "the next submission sets the estimate of the take after it")
+        XCTAssertEqual(queue.takes.first?.estimate, submitted)
+        admit(&queue, sessionID: "line-3", pending: &pending)
+        XCTAssertEqual(queue.takes.last?.estimate, LivePreviewEstimate(text: "fallback"))
+    }
+
+    func testChunksFollowTheirStreamAndAnUnnamedTakeAdoptsANewStream() {
+        var queue = Queue()
+        var pending: LivePreviewEstimate?
+        admit(&queue, sessionID: "segment-2", pending: &pending)
+        admit(&queue, sessionID: nil, pending: &pending)
+        XCTAssertEqual(route(&queue, 1, to: "segment-2"), .stored(firstAudio: true))
+        XCTAssertEqual(route(&queue, 2, to: "segment-2"), .stored(firstAudio: false))
+        XCTAssertEqual(route(&queue, 9, to: "current", isCurrent: true), .notQueued,
+                       "the playing take's own chunk is not adopted")
+        XCTAssertEqual(route(&queue, 3, to: "segment-3"), .stored(firstAudio: true))
+        XCTAssertEqual(queue.takes.map(\.sessionID), ["segment-2", "segment-3"])
+        XCTAssertEqual(queue.takes.map(\.chunks), [[1, 2], [3]])
+        XCTAssertEqual(route(&queue, 4, to: "segment-4"), .notQueued, "no waiting take is unnamed any more")
+    }
+
+    func testResultsBelongToTheNewestTakeInOrder() {
+        var queue = Queue()
+        XCTAssertFalse(queue.attach("orphan", details: "none"), "with no waiting take the player applies it")
+        var pending: LivePreviewEstimate?
         let operation = UUID()
-        let bound = LivePreviewSuccessionPolicy.maximumBacklogSeconds
-        XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: operation, previousOperationID: operation, previous: .playing,
-            backlogSeconds: bound - 1
-        ), .queue)
-        XCTAssertEqual(LivePreviewSuccessionPolicy.decide(
-            incomingOperationID: operation, previousOperationID: operation, previous: .playing,
-            backlogSeconds: bound
-        ), .startNow)
+        admit(&queue, sessionID: "line-2", operationID: operation, pending: &pending)
+        XCTAssertTrue(queue.attach("result-2", details: "line-2"))
+        XCTAssertTrue(queue.attach("result-3", details: "line-3"))
+        XCTAssertEqual(queue.takes.map(\.completion), ["result-2", "result-3"])
+        let streamedNothing = queue.takes.last
+        XCTAssertNil(streamedNothing?.sessionID)
+        XCTAssertEqual(streamedNothing?.operationID, operation)
+        XCTAssertEqual(streamedNothing?.acceptsUnnamedChunks, false, "a completed take adopts no stream")
+        XCTAssertEqual(route(&queue, 1, to: "line-4"), .notQueued)
+    }
+
+    func testBacklogCountsCumulativeAudio() {
+        var queue = Queue()
+        var pending: LivePreviewEstimate?
+        admit(&queue, sessionID: "a", pending: &pending)
+        route(&queue, 1, to: "a", cumulative: 0.32)
+        route(&queue, 2, to: "a", cumulative: 0.64)
+        admit(&queue, sessionID: "b", pending: &pending)
+        route(&queue, 3, to: "b", cumulative: nil, seconds: 0.5)
+        XCTAssertEqual(queue.backlogSeconds, 1.14, accuracy: 1e-9)
+    }
+
+    func testPastTheBoundTheNewcomerKeepsItsResultButNotItsPreview() {
+        let bound = Queue.maximumBacklogSeconds
+        var queue = Queue()
+        var pending: LivePreviewEstimate?
+        admit(&queue, sessionID: "a", pending: &pending, currentBacklog: 10)
+        XCTAssertEqual(route(&queue, 1, to: "a", seconds: bound - 20, currentBacklog: 10), .stored(firstAudio: true))
+        XCTAssertEqual(route(&queue, 2, to: "a", seconds: 20, currentBacklog: 10), .dropped,
+                       "N1: the bound holds on every chunk, not only at admission")
+        XCTAssertTrue(queue.takes[0].isPreviewTruncated)
+        XCTAssertEqual(route(&queue, 3, to: "a", seconds: 0.1, currentBacklog: 0), .dropped,
+                       "a truncated preview stays truncated")
+
+        admit(&queue, sessionID: "b", pending: &pending, currentBacklog: 30)
+        XCTAssertTrue(queue.takes[1].isPreviewTruncated, "N2: the newcomer gives up its preview")
+        XCTAssertEqual(route(&queue, 4, to: "b"), .dropped)
+        XCTAssertTrue(queue.attach("result-b", details: "b"), "its result still waits for its turn")
+        XCTAssertEqual(queue.takes[1].completion, "result-b")
+        XCTAssertEqual(queue.takes.map(\.chunks), [[1], []])
+    }
+
+    func testOrderAndRemovalOfAnotherOperationsTakes() {
+        var queue = Queue()
+        var pending: LivePreviewEstimate?
+        let old = UUID(), current = UUID()
+        admit(&queue, sessionID: "old", operationID: old, pending: &pending)
+        admit(&queue, sessionID: "kept", operationID: current, pending: &pending)
+        let removed = queue.removeAll { $0.operationID == old }
+        XCTAssertEqual(removed.map(\.sessionID), ["old"])
+        XCTAssertEqual(queue.popFirst()?.sessionID, "kept")
+        XCTAssertNil(queue.popFirst())
+        XCTAssertTrue(queue.isEmpty)
     }
 }
 

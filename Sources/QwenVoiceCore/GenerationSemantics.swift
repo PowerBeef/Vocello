@@ -834,7 +834,13 @@ public enum GenerationSemantics {
         if containsDictionToken(trimmedBase) {
             return trimmedBase
         }
-        return "\(trimmedBase) \(reinforcement)"
+        // P12-08: the reinforcement is its own sentence. A base without a
+        // closing stop (a neutral-delivery Design brief, whose final period
+        // `designInstruction` strips, or free-form delivery text) gets one, so
+        // "…a subtle British accent" never runs into "Native English
+        // pronunciation…" as one phrase.
+        let separator = trimmedBase.endsWithSentencePunctuation ? " " : ". "
+        return "\(trimmedBase)\(separator)\(reinforcement)"
     }
 
     public static func qwenLanguageHint(
@@ -1223,6 +1229,12 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!?。！？"))
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether the text already closes its sentence (an ellipsis counts).
+    var endsWithSentencePunctuation: Bool {
+        guard let last = trimmingCharacters(in: .whitespacesAndNewlines).last else { return false }
+        return ".!?。！？…".contains(last)
     }
 }
 

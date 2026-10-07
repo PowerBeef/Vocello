@@ -36,7 +36,6 @@ struct MacVoiceDesignScreen: View {
         )
     }
 
-    @State private var deliverySelection = MacDeliverySelection()
     @State private var actionAlert: VoiceDesignActionAlert?
     @State private var isBriefPresented = false
 
@@ -183,7 +182,6 @@ struct MacVoiceDesignScreen: View {
         .accessibilityIdentifier("screen_voiceDesign")
         .onAppear {
             reconcileGenerationVariantSelection()
-            deliverySelection = MacDeliverySelection.synced(from: draft.emotion)
         }
         .task(id: draft.text) {
             // Debounced: the detector loads a language recognizer per call, so it
@@ -265,7 +263,7 @@ struct MacVoiceDesignScreen: View {
         briefChip
         MacStudioChipContainer(accessibilityIdentifier: "voiceDesign_toneSpeed") {
             MacStudioDeliveryChip(
-                selection: $deliverySelection, emotion: $draft.emotion, tint: tint,
+                delivery: $draft.delivery, tint: tint,
                 contentLanguage: promptContentLanguage
             )
         }
@@ -283,7 +281,7 @@ struct MacVoiceDesignScreen: View {
     @ViewBuilder
     private var chipFooter: some View {
         MacStudioDeliveryFooter(
-            selection: $deliverySelection, emotion: $draft.emotion, tint: tint,
+            delivery: $draft.delivery, tint: tint,
             contentLanguage: promptContentLanguage
         )
         saveVoiceAction

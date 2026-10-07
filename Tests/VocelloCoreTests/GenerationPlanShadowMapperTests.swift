@@ -18,7 +18,7 @@ final class GenerationPlanShadowMapperTests: XCTestCase {
             projection.plan.core.conditioning,
             .custom(
                 speakerID: "aiden",
-                deliveryInstruction: "Warm and confident Native English pronunciation with clear English diction and natural stress."
+                deliveryInstruction: "Warm and confident. Native English pronunciation with clear English diction and natural stress."
             )
         )
         XCTAssertEqual(projection.plan.core.sampling.effectiveSeed, 42)

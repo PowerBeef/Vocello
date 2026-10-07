@@ -65,18 +65,20 @@ struct DeliveryInputState: Equatable {
     var supportsIntensity: Bool { false }
 
     var resolvedDeliveryProfile: DeliveryProfile {
-        switch mode {
-        case .preset:
-            guard let preset = EmotionPreset.preset(id: selectedPresetID) else {
-                return .neutral
-            }
-            return DeliveryProfile.preset(preset, intensity: selectedIntensity)
-        case .custom:
-            guard let trimmedCustomText = customText.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
-                return .neutral
-            }
-            return DeliveryProfile.custom(trimmedCustomText)
-        }
+        DeliveryProfile.studioSelection(
+            presetID: selectedPresetID,
+            intensity: selectedIntensity,
+            customTone: mode == .custom ? customText : nil
+        )
+    }
+
+    /// A preset picked from the Mac delivery menu, written as the iPhone's
+    /// delivery sheet writes it: the preset at its shipped tier, with the
+    /// Custom tone text kept for a later switch back.
+    mutating func selectPreset(_ preset: EmotionPreset) {
+        mode = .preset
+        selectedPresetID = preset.id
+        selectedIntensity = preset.shippedIntensity
     }
 
     var resolvedDeliveryInstruction: String {
@@ -226,10 +228,4 @@ struct VoiceCloningReadinessDescriptor: Equatable {
     let title: String
     let detail: String
     let trailingText: String?
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
 }

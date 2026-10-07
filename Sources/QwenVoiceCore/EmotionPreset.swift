@@ -190,6 +190,25 @@ public struct DeliveryProfile: Equatable, Sendable {
             finalInstruction: text
         )
     }
+
+    /// What a Studio delivery control resolves to, the one reading both apps
+    /// share (P02-07). `customTone` is the Custom tone field's text when that
+    /// field is the selection, nil when a preset is. A blank field is no
+    /// instruction (`neutral`, which prompt assembly drops); any other text,
+    /// a typed "neutral" or a preset's own wording included, is sent verbatim
+    /// as a custom tone and never re-read as a preset or its delivery cell.
+    public static func studioSelection(
+        presetID: String,
+        intensity: EmotionIntensity,
+        customTone: String?
+    ) -> DeliveryProfile {
+        if let customTone {
+            let trimmed = customTone.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? .neutral : .custom(trimmed)
+        }
+        guard let preset = EmotionPreset.preset(id: presetID) else { return .neutral }
+        return .preset(preset, intensity: intensity)
+    }
 }
 
 public struct EmotionPreset: Identifiable, Sendable {

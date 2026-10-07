@@ -3,67 +3,24 @@ import SwiftUI
 
 /// The chips every Studio mode shares: the delivery preset menu with its
 /// Custom tone field and hint advisory, and the language menu with its
-/// Recommended section. The screens keep the draft; these views own only
-/// the menu presentation and the mutations that keep the stored instruction,
-/// the delivery profile and the chip in step.
+/// Recommended section. The screens keep the draft; the delivery views write
+/// its `DeliveryInputState` directly, as the iPhone's delivery controls do, so
+/// one selection resolves to one instruction on both apps (P02-07). They never
+/// round-trip through the stored instruction string, whose legacy reading
+/// turned a blank or typed "neutral" Custom tone into the Neutral preset.
 
-/// Which half of the delivery control is active: a preset (derived from the
-/// stored instruction) or the Custom tone field with its own text, so an
-/// empty custom field stays neutral in the request.
-struct MacDeliverySelection: Equatable {
-    var isCustom = false
-    var customText = ""
-
-    /// Derives the selection from a stored instruction on appearance.
-    static func synced(from emotion: String) -> MacDeliverySelection {
-        let trimmed = emotion.trimmingCharacters(in: .whitespacesAndNewlines)
-        if EmotionPreset.matchInstruction(trimmed) != nil || DeliveryProfile.isNeutralInstruction(trimmed) {
-            return MacDeliverySelection()
-        }
-        return MacDeliverySelection(isCustom: true, customText: trimmed)
+/// How the Mac delivery control reads a draft's delivery state.
+extension DeliveryInputState {
+    /// The selected preset; nil while the Custom tone field is the selection.
+    var macSelectedPreset: EmotionPreset? {
+        guard mode == .preset else { return nil }
+        return EmotionPreset.preset(id: selectedPresetID)
     }
 
-    func selectedPreset(for emotion: String) -> EmotionPreset? {
-        guard !isCustom else { return nil }
-        let trimmed = emotion.trimmingCharacters(in: .whitespacesAndNewlines)
-        return EmotionPreset.matchInstruction(trimmed)?.preset
-            ?? (DeliveryProfile.isNeutralInstruction(trimmed) ? EmotionPreset.all.first : nil)
-    }
-
-    func chipValue(for emotion: String) -> String {
-        if isCustom {
-            let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? MacInterfaceText.emotionCustom : trimmed
-        }
-        return selectedPreset(for: emotion).flatMap { MacInterfaceText.presetName(id: $0.id) } ?? emotion
-    }
-}
-
-enum MacDeliveryMutations {
-    /// A new selection always ships the preset's shipped tier (the DP-8 strong
-    /// anchor; happy/angry ship normal, DP-22 branch (a)).
-    @MainActor
-    static func select(
-        _ preset: EmotionPreset,
-        selection: Binding<MacDeliverySelection>,
-        emotion: Binding<String>,
-        deliveryProfile: Binding<DeliveryProfile?>?
-    ) {
-        selection.wrappedValue = MacDeliverySelection()
-        let profile = DeliveryProfile.preset(preset, intensity: preset.shippedIntensity)
-        emotion.wrappedValue = profile.finalInstruction
-        deliveryProfile?.wrappedValue = profile
-    }
-
-    @MainActor
-    static func applyCustom(
-        selection: Binding<MacDeliverySelection>,
-        emotion: Binding<String>,
-        deliveryProfile: Binding<DeliveryProfile?>?
-    ) {
-        let profile = DeliveryProfile.custom(selection.wrappedValue.customText)
-        emotion.wrappedValue = profile.finalInstruction
-        deliveryProfile?.wrappedValue = profile
+    /// The chip's value while Custom is selected.
+    var macCustomChipValue: String {
+        let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? MacInterfaceText.emotionCustom : trimmed
     }
 }
 
@@ -71,18 +28,17 @@ enum MacDeliveryMutations {
 /// deliveries first, directional hints second (the measured DP-12 split),
 /// then Custom.
 struct MacStudioDeliveryChip: View {
-    @Binding var selection: MacDeliverySelection
-    @Binding var emotion: String
-    var deliveryProfile: Binding<DeliveryProfile?>? = nil
+    @Binding var delivery: DeliveryInputState
     let tint: Color
     let contentLanguage: Qwen3SupportedLanguage
     var accessibilityIdentifier = "delivery_tonePicker"
 
-    private var selectedPreset: EmotionPreset? { selection.selectedPreset(for: emotion) }
+    private var selectedPreset: EmotionPreset? { delivery.macSelectedPreset }
 
     private var displayedValue: String {
         if let selectedPreset { return StudioPromptContent.delivery(selectedPreset, in: contentLanguage).name }
-        return selection.chipValue(for: emotion)
+        if delivery.mode == .custom { return delivery.macCustomChipValue }
+        return delivery.selectedPresetLabel
     }
 
     var body: some View {
@@ -108,13 +64,8 @@ struct MacStudioDeliveryChip: View {
                 Toggle(
                     MacInterfaceText.emotionCustom,
                     isOn: Binding(
-                        get: { selection.isCustom },
-                        set: { _ in
-                            selection.isCustom = true
-                            MacDeliveryMutations.applyCustom(
-                                selection: $selection, emotion: $emotion, deliveryProfile: deliveryProfile
-                            )
-                        }
+                        get: { delivery.mode == .custom },
+                        set: { _ in delivery.mode = .custom }
                     )
                 )
             }
@@ -127,12 +78,8 @@ struct MacStudioDeliveryChip: View {
         Toggle(
             StudioPromptContent.delivery(preset, in: contentLanguage).name,
             isOn: Binding(
-                get: { !selection.isCustom && selectedPreset?.id == preset.id },
-                set: { _ in
-                    MacDeliveryMutations.select(
-                        preset, selection: $selection, emotion: $emotion, deliveryProfile: deliveryProfile
-                    )
-                }
+                get: { selectedPreset?.id == preset.id },
+                set: { _ in delivery.selectPreset(preset) }
             )
         )
         .help(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
@@ -143,9 +90,7 @@ struct MacStudioDeliveryChip: View {
 /// Rows under the chips for the delivery control: the Custom tone field with
 /// its duration advisory, or the directional-hint advisory.
 struct MacStudioDeliveryFooter: View {
-    @Binding var selection: MacDeliverySelection
-    @Binding var emotion: String
-    var deliveryProfile: Binding<DeliveryProfile?>? = nil
+    @Binding var delivery: DeliveryInputState
     let tint: Color
     let contentLanguage: Qwen3SupportedLanguage
     var accessibilityPrefix = "delivery"
@@ -153,9 +98,9 @@ struct MacStudioDeliveryFooter: View {
     private let customToneCharacterLimit = GenerationTextLimitPolicy.deliveryInstructionLimit
 
     var body: some View {
-        if selection.isCustom {
+        if delivery.mode == .custom {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.tight) {
-                TextField(MacInterfaceText.emotionCustomTonePlaceholder, text: $selection.customText)
+                TextField(MacInterfaceText.emotionCustomTonePlaceholder, text: $delivery.customText)
                     .textFieldStyle(.plain)
                     .macType(.body)
                     .foregroundStyle(MacTheme.Text.primary)
@@ -172,23 +117,20 @@ struct MacStudioDeliveryFooter: View {
                     }
                     .accessibilityLabel(MacInterfaceText.emotionCustomTone)
                     .accessibilityIdentifier("\(accessibilityPrefix)_toneField")
-                    .onChange(of: selection.customText) { _, newValue in
+                    .onChange(of: delivery.customText) { _, newValue in
                         if newValue.count > customToneCharacterLimit {
-                            selection.customText = String(newValue.prefix(customToneCharacterLimit))
+                            delivery.customText = String(newValue.prefix(customToneCharacterLimit))
                         }
-                        MacDeliveryMutations.applyCustom(
-                            selection: $selection, emotion: $emotion, deliveryProfile: deliveryProfile
-                        )
                     }
 
-                if DeliveryInstructionAdvisor.hasDurationDirective(selection.customText) {
+                if DeliveryInstructionAdvisor.hasDurationDirective(delivery.customText) {
                     Label(MacInterfaceText.deliveryDurationAdvisory, systemImage: "exclamationmark.triangle")
                         .macType(.caption)
                         .foregroundStyle(MacTheme.Status.guarded)
                         .accessibilityIdentifier("\(accessibilityPrefix)_durationAdvisory")
                 }
             }
-        } else if selection.selectedPreset(for: emotion)?.isDirectionalHint == true {
+        } else if delivery.macSelectedPreset?.isDirectionalHint == true {
             Label(StudioPromptContent.directionalHintAdvisory(in: contentLanguage), systemImage: "wand.and.sparkles")
                 .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)

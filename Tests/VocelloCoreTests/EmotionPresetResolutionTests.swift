@@ -193,6 +193,88 @@ final class EmotionPresetResolutionTests: XCTestCase {
         XCTAssertFalse(EmotionPreset.directionalHintAdvisory.isEmpty)
     }
 
+    // MARK: - One Studio delivery reading on both apps (P02-07)
+
+    /// The Mac read a blank or typed-"neutral" Custom tone back through the
+    /// legacy instruction parser and sent the Neutral preset; the iPhone sent
+    /// no instruction. Both apps now resolve the control through one builder.
+    func testABlankCustomToneIsNoInstructionOnEveryApp() {
+        for blank in ["", "   ", "\n"] {
+            let profile = DeliveryProfile.studioSelection(presetID: "neutral", intensity: .strong, customTone: blank)
+            XCTAssertEqual(profile, .neutral)
+            XCTAssertNil(GenerationSemantics.customInstruction(deliveryStyle: profile.finalInstruction))
+            XCTAssertNil(profile.instructionCellID)
+        }
+    }
+
+    func testCustomToneTextIsSentVerbatimNeverReadAsAPreset() throws {
+        let neutralTyped = DeliveryProfile.studioSelection(presetID: "neutral", intensity: .strong, customTone: " neutral ")
+        XCTAssertEqual(neutralTyped.finalInstruction, "neutral")
+        XCTAssertNil(
+            GenerationSemantics.customInstruction(deliveryStyle: neutralTyped.finalInstruction),
+            "A typed neutral synonym drops, as EmotionPreset documents, rather than becoming the preset"
+        )
+
+        let calm = try XCTUnwrap(EmotionPreset.preset(id: "calm"))
+        let presetWording = calm.instruction(for: .strong)
+        let typed = DeliveryProfile.studioSelection(presetID: "neutral", intensity: .strong, customTone: presetWording)
+        XCTAssertEqual(typed.finalInstruction, presetWording)
+        XCTAssertNil(typed.presetID)
+        XCTAssertNil(typed.instructionCellID, "Custom text never claims a canonical delivery cell")
+    }
+
+    func testAPresetSelectionShipsItsTierAndCell() throws {
+        let neutral = DeliveryProfile.studioSelection(presetID: "neutral", intensity: .strong, customTone: nil)
+        XCTAssertEqual(neutral.finalInstruction, EmotionPreset.neutralPresetInstruction)
+
+        let calm = try XCTUnwrap(EmotionPreset.preset(id: "calm"))
+        let selected = DeliveryProfile.studioSelection(presetID: "calm", intensity: calm.shippedIntensity, customTone: nil)
+        XCTAssertEqual(selected, .preset(calm, intensity: calm.shippedIntensity))
+        XCTAssertEqual(selected.instructionCellID, "calm.\(calm.shippedIntensity.rpcValue)")
+
+        XCTAssertEqual(
+            DeliveryProfile.studioSelection(presetID: "retired-preset", intensity: .strong, customTone: nil),
+            .neutral
+        )
+    }
+
+    // MARK: - The diction sentence is its own sentence (P12-08)
+
+    /// A neutral-delivery Voice Design brief loses its final period, and the
+    /// English diction sentence was glued on after a space: "…a subtle British
+    /// accent Native English pronunciation…".
+    func testTheDictionSentenceFollowsANeutralDesignBriefAsItsOwnSentence() {
+        let brief = "A deep, low-pitched male narrator, warm and bass-resonant, with a subtle British accent."
+        let instruction = GenerationSemantics.englishDictionReinforcedInstruction(
+            baseInstruction: GenerationSemantics.designInstruction(voiceDescription: brief, emotion: ""),
+            language: "english"
+        )
+        XCTAssertEqual(
+            instruction,
+            "A deep, low-pitched male narrator, warm and bass-resonant, with a subtle British accent. "
+                + GenerationSemantics.englishDictionReinforcement
+        )
+    }
+
+    func testTheDictionSentenceJoinsFreeFormAndClosedTextWithOneSentenceBoundary() {
+        XCTAssertEqual(
+            GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: "Warm and confident", language: "english"),
+            "Warm and confident. \(GenerationSemantics.englishDictionReinforcement)"
+        )
+        for closed in ["Warm and confident.", "Warm and confident!", "Warm and confident?", "Warm and confident…"] {
+            XCTAssertEqual(
+                GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: closed, language: "english"),
+                "\(closed) \(GenerationSemantics.englishDictionReinforcement)",
+                closed
+            )
+        }
+        XCTAssertEqual(
+            GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: "Warm and confident", language: "french"),
+            "Warm and confident",
+            "Only English output takes the sentence"
+        )
+    }
+
     private static func sha256(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8))
             .map { String(format: "%02x", $0) }

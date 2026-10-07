@@ -32,8 +32,6 @@ struct MacCustomVoiceScreen: View {
         )
     }
 
-    @State private var deliverySelection = MacDeliverySelection()
-
     private let tint = MacTheme.Brand.modeCustom
 
     private var coordinator: StudioGenerationCoordinator { appModel.customCoordinator }
@@ -169,7 +167,6 @@ struct MacCustomVoiceScreen: View {
         .accessibilityIdentifier("screen_customVoice")
         .onAppear {
             reconcileGenerationVariantSelection()
-            deliverySelection = MacDeliverySelection.synced(from: draft.emotion)
         }
         .task(id: draft.text) {
             // Debounced: the detector loads a language recognizer per call, so it
@@ -205,8 +202,7 @@ struct MacCustomVoiceScreen: View {
         if supportsDeliveryControl {
             MacStudioChipContainer(accessibilityIdentifier: "customVoice_toneSpeed") {
                 MacStudioDeliveryChip(
-                    selection: $deliverySelection,
-                    emotion: $draft.emotion,
+                    delivery: $draft.delivery,
                     tint: tint,
                     contentLanguage: promptContentLanguage
                 )
@@ -274,8 +270,7 @@ struct MacCustomVoiceScreen: View {
     private var chipFooter: some View {
         if supportsDeliveryControl {
             MacStudioDeliveryFooter(
-                selection: $deliverySelection,
-                emotion: $draft.emotion,
+                delivery: $draft.delivery,
                 tint: tint,
                 contentLanguage: promptContentLanguage
             )

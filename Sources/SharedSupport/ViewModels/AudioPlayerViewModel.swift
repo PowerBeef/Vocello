@@ -1255,10 +1255,15 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             let seconds = previewAudio.sampleRate > 0
                 ? Double(previewAudio.frameCount) / Double(previewAudio.sampleRate)
                 : 0
-            return (.pcm(previewAudio, cumulativeDuration: chunk.cumulativeDuration), seconds)
+            let queued = QueuedLiveSession.Chunk.pcm(previewAudio, cumulativeDuration: chunk.cumulativeDuration)
+            return (chunk: queued, seconds: seconds)
         }
         if let chunkPath = chunk.chunkPath {
-            return (.file(URL(fileURLWithPath: chunkPath), cumulativeDuration: chunk.cumulativeDuration), 0)
+            let queued = QueuedLiveSession.Chunk.file(
+                URL(fileURLWithPath: chunkPath),
+                cumulativeDuration: chunk.cumulativeDuration
+            )
+            return (chunk: queued, seconds: 0)
         }
         return nil
     }

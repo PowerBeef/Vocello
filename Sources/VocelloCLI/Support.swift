@@ -10,6 +10,55 @@ struct CLIError: Error, CustomStringConvertible {
     init(_ message: String) { self.description = message }
 }
 
+/// A take the engine stopped on its own while no signal reached the command
+/// (P15-02). In a CLI process the engine's kernel memory-pressure responder is
+/// the only such source: a critical event cancels the active take with reason
+/// `memory_pressure`. It is reported apart from an operator interrupt (exit
+/// 130): `vocello` exits `exitStatus` and a batch row ends `failed` with
+/// `errorCode`, never `cancelled`.
+struct CLIEngineCancellation: Error, LocalizedError, Equatable {
+    /// sysexits.h `EX_TEMPFAIL`: a temporary failure that a later retry may clear.
+    static let exitStatus: Int32 = 75
+
+    let reason: GenerationCancellationReason
+
+    /// A batch row's `errorCode`: the typed reason (`memory_pressure`).
+    var errorCode: String { reason.rawValue }
+
+    var errorDescription: String? {
+        switch reason {
+        case .memoryPressure:
+            return "the engine stopped this take under critical memory pressure, so no audio was written. "
+                + "Free memory (quit other apps) or use --variant speed, then retry."
+        case .user, .superseded, .shutdown:
+            return "the engine stopped this take on its own (\(reason.rawValue)), so no audio was written."
+        }
+    }
+
+    /// The error a command reports for `error`: a `CancellationError` that its own
+    /// task never received (no SIGINT or SIGTERM cancelled it) is the engine's.
+    /// `observedReason` is the typed reason a streaming run read off the take's
+    /// `.cancelled` event; without one (or with the engine's `user` default) the
+    /// reason is memory pressure, the engine's only cancellation of its own here.
+    /// Every other error, and a signalled run's cancellation, passes through.
+    static func classify(
+        _ error: any Error,
+        commandCancelled: Bool,
+        observedReason: GenerationCancellationReason? = nil
+    ) -> any Error {
+        if let stopped = error as? CLIEngineCancellation {
+            return stopped.refined(by: observedReason)
+        }
+        guard error is CancellationError, !commandCancelled else { return error }
+        return CLIEngineCancellation(reason: .memoryPressure).refined(by: observedReason)
+    }
+
+    private func refined(by observedReason: GenerationCancellationReason?) -> CLIEngineCancellation {
+        guard let observedReason, observedReason != .user else { return self }
+        return CLIEngineCancellation(reason: observedReason)
+    }
+}
+
 /// Minimal flag parser: `--key value` pairs, `--key=value`, bare `--flag`s, and
 /// positionals. A bare `--` ends flag parsing (everything after is positional).
 /// Note: a value cannot itself begin with `--` (it would parse as a flag) — use

@@ -55,10 +55,16 @@ struct CLIRuntime {
         deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager
     }
 
-    /// Every CLI generation: clone requests are refused without recorded consent.
+    /// Every CLI generation: clone requests are refused without recorded consent,
+    /// and a take the engine cancelled while no signal reached the command throws
+    /// `CLIEngineCancellation` instead of the operator's `CancellationError` (P15-02).
     func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         try voiceCloningConsent.admitGeneration(request)
-        return try await engine.generate(request)
+        do {
+            return try await engine.generate(request)
+        } catch {
+            throw CLIEngineCancellation.classify(error, commandCancelled: Task.isCancelled)
+        }
     }
 
     /// Clone-reference priming conditions the engine on a reference voice, so it is

@@ -79,6 +79,9 @@ enum CLIBatchExecution {
     struct Outcome {
         let rows: [Row]
         let results: [GenerationResult]
+        /// The engine stopped a take on its own (P15-02); that row is `failed`
+        /// with the reason as its code, and the command exits with its status.
+        var engineCancellation: CLIEngineCancellation?
         var passed: Bool { rows.allSatisfy { $0.status == .completed } }
         var cancelled: Bool { rows.contains { $0.status == .cancelled } }
     }
@@ -90,6 +93,7 @@ enum CLIBatchExecution {
     ) async -> Outcome {
         var rows = requests.enumerated().map { Row(index: $0.offset, generationID: $0.element.generationID) }
         var results: [GenerationResult] = []
+        var engineCancellation: CLIEngineCancellation?
         for (index, request) in requests.enumerated() {
             do {
                 try Task.checkCancellation()
@@ -106,6 +110,12 @@ enum CLIBatchExecution {
                 rows[index].durationSeconds = result.durationSeconds
                 rows[index].finishReason = result.finishReason?.rawValue
                 results.append(result)
+            } catch let stopped as CLIEngineCancellation {
+                // The engine stopped the take on its own (memory pressure): a
+                // failure with its reason, not the operator's interrupt.
+                rows[index].fail(stopped.errorCode)
+                engineCancellation = stopped
+                break
             } catch is CancellationError {
                 rows[index].status = .cancelled
                 rows[index].errorCode = "cancelled"
@@ -118,7 +128,7 @@ enum CLIBatchExecution {
                 break
             }
         }
-        return Outcome(rows: rows, results: results)
+        return Outcome(rows: rows, results: results, engineCancellation: engineCancellation)
     }
 }
 

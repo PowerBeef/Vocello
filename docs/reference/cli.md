@@ -129,7 +129,9 @@ set) and forces telemetry on.
 - `--json` switches stdout to a structured JSON object/array (on `generate`, `batch`, `voices list`,
   `speakers list`, `models`).
 - `--quiet` suppresses the stderr notes; `--verbose` adds per-step detail.
-- Exit codes: `0` success · `1` error · `2` usage / unknown command · `130` interrupted (Ctrl-C) · `143` terminated (SIGTERM).
+- Exit codes: `0` success · `1` error · `2` usage / unknown command · `75` the engine stopped a take
+  on its own under memory pressure (no signal reached the CLI; retry later) · `130` interrupted
+  (Ctrl-C) · `143` terminated (SIGTERM).
 - Signal handling is armed before any command work starts. The first SIGINT/SIGTERM cancels the
   owned command and awaits its cleanup. A second signal or 30-second deadline forces exit with an
   explicit stderr warning after killing any `--play` child and waiting up to 2 seconds for its
@@ -152,14 +154,16 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--mode` | `custom` (default) · `design` · `clone` |
 | `--variant` | `speed` (default, 4-bit) · `quality` (8-bit) |
 | `--text` / `--text-file` | inline text or a file (`-` reads stdin); with neither, piped stdin is used |
-| `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`) |
+| `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`); an empty or blank value is refused |
 | `--voice-brief` | (design) plain-language voice description |
 | `--voice` / `--reference` / `--transcript` | (clone) a saved voice name/id, or a reference `.wav` + optional transcript |
 | `--confirm-consent` | (clone) **required**: confirms you own or have permission to clone this voice; ignored by other modes (see [Voice-cloning consent](#voice-cloning-consent)) |
-| `--delivery` | optional delivery style |
+| `--delivery` | optional delivery style (custom and design; refused in clone mode, which has no instruction channel) |
+| `--app-delivery` | with no `--delivery`/`--delivery-cell`, send the apps' default delivery (the Neutral preset instruction) on Custom and Design, as `batch --app-delivery` does |
+| `--language` | `auto` or a Qwen3 language (`chinese`, `english`, `japanese`, `korean`, `german`, `french`, `russian`, `portuguese`, `spanish`, `italian`) by name or code, a region subtag ignored (`ja-JP`, `es-MX`); omitted = Auto; any other value is refused before boot |
 | `--seed` | deterministic sampling seed — the same request + seed reproduces the same take bit-for-bit |
 | `--variation` | `expressive` (default, official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability |
-| `--out` | output `.wav` path; default → `<data>/outputs/cli/` |
+| `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
@@ -181,11 +185,14 @@ Prints the output WAV path on stdout (or a JSON object: `audioPath`, `durationSe
 real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, and — when `--stream` — `firstChunkMS`
 and `chunks`).
 
-Explicit `--out` permits atomic replacement on successful QC/publication. Failed startup, QC,
-cancellation and publication preserve any previous destination. Only attempt-owned staging is
+Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
+never share a file. An explicit `--out` that names an existing file is replaced atomically only by a
+successful take (QC and publication passed), and a stderr note says so before boot. Failed startup,
+QC, cancellation and publication preserve any previous destination. Only attempt-owned staging is
 discarded. Clone rejects a reference/output alias (including symlink and hardlink aliases).
-Two successful writers to the same destination use last-publication-wins; use distinct paths when
-both outputs must be retained.
+Two successful writers to the same explicit destination use last-publication-wins; use distinct
+paths when both outputs must be retained. A Ctrl-C at the interactive mode picker ends the command
+at once (exit 130).
 
 ### `batch` — synthesize many clips with a single model load
 
@@ -207,9 +214,10 @@ The command uses the same request builder exercised against the real engine supp
 
 Batch stops at the first failure. Its failure-only JSON is versioned (`schemaVersion: 2`) and
 contains every planned index/generation identity with `completed`, `failed`, `cancelled`, or
-`not_attempted` status; completed paths are retained. Only the engine's typed cancellation makes a
+`not_attempted` status; completed paths are retained. Only a signalled cancellation makes a
 row `cancelled`; a genuine failure that coincides with a signal stays `failed` and adds
-`cancellationRequested: true`. Failure exits nonzero. All-success JSON stays
+`cancellationRequested: true`. A take the engine stopped on its own under memory pressure is
+`failed` with `errorCode: memory_pressure` and the command exits `75`. Failure exits nonzero. All-success JSON stays
 compatible. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
 language per text and non-streaming output (with `--long-form`, each line is a long-form project
 whose segments stream); `--language`, `--stream`, and `--out` are rejected

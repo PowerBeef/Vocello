@@ -110,9 +110,7 @@ enum BatchCommand {
             // A value would silently fall back to the short-form batch.
             throw CLIError("--long-form takes no value (got \"\(value)\"): pass the bare flag --long-form")
         }
-        if let value = args.string("app-delivery") {
-            throw CLIError("--app-delivery takes no value (got \"\(value)\"): pass the bare flag --app-delivery")
-        }
+        let appDelivery = try GenerateCommand.parseAppDelivery(args)
         if let value = args.string("capture-codec-trace") {
             throw CLIError(
                 "--capture-codec-trace takes no value (got \"\(value)\"): pass the bare flag --capture-codec-trace"
@@ -144,6 +142,7 @@ enum BatchCommand {
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
+        try GenerateCommand.validatePayloadOptions(args, mode: mode)
 
         let lines = try readLines(args)
         guard !lines.isEmpty else {
@@ -160,7 +159,7 @@ enum BatchCommand {
         // One shared payload keeps the loaded model/session reusable while the
         // command owns each item's result, cancellation, and retained receipt.
         let built = try await GenerateCommand.buildPayload(args, mode: mode, runtime: runtime)
-        let payload = args.flag("app-delivery") ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
+        let payload = appDelivery ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
         let deliveryInstructionCellID = try GenerateCommand.resolveDeliveryInstructionCellID(
             args,
             mode: mode
@@ -212,11 +211,13 @@ enum BatchCommand {
             } else {
                 for result in results { print(result.audioPath) }
                 for row in outcome.rows {
+                    let code = row.status == .failed ? row.errorCode.map { " (\($0))" } ?? "" : ""
                     let signalled = row.cancellationRequested == true ? " (cancellation requested)" : ""
-                    note("item \(row.index): \(row.status.rawValue)\(signalled)")
+                    note("item \(row.index): \(row.status.rawValue)\(code)\(signalled)")
                 }
             }
             if outcome.cancelled { throw CancellationError() }
+            if let engineCancellation = outcome.engineCancellation { throw engineCancellation }
             throw CLIError("batch stopped; completed outputs retained, remaining rows not attempted")
         }
 
@@ -290,6 +291,7 @@ enum BatchCommand {
         var items: [LongFormItemJSON] = []
         var stopped = false
         var cancelled = false
+        var engineCancellation: CLIEngineCancellation?
         let started = ContinuousClock.now
         projects: for (index, plan) in plans.enumerated() {
             let name = "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
@@ -337,6 +339,13 @@ enum BatchCommand {
                         audioURL: URL(fileURLWithPath: result.audioPath), boundary: segment.evidence.boundary,
                         intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds
                     ))
+                } catch let engineStop as CLIEngineCancellation {
+                    // The engine stopped the segment on its own (P15-02): a failure, not an interrupt.
+                    rows[index].status = .failed
+                    rows[index].errorCode = engineStop.errorCode
+                    engineCancellation = engineStop
+                    stopped = true
+                    break projects
                 } catch is CancellationError {
                     rows[index].status = .cancelled
                     rows[index].errorCode = "cancelled"
@@ -407,11 +416,13 @@ enum BatchCommand {
             } else {
                 for item in items { print(item.audioPath) }
                 for row in rows where row.status != .completed {
+                    let code = row.status == .failed ? row.errorCode.map { " (\($0))" } ?? "" : ""
                     let signalled = row.cancellationRequested == true ? " (cancellation requested)" : ""
-                    note("project \(row.index): \(row.status.rawValue)\(signalled)")
+                    note("project \(row.index): \(row.status.rawValue)\(code)\(signalled)")
                 }
             }
             if cancelled { throw CancellationError() }
+            if let engineCancellation { throw engineCancellation }
             throw CLIError("long-form batch stopped; completed projects retained, remaining projects not attempted")
         }
         if args.flag("json") {
@@ -468,14 +479,16 @@ enum BatchCommand {
           --file         input file, one clip per line ("-" or omitted = stdin)
           --mode         custom (default) | design | clone
           --variant      speed (default) | quality
-          --speaker      (custom) speaker id; default = contract default
+          --speaker      (custom) speaker id; default = contract default; an empty
+                         value is refused
           --voice-brief  (design) voice description
           --voice        (clone) saved voice name or id
           --reference    (clone) path to a reference .wav
           --transcript   (clone) transcript of the --reference clip
           --confirm-consent  (clone) required: confirms you own or have permission
                          to clone this voice (ignored by other modes)
-          --delivery     optional delivery style (applies to all clips)
+          --delivery     optional delivery style (applies to all clips; custom and
+                         design only, refused in clone)
           --app-delivery with no --delivery/--delivery-cell, send the apps' default
                          delivery (the Neutral preset instruction) on Custom and
                          Design, as a new Studio draft does; otherwise uninstructed
@@ -501,7 +514,9 @@ enum BatchCommand {
 
         Prints one output WAV path per line on stdout (or a JSON object with --json).
         All-success JSON is unchanged. Partial failure/cancellation emits schemaVersion 2
-        with every planned row and exits nonzero. No failed item is retried.
+        with every planned row and exits nonzero. No failed item is retried. A take the
+        engine stopped under memory pressure is a failed row (errorCode memory_pressure)
+        and exits 75; Ctrl-C makes it cancelled and exits 130.
         Batch uses Auto language per text and non-streaming output (a --long-form segment
         streams, as the apps' long-form path does); --language/--stream/--out are rejected
         rather than silently ignored. Use generate for those controls.

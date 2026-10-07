@@ -129,6 +129,158 @@ final class CLIArgumentsTests: XCTestCase {
         ))
     }
 
+    /// P15-07 / P02-09: an unknown `--language` is refused before boot instead of
+    /// silently running as Auto; names, codes and region-tagged codes resolve to
+    /// the canonical language the apps send.
+    func testLanguageResolvesNamesAndCodesAndRefusesTheRest() throws {
+        func parse(_ value: String) throws -> Qwen3SupportedLanguage? {
+            try GenerateCommand.parseLanguage(Args(["--language", value]))
+        }
+        XCTAssertNil(try GenerateCommand.parseLanguage(Args([])), "omitted stays Auto with no hint")
+        XCTAssertEqual(try parse("auto"), .auto)
+        XCTAssertEqual(try parse("Automatic"), .auto)
+        XCTAssertEqual(try parse("French"), .french)
+        XCTAssertEqual(try parse("fr"), .french)
+        XCTAssertEqual(try parse(" pt-BR "), .portuguese)
+        XCTAssertEqual(try parse("ja-JP"), .japanese, "a region subtag never changes the language")
+        XCTAssertEqual(try parse("ko_KR"), .korean)
+        XCTAssertEqual(try parse("zh-Hant"), .chinese)
+        XCTAssertEqual(try parse("es-MX"), .spanish)
+        XCTAssertEqual(try parse("en-AU"), .english)
+        for invalid in ["englsh", "portugese", "cantonese", "français", "klingon", "auto-detect", ""] {
+            XCTAssertThrowsError(try parse(invalid), invalid) { error in
+                let message = (error as? CLIError)?.description ?? ""
+                XCTAssertTrue(message.hasPrefix("invalid --language '\(invalid)'"), message)
+                XCTAssertTrue(message.contains("auto | chinese | english"), "the refusal lists the accepted values")
+            }
+        }
+        XCTAssertThrowsError(try GenerateCommand.parseLanguage(Args(["--language"])), "a bare flag has no language")
+    }
+
+    /// P15-08 / P05-05: an empty speaker (an unset shell variable) is refused,
+    /// never sent as a take with no speaker conditioning; P02-09: Clone refuses
+    /// a delivery it would drop unseen; P15-06: `--app-delivery` is a bare flag.
+    func testPayloadOptionsRefuseAnEmptySpeakerAndACloneDelivery() throws {
+        XCTAssertNil(try GenerateCommand.explicitSpeaker(Args([])), "omitted takes the contract default")
+        XCTAssertEqual(try GenerateCommand.explicitSpeaker(Args(["--speaker", " ryan "])), "ryan")
+        for argv in [["--speaker", ""], ["--speaker=   "], ["--speaker=", "--json"], ["--speaker", "--json"]] {
+            XCTAssertThrowsError(try GenerateCommand.explicitSpeaker(Args(argv)), "\(argv)") { error in
+                XCTAssertTrue((error as? CLIError)?.description.hasPrefix("empty --speaker") == true)
+            }
+            XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(Args(argv), mode: .custom))
+            XCTAssertNoThrow(
+                try GenerateCommand.validatePayloadOptions(Args(argv), mode: .design),
+                "only Built-in Voice reads --speaker"
+            )
+        }
+
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .custom))
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .design))
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--app-delivery"]), mode: .clone))
+        XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .clone))
+
+        XCTAssertFalse(try GenerateCommand.parseAppDelivery(Args([])))
+        XCTAssertTrue(try GenerateCommand.parseAppDelivery(Args(["--app-delivery"])))
+        XCTAssertThrowsError(try GenerateCommand.parseAppDelivery(Args(["--app-delivery=yes"])))
+    }
+
+    /// U28: two runs that resolve their default output in the same second and
+    /// mode still get distinct files, named by their generation ids.
+    func testDefaultOutputNamesAreUniquePerTake() throws {
+        let dataDir = URL(fileURLWithPath: "/fixture/data", isDirectory: true)
+        let now = Date(timeIntervalSince1970: 1_790_431_387)
+        let first = UUID()
+        let second = UUID()
+        let a = try GenerateCommand.resolveOutputDestination(
+            Args([]), dataDir: dataDir, mode: .custom, generationID: first, now: now)
+        let b = try GenerateCommand.resolveOutputDestination(
+            Args([]), dataDir: dataDir, mode: .custom, generationID: second, now: now)
+        XCTAssertNotEqual(a.path, b.path)
+        XCTAssertEqual(
+            a.path,
+            "/fixture/data/outputs/cli/\(GenerateCommand.defaultOutputStamp(now))_custom_\(first.uuidString.lowercased()).wav"
+        )
+        XCTAssertFalse(a.replacesExistingFile)
+        XCTAssertTrue(GenerateCommand.defaultOutputStamp(now).allSatisfy { $0.isASCII })
+        XCTAssertEqual(GenerateCommand.defaultOutputStamp(now).count, "yyyyMMdd_HHmmss".count)
+    }
+
+    /// P15-09 / P09-02: an explicit `--out` must name a `.wav` file, checked
+    /// before any model work; an existing file is reported as replaced.
+    func testExplicitOutputIsValidatedBeforeBoot() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cli-out-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let existing = root.appendingPathComponent("existing.wav")
+        try Data([0]).write(to: existing)
+        let folderNamedLikeAWAV = root.appendingPathComponent("folder.wav", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderNamedLikeAWAV, withIntermediateDirectories: true)
+
+        func resolve(_ out: String) throws -> GenerateCommand.OutputDestination {
+            try GenerateCommand.resolveOutputDestination(
+                Args(["--out", out]), dataDir: root, mode: .design, generationID: UUID())
+        }
+        let fresh = try resolve(root.appendingPathComponent("take.wav").path)
+        XCTAssertEqual(fresh.path, root.appendingPathComponent("take.wav").path)
+        XCTAssertFalse(fresh.replacesExistingFile)
+        XCTAssertTrue(try resolve(root.appendingPathComponent("TAKE.WAV").path).path.hasSuffix("TAKE.WAV"))
+        XCTAssertTrue(try resolve(existing.path).replacesExistingFile, "an existing file is replaced, and says so")
+        let home = try resolve("~/take.wav").path
+        XCTAssertFalse(home.hasPrefix("~"), "the tilde is expanded")
+        XCTAssertTrue(home.hasSuffix("/take.wav"))
+
+        for refused in [
+            root.path,                                            // an existing folder
+            root.path + "/",                                      // a trailing slash
+            folderNamedLikeAWAV.path,                             // a folder with a .wav name
+            root.appendingPathComponent("take").path,             // no extension: CAF bytes
+            root.appendingPathComponent("take.aiff").path,        // another container
+            "",
+        ] {
+            XCTAssertThrowsError(try resolve(refused), refused) { error in
+                XCTAssertTrue(error is CLIError)
+            }
+        }
+        XCTAssertThrowsError(try GenerateCommand.resolveOutputDestination(
+            Args(["--out"]), dataDir: root, mode: .custom, generationID: UUID()))
+
+        // The folder is created when missing, and a file in its place is refused.
+        let nested = root.appendingPathComponent("a/b/take.wav").path
+        try GenerateCommand.prepareOutputFolder(of: nested)
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("a/b").path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+        XCTAssertThrowsError(try GenerateCommand.prepareOutputFolder(of: existing.appendingPathComponent("take.wav").path))
+    }
+
+    // MARK: - Engine-initiated cancellation (P15-02)
+
+    func testAnEngineCancellationIsReportedApartFromASignal() {
+        let engine = CLIEngineCancellation.classify(CancellationError(), commandCancelled: false)
+        XCTAssertEqual(engine as? CLIEngineCancellation, CLIEngineCancellation(reason: .memoryPressure))
+        XCTAssertEqual((engine as? CLIEngineCancellation)?.errorCode, "memory_pressure")
+        XCTAssertTrue(CLIEngineCancellation.classify(CancellationError(), commandCancelled: true) is CancellationError,
+                      "a signalled run stays the operator's interrupt")
+        XCTAssertEqual(
+            CLIEngineCancellation.classify(CancellationError(), commandCancelled: false, observedReason: .shutdown)
+                as? CLIEngineCancellation,
+            CLIEngineCancellation(reason: .shutdown),
+            "the take's own `.cancelled` event names the reason"
+        )
+        XCTAssertEqual(
+            CLIEngineCancellation.classify(
+                CLIEngineCancellation(reason: .memoryPressure), commandCancelled: false, observedReason: .user
+            ) as? CLIEngineCancellation,
+            CLIEngineCancellation(reason: .memoryPressure),
+            "the engine's `user` default never relabels an engine stop"
+        )
+        let other = CLIError("fixture")
+        XCTAssertEqual((CLIEngineCancellation.classify(other, commandCancelled: false) as? CLIError)?.description, "fixture")
+        XCTAssertEqual(CLIEngineCancellation.exitStatus, 75)
+        XCTAssertNotEqual(CLIEngineCancellation.exitStatus, 130)
+        XCTAssertTrue(CLIEngineCancellation(reason: .memoryPressure).errorDescription?.contains("memory pressure") == true)
+    }
+
     func testScriptTextComesFromTheFlagOrAFile() throws {
         XCTAssertEqual(try GenerateCommand.resolveText(Args(["--text", "Hello there."])), "Hello there.")
         let url = FileManager.default.temporaryDirectory

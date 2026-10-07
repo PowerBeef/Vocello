@@ -50,6 +50,11 @@ enum VocelloMain {
                 FileHandle.standardError.write(Data("Cancelled; command cleanup completed.\n".utf8))
             }
             return 130
+        } catch let engineStop as CLIEngineCancellation {
+            // P15-02: the engine stopped a take on its own (memory pressure);
+            // a wrapper must never read it as an operator interrupt.
+            FileHandle.standardError.write(Data("error: \(engineStop.errorDescription ?? engineStop.errorCode)\n".utf8))
+            return CLIEngineCancellation.exitStatus
         } catch {
             // A typed error prints its own path-free description (SEC-11); the
             // raw value would print every associated value, staged paths and an
@@ -81,6 +86,9 @@ enum VocelloMain {
         Global: --json (machine-readable stdout), --quiet / --verbose (stderr notes).
         Voice cloning (clone generation, `voices enroll`, clone bench cells) requires
         --confirm-consent: only clone voices you own or have permission to use.
+
+        Exit status: 0 success · 1 error · 2 usage · 75 the engine stopped a take
+        under memory pressure (retry later) · 130 / 143 interrupted (SIGINT / SIGTERM).
         """)
     }
 }

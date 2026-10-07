@@ -214,6 +214,32 @@ final class CLIExecutionTests: XCTestCase {
         XCTAssertTrue(cancelled.cancelled)
     }
 
+    /// P15-02: a take the engine stopped on its own under memory pressure is a
+    /// failed row with its reason, never a `cancelled` row like a Ctrl-C, and the
+    /// outcome carries it so the command exits with its own status.
+    func testABatchTheEngineStoppedIsAFailedRowWithItsReason() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let requests = (0..<3).map { request($0, root: root) }
+        let outcome = await CLIBatchExecution.run(requests) { request in
+            if request.seed == 1 { throw CLIEngineCancellation(reason: .memoryPressure) }
+            try Data([1, 2, 3]).write(to: URL(fileURLWithPath: request.outputPath))
+            return self.result(request)
+        }
+        XCTAssertEqual(outcome.rows.map(\.status), [.completed, .failed, .notAttempted])
+        XCTAssertEqual(outcome.rows[1].errorCode, "memory_pressure")
+        XCTAssertNil(outcome.rows[1].cancellationRequested, "no signal reached the batch")
+        XCTAssertFalse(outcome.cancelled)
+        XCTAssertFalse(outcome.passed)
+        XCTAssertEqual(outcome.engineCancellation, CLIEngineCancellation(reason: .memoryPressure))
+        XCTAssertEqual(outcome.results.count, 1, "the completed take is kept")
+
+        let interrupted = await CLIBatchExecution.run(requests) { _ in throw CancellationError() }
+        XCTAssertNil(interrupted.engineCancellation)
+        XCTAssertTrue(interrupted.cancelled)
+    }
+
     func testFailureCoincidingWithCancellationStaysFailedAndNotesIt() async throws {
         let requests = (0..<2).map { request($0, root: URL(fileURLWithPath: "/missing/\(UUID())")) }
         let failed = await Task {
@@ -325,6 +351,61 @@ final class CLIExecutionTests: XCTestCase {
         }
         XCTAssertEqual(observed.all, ["armed", "cancelled"])
         XCTAssertEqual(code, 128 + number)
+    }
+
+    // MARK: - Interactive picker (P15-10)
+
+    func testThePickerReadsANumberOrANameAndDefaultsToCustom() async throws {
+        let design = try await GenerateCommand.promptForMode(readLine: { "2" })
+        XCTAssertEqual(design, GenerationMode.allCases[1])
+        let clone = try await GenerateCommand.promptForMode(readLine: { "Clone" })
+        XCTAssertEqual(clone, .clone)
+        let fallback = try await GenerateCommand.promptForMode(readLine: { nil })
+        XCTAssertEqual(fallback, .custom)
+    }
+
+    /// A Ctrl-C at the picker cancels the command task while `readLine` still
+    /// blocks (SIGINT is ignored at the process level): the wait ends at once,
+    /// not at the supervisor's 30-second forced exit.
+    func testThePickerReadEndsAtOnceWhenTheCommandIsCancelled() async throws {
+        let release = DispatchSemaphore(value: 0)
+        let entered = expectation(description: "read started")
+        // Non-throwing tasks returning the error: the pinned CI compiler rejects
+        // a throwing `Task` that returns a value here.
+        let reading = Task { () -> (any Error)? in
+            do {
+                _ = try await GenerateCommand.readLineCancellably {
+                    entered.fulfill()
+                    release.wait()
+                    return "1"
+                }
+                return nil
+            } catch {
+                return error
+            }
+        }
+        await fulfillment(of: [entered], timeout: 5)
+        let cancelled = ContinuousClock.now
+        reading.cancel()
+        let readError = await reading.value
+        XCTAssertTrue(readError is CancellationError, "a cancelled read must not return a line")
+        XCTAssertLessThan(ContinuousClock.now - cancelled, .seconds(5))
+        release.signal()
+
+        let preCancelled = Task { () -> (any Error)? in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await GenerateCommand.readLineCancellably {
+                    XCTFail("no read starts once the command is cancelled")
+                    return nil
+                }
+                return nil
+            } catch {
+                return error
+            }
+        }
+        let preCancelledError = await preCancelled.value
+        XCTAssertTrue(preCancelledError is CancellationError)
     }
 
     func testPlaybackCancellationTerminatesAndReapsThePlayerBeforeReportingCancellation() async {

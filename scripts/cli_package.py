@@ -140,7 +140,8 @@ def stage(products: Path, output: Path, root: Path = ROOT) -> None:
             'explicitly through Vocello or `vocello models install <id>` before generation.\n'
             'The default data store is shared with the desktop app. Use --data-dir <folder>\n'
             'to select a separate store. Downloads require network; inference is local.\n'
-            'Ctrl-C cancels a command. Exit status: 0 success, 1 error, 2 usage, 130 interrupted.\n'
+            'Ctrl-C cancels a command. Exit status: 0 success, 1 error, 2 usage, 75 the engine\n'
+            'stopped a take under memory pressure (retry later), 130 interrupted.\n'
             'See LICENSE, THIRD-PARTY-NOTICES.txt and third_party_attributions.json for notices.\n'
             'The signed DMG and release SHA256SUMS bind this package; package-manifest.json\n'
             'is a content inventory, not independent release or audio-quality approval.\n', encoding="utf-8")

@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import QwenVoiceCore
+import Synchronization
 
 /// `vocello generate` — synthesize one clip headlessly via the in-process engine.
 enum GenerateCommand {
@@ -54,6 +55,8 @@ enum GenerateCommand {
         /// observer's lag behind the hand-off (`ttfcObserverLagMS`, audit #48).
         let firstChunkUptimeNS: UInt64?
         let chunkCount: Int
+        /// The typed reason of a `.cancelled` terminal (P15-02).
+        var cancellationReason: GenerationCancellationReason?
     }
 
     /// Run a request, and when it's streaming, drain `engine.events` on a side task
@@ -88,7 +91,14 @@ enum GenerateCommand {
                             firstChunkUptimeNS = DispatchTime.now().uptimeNanoseconds
                         }
                         count += 1
-                    case .completed, .cancelled, .failed:
+                    case .cancelled(let summary):
+                        return StreamObservation(
+                            firstChunkMS: firstChunkMS,
+                            firstChunkUptimeNS: firstChunkUptimeNS,
+                            chunkCount: count,
+                            cancellationReason: summary.reason
+                        )
+                    case .completed, .failed:
                         return StreamObservation(
                             firstChunkMS: firstChunkMS,
                             firstChunkUptimeNS: firstChunkUptimeNS,
@@ -110,8 +120,13 @@ enum GenerateCommand {
         do {
             result = try await runtime.generate(request)
         } catch {
-            if let streamTask { _ = await streamTask.value }
-            throw error
+            let observation = await streamTask?.value
+            // P15-02: the take's own `.cancelled` event names the engine's reason.
+            throw CLIEngineCancellation.classify(
+                error,
+                commandCancelled: Task.isCancelled,
+                observedReason: observation?.cancellationReason
+            )
         }
         var firstChunkMS: Double?
         var chunkCount: Int?
@@ -140,40 +155,51 @@ enum GenerateCommand {
 
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
         // default to custom (keeps scripted/piped runs unchanged).
-        let mode = try resolveModeInteractive(args)
+        let mode = try await resolveModeInteractive(args)
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
+        // Every option is checked before boot, so a bad value never costs a model load.
+        let language = try parseLanguage(args)
+        let seed = try parseSeed(args)
+        let variation = try parseVariation(args)
+        let appDelivery = try parseAppDelivery(args)
+        try validatePayloadOptions(args, mode: mode)
+        let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
 
         let dataDir = CLIPaths.dataDirectory(override: args.string("data-dir"))
         let manifestOverride = args.string("manifest").map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
+        }
+        // The take's identity names its default output, so the path and the
+        // JSON `generationID` agree and no two runs share a file (U28).
+        let generationID = UUID()
+        let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        try prepareOutputFolder(of: output.path)
+        if output.replacesExistingFile {
+            note("--out names an existing file: a successful take replaces it")
         }
 
         note("booting engine (data: \(dataDir.path))")
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
-        let payload = try await buildPayload(args, mode: mode, runtime: runtime)
-        let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
-
-        let outputPath = resolveOutputPath(args, dataDir: dataDir, mode: mode)
-        ensureParentDirectory(of: outputPath)
+        let built = try await buildPayload(args, mode: mode, runtime: runtime)
+        let payload = appDelivery ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
 
         note("loading \(modelID)…")
         try await runtime.engine.loadModel(id: modelID)
 
-        let generationID = UUID()
         let request = GenerationRequest(
-            mode: mode, modelID: modelID, text: text, outputPath: outputPath,
+            mode: mode, modelID: modelID, text: text, outputPath: output.path,
             shouldStream: streaming,
             // Match the app's interactive streaming cadence so --stream exercises
             // the same engine chunk path the UI uses (CustomVoiceCoordinator et al.).
             streamingInterval: streaming ? GenerationSemantics.appStreamingInterval : nil,
-            languageHint: args.string("language"),
+            languageHint: language?.rawValue,
             payload: payload, generationID: generationID,
-            seed: try parseSeed(args),
-            variation: try parseVariation(args),
+            seed: seed,
+            variation: variation,
             deliveryInstructionCellID: deliveryInstructionCellID)
 
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
@@ -304,6 +330,80 @@ enum GenerateCommand {
         return variation
     }
 
+    /// `--language` (P15-07, P02-09): a Qwen3 language name or code in any case,
+    /// with a region or script subtag dropped (`ja-JP` is Japanese, `zh-Hant`
+    /// Chinese), or `auto`. Anything else is refused before boot, because the
+    /// engine would read it as Auto and pick a language from the script. `nil`
+    /// when omitted (Auto); otherwise the canonical name the apps send.
+    static func parseLanguage(_ args: Args) throws -> Qwen3SupportedLanguage? {
+        guard let raw = args.string("language") else {
+            if args.flag("language") { throw invalidLanguage("") }
+            return nil
+        }
+        guard let language = Self.language(named: raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            throw invalidLanguage(raw)
+        }
+        return language
+    }
+
+    private static func language(named token: String) -> Qwen3SupportedLanguage? {
+        let lowered = token.lowercased()
+        if lowered == "auto" || lowered == "automatic" { return .auto }
+        let normalized = Qwen3SupportedLanguage.normalized(token)
+        if normalized != .auto { return normalized }
+        let primary = lowered.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? ""
+        guard !primary.isEmpty, primary != lowered else { return nil }
+        let fromPrimary = Qwen3SupportedLanguage.normalized(primary)
+        return fromPrimary == .auto ? nil : fromPrimary
+    }
+
+    private static func invalidLanguage(_ raw: String) -> CLIError {
+        let accepted = Qwen3SupportedLanguage.allCases.map(\.rawValue).joined(separator: " | ")
+        return CLIError("invalid --language '\(raw)' (use \(accepted), or a code such as en, fr or ja-JP)")
+    }
+
+    /// `--app-delivery` (P15-06): with no --delivery or --delivery-cell, send the
+    /// apps' default delivery, as batch does. A bare flag; a value is refused.
+    static func parseAppDelivery(_ args: Args) throws -> Bool {
+        if let value = args.string("app-delivery") {
+            throw CLIError("--app-delivery takes no value (got \"\(value)\"): pass the bare flag --app-delivery")
+        }
+        return args.flag("app-delivery")
+    }
+
+    /// The payload options that need no engine, checked before boot by
+    /// `generate` and again by `buildPayload` (which `batch` runs).
+    static func validatePayloadOptions(_ args: Args, mode: GenerationMode) throws {
+        switch mode {
+        case .custom:
+            _ = try explicitSpeaker(args)
+        case .design:
+            break
+        case .clone:
+            // Clone has no instruction channel: a delivery would be dropped unseen.
+            if args.string("delivery") != nil || args.flag("delivery") {
+                throw CLIError("--delivery is not available in clone mode (the reference voice sets the delivery)")
+            }
+        }
+    }
+
+    /// `--speaker` (P15-08): `nil` when omitted (the contract default). An empty
+    /// or blank value, such as an unset shell variable, is refused: sent as is,
+    /// it would run the take with no speaker conditioning at all.
+    static func explicitSpeaker(_ args: Args) throws -> String? {
+        guard let raw = args.string("speaker") else {
+            if args.flag("speaker") { throw emptySpeaker }
+            return nil
+        }
+        let speaker = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !speaker.isEmpty else { throw emptySpeaker }
+        return speaker
+    }
+
+    private static var emptySpeaker: CLIError {
+        CLIError("empty --speaker: pass a speaker id (see `vocello speakers list`), or omit it for the default speaker")
+    }
+
     /// Validate a mode string into a `GenerationMode`.
     static func parseModeString(_ s: String) throws -> GenerationMode {
         guard let mode = GenerationMode(rawValue: s.lowercased()) else {
@@ -320,15 +420,18 @@ enum GenerateCommand {
 
     /// Mode for `generate`: an explicit `--mode` wins; otherwise prompt interactively
     /// when stdin is a terminal; otherwise default to `custom` (scripted/piped runs).
-    static func resolveModeInteractive(_ args: Args) throws -> GenerationMode {
+    static func resolveModeInteractive(_ args: Args) async throws -> GenerationMode {
         if let explicit = args.string("mode") { return try parseModeString(explicit) }
-        if isInteractiveStdin() { return promptForMode() }
+        if isInteractiveStdin() { return try await promptForMode() }
         return .custom
     }
 
     /// Numbered menu on stderr; reads a choice (number or name) from stdin. Falls
-    /// back to `custom` on EOF/blank after a few tries.
-    static func promptForMode() -> GenerationMode {
+    /// back to `custom` on EOF/blank after a few tries. A Ctrl-C at the prompt
+    /// ends the command at once (P15-10).
+    static func promptForMode(
+        readLine read: @escaping @Sendable () -> String? = { Swift.readLine(strippingNewline: true) }
+    ) async throws -> GenerationMode {
         let modes = GenerationMode.allCases
         for _ in 0..<3 {
             FileHandle.standardError.write(Data("Select a mode:\n".utf8))
@@ -336,7 +439,7 @@ enum GenerateCommand {
                 FileHandle.standardError.write(Data("  \(i + 1)) \(m.rawValue)\t\(ModesCommand.info(for: m).summary)\n".utf8))
             }
             FileHandle.standardError.write(Data("> ".utf8))
-            guard let line = readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespaces),
+            guard let line = try await readLineCancellably(read)?.trimmingCharacters(in: .whitespaces),
                   !line.isEmpty else { break }
             if let n = Int(line), n >= 1, n <= modes.count { return modes[n - 1] }
             if let m = GenerationMode(rawValue: line.lowercased()) { return m }
@@ -344,6 +447,24 @@ enum GenerateCommand {
         }
         FileHandle.standardError.write(Data("• defaulting to custom\n".utf8))
         return .custom
+    }
+
+    /// One line from `read`, raced against the command's cancellation (P15-10).
+    /// Once the supervisor owns SIGINT the signal is ignored at the process level,
+    /// so a blocking read on the main actor would hold a Ctrl-C until the 30 s
+    /// forced exit. The read runs on its own thread instead; a cancellation ends
+    /// the wait at once with `CancellationError`, and the abandoned thread ends
+    /// with the process.
+    static func readLineCancellably(_ read: @escaping @Sendable () -> String?) async throws -> String? {
+        let gate = CLICancellableLineRead()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String?, any Error>) in
+                guard gate.install(continuation) else { return }
+                Thread.detachNewThread { gate.deliver(read()) }
+            }
+        } onCancel: {
+            gate.cancel()
+        }
     }
 
     static func resolveQuality(_ args: Args) throws -> Bool {
@@ -358,6 +479,7 @@ enum GenerateCommand {
     /// reference once; `batch` reuses it across all of its requests.
     @MainActor
     static func buildPayload(_ args: Args, mode: GenerationMode, runtime: CLIRuntime) async throws -> GenerationRequest.Payload {
+        try validatePayloadOptions(args, mode: mode)
         switch mode {
         case .custom:
             let delivery: String?
@@ -369,7 +491,7 @@ enum GenerateCommand {
             } else {
                 delivery = args.string("delivery")
             }
-            return .custom(speakerID: args.string("speaker") ?? runtime.defaultSpeakerID,
+            return .custom(speakerID: try explicitSpeaker(args) ?? runtime.defaultSpeakerID,
                            deliveryStyle: delivery)
         case .design:
             return .design(voiceDescription: try args.require("voice-brief", "a voice description for Voice Design"),
@@ -449,23 +571,75 @@ enum GenerateCommand {
         throw CLIError("missing text — pass --text \"…\", --text-file <path>, or pipe text on stdin")
     }
 
-    /// Create the parent directory of an output path when it has one (a bare
-    /// filename writes into the cwd — nothing to create).
-    static func ensureParentDirectory(of outputPath: String) {
-        let parent = URL(fileURLWithPath: outputPath).deletingLastPathComponent()
-        if !parent.path.isEmpty, parent.path != "." {
-            try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        }
+    /// Where `generate` writes its take.
+    struct OutputDestination: Equatable {
+        let path: String
+        /// An explicit `--out` names an existing file, which a successful take
+        /// replaces atomically (a failed one leaves it as it was).
+        let replacesExistingFile: Bool
     }
 
-    private static func resolveOutputPath(_ args: Args, dataDir: URL, mode: GenerationMode) -> String {
-        if let out = args.string("out") { return (out as NSString).expandingTildeInPath }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyyMMdd_HHmmss"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        return dataDir
-            .appendingPathComponent("outputs/cli", isDirectory: true)
-            .appendingPathComponent("\(fmt.string(from: Date()))_\(mode.rawValue).wav").path
+    /// The take's destination, resolved and checked before the engine boots, so
+    /// a path that cannot hold the take never costs a model load (P15-09, P09-02).
+    /// The default name carries the take's generation id, so two runs, however
+    /// close together, never share a file (U28). An explicit `--out` must name a
+    /// `.wav` file (any case), not a folder.
+    static func resolveOutputDestination(
+        _ args: Args,
+        dataDir: URL,
+        mode: GenerationMode,
+        generationID: UUID,
+        now: Date = Date(),
+        fileManager: FileManager = .default
+    ) throws -> OutputDestination {
+        guard let out = args.string("out") else {
+            if args.flag("out") { throw CLIError("--out needs a .wav file path") }
+            let name = "\(defaultOutputStamp(now))_\(mode.rawValue)_\(generationID.uuidString.lowercased()).wav"
+            let path = dataDir.appendingPathComponent("outputs/cli", isDirectory: true)
+                .appendingPathComponent(name).path
+            return OutputDestination(path: path, replacesExistingFile: false)
+        }
+        guard !out.isEmpty else { throw CLIError("--out needs a .wav file path") }
+        guard !out.hasSuffix("/") else {
+            throw CLIError("--out \(out) names a folder; pass a .wav file path inside it")
+        }
+        let path = (out as NSString).expandingTildeInPath
+        guard (path as NSString).pathExtension.lowercased() == "wav" else {
+            throw CLIError("--out must name a .wav file (got \(out)); the take is always written as WAV")
+        }
+        var isDirectory: ObjCBool = false
+        let exists = fileManager.fileExists(atPath: path, isDirectory: &isDirectory)
+        guard !(exists && isDirectory.boolValue) else {
+            throw CLIError("--out \(out) is an existing folder; pass a .wav file path inside it")
+        }
+        return OutputDestination(path: path, replacesExistingFile: exists)
+    }
+
+    /// `yyyyMMdd_HHmmss` in the POSIX locale and the Gregorian calendar.
+    static func defaultOutputStamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter.string(from: date)
+    }
+
+    /// Creates the folder of `outputPath` when it is missing; refuses a folder
+    /// that cannot be created or is a file, before any model work.
+    static func prepareOutputFolder(of outputPath: String, fileManager: FileManager = .default) throws {
+        let folder = URL(fileURLWithPath: outputPath).deletingLastPathComponent()
+        var isDirectory: ObjCBool = false
+        if fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else {
+                throw CLIError("the output folder \(folder.path) is a file")
+            }
+            return
+        }
+        do {
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        } catch {
+            throw CLIError("could not create the output folder \(folder.path): \(error.localizedDescription)")
+        }
     }
 
     static func printHelp() {
@@ -484,20 +658,28 @@ enum GenerateCommand {
           --variant      speed (default) | quality
           --text         inline script text ("-" reads stdin)
           --text-file    read script text from a file ("-" reads stdin)
-          --speaker      (custom) speaker id; default = contract default (see `vocello speakers list`)
+          --speaker      (custom) speaker id; default = contract default (see `vocello speakers list`);
+                         an empty value is refused
           --voice-brief  (design) voice description
           --voice        (clone) saved voice name or id
           --reference    (clone) path to a reference .wav (alternative to --voice)
           --transcript   (clone) transcript of the --reference clip
           --confirm-consent  (clone) required: confirms you own or have permission
                          to clone this voice (ignored by other modes)
-          --delivery     optional delivery style
+          --delivery     optional delivery style (custom and design; refused in clone)
           --delivery-cell  canonical preset cell (<preset>.<intensity>); custom mode only
-          --language     Qwen3 language hint (english, french, auto, …); omitted = Auto
+          --app-delivery with no --delivery/--delivery-cell, send the apps' default
+                         delivery (the Neutral preset instruction) on Custom and
+                         Design, as a new Studio draft does; otherwise uninstructed
+          --language     auto | chinese | english | japanese | korean | german | french |
+                         russian | portuguese | spanish | italian, or a code (en, fr, ja-JP);
+                         omitted = Auto; anything else is refused
           --seed         deterministic sampling seed — same request + seed
                          reproduces the same take
           --variation    expressive (default, official) | balanced | consistent
-          --out          output .wav path; default → <data>/outputs/cli/
+          --out          output .wav file (not a folder; its folder is created); an
+                         existing file is replaced only by a successful take. Default →
+                         <data>/outputs/cli/<time>_<mode>_<generation id>.wav, unique per run
           --stream       streaming synthesis at the app's 320ms cadence; reports
                          first-chunk latency (TTFC) + chunk count (no live playback).
                          This is the default; use --no-stream to disable it.
@@ -508,7 +690,60 @@ enum GenerateCommand {
           --data-dir     runtime dir (default ~/Library/Application Support/QwenVoice[-Debug])
           --manifest     override path to qwenvoice_contract.json
 
-        Prints the output WAV path on stdout (or a JSON object with --json).
+        Prints the output WAV path on stdout (or a JSON object with --json). Exits 75
+        when the engine stopped the take under memory pressure, 130 on Ctrl-C.
         """)
+    }
+}
+
+/// The one-shot rendezvous of `GenerateCommand.readLineCancellably`: whichever
+/// of the read and the cancellation comes first resumes the waiting command,
+/// exactly once.
+final class CLICancellableLineRead: Sendable {
+    private enum State {
+        case idle
+        case waiting(CheckedContinuation<String?, any Error>)
+        case cancelled
+        case finished
+    }
+
+    private let state = Mutex(State.idle)
+
+    /// Parks `continuation` until the read or a cancellation; returns false,
+    /// having resumed it with `CancellationError`, when the command was already
+    /// cancelled, so no read starts.
+    func install(_ continuation: CheckedContinuation<String?, any Error>) -> Bool {
+        let alreadyCancelled = state.withLock { state -> Bool in
+            guard case .idle = state else { return true }
+            state = .waiting(continuation)
+            return false
+        }
+        if alreadyCancelled { continuation.resume(throwing: CancellationError()) }
+        return !alreadyCancelled
+    }
+
+    func deliver(_ line: String?) {
+        let waiting = state.withLock { state -> CheckedContinuation<String?, any Error>? in
+            guard case .waiting(let continuation) = state else { return nil }
+            state = .finished
+            return continuation
+        }
+        waiting?.resume(returning: line)
+    }
+
+    func cancel() {
+        let waiting = state.withLock { state -> CheckedContinuation<String?, any Error>? in
+            switch state {
+            case .idle:
+                state = .cancelled
+                return nil
+            case .waiting(let continuation):
+                state = .cancelled
+                return continuation
+            case .cancelled, .finished:
+                return nil
+            }
+        }
+        waiting?.resume(throwing: CancellationError())
     }
 }

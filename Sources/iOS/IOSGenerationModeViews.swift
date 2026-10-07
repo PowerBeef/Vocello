@@ -2,12 +2,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 import QwenVoiceCore
 
-/// The recognizer reads the whole script (up to the long-form limit), so after
-/// the typing pause it runs off the main actor, as on the Mac (MAC-22, A10-05).
+/// The engine's own Auto resolution, so the chip names the language the take
+/// is sent with (U02). The recognizer reads the whole script (up to the
+/// long-form limit), so after the typing pause it runs off the main actor, as
+/// on the Mac (MAC-22, A10-05).
 enum IOSPromptLanguageDetection {
     @concurrent
     static func detect(_ text: String) async -> Qwen3SupportedLanguage {
-        PromptLanguageDetector.detect(text)
+        GenerationSemantics.autoDetectedLanguage(in: text)
     }
 }
 
@@ -160,7 +162,7 @@ struct IOSCustomVoiceView: View {
         allowsExecution
             && ttsEngine.isReady
             && isModelAvailable
-            && !scriptLimitState.trimmedIsEmpty
+            && scriptLimitState.hasSpeakableText
             && !scriptLimitState.isOverLimit
             && !ttsEngine.hasActiveGeneration
             && !appModel.longForm.isProcessing
@@ -450,7 +452,7 @@ struct IOSCustomVoiceView: View {
     }
 
     private func generate() {
-        guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
+        guard scriptLimitState.hasSpeakableText, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard !scriptLimitState.isOverLimit else {
             coordinator.rejectStart(scriptLimitState.warningMessage)
             return
@@ -679,8 +681,8 @@ struct IOSVoiceDesignView: View {
         allowsExecution
             && ttsEngine.isReady
             && isModelAvailable
-            && !draft.voiceDescription.isEmpty
-            && !scriptLimitState.trimmedIsEmpty
+            && IOSGenerationTextLimitPolicy.hasVoiceDescription(draft.voiceDescription)
+            && scriptLimitState.hasSpeakableText
             && !scriptLimitState.isOverLimit
             && !ttsEngine.hasActiveGeneration
             && !appModel.longForm.isProcessing
@@ -1560,7 +1562,7 @@ struct IOSVoiceCloningView: View {
             && allowsExecution
             && isModelAvailable
             && draft.referenceAudioPath != nil
-            && !scriptLimitState.trimmedIsEmpty
+            && scriptLimitState.hasSpeakableText
             && !scriptLimitState.isOverLimit
             && !ttsEngine.hasActiveGeneration
             && !appModel.longForm.isProcessing
@@ -2014,7 +2016,7 @@ struct IOSVoiceCloningView: View {
     }
 
     private func generate() {
-        guard !scriptLimitState.trimmedIsEmpty, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
+        guard scriptLimitState.hasSpeakableText, ttsEngine.isReady, !ttsEngine.hasActiveGeneration else { return }
         guard cloneConsentAcknowledged else {
             coordinator.rejectStart(IOSAppLanguage.shared.presentation.cloningConsentRequired)
             return

@@ -47,7 +47,7 @@
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
 - **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip, import an audio file, or reuse a voice from Saved Voices, including one saved from Voice Design.
 
-Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
+Scripts past 900 characters (about 300 in Chinese, Japanese or Korean) become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 
 Vocello is not a wrapper around a Python server: generation runs through a first-party Swift runtime on MLX, and the full engineering story lives in [Under the hood](#under-the-hood).
 

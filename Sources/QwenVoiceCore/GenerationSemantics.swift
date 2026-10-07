@@ -1143,7 +1143,15 @@ public enum GenerationSemantics {
             .joined()
     }
 
-    private static func detectedQwenLanguage(in text: String) -> Qwen3SupportedLanguage? {
+    /// The language an Auto request for `text` is sent with, or `.auto` when
+    /// the text decides none (the engine then falls back per mode). The Studio
+    /// language chip and its recommended speakers read this, so the chip shows
+    /// the language the engine sends (U02).
+    public static func autoDetectedLanguage(in text: String) -> Qwen3SupportedLanguage {
+        detectedQwenLanguage(in: text) ?? .auto
+    }
+
+    static func detectedQwenLanguage(in text: String) -> Qwen3SupportedLanguage? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
@@ -1152,10 +1160,7 @@ public enum GenerationSemantics {
         // send the whole take as Chinese.
         let units = ScriptUnits(counting: trimmed)
         if units.eastAsian * 2 > units.total {
-            if units.kana > 0, units.kana >= units.hangul {
-                return .japanese
-            }
-            return units.hangul > 0 ? .korean : .chinese
+            return eastAsianLanguage(of: units)
         }
         if units.cyrillicWords * 2 > units.total {
             return .russian
@@ -1170,6 +1175,38 @@ public enum GenerationSemantics {
         // an explicit language outperforms Auto.)
         let recognized = PromptLanguageDetector.detect(trimmed)
         return recognized == .auto ? nil : recognized
+    }
+
+    /// Chinese, Japanese or Korean for a mostly East Asian text, by proportion
+    /// (U02). One kana or Hangul character used to decide the whole take, so a
+    /// Chinese script with one の, a katakana brand name or a Korean name was
+    /// spoken with the Japanese or Korean token as garbled speech.
+    ///
+    /// - Japanese needs kana worth at least a quarter of the Han: Japanese
+    ///   prose carries kana particles and endings in nearly every clause
+    ///   (今日はいい天気です。 is mostly kana; even kanji-dense news keeps about
+    ///   one kana per two to four kanji), while a stray の, ソニー or a quoted
+    ///   《鬼滅の刃》 in Chinese prose stays far below that.
+    /// - Korean needs Hangul to outnumber the Han: modern Korean is written
+    ///   almost entirely in Hangul, while a Korean name in Chinese prose is a
+    ///   few syllables among many Han characters.
+    /// - Both at once (rare): the larger of the two, kana on a tie.
+    /// - Otherwise Chinese. Han alone cannot tell the languages apart, so a
+    ///   kanji-only Japanese heading such as 第一章　東京駅 (or a Hanja-only
+    ///   Korean one) resolves to Chinese; pick the language explicitly for it.
+    private static func eastAsianLanguage(of units: ScriptUnits) -> Qwen3SupportedLanguage {
+        let isJapanese = units.kana > 0 && units.kana * 4 >= units.han
+        let isKorean = units.hangul > units.han
+        switch (isJapanese, isKorean) {
+        case (true, true):
+            return units.hangul > units.kana ? .korean : .japanese
+        case (true, false):
+            return .japanese
+        case (false, true):
+            return .korean
+        case (false, false):
+            return .chinese
+        }
     }
 
     /// Script proportions of a text, in comparable units: one per Han, kana
@@ -1190,7 +1227,9 @@ public enum GenerationSemantics {
             enum Run { case idle, cyrillic, other }
             var run = Run.idle
             for scalar in text.unicodeScalars {
-                if scalar.isJapaneseScalar {
+                if scalar.isScriptNeutralKanaMark {
+                    run = .idle
+                } else if scalar.isJapaneseScalar {
                     kana += 1
                     run = .idle
                 } else if scalar.isHangulScalar {
@@ -1242,6 +1281,20 @@ private extension UnicodeScalar {
     var isCJKScalar: Bool {
         switch value {
         case 0x3400 ... 0x4DBF, 0x4E00 ... 0x9FFF, 0xF900 ... 0xFAFF:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Marks in the kana blocks that say nothing about the language: the
+    /// voicing marks (U+3099–U+309C), the double hyphen (U+30A0), the middle
+    /// dot ・ (U+30FB), which Chinese text uses between the parts of a foreign
+    /// name, and the prolonged sound mark ー (U+30FC), which also stands in for
+    /// a dash. They count toward no script (U02).
+    var isScriptNeutralKanaMark: Bool {
+        switch value {
+        case 0x3099 ... 0x309C, 0x30A0, 0x30FB, 0x30FC:
             return true
         default:
             return false

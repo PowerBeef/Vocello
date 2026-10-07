@@ -47,7 +47,8 @@ Generate remains unavailable until the script and Custom model are ready. Smoke 
 completed player and matching History row; the benchmark validator adds readable-audio and exact
 telemetry evidence per take.
 
-Scripts above the 900-character single-take limit route to a long-form project (all three modes):
+Scripts above the 900-character single-take limit (a Han, kana or Hangul character counts three)
+route to a long-form project (all three modes):
 the helper line narrates per-segment progress, the dock's Cancel stops the whole run, and a
 stopped project with reusable takes exposes `longform_resumeChip`, and a completed in-session
 project exposes `iosLongForm_segmentsChip` (a setup-row chip whose confirmation-dialog items,

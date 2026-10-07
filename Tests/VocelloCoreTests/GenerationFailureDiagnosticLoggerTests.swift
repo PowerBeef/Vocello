@@ -1,5 +1,6 @@
 import Foundation
 @testable import QwenVoiceCore
+import VocelloQwen3Core
 import XCTest
 
 final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
@@ -240,6 +241,27 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             )),
             .runtimeFailure
         )
+    }
+
+    /// U29: a take the model ended before its first audio frame (a script with
+    /// nothing to speak) has its own reason and journal code, and its English
+    /// text is neither a startup failure nor an internal error description.
+    func testNoAudioTakeSurfacesItsOwnReasonWithoutInternalErrorText() {
+        typealias Reason = GenerationFailurePresentationReason
+        let cause = VocelloQwen3GenerationOutputFailure.noAudioProduced
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: cause).code, "generation.no_audio")
+        XCTAssertEqual(Reason(cause), .noAudioProduced)
+        for retried in [false, true] {
+            let surfaced = MLXTTSEngine.surfacedGenerationError(cause, allocationRetryAttempted: retried)
+            XCTAssertEqual(Reason(surfaced), .noAudioProduced)
+            XCTAssertEqual(surfaced.stage, .streamGenerationEnded)
+            XCTAssertEqual(surfaced.underlyingDisposition, .failure)
+            let message = surfaced.localizedDescription
+            XCTAssertTrue(message.hasPrefix("The model produced no audio for this script"), message)
+            for internalText in ["could not start", "VocelloQwen3", "error 1", "allocation retry"] {
+                XCTAssertFalse(message.contains(internalText), message)
+            }
+        }
     }
 
     /// A9-01: the store's admission refusals carry typed codes and reasons, so

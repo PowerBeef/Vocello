@@ -583,12 +583,13 @@ struct MacStudioBatchButton: View {
     }
 }
 
-/// The Studio screens' script-language detection (MAC-22). The recognizer
-/// reads the whole script, about a tenth of a second for a long one, so after
-/// the typing pause it runs off the main actor.
+/// The Studio screens' script-language detection (MAC-22). It is the engine's
+/// own Auto resolution, so the chip names the language the take is sent with
+/// (U02). The recognizer reads the whole script, about a tenth of a second for
+/// a long one, so after the typing pause it runs off the main actor.
 enum MacPromptLanguageDetection {
     @concurrent
     static func detect(_ text: String) async -> Qwen3SupportedLanguage {
-        PromptLanguageDetector.detect(text)
+        GenerationSemantics.autoDetectedLanguage(in: text)
     }
 }

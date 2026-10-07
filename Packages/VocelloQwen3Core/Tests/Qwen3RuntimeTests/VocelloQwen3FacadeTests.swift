@@ -586,28 +586,49 @@ final class VocelloQwen3FacadeTests: XCTestCase {
     }
 
     func testEngineRejectsNominalSuccessThatProducedNoAudio() async throws {
-        let engine = VocelloQwen3Engine(
-            loadedModel: try makeLoadedFixture(
-                compatibilityModel: FacadeCompatibilityModel(emitsAudio: false)
+        // End of sequence and the token cap alike, before any audio frame.
+        for endReason in ["eos", "token_cap"] {
+            let engine = VocelloQwen3Engine(
+                loadedModel: try makeLoadedFixture(
+                    compatibilityModel: FacadeCompatibilityModel(
+                        generationEndReason: endReason,
+                        emitsAudio: false
+                    )
+                )
             )
-        )
-        let reservation = try await engine.reserveGeneration(
-            request: makeCustomRequest(generationID: UUID()),
-            audioCapacityFrames: 24_000
-        )
-        _ = try await reservation.session.claimAudioConsumer()
+            let reservation = try await engine.reserveGeneration(
+                request: makeCustomRequest(generationID: UUID()),
+                audioCapacityFrames: 24_000
+            )
+            let audio = try await reservation.session.claimAudioConsumer()
+            let drain = Task { () -> Error? in
+                do {
+                    for try await _ in audio {}
+                    return nil
+                } catch {
+                    return error
+                }
+            }
 
-        try await engine.open(reservation.id)
-        let terminal = await reservation.session.waitForModelTermination()
-        XCTAssertEqual(terminal.outcome, .failed(.runtime))
-        XCTAssertEqual(terminal.emittedAudioFrameCount, 0)
+            try await engine.open(reservation.id)
+            let terminal = await reservation.session.waitForModelTermination()
+            XCTAssertEqual(terminal.outcome, .failed(.runtime), endReason)
+            XCTAssertEqual(terminal.emittedAudioFrameCount, 0, endReason)
+            // U29: the consumer learns the typed cause, not an opaque runtime failure.
+            let consumerError = await drain.value
+            XCTAssertEqual(
+                consumerError as? VocelloQwen3GenerationOutputFailure,
+                .noAudioProduced,
+                endReason
+            )
 
-        _ = try await engine.acknowledgeProductFinalization(
-            generationID: reservation.session.generationID,
-            leaseID: reservation.lease.id,
-            token: reservation.session.finalizationToken,
-            disposition: .aborted(.runtime)
-        )
+            _ = try await engine.acknowledgeProductFinalization(
+                generationID: reservation.session.generationID,
+                leaseID: reservation.lease.id,
+                token: reservation.session.finalizationToken,
+                disposition: .aborted(.runtime)
+            )
+        }
     }
 
     func testEngineAbortBeforeOpenHasNoGenerationSideEffects() async throws {

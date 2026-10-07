@@ -1782,6 +1782,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         if let runtimeError = error as? NativeRuntimeError {
             return runtimeError
         }
+        // U29: the model ended the take before any audio, which is not a
+        // startup failure. The wrapped typed cause gives the interface its
+        // reason (`noAudioProduced`) and the journal its code, and the English
+        // text carries no internal error description.
+        if case .noAudioProduced? = error as? VocelloQwen3GenerationOutputFailure {
+            return NativeRuntimeError(
+                stage: .streamGenerationEnded,
+                message: "The model produced no audio for this script, so nothing was saved. Check that the script has words to speak, then retry.",
+                underlying: error,
+                diagnosticDetail: "end_before_first_audio_frame"
+            )
+        }
         let message = allocationRetryAttempted
             ? "The native runtime could not start audio generation after one allocation retry."
             : "The native runtime could not start audio generation."

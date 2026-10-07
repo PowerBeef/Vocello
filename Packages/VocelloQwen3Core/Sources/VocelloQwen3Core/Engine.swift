@@ -240,6 +240,16 @@ public enum VocelloQwen3EngineError: Error, Equatable, Sendable {
     case invalidCodecRoundTripOutput
 }
 
+/// A take the model ended before it produced any audio (U29). It reaches the
+/// audio consumer as the stream's failure, with the terminal outcome
+/// `.failed(.runtime)`, so the product can name the cause instead of reporting
+/// an internal engine failure.
+public enum VocelloQwen3GenerationOutputFailure: Error, Equatable, Sendable {
+    /// The model stopped (end of sequence, or its token budget) before its
+    /// first audio frame: typically a script with nothing to speak.
+    case noAudioProduced
+}
+
 public enum VocelloQwen3CloneHandleCapability: String, Codable, Hashable, Sendable {
     case decoderOnly = "decoder_only"
     case encoderAndDecoder = "encoder_and_decoder"
@@ -1475,12 +1485,12 @@ public actor VocelloQwen3Engine {
                 switch finishReason {
                 case .endOfSequence:
                     guard completed.emittedAudioFrameCount > 0 else {
-                        throw VocelloQwen3EngineRuntimeFailure()
+                        throw VocelloQwen3GenerationOutputFailure.noAudioProduced
                     }
                     outcome = .completed(.endOfSequence)
                 case .maximumTokens:
                     guard completed.emittedAudioFrameCount > 0 else {
-                        throw VocelloQwen3EngineRuntimeFailure()
+                        throw VocelloQwen3GenerationOutputFailure.noAudioProduced
                     }
                     outcome = .completed(.maximumTokens)
                 case .cancelled:
@@ -1565,6 +1575,8 @@ public actor VocelloQwen3Engine {
                 let terminalError: any Error & Sendable
                 if let mlxFailure {
                     terminalError = mlxFailure
+                } else if let outputFailure = error as? VocelloQwen3GenerationOutputFailure {
+                    terminalError = outputFailure
                 } else {
                     terminalError = VocelloQwen3EngineRuntimeFailure()
                 }

@@ -7,9 +7,10 @@ import QwenVoiceCore
 /// Model: a stored selection of `.auto` means "follow detection" — the UI shows
 /// the *effective* language (the detected one while following, else the pinned
 /// pick). Picking a concrete language pins it; picking the Auto row resumes
-/// following. Generation behavior is inherently consistent with this display:
-/// `GenerationSemantics.qwenLanguageHint` resolves `.auto` through the same
-/// `PromptLanguageDetector` at request time.
+/// following. Both Studios detect with `GenerationSemantics.autoDetectedLanguage`,
+/// the resolver `GenerationSemantics.qwenLanguageHint` applies to `.auto` at
+/// request time, so the display names the language the take is sent with
+/// (U02). When it detects nothing the engine still falls back per mode.
 enum LanguageSelectionPresentation {
     /// The language the generation will effectively use, for display purposes.
     static func effective(

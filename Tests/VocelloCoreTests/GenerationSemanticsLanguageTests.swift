@@ -265,6 +265,81 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
         }
     }
 
+    /// U02: within East Asian text, kana or Hangul picks Japanese or Korean
+    /// only as a real share of the script. One の, ・, ー, katakana brand or
+    /// Korean name used to flip a Chinese take (spoken as garbled speech).
+    func testEastAsianAutoLanguageNeedsAMeaningfulKanaOrHangulShare() {
+        let cases: [(String, Qwen3SupportedLanguage)] = [
+            // Chinese with a stray kana, kana punctuation or Hangul name.
+            ("我最喜欢的动画是《鬼滅の刃》，每个周末都会和朋友一起看。", .chinese),
+            ("我の世界很大，今天想和大家分享一下。", .chinese),
+            ("哈利・波特是一本很好的书。", .chinese),
+            ("列夫・托尔斯泰是一位伟大的俄国作家。", .chinese),
+            ("我昨天买了一台ソニー的相机。", .chinese),
+            ("我很喜欢《君の名は。》这部电影。", .chinese),
+            ("我的朋友김민수明天来北京。", .chinese),
+            ("我喜欢听아이유的歌。", .chinese),
+            ("这是第一期——ー——的节目。", .chinese),
+            // Japanese, including kanji-dense text and katakana alone.
+            ("今日はいい天気です。", .japanese),
+            (LanguageFixtures.japanese, .japanese),
+            ("東京駅で火災、3人けが", .japanese),
+            ("日本政府は新たな経済対策を発表した。", .japanese),
+            ("コーヒーをください。", .japanese),
+            ("ソニー", .japanese),
+            // Korean, with a stray kana.
+            (LanguageFixtures.korean, .korean),
+            ("김치찌개를 좋아해요. 東京の", .korean),
+            // A kanji-only heading cannot be told apart from Chinese by script:
+            // it resolves to Chinese (pick Japanese explicitly for it).
+            ("第一章　東京駅", .chinese),
+        ]
+        for (text, expected) in cases {
+            let request = LanguageTestSupport.makeRequest(
+                mode: .custom,
+                text: text,
+                languageHint: Qwen3SupportedLanguage.auto.rawValue
+            )
+            XCTAssertEqual(GenerationSemantics.qwenLanguageHint(for: request), expected.rawValue, text)
+            XCTAssertEqual(GenerationSemantics.autoDetectedLanguage(in: text), expected, text)
+        }
+    }
+
+    /// U02: the Studio chip reads `autoDetectedLanguage`, the resolver the
+    /// engine applies to Auto, so the chip names the language the take is sent
+    /// with (`.auto` where the engine falls back).
+    func testStudioChipLanguageMatchesTheEngineAutoLanguage() {
+        let texts = [
+            LanguageFixtures.chinese, LanguageFixtures.japanese, LanguageFixtures.korean,
+            LanguageFixtures.russian, LanguageFixtures.english, LanguageFixtures.italian,
+            "哈利・波特是一本很好的书。", "我昨天买了一台ソニー的相机。", "我的朋友김민수明天来北京。",
+            "你好", "...", "",
+        ]
+        for text in texts {
+            for mode in [GenerationMode.design, .clone] {
+                let request = LanguageTestSupport.makeRequest(
+                    mode: mode,
+                    text: text,
+                    languageHint: Qwen3SupportedLanguage.auto.rawValue
+                )
+                XCTAssertEqual(
+                    GenerationSemantics.autoDetectedLanguage(in: text).rawValue,
+                    GenerationSemantics.qwenLanguageHint(for: request),
+                    "\(mode.rawValue): \(text)"
+                )
+            }
+        }
+        XCTAssertEqual(GenerationSemantics.autoDetectedLanguage(in: "..."), .auto)
+    }
+
+    func testScriptUnitsIgnoreKanaPunctuation() {
+        let units = GenerationSemantics.ScriptUnits(counting: "哈利・波特ー\u{309B}\u{30A0}")
+        XCTAssertEqual(units.han, 4)
+        XCTAssertEqual(units.kana, 0)
+        XCTAssertEqual(units.otherWords, 0)
+        XCTAssertEqual(GenerationSemantics.ScriptUnits(counting: "ソニー").kana, 2)
+    }
+
     func testScriptUnitsCountCharactersAndWords() {
         let units = GenerationSemantics.ScriptUnits(counting: "Tokyo 東京, Café\u{301} and Москва 2026!")
         XCTAssertEqual(units.han, 2)

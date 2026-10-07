@@ -24,8 +24,11 @@ standalone History. These source corrections still require corrected-candidate a
 
 ## Shipping path (macOS)
 
-`LongTextGenerationRouter` routes scripts above 900 characters (`singleTakeScriptLimit`, untrimmed count) (the retired character
-segmenter's historical threshold, kept so routing behavior is unchanged) into a long-form project:
+`LongTextGenerationRouter` routes a script into a long-form project when its single-take length
+passes 900 (`SingleTakeScriptBudget`, untrimmed): each Han, kana or Hangul character counts three,
+every other character one, so English keeps its 900-character take and Chinese or Japanese stops
+near 300 characters, inside the 2,048-token cap (U01). The iOS Studio, the Mac line batch's per-line
+check and `vocello generate` use the same predicate:
 
 1. **Planning.** `SpokenTextPlanner` + `LongFormPlanner` produce a schema-v4 plan: normalization
    with typed transformation risks, protected spans (decimals, versions, URLs, abbreviations),

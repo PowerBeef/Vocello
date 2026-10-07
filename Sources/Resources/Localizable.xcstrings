@@ -73374,6 +73374,138 @@
           }
         }
       }
+    },
+    "vocello.error.generation_no_audio": {
+      "comment": "Studio error when the model ended a take before producing any audio, typically for a script with nothing to speak (only punctuation or symbols). Engine failure code generation.no_audio.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model produced no audio for this script, so nothing was saved. Check that the script has words to speak, then retry."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle n’a produit aucun audio pour ce texte, donc rien n’a été enregistré. Vérifiez que le texte contient des mots à prononcer, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo no produjo audio para este guion, así que no se guardó nada. Comprueba que el guion tenga palabras que decir y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat für dieses Skript kein Audio erzeugt, daher wurde nichts gespeichert. Prüfe, ob das Skript Wörter zum Sprechen enthält, und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello non ha prodotto audio per questo testo, quindi non è stato salvato nulla. Controlla che il testo contenga parole da pronunciare, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo não produziu áudio para este roteiro, então nada foi salvo. Verifique se o roteiro tem palavras para falar e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型没有为此文本生成任何音频，因此未保存任何内容。请检查文本中是否有可朗读的文字，然后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルはこのスクリプトの音声を生成しなかったため、何も保存されませんでした。読み上げる言葉がスクリプトに含まれているか確認してから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델이 이 스크립트의 오디오를 생성하지 않아 아무것도 저장되지 않았습니다. 스크립트에 읽을 단어가 있는지 확인한 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Модель не создала аудио для этого текста, поэтому ничего не сохранено. Убедитесь, что в тексте есть слова для озвучивания, и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.lineTooLongForOneTake": {
+      "comment": "macOS interface: batch validation message when one line is past the single-take limit; %1$lld is the line number (an ordinal position, not a count). Line-by-line is the batch toggle's name. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %1$lld is too long for one take. Split it into shorter lines, or turn off Line-by-line to generate the script as a long-form project."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ligne %1$lld est trop longue pour une seule prise. Découpez-la en lignes plus courtes, ou désactivez Ligne par ligne pour générer le texte comme un projet de texte long."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La línea %1$lld es demasiado larga para una sola toma. Divídela en líneas más cortas o desactiva Línea por línea para generar el guion como un proyecto de guion largo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %1$lld ist zu lang für eine einzige Aufnahme. Teile sie in kürzere Zeilen auf oder schalte Zeilenweise aus, um das Skript als Langtext-Projekt zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La riga %1$lld è troppo lunga per un solo take. Dividila in righe più brevi oppure disattiva Riga per riga per generare il testo come progetto di testo lungo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %1$lld é longa demais para uma única tomada. Divida-a em linhas mais curtas ou desative Linha por linha para gerar o roteiro como um projeto de texto longo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 行太长，无法在一次生成中读完。请将其拆分为较短的行，或关闭“逐行”，将文本作为长文本项目生成。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 行目は長すぎて1回のテイクでは読み上げられません。短い行に分割するか、「行ごと」をオフにしてスクリプトを長文プロジェクトとして生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld번째 줄이 너무 길어 한 번의 테이크로 읽을 수 없습니다. 더 짧은 줄로 나누거나 줄 단위를 끄고 스크립트를 긴 원고 프로젝트로 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Строка %1$lld слишком длинная для одного дубля. Разделите её на более короткие строки или отключите режим «Построчно», чтобы создать текст как проект длинного текста."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

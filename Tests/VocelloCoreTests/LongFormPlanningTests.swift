@@ -198,41 +198,100 @@ final class LongFormPlanningTests: XCTestCase {
     }
 
     /// CORE-19: only a script that would overrun even at a fast pace is refused
-    /// before generation; every script the apps send as one take, and every
-    /// planned long-form segment, stays well inside the bound.
+    /// before generation, at a per-script pace (0.2 s per CJK character, 0.052 s
+    /// per other letter or digit); every script the apps send as one take, and
+    /// every planned long-form segment, stays well inside the bound.
     func testSingleTakeBudgetRefusesOnlyScriptsThatCannotFinish() throws {
         let cap = Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens
         let englishSentence = "The narrator kept a steady, unhurried pace through the winding chapters. "
+        let chineseSentence = "火车在黎明时分离开了车站。"
         let english900 = String(String(repeating: englishSentence, count: 13).prefix(900))
-        let chinese900 = String(repeating: "火车在黎明时分离开了车站。", count: 70).prefix(900)
-        let chinese1500 = String(repeating: "火车在黎明时分离开了车站。", count: 116)
+        let chinese900 = String(String(repeating: chineseSentence, count: 70).prefix(900))
+        let chinese1500 = String(repeating: chineseSentence, count: 116)
+        let english3000 = String(String(repeating: englishSentence, count: 42).prefix(3_000))
         let english6000 = String(repeating: englishSentence, count: 82)
 
         XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: english900, maximumCodecTokens: cap))
-        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: String(chinese900), maximumCodecTokens: cap))
+        // U01: 900 Chinese characters (831 Han) need about 2,700 codec tokens at
+        // the median pace; the old 1.5-tokens-per-unit floor admitted them.
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: chinese900, maximumCodecTokens: cap))
         XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: chinese1500, maximumCodecTokens: cap))
+        // English keeps its old bound: a fast reading of 3,000 characters fits.
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: english3000, maximumCodecTokens: cap))
         XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: english6000, maximumCodecTokens: cap))
         XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: english6000, maximumCodecTokens: 0))
+        // Punctuation, symbols and spaces cost nothing.
+        XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(
+            text: String(repeating: "。！… — ", count: 2_000),
+            maximumCodecTokens: cap
+        ))
 
-        // The bound sits at 2/3 of the cap in estimate units.
-        let limit = cap * 2 / 3
-        let atLimit = String(repeating: "火", count: limit)
-        XCTAssertEqual(SingleTakeCodecBudget.conservativeTokenEstimate(of: atLimit), limit)
+        // The CJK bound sits at 2.5 codec tokens per character: 819 fit, 820 do not.
+        let cjkLimit = cap * 2 / 5
+        let atLimit = String(repeating: "火", count: cjkLimit)
         XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: atLimit, maximumCodecTokens: cap))
         XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: atLimit + "火", maximumCodecTokens: cap))
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: atLimit + "か", maximumCodecTokens: cap))
+        XCTAssertTrue(SingleTakeCodecBudget.certainlyExceeds(text: atLimit + "한", maximumCodecTokens: cap))
 
-        let plan = try LongFormPlanner.plan(
-            spokenTextPlan: SpokenTextPlanner.plan(originalText: english6000),
-            configuration: LongFormPlanningConfiguration(
-                runtimeTokenLimit: LongFormPlanningConfiguration.shippingRuntimeTokenLimit,
-                baseSeed: 3
+        // Nothing the single-take routing admits can come near the bound.
+        for limitText in [
+            String(repeating: "火", count: 300),
+            String(repeating: "a", count: 900),
+            String(repeating: "я", count: 900),
+        ] {
+            XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(limitText))
+            XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(text: limitText, maximumCodecTokens: cap / 2))
+        }
+
+        for text in [english6000, chinese1500] {
+            let plan = try LongFormPlanner.plan(
+                spokenTextPlan: SpokenTextPlanner.plan(originalText: text),
+                configuration: LongFormPlanningConfiguration(
+                    runtimeTokenLimit: LongFormPlanningConfiguration.shippingRuntimeTokenLimit,
+                    baseSeed: 3
+                )
             )
-        )
-        for segment in plan.segments {
-            XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(
-                text: segment.spokenTextForGeneration,
-                maximumCodecTokens: cap
-            ))
+            for segment in plan.segments {
+                XCTAssertFalse(SingleTakeCodecBudget.certainlyExceeds(
+                    text: segment.spokenTextForGeneration,
+                    maximumCodecTokens: cap
+                ))
+            }
+        }
+    }
+
+    /// U01: one single-take length for every surface: a Han, kana or Hangul
+    /// character counts three, everything else one, so English keeps its
+    /// 900-character take and Chinese or Japanese stops near 300.
+    func testSingleTakeScriptBudgetWeighsEastAsianCharactersThree() {
+        let measure = SingleTakeScriptBudget.measure("Tokyo 東京、こんにちは。서울 2026!")
+        XCTAssertEqual(measure.characters, 23)
+        XCTAssertEqual(measure.eastAsianCharacters, 9)
+        XCTAssertEqual(measure.otherLettersAndDigits, 9)
+        XCTAssertEqual(measure.singleTakeLength, 23 + 2 * 9)
+        XCTAssertTrue(measure.hasSpeakableContent)
+
+        // The katakana middle dot is punctuation, not a CJK character.
+        XCTAssertEqual(SingleTakeScriptBudget.measure("哈利・波特").eastAsianCharacters, 4)
+
+        XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "火", count: 300)))
+        XCTAssertTrue(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "火", count: 301)))
+        XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "a", count: 900)))
+        XCTAssertTrue(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "a", count: 901)))
+        // Cyrillic, accented Latin and emoji count one each, like any letter.
+        XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "я", count: 900)))
+        XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "\u{E9}", count: 900)))
+        XCTAssertFalse(SingleTakeScriptBudget.exceedsSingleTake(String(repeating: "👋🏽", count: 900)))
+
+        // U29: punctuation, symbols, emoji and spaces alone have nothing to speak.
+        for text in ["", " \n", "...", "…", "!?", "— · —", "🙂🙂", "♪ ♪", "・"] {
+            XCTAssertFalse(SingleTakeScriptBudget.hasSpeakableContent(text), text)
+            XCTAssertFalse(SingleTakeScriptBudget.measure(text).hasSpeakableContent, text)
+        }
+        for text in ["Hi", "42", "你好", "ねこ", "서울", "Ça", "…oui…"] {
+            XCTAssertTrue(SingleTakeScriptBudget.hasSpeakableContent(text), text)
+            XCTAssertTrue(SingleTakeScriptBudget.measure(text).hasSpeakableContent, text)
         }
     }
 

@@ -143,6 +143,32 @@ final class CLIArgumentsTests: XCTestCase {
         }
     }
 
+    /// U29 and P15-03: `generate` refuses, before the engine boots, a script with
+    /// nothing to speak and one past the apps' single-take limit, pointing the
+    /// latter at `batch --long-form`.
+    func testGenerateRefusesUnspeakableAndOverLongScriptsBeforeTheEngine() throws {
+        func refusal(_ text: String) -> String? {
+            do {
+                try GenerateCommand.validateSingleTakeText(text)
+                return nil
+            } catch {
+                return (error as? CLIError)?.description ?? "unexpected \(error)"
+            }
+        }
+        XCTAssertEqual(refusal(" \n")?.hasPrefix("empty text"), true)
+        for text in ["...", "!?", "— · —", "🙂"] {
+            XCTAssertEqual(refusal(text)?.hasPrefix("nothing to speak"), true, text)
+        }
+        for text in [String(repeating: "a", count: 901), String(repeating: "火", count: 301), String(repeating: "word ", count: 600)] {
+            let message = try XCTUnwrap(refusal(text), "\(text.count) characters")
+            XCTAssertTrue(message.hasPrefix("text is too long for one take"), message)
+            XCTAssertTrue(message.contains("vocello batch --long-form"), message)
+        }
+        for text in ["Hi", "Hello there.", String(repeating: "a", count: 900), String(repeating: "火", count: 300)] {
+            XCTAssertNil(refusal(text), "\(text.prefix(12)) (\(text.count))")
+        }
+    }
+
     // MARK: - Trust anchors (SEC-09)
 
     func testTrustAnchorsNeverComeFromTheWorkingDirectoryOfASealedPayload() {

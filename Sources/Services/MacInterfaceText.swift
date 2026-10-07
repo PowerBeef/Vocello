@@ -143,6 +143,11 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.needsReference", defaultValue: "Select a reference audio file before starting batch generation.",
                comment: "macOS interface: batch validation message for Voice Cloning. Presentation only.")
     }
+    static func batchLineTooLongForOneTake(lineNumber: Int) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.lineTooLongForOneTake",
+            defaultValue: "Line %1$lld is too long for one take. Split it into shorter lines, or turn off Line-by-line to generate the script as a long-form project.",
+            comment: "macOS interface: batch validation message when one line is past the single-take limit; %1$lld is the line number (an ordinal position, not a count). Line-by-line is the batch toggle's name. Presentation only."), lineNumber)
+    }
     static var batchNeedsVoiceDescription: String {
         localization.string(localized: "vocello.mac.batch.needsVoiceDescription", defaultValue: "Enter a voice description before starting batch generation.",
                comment: "macOS interface: batch validation message for Voice Design. Presentation only.")

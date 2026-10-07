@@ -200,6 +200,7 @@
     "Sources/VocelloQwen3Core/Engine.swift::public let sampleRate: Int",
     "Sources/VocelloQwen3Core/Engine.swift::public init(codes: [[Int32]], audio: [Float], sampleRate: Int)",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3EngineError: Error, Equatable, Sendable",
+    "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3GenerationOutputFailure: Error, Equatable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public enum VocelloQwen3CloneHandleCapability: String, Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public struct VocelloQwen3CloneHandle: Hashable, Sendable",
     "Sources/VocelloQwen3Core/Engine.swift::public let model: VocelloQwen3ModelIdentity",
@@ -451,7 +452,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "d69c4eb870e6864d8bb2fdc8cad430e6c97f340f6977878cb248e608da075c9c"
+      "sha256": "714d5d94254e73e66c50b13a766f0f9eb9bdc3930c16b3d2394e79ca494cd5f3"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",

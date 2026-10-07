@@ -99,6 +99,36 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertNil(makeRequest(mode: .clone).validationError(isModelAvailable: true, recoveryDetail: ""))
     }
 
+    /// P01-04: each line is one take, so a line past the single-take limit is
+    /// refused, naming it, before the first take runs.
+    func testValidationRefusesALinePastTheSingleTakeLimit() {
+        let atLimit = String(repeating: "a", count: 900)
+        XCTAssertNil(
+            makeRequest(mode: .custom, lines: ["Short line", atLimit, String(repeating: "火", count: 300)])
+                .validationError(isModelAvailable: true, recoveryDetail: "")
+        )
+        for mode in [GenerationMode.custom, .design, .clone] {
+            XCTAssertEqual(
+                makeRequest(mode: mode, lines: ["Short line", String(repeating: "word ", count: 500), atLimit + "a"])
+                    .validationError(isModelAvailable: true, recoveryDetail: ""),
+                MacInterfaceText.batchLineTooLongForOneTake(lineNumber: 2),
+                mode.rawValue
+            )
+        }
+        // A CJK line weighs three per character, as in the composer.
+        XCTAssertEqual(
+            makeRequest(mode: .custom, lines: [String(repeating: "火", count: 301)])
+                .validationError(isModelAvailable: true, recoveryDetail: ""),
+            MacInterfaceText.batchLineTooLongForOneTake(lineNumber: 1)
+        )
+        // The model and the mode's own inputs are reported first.
+        XCTAssertEqual(
+            makeRequest(mode: .design, lines: [atLimit + "a"], voiceDescription: "")
+                .validationError(isModelAvailable: true, recoveryDetail: ""),
+            MacInterfaceText.batchNeedsVoiceDescription
+        )
+    }
+
     // MARK: - History naming
 
     func testHistoryVoiceAndEmotionFollowTheModeRules() {

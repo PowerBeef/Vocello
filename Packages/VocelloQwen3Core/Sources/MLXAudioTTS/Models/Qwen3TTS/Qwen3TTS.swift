@@ -1469,7 +1469,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     private func trimmedInstruction(_ instruct: String?) -> String? {
         guard let instruct else { return nil }
-        let trimmed = instruct.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = Qwen3ChatTemplateText.neutralizingControlTokens(instruct)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
@@ -1658,6 +1659,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         let textPrepareStartedAt = ContinuousClock.now
+        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
@@ -1697,6 +1699,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         let textPrepareStartedAt = ContinuousClock.now
+        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
@@ -4521,6 +4524,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Reference text and target text tokenization
+        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
+        let refText = Qwen3ChatTemplateText.neutralizingControlTokens(refText)
         let targetTokenCount = tokenizer.encode(text: text).count
         let refChatText = "<|im_start|>assistant\n\(refText)<|im_end|>\n"
         let refIds = MLXArray(tokenizer.encode(text: refChatText).map { Int32($0) }).reshaped(1, -1)
@@ -4831,6 +4836,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Tokenize text with ChatML template
+        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map { Int32($0) }).reshaped(1, -1)
 
@@ -4880,7 +4886,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         // Instruct embedding
         var instructEmbed: MLXArray?
-        if let instruct, !instruct.isEmpty {
+        if let instruct = instruct.map(Qwen3ChatTemplateText.neutralizingControlTokens), !instruct.isEmpty {
             let instructText = "<|im_start|>user\n\(instruct)<|im_end|>\n"
             let instructIds = MLXArray(tokenizer.encode(text: instructText).map { Int32($0) }).reshaped(1, -1)
             instructEmbed = talker.textProjection(talker.getTextEmbeddings()(instructIds))
@@ -6518,5 +6524,35 @@ extension Duration {
         let components = components
         return Double(components.seconds)
             + Double(components.attoseconds) / 1_000_000_000_000_000_000
+    }
+}
+
+/// User text in the Qwen3-TTS ChatML template (P05-02).
+///
+/// The script, the delivery instruction, the Voice Design brief and the clone
+/// reference transcript are interpolated into `<|im_start|>…<|im_end|>` turns,
+/// and the tokenizer maps every added-token literal in that text straight to
+/// the token's ID. A `<tts_text_eod>` typed or pasted into a script became the
+/// end-of-text embedding the prompt itself uses, and `<|im_end|>` closed the
+/// turn early; on a live run such literals were spoken as noise. Every literal
+/// of the model's added-token families is removed before templating, so user
+/// text reaches the model only as ordinary text tokens. Text without `<` is
+/// returned unchanged.
+enum Qwen3ChatTemplateText {
+    /// `<|…|>` (`<|im_start|>`, `<|im_end|>`, `<|endoftext|>`, the vision, box,
+    /// quad, object-ref, audio and fill-in-the-middle markers), `<tts_…>`
+    /// (`<tts_pad>`, `<tts_text_bos>`, `<tts_text_eod>`,
+    /// `<tts_text_bos_single>`) and the `<think>`, `<tool_call>` and
+    /// `<tool_response>` tags with their closing forms.
+    static let controlTokenPattern =
+        #"<\|[A-Za-z0-9_]+\|>|<tts_[A-Za-z0-9_]+>|</?(?:think|tool_call|tool_response)>"#
+
+    static func neutralizingControlTokens(_ text: String) -> String {
+        guard text.contains("<") else { return text }
+        return text.replacingOccurrences(
+            of: controlTokenPattern,
+            with: " ",
+            options: .regularExpression
+        )
     }
 }

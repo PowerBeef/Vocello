@@ -534,17 +534,122 @@ public enum LongFormPlanner {
     }
 }
 
+/// The one rule for what a single take may carry (U01), shared by the Studio
+/// routing on both apps (`GenerationTextLimitPolicy`, `LongTextGenerationRouter`),
+/// the Mac line batch, `vocello generate` and the engine's CORE-19 pre-check.
+///
+/// A script's single-take length counts each Han, kana or Hangul character as
+/// three characters and every other character as one. That is the long-form
+/// planner's own ratio (`ConservativeTokenEstimator` gives a CJK character a
+/// whole unit, about three English letters), and the measured pace agrees: a
+/// Chinese character takes a median 0.26 s and a Japanese one 0.22 s, a letter
+/// 0.076 s (`AudioSpeakingRateQC`). Above 900 the script runs as a long-form
+/// project, so English keeps its delivery-validated 900-character take and a
+/// Chinese or Japanese take stops near 300 characters, the planner's segment
+/// budget. Counting graphemes alone let 600 to 900 Han characters run as one
+/// take, and they exhausted the 2,048-token cap (runtime: 600 and 829 Han
+/// characters both failed with "reached its generation limit").
+public enum SingleTakeScriptBudget {
+    /// Single-take length ceiling, in characters of an alphabetic script.
+    public static let characterLimit = 900
+
+    /// Single-take length of one Han, kana or Hangul character.
+    public static let eastAsianCharacterWeight = 3
+
+    public struct Measure: Equatable, Sendable {
+        /// Every character (grapheme cluster) of the text.
+        public let characters: Int
+        /// Han, kana and Hangul characters.
+        public let eastAsianCharacters: Int
+        /// Letters and digits outside the East Asian scripts.
+        public let otherLettersAndDigits: Int
+
+        /// The length the single-take limit applies to.
+        public var singleTakeLength: Int {
+            characters + (SingleTakeScriptBudget.eastAsianCharacterWeight - 1) * eastAsianCharacters
+        }
+
+        /// Whether the text has anything to speak: a letter or a digit (U29).
+        /// Punctuation, symbols, emoji and spaces alone make the model end the
+        /// take before its first audio frame.
+        public var hasSpeakableContent: Bool {
+            eastAsianCharacters + otherLettersAndDigits > 0
+        }
+
+        /// Whether the text needs a long-form project instead of one take.
+        public var exceedsSingleTake: Bool {
+            singleTakeLength > SingleTakeScriptBudget.characterLimit
+        }
+    }
+
+    public static func measure(_ text: String) -> Measure {
+        var characters = 0
+        var eastAsian = 0
+        var otherLettersAndDigits = 0
+        for character in text {
+            characters += 1
+            if character.isEastAsianScriptCharacter {
+                eastAsian += 1
+            } else if character.isLetter || character.isNumber {
+                otherLettersAndDigits += 1
+            }
+        }
+        return Measure(
+            characters: characters,
+            eastAsianCharacters: eastAsian,
+            otherLettersAndDigits: otherLettersAndDigits
+        )
+    }
+
+    public static func singleTakeLength(of text: String) -> Int {
+        measure(text).singleTakeLength
+    }
+
+    /// Whether `text` must run as a long-form project (or be refused where no
+    /// long-form path exists) instead of as one take.
+    public static func exceedsSingleTake(_ text: String) -> Bool {
+        measure(text).exceedsSingleTake
+    }
+
+    public static func hasSpeakableContent(_ text: String) -> Bool {
+        text.contains { $0.isEastAsianScriptCharacter || $0.isLetter || $0.isNumber }
+    }
+}
+
+extension Character {
+    /// A Han, kana or Hangul character, by its first scalar. The katakana
+    /// middle dot, the spacing voicing marks and the double hyphen are
+    /// punctuation, not speech.
+    var isEastAsianScriptCharacter: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        switch scalar.value {
+        case 0x309B, 0x309C, 0x30A0, 0x30FB:
+            return false
+        case 0x3040 ... 0x30FF, 0x31F0 ... 0x31FF, 0xFF66 ... 0xFF9F, // kana
+             0x3400 ... 0x4DBF, 0x4E00 ... 0x9FFF, 0xF900 ... 0xFAFF, // Han
+             0x1100 ... 0x11FF, 0x3130 ... 0x318F, 0xAC00 ... 0xD7AF: // Hangul
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// Single-take budget pre-check (CORE-19). A take that cannot finish inside its
 /// codec-token budget otherwise fails only after spending the whole budget
-/// (2,048 tokens, about 170 s of generation). It is refused up front when even
-/// an implausibly fast delivery would overrun: codec tokens run 12 per second
-/// of audio, about 2.6 per conservative text-token estimate unit at canonical
-/// pace and 3.6 slow (`shippingRuntimeTokenLimit`); 1.5 sits below any
-/// measured pace, so a script that might still finish is never refused.
-/// Long-form segments stay far below the bound by construction.
+/// (2,048 tokens, about 164 s of audio at 12.5 codec frames per second). It is
+/// refused up front when even a fast delivery would overrun. The pace is per
+/// script, on the `SingleTakeScriptBudget` classification: 0.2 s per Han, kana
+/// or Hangul character (2.5 tokens; the measured medians are 0.26 s Chinese and
+/// 0.22 s Japanese) and 0.052 s per other letter or digit (0.65 tokens; median
+/// 0.076 s). The old single rate of 1.5 tokens per planner estimate unit was
+/// right for English but half the Chinese pace, so 600 to 1,365 Han
+/// characters passed and then ran out of tokens. Every script the apps send as
+/// one take, and every planned long-form segment, stays far below the bound.
 public enum SingleTakeCodecBudget {
-    /// Fewest codec tokens one estimate unit produces, as a ratio.
-    static let fastestCodecTokensPerEstimateUnit = (numerator: 3, denominator: 2)
+    /// Fastest codec tokens per character, in twentieths of a token.
+    static let fastestTwentiethTokensPerEastAsianCharacter = 50
+    static let fastestTwentiethTokensPerOtherLetterOrDigit = 13
 
     /// The conservative text-token estimate the long-form planner budgets with.
     public static func conservativeTokenEstimate(of text: String) -> Int {
@@ -555,9 +660,10 @@ public enum SingleTakeCodecBudget {
     /// `maximumCodecTokens` codec tokens.
     public static func certainlyExceeds(text: String, maximumCodecTokens: Int) -> Bool {
         guard maximumCodecTokens > 0 else { return false }
-        let ratio = fastestCodecTokensPerEstimateUnit
-        return conservativeTokenEstimate(of: text) * ratio.numerator
-            > maximumCodecTokens * ratio.denominator
+        let measure = SingleTakeScriptBudget.measure(text)
+        let fastestTwentieths = measure.eastAsianCharacters * fastestTwentiethTokensPerEastAsianCharacter
+            + measure.otherLettersAndDigits * fastestTwentiethTokensPerOtherLetterOrDigit
+        return fastestTwentieths > maximumCodecTokens * 20
     }
 }
 

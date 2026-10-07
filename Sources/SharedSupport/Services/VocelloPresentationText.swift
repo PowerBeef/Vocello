@@ -644,6 +644,10 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.error.generation_script_too_long",
                 defaultValue: "This script is too long to speak in one take. Shorten it, or split it into shorter takes.",
                 comment: "Studio error when a script is far too long for one take, refused before generation starts.")
+        case .noAudioProduced:
+            return localization.string(localized: "vocello.error.generation_no_audio",
+                defaultValue: "The model produced no audio for this script, so nothing was saved. Check that the script has words to speak, then retry.",
+                comment: "Studio error when the model ended a take before producing any audio, typically for a script with nothing to speak (only punctuation or symbols).")
         case .audioSilentGap:
             return localization.string(localized: "vocello.error.audio_qc_silent_gap",
                 defaultValue: "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take.",

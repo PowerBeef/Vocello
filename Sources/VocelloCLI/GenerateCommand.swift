@@ -136,9 +136,7 @@ enum GenerateCommand {
 
         // Resolve text first so a missing-text run fails fast (before any prompt).
         let text = try resolveText(args)
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CLIError("empty text — pass --text \"…\", --text-file <path>, or pipe text on stdin")
-        }
+        try validateSingleTakeText(text)
 
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
         // default to custom (keeps scripted/piped runs unchanged).
@@ -410,6 +408,30 @@ enum GenerateCommand {
             throw CLIError("no saved voice '\(name)' (have: \(avail.isEmpty ? "none" : avail))")
         }
         return CloneReference(audioPath: voice.audioPath, transcript: nil, preparedVoiceID: voice.id)
+    }
+
+    /// Refuses, before the engine boots, a script one take cannot speak: empty,
+    /// nothing to speak (only punctuation, symbols or emoji, which the model
+    /// ends before any audio, U29), or past the apps' single-take limit (CJK
+    /// characters count three, `SingleTakeScriptBudget`), which would spend
+    /// minutes on a take that runs out of tokens (P15-03).
+    static func validateSingleTakeText(_ text: String) throws {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CLIError("empty text — pass --text \"…\", --text-file <path>, or pipe text on stdin")
+        }
+        let measure = SingleTakeScriptBudget.measure(text)
+        guard measure.hasSpeakableContent else {
+            throw CLIError("nothing to speak — the text has no letters or digits")
+        }
+        guard !measure.exceedsSingleTake else {
+            throw CLIError(
+                "text is too long for one take (\(measure.characters) characters; one take holds "
+                    + "\(SingleTakeScriptBudget.characterLimit), or about "
+                    + "\(SingleTakeScriptBudget.characterLimit / SingleTakeScriptBudget.eastAsianCharacterWeight) "
+                    + "Chinese, Japanese or Korean characters) — run it as a long-form project with "
+                    + "vocello batch --long-form --file <path>, which reads each line as one project"
+            )
+        }
     }
 
     /// Resolve script text from --text, --text-file, or piped stdin (`-` forces stdin).

@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import VocelloQwen3Core
 
 /// Privacy-reduced, bounded diagnostics for generation failures.
 ///
@@ -253,6 +254,11 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
             }
         }
 
+        // U29: the model ended a take before its first audio frame.
+        if error is VocelloQwen3GenerationOutputFailure {
+            return ErrorMetadata(code: "generation.no_audio", classification: .model)
+        }
+
         if let urlError = error as? URLError {
             if urlError.code == .cancelled {
                 return ErrorMetadata(code: "network.cancelled", classification: .cancelled)
@@ -398,6 +404,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     case preparationFailure = "runtime.preparation_failed"
     case generationLimit = "generation.incomplete"
     case scriptTooLongForTake = "generation.script_too_long"
+    case noAudioProduced = "generation.no_audio"
     case audioSilentGap = "audio.quality_rejected.silent_gap"
     case audioNoSpeech = "audio.quality_rejected.no_speech"
     case audioUnstable = "audio.quality_rejected.unstable"
@@ -491,6 +498,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     /// that carry a reason people can act on. Other codes keep the error's own text.
     private init?(typedCode code: String) {
         switch code {
+        case "generation.no_audio": self = .noAudioProduced
         case "memory.insufficient": self = .insufficientMemory
         case "engine.not_initialized": self = .engineNotReady
         case "engine.busy": self = .engineBusy

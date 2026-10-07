@@ -187,6 +187,13 @@ struct MacLineBatchRequest {
         if mode == .clone && refAudio == nil {
             return MacInterfaceText.batchNeedsReference
         }
+        // Each line is one take, so a line past the single-take limit (the
+        // composer would route it to long-form) is refused before anything
+        // runs instead of exhausting its token budget and stopping the batch
+        // partway (P01-04).
+        if let overLongIndex = lines.firstIndex(where: GenerationTextLimitPolicy.exceedsSingleTake) {
+            return MacInterfaceText.batchLineTooLongForOneTake(lineNumber: overLongIndex + 1)
+        }
         return nil
     }
 

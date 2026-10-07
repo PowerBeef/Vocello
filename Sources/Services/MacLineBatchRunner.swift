@@ -29,7 +29,8 @@ final class MacLineBatchRunner {
     /// Mode that started the current/last batch; the sheet of that mode owns it.
     private(set) var lastMode: GenerationMode?
     /// The request of the current/last batch: a retry of its lines keeps its
-    /// resolved language and derives its seed from it (U03, U10).
+    /// resolved language and each line's seed, or derives a fresh one for a
+    /// failed line (U03, U10).
     @ObservationIgnored private(set) var lastRequest: Request?
 
     @ObservationIgnored private var runTask: Task<Void, Never>?
@@ -274,8 +275,8 @@ actor MacLineBatchCancellationState {
 extension MacLineBatchRequest {
     /// The sheet's constructor: scalar model facts from the active package,
     /// the display name the dock shows, and the Settings variation.
-    /// `batchSeed` is the pinned Studio seed or a retry's seed (U11); nil mints
-    /// one for this run.
+    /// `batchSeed` is the pinned Studio seed or the retried batch's (U11); nil
+    /// mints one for this run. `lineSeeds` are a retry's own seeds per line.
     init(
         mode: GenerationMode,
         model: TTSModel,
@@ -289,7 +290,8 @@ extension MacLineBatchRequest {
         refText: String?,
         preparedVoiceID: String?,
         displayVoiceName: String,
-        batchSeed: UInt64? = nil
+        batchSeed: UInt64? = nil,
+        lineSeeds: [UInt64]? = nil
     ) {
         self.init(
             mode: mode,
@@ -308,7 +310,8 @@ extension MacLineBatchRequest {
             preparedVoiceID: preparedVoiceID,
             displayVoiceName: displayVoiceName,
             variation: GenerationVariationPreference.requestValue(),
-            batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
+            batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max),
+            lineSeeds: lineSeeds
         )
     }
 }

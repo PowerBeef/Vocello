@@ -348,14 +348,14 @@ struct MacBatchGenerationSheet: View {
             } else {
                 if !outcome.retryRemainingLines.isEmpty {
                     Button(MacInterfaceText.batchRetryRemaining) {
-                        retryBatch(with: outcome.retryRemainingLines, failedLines: false)
+                        retryBatch(failedLines: false)
                     }
                     .buttonStyle(.bordered)
                 }
 
                 if !outcome.retryFailedLines.isEmpty {
                     Button(MacInterfaceText.batchRetryFailed) {
-                        retryBatch(with: outcome.retryFailedLines, failedLines: true)
+                        retryBatch(failedLines: true)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -418,16 +418,16 @@ struct MacBatchGenerationSheet: View {
 
     // MARK: - Actions
 
-    /// A retry of the last line batch's lines (`failedLines`: the failed ones,
-    /// otherwise the remaining ones).
+    /// A retry of some of the last line batch's lines, with each line's seed.
     private struct LineBatchRetry {
         let previous: MacLineBatchRequest
-        let failedLines: Bool
+        let lines: [String]
+        let seeds: [UInt64]
     }
 
     /// A batch takes the pinned seed, if any (U11). A retry keeps the earlier
-    /// batch's resolved language and seed, except that failed lines derive a
-    /// fresh seed, since their own would fail the same way again (U10).
+    /// batch's resolved language and each line's seed, except that failed
+    /// lines derive a fresh one, since theirs would fail the same way (U10).
     private func makeLineBatchRequest(
         model: TTSModel,
         lines: [String],
@@ -446,7 +446,8 @@ struct MacBatchGenerationSheet: View {
             refText: configuration.refText,
             preparedVoiceID: configuration.preparedVoiceID,
             displayVoiceName: displayVoiceName,
-            batchSeed: retry.map { $0.previous.retrySeed(failedLines: $0.failedLines) } ?? configuration.pinnedSeed
+            batchSeed: retry?.previous.batchSeed ?? configuration.pinnedSeed,
+            lineSeeds: retry.flatMap { $0.lines == lines ? $0.seeds : nil }
         )
     }
 
@@ -588,11 +589,21 @@ struct MacBatchGenerationSheet: View {
         }
     }
 
-    private func retryBatch(with lines: [String], failedLines: Bool) {
-        guard !lines.isEmpty else { return }
+    private func retryBatch(failedLines: Bool) {
+        guard let outcome = lineBatch.outcome else { return }
+        let items = failedLines ? outcome.retryFailedItems : outcome.retryRemainingItems
+        guard !items.isEmpty else { return }
+        let lines = items.map(\.line)
         batchText = lines.joined(separator: "\n")
         segmentationMode = .lineSeparated
-        startBatch(retrying: lineBatch.lastRequest.map { LineBatchRetry(previous: $0, failedLines: failedLines) })
+        let retry = lineBatch.lastRequest.map { previous in
+            LineBatchRetry(
+                previous: previous,
+                lines: lines,
+                seeds: previous.retrySeeds(forLinesAt: items.map(\.index), failedLines: failedLines)
+            )
+        }
+        startBatch(retrying: retry)
     }
 
     private func revealOutputs(_ audioPaths: [String]) {

@@ -44,7 +44,8 @@ final class MacLineBatchRunnerTests: XCTestCase {
         refAudio: String? = "/tmp/reference.wav",
         refText: String? = "Reference transcript",
         preparedVoiceID: String? = "prepared-voice",
-        batchSeed: UInt64 = 42
+        batchSeed: UInt64 = 42,
+        lineSeeds: [UInt64]? = nil
     ) -> MacLineBatchRequest {
         MacLineBatchRequest(
             mode: mode,
@@ -63,7 +64,8 @@ final class MacLineBatchRunnerTests: XCTestCase {
             preparedVoiceID: preparedVoiceID,
             displayVoiceName: "Ryan",
             variation: .consistent,
-            batchSeed: batchSeed
+            batchSeed: batchSeed,
+            lineSeeds: lineSeeds
         )
     }
 
@@ -255,17 +257,54 @@ final class MacLineBatchRunnerTests: XCTestCase {
         )
     }
 
-    /// U10: a retry of remaining lines keeps the batch seed; failed lines
-    /// failed on it, so their retry derives a fresh one.
-    func testARetryOfFailedLinesDerivesAFreshSeed() {
-        let request = makeRequest(mode: .design, batchSeed: 7)
-        XCTAssertEqual(request.retrySeed(failedLines: false), 7)
-        let retry = request.retrySeed(failedLines: true)
-        XCTAssertNotEqual(retry, 7)
-        XCTAssertEqual(retry, request.retrySeed(failedLines: true), "The retry seed reproduces")
-        XCTAssertNotEqual(retry, StudioRetakeSeed.after(7), "Nor is it a repeated line's seed")
-        let again = makeRequest(mode: .design, batchSeed: retry).retrySeed(failedLines: true)
-        XCTAssertNotEqual(again, retry, "Retrying again draws again")
+    /// U10: a retry keeps each remaining line's own seed; a failed line failed
+    /// on its seed, so its retry derives a fresh one. A retry numbers its lines
+    /// afresh, so a repeat that never ran keeps its repeat seed rather than
+    /// taking the seed of the copy already saved.
+    func testARetryKeepsEachLineSeedAndDerivesAFreshOneForAFailedLine() throws {
+        let request = makeRequest(mode: .design, lines: ["Welcome back.", "Welcome back.", "Goodbye."], batchSeed: 7)
+        let repeatSeed = StudioRetakeSeed.after(7)
+
+        let remaining = request.retrySeeds(forLinesAt: [1, 2], failedLines: false)
+        XCTAssertEqual(remaining, [repeatSeed, 7])
+        let remainingRetry = makeRequest(
+            mode: .design,
+            lines: ["Welcome back.", "Goodbye."],
+            batchSeed: 7,
+            lineSeeds: remaining
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(remainingRetry.generationRequest(line: "Welcome back.", outputPath: "/tmp/1.wav", lineIndex: 0)).seed,
+            repeatSeed,
+            "The retried repeat is not the saved first copy again"
+        )
+
+        let failed = request.retrySeeds(forLinesAt: [0], failedLines: true)
+        XCTAssertEqual(failed.count, 1)
+        XCTAssertNotEqual(failed[0], 7)
+        XCTAssertNotEqual(failed[0], repeatSeed, "Nor is it a repeated line's seed")
+        XCTAssertEqual(failed, request.retrySeeds(forLinesAt: [0], failedLines: true), "A retry's seeds reproduce")
+        let failedRetry = makeRequest(mode: .design, lines: ["Welcome back."], batchSeed: 7, lineSeeds: failed)
+        XCTAssertNotEqual(
+            failedRetry.retrySeeds(forLinesAt: [0], failedLines: true),
+            failed,
+            "Retrying again draws again"
+        )
+        XCTAssertNil(
+            makeRequest(mode: .design, lines: ["One", "Two"], lineSeeds: [1]).lineSeeds,
+            "Seeds that do not match the lines are ignored"
+        )
+    }
+
+    func testOutcomeRetryItemsKeepTheirBatchPositions() {
+        let items = [
+            MacLineBatchItem(index: 0, line: "Saved", status: .saved(audioPath: "/tmp/saved.wav")),
+            MacLineBatchItem(index: 1, line: "Failed", status: .failed(message: "boom")),
+            MacLineBatchItem(index: 2, line: "Cancelled", status: .cancelled),
+        ]
+        let outcome = MacLineBatchOutcome.cancelled(items: items, restartFailedMessage: nil)
+        XCTAssertEqual(outcome.retryRemainingItems.map(\.index), [2])
+        XCTAssertEqual(outcome.retryFailedItems.map(\.index), [1])
     }
 
     func testCloneLineRequestCarriesTheReferenceAndPreparedVoice() throws {

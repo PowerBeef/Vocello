@@ -58,24 +58,28 @@ enum MacLineBatchOutcome: Equatable {
     }
 
     /// Lines that never produced a saved clip: pending, running or cancelled
-    /// (a failed line is offered separately by `retryFailedLines`).
-    var retryRemainingLines: [String] {
-        items.compactMap { item in
+    /// (a failed line is offered separately by `retryFailedItems`).
+    var retryRemainingItems: [MacLineBatchItem] {
+        items.filter { item in
             switch item.status {
             case .pending, .running, .cancelled:
-                return item.line
+                return true
             case .failed, .saved:
-                return nil
+                return false
             }
         }
     }
 
-    var retryFailedLines: [String] {
-        items.compactMap { item in
-            if case .failed = item.status { return item.line }
-            return nil
+    var retryFailedItems: [MacLineBatchItem] {
+        items.filter { item in
+            if case .failed = item.status { return true }
+            return false
         }
     }
+
+    var retryRemainingLines: [String] { retryRemainingItems.map(\.line) }
+
+    var retryFailedLines: [String] { retryFailedItems.map(\.line) }
 
     var savedAudioPaths: [String] {
         items.compactMap(\.audioPath)
@@ -137,6 +141,10 @@ struct MacLineBatchRequest {
     /// independent draws. The pinned Studio seed when there is one (U11);
     /// otherwise minted per run, so separate batches still differ.
     let batchSeed: UInt64
+    /// A retry's own seed for each of its lines (aligned with `lines`), kept
+    /// from the batch it retries (`retrySeeds(forLinesAt:failedLines:)`); nil
+    /// derives every line's seed from `batchSeed`.
+    let lineSeeds: [UInt64]?
 
     init(
         mode: GenerationMode,
@@ -155,7 +163,8 @@ struct MacLineBatchRequest {
         preparedVoiceID: String?,
         displayVoiceName: String,
         variation: Qwen3SamplingVariation?,
-        batchSeed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max)
+        batchSeed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max),
+        lineSeeds: [UInt64]? = nil
     ) {
         self.mode = mode
         self.modelID = modelID
@@ -176,6 +185,7 @@ struct MacLineBatchRequest {
         self.displayVoiceName = displayVoiceName
         self.variation = variation
         self.batchSeed = batchSeed
+        self.lineSeeds = lineSeeds?.count == lines.count ? lineSeeds : nil
     }
 
     /// One line per non-blank row of the editor, trimmed of surrounding spaces.
@@ -242,17 +252,23 @@ struct MacLineBatchRequest {
     /// reproduces from its seed.
     func seed(forLineAt index: Int) -> UInt64 {
         guard lines.indices.contains(index) else { return batchSeed }
+        if let lineSeeds { return lineSeeds[index] }
         let repeats = lines[..<index].count(where: { $0 == lines[index] })
         return (0..<repeats).reduce(batchSeed) { seed, _ in StudioRetakeSeed.after(seed) }
     }
 
-    /// The batch seed of a retry of this batch's lines. Remaining lines never
-    /// produced a take, so they keep the batch's seed. A failed line failed on
-    /// its seed and would fail the same way on it again, so its retry derives
-    /// a fresh one (U10); retrying again derives again. The salt keeps a
-    /// retry's seed off the chain a repeated line draws from.
-    func retrySeed(failedLines: Bool) -> UInt64 {
-        failedLines ? StudioRetakeSeed.after(batchSeed ^ Self.retrySeedSalt) : batchSeed
+    /// The seeds of a retry of this batch's lines at `indices`, each line's
+    /// own: a retry numbers its lines afresh, so a repeat that never ran
+    /// would otherwise take the seed of the copy already saved. Remaining
+    /// lines never produced a take, so they keep their seeds. A failed line
+    /// failed on its seed and would fail the same way on it again, so its
+    /// retry derives a fresh one (U10); retrying again derives again. The
+    /// salt keeps a retry's seed off the chain a repeated line draws from.
+    func retrySeeds(forLinesAt indices: [Int], failedLines: Bool) -> [UInt64] {
+        indices.map { index in
+            let lineSeed = self.seed(forLineAt: index)
+            return failedLines ? StudioRetakeSeed.after(lineSeed ^ Self.retrySeedSalt) : lineSeed
+        }
     }
 
     private static let retrySeedSalt: UInt64 = 0x5245_5452_5953_4544 // "RETRYSED"

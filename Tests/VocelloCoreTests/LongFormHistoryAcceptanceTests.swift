@@ -43,7 +43,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
 
         _ = try await f.store.commit(f.input, using: f.queue)
 
-        let rows = try f.queue.read { try Generation.fetchAll($0) }
+        let rows = try await f.queue.read { try Generation.fetchAll($0) }
         func role(of path: String) -> String? { rows.first { $0.audioPath == path }?.longFormRole }
         XCTAssertEqual(role(of: replaced.audioPath), "superseded")
         XCTAssertEqual(role(of: otherProject.audioPath), "segment", "Another project's rows are not touched")

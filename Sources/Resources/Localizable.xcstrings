@@ -3187,6 +3187,72 @@
         }
       }
     },
+    "vocello.presentation.longFormSegmentHistoryQueued": {
+      "comment": "Long-form: a segment's take passed its checks but History could not save it right away; the take is durably queued and saved later, and Resume reuses it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History couldn't save this segment yet. Its take is kept and will be saved when History is available again; resume the project to continue."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique n’a pas encore pu enregistrer ce segment. Sa prise est conservée et sera enregistrée dès que l’historique sera de nouveau disponible ; reprenez le projet pour continuer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El historial aún no pudo guardar este segmento. Su toma se conserva y se guardará cuando el historial vuelva a estar disponible; reanuda el proyecto para continuar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Verlauf konnte diesen Abschnitt noch nicht speichern. Seine Aufnahme bleibt erhalten und wird gesichert, sobald der Verlauf wieder verfügbar ist; setze das Projekt fort, um weiterzumachen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cronologia non è ancora riuscita a salvare questo segmento. Il suo take è conservato e verrà salvato quando la cronologia sarà di nuovo disponibile; riprendi il progetto per continuare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O histórico ainda não conseguiu salvar este segmento. A tomada dele foi mantida e será salva quando o histórico estiver disponível novamente; retome o projeto para continuar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史记录暂时无法保存此片段。该片段的音频已保留，将在历史记录恢复可用后保存；请继续项目以接着生成。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴にこの区間をまだ保存できませんでした。テイクは保持されており、履歴が再び使えるようになると保存されます。プロジェクトを再開して続けてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록에 이 구간을 아직 저장하지 못했습니다. 테이크는 보관되어 있으며 기록을 다시 사용할 수 있게 되면 저장됩니다. 프로젝트를 재개하여 계속하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "История пока не смогла сохранить этот сегмент. Его дубль сохранён и будет записан, когда история снова станет доступна; продолжите проект, чтобы завершить его."
+          }
+        }
+      }
+    },
     "vocello.presentation.segmentNotInProject": {
       "comment": "Complete user-facing segmentNotInProject message. Preserve substitutions.",
       "extractionState": "manual",

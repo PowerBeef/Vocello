@@ -253,8 +253,21 @@ struct IOSLongFormProjectRequest {
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+    /// One project start: resume and regeneration keep it, a new Generate
+    /// mints another. The plan digest alone is not unique once a seed is
+    /// pinned (the same script and seed plan the same digest for any voice,
+    /// mode or model), so it never names a project on its own.
+    let projectStartID: String
+
+    /// The project's History identity (`longFormProjectID`): the plan digest
+    /// qualified by this project start, so two projects never share History
+    /// rows and accepting one never supersedes another's.
+    var historyProjectID: String {
+        LongFormHistoryAcceptance.projectID(planDigest: plan.evidence.planDigest, projectStartID: projectStartID)
+    }
 
     /// `languageHint` is the Studio selection; Auto resolves over the script.
+    /// `projectStartID` is minted per project unless a test pins it.
     init(
         mode: GenerationMode,
         model: TTSModel,
@@ -266,8 +279,10 @@ struct IOSLongFormProjectRequest {
         voiceDescription: String?,
         refAudio: String?,
         refText: String?,
-        preparedVoiceID: String?
+        preparedVoiceID: String?,
+        projectStartID: String? = nil
     ) {
+        self.projectStartID = projectStartID ?? LongFormHistoryAcceptance.mintProjectStartID()
         self.mode = mode
         self.model = model
         self.plan = plan
@@ -376,7 +391,7 @@ struct IOSLongFormProjectRequest {
             audioPath: audioPath,
             duration: duration,
             createdAt: Date(),
-            longFormProjectID: plan.evidence.planDigest,
+            longFormProjectID: historyProjectID,
             longFormRole: "segment"
         )
     }
@@ -392,7 +407,7 @@ struct IOSLongFormProjectRequest {
             audioPath: outputURL.path,
             duration: Double(assembly.outputFrameCount) / Double(assembly.sampleRate),
             createdAt: Date(),
-            longFormProjectID: plan.evidence.planDigest,
+            longFormProjectID: historyProjectID,
             longFormRole: "joined"
         )
     }
@@ -640,12 +655,11 @@ final class IOSLongFormCoordinator {
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard !isProcessing, !ttsEngine.hasActiveGeneration else { return }
-        // A new project starts its own lineage even on the same plan identity
-        // (the same script and pinned seed): only a resume continues one.
-        if prior == nil || lastRequest?.plan.evidence.planDigest != request.plan.evidence.planDigest {
+        guard let attempt = studioCoordinator.start(live: nil) else { return }
+        // A new project starts its own lineage; only a resume continues one.
+        if prior == nil || lastRequest?.historyProjectID != request.historyProjectID {
             replacements = []
         }
-        guard let attempt = studioCoordinator.start(live: nil) else { return }
         #if os(macOS)
         audioPlayer.beginGenerationPlayback(operationID: attempt.rawValue, mode: request.mode)
         #endif
@@ -666,9 +680,11 @@ final class IOSLongFormCoordinator {
             var segment = IOSLongFormSegmentState(index: index, line: line, status: .pending)
             guard let prior, index < prior.count, prior[index].line == line else { return segment }
             if prior[index].isSaved { return prior[index] }
-            // The same seed would reproduce the failed take, so the retake
-            // derives a fresh one from it (U10); a stopped take keeps its seed.
-            segment.seedOverride = prior[index].isFailed
+            // The same seed would reproduce a take that failed on it, so the
+            // retake derives a fresh one from it (U10). A stopped take, or one
+            // that passed QC and failed only to save, keeps its seed.
+            let failedOnItsSeed = prior[index].isFailed && prior[index].qualityReport?.passed != true
+            segment.seedOverride = failedOnItsSeed
                 ? StudioRetakeSeed.after(prior[index].seedOverride ?? request.plannedSeed(forSegment: index))
                 : prior[index].seedOverride
             return segment
@@ -867,6 +883,7 @@ final class IOSLongFormProjectRunner {
 
             let seed = segments[index].seedOverride ?? request.plannedSeed(forSegment: index)
             let generationID = UUID()
+            var generationCompleted = false
             let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
                 subfolder: request.model.outputSubfolder,
                 text: request.outputText(forSegment: index)
@@ -917,6 +934,7 @@ final class IOSLongFormProjectRunner {
                     finishReason: result.finishReason?.rawValue,
                     summary: result.telemetrySummary
                 )
+                generationCompleted = true
                 hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
 
                 let report = await evaluateQC(
@@ -967,7 +985,7 @@ final class IOSLongFormProjectRunner {
                         return .cancelled(segments: segments)
                     }
                     onSegmentsUpdated(segments)
-                    return .failed(segments: segments, message: hooks.presentation.longFormSegmentHistoryFailed)
+                    return .failed(segments: segments, message: hooks.presentation.longFormSegmentHistoryQueued)
                 }
                 try persistence.requireSavedLongFormSegment()
                 segments[index].status = .saved(audioPath: result.audioPath)
@@ -975,10 +993,14 @@ final class IOSLongFormProjectRunner {
             } catch {
                 audioPlayer.abortLivePreviewIfNeeded()
                 let cancellationRequested = await cancellationState.wasRequested()
-                await services.recordFailed(
-                    id: generationID,
-                    finishReason: (error is CancellationError || cancellationRequested) ? .cancelled : .failed
-                )
+                // A History failure after a completed take never overwrites the
+                // engine's completed boundary, as in `regenerateSegment`.
+                if !generationCompleted {
+                    await services.recordFailed(
+                        id: generationID,
+                        finishReason: (error is CancellationError || cancellationRequested) ? .cancelled : .failed
+                    )
+                }
                 hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
                 if error is CancellationError || Task.isCancelled || cancellationRequested {
                     markCancelled(startingAt: index)
@@ -1042,7 +1064,10 @@ final class IOSLongFormProjectRunner {
             let acceptanceError = error as? LongFormAcceptanceError
             // Recovery keeps, or completes after resume, what it owns (PA-30).
             if acceptanceError?.leavesCandidateToRecovery == true { candidateJoinedURL = nil }
-            if error is CancellationError { return .cancelled(segments: segments) }
+            let cancellationRequested = await cancellationState.wasRequested()
+            if error is CancellationError || Task.isCancelled || cancellationRequested {
+                return .cancelled(segments: segments)
+            }
             return .failed(segments: segments, message: failureMessage(for: error, afterGeneration: true))
         }
     }
@@ -1063,6 +1088,8 @@ final class IOSLongFormProjectRunner {
             }
         case is LongFormSegmentHistoryError:
             return hooks.presentation.longFormSegmentHistoryFailed
+        case let history as HistoryPersistenceError:
+            return history.interfaceMessage(hooks.presentation.localization)
         case let runError as RunError:
             return runError.localizedDescription
         default:
@@ -1395,7 +1422,7 @@ final class IOSLongFormProjectRunner {
         guard let firstAudioPath = segments.compactMap(\.audioPath).first else { throw RunError.missingSegmentAudio(index: 0, text: hooks.presentation) }
         let directory = URL(fileURLWithPath: firstAudioPath).deletingLastPathComponent()
         let manifestURL = directory.appendingPathComponent(
-            "long_form_manifest_\(request.projectDigestPrefix).json",
+            "long_form_manifest_\(request.projectDigestPrefix)_\(request.projectStartID).json",
             isDirectory: false
         )
         _ = try manifest.canonicalJSONData()

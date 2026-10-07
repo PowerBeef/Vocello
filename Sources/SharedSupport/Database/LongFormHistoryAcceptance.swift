@@ -41,6 +41,26 @@ struct LongFormHistoryAcceptance: Sendable {
     /// Only newly produced, discardable files (not retained in-session segments).
     let ownedAudioURLs: [URL]
 
+    /// A project's History identity (`longFormProjectID`): its plan digest
+    /// qualified by one project start. The digest binds the rows to the
+    /// manifest's plan; the start keeps two projects of one plan identity
+    /// (the same script and pinned seed) apart in History.
+    static func projectID(planDigest: String, projectStartID: String) -> String {
+        "\(planDigest).\(projectStartID)"
+    }
+
+    static func mintProjectStartID() -> String {
+        String(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(16))
+    }
+
+    /// Whether `projectID` names a project of the plan `planDigest`: the bare
+    /// digest that projects accepted before project starts used, or the
+    /// digest qualified by a project start.
+    static func projectID(_ projectID: String?, belongsTo planDigest: String) -> Bool {
+        guard let projectID else { return false }
+        return projectID == planDigest || projectID.hasPrefix(planDigest + ".")
+    }
+
     static func uniqueAudioURL(basedOn url: URL) -> URL {
         url.deletingLastPathComponent().appendingPathComponent(
             "\(url.deletingPathExtension().lastPathComponent)_\(UUID().uuidString).wav"
@@ -254,7 +274,7 @@ struct LongFormHistoryAcceptanceStore: Sendable {
               !execution.segments.isEmpty,
               execution.segments.allSatisfy({ $0.generated && $0.qcPassed == true }),
               input.segments.count == execution.segments.count,
-              input.joined.longFormProjectID == input.manifest.plan.planDigest,
+              LongFormHistoryAcceptance.projectID(input.joined.longFormProjectID, belongsTo: input.manifest.plan.planDigest),
               input.joined.longFormRole == "joined",
               input.segments.allSatisfy({
                   $0.longFormProjectID == input.joined.longFormProjectID && $0.longFormRole == "segment"
@@ -306,11 +326,11 @@ struct LongFormHistoryAcceptanceStore: Sendable {
             }
         }
         // A project lists exactly the takes it was accepted with (U13). A
-        // segment row of the project that the accepted set no longer holds —
+        // segment row of the project (one project start, never another
+        // project of the same plan) that the accepted set no longer holds —
         // the take a regeneration replaced, a stopped take History saved
-        // anyway, an earlier run of the same plan identity — is superseded
-        // like an older joined row: it stays in History, owned and deletable
-        // on its own, but leaves the project's segment list.
+        // anyway — is superseded like an older joined row: it stays in
+        // History, owned and deletable on its own, but leaves the project.
         let acceptedPaths = segments.map(\.audioPath)
         let keptPaths = acceptedPaths.isEmpty ? "" : " AND audioPath NOT IN (\(databaseQuestionMarks(count: acceptedPaths.count)))"
         var supersededSegmentArguments: [(any DatabaseValueConvertible)?] = [joined.longFormProjectID]

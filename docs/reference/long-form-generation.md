@@ -49,13 +49,16 @@ check and `vocello generate` use the same predicate:
 4. **Manifest v4.** `LongFormManifestV4` records plan + execution + assembly + replacement
    evidence and validates fail-closed. Schema-v3 documents remain readable only as a limited
    legacy summary; missing plan identity is never fabricated.
-5. **History.** Migration v5 adds project columns keyed by the plan digest. Completed initial
+5. **History.** Migration v5 adds project columns keyed by the project's identity: the plan
+   digest qualified by one project start (`<digest>.<start>`; resume and regeneration keep it, a
+   new Generate mints another), since a pinned seed plans the same digest for any voice or model;
+   projects accepted earlier carry the bare digest. Completed initial
    segments are individually saved before continuing, so failed assembly does not orphan them.
    Only successful segment QC, joined QC and journaled acceptance publish the current joined row.
    History groups projects with an expandable per-segment map
    (`history_longFormSegmentsToggle_<digest8>`). New joined audio uses a UUID-qualified
-   `long_form_joined_<digest8>_<uuid>.wav`; the manifest remains
-   `long_form_manifest_<digest8>.json` and is atomically replaced. Superseded audio retains
+   `long_form_joined_<digest8>_<uuid>.wav`; the project's manifest is
+   `long_form_manifest_<digest8>_<start>.json` and is atomically replaced. Superseded audio retains
    History ownership and remains deletable; cleanup never deletes accepted/referenced audio.
 6. **Resume and replacement.** In-session resume reuses saved takes (long-form retry never
    degrades to line-separated), and single-segment regeneration appends fail-closed

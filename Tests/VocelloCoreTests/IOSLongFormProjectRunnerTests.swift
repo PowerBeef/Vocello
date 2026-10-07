@@ -458,7 +458,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertEqual(joinedRows.first?.text, f.request.lines.joined(separator: " "))
         XCTAssertEqual(try f.database.fetchAllGenerations().count, 4)
         XCTAssertTrue(
-            try f.database.fetchAllGenerations().allSatisfy { $0.longFormProjectID == f.plan.evidence.planDigest }
+            try f.database.fetchAllGenerations().allSatisfy { $0.longFormProjectID == f.request.historyProjectID }
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: joinedAudioPath))
 
@@ -467,6 +467,11 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertEqual(f.services.acceptanceCandidates.count, 1)
         XCTAssertEqual(try Data(contentsOf: candidate.manifestURL), try candidate.manifest.canonicalJSONData())
         XCTAssertEqual(candidate.manifest.plan.planDigest, f.plan.evidence.planDigest)
+        XCTAssertTrue(f.request.historyProjectID.hasPrefix(f.plan.evidence.planDigest + "."))
+        XCTAssertEqual(
+            candidate.manifestURL.lastPathComponent,
+            "long_form_manifest_\(f.request.projectDigestPrefix)_\(f.request.projectStartID).json"
+        )
         XCTAssertEqual(candidate.manifest.execution?.segments.map(\.qcPassed), [true, true, true])
         XCTAssertEqual(candidate.manifest.execution?.segments.map(\.generationID), generationIDs.map { Optional($0) })
         XCTAssertEqual(
@@ -885,19 +890,36 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertNotEqual(pinned.segments.map(\.evidence.effectiveSubseed), other.segments.map(\.evidence.effectiveSubseed))
     }
 
-    /// The same script and pinned seed start a new project on the same plan
-    /// identity: it carries none of the earlier project's replacements, and
-    /// History lists only its own takes under the project.
-    func testANewProjectOnTheSamePlanIdentityStartsItsOwnLineage() async throws {
+    /// The same script and pinned seed plan the same digest for any voice, so
+    /// a new Generate on that plan is a project of its own: History keeps the
+    /// earlier project whole, and the new one starts its own lineage.
+    func testANewProjectOnTheSamePlanIdentityIsAProjectOfItsOwn() async throws {
         let f = try makeFixture()
         let coordinator = f.makeCoordinator()
         coordinator.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
-        await waitUntil("the project to finish") { !coordinator.isProcessing }
+        await waitUntil("the first project to finish") { !coordinator.isProcessing }
         coordinator.regenerateSegment(index: 0, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
         await waitUntil("the replacement to finish") { !coordinator.isProcessing }
+        guard case .completed(let first, let firstJoinedPath, _) = coordinator.outcome else {
+            return XCTFail("Expected the replaced first project, got \(String(describing: coordinator.outcome))")
+        }
         XCTAssertEqual(coordinator.replacements.count, 1)
 
-        coordinator.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        let second = IOSLongFormProjectRequest(
+            mode: .custom,
+            model: f.request.model,
+            plan: f.plan,
+            voice: "ryan",
+            emotion: nil,
+            deliveryInstructionCellID: nil,
+            languageHint: "en",
+            voiceDescription: nil,
+            refAudio: nil,
+            refText: nil,
+            preparedVoiceID: nil
+        )
+        XCTAssertNotEqual(second.historyProjectID, f.request.historyProjectID)
+        coordinator.start(request: second, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
         await waitUntil("the second project to finish") { !coordinator.isProcessing }
 
         guard case .completed(let segments, let joinedAudioPath, _) = coordinator.outcome else {
@@ -905,10 +927,78 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         }
         XCTAssertTrue(coordinator.replacements.isEmpty)
         XCTAssertNil(f.services.acceptanceCandidates.last?.manifest.replacements)
-        XCTAssertEqual(Array(f.engine.takeRequests.suffix(3)).map(\.seed), f.plan.segments.map { Optional($0.evidence.effectiveSubseed) })
-        XCTAssertEqual(Set(try rows(f, role: "segment").map(\.audioPath)), Set(segments.compactMap(\.audioPath)))
-        XCTAssertEqual(try rows(f, role: "joined").map(\.audioPath), [joinedAudioPath])
-        XCTAssertEqual(try rows(f, role: "superseded").count, 6, "Both earlier joined rows and all four earlier takes")
+        XCTAssertEqual(
+            Array(f.engine.takeRequests.suffix(3)).map(\.seed),
+            f.plan.segments.map { Optional($0.evidence.effectiveSubseed) }
+        )
+
+        func projectRows(_ projectID: String, role: String) throws -> Set<String> {
+            Set(try rows(f, role: role).filter { $0.longFormProjectID == projectID }.map(\.audioPath))
+        }
+        XCTAssertEqual(try projectRows(second.historyProjectID, role: "segment"), Set(segments.compactMap(\.audioPath)))
+        XCTAssertEqual(try projectRows(second.historyProjectID, role: "joined"), [joinedAudioPath])
+        XCTAssertEqual(
+            try projectRows(f.request.historyProjectID, role: "segment"),
+            Set(first.compactMap(\.audioPath)),
+            "The earlier project keeps its own takes"
+        )
+        XCTAssertEqual(try projectRows(f.request.historyProjectID, role: "joined"), [firstJoinedPath])
+        XCTAssertEqual(try rows(f, role: "superseded").count, 2, "Only what the earlier regeneration replaced")
+        XCTAssertEqual(Set(f.services.acceptanceCandidates.map(\.manifestURL)).count, 2, "Each project keeps its manifest")
+    }
+
+    /// A take that passed QC and failed only to save did not fail on its
+    /// seed: Resume retakes it on the same one, and the storage failure never
+    /// overwrites the engine's completed boundary.
+    func testATakeThatFailedOnlyToSaveKeepsItsSeedOnResume() async throws {
+        let f = try makeFixture()
+        let coordinator = f.makeCoordinator()
+        f.services.persistOutcomes = [1: .unableToQueue]
+
+        coordinator.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to stop") { !coordinator.isProcessing }
+        guard case .failed(_, let message) = coordinator.outcome else {
+            return XCTFail("Expected a failed project, got \(String(describing: coordinator.outcome))")
+        }
+        XCTAssertEqual(message, f.hooks.presentation.longFormSegmentHistoryFailed)
+        let failedID = try XCTUnwrap(f.engine.takeRequests[1].generationID)
+        XCTAssertFalse(f.services.timeline.contains(.failed(failedID, .failed)), "The completed take stays completed")
+
+        f.services.persistOutcomes = [:]
+        coordinator.resume(ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the resumed project to finish") { !coordinator.isProcessing }
+        guard case .completed = coordinator.outcome else {
+            return XCTFail("Expected a completed project, got \(String(describing: coordinator.outcome))")
+        }
+        let takes = f.engine.takeRequests
+        XCTAssertEqual(takes.count, 4)
+        XCTAssertEqual(takes[2].text, f.request.lines[1])
+        XCTAssertEqual(takes[2].seed, f.plan.segments[1].evidence.effectiveSubseed)
+    }
+
+    /// A segment History write that lands only in the durable outbox keeps the
+    /// take: the project stops with copy that says it is kept, and Resume
+    /// reuses it.
+    func testASegmentQueuedForHistoryIsKeptAndResumeReusesIt() async throws {
+        let f = try makeFixture()
+        let coordinator = f.makeCoordinator()
+        f.services.persistOutcomes = [1: .queuedForRecovery]
+
+        coordinator.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to stop") { !coordinator.isProcessing }
+        guard case .failed(let stopped, let message) = coordinator.outcome else {
+            return XCTFail("Expected a stopped project, got \(String(describing: coordinator.outcome))")
+        }
+        XCTAssertEqual(message, f.hooks.presentation.longFormSegmentHistoryQueued)
+        XCTAssertEqual(stopped.map(\.isSaved), [true, true, false])
+
+        coordinator.resume(ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the resumed project to finish") { !coordinator.isProcessing }
+        guard case .completed = coordinator.outcome else {
+            return XCTFail("Expected a completed project, got \(String(describing: coordinator.outcome))")
+        }
+        XCTAssertEqual(f.engine.takeRequests.count, 3, "The queued take is reused")
+        XCTAssertEqual(try rows(f, role: "segment").count, 3)
     }
 
     // MARK: - Script language (U03)

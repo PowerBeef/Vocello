@@ -55,6 +55,22 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertEqual(role(of: f.input.joined.audioPath), "joined")
     }
 
+    /// A project's History identity binds its rows to the manifest's plan: the
+    /// bare digest earlier projects used, or the digest qualified by one
+    /// project start; never another plan's digest.
+    func testAProjectIdentityBelongsToItsPlanDigestOnly() {
+        let digest = String(repeating: "a", count: 64)
+        let start = LongFormHistoryAcceptance.mintProjectStartID()
+        XCTAssertEqual(start.count, 16)
+        XCTAssertNotEqual(start, LongFormHistoryAcceptance.mintProjectStartID())
+        let projectID = LongFormHistoryAcceptance.projectID(planDigest: digest, projectStartID: start)
+        XCTAssertTrue(LongFormHistoryAcceptance.projectID(projectID, belongsTo: digest))
+        XCTAssertTrue(LongFormHistoryAcceptance.projectID(digest, belongsTo: digest))
+        XCTAssertFalse(LongFormHistoryAcceptance.projectID(projectID, belongsTo: String(repeating: "b", count: 64)))
+        XCTAssertFalse(LongFormHistoryAcceptance.projectID(digest + "x", belongsTo: digest))
+        XCTAssertFalse(LongFormHistoryAcceptance.projectID(nil, belongsTo: digest))
+    }
+
     func testDatabaseFailureRestoresPriorManifestAndRows() async throws {
         let f = try fixture()
         try await f.queue.write { db in

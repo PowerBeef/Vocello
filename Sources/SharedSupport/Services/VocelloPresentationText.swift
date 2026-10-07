@@ -214,6 +214,12 @@ struct VocelloPresentationText: Sendable {
             comment: "Long-form: writing the joined output file failed after every segment was generated; the segments are kept and the join can be tried again (Resume, or another regeneration).")
     }
 
+    var longFormSegmentHistoryQueued: String {
+        localization.string(localized: "vocello.presentation.longFormSegmentHistoryQueued",
+            defaultValue: "History couldn't save this segment yet. Its take is kept and will be saved when History is available again; resume the project to continue.",
+            comment: "Long-form: a segment's take passed its checks but History could not save it right away; the take is durably queued and saved later, and Resume reuses it.")
+    }
+
     var segmentNotInProject: String {
         localization.string(localized: "vocello.presentation.segmentNotInProject", defaultValue: "The segment to regenerate is not part of this completed project.",
                comment: "User-facing segmentNotInProject message.")

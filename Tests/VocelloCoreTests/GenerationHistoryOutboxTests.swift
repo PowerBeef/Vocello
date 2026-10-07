@@ -125,6 +125,90 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(state.counts.rows, 1)
     }
 
+    /// P10-06: a take whose commit was deferred is still queued when the device
+    /// is backed up, and the restore moves the container. Its entry names the
+    /// old root; it commits once, with the audio that moved along, instead of
+    /// failing `missingAudio` on every reconcile.
+    func testAnEntryQueuedUnderAContainerThatMovedCommitsWithTheAudioThatMovedAlong() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GenerationHistoryOutbox-\(UUID().uuidString)", isDirectory: true)
+        temporaryRoots.append(root)
+        let currentRoot = root.appendingPathComponent("restored-container", isDirectory: true)
+        let goneRoot = root.appendingPathComponent("backed-up-container", isDirectory: true)
+        let takes = currentRoot.appendingPathComponent("outputs/CustomVoice", isDirectory: true)
+        try FileManager.default.createDirectory(at: takes, withIntermediateDirectories: true)
+        let audio = takes.appendingPathComponent("take.wav")
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: audio)
+        let storeRoot = currentRoot.appendingPathComponent("history-outbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+        let queued = Generation(
+            id: nil,
+            text: "Local test sentence",
+            mode: "custom",
+            modelTier: "lite",
+            voice: "Aiden",
+            emotion: "Neutral",
+            speed: 1,
+            audioPath: goneRoot.path + "/outputs/CustomVoice/take.wav",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            longFormProjectID: nil,
+            longFormRole: nil,
+            seed: 42
+        )
+        let entry = GenerationHistoryOutboxEntry(operation: .append, generation: queued)
+        try encode(entry).write(to: storeRoot.appendingPathComponent("\(entry.id.uuidString.lowercased()).json"))
+
+        // Without the audio root every path reads as stored, and the audio is missing.
+        XCTAssertEqual(
+            GenerationHistoryOutboxStore(rootURL: storeRoot).scan().entries.map(\.generation.audioPath),
+            [queued.audioPath]
+        )
+
+        let store = GenerationHistoryOutboxStore(rootURL: storeRoot, audioRootURL: currentRoot)
+        XCTAssertEqual(store.scan().entries.map(\.generation.audioPath), [audio.path])
+        let state = CommitState()
+        let coordinator = makeCoordinator(store: store, state: state)
+        let before = await coordinator.snapshot()
+        XCTAssertEqual(before.availableAudioCount, 1)
+        XCTAssertEqual(before.issueCount, 0, "Retry can commit it, so it is not reported as damaged")
+
+        let result = await coordinator.reconcile()
+        XCTAssertEqual(result.committed.map(\.audioPath), [audio.path])
+        XCTAssertEqual(state.rows().map(\.audioPath), [audio.path])
+        XCTAssertEqual(state.counts.rows, 1)
+        XCTAssertTrue(store.scan().entries.isEmpty)
+        XCTAssertEqual(result.snapshot, .empty)
+    }
+
+    /// The moved-container rule both History rows and queued entries follow.
+    func testAudioPathsMoveOnlyWhenTheirRootIsGoneAndTheAudioMovedAlong() {
+        let current = "/containers/new"
+        let present: Set<String> = ["/containers/new/outputs/Design/take.wav"]
+        func rebased(_ path: String, gone: Set<String>) -> String? {
+            GenerationAudioPathRebase.rebased(
+                path, onto: current, rootIsGone: { gone.contains($0) }, fileExists: { present.contains($0) }
+            )
+        }
+
+        XCTAssertEqual(
+            rebased("/containers/old/outputs/Design/take.wav", gone: ["/containers/old"]),
+            "/containers/new/outputs/Design/take.wav"
+        )
+        XCTAssertNil(
+            rebased("/containers/old/outputs/Design/take.wav", gone: []),
+            "A root that still exists (an unmounted volume, a custom folder) keeps its paths"
+        )
+        XCTAssertNil(
+            rebased("/containers/old/outputs/Design/other.wav", gone: ["/containers/old"]),
+            "Audio that did not move along keeps its path"
+        )
+        XCTAssertNil(rebased("/containers/new/outputs/Design/take.wav", gone: ["/containers/new"]))
+        XCTAssertNil(rebased("/elsewhere/take.wav", gone: ["/elsewhere"]), "No outputs folder, no root")
+        XCTAssertNil(GenerationAudioPathRebase.storedRoot(of: "/outputs/take.wav"))
+        XCTAssertEqual(GenerationAudioPathRebase.storedRoot(of: "/a/outputs/b/outputs/c.wav"), "/a")
+    }
+
     func testEnqueueRejectsMissingPublishedAudio() throws {
         let fixture = try makeFixture(createAudio: false)
         XCTAssertThrowsError(try fixture.store.enqueue(fixture.generation, operation: .append)) { error in

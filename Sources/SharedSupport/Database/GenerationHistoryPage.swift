@@ -79,6 +79,64 @@ struct GenerationHistoryPage: Equatable, Sendable {
     let archiveCount: Int
 }
 
+/// One page read at a time (P10-07). A reload asked for while a read is in
+/// flight, or a saved take appended in place meanwhile, is answered by one more
+/// full read once the running one lands: that read may have queried the
+/// archive before the take's row existed, and its page replaces the list
+/// wholesale, so without the follow-up the new take would vanish from History
+/// until something else reloaded it.
+/// Each read carries a token, so a read abandoned when its screen went away
+/// cannot end the read a returning screen started.
+struct GenerationHistoryReloadCoalescer: Equatable, Sendable {
+    private var currentRead: Int?
+    private var lastToken = 0
+    private(set) var followUpPending = false
+
+    var isReading: Bool { currentRead != nil }
+
+    func isCurrentRead(_ token: Int) -> Bool { currentRead == token }
+
+    /// The token of a read to start now, or nil when one is running; that
+    /// read is then followed by one more.
+    mutating func beginRead() -> Int? {
+        guard currentRead == nil else {
+            followUpPending = true
+            return nil
+        }
+        lastToken &+= 1
+        currentRead = lastToken
+        return lastToken
+    }
+
+    /// A take saved, or a row replaced, in place while a read may be in
+    /// flight: a running read is followed by one more.
+    mutating func noteRowChangedInPlace() {
+        if currentRead != nil { followUpPending = true }
+    }
+
+    /// Read `token` landed or failed. `true`: start the follow-up read now.
+    /// Any other token changes nothing.
+    mutating func finishRead(_ token: Int) -> Bool {
+        guard currentRead == token else { return false }
+        currentRead = nil
+        defer { followUpPending = false }
+        return followUpPending
+    }
+
+    /// Read `token` ended without a page (cancelled); nothing follows it. Any
+    /// other token changes nothing.
+    mutating func cancelRead(_ token: Int) {
+        guard currentRead == token else { return }
+        abandonRead()
+    }
+
+    /// The screen went away: its running read no longer counts.
+    mutating func abandonRead() {
+        currentRead = nil
+        followUpPending = false
+    }
+}
+
 enum GenerationHistoryPageQuery {
     /// `includesLongFormProjects` is false while a long-form journal needs
     /// recovery: project rows stay withheld, as `readableHistory` does.

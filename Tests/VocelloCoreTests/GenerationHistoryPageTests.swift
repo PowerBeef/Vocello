@@ -153,6 +153,64 @@ final class GenerationHistoryPageTests: XCTestCase {
         XCTAssertFalse(GenerationHistoryPageRequest(query: "take").isUnfiltered)
     }
 
+    // MARK: - Reload coalescing (P10-07)
+
+    /// A take saved while a page read is in flight is appended in place, but
+    /// the read may have queried the archive before the row existed and its
+    /// page replaces the list: one more read must follow it.
+    func testATakeAppendedDuringAReadIsFollowedByOneMoreRead() throws {
+        var coalescer = GenerationHistoryReloadCoalescer()
+        let read = try XCTUnwrap(coalescer.beginRead())
+        coalescer.noteRowChangedInPlace()
+
+        XCTAssertTrue(coalescer.finishRead(read), "The page that may predate the row is read again")
+        let followUp = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertFalse(coalescer.finishRead(followUp), "Nothing changed during the follow-up")
+        XCTAssertFalse(coalescer.isReading)
+    }
+
+    func testATakeAppendedWithNoReadInFlightNeedsNoRead() throws {
+        var coalescer = GenerationHistoryReloadCoalescer()
+        coalescer.noteRowChangedInPlace()
+        XCTAssertFalse(coalescer.followUpPending)
+
+        let read = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertFalse(coalescer.finishRead(read))
+    }
+
+    func testReloadsAskedForDuringAReadCoalesceIntoOne() throws {
+        var coalescer = GenerationHistoryReloadCoalescer()
+        let read = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertNil(coalescer.beginRead())
+        XCTAssertNil(coalescer.beginRead())
+        coalescer.noteRowChangedInPlace()
+
+        XCTAssertTrue(coalescer.finishRead(read))
+        let followUp = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertFalse(coalescer.finishRead(followUp), "One follow-up answers every request")
+    }
+
+    /// The screen went away mid-read and came back: the abandoned read's late
+    /// end must not end, or follow up, the read the returning screen started.
+    func testAReadAbandonedWithItsScreenCannotEndTheNextRead() throws {
+        var coalescer = GenerationHistoryReloadCoalescer()
+        let abandoned = try XCTUnwrap(coalescer.beginRead())
+        coalescer.noteRowChangedInPlace()
+        coalescer.abandonRead()
+        XCTAssertFalse(coalescer.isReading)
+        XCTAssertFalse(coalescer.followUpPending)
+
+        let current = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertNotEqual(abandoned, current)
+        XCTAssertFalse(coalescer.finishRead(abandoned))
+        coalescer.cancelRead(abandoned)
+        XCTAssertTrue(coalescer.isCurrentRead(current))
+
+        coalescer.cancelRead(current)
+        XCTAssertFalse(coalescer.isReading)
+        XCTAssertFalse(coalescer.finishRead(current), "A cancelled read has nothing to follow up")
+    }
+
     // MARK: - Fixture
 
     private func makeQueue() throws -> DatabaseQueue {

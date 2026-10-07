@@ -249,6 +249,40 @@ struct GenerationHistoryClearOutcome: Equatable, Sendable {
     let snapshot: GenerationHistoryRecoverySnapshot
 }
 
+/// The moved-container rule for stored take paths (A2-01, P10-06). Takes are
+/// recorded as absolute paths under `<root>/outputs/`, and on iPhone the root
+/// is the App Group container, whose path changes with a restore or a device
+/// migration while the files arrive under the new root. A path is moved onto
+/// the current root only when its stored root is gone and the audio exists at
+/// the rebased path, so a folder that is merely unavailable (an unmounted
+/// volume holding a custom macOS output folder) keeps its paths. History rows
+/// and queued outbox entries follow the same rule.
+enum GenerationAudioPathRebase {
+    static let outputsMarker = "/outputs/"
+
+    /// The root a take path was recorded under: everything before its first
+    /// `/outputs/`, or nil for a path with none (or one that starts with it).
+    static func storedRoot(of path: String) -> String? {
+        guard let range = path.range(of: outputsMarker), range.lowerBound > path.startIndex else { return nil }
+        return String(path[..<range.lowerBound])
+    }
+
+    /// `path` on `currentRoot`, or nil when it stays as it is: no stored root,
+    /// already the current root, a root that still exists, or no audio at the
+    /// rebased path.
+    static func rebased(
+        _ path: String,
+        onto currentRoot: String,
+        rootIsGone: (String) -> Bool,
+        fileExists: (String) -> Bool
+    ) -> String? {
+        guard let root = storedRoot(of: path), root != currentRoot, rootIsGone(root),
+              let range = path.range(of: outputsMarker) else { return nil }
+        let candidate = currentRoot + path[range.lowerBound...]
+        return fileExists(candidate) ? candidate : nil
+    }
+}
+
 /// File-backed, app-support-local persistence intent store. Final `.json` entries
 /// appear only after an atomic same-directory rename. A valid interrupted
 /// `.writing` file is promoted on the next scan; corrupt or identity-mismatched
@@ -256,6 +290,10 @@ struct GenerationHistoryClearOutcome: Equatable, Sendable {
 /// until the user confirms setting them aside (A2-02).
 struct GenerationHistoryOutboxStore: Sendable {
     let rootURL: URL
+    /// The root whose `outputs/` holds the queued takes' audio (the app-support
+    /// root). Set, an entry queued before the container moved reads with its
+    /// audio path rebased onto it (P10-06); nil reads every path as stored.
+    var audioRootURL: URL? = nil
 
     private var clearTransactionURL: URL {
         rootURL.appendingPathComponent("clear-transaction.json", isDirectory: false)
@@ -340,7 +378,7 @@ struct GenerationHistoryOutboxStore: Sendable {
                                 try FileManager.default.moveItem(at: url, to: finalURL)
                             }
                         }
-                        entries.append(entry)
+                        entries.append(rebasingMovedAudio(entry))
                     } catch {
                         // The scan can lose the race with a promotion made
                         // meanwhile (an off-actor enqueue renames its own
@@ -349,7 +387,7 @@ struct GenerationHistoryOutboxStore: Sendable {
                            let id = writingFileID(url),
                            let promoted: GenerationHistoryOutboxEntry = try? decode(entryURL(for: id)),
                            (try? validate(promoted, filenameID: id)) != nil {
-                            entries.append(promoted)
+                            entries.append(rebasingMovedAudio(promoted))
                         } else {
                             issues += 1
                             // A valid file whose promotion failed is not damaged.
@@ -363,7 +401,7 @@ struct GenerationHistoryOutboxStore: Sendable {
                     do {
                         let entry: GenerationHistoryOutboxEntry = try decode(url)
                         try validate(entry, filenameID: UUID(uuidString: url.deletingPathExtension().lastPathComponent))
-                        entries.append(entry)
+                        entries.append(rebasingMovedAudio(entry))
                     } catch {
                         // An entry committed and removed since the listing is
                         // gone, not damaged.
@@ -617,6 +655,10 @@ struct GenerationHistoryOutboxStore: Sendable {
         for url in urls where url.pathExtension == Self.unverifiableExtension {
             guard let entry: GenerationHistoryOutboxEntry = try? decode(url) else { return nil }
             paths.insert(entry.generation.audioPath)
+            // Its audio may have moved with the container (P10-06); keep that file too.
+            if let rebased = rebasedAudioPath(entry.generation.audioPath) {
+                paths.insert(rebased)
+            }
         }
         return paths
     }
@@ -646,6 +688,33 @@ struct GenerationHistoryOutboxStore: Sendable {
         } catch {
             throw GenerationHistoryOutboxError.unavailable
         }
+    }
+
+    /// P10-06: an entry queued before a restore or a device migration names
+    /// the old container. It reads with its audio on the current root when the
+    /// moved-container rule applies, so it commits, counts as available and is
+    /// cleared with the file that exists; the entry file itself is left as
+    /// written, and a commit removes it.
+    private func rebasingMovedAudio(_ entry: GenerationHistoryOutboxEntry) -> GenerationHistoryOutboxEntry {
+        guard let rebased = rebasedAudioPath(entry.generation.audioPath) else { return entry }
+        var generation = entry.generation
+        generation.audioPath = rebased
+        return GenerationHistoryOutboxEntry(
+            id: entry.id,
+            operation: entry.operation,
+            generation: generation,
+            createdAt: entry.createdAt
+        )
+    }
+
+    private func rebasedAudioPath(_ path: String) -> String? {
+        guard let audioRootURL else { return nil }
+        return GenerationAudioPathRebase.rebased(
+            path,
+            onto: audioRootURL.path,
+            rootIsGone: { !FileManager.default.fileExists(atPath: $0) },
+            fileExists: { FileManager.default.fileExists(atPath: $0) }
+        )
     }
 
     private func validate(_ entry: GenerationHistoryOutboxEntry, filenameID: UUID?) throws {

@@ -6,7 +6,10 @@ import QwenVoiceCore
 enum GenerationHistoryRecovery {
     @MainActor static let unqueued = GenerationHistoryEnqueueState()
     static let outboxStore = GenerationHistoryOutboxStore(
-        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox", isDirectory: true)
+        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox", isDirectory: true),
+        // Entries queued before a restore or device migration commit with
+        // their audio on the current container (P10-06), as rows do (A2-01).
+        audioRootURL: AppPaths.appSupportDir
     )
     static let longFormStore = LongFormHistoryAcceptanceStore(
         rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true)

@@ -75,11 +75,12 @@ final class DatabaseService: @unchecked Sendable {
     /// Rows store absolute audio paths, and on iPhone the root is the App Group
     /// container, whose path changes with the install. After a restore or a
     /// device migration the files and the database arrive together under a new
-    /// root, so every row would point at a path that no longer exists. A row is
-    /// rewritten onto `rootDirectory` only when its stored root is gone and its
-    /// audio exists at the rebased path: a folder that is merely unavailable (an
-    /// unmounted volume holding a custom macOS output folder) keeps its rows.
-    /// Returns the number of rows rewritten.
+    /// root, so every row would point at a path that no longer exists. Rows
+    /// follow `GenerationAudioPathRebase`, the rule queued outbox entries share
+    /// (P10-06): a row is rewritten onto `rootDirectory` only when its stored
+    /// root is gone and its audio exists at the rebased path, so a folder that
+    /// is merely unavailable (an unmounted volume holding a custom macOS output
+    /// folder) keeps its rows. Returns the number of rows rewritten.
     @discardableResult
     static func rebaseMovedAudioPaths(
         in queue: DatabaseQueue,
@@ -89,7 +90,6 @@ final class DatabaseService: @unchecked Sendable {
         // Built as the writers build it (`AppPaths.outputsDir`), so a rebased row
         // matches the path a new take of the same file would record.
         let currentRoot = rootDirectory.path
-        let marker = "/outputs/"
         let storedRoots = try queue.read { db in
             try String.fetchSet(
                 db,
@@ -110,10 +110,12 @@ final class DatabaseService: @unchecked Sendable {
             for row in rows {
                 let id: Int64 = row["id"]
                 let stored: String = row["audioPath"]
-                guard let range = stored.range(of: marker),
-                      movedRoots.contains(String(stored[..<range.lowerBound])) else { continue }
-                let rebased = currentRoot + stored[range.lowerBound...]
-                guard fileExists(rebased) else { continue }
+                guard let rebased = GenerationAudioPathRebase.rebased(
+                    stored,
+                    onto: currentRoot,
+                    rootIsGone: { movedRoots.contains($0) },
+                    fileExists: fileExists
+                ) else { continue }
                 try db.execute(
                     sql: "UPDATE generations SET audioPath = ? WHERE id = ?",
                     arguments: [rebased, id]

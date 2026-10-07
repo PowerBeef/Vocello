@@ -249,7 +249,9 @@ struct MacHistoryScreen: View {
     @State private var itemToDelete: MacHistoryListItem?
     @State private var actionAlert: MacHistoryActionAlert?
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
-    @State private var pendingReloadAfterCurrentLoad = false
+    /// One page read at a time; a reload or an in-place row change during a
+    /// read is followed by one more read (P10-07).
+    @State private var reloadCoalescer = GenerationHistoryReloadCoalescer()
     @State private var modeFilter: HistoryModeFilter = .all
     @State private var filteredItems: [MacHistoryListItem] = []
     /// Cached grouped list (W1-D): recomputed only when its inputs change,
@@ -619,11 +621,16 @@ private extension MacHistoryScreen {
         }
         itemsRevision &+= 1
         MacHistorySessionCache.items = items
+        // A read in flight may have queried the archive before this row
+        // existed; its page would replace the list without it (P10-07).
+        reloadCoalescer.noteRowChangedInPlace()
     }
 
     func handleDisappear() {
         loadTask?.cancel()
         loadTask = nil
+        reloadCoalescer.abandonRead()
+        isLoading = false
         searchDebounceTask?.cancel()
     }
 
@@ -742,10 +749,7 @@ private extension MacHistoryScreen {
     /// pending History first; a sort, filter, search or Show More only reads.
     /// A reload asked for during another coalesces into one full reload.
     func reloadHistory(reopenFailedStore: Bool = false, reconciling: Bool = true) {
-        if loadTask != nil {
-            pendingReloadAfterCurrentLoad = true
-            return
-        }
+        guard let readToken = reloadCoalescer.beginRead() else { return }
 
         let hasExistingItems = !items.isEmpty
         if !hasExistingItems {
@@ -762,7 +766,7 @@ private extension MacHistoryScreen {
             defer {
                 if !didFinishReload {
                     Task { @MainActor in
-                        cancelReload(interval: interval)
+                        cancelReload(readToken: readToken, interval: interval)
                     }
                 }
             }
@@ -794,7 +798,7 @@ private extension MacHistoryScreen {
                     loadError = nil
                     databaseUnavailable = false
                     isLoading = false
-                    finishReload(wallStart: wallStart, interval: interval)
+                    finishReload(readToken: readToken, wallStart: wallStart, interval: interval)
                     refreshRecoveryState()
                 }
                 didFinishReload = true
@@ -811,33 +815,35 @@ private extension MacHistoryScreen {
                         loadError = MacInterfaceText.historyFailureMessage(error)
                     }
                     isLoading = false
-                    finishReload(wallStart: wallStart, interval: interval)
+                    finishReload(readToken: readToken, wallStart: wallStart, interval: interval)
                 }
                 didFinishReload = true
             }
         }
     }
 
-    func finishReload(wallStart: UInt64, interval: AppPerformanceSignposts.Interval) {
+    func finishReload(readToken: Int, wallStart: UInt64, interval: AppPerformanceSignposts.Interval) {
         AppPerformanceSignposts.end(interval)
         if DebugMode.isEnabled {
             let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
             print("[Performance][MacHistoryScreen] reload_wall_ms=\(elapsedMs)")
         }
 
+        // A read abandoned with its screen no longer owns the load state.
+        guard reloadCoalescer.isCurrentRead(readToken) else { return }
         loadTask = nil
 
-        if pendingReloadAfterCurrentLoad {
-            pendingReloadAfterCurrentLoad = false
+        if reloadCoalescer.finishRead(readToken) {
             reloadHistory()
         }
     }
 
-    func cancelReload(interval: AppPerformanceSignposts.Interval) {
+    func cancelReload(readToken: Int, interval: AppPerformanceSignposts.Interval) {
         AppPerformanceSignposts.end(interval)
+        guard reloadCoalescer.isCurrentRead(readToken) else { return }
         isLoading = false
         loadTask = nil
-        pendingReloadAfterCurrentLoad = false
+        reloadCoalescer.cancelRead(readToken)
     }
 
     func exportGeneration(_ item: MacHistoryListItem) {

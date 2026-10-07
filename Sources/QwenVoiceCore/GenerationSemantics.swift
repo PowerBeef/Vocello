@@ -839,8 +839,7 @@ public enum GenerationSemantics {
         // `designInstruction` strips, or free-form delivery text) gets one, so
         // "…a subtle British accent" never runs into "Native English
         // pronunciation…" as one phrase.
-        let separator = trimmedBase.endsWithSentencePunctuation ? " " : ". "
-        return "\(trimmedBase)\(separator)\(reinforcement)"
+        return "\(trimmedBase.closingItsSentence) \(reinforcement)"
     }
 
     public static func qwenLanguageHint(
@@ -1270,10 +1269,22 @@ private extension String {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Whether the text already closes its sentence (an ellipsis counts).
+    /// Whether the text already closes its sentence (an ellipsis counts, and
+    /// so does a stop before a closing quote or bracket).
     var endsWithSentencePunctuation: Bool {
-        guard let last = trimmingCharacters(in: .whitespacesAndNewlines).last else { return false }
+        var core = Substring(trimmingCharacters(in: .whitespacesAndNewlines))
+        while let last = core.last, "\"'\u{201D}\u{2019})]\u{300D}\u{300F}".contains(last) { core = core.dropLast() }
+        guard let last = core.last else { return false }
         return ".!?。！？…".contains(last)
+    }
+
+    /// The text ready for a following sentence: kept when it already closes
+    /// one, a trailing comma, semicolon or colon turned into a period, and
+    /// otherwise a period added.
+    var closingItsSentence: String {
+        if endsWithSentencePunctuation { return self }
+        if let last = last, ",;:\u{FF0C}\u{FF1B}\u{FF1A}".contains(last) { return String(dropLast()) + "." }
+        return self + "."
     }
 }
 

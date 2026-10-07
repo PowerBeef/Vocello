@@ -190,6 +190,24 @@ final class GenerationHistoryPageTests: XCTestCase {
         XCTAssertFalse(coalescer.finishRead(followUp), "One follow-up answers every request")
     }
 
+    /// A Retry that reopens a failed store, asked for while a read is in
+    /// flight, is not lost: the follow-up carries the strongest request it
+    /// answers, and an in-place change (an append or a delete) reconciles.
+    func testAFollowUpCarriesTheStrongestRequestItAnswers() throws {
+        var coalescer = GenerationHistoryReloadCoalescer()
+        let read = try XCTUnwrap(coalescer.beginRead(reopenFailedStore: false, reconciling: false))
+        XCTAssertNil(coalescer.beginRead(reopenFailedStore: true, reconciling: false))
+        XCTAssertEqual(coalescer.finishReadWithFollowUp(read),
+                       .init(reopenFailedStore: true, reconciling: false))
+
+        let next = try XCTUnwrap(coalescer.beginRead(reopenFailedStore: false, reconciling: false))
+        coalescer.noteRowChangedInPlace()
+        XCTAssertEqual(coalescer.finishReadWithFollowUp(next),
+                       .init(reopenFailedStore: false, reconciling: true))
+        let last = try XCTUnwrap(coalescer.beginRead())
+        XCTAssertNil(coalescer.finishReadWithFollowUp(last))
+    }
+
     /// The screen went away mid-read and came back: the abandoned read's late
     /// end must not end, or follow up, the read the returning screen started.
     func testAReadAbandonedWithItsScreenCannotEndTheNextRead() throws {

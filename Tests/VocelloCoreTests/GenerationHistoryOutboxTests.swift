@@ -197,7 +197,7 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         )
         XCTAssertNil(
             rebased("/containers/old/outputs/Design/take.wav", gone: []),
-            "A root that still exists (an unmounted volume, a custom folder) keeps its paths"
+            "A path with no audio at the rebased location (an unmounted volume, a custom folder) keeps its path"
         )
         XCTAssertNil(
             rebased("/containers/old/outputs/Design/other.wav", gone: ["/containers/old"]),

@@ -749,7 +749,9 @@ private extension MacHistoryScreen {
     /// pending History first; a sort, filter, search or Show More only reads.
     /// A reload asked for during another coalesces into one full reload.
     func reloadHistory(reopenFailedStore: Bool = false, reconciling: Bool = true) {
-        guard let readToken = reloadCoalescer.beginRead() else { return }
+        guard let readToken = reloadCoalescer.beginRead(
+            reopenFailedStore: reopenFailedStore, reconciling: reconciling
+        ) else { return }
 
         let hasExistingItems = !items.isEmpty
         if !hasExistingItems {
@@ -833,8 +835,8 @@ private extension MacHistoryScreen {
         guard reloadCoalescer.isCurrentRead(readToken) else { return }
         loadTask = nil
 
-        if reloadCoalescer.finishRead(readToken) {
-            reloadHistory()
+        if let followUp = reloadCoalescer.finishReadWithFollowUp(readToken) {
+            reloadHistory(reopenFailedStore: followUp.reopenFailedStore, reconciling: followUp.reconciling)
         }
     }
 
@@ -961,6 +963,9 @@ private extension MacHistoryScreen {
         }
 
         items.removeAll { $0.id == item.id }
+        // A read already in flight may predate the delete; its page must not
+        // bring the row back (P10-07).
+        reloadCoalescer.noteRowChangedInPlace()
         archiveCount = max(0, archiveCount - 1)
         itemsRevision &+= 1
         MacHistorySessionCache.items = items

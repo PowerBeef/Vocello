@@ -261,7 +261,17 @@ final class EmotionPresetResolutionTests: XCTestCase {
             GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: "Warm and confident", language: "english"),
             "Warm and confident. \(GenerationSemantics.englishDictionReinforcement)"
         )
-        for closed in ["Warm and confident.", "Warm and confident!", "Warm and confident?", "Warm and confident…"] {
+        for (open, closedForm) in [("Warm and confident,", "Warm and confident."),
+                                   ("Warm and confident;", "Warm and confident."),
+                                   ("Warm and confident:", "Warm and confident.")] {
+            XCTAssertEqual(
+                GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: open, language: "english"),
+                "\(closedForm) \(GenerationSemantics.englishDictionReinforcement)",
+                open
+            )
+        }
+        for closed in ["Warm and confident.", "Warm and confident!", "Warm and confident?", "Warm and confident…",
+                       "She says \u{201C}warm.\u{201D}", "(Warm and confident.)"] {
             XCTAssertEqual(
                 GenerationSemantics.englishDictionReinforcedInstruction(baseInstruction: closed, language: "english"),
                 "\(closed) \(GenerationSemantics.englishDictionReinforcement)",

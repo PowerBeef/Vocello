@@ -88,19 +88,31 @@ struct GenerationHistoryPage: Equatable, Sendable {
 /// Each read carries a token, so a read abandoned when its screen went away
 /// cannot end the read a returning screen started.
 struct GenerationHistoryReloadCoalescer: Equatable, Sendable {
+    /// What the follow-up read must do: every request it answers asked for
+    /// at most this much, so a Retry that reopens a failed store is not lost
+    /// behind a read already in flight.
+    struct FollowUp: Equatable, Sendable {
+        var reopenFailedStore = false
+        var reconciling = false
+    }
+
     private var currentRead: Int?
     private var lastToken = 0
-    private(set) var followUpPending = false
+    private(set) var pendingFollowUp: FollowUp?
 
+    var followUpPending: Bool { pendingFollowUp != nil }
     var isReading: Bool { currentRead != nil }
 
     func isCurrentRead(_ token: Int) -> Bool { currentRead == token }
 
     /// The token of a read to start now, or nil when one is running; that
-    /// read is then followed by one more.
-    mutating func beginRead() -> Int? {
+    /// read is then followed by one more carrying this request's options.
+    mutating func beginRead(reopenFailedStore: Bool = false, reconciling: Bool = true) -> Int? {
         guard currentRead == nil else {
-            followUpPending = true
+            var followUp = pendingFollowUp ?? FollowUp()
+            followUp.reopenFailedStore = followUp.reopenFailedStore || reopenFailedStore
+            followUp.reconciling = followUp.reconciling || reconciling
+            pendingFollowUp = followUp
             return nil
         }
         lastToken &+= 1
@@ -108,19 +120,28 @@ struct GenerationHistoryReloadCoalescer: Equatable, Sendable {
         return lastToken
     }
 
-    /// A take saved, or a row replaced, in place while a read may be in
+    /// A take saved, deleted or replaced in place while a read may be in
     /// flight: a running read is followed by one more.
     mutating func noteRowChangedInPlace() {
-        if currentRead != nil { followUpPending = true }
+        if currentRead != nil {
+            var followUp = pendingFollowUp ?? FollowUp()
+            followUp.reconciling = true
+            pendingFollowUp = followUp
+        }
     }
 
     /// Read `token` landed or failed. `true`: start the follow-up read now.
     /// Any other token changes nothing.
     mutating func finishRead(_ token: Int) -> Bool {
-        guard currentRead == token else { return false }
+        finishReadWithFollowUp(token) != nil
+    }
+
+    /// Read `token` landed or failed: the follow-up read to start now, if any.
+    mutating func finishReadWithFollowUp(_ token: Int) -> FollowUp? {
+        guard currentRead == token else { return nil }
         currentRead = nil
-        defer { followUpPending = false }
-        return followUpPending
+        defer { pendingFollowUp = nil }
+        return pendingFollowUp
     }
 
     /// Read `token` ended without a page (cancelled); nothing follows it. Any
@@ -133,7 +154,7 @@ struct GenerationHistoryReloadCoalescer: Equatable, Sendable {
     /// The screen went away: its running read no longer counts.
     mutating func abandonRead() {
         currentRead = nil
-        followUpPending = false
+        pendingFollowUp = nil
     }
 }
 

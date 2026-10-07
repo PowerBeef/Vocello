@@ -148,6 +148,13 @@ enum BatchCommand {
         guard !lines.isEmpty else {
             throw CLIError("no input lines — pass --file <path> (one clip per line) or pipe text on stdin")
         }
+        // A short-form line is one take: the same single-take rule as
+        // `generate`, checked for every line before the engine boots, so a
+        // line with nothing to speak or past the budget never stops the batch
+        // partway (U01, U29). A long-form line is a project the planner splits.
+        if !args.flag("long-form") {
+            try CLIBatchExecution.validateShortFormLines(lines)
+        }
 
         let dataDir = CLIPaths.dataDirectory(override: args.string("data-dir"))
         let manifestOverride = args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }

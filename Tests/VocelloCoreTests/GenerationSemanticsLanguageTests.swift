@@ -285,6 +285,13 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
             (LanguageFixtures.japanese, .japanese),
             ("東京駅で火災、3人けが", .japanese),
             ("日本政府は新たな経済対策を発表した。", .japanese),
+            // Kanji-dense news keeps its hiragana particles.
+            ("国土交通省は観光庁設置法改正案を閣議決定した。", .japanese),
+            ("日本銀行は金融政策決定会合で大規模金融緩和策の維持を決定した。", .japanese),
+            // A Chinese paragraph quoting a short Japanese phrase stays Chinese.
+            ("他在信里写道「ありがとう」，然后我们一起去了北京、上海、广州、深圳和杭州旅行了很久很久。", .chinese),
+            // Korean with Hanja and no kana.
+            ("大韓民國의 憲法은 국민의 권리를 보장한다。", .korean),
             ("コーヒーをください。", .japanese),
             ("ソニー", .japanese),
             // Korean, with a stray kana.

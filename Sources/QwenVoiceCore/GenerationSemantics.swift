@@ -1181,11 +1181,15 @@ public enum GenerationSemantics {
     /// Chinese script with one の, a katakana brand name or a Korean name was
     /// spoken with the Japanese or Korean token as garbled speech.
     ///
-    /// - Japanese needs kana worth at least a quarter of the Han: Japanese
-    ///   prose carries kana particles and endings in nearly every clause
-    ///   (今日はいい天気です。 is mostly kana; even kanji-dense news keeps about
-    ///   one kana per two to four kanji), while a stray の, ソニー or a quoted
-    ///   《鬼滅の刃》 in Chinese prose stays far below that.
+    /// - Japanese: kana worth at least a quarter of the Han, or hiragana
+    ///   particles and endings (any hiragana but の) with kana worth at least a
+    ///   sixth of the Han. Japanese prose carries hiragana in nearly every
+    ///   clause; even kanji-dense news (国土交通省は観光庁設置法改正案を閣議決定した。,
+    ///   18 Han to 4 kana) keeps more than a sixth, while a Chinese paragraph
+    ///   quoting a short Japanese phrase stays below it. Chinese borrows katakana
+    ///   for names and brands (ソニー) and the lone の as a stylistic 的, and
+    ///   kana inside the Chinese title marks 《》〈〉 (《君の名は。》) counts
+    ///   toward nothing, so those stay Chinese.
     /// - Korean needs Hangul to outnumber the Han: modern Korean is written
     ///   almost entirely in Hangul, while a Korean name in Chinese prose is a
     ///   few syllables among many Han characters.
@@ -1194,7 +1198,9 @@ public enum GenerationSemantics {
     ///   kanji-only Japanese heading such as 第一章　東京駅 (or a Hanja-only
     ///   Korean one) resolves to Chinese; pick the language explicitly for it.
     private static func eastAsianLanguage(of units: ScriptUnits) -> Qwen3SupportedLanguage {
-        let isJapanese = units.kana > 0 && units.kana * 4 >= units.han
+        let isJapanese = units.kana > 0
+            && (units.kana * 4 >= units.han
+                || (units.particleHiragana > 0 && units.kana * 6 >= units.han))
         let isKorean = units.hangul > units.han
         switch (isJapanese, isKorean) {
         case (true, true):
@@ -1215,6 +1221,9 @@ public enum GenerationSemantics {
     struct ScriptUnits: Equatable {
         private(set) var han = 0
         private(set) var kana = 0
+        /// Hiragana other than の, the particles and endings Japanese prose
+        /// carries (counted within `kana`).
+        private(set) var particleHiragana = 0
         private(set) var hangul = 0
         private(set) var cyrillicWords = 0
         private(set) var otherWords = 0
@@ -1225,11 +1234,23 @@ public enum GenerationSemantics {
         init(counting text: String) {
             enum Run { case idle, cyrillic, other }
             var run = Run.idle
+            var titleDepth = 0
             for scalar in text.unicodeScalars {
+                switch scalar.value {
+                case 0x3008, 0x300A: titleDepth += 1   // 〈 《
+                case 0x3009, 0x300B: titleDepth = max(0, titleDepth - 1)   // 〉 》
+                default: break
+                }
                 if scalar.isScriptNeutralKanaMark {
                     run = .idle
                 } else if scalar.isJapaneseScalar {
-                    kana += 1
+                    // Kana inside a Chinese title mark is a quoted name.
+                    if titleDepth == 0 {
+                        kana += 1
+                        if (0x3041 ... 0x309F).contains(scalar.value), scalar.value != 0x306E {
+                            particleHiragana += 1
+                        }
+                    }
                     run = .idle
                 } else if scalar.isHangulScalar {
                     hangul += 1

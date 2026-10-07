@@ -321,6 +321,21 @@ final class CLIArgumentsTests: XCTestCase {
         }
     }
 
+    /// A short-form `batch` line is one take: every line is checked by the
+    /// same rule before the engine boots, and the refusal names the line.
+    func testBatchRefusesAShortFormLineThatCannotBeOneTake() throws {
+        XCTAssertNoThrow(try CLIBatchExecution.validateShortFormLines(["First line.", "Second line."]))
+        for (lines, prefix) in [(["Fine.", "***"], "line 2: nothing to speak"),
+                                (["Fine.", "Also fine.", String(repeating: "火", count: 301)], "line 3: text is too long")] {
+            do {
+                try CLIBatchExecution.validateShortFormLines(lines)
+                XCTFail("\(lines.count) lines must be refused")
+            } catch let error as CLIError {
+                XCTAssertTrue(error.description.hasPrefix(prefix), error.description)
+            }
+        }
+    }
+
     // MARK: - Trust anchors (SEC-09)
 
     func testTrustAnchorsNeverComeFromTheWorkingDirectoryOfASealedPayload() {

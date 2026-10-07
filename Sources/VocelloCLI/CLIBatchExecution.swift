@@ -5,6 +5,18 @@ import QwenVoiceCore
 /// retry, replacement seed, or implicit resume is performed.
 @MainActor
 enum CLIBatchExecution {
+    /// Every short-form line must hold one take; the error names the first
+    /// line that does not.
+    nonisolated static func validateShortFormLines(_ lines: [String]) throws {
+        for (index, line) in lines.enumerated() {
+            do {
+                try GenerateCommand.validateSingleTakeText(line)
+            } catch let error as CLIError {
+                throw CLIError("line \(index + 1): \(error.description)")
+            }
+        }
+    }
+
     /// Batch bookkeeping belongs to the CLI. Each request uses the ordinary
     /// single-take API; do not attach engine batch-only fields here.
     /// `captureCodecTrace` (`--capture-codec-trace`, internal diagnostics only)

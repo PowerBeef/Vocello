@@ -1611,6 +1611,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-074746-40ab73d6`](runs/ui-generation/macos-xcui-benchmark-20260723-074746-40ab73d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074746-40ab73d6 |
 
+## ui-generation / macos / mac-mini-m6-16gb / config `514d0fa7800d`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-10-07 | [`macos-xcui-benchmark-20261007-015814-74f026be`](runs/ui-generation/macos-xcui-benchmark-20261007-015814-74f026be.json) | canonical | canonical | passed | qualified | 29 | 0.28 | `30e803a18e0a` | `514d0fa7800d` | baseline | macos-xcui-benchmark-20261007-015814-74f026be |
+
 ## ui-generation / macos / mac-mini-m6-16gb / config `d1c935e54ac5`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

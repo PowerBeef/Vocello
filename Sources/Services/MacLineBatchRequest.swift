@@ -235,11 +235,22 @@ struct MacLineBatchRequest {
 
     var modeLabel: String { MacInterfaceText.modeName(mode) }
 
+    /// The seed of the line at `index`: the batch seed, so the batch keeps one
+    /// character (GitHub #30). Sampling is seed-deterministic, so a line the
+    /// batch repeats would come out byte-identical on it; each repeat derives
+    /// its own seed from the batch seed instead (P11-10), and the batch still
+    /// reproduces from its seed.
+    func seed(forLineAt index: Int) -> UInt64 {
+        guard lines.indices.contains(index) else { return batchSeed }
+        let repeats = lines[..<index].count(where: { $0 == lines[index] })
+        return (0..<repeats).reduce(batchSeed) { seed, _ in StudioRetakeSeed.after(seed) }
+    }
+
     /// The batch seed of a retry of this batch's lines. Remaining lines never
     /// produced a take, so they keep the batch's seed. A failed line failed on
     /// its seed and would fail the same way on it again, so its retry derives
     /// a fresh one (U10); retrying again derives again. The salt keeps a
-    /// retry's seed off the chain other derived seeds draw from.
+    /// retry's seed off the chain a repeated line draws from.
     func retrySeed(failedLines: Bool) -> UInt64 {
         failedLines ? StudioRetakeSeed.after(batchSeed ^ Self.retrySeedSalt) : batchSeed
     }
@@ -247,10 +258,18 @@ struct MacLineBatchRequest {
     private static let retrySeedSalt: UInt64 = 0x5245_5452_5953_4544 // "RETRYSED"
 
     /// The engine request for one line through `MacStudioGenerationRequestFactory`
-    /// (streaming, the batch seed, the Settings variation, a fresh generation
-    /// identity). Nil only for a clone line without a reference or a custom
-    /// line without a speaker, which the configuration never produces.
-    func generationRequest(line: String, outputPath: String, generationID: UUID = UUID()) -> GenerationRequest? {
+    /// (streaming, the line's seed, the Settings variation, a fresh generation
+    /// identity). `lineIndex` is the line's position in the batch, which picks
+    /// its seed (`seed(forLineAt:)`); without one the line takes the batch
+    /// seed. Nil only for a clone line without a reference or a custom line
+    /// without a speaker, which the configuration never produces.
+    func generationRequest(
+        line: String,
+        outputPath: String,
+        generationID: UUID = UUID(),
+        lineIndex: Int? = nil
+    ) -> GenerationRequest? {
+        let lineSeed = lineIndex.map(seed(forLineAt:)) ?? batchSeed
         switch mode {
         case .custom:
             guard let voice else { return nil }
@@ -262,7 +281,7 @@ struct MacLineBatchRequest {
                 speakerID: voice,
                 deliveryStyle: supportsInstructionControl ? (emotion ?? EmotionPreset.neutralPresetInstruction) : nil,
                 deliveryInstructionCellID: deliveryInstructionCellID,
-                seed: batchSeed,
+                seed: lineSeed,
                 variation: variation,
                 generationID: generationID
             )
@@ -274,7 +293,7 @@ struct MacLineBatchRequest {
                 language: language,
                 voiceDescription: voiceDescription ?? "",
                 deliveryStyle: emotion ?? EmotionPreset.neutralPresetInstruction,
-                seed: batchSeed,
+                seed: lineSeed,
                 variation: variation,
                 generationID: generationID
             )
@@ -287,7 +306,7 @@ struct MacLineBatchRequest {
                 referenceAudioPath: refAudio,
                 referenceTranscript: refText,
                 preparedVoiceID: preparedVoiceID,
-                seed: batchSeed,
+                seed: lineSeed,
                 variation: variation,
                 generationID: generationID
             )

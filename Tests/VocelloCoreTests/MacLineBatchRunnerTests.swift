@@ -225,11 +225,34 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertEqual(request.language, .german)
         for (index, line) in lines.enumerated() {
             let lineRequest = try XCTUnwrap(
-                request.generationRequest(line: line, outputPath: "/tmp/\(index).wav")
+                request.generationRequest(line: line, outputPath: "/tmp/\(index).wav", lineIndex: index)
             )
             XCTAssertEqual(lineRequest.languageHint, Qwen3SupportedLanguage.german.rawValue, line)
         }
         XCTAssertEqual(makeRequest(mode: .custom).language, .french, "An explicit selection is kept")
+    }
+
+    /// P11-10: the batch keeps one seed (GitHub #30), but a repeated line
+    /// derives its own from it, so repeats are distinct takes that still
+    /// reproduce from the batch seed.
+    func testARepeatedLineDerivesItsOwnSeedFromTheBatchSeed() throws {
+        let request = makeRequest(
+            mode: .custom,
+            lines: ["Welcome back.", "Welcome back.", "Another line.", "Welcome back."],
+            batchSeed: 42
+        )
+        let first = StudioRetakeSeed.after(42)
+        XCTAssertEqual((0..<4).map(request.seed(forLineAt:)), [42, first, 42, StudioRetakeSeed.after(first)])
+        XCTAssertNotEqual(first, 42)
+        let repeated = try XCTUnwrap(
+            request.generationRequest(line: "Welcome back.", outputPath: "/tmp/2.wav", lineIndex: 1)
+        )
+        XCTAssertEqual(repeated.seed, first)
+        XCTAssertEqual(
+            request.generationRequest(line: "Welcome back.", outputPath: "/tmp/1.wav")?.seed,
+            42,
+            "Without a position a line takes the batch seed"
+        )
     }
 
     /// U10: a retry of remaining lines keeps the batch seed; failed lines
@@ -240,6 +263,7 @@ final class MacLineBatchRunnerTests: XCTestCase {
         let retry = request.retrySeed(failedLines: true)
         XCTAssertNotEqual(retry, 7)
         XCTAssertEqual(retry, request.retrySeed(failedLines: true), "The retry seed reproduces")
+        XCTAssertNotEqual(retry, StudioRetakeSeed.after(7), "Nor is it a repeated line's seed")
         let again = makeRequest(mode: .design, batchSeed: retry).retrySeed(failedLines: true)
         XCTAssertNotEqual(again, retry, "Retrying again draws again")
     }

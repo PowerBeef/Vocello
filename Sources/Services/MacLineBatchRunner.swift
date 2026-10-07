@@ -195,7 +195,11 @@ final class MacLineBatchRunner {
 
             do {
                 let outputPath = makeOutputPath(subfolder: request.outputSubfolder, text: line)
-                guard let generationRequest = request.generationRequest(line: line, outputPath: outputPath) else {
+                guard let generationRequest = request.generationRequest(
+                    line: line,
+                    outputPath: outputPath,
+                    lineIndex: index
+                ) else {
                     throw MacLineBatchError.requestConstructionFailed(request.mode)
                 }
                 let plan = try IOSSingleTakeGenerationPlan(

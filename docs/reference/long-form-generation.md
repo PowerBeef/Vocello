@@ -74,7 +74,8 @@ check and `vocello generate` use the same predicate:
 The ordinary line-separated batch (`MacLineBatchRunner`, macOS only) loops the shared single-take
 executor over the lines with the same QC, telemetry, and preview semantics; only the planning and
 assembly stages are long-form-specific. Its lines share one seed (the pinned one, if any) and one
-language resolved over all lines under Auto; a retry of failed lines derives a fresh seed.
+language resolved over all lines under Auto; a repeated line derives its own seed from the batch
+seed, and a retry of failed lines derives a fresh one.
 The sustained performance gate (`TTSEngineStore.hasSustainedPerformanceActivity`) holds across the
 whole run — segments, QC, and assembly — so the UI performance posture matches a single take.
 

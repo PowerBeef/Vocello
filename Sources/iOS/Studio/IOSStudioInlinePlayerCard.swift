@@ -641,14 +641,49 @@ final class IOSInlinePlaybackController: NSObject {
     }
 
     /// Adopt the shared player for a generation it already owns (no second AVAudioPlayer).
+    /// U08: the shared state is mirrored only while the shared player holds this card's
+    /// file. A card rebuilt after another take played (a mode switch) shows its own take
+    /// idle at its start, and its first Play starts that take from 0.
     func adopt(sharedPlayer: AudioPlayerViewModel, url: URL) {
         self.sharedPlayer = sharedPlayer
         self.adoptedURL = url
         self.loadedURL = url
-        self.isPlaying = sharedPlayer.isPlaying
-        self.currentTime = sharedPlayer.currentTime
-        self.duration = sharedPlayer.duration
-        startDisplayLink()
+        // The live mirror ends with the take; from here the card follows its file.
+        self.isLiveMirroring = false
+        if let player, player.url?.path != url.path {
+            player.stop()
+            self.player = nil
+        }
+        if let player {
+            // This card already plays its file on its own player: keep its position.
+            isPlaying = player.isPlaying
+            currentTime = player.currentTime
+            duration = player.duration
+            if isPlaying { startDisplayLink() } else { stopDisplayLink() }
+            return
+        }
+        let adoption = SharedPlayerAdoption.resolve(
+            cardFilePath: url.path,
+            sharedFilePath: sharedPlayer.currentFilePath,
+            sharedIsPlaying: sharedPlayer.isPlaying,
+            sharedCurrentTime: sharedPlayer.currentTime,
+            sharedDuration: sharedPlayer.duration
+        )
+        isPlaying = adoption.isPlaying
+        currentTime = adoption.currentTime
+        duration = adoption.duration ?? Self.fileDuration(of: url)
+        if adoption.mirrorsSharedPlayer {
+            startDisplayLink()
+        } else {
+            stopDisplayLink()
+        }
+    }
+
+    /// The take's length from its file header, without creating a player.
+    private static func fileDuration(of url: URL) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url),
+              file.processingFormat.sampleRate > 0 else { return 0 }
+        return Double(file.length) / file.processingFormat.sampleRate
     }
 
     /// Mirror the shared player's LIVE streaming preview (generation still in flight,

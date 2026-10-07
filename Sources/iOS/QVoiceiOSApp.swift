@@ -108,8 +108,12 @@ struct QVoiceiOSApp: App {
                                 )
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .ttsEngineMemoryContextDidChange)) { _ in
+                                // P03-02: the store's post-generation refresh can report
+                                // critical after the take finished, so keep the heard
+                                // position for the final-file handoff; a cancelled take
+                                // still clears the player through its own abort.
                                 if engine.currentMemoryContext().pressureBand == .critical {
-                                    audioPlayer.abortLivePreviewIfNeeded()
+                                    audioPlayer.relieveLivePreviewForMemoryPressure()
                                 }
                             }
                             .onReceive(engine.$engineLifecycleState.removeDuplicates()) { lifecycleState in

@@ -782,7 +782,9 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   AVAudioEngine/player-node live-preview mechanics were extracted into
   `Services/LiveStreamingPlaybackEngine` in the 2026-08 UI review's wave 2 —
   FIFO buffer bookkeeping and graph control live there, session policy stays in
-  the view model),
+  the view model, and its pure decisions (start and resume, completion,
+  final-file handoff, the autoplay hold and take succession) are value types in
+  `Services/AudioPlaybackResumePolicy.swift`, tested in `VocelloCoreTests`),
   `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture), `WaveformService` (block-read
   waveform bars) and `GenerationOutputFileName` (take file names in the POSIX locale),
   `ReferenceTranscriptionReviewState` (operation-generation review and explicit audio-only policy),

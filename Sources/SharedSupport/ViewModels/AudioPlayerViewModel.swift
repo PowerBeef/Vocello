@@ -100,10 +100,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         case finalizing
     }
 
-    struct FinalPlaybackHandoff: Equatable, Sendable {
-        let preserveCurrentTime: TimeInterval
-        let shouldAutoPlay: Bool
-    }
+    typealias FinalPlaybackHandoff = LivePreviewFinalHandoff
 
     private struct LivePreviewConfiguration {
         let prebufferThreshold: Int
@@ -129,21 +126,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 
-    /// Decides whether the live-preview player has enough buffered
-    /// audio to begin (or resume) playback.
-    ///
-    /// Two policies, picked per-call:
-    ///
-    /// 1. **Smooth-first estimate** — production generation passes an
-    ///    estimated audio duration before streaming begins. The preview
-    ///    waits for a conservative queue depth:
-    ///    `max(3.25s, min(8s, estimatedDuration * 0.35))`, capped by
-    ///    the estimated duration for short clips.
-    ///
-    /// 2. **Adaptive fallback** — when no estimate exists, each underrun multiplies
-    ///    the prebuffer requirement by +75 % up to a 4× cap. Trades
-    ///    fast first-audio for periodic mid-playback pauses that
-    ///    grow further apart on subsequent resumes.
+    /// Whether the live preview has enough buffered audio to begin (or
+    /// resume) on its own; the decision lives in `LivePreviewStartPolicy`.
     private static func shouldStartLivePlayback(
         autoplayEnabled: Bool,
         queuedChunks: Int,
@@ -154,40 +138,61 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         underrunCount: Int = 0,
         estimate: LivePreviewEstimate? = nil
     ) -> Bool {
-        guard autoplayEnabled else {
+        switch LivePreviewStartPolicy.decide(
+            autoplayEnabled: autoplayEnabled,
+            queuedChunks: queuedChunks,
+            queuedDuration: queuedDuration,
+            prebufferThreshold: prebufferThreshold,
+            minimumBufferedDuration: minimumBufferedDuration,
+            finalFileAvailable: finalFileAvailable,
+            underrunCount: underrunCount,
+            estimate: estimate
+        ) {
+        case .start:
+            return true
+        case .rejectAutoplay:
             AppPerformanceSignposts.emit("Should Start Reject Autoplay")
             return false
-        }
-        guard !finalFileAvailable else { return true }
-
-        if let estimate {
-            let requiredBuffer = estimate.requiredBufferDuration(
-                minimumBufferedDuration: minimumBufferedDuration
-            )
-            let pass = queuedDuration >= requiredBuffer
-            if !pass {
-                AppPerformanceSignposts.emit("Should Start Reject Buffer")
-            }
-            return pass
-        }
-
-        // Policy 2 — fallback adaptive scaling (no estimate).
-        // Reached when `setLivePreviewEstimate` was not called or
-        // returned nil. Keeps the historical chunk-count + duration
-        // thresholds with underrun-driven scaling so a session that
-        // does drain dry adapts after the first stall.
-        let multiplier = min(1.0 + 0.75 * Double(max(underrunCount, 0)), 4.0)
-        let scaledChunks = max(
-            prebufferThreshold,
-            Int((Double(prebufferThreshold) * multiplier).rounded(.up))
-        )
-        let scaledDuration = minimumBufferedDuration * multiplier
-
-        let pass = queuedChunks >= scaledChunks && queuedDuration >= scaledDuration
-        if !pass {
+        case .rejectBuffer:
             AppPerformanceSignposts.emit("Should Start Reject Buffer")
+            return false
         }
-        return pass
+    }
+
+    /// U07: a take of the same operation whose preview waits for the take
+    /// still playing. Its chunks (and its result, once it completes) stay
+    /// here until `promoteQueuedLiveSession` starts it.
+    private struct QueuedLiveSession {
+        enum Chunk {
+            case pcm(StreamingAudioChunk, cumulativeDuration: TimeInterval?)
+            case file(URL, cumulativeDuration: TimeInterval?)
+        }
+
+        struct Completion {
+            let result: PlaybackGenerationResult
+            let title: String
+            let shouldAutoPlay: Bool
+            let playbackOperationID: UUID?
+        }
+
+        /// nil until the first chunk names it (a prepared take without a
+        /// generation ID, or a completed take that streamed nothing).
+        var sessionID: String?
+        let operationID: UUID?
+        let title: String
+        var sessionDirectory: String?
+        let autoplayPreference: Bool
+        let estimate: LivePreviewEstimate?
+        var chunks: [Chunk] = []
+        var completion: Completion?
+        var queuedSeconds: TimeInterval = 0
+
+        var acceptsUnnamedChunks: Bool { sessionID == nil && completion == nil }
+
+        mutating func append(_ chunk: Chunk, chunkSeconds: TimeInterval, cumulativeDuration: TimeInterval?) {
+            chunks.append(chunk)
+            queuedSeconds = cumulativeDuration ?? (queuedSeconds + chunkSeconds)
+        }
     }
 
     private var playbackMode: PlaybackMode = .none
@@ -205,7 +210,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     private var liveSessionID: String?
     private var liveSessionDirectory: String?
     private var liveFinalFilePath: String?
-    private var liveAutoplayEnabled = false
+    /// Auto-play, user and system holds and explicit Play for the current
+    /// session and its generation operation (U04, U06).
+    private var liveAutoplay = LivePreviewAutoplayState()
+    private var liveAutoplayEnabled: Bool { liveAutoplay.allowsAutomaticPlayback }
+    /// Takes of the current operation waiting for the take that plays (U07).
+    private var queuedLiveSessions: [QueuedLiveSession] = []
     private var pendingFirstChunkInterval: AppPerformanceSignposts.Interval?
     private var pendingAutoplaySignpost = false
     private var livePlaybackStarted = false
@@ -336,9 +346,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     private func pauseForRecording() {
-        if playbackMode == .live {
-            liveAutoplayEnabled = false
-        }
+        holdAutomaticPlayback()
         if isPlaying {
             pause()
         }
@@ -354,9 +362,20 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     /// restarts its engine on the next Play or chunk. File playback
     /// (`AVAudioPlayer`) follows the new device by itself.
     private func handleLiveOutputConfigurationChange() {
-        guard playbackMode == .live, isPlaying, let liveSessionID,
-              livePreviewDisabledSessionID != liveSessionID else { return }
+        guard playbackMode == .live, isPlaying else { return }
         AppPerformanceSignposts.emit("Live Preview Output Changed")
+        retireLiveGraphKeepingHeardPosition()
+    }
+    #endif
+
+    /// Drops the live graph and whatever it had queued but keeps the session
+    /// and the heard position, so the take continues from its final file at
+    /// that position: at once when the file exists, otherwise when the take
+    /// completes. A take waiting behind this one starts instead when this
+    /// one's stream has already ended (U07).
+    private func retireLiveGraphKeepingHeardPosition() {
+        guard playbackMode == .live, let liveSessionID,
+              livePreviewDisabledSessionID != liveSessionID else { return }
         let heardTime = currentTime
         livePreviewDisabledSessionID = liveSessionID
         stopLivePlayback(resetCurrentTime: false)
@@ -366,6 +385,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         currentTime = heardTime
         setLivePreviewQueueDepth(0)
         guard liveFinalFilePath != nil else {
+            if promoteQueuedLiveSession() { return }
             setLivePreviewPhase(.buffering)
             return
         }
@@ -377,12 +397,20 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             duration: duration,
             autoPlayEnabled: liveAutoplayEnabled
         )
-        switchToFinalFilePlayback(
-            preserveCurrentTime: handoff.preserveCurrentTime,
-            autoPlay: handoff.shouldAutoPlay
-        )
+        handOffToFinalFile(handoff)
     }
-    #endif
+
+    /// U04/U06: a user or system pause, another player or a recording. A live
+    /// session, playing or still buffering, waits for an explicit Play; a take
+    /// submitted without a session yet starts held.
+    private func holdAutomaticPlayback() {
+        if playbackMode == .live || isPlaying {
+            liveAutoplay.hold()
+        }
+        if playbackMode != .live, pendingLivePreviewEstimate != nil {
+            liveAutoplay.holdUpcomingSession()
+        }
+    }
 
     #if os(iOS)
     /// Pause for audio-session interruptions (calls/Siri) and route changes
@@ -416,8 +444,10 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         switch type {
         case .began:
             // Only file playback is safely resumable; a live streaming preview
-            // is transient and should not auto-resume mid-generation.
+            // is transient and should not auto-resume mid-generation: playing
+            // or still buffering, it waits for Play (U04).
             shouldResumeAfterInterruption = isPlaying && playbackMode == .file
+            if playbackMode == .live { liveAutoplay.hold() }
             if isPlaying { pause() }
         case .ended:
             guard shouldResumeAfterInterruption, playbackMode == .file else { return }
@@ -440,19 +470,22 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
     /// Another player (a preview, the player sheet, clip review or the recorder)
     /// started. A paused live preview must not resume on its next chunk, so
-    /// autoplay ends for this session; Play resumes it.
+    /// autoplay ends for this take, audible, buffering, underrun or not yet
+    /// started alike (U06); Play resumes it.
     private func pauseForOtherPlayback() {
+        holdAutomaticPlayback()
         guard isPlaying else { return }
-        if playbackMode == .live {
-            liveAutoplayEnabled = false
-        }
         shouldResumeAfterInterruption = false
         pause()
     }
 
+    /// The output the preview was playing on went away (headphones unplugged):
+    /// a live preview, playing or still buffering, waits for Play rather than
+    /// starting on the speaker with its next chunk (U04).
     private func handleAudioRouteChange(reasonRaw: UInt?) {
         guard let reasonRaw,
               AVAudioSession.RouteChangeReason(rawValue: reasonRaw) == .oldDeviceUnavailable else { return }
+        if playbackMode == .live { liveAutoplay.hold() }
         if isPlaying { pause() }
     }
 
@@ -481,8 +514,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         playbackTargetFilePath = filePath
         currentGenerationMode = generationMode
         pendingAutoplaySignpost = false
+        discardQueuedLiveSessions()
         teardownLivePlayback(clearSession: true)
         stopFilePlayback(clearPlayer: true)
+        // Other audio: no hold or explicit Play carries over, except that a
+        // file the operation itself hands over stays the operation's.
+        liveAutoplay.reset(operationID: playbackOperationID)
 
         do {
             try applyFilePlayback(
@@ -502,6 +539,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     func play() {
+        // The only way out of a user or system hold (U04): later underruns,
+        // the final-file handoff and the operation's next takes play again.
+        liveAutoplay.play()
         switch playbackMode {
         case .live:
             if liveFinalFilePath != nil {
@@ -526,13 +566,19 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 
+    /// A user or system pause holds the take (U04): no streamed chunk, underrun
+    /// recovery or final-file handoff restarts it, only `play()`. An underrun
+    /// pauses the node directly and keeps automatic resume.
     func pause() {
         switch playbackMode {
         case .live:
+            liveAutoplay.hold()
             livePlayback.pauseNode()
             isPlaying = false
             stopTimer()
         case .file:
+            // The operation's next take waits for Play too.
+            liveAutoplay.hold()
             player?.pause()
             isPlaying = false
             stopTimer()
@@ -566,6 +612,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         playbackTargetFilePath = nil
         currentGenerationMode = nil
         pendingAutoplaySignpost = false
+        discardQueuedLiveSessions()
         stop()
         teardownLivePlayback(clearSession: true)
         stopFilePlayback(clearPlayer: true)
@@ -622,17 +669,32 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     /// captured.
     func setLivePreviewEstimate(_ estimate: LivePreviewEstimate?) {
         pendingLivePreviewEstimate = estimate
+        // A newly submitted take: an earlier take's upcoming hold is spent.
+        if estimate != nil {
+            liveAutoplay.clearUpcomingHold()
+        }
     }
 
     func prepareStreamingPreview(
         title: String, shouldAutoPlay: Bool,
         generationID: UUID? = nil, playbackOperationID: UUID? = nil
     ) {
+        let streamSessionID = generationID?.uuidString
         #if os(macOS)
         guard let generationID, let playbackOperationID,
               claimGenerationStream(generationID, operationID: playbackOperationID) else { return }
         currentGenerationMode = generationPlaybackMode
         #endif
+        // U07: the operation's previous take plays to its end; this one waits.
+        if queueBehindCurrentTake(
+            sessionID: streamSessionID,
+            operationID: playbackOperationID,
+            title: title,
+            sessionDirectory: nil,
+            autoplayPreference: shouldAutoPlay
+        ) {
+            return
+        }
         playbackTargetFilePath = nil
         let sessionEstimate = pendingLivePreviewEstimate
             ?? livePreviewEstimate
@@ -646,8 +708,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         liveSessionID = "pending-\(UUID().uuidString)"
         liveSessionDirectory = nil
         liveFinalFilePath = nil
-        liveAutoplayEnabled = shouldAutoPlay
-        pendingAutoplaySignpost = shouldAutoPlay
+        liveAutoplay.beginSession(operationID: playbackOperationID, autoplayPreference: shouldAutoPlay)
+        pendingAutoplaySignpost = liveAutoplayEnabled
         pendingFirstChunkInterval = AppPerformanceSignposts.begin("Preview To First Chunk")
         livePlayback.resetBookkeeping()
         livePlayback.clearFormat()
@@ -695,15 +757,63 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     ) {
         #if os(macOS)
         guard let playbackOperationID, ownsGenerationPlayback(playbackOperationID) else { return }
+        #endif
+        // U07: a take still waiting for the take that plays keeps its result
+        // for its turn. Results arrive in take order, after the take's last
+        // chunk, so this one belongs to the newest waiting take.
+        if result.usedStreaming, let last = queuedLiveSessions.indices.last {
+            let completion = QueuedLiveSession.Completion(
+                result: result,
+                title: title,
+                shouldAutoPlay: shouldAutoPlay,
+                playbackOperationID: playbackOperationID
+            )
+            if queuedLiveSessions[last].completion == nil {
+                queuedLiveSessions[last].completion = completion
+            } else {
+                // A take that streamed nothing waits with its file alone.
+                queuedLiveSessions.append(QueuedLiveSession(
+                    sessionID: nil,
+                    operationID: queuedLiveSessions[last].operationID,
+                    title: title,
+                    sessionDirectory: nil,
+                    autoplayPreference: shouldAutoPlay,
+                    estimate: nil,
+                    completion: completion
+                ))
+            }
+            return
+        }
+        applyCompletedResult(
+            result,
+            title: title,
+            shouldAutoPlay: shouldAutoPlay,
+            playbackOperationID: playbackOperationID
+        )
+    }
+
+    private func applyCompletedResult(
+        _ result: PlaybackGenerationResult, title: String, shouldAutoPlay: Bool,
+        playbackOperationID: UUID?
+    ) {
+        #if os(macOS)
         let authorizedPlaybackOperationID: UUID? = playbackOperationID
         currentGenerationMode = generationPlaybackMode
         #else
         // iOS retains its existing playback handoff; operation ownership is Mac-only.
         let authorizedPlaybackOperationID: UUID? = nil
         #endif
+        // U06: with no live session left, a hold of the operation or of the
+        // submitted take (another player, a recording) still wins over the
+        // caller's Auto-play preference. The upcoming hold is spent here.
+        let finalAutoplay = liveAutoplay.allowsAutomaticFinalPlayback(
+            operationID: playbackOperationID,
+            autoplayPreference: shouldAutoPlay
+        )
+        liveAutoplay.clearUpcomingHold()
         playbackTargetFilePath = result.audioPath
         guard result.usedStreaming else {
-            if shouldAutoPlay {
+            if finalAutoplay {
                 playFile(
                     result.audioPath,
                     title: title,
@@ -745,39 +855,72 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         // buffers have already drained. Otherwise the existing buffer-drain
         // mechanism (handleLiveBufferPlaybackCompletion -> finishLivePlaybackAfterDrainingBuffers)
         // keeps playback moving from the heard preview position into the final file.
-        if !livePlaybackStarted || livePlayback.scheduledCount == 0 {
+        switch LivePreviewCompletionPolicy.decide(
+            previewStarted: livePlaybackStarted,
+            queuedBuffers: livePlayback.scheduledCount,
+            isPlaying: isPlaying,
+            allowsAutomaticPlayback: liveAutoplayEnabled,
+            previewDisabled: livePreviewDisabledSessionID == liveSessionID
+        ) {
+        case .handOffNow:
             // Immediate-handoff branch: live preview is over (never
             // started or already drained). Any chunk arriving from
             // the broker now is genuinely stale. Record the session
             // as completed so the `handleGenerationChunk` guard
             // drops it.
             recordCompletedLiveSessionID(liveSessionID)
+            // U06 (P10-02): the session's own state decides, so a hold
+            // (Pause, another player, a recording) is not undone by the
+            // caller's Auto-play preference.
             let handoff = Self.finalPlaybackHandoff(
                 heardLivePreview: livePlaybackStarted,
                 currentTime: currentTime,
                 previewDuration: livePreviewDuration,
                 duration: duration,
-                autoPlayEnabled: shouldAutoPlay
+                autoPlayEnabled: playbackMode == .live && liveSessionID != nil
+                    ? liveAutoplayEnabled
+                    : finalAutoplay
             )
-            switchToFinalFilePlayback(
-                preserveCurrentTime: handoff.preserveCurrentTime,
-                autoPlay: handoff.shouldAutoPlay
-            )
+            handOffToFinalFile(handoff)
+        case .playOutQueuedTail:
+            // U05: after an underrun the stream has ended, so a tail shorter
+            // than the prebuffer will never fill it. Play it out now; the
+            // drain hands off to the file.
+            startLiveNode()
+        case .awaitDrain:
+            // Live preview still draining (or held). Late chunks that
+            // arrive between now and the drain are appended naturally
+            // by `appendLiveChunk` (the session ID is NOT in
+            // `completedLiveSessionIDs` yet, so the guard lets them
+            // through). When the queue drains and
+            // `finishLivePlaybackAfterDrainingBuffers` fires, the
+            // session ID is recorded there.
+            break
         }
-        // Else: live preview still draining. Late chunks that
-        // arrive between now and the drain are appended naturally
-        // by `appendLiveChunk` (the session ID is NOT in
-        // `completedLiveSessionIDs` yet, so the guard lets them
-        // through). When the queue drains and
-        // `finishLivePlaybackAfterDrainingBuffers` fires, the
-        // session ID is recorded there.
     }
 
     func abortLivePreviewIfNeeded() {
         pendingLivePreviewEstimate = nil
-        guard playbackMode == .live || liveSessionID != nil else { return }
+        liveAutoplay.clearUpcomingHold()
+        // U07: the operation's waiting takes go with it, and so does the
+        // take still playing ahead of them: the narration stops, as before.
+        let narrationWasQueued = !queuedLiveSessions.isEmpty
+        discardQueuedLiveSessions()
+        guard narrationWasQueued || playbackMode == .live || liveSessionID != nil else { return }
         dismiss()
     }
+
+    #if os(iOS)
+    /// P03-02: critical memory drops the live preview's graph, what it had
+    /// queued and any take waiting behind it, but keeps the session and the
+    /// heard position. A take that still completes then continues from its
+    /// final file there instead of replaying from the start; a cancelled or
+    /// failed take clears the player through `abortLivePreviewIfNeeded`.
+    func relieveLivePreviewForMemoryPressure() {
+        discardQueuedLiveSessions()
+        retireLiveGraphKeepingHeardPosition()
+    }
+    #endif
 
     /// Internal long-form cleanup preserves the operation's final-file handoff.
     /// A user dismissal or another audio selection still wins over this cleanup.
@@ -787,7 +930,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         generationPlaybackOwnership.finishStream(operationID: playbackOperationID)
         #endif
         pendingLivePreviewEstimate = nil
-        guard playbackMode == .live || liveSessionID != nil else { return }
+        guard !queuedLiveSessions.isEmpty || playbackMode == .live || liveSessionID != nil else { return }
         clearPlayback()
     }
 
@@ -868,12 +1011,27 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         let sessionDirectory = chunk.sessionDirectory
         let cumulativeDuration = chunk.cumulativeDuration
 
+        // U07: a take waiting for the take that plays keeps its chunks.
+        if appendToQueuedLiveSession(chunk, sessionID: sessionID) { return }
+
         if liveSessionID != sessionID {
+            let operationID = chunkOperationID
+            if queueBehindCurrentTake(
+                sessionID: sessionID,
+                operationID: operationID,
+                title: chunk.title,
+                sessionDirectory: sessionDirectory,
+                autoplayPreference: AudioService.shouldAutoPlay,
+                firstChunk: chunk
+            ) {
+                return
+            }
             startLiveSession(
                 id: sessionID,
                 title: chunk.title,
                 sessionDirectory: sessionDirectory,
-                autoPlay: AudioService.shouldAutoPlay
+                autoPlay: AudioService.shouldAutoPlay,
+                operationID: operationID
             )
         }
         guard livePreviewDisabledSessionID != sessionID else {
@@ -909,22 +1067,37 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 
-    private func startLiveSession(id: String, title: String, sessionDirectory: String?, autoPlay: Bool) {
+    /// Starts a live session. A take promoted from the queue (U07) brings the
+    /// estimate it captured when it was queued and leaves the pending estimate
+    /// to the take that was submitted after it.
+    private func startLiveSession(
+        id: String,
+        title: String,
+        sessionDirectory: String?,
+        autoPlay: Bool,
+        operationID: UUID?,
+        queuedEstimate: LivePreviewEstimate? = nil,
+        isQueuedTake: Bool = false
+    ) {
         playbackTargetFilePath = nil
         currentGenerationMode = generationPlaybackMode
-        let sessionEstimate = pendingLivePreviewEstimate
-            ?? livePreviewEstimate
-            ?? LivePreviewEstimate(text: title)
+        let sessionEstimate = isQueuedTake
+            ? (queuedEstimate ?? LivePreviewEstimate(text: title))
+            : (pendingLivePreviewEstimate ?? livePreviewEstimate ?? LivePreviewEstimate(text: title))
 
         AppPerformanceSignposts.emit("Live Session Start")
+        // Teardown clears the pending estimate, which belongs to a later take
+        // when this one comes from the queue.
+        let laterTakeEstimate = isQueuedTake ? pendingLivePreviewEstimate : nil
         teardownLivePlayback(clearSession: true)
         stopFilePlayback(clearPlayer: true)
+        pendingLivePreviewEstimate = laterTakeEstimate
 
         playbackMode = .live
         liveSessionID = id
         liveSessionDirectory = sessionDirectory
         liveFinalFilePath = nil
-        liveAutoplayEnabled = autoPlay
+        liveAutoplay.beginSession(operationID: operationID, autoplayPreference: autoPlay)
         // When `startLiveSession` fires from `handleGenerationChunk` (the
         // auto-init path used by every streaming generation today), nothing
         // upstream sets `pendingAutoplaySignpost`. Without it, the
@@ -933,7 +1106,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         // (and any forensic latency analysis) can't see the perceived-speed
         // gain. Set it here so the signpost mirrors the live engine's
         // play() call when autoplay is enabled for this session.
-        pendingAutoplaySignpost = autoPlay
+        pendingAutoplaySignpost = liveAutoplayEnabled
         livePlayback.resetBookkeeping()
         livePlayback.clearFormat()
         livePlaybackStarted = false
@@ -942,10 +1115,10 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         liveUnderrunCount = 0
         // Smooth-first prebuffer estimate handoff: pending values
         // captured pre-generation become the active session's
-        // estimate, then are cleared so a future session that arrives
-        // without a fresh estimate falls back to adaptive scaling.
+        // estimate, then are cleared (above, by the teardown) so a future
+        // session that arrives without a fresh estimate falls back to
+        // adaptive scaling.
         livePreviewEstimate = sessionEstimate
-        pendingLivePreviewEstimate = nil
         liveExpectedFrameOffset = 0
         livePreviewDisabledSessionID = nil
         currentTitle = title
@@ -960,6 +1133,208 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         setLivePreviewPhase(.buffering)
         playbackPresentationContext = .generatePreview
         generatePreviewVisibilityState = .preparing
+    }
+
+    // MARK: - Take succession (U07)
+
+    /// The generation operation a newly streaming take belongs to. On the Mac
+    /// every accepted chunk belongs to the operation that owns playback; on
+    /// iOS only a prepared session (a long-form segment) names one.
+    private var chunkOperationID: UUID? {
+        #if os(macOS)
+        return generationPlaybackOwnership.operationID
+        #else
+        guard let liveSessionID, liveSessionID.hasPrefix("pending-") else { return nil }
+        return liveAutoplay.operationID
+        #endif
+    }
+
+    /// What the current take would still play.
+    private var previousTakeState: LivePreviewSuccessionPolicy.PreviousTake {
+        if isPlaying { return .playing }
+        if liveAutoplay.isHeld { return .held }
+        if playbackMode == .live, liveAutoplayEnabled, livePlayback.scheduledCount > 0,
+           livePreviewDisabledSessionID != liveSessionID {
+            return .unplayedTail
+        }
+        return .silent
+    }
+
+    /// Audio still to play before a newly queued take: the current take's
+    /// queue or the rest of its file, and every waiting take.
+    private var queuedBacklogSeconds: TimeInterval {
+        let current: TimeInterval
+        switch playbackMode {
+        case .live: current = livePlayback.queuedAudioSeconds
+        case .file: current = max(0, duration - currentTime)
+        case .none: current = 0
+        }
+        return queuedLiveSessions.reduce(current) { $0 + $1.queuedSeconds }
+    }
+
+    /// Decides whether a new take of the operation waits for the take that
+    /// plays, and queues it when it does (returning true, so the caller
+    /// stops). Otherwise the waiting takes are dropped and the caller starts
+    /// the new take at once, as before.
+    private func queueBehindCurrentTake(
+        sessionID: String?,
+        operationID: UUID?,
+        title: String,
+        sessionDirectory: String?,
+        autoplayPreference: Bool,
+        firstChunk: ChunkInfo? = nil
+    ) -> Bool {
+        let decision = LivePreviewSuccessionPolicy.decide(
+            incomingOperationID: operationID,
+            previousOperationID: liveAutoplay.operationID,
+            previous: previousTakeState,
+            backlogSeconds: queuedBacklogSeconds
+        )
+        switch decision {
+        case .startNow:
+            discardQueuedLiveSessions()
+            return false
+        case .releaseTailThenQueue:
+            // A successor means the current stream has ended: play the tail
+            // its prebuffer or an underrun was holding back.
+            startLiveNode()
+            guard isPlaying else {
+                discardQueuedLiveSessions()
+                return false
+            }
+        case .queue:
+            break
+        }
+        var queued = QueuedLiveSession(
+            sessionID: sessionID,
+            operationID: operationID,
+            title: title,
+            sessionDirectory: sessionDirectory,
+            autoplayPreference: autoplayPreference,
+            estimate: pendingLivePreviewEstimate ?? LivePreviewEstimate(text: title)
+        )
+        pendingLivePreviewEstimate = nil
+        if let firstChunk, let entry = Self.queuedChunk(from: firstChunk) {
+            queued.append(entry.chunk, chunkSeconds: entry.seconds, cumulativeDuration: firstChunk.cumulativeDuration)
+        }
+        queuedLiveSessions.append(queued)
+        AppPerformanceSignposts.emit("Live Session Queued")
+        return true
+    }
+
+    /// Routes a chunk of a waiting take to it. A waiting take without a name
+    /// yet takes the first chunk of a new stream.
+    private func appendToQueuedLiveSession(_ chunk: ChunkInfo, sessionID: String) -> Bool {
+        let index: Int
+        if let named = queuedLiveSessions.lastIndex(where: { $0.sessionID == sessionID }) {
+            index = named
+        } else if let last = queuedLiveSessions.indices.last, queuedLiveSessions[last].acceptsUnnamedChunks,
+                  liveSessionID != sessionID {
+            index = last
+        } else {
+            return false
+        }
+        queuedLiveSessions[index].sessionID = sessionID
+        if queuedLiveSessions[index].sessionDirectory == nil {
+            queuedLiveSessions[index].sessionDirectory = chunk.sessionDirectory
+        }
+        if let entry = Self.queuedChunk(from: chunk) {
+            queuedLiveSessions[index].append(
+                entry.chunk,
+                chunkSeconds: entry.seconds,
+                cumulativeDuration: chunk.cumulativeDuration
+            )
+        }
+        return true
+    }
+
+    private static func queuedChunk(
+        from chunk: ChunkInfo
+    ) -> (chunk: QueuedLiveSession.Chunk, seconds: TimeInterval)? {
+        if let previewAudio = chunk.previewAudio {
+            let seconds = previewAudio.sampleRate > 0
+                ? Double(previewAudio.frameCount) / Double(previewAudio.sampleRate)
+                : 0
+            return (.pcm(previewAudio, cumulativeDuration: chunk.cumulativeDuration), seconds)
+        }
+        if let chunkPath = chunk.chunkPath {
+            return (.file(URL(fileURLWithPath: chunkPath), cumulativeDuration: chunk.cumulativeDuration), 0)
+        }
+        return nil
+    }
+
+    /// The take that played has ended: start the oldest waiting take. Its
+    /// buffered chunks schedule at once, so it plays as soon as they fill its
+    /// prebuffer (or its result arrives), and drains into its final file.
+    @discardableResult
+    private func promoteQueuedLiveSession() -> Bool {
+        guard !queuedLiveSessions.isEmpty else { return false }
+        let next = queuedLiveSessions.removeFirst()
+        AppPerformanceSignposts.emit("Queued Live Session Started")
+        startLiveSession(
+            id: next.sessionID ?? "pending-\(UUID().uuidString)",
+            title: next.title,
+            sessionDirectory: next.sessionDirectory,
+            autoPlay: next.autoplayPreference,
+            operationID: next.operationID,
+            queuedEstimate: next.estimate,
+            isQueuedTake: true
+        )
+        for chunk in next.chunks {
+            guard livePreviewDisabledSessionID != liveSessionID else {
+                if case .file(let url, cumulativeDuration: _) = chunk {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                continue
+            }
+            switch chunk {
+            case .pcm(let previewAudio, cumulativeDuration: let cumulativeDuration):
+                appendLiveChunk(previewAudio, cumulativeDuration: cumulativeDuration)
+            case .file(let url, cumulativeDuration: let cumulativeDuration):
+                appendLiveChunk(from: url, cumulativeDuration: cumulativeDuration)
+            }
+        }
+        if let completion = next.completion {
+            applyCompletedResult(
+                completion.result,
+                title: completion.title,
+                shouldAutoPlay: completion.shouldAutoPlay,
+                playbackOperationID: completion.playbackOperationID
+            )
+        }
+        return true
+    }
+
+    /// Drops every waiting take; their late chunks are dropped too.
+    private func discardQueuedLiveSessions() {
+        guard !queuedLiveSessions.isEmpty else { return }
+        for session in queuedLiveSessions {
+            recordCompletedLiveSessionID(session.sessionID)
+            for chunk in session.chunks {
+                if case .file(let url, cumulativeDuration: _) = chunk {
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
+            if let sessionDirectory = session.sessionDirectory {
+                try? FileManager.default.removeItem(at: URL(fileURLWithPath: sessionDirectory, isDirectory: true))
+            }
+        }
+        queuedLiveSessions.removeAll()
+    }
+
+    /// Hands a live take over to its final file. When the file would not play
+    /// on (the take was heard to its end, or may not play on its own), the
+    /// operation's next waiting take starts instead; a file that plays on
+    /// hands over to that take when it ends.
+    private func handOffToFinalFile(_ handoff: FinalPlaybackHandoff) {
+        if handoff.shouldAutoPlay || queuedLiveSessions.isEmpty {
+            switchToFinalFilePlayback(
+                preserveCurrentTime: handoff.preserveCurrentTime,
+                autoPlay: handoff.shouldAutoPlay
+            )
+            if isPlaying || queuedLiveSessions.isEmpty { return }
+        }
+        promoteQueuedLiveSession()
     }
 
     private func appendLiveChunk(from url: URL, cumulativeDuration: TimeInterval?) {
@@ -1133,13 +1508,15 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
                 duration: duration,
                 autoPlayEnabled: liveAutoplayEnabled
             )
-            switchToFinalFilePlayback(
-                preserveCurrentTime: handoff.preserveCurrentTime,
-                autoPlay: handoff.shouldAutoPlay
-            )
+            handOffToFinalFile(handoff)
             return
         }
+        startLiveNode()
+    }
 
+    /// Plays the live node from what it has queued, whatever the prebuffer
+    /// says: an explicit Play, a filled prebuffer, or a stream that ended.
+    private func startLiveNode() {
         guard livePlayback.isConfigured else { return }
 
         #if os(iOS)
@@ -1204,6 +1581,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             setLivePreviewPhase(.finalizing)
             finishLivePlaybackAfterDrainingBuffers()
         } else if livePlayback.scheduledCount == 0 {
+            // U07: a waiting take means this stream has ended, so this is the
+            // take's end, not an underrun; the next take starts.
+            if promoteQueuedLiveSession() { return }
             liveUnderrunCount += 1
             AppPerformanceSignposts.emit("Live Preview Underrun")
             AppGenerationTimeline.shared.recordPlaybackUnderrun(id: liveSessionID)
@@ -1235,10 +1615,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
                 duration: duration,
                 autoPlayEnabled: liveAutoplayEnabled
             )
-            switchToFinalFilePlayback(
-                preserveCurrentTime: handoff.preserveCurrentTime,
-                autoPlay: handoff.shouldAutoPlay
-            )
+            handOffToFinalFile(handoff)
         }
     }
 
@@ -1297,7 +1674,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             liveSessionID = nil
             liveSessionDirectory = nil
             liveFinalFilePath = nil
-            liveAutoplayEnabled = false
+            liveAutoplay.endSession()
             pendingLivePreviewEstimate = nil
             livePreviewDisabledSessionID = nil
             isLiveStream = false
@@ -1432,7 +1809,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             liveSessionID = nil
             liveSessionDirectory = nil
             liveFinalFilePath = nil
-            liveAutoplayEnabled = false
+            liveAutoplay.endSession()
         } else {
             teardownLivePlayback(clearSession: true)
         }
@@ -1579,35 +1956,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         duration: TimeInterval,
         autoPlayEnabled: Bool
     ) -> FinalPlaybackHandoff {
-        guard heardLivePreview else {
-            return FinalPlaybackHandoff(
-                preserveCurrentTime: 0,
-                shouldAutoPlay: autoPlayEnabled
-            )
-        }
-
-        guard autoPlayEnabled else {
-            return FinalPlaybackHandoff(
-                preserveCurrentTime: 0,
-                shouldAutoPlay: false
-            )
-        }
-
-        let safeDuration = max(duration, 0)
-        let heardTime = max(currentTime, previewDuration)
-        let safeCurrentTime = min(max(heardTime, 0), safeDuration)
-        let replayThreshold: TimeInterval = 0.12
-        guard safeDuration > replayThreshold,
-              safeCurrentTime < safeDuration - replayThreshold else {
-            return FinalPlaybackHandoff(
-                preserveCurrentTime: 0,
-                shouldAutoPlay: false
-            )
-        }
-
-        return FinalPlaybackHandoff(
-            preserveCurrentTime: safeCurrentTime,
-            shouldAutoPlay: true
+        LivePreviewFinalHandoff.resolve(
+            heardLivePreview: heardLivePreview,
+            currentTime: currentTime,
+            previewDuration: previewDuration,
+            duration: duration,
+            autoPlayEnabled: autoPlayEnabled
         )
     }
 
@@ -1673,10 +2027,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
                     duration: duration,
                     autoPlayEnabled: liveAutoplayEnabled
                 )
-                switchToFinalFilePlayback(
-                    preserveCurrentTime: handoff.preserveCurrentTime,
-                    autoPlay: handoff.shouldAutoPlay
-                )
+                handOffToFinalFile(handoff)
             }
         case .none:
             stopTimer()
@@ -1719,6 +2070,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             if !flag {
                 self.playbackError = "Playback stopped unexpectedly."
             }
+            // U07: the operation's next take was waiting for this file.
+            self.promoteQueuedLiveSession()
         }
     }
 }

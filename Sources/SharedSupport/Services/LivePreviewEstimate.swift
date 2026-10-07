@@ -30,17 +30,23 @@ struct LivePreviewEstimate: Equatable, Sendable {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return 0 }
 
-        let words = trimmed
+        // P08-07: an unspaced Chinese or Japanese run is one "word" and reads
+        // far slower than 16 characters per second, so CJK characters are
+        // timed apart, per character (per syllable block in Korean), and the
+        // rest of the text keeps the word and character rates below.
+        let script = CJKScriptCount(text: trimmed)
+        let rest = script.textWithoutCJK
+        let words = rest
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .count
-        let nonWhitespaceCharacters = trimmed.reduce(into: 0) { count, character in
+        let nonWhitespaceCharacters = rest.reduce(into: 0) { count, character in
             if !character.isWhitespace {
                 count += 1
             }
         }
         let punctuationPauses = trimmed.reduce(into: 0) { count, character in
-            if ".!?;:,\n".contains(character) {
+            if ".!?;:,\n。！？；：，、".contains(character) {
                 count += 1
             }
         }
@@ -50,6 +56,53 @@ struct LivePreviewEstimate: Equatable, Sendable {
         let wordEstimate = Double(words) / wordsPerSecond
         let characterEstimate = Double(nonWhitespaceCharacters) / charactersPerSecond
         let pauseEstimate = Double(punctuationPauses) * 0.08
-        return max(0.8, max(wordEstimate, characterEstimate) + pauseEstimate)
+        return max(0.8, script.estimatedSeconds + max(wordEstimate, characterEstimate) + pauseEstimate)
+    }
+}
+
+/// Han, kana and Hangul in a script, with the speaking rates of the committed
+/// benchmark takes that `AudioSpeakingRateQC` cites: a median 0.26 s per
+/// character in Chinese and 0.22 s in Japanese (Han read among kana counts as
+/// Japanese). Korean has no committed take yet and borrows the Japanese rate,
+/// as the speaking-rate QC does. The Unicode blocks match that QC's.
+private struct CJKScriptCount {
+    let han: Int
+    let kana: Int
+    let hangul: Int
+    /// The text with every counted character replaced by a space.
+    let textWithoutCJK: String
+
+    init(text: String) {
+        let space: Unicode.Scalar = " "
+        var han = 0
+        var kana = 0
+        var hangul = 0
+        var rest = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x3040...0x30FF, 0x31F0...0x31FF, 0xFF66...0xFF9F:
+                kana += 1
+                rest.append(space)
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+                han += 1
+                rest.append(space)
+            case 0x1100...0x11FF, 0x3130...0x318F, 0xAC00...0xD7AF:
+                hangul += 1
+                rest.append(space)
+            default:
+                rest.append(scalar)
+            }
+        }
+        self.han = han
+        self.kana = kana
+        self.hangul = hangul
+        textWithoutCJK = String(rest)
+    }
+
+    var estimatedSeconds: TimeInterval {
+        let chineseSecondsPerCharacter = 0.26
+        let japaneseSecondsPerCharacter = 0.22
+        let hanSeconds = kana > 0 ? japaneseSecondsPerCharacter : chineseSecondsPerCharacter
+        return Double(han) * hanSeconds + Double(kana + hangul) * japaneseSecondsPerCharacter
     }
 }

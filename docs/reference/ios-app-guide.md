@@ -457,7 +457,9 @@ hold a mixable claim, and the recorder holds `.record` (which outranks playback 
 session deactivates with `.notifyOthersOnDeactivation` only when the last claim is released, and
 the default category is restored afterwards. `IOSPlaybackExclusivity` keeps one player audible:
 a starting player or recording pauses the others, and a paused live preview does not resume on
-its next chunk. Leaving the foreground drops every claim and hands the session back; until the app
+its next chunk. A Pause, an interruption, unplugged headphones or another player (even while the
+preview is still buffering or the take has no chunk yet) holds the take: no chunk, underrun
+recovery or final-file handoff plays it again, only Play; an underrun alone resumes on its own. Leaving the foreground drops every claim and hands the session back; until the app
 is active again a claim changes nothing, so a late live chunk or an interruption ending in the
 background cannot reactivate the session. `AVAudioPlayer` players claim without blocking
 (`activateAsync`); only the player sheet's load and the recorder's start use the blocking

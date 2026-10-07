@@ -2,6 +2,12 @@ import Foundation
 import QwenVoiceCore
 import XCTest
 
+/// Records the VoiceOver announcements a coordinator posts.
+@MainActor
+private final class AnnouncementRecorder {
+    var messages: [String] = []
+}
+
 /// AUD-03: the macOS Studio start and cancel path (`MacStudioSingleTakeRunner`)
 /// on the real attempt-scoped `StudioGenerationCoordinator` with a fake engine.
 /// The runner owns the take's task and the coordinator retains it; only the
@@ -114,6 +120,40 @@ final class MacStudioSingleTakeRunnerTests: XCTestCase {
         XCTAssertEqual(coordinator.errorMessage, "engine write failed")
         XCTAssertNil(coordinator.lastCompletedOutput)
         XCTAssertTrue(engine.completedResults.isEmpty)
+    }
+
+    /// U23: the store's critical memory guard (or the engine's critical trim)
+    /// cancels the take while nobody asked for it. The take must say why, with
+    /// the localized notice and its announcement, instead of leaving an idle
+    /// Studio with no card, no message and nothing for VoiceOver.
+    func testAnEngineCancellationNobodyRequestedEndsWithTheMemoryNotice() async throws {
+        let announcements = AnnouncementRecorder()
+        let presentation = IOSAppLanguage.shared.presentation
+        let coordinator = StudioGenerationCoordinator(mode: .custom, announce: { announcements.messages.append($0) })
+        let engine = FakeEngine()
+
+        let plan = try makePlan()
+        XCTAssertTrue(startTake(plan, on: coordinator, engine: engine))
+        let task = try XCTUnwrap(coordinator.generationTask)
+        await engine.waitUntilGenerating()
+        engine.finishGeneration(.failure(CancellationError()))
+        await task.value
+
+        XCTAssertEqual(engine.events, [.submitted, .generated, .cancelled(materialized: false)],
+                       "the executor still owns the cancelled take's cleanup")
+        XCTAssertFalse(coordinator.isGenerating)
+        XCTAssertNil(coordinator.activeAttempt)
+        XCTAssertEqual(coordinator.errorMessage, presentation.generationStoppedToFreeMemory)
+        XCTAssertNil(coordinator.lastCompletedOutput)
+        XCTAssertTrue(engine.completedResults.isEmpty)
+        XCTAssertEqual(announcements.messages, [presentation.announceGenerationStarted, presentation.generationStoppedToFreeMemory])
+        let next = FakeEngine()
+        next.finishGeneration(.success(next.result))
+        XCTAssertTrue(startTake(plan, on: coordinator, engine: next), "the next take is not refused")
+        let nextTask = try XCTUnwrap(coordinator.generationTask)
+        await nextTask.value
+        XCTAssertNil(coordinator.errorMessage, "a new take clears the notice")
+        XCTAssertEqual(next.completedResults, [next.result])
     }
 
     // MARK: - Cancel

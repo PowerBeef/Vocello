@@ -108,6 +108,11 @@ enum IOSSingleTakeGenerationExecutor {
     /// the take exists and no cancellation was accepted, and the attempt owner
     /// refuses cancellation from then on, so completion (History, export) cannot
     /// be overtaken by a Stop. It returns false when a cancellation won the race.
+    ///
+    /// Every cancellation rethrows `CancellationError` after the same cleanup,
+    /// including one the engine or the store chose itself (memory pressure). The
+    /// owner tells them apart: a Studio attempt nobody asked to stop closes
+    /// through `StudioGenerationCoordinator.finishEngineCancellation` (U23).
     static func run(
         plan: IOSSingleTakeGenerationPlan,
         hooks: any IOSSingleTakeGenerationExecutionHooks,

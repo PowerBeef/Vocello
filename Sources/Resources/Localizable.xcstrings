@@ -68353,6 +68353,72 @@
         }
       }
     },
+    "vocello.error.generation_stopped_memory_pressure": {
+      "comment": "Studio notice, also announced to VoiceOver, when the app stopped a take on its own because the device ran critically low on memory (not a Stop the user pressed). The unfinished take was discarded, never saved to History.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello stopped this take to free memory, so it was not saved. Close other apps, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello a arrêté cette prise pour libérer de la mémoire, qui n’a donc pas été enregistrée. Fermez d’autres apps, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello detuvo esta toma para liberar memoria, así que no se guardó. Cierra otras apps y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello hat diese Aufnahme beendet, um Speicher freizugeben, daher wurde sie nicht gesichert. Schließe andere Apps und versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ha interrotto questo take per liberare memoria, quindi non è stato salvato. Chiudi le altre app, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello interrompeu esta tomada para liberar memória, por isso ela não foi salva. Feche outros apps e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 已停止此音频以释放内存，因此未保存。请关闭其他应用，然后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はメモリを解放するためにこのテイクを停止したため、保存されませんでした。ほかのアプリを閉じてから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 메모리를 확보하기 위해 이 테이크를 중지했으며 저장되지 않았습니다. 다른 앱을 닫은 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello остановил этот дубль, чтобы освободить память, поэтому он не сохранён. Закройте другие приложения и повторите попытку."
+          }
+        }
+      }
+    },
     "vocello.error.generation_runtime_failed": {
       "comment": "Studio error after the on-device voice engine failed while a take was generating. The take was discarded; retrying generates a new one. Engine failure code runtime.failed.",
       "extractionState": "manual",

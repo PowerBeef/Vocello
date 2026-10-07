@@ -83,7 +83,10 @@ enum MacStudioSingleTakeRunner {
                     onCompleted(result)
                 }
             } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
+                // The shared executor owns cancellation cleanup and telemetry. A
+                // cancellation nobody asked for is the engine's or the store's
+                // (memory pressure): the take says why instead of vanishing (U23).
+                coordinator.finishEngineCancellation(attempt: attempt)
             } catch {
                 coordinator.fail(MacInterfaceText.generationFailureMessage(error), attempt: attempt)
             }

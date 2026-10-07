@@ -535,7 +535,10 @@ struct IOSCustomVoiceView: View {
                 )
                 if accepted { IOSHaptics.success() }
             } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
+                // The shared executor owns cancellation cleanup and telemetry. A
+                // cancellation nobody asked for is the engine's or the store's
+                // (memory pressure): the take says why instead of vanishing (U23).
+                if coordinator.finishEngineCancellation(attempt: attempt) { IOSHaptics.warning() }
             } catch {
                 let accepted = coordinator.fail(
                     IOSAppLanguage.shared.presentation.generationFailureMessage(error),
@@ -1359,7 +1362,10 @@ struct IOSVoiceDesignView: View {
                     IOSHaptics.success()
                 }
             } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
+                // The shared executor owns cancellation cleanup and telemetry. A
+                // cancellation nobody asked for is the engine's or the store's
+                // (memory pressure): the take says why instead of vanishing (U23).
+                if coordinator.finishEngineCancellation(attempt: attempt) { IOSHaptics.warning() }
             } catch {
                 let accepted = coordinator.fail(
                     IOSAppLanguage.shared.presentation.generationFailureMessage(error),
@@ -2118,7 +2124,10 @@ struct IOSVoiceCloningView: View {
                 )
                 if accepted { IOSHaptics.success() }
             } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
+                // The shared executor owns cancellation cleanup and telemetry. A
+                // cancellation nobody asked for is the engine's or the store's
+                // (memory pressure): the take says why instead of vanishing (U23).
+                if coordinator.finishEngineCancellation(attempt: attempt) { IOSHaptics.warning() }
             } catch {
                 let accepted = coordinator.fail(
                     IOSAppLanguage.shared.presentation.generationFailureMessage(error),

@@ -56,6 +56,9 @@ final class StudioGenerationCoordinator {
     /// `MacInterfaceText` on macOS (PA-20).
     @ObservationIgnored private let presentation: @MainActor () -> VocelloPresentationText
 
+    /// Posts one VoiceOver announcement per transition; tests record them.
+    @ObservationIgnored private let announce: @MainActor (String) -> Void
+
     var activeAttempt: StudioGenerationAttemptToken? {
         attemptAuthority.currentToken
     }
@@ -90,10 +93,12 @@ final class StudioGenerationCoordinator {
 
     init(
         mode: GenerationMode,
-        presentation: @escaping @MainActor () -> VocelloPresentationText = { IOSAppLanguage.shared.presentation }
+        presentation: @escaping @MainActor () -> VocelloPresentationText = { IOSAppLanguage.shared.presentation },
+        announce: @escaping @MainActor (String) -> Void = { StudioGenerationAnnouncer.post($0) }
     ) {
         self.mode = mode
         self.presentation = presentation
+        self.announce = announce
     }
 
     /// Marks a generation attempt as started. Clears any prior error.
@@ -108,7 +113,7 @@ final class StudioGenerationCoordinator {
         lastCompletedOutput = nil
         liveItem = live
         isGenerating = true
-        StudioGenerationAnnouncer.post(presentation().announceGenerationStarted)
+        announce(presentation().announceGenerationStarted)
         return attempt
     }
 
@@ -179,7 +184,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.completeCancellation(attempt) else { return false }
         errorMessage = nil
         clearTerminalState()
-        StudioGenerationAnnouncer.post(presentation().announceGenerationStopped)
+        announce(presentation().announceGenerationStopped)
         return true
     }
 
@@ -199,7 +204,27 @@ final class StudioGenerationCoordinator {
         )
         errorMessage = message
         clearTerminalState()
-        StudioGenerationAnnouncer.post(presentation().announceGenerationFailed(message))
+        announce(presentation().announceGenerationFailed(message))
+        return true
+    }
+
+    /// U23: closes an attempt whose take the engine or the store cancelled on its
+    /// own, with a notice and its announcement, so the take never just vanishes
+    /// with an idle Generate button. While the app runs only memory pressure
+    /// does that: the store's critical memory guard, an iPhone memory warning or
+    /// the engine's critical kernel trim. A cancellation the attempt owner asked
+    /// for (Stop, leaving the foreground) is closed by its engine barrier instead,
+    /// and a cancelled Swift task means its owner stopped it: both return false
+    /// and change nothing. Call it from the take's own task when the executor
+    /// reported a cancellation.
+    @discardableResult
+    func finishEngineCancellation(attempt: StudioGenerationAttemptToken) -> Bool {
+        guard !Task.isCancelled, attemptAuthority.isRunning(attempt),
+              attemptAuthority.finishGeneration(attempt) else { return false }
+        let message = presentation().generationStoppedToFreeMemory
+        errorMessage = message
+        clearTerminalState()
+        announce(message)
         return true
     }
 
@@ -224,7 +249,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.finishGeneration(attempt) else { return false }
         lastCompletedOutput = item
         clearTerminalState()
-        StudioGenerationAnnouncer.post(presentation().announceTakeReady)
+        announce(presentation().announceTakeReady)
         return true
     }
 
@@ -237,7 +262,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.finishGeneration(attempt) else { return false }
         errorMessage = message
         clearTerminalState()
-        StudioGenerationAnnouncer.post(presentation().announceGenerationFailed(message))
+        announce(presentation().announceGenerationFailed(message))
         return true
     }
 

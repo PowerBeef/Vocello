@@ -713,6 +713,15 @@ struct VocelloPresentationText: Sendable {
         }
     }
 
+    /// U23: Studio notice when the app stopped a take on its own to free memory
+    /// (the critical memory guard, an iPhone memory warning or the engine's
+    /// critical memory trim), never for a Stop the user pressed.
+    var generationStoppedToFreeMemory: String {
+        localization.string(localized: "vocello.error.generation_stopped_memory_pressure",
+            defaultValue: "Vocello stopped this take to free memory, so it was not saved. Close other apps, then try again.",
+            comment: "Studio notice, also announced to VoiceOver, when the app stopped a take on its own because the device ran critically low on memory (not a Stop the user pressed). The unfinished take was discarded, never saved to History.")
+    }
+
     func cancellationCouldNotFinish(details: String) -> String {
         let format = localization.string(localized: "vocello.error.cancellation_not_finished",
             defaultValue: "Cancellation could not finish safely: %1$@",

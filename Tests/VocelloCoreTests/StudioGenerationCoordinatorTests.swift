@@ -6,6 +6,12 @@ private struct CoordinatorFixtureBarrierFailure: LocalizedError {
     var errorDescription: String? { "fixture barrier failure" }
 }
 
+/// Records the VoiceOver announcements a coordinator posts.
+@MainActor
+private final class AnnouncementRecorder {
+    var messages: [String] = []
+}
+
 /// PA-19: the attempt-scoped Studio lifecycle both apps render. The pure
 /// transitions are pinned by `StudioGenerationAttemptAuthorityTests`; these tests
 /// hold the observable coordinator itself: what each transition publishes, which
@@ -209,6 +215,52 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
             coordinator.backgroundInterruptionNotice,
             "A notice claiming the work stopped cleanly would contradict the error"
         )
+    }
+
+    /// U23: a take the engine or the store cancelled on its own (memory
+    /// pressure) ends with the localized notice and its announcement instead of
+    /// a silent idle Studio; a cancellation the owner asked for is left to its
+    /// engine barrier.
+    func testAnEngineCancellationEndsTheAttemptWithTheMemoryNoticeAndAnnouncesIt() async throws {
+        let announcements = AnnouncementRecorder()
+        let presentation = IOSAppLanguage.shared.presentation
+        let coordinator = StudioGenerationCoordinator(mode: .custom, announce: { announcements.messages.append($0) })
+        let attempt = try XCTUnwrap(coordinator.start(live: liveItem()))
+        let task = pendingTask()
+        defer { task.cancel() }
+        coordinator.installGenerationTask(task, for: attempt)
+
+        XCTAssertFalse(coordinator.finishEngineCancellation(attempt: StudioGenerationAttemptToken()), "A stale token is rejected")
+        XCTAssertTrue(coordinator.finishEngineCancellation(attempt: attempt))
+        XCTAssertEqual(coordinator.errorMessage, presentation.generationStoppedToFreeMemory)
+        XCTAssertFalse(coordinator.isGenerating)
+        XCTAssertNil(coordinator.activeAttempt)
+        XCTAssertNil(coordinator.liveItem)
+        XCTAssertNil(coordinator.generationTask)
+        XCTAssertNil(coordinator.lastCompletedOutput, "A cancelled take never surfaces a result")
+        XCTAssertEqual(announcements.messages, [presentation.announceGenerationStarted, presentation.generationStoppedToFreeMemory])
+        XCTAssertFalse(coordinator.finishEngineCancellation(attempt: attempt), "A duplicate terminal is rejected")
+        XCTAssertFalse(coordinator.finish(attempt: attempt), "The deferred finish no longer clears it")
+        XCTAssertEqual(coordinator.errorMessage, presentation.generationStoppedToFreeMemory)
+
+        // A Stop the user pressed stays the barrier's to close, and says nothing about memory.
+        let stopped = try XCTUnwrap(coordinator.start())
+        XCTAssertEqual(coordinator.requestCancellation(cancelsTask: false), stopped)
+        XCTAssertFalse(coordinator.finishEngineCancellation(attempt: stopped))
+        XCTAssertTrue(coordinator.isGenerating)
+        XCTAssertTrue(coordinator.completeCancellation(attempt: stopped))
+        XCTAssertNil(coordinator.errorMessage)
+        XCTAssertEqual(announcements.messages.last, presentation.announceGenerationStopped)
+
+        // From a cancelled task, the owner stopped the take: nothing changes.
+        let owned = try XCTUnwrap(coordinator.start())
+        let fromCancelledTask = await Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return coordinator.finishEngineCancellation(attempt: owned)
+        }.value
+        XCTAssertFalse(fromCancelledTask)
+        XCTAssertTrue(coordinator.isAttemptRunning)
+        XCTAssertTrue(coordinator.finish(attempt: owned))
     }
 
     func testLiveItemUpdatesApplyOnlyToTheRunningAttempt() throws {

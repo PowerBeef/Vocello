@@ -260,6 +260,74 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         XCTAssertEqual(IOSSavedOutputsDestination.exportIssue, .copyFailed)
     }
 
+    /// P10-09: a Built-in copy that refreshes a stale bookmark rewrites the
+    /// stored bookmark for the same folder. A paid take waiting on the access
+    /// check is still copied once access verifies; only choosing or clearing
+    /// the folder ends its wait.
+    func testAWaitingPaidTakeStillCopiesWhenABookmarkRefreshRewritesTheSameFolder() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let client = FolderCopyExportClient()
+        client.entitlements = [IOSExportTransaction(id: 1, productID: IOSExportAccessPolicy.productID,
+                                                    verified: true, nonConsumable: true, revoked: false)]
+        let purchases = IOSExportPurchaseState(client: client)
+        let entered = expectation(description: "entitlement scan running")
+        client.scanEntered = { entered.fulfill() }
+        let destination = folder.appendingPathComponent("design_take.wav")
+
+        let copy = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: try clip("design_take.wav").path, generationMode: "design", purchases: purchases
+        ))
+        await fulfillment(of: [entered], timeout: 2)
+
+        // What the refresh stores: other bookmark bytes that resolve to the same folder.
+        let original = try folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        let refreshed = try folder.bookmarkData(
+            options: [],
+            includingResourceValuesForKeys: [.localizedNameKey, .isHiddenKey, .creationDateKey, .contentModificationDateKey],
+            relativeTo: nil
+        )
+        XCTAssertNotEqual(refreshed, original, "the refresh must change the stored bytes for this test to hold")
+        let choice = IOSSavedOutputsDestination.folderChoice
+        IOSSavedOutputsDestination.storeRefreshedBookmark(refreshed)
+        XCTAssertEqual(IOSSavedOutputsDestination.folderChoice, choice, "a refresh is not a new folder choice")
+        let free = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: try clip("custom_take.wav").path, generationMode: "custom", purchases: purchases
+        ))
+        let freeCopied = await free.value
+        XCTAssertTrue(freeCopied)
+
+        client.settleScan()
+        let copied = await copy.value
+        XCTAssertTrue(copied, "the waiting copy belongs to the same folder choice")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
+    }
+
+    /// Choosing a folder again while a paid take waits ends that take's wait:
+    /// its copy never lands on the new choice.
+    func testAWaitingPaidTakeIsDroppedWhenTheFolderIsChosenAgain() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let client = FolderCopyExportClient()
+        client.entitlements = [IOSExportTransaction(id: 1, productID: IOSExportAccessPolicy.productID,
+                                                    verified: true, nonConsumable: true, revoked: false)]
+        let purchases = IOSExportPurchaseState(client: client)
+        let entered = expectation(description: "entitlement scan running")
+        client.scanEntered = { entered.fulfill() }
+        let copy = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: try clip("clone_take.wav").path, generationMode: "clone", purchases: purchases
+        ))
+        await fulfillment(of: [entered], timeout: 2)
+
+        let other = root.appendingPathComponent("Other", isDirectory: true)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try IOSSavedOutputsDestination.setFolder(other)
+        client.settleScan()
+        let copied = await copy.value
+        XCTAssertFalse(copied)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: other.appendingPathComponent("clone_take.wav").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("clone_take.wav").path))
+    }
+
     func testPolicySeesTheSavedRowsModeNotAnyCurrentSelection() throws {
         try IOSSavedOutputsDestination.setFolder(folder)
         var seen: [IOSExportProvenance] = []

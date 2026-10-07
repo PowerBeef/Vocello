@@ -20,6 +20,7 @@ public enum IOSSavedOutputsDestination {
         static let bookmark = "vocello.ios.savedOutputs.bookmark"
         static let displayName = "vocello.ios.savedOutputs.displayName"
         static let exportIssue = "vocello.ios.savedOutputs.exportIssue"
+        static let folderChoice = "vocello.ios.savedOutputs.folderChoice"
     }
 
     /// Why the last automatic copy did not reach the chosen folder.
@@ -44,6 +45,16 @@ public enum IOSSavedOutputsDestination {
     /// The last automatic copy's failure, or `nil` once a copy landed or the folder changed.
     public static var exportIssue: ExportIssue? {
         defaults.string(forKey: Keys.exportIssue).flatMap(ExportIssue.init(rawValue:))
+    }
+
+    /// Which folder choice a copy belongs to (P10-09). Only choosing or clearing
+    /// the folder moves it on. A stale bookmark's refresh rewrites the stored
+    /// bookmark bytes for the same folder, so the bytes cannot tell a copy
+    /// whether the user changed the folder meanwhile; this can.
+    static var folderChoice: Int { defaults.integer(forKey: Keys.folderChoice) }
+
+    private static func beginNewFolderChoice() {
+        defaults.set(folderChoice &+ 1, forKey: Keys.folderChoice)
     }
 
     private static func recordExportIssue(_ issue: ExportIssue?) {
@@ -72,6 +83,7 @@ public enum IOSSavedOutputsDestination {
         let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
         defaults.set(bookmark, forKey: Keys.bookmark)
         defaults.set(url.lastPathComponent, forKey: Keys.displayName)
+        beginNewFolderChoice()
         recordExportIssue(nil)
     }
 
@@ -79,6 +91,7 @@ public enum IOSSavedOutputsDestination {
     public static func clearFolder() {
         defaults.removeObject(forKey: Keys.bookmark)
         defaults.removeObject(forKey: Keys.displayName)
+        beginNewFolderChoice()
         recordExportIssue(nil)
     }
 
@@ -99,10 +112,16 @@ public enum IOSSavedOutputsDestination {
             let didAccess = url.startAccessingSecurityScopedResource()
             defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
             if let refreshed = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
-                defaults.set(refreshed, forKey: Keys.bookmark)
+                storeRefreshedBookmark(refreshed)
             }
         }
         return url
+    }
+
+    /// A stale bookmark's replacement for the same folder: the folder choice,
+    /// and every copy waiting on it, stays as it was (P10-09).
+    static func storeRefreshedBookmark(_ bookmark: Data) {
+        defaults.set(bookmark, forKey: Keys.bookmark)
     }
 
     /// App entry over the one purchase owner. A paid-mode clip that finishes before the launch
@@ -123,11 +142,12 @@ public enum IOSSavedOutputsDestination {
         }
         // An earlier failure stays reported; the deferred copy below clears it only if it lands.
         if exportIssue == nil { recordExportIssue(.accessUnverified) }
-        let resolvedBookmark = defaults.data(forKey: Keys.bookmark)
+        let choice = folderChoice
         return Task { @MainActor in
             await purchases.refresh()
-            // A folder chosen or cleared meanwhile ended this clip's report.
-            guard defaults.data(forKey: Keys.bookmark) == resolvedBookmark else { return false }
+            // A folder chosen or cleared meanwhile ended this clip's report. A
+            // stale bookmark refreshed by another copy is the same folder.
+            guard folderChoice == choice else { return false }
             if let copy = exportIfConfigured(
                 internalAudioPath: internalAudioPath, generationMode: generationMode,
                 permits: { purchases.permits([$0]) }
@@ -163,8 +183,8 @@ public enum IOSSavedOutputsDestination {
         let source = URL(fileURLWithPath: internalAudioPath)
         // The copy's outcome belongs to the folder it resolved; if the user clears or re-picks
         // the folder meanwhile (which clears the issue), a late result must not land on the new
-        // choice.
-        let resolvedBookmark = defaults.data(forKey: Keys.bookmark)
+        // choice. Another copy refreshing a stale bookmark is not a new choice (P10-09).
+        let choice = folderChoice
         return Task.detached(priority: .utility) {
             let didAccess = folder.startAccessingSecurityScopedResource()
             defer { if didAccess { folder.stopAccessingSecurityScopedResource() } }
@@ -184,7 +204,7 @@ public enum IOSSavedOutputsDestination {
             }
             let landed = copied && coordinationError == nil
             await MainActor.run {
-                if defaults.data(forKey: Keys.bookmark) == resolvedBookmark {
+                if folderChoice == choice {
                     recordExportIssue(landed ? nil : .copyFailed)
                 }
             }

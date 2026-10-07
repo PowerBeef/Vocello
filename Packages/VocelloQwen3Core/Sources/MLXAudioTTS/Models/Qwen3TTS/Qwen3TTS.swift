@@ -1103,6 +1103,35 @@ private final class CachedConditioningPrefixBox: @unchecked Sendable {
     }
 }
 
+/// The model-relative part of a conditioning-prefix cache key (P02-08, P05-07).
+/// A cached prefix holds the instruct tokens embedded on the miss that built it,
+/// and those are the instruction exactly as given, trimmed at its ends only. The
+/// key therefore carries that exact text: two instructions that differ only in
+/// case, line breaks or inner spacing are two prompts and never share an entry,
+/// so an edit to a brief always reaches the model and a request and seed give
+/// the same take whatever the cache held. Language and speaker fold case and
+/// trim because the prefix resolves both that way (`resolvedLanguageIdentifier`,
+/// `speakerTokenEmbeddings`).
+enum Qwen3ConditioningPrefixCacheKey {
+    static func customVoice(language: String, speaker: String, instruction: String?) -> String {
+        "custom|\(folded(language))|\(folded(speaker))|\(embeddedInstruction(instruction))"
+    }
+
+    static func voiceDesign(language: String, voiceDescription: String) -> String {
+        "design|\(folded(language))|\(embeddedInstruction(voiceDescription))"
+    }
+
+    /// The instruct text the prefix embeds: trimmed as `buildConditioningPrefix`
+    /// trims it, otherwise untouched; empty when there is none.
+    static func embeddedInstruction(_ instruction: String?) -> String {
+        instruction?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private static func folded(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
 private final class Qwen3TTSConditioningPrefixCache: @unchecked Sendable {
     static let shared = Qwen3TTSConditioningPrefixCache()
 
@@ -1449,17 +1478,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         return trimmedInstruction(instruct)
     }
 
-    private func normalizedConditioningCacheKeyText(_ text: String) -> String {
-        text
-            .replacingOccurrences(
-                of: #"\s+"#,
-                with: " ",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-    }
-
     private func conditioningCacheKey(for mode: String) -> String? {
         guard let preparedKey else { return nil }
         return "\(preparedKey)|\(mode)"
@@ -1511,19 +1529,21 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     }
 
     private func prefixCacheKeyForCustomVoice(language: String, speaker: String, instruct: String?) -> String? {
-        let normalizedLanguage = language.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedSpeaker = speaker.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedInstruction = trimmedInstruction(instruct)?.lowercased() ?? ""
-        return conditioningCacheKey(
-            for: "custom|\(normalizedLanguage)|\(normalizedSpeaker)|\(normalizedInstruction)"
+        conditioningCacheKey(
+            for: Qwen3ConditioningPrefixCacheKey.customVoice(
+                language: language,
+                speaker: speaker,
+                instruction: instruct
+            )
         )
     }
 
     private func prefixCacheKeyForVoiceDesign(language: String, voiceDescription: String) -> String? {
-        let normalizedLanguage = language.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedDescription = normalizedConditioningCacheKeyText(voiceDescription)
-        return conditioningCacheKey(
-            for: "design|\(normalizedLanguage)|\(normalizedDescription)"
+        conditioningCacheKey(
+            for: Qwen3ConditioningPrefixCacheKey.voiceDesign(
+                language: language,
+                voiceDescription: voiceDescription
+            )
         )
     }
 

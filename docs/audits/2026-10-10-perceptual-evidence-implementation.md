@@ -157,6 +157,22 @@ The context-window refinement at `170eb020` received a fresh routed check: **2,2
 Source remained fixed during the check; the added context view does not alter strict phone-only
 or whole-clip measurements.
 
+Final cache-only verification used clean source `cf3061eb`, after every worker completed:
+
+| Final run | Result |
+|---|---|
+| `qc-takes-20261010-231206-aafb` | Design context 74/74, Dylan context 80/80 usable; strict crops remain 11/74 and 13/80. Timed candidates remain 13 and 27. |
+| `clone-lane-20261010-231207-64e0` | Clone evidence retained with unchanged register, identity and reference comparisons. |
+| `clone-lane-20261010-231208-d75d` | Identical and octave/speed control measurements unchanged. |
+
+All final gates again exited 4 with current scoring identity. A structural comparison confirms
+existing detector features, strict/recognized crops, discovery intervals, whole-clip acoustic
+summaries, pitch tracks and reference comparisons are identical across the two rounds. Complete
+context availability means that contextual statistics can be inspected, not that individual
+phonation defects or quality dimensions have been assessed. The second receipt records the new
+identity and rationale for re-analysis; the first runs remain intact. All roadmap statuses, gates,
+dependencies and unblock conditions are unchanged from the baseline.
+
 Raw run artifacts, command outputs, gate/report JSON and the clean source checkpoint receipt remain
 ignored under `build/private/qc/perceptual-implementation-20261010/` and the referenced QC run
 directories. Earlier failed/partial evidence remains preserved.

@@ -40,6 +40,9 @@ contracts/privacy/invariants/roadmap. Native builds were not selected for these 
 prior native results remain separate. Hook delivery was observed, persisted trust remains unconfirmed.
 The context-window follow-up at `170eb020` passed a fresh routed check with **2,211 tests plus
 2,597 subtests**, one existing skip; the source tree stayed fixed throughout both full checks.
+Final clean source `cf3061eb` produced three new cache-only runs: context support reaches 74/74
+Design and 80/80 Dylan windows while strict crops, candidate counts and existing measurements stay
+unchanged. All final gates remain NOT_ASSESSED (4); both rounds and rerun rationale are retained.
 Raw evidence and clean-checkpoint receipts remain ignored under
 `build/private/qc/perceptual-implementation-20261010/`; the implementation report lists exact run IDs.
 

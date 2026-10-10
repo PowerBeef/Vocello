@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-10-10
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -15,14 +15,11 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> Architecture review checkpoint: 2026-09-02. At that checkpoint, `project.yml` moved clone-reference transcription
-> review into SharedSupport and registers the pure macOS Design/Clone request factory with its
-> deterministic tests; engine hosting, model delivery, and runtime topology are unchanged.
-> A bounded September 4 audit correction updates the resolved swift-transformers entry below;
-> it does not represent a new whole-architecture review. A bounded September 12 currency pass
-> corrected the facts this document had drifted on (model repositories, persisted keys, caches,
-> caps and counts) and re-read the CI, security and release paragraph against `ci.yml`,
-> `security.yml` and `release.yml`; it is likewise not a whole-architecture review.
+> October 10 takeover checkpoint: source-traced runtime ownership, cancellation and streaming,
+> app/CLI adapters, History recovery, model delivery, diagnostics, and CI/release workflows.
+> This is static architecture verification; it is not fresh model, device, UI, or performance
+> evidence. The [takeover audit](audits/2026-10-10-codex-workflow-audit.md) maps coverage and
+> outstanding boundaries. Historical September checkpoints remain in Git history.
 
 ## TL;DR
 
@@ -50,7 +47,7 @@ build 24 candidate); public facts live in `config/public-product-facts.json`: th
 release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta**.
 
 > For repo conventions,
-> build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
+> build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
 > This document provides the deeper architecture narrative.
 
 ---
@@ -131,20 +128,31 @@ Release packaging is deterministic and does not consume UI results. Frontend evi
 platform-specific and is created only when explicitly requested.
 
 The loop around this table is short. `scripts/dev.sh check` runs lint, contracts, the selected
-tests and the native lanes the dirty tree touches, and is advisory; the only local block is
-`scripts/hooks/commit_lint.sh` (commits on `main` or an agent's `worktree-*` branch, pushes only
-from `main`, clean whitespace, no private path or credential). Push CI on `main` is the gate —
+tests and the native lanes the dirty tree touches, and is advisory. `check --dry-run --json`
+provides the same routing without execution; `doctor` inventories prerequisites and `triage`
+reads retained evidence. Direct repository guards preserve whitespace, privacy, generated-file,
+cache, and Git policy. Trusted Codex hooks add bounded startup context and invoke those guards;
+an inactive hook does not prove a check passed. Scoped local commits and managed worktrees are
+allowed; pushes require an explicit request. Push CI on `main` is the gate —
 `scripts/ci/classify_changes.py` routes each push into the `contracts`, `python`, `macos-tests`,
 `macos-tsan`, `ios-compile`, `website` and `dependency-submission` jobs and `CI required` is the
 single aggregate — and `scripts/dev.sh ci` reproduces that list serially. The timing lanes
 (`scripts/macos_test.sh lang-bench|memory|profile|telemetry-overhead` and the optional `gate` bench,
 `scripts/ios_device.sh bench|lang-bench|memory|gate` and the XCUITest benchmark and perf lanes)
 refuse to start on a busy host through `require_quiet_host` (load within twice the cores, no kernel
-memory pressure, no other holder of the host-wide native lock, no running agent worktree;
+memory pressure, no other holder of the host-wide native lock, no active delegated worker;
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues). A public promotion is routed separately: `promotionRouting` in
 `config/quality-promotion-contract.json` maps the paths changed since the previous release to the
 capability lanes it must prove, and `python3 scripts/quality_promotion.py classify --base <tag>`
 lists them.
+
+Project regeneration and cache freshness share `scripts/project_generation.py`'s signature over
+project specifications, generator inputs, and source/resource membership. Source additions,
+deletions, and renames invalidate it; ordinary content edits retain incremental builds. Worker
+measurement isolation uses live ownership records through `scripts/active_workers.py`, not Git
+worktree lock state. Join or stop delegated work before measured lanes; when lifecycle tracking
+is unavailable, use lead-only execution. See [`reference/development-workflow.md`](reference/development-workflow.md)
+for the operational sequence and hook trust limitations.
 
 **Seven shared schemes**: the five XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
 (iOS app), `VocelloMacUI` (explicit macOS XCUITest), and `VocelloiOSUI` (explicit physical-device
@@ -509,6 +517,43 @@ awaits its terminal barrier before ownership is released or trim/unload begins. 
 a late result after cancellation. Every terminal path restores `loadState` and completes exactly
 once.
 
+The ownership sequence is deliberately split between model termination and product finalization.
+Source authority is [`GenerationOutputAdapter.runReservedTake`](../Sources/QwenVoiceCore/GenerationOutputAdapter.swift),
+[`ActiveGenerationCoordinator`](../Sources/QwenVoiceCore/ActiveGenerationCoordinator.swift), and the owned
+[`VocelloQwen3Engine`](../Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift).
+
+```mermaid
+sequenceDiagram
+    participant H as Host / engine admission
+    participant A as GenerationOutputAdapter
+    participant R as VocelloQwen3Engine actor
+    participant W as WAV / quality / preview
+    H->>A: admitted request + first-reason cancellation ingress
+    A->>R: reserve operation lease
+    A->>R: claim sole audio consumer
+    A->>A: prepare fallible product output
+    A->>R: open reservation
+    R-->>W: lossless frame-bounded audio
+    W->>W: write canonical PCM before matching preview
+    R-->>A: model terminal
+    alt EOS and product output succeeds
+        A->>H: accepted completed(result) event
+        A->>R: acknowledge product published
+    else cancellation or product/model failure
+        A->>R: cancel audio and generation; await terminal
+        A->>R: acknowledge product aborted
+        A-->>H: typed cancellation or failure
+    end
+    R->>R: release operation ownership
+    H->>H: terminal barrier permits trim / unload
+```
+
+Before `open`, an error aborts the inert reservation instead of taking the after-open cancellation
+path. `GenerationOutputAdapterChoreographyTests` exercises this production helper with a scripted
+reservation, including terminal-before-release ordering. It does not execute concrete `run` with
+loaded weights, `EngineReservedTake`, the limiter, file writer, telemetry, and transport together;
+that integration boundary remains explicit in the takeover audit.
+
 ### 4.10 Audio prep & QC
 
 `AudioPreparation.swift` normalizes reference audio to the canonical 24 kHz /
@@ -841,6 +886,13 @@ Indexes `idx_generations_createdAt` on `createdAt` and
 `idx_generations_longFormProjectID` on `longFormProjectID`, and (v7) `idx_generations_audioPath` on `audioPath`. `DatabaseService`
 uses a GRDB `DatabaseQueue` with async, off-main writes (`saveGenerationAsync`).
 
+The versioned migrations remain immutable after shipping. Populated upgrade tests exercise
+the old-schema path separately from fresh creation. One characterized v3 boundary remains:
+rebuilding the table copies surviving row IDs but does not preserve a larger deleted
+AUTOINCREMENT high-water mark (retained ID 41 / deleted ID 900 becomes sequence 41, next ID 42).
+This is tracked separately from workflow migration; do not assume historical IDs remain globally
+unused across that upgrade. See the [takeover audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition).
+
 **Locations** (release vs debug):
 
 - macOS: `~/Library/Application Support/QwenVoice/` (debug: `QwenVoice-Debug/`).
@@ -872,6 +924,32 @@ banner counts it, and every reconcile retries it, never while a row or a queued 
 references the path. An unreadable list is set aside unparsed and a fresh list starts (AUD-05); the
 banner reports it under its own notice until Retry from that notice discards the set-aside lists,
 which hold paths only, without deleting the audio they named (PA-30).
+
+`DatabaseService.openQueue` also repairs moved-container absolute audio paths after schema
+migration. It rewrites only when the old root is gone and the corresponding audio exists under
+the current root; it preserves an unavailable custom macOS output volume. Outbox replay follows
+the same shared `GenerationAudioPathRebase` rule. The October A2-01 restore defect therefore must
+not be inferred from the absolute-path column alone.
+
+```mermaid
+flowchart LR
+    W[Atomic final WAV] --> E[Durable outbox enqueue]
+    E --> C[Idempotent GRDB commit]
+    C -->|accepted| R[Retire outbox intent]
+    E -->|write fails| U[Visible in-session recovery]
+    C -->|database fails| P[Retain durable pending intent]
+    P --> S[Startup / History-open reconcile]
+    S --> C
+    D[Clear / delete request] --> J[Persist bounded deletion journal]
+    J --> Q[Delete selected rows]
+    Q --> A[Durable pending audio removal]
+    A -->|unreferenced and removable| F[Remove WAV / retire journal]
+    A -->|removal fails| S
+```
+
+Long-form acceptance uses its separate journal so a joined take and segment supersession settle
+together. The graph describes publication authority, not every callback: playback can precede
+History acceptance, and an enqueue failure has no durable crash-recovery claim.
 
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
 acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`
@@ -998,6 +1076,15 @@ contract: [`reference/model-delivery.md`](reference/model-delivery.md).
 `QwenVoice/models` store. See [`reference/testing-runbook.md`](reference/testing-runbook.md)
 "Model readiness"
 and [`scripts/lib/test_models.sh`](../scripts/lib/test_models.sh).
+
+The app-lifetime coordinator's background orchestration remains a coverage boundary.
+`restoreInFlightDownloadsIfNeeded` migrates/reconciles the ledger, discards durable cancelled
+requests, recognizes installed files, and requeues valid unfinished requests. Its concrete
+background URLSession, `IOSModelDeliveryBackgroundEventRelay`, and AppPaths wiring are not
+compiled into app-host-free deterministic tests. Pure cancellation, ledger, downloader, and
+integrity tests cover their own owners; they do not jointly prove coordinator restoration,
+task adoption, progress fencing, or durable UIKit completion. The explicit physical-iPhone
+`ui_test.sh ios model-download` lane exercises the app path and remains opt-in.
 
 ---
 
@@ -1226,7 +1313,8 @@ Most-frequent imports across `Sources/**/*.swift`:
 ## 17. Related documents
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
-- [`CLAUDE.md`](../CLAUDE.md) — repo operating manual: build, conventions, engine invariants, dependency pinning, release/QA.
+- [`AGENTS.md`](../AGENTS.md) — repo operating instructions and links to native/tooling safeguards.
+- [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — source-traced takeover findings and coverage map; static review is distinguished from fresh runtime evidence.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
 - Per-subsystem deep-dives in `docs/reference/`:
@@ -1245,3 +1333,23 @@ Most-frequent imports across `Sources/**/*.swift`:
   [`privacy-storage.md`](reference/privacy-storage.md),
   [`macos-permissions.md`](reference/macos-permissions.md),
   [`qwen3-core-maintenance.md`](reference/qwen3-core-maintenance.md).
+
+## 18. Website and developer tooling boundaries
+
+The website is a separate React/Vite surface with SSR/prerender output; it imports public product
+facts and sample metadata rather than the native engine. [`website/package.json`](../website/package.json)
+sequences source/copy contracts, Node tests and rendered-contract checks, a production build, and
+Playwright browser smoke. Native compilation cannot validate web rendering or audio controls;
+website inputs outside `website/` must still select the web CI lane.
+
+[`scripts/dev.sh`](../scripts/dev.sh) is the local routing interface. Repository instructions,
+`.agents/skills`, read-only review/triage agents, and `.codex/hooks.json` point back to canonical
+scripts. Optional MCP servers and verified Axiom diagnostic helpers supply discovery, research,
+debugging, and retained-log/trace analysis; they do not define a second source of build provenance,
+native serialization, performance admissibility, or release authority. Scripts remain usable on
+CI and on hosts without personal plugins.
+
+Use the [takeover coverage map](audits/2026-10-10-codex-workflow-audit.md#coverage-map) when choosing
+verification: helper-level deterministic tests, compile-only bundles, explicit native UI/device
+execution, and measured model lanes answer different questions. A successful build or passing
+schema test never implies background delivery, audible playback, or benchmark qualification.

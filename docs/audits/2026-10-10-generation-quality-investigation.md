@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 reviewed: 2026-10-10
-summary: End-to-end generation investigation, retained quality counterexamples, and a coverage-aware automatic detection proposal.
+summary: End-to-end generation investigation, implemented input/provenance/QC safeguards, installed-model observations and remaining qualification boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationSemantics.swift
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -19,8 +19,10 @@ nonnative-sounding French despite valid settings, and how to detect those failur
 It traces the complete request and audio lifecycle, reconciles the supplied historical reports,
 and proposes experiments that distinguish application defects from model limitations.
 
-It is an investigation and implementation proposal. No generation behavior, detector, threshold,
-model, dependency, release requirement or quality claim was changed by this audit.
+Sections 1–12 preserve the original investigation and proposal at the checkpoint above. They made
+no application or detector changes. Sections 13–14 record the subsequent remediation, validation
+and installed-model observations. Historical findings below are not claims that remediated defects
+still exist; implementation also does not qualify the remaining acoustic acceptance dimensions.
 
 ## Reading map
 
@@ -36,6 +38,8 @@ model, dependency, release requirement or quality claim was changed by this audi
 10. [Validation and engineering sequence](#10-validation-and-engineering-sequence)
 11. [Roadmap reconciliation](#11-roadmap-reconciliation)
 12. [Source index and research](#12-source-index-and-research)
+13. [Remediation implementation](#13-remediation-implementation--october-10)
+14. [Validation and observed limits](#14-remediation-validation-and-observed-limits)
 
 ## 1. Conclusions and priorities
 
@@ -1156,7 +1160,7 @@ same-path mutation and a user edit invalidate stale completion. Temporary recogn
 removed. Conditioning whitespace normalization is shared; iOS snapshots the short-take draft at
 the Generate action. Its transcript editor remains accessible during edits and after ASR failure.
 
-The French bright-presenter starter no longer requests a British accent. User-authored briefs are
+The first French narrator starter no longer requests a British accent. User-authored briefs are
 unchanged; selecting French still does not override an intentionally requested accent. The default
 analysis accepts supported French varieties rather than assuming Metropolitan French.
 
@@ -1187,6 +1191,12 @@ segments retain their own receipts; an assembled output has no invented single s
 Raw prompts, transcripts, private paths and audio are not added to receipt fields. Hashes support
 correlation, not reconstruction. Application build SHA remains unavailable in current runtime
 metadata and is not promised. Optional missing hashes/decoder-history fields mean unavailable.
+
+The implementation and regression coverage are in
+[generation diagnostics](../../Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift),
+[completion ownership](../../Sources/QwenVoiceCore/GenerationOutputAdapter.swift),
+[History migrations](../../Sources/SharedSupport/Database/GenerationMigrations.swift), and
+[the shared cloning draft](../../Sources/iOSSupport/Models/GenerationDrafts.swift).
 
 ### 13.4 Controlled decoder-history diagnosis
 
@@ -1226,3 +1236,153 @@ QC-08's Fast QC v9 silence/finishing/loudness changes retain their existing huma
 and new-lineage prerequisites; no unqualified signal reshaping is activated as an accent fix.
 RF-14's release decision/listening gate remains unchanged. Phone acceptance is deferred. Validation
 and actual installed-asset observations are recorded in the existing development checkpoint.
+
+## 14. Remediation validation and observed limits
+
+### 14.1 Source, execution and evidence ownership
+
+The implementation checkpoint is `0dc0fab4dffa556fdf3c79dd4765e11d4a44101c`. The focused UI
+runner routes are committed at `113fe187`; they select existing test08/test09 journeys rather than
+introducing a second UI driver. Installed-model synthesis/replay used an optimized arm64 Release
+CLI built from the first checkpoint, with executable SHA-256
+`dbec9eeb543a75ff557e86c34b78d786f3e12fd496a6013ddd0711fb22c4bb4d`.
+The private experiment retains the build receipt, clean complete source snapshot, effective seed
+42, request receipt, codec trace, catalog verification, output digests and runner logs. The later
+pitch-control and focused UI runs retain their own clean source identities at `113fe187`.
+
+All known workers were joined before model/native lanes. Live session tracking reported zero
+active, stale or unknown workers. Canonical native serialization, quiet-host/load and memory-pressure
+preflight were retained. No phone, Simulator, model installation, dependency repin, cloud inference,
+publication or human listening was performed. Raw audio, scripts, reference/transcript material,
+unredacted diagnostics and detailed artifacts remain ignored in the private evidence directory
+`build/private/qc/generation-audit-20261010/` and canonical run directories.
+
+### 14.2 Deterministic, compiler, sanitizer and UI checks
+
+| Check | Observed result | Scope and limits |
+| --- | --- | --- |
+| Routed `dev.sh check --since 19358824` | PASS; contracts, privacy, ShellCheck/SwiftLint and 2,110 selected Python tests plus 2,510 subtests; one existing skip. | Selected routing at the implementation checkpoint. |
+| Complete `dev.sh py --all` | PASS; 2,184 tests plus 2,576 subtests; one existing skip. | Frozen source at `113fe187`; separate from the earlier selected suite. |
+| Native `mac-test-20261010-173151` | PASS; 1,421 core tests and 180 runtime tests passed; three expected runtime skips. | Complete, consistent summaries and offline triage PASS. |
+| `tsan-20261010-181435` | PASS; 1,419 core tests passed, two registered skips, zero reported races. | CPU core subset; not Metal/runtime race qualification. |
+| Generic physical-device iOS SDK compile | PASS for app and logic-test bundle. | Compile only; physical-phone acceptance remains deferred. |
+| Optimized macOS UI bundle and CLI | PASS. | Local Xcode 27.0; not qualification on the pinned CI 26.6 compiler. |
+| Focused runner/finalization tests | PASS; 54 tests plus 202 subtests. | Routing and retained-evidence behavior; independent read-only review found no actionable issue. |
+| Final supported VLR receipt-version checks | PASS; 11 focused tests. | Supports versions 2/3; rejects unknown/boolean versions. |
+| Design focused XCUITest | PASS; `macos-xcui-smoke-20261010-220929-aef190f4`, test08, 82.8 s. | Generated completion, enrollment origin/transcription status and cancellation; final triage PASS. |
+| Clone focused XCUITest | PASS; `macos-xcui-smoke-20261010-221133-bbce943a`, test09, 103.8 s. | Saved-reference hydration, retained transcript and generation; final triage PASS. |
+
+The focused UI runs retain their result bundles with campaign retention pins. They do not prove
+ASR accuracy, every one-off transcript transition, all localizations or acoustic quality. Pure tests
+exercise pending recognition, explicit review/audio-only choices, edits, replacement, cancellation
+and stale completion; the new iOS editor compiled but has not been exercised on a phone.
+
+The broader `macos-xcui-smoke-20261010-214221-5dbf1811` run was deliberately interrupted during
+the unchanged ten-language navigation sweep. Window/settings test00 passed in 488.2 s; test01
+was partial. Its exit 130, incomplete summary and interruption explanation remain retained. It
+is not a full smoke PASS or a reproduced product failure. The smaller journeys above are separate
+identities with explicitly narrower coverage. An early Design triage read before terminal metadata
+correctly returned incomplete; the retained final read after cleanup returned PASS.
+
+Earlier failures remain intact: the initial Python fixture/tree-identity failures, native compile
+failure `mac-test-20261010-172830`, and the first decoder command's unsupported argument refusal.
+The compiler expression was simplified without changing sampling identity order; the reruns used
+new identities. No failed evidence was replaced or retrospectively called successful.
+
+### 14.3 Installed Clone acquisition and pitch controls
+
+`clone-lane-20261010-214023-bd1a` exercised the installed speaker embedding, FCPE and SwiftF0
+runners on two retained English/French Clone takes and their actual existing reference WAVs.
+All selected runners completed without failure or timeout. The output-minus-reference register
+measurements were −1.843 semitones for English and +0.852 for French, with 1.26/1.17 seconds of
+agreeing output voicing and 8.66/8.53 seconds of agreeing reference voicing. Whole speaker distances
+were 0.294/0.372. Those are descriptive observations from short takes, not calibrated rejection
+boundaries, confirmed defects or the user's recent failing examples.
+
+The separate `clone-lane-20261010-221423-b26c` run checked acquisition with two controls and the
+four decoder arms below. Identical reference/output audio measured exactly 0 semitones and zero
+whole-speaker distance. Retaining every second PCM16 sample at the original sample rate produced
+the expected octave/speed change and measured +12.032 semitones. Agreeing voiced duration was
+8.66 s for the identity control and 4.25 s for the transformed clip. This verifies the signed
+measurement on these fixtures. The transform also changes duration, formants and aliasing; it is
+not a pitch-only clone-fidelity positive, a representative defect corpus or a tolerance calibration.
+
+Both runs correctly returned strict exit 4, `NOT_ASSESSED`: acquisition completed, but required
+dimensions lacked qualified current boundaries or complete evidence. Frozen thresholds retain
+their old scoring identity and were not rewritten to make these runs appear calibrated. Model
+peak-RSS and elapsed diagnostics are retained; these probes are not memory-qualified performance
+benchmarks and no comparison/publication claim follows from them.
+
+### 14.4 French forensic acquisition exposed a remaining miss
+
+`qc-takes-20261010-214051-aa9e` rescored the retained bright-presenter Design take and historical
+`fr-0101--dylan` through cache-only mode. Audio identities were revalidated; no new model, G2P
+or excerpt inference ran. Original/narrow phone streams and local acoustic windows were available
+for both, yet **neither take produced an agreed local defect event**. In particular, the new view
+does not automatically recover the whispered syllable, false start and inserted-vowel judgments
+recorded for Dylan in the supplied report.
+
+This is a useful negative result. Preserving phonetic detail makes evidence inspectable but cannot
+restore a distinction that recognizers normalize away or consistently mishear. Shared recognizer
+bias, approximate alignment, legitimate rhotic/variety differences and an unspecified target dialect
+remain explicit limits. Strict gate exit 4 prevents “no events” from becoming native-accent,
+whisper or intent acceptance. These failures still require a challenge set and calibrated local
+acoustic/pronunciation measurements, potentially a separately qualified detector; they are not
+solved by adding more broad ASR consensus.
+
+### 14.5 One controlled decoder-history experiment
+
+The fresh experiment `quality-decoder-851fd96943cd` synthesized one short transcript-backed English
+Clone with seed 42 and the installed Speed model. Its actual Auto resolution was English. The v3
+receipt bound the canonical conditioning WAV by full SHA-256. The complete trace had 32 generated
+frames with 16 groups; the diagnostic reencoded reference supplied 205 frames, including the
+existing 500 ms encoder padding. All installed artifacts/tokenizer identities matched the catalog.
+
+Replay `codec-replay-9a764f06-dbca-48cb-a95b-0da77aa46fd8` passed the same generated codes through
+cold incremental, cold 25-frame, reference-primed incremental and reference-primed 25-frame arms.
+All outputs were 2.56 seconds, with exact reference-prefix removal. All four passed signal Fast QC;
+the experiment status remains `replay_complete`, not a global quality PASS.
+
+Cold arms were byte-identical. Reference priming changed the waveform: cold-versus-primed RMS
+difference was approximately 0.003 in the first 80 ms, 0.030 from 80–240 ms, 0.056 from
+240–500 ms, 0.047 from 0.5–1 s and 0.031 thereafter. Primed chunk schedules produced much
+smaller differences (maximum absolute difference at most 0.000916; interval RMS at most 0.000092).
+This demonstrates a decoder-history effect in this fixture, not that the effect is harmful.
+
+The installed pitch/speaker probe above measured these diagnostic WAVs:
+
+| Arm | Signed register relative to reference, semitones | Agreeing output voicing | Whole speaker distance |
+| --- | ---: | ---: | ---: |
+| Cold incremental / cold 25-frame | −0.905 / −0.905 | 1.53 s / 1.53 s | 0.405 / 0.405 |
+| Primed incremental / primed 25-frame | −0.856 / −0.857 | 1.57 s / 1.57 s | 0.344 / 0.344 |
+
+Reference history changed measured register by only about 0.05 semitones here. The embedding
+distance moved descriptively, but no qualified boundary or listening label establishes improved
+identity. One short English phrase cannot establish causality for the user's pitch complaint,
+French accent, other seeds, longer traces, Quality mode or real-time delivery. Reference codes
+were reencoded diagnostically rather than captured from the production prefix. Diagnostic limiting
+and file writing do not prove watermark/final-publication equivalence. Shipping decoder behavior
+therefore remains unchanged pending a failing paired example and broader controlled evidence.
+
+### 14.6 What is complete and what still needs evidence
+
+The engineering corrections are implemented and verified: explicit reference intent, stale-ASR
+ownership, truthful Design enrollment, complete available request/completion provenance, additive
+History persistence, coverage-aware QC, signed acquisition, inspectable French evidence and bounded
+decoder replay. The diagnostic extension and focused smoke routing do not alter benchmark timing
+windows or aggregate definitions. Clone lane v6 names its changed assessment semantics; frozen
+calibration and published comparison keys were not mutated.
+
+The unresolved acceptance work is specific: actual failing Clone/reference and French Design
+requests; paired speaker/register controls across meaningful scripts; held-out native French varieties
+and Anglophone-French challenges; local whispered-syllable, false-start and liaison examples with
+time annotations; and emotion/intent definitions with an abstention policy. Those data are required
+before validating a new detector, tolerance or bounded regenerate/select policy. The supplied
+documents and one retained negative example cannot supply those splits. QC-06 stays in flight;
+QC-08 and RF-14 remain open, with their existing calibration and release-decision gates intact.
+No claim is made that the user can now accept every output without listening.
+
+No new tool installation is needed for the completed mechanisms. Repository scripts remain the
+canonical execution/evidence surface; independent review and applicable Axiom testing/concurrency/
+data guidance informed the checks. Session hook delivery was observed, but doctor still cannot
+establish persisted hook trust. No push or current-source remote CI observation was requested.

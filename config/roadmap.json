@@ -1528,14 +1528,14 @@
       "blockedBy": [
         "QC-03"
       ],
-      "gate": "lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.",
+      "gate": "lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; strict gate exit codes 0/3/1/2/4 distinguish assessed outcomes, execution errors and NOT_ASSESSED coverage; the listening queue opens in the label tool; one real run of each completes with qualified required coverage. Missing, stale or unqualified coverage never counts as PASS.",
       "sourceOfTruth": [
         "docs/reference/qc.md",
         "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Wired: lang-bench and qc-takes run ASR/G2P/phone roles; clone-lane and voice-reliability configure speaker and both pitch roles. QC v2 remains report-only since October 6. October 10 audit: all nine retained feature runs lack pitch/speaker outputs; the 957-take run includes 320 clones but does not assess clone fidelity. Current scoring can return clone-lane PASS with missing clone inputs or an uncalibrated 12-semitone synthetic feature offset. Next: distinguish execution, qualified coverage and per-defect decisions; version/test any exit-contract change and qualify real lane runs. Phone-dependent acceptance remains deferred.",
+      "notes": "Wired: lang-bench and qc-takes run ASR/G2P/phone roles; clone-lane and voice-reliability configure speaker and both pitch roles. QC v2 remains report-only since October 6. The October 10 audit reproduced missing-input and uncalibrated-offset PASS. Remediation now separates execution, coverage and qualification, adds strict exit 4 NOT_ASSESSED with explicit legacy-exit compatibility, tests stale scoring/runner identities and updates wrappers; clone lane v6 names the contract change. Installed two-clone and six-control/replay runs completed acquisition but correctly abstain from acceptance. The retained French cache-only run also abstains. Full per-lane qualified acceptance is not established; phone-dependent work remains deferred.",
       "legacyIds": [
         "BT-05"
       ]
@@ -1555,7 +1555,7 @@
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Historical leads and acceptance limits are documented in the October 10 generation-quality investigation. Remediation implemented: coverage-aware QC/strict NOT_ASSESSED, signed reference register and voiced coverage, current-identity speaker evidence, narrow French phonetic/acoustic forensics, explicit Clone review/audio-only readiness with stale-ASR guards, accent-neutral French starter, actual-audio Design enrollment, durable v3 request/completion receipts with nullable History v8 migration, and identical-codec reference-history diagnostic replay. No shipping decoder change, calibrated accent/whisper/identity acceptance, bounded regeneration or release qualification is claimed. Remaining: actual failing clone pairs and held-out paired reference/variety/local-defect qualification; decoder hypothesis evaluation on shipped weights; QC-08 finishing qualification remains separate. RF-14 retains the quality decision."
+      "notes": "Implemented/tested: strict NOT_ASSESSED coverage, signed reference register/voicing, current speaker identity, narrow French forensics, explicit Clone review/audio-only with stale-ASR guards, neutral French narrator starter, actual-audio Design enrollment, v3 request/completion receipts and nullable History v8 migration, bounded decoder replay. Installed controls measured identity at 0 and octave/speed change at +12.032 semitones. One fixed-codec English replay changes waveform but register by only about 0.05 semitones; no pitch repair is established. Dylan/Design yielded zero agreed local defect events. Native, TSan, full Python, generic iOS compile and focused Mac journeys passed; broad localization smoke remains interrupted/partial. No shipping decoder change, qualified accent/whisper/identity acceptance, regeneration or release qualification. Remaining: actual failing pairs, held-out paired reference/variety/local-defect data and broader causal replay; QC-08 finishing stays separate and RF-14 retains the release decision. Full evidence is in the investigation addendum."
     },
     {
       "id": "QC-08",

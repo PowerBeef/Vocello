@@ -107,11 +107,13 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   (`config/marking-peak-equality.json`).
 - **Audio QA: Fast QC gates, QC v2 reports, the maintainer's ear judges (`docs/reference/qc.md`).**
   Fixed seeds and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 is
-  a report-only diagnostic: its detectors are calibrated on human recordings (`qc.py controls`,
-  `qc.py calibrate`: a take flags only beyond what held-out human speakers do, per language), and 39
-  blind confirmations by ear (`qc.py confirm`, 2026-10-06) found flagged takes no more often unusable
-  than unflagged ones. Its warn means unusual, not defective: it never fails a lane, no detector
-  reaches fail, and no release decision leans on it. Thresholds freeze in
+  a report-only diagnostic: some detectors have historical human-recording calibration (`qc.py controls`,
+  `qc.py calibrate`), while current acceptance requires complete inputs and qualified scoring/runner
+  identities; strict `gate` exits 4 (`NOT_ASSESSED`) when required coverage is unqualified or stale. The 39
+  blind confirmations by ear (`qc.py confirm`, 2026-10-06) did not establish useful defect
+  discrimination. Historical warnings mean unusual, not defective; they do not fail a lane or
+  justify a release decision. A qualified defect still fails the strict gate even if another
+  dimension is incomplete. Thresholds freeze in
   `config/qc/thresholds-v<N>.json`, bound to the scoring code and norms, and are committed before
   `qc.py eval` sets their levels; a model, feature or threshold change is a new version. A listening
   verdict never clears a machine failure. Language verdicts name their recognizer families (Apple

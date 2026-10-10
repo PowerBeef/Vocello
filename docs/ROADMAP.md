@@ -539,7 +539,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
 ### Open items in detail
 
 - **`QC-04`** (planned) — Lanes on QC v2.
-  gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.
+  gate: lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; strict gate exit codes 0/3/1/2/4 distinguish assessed outcomes, execution errors and NOT_ASSESSED coverage; the listening queue opens in the label tool; one real run of each completes with qualified required coverage. Missing, stale or unqualified coverage never counts as PASS.
 
 - **`QC-06`** (in-flight) — Product follow-ups surfaced by QC.
   gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).

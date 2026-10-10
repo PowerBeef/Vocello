@@ -40,13 +40,36 @@ runtime skips and complete/consistent summaries. The final receipt-compatibility
 fixture/tree-identity failures remain retained. Source was frozen for the successful full suite.
 Root changed only the supported receipt-version check after that Python pass; its focused rerun passed.
 
-**Remaining qualification:** QC-06 is in flight; QC-08 and RF-14 remain open. Exact recent failing
-Clone/Design inputs and held-out labeled native-French/whisper/clone-fidelity data are unavailable.
-No automated native-accent or emotional-intent acceptance is established. Installed-asset probes,
-UI execution and decoder observations follow on a committed checkpoint. No phone, model download,
-release decision, benchmark publication or push is included. Local Xcode 27.0 does not qualify the
-pinned CI 26.6 compiler. Hook delivery was observed; persisted trust remains unconfirmed by doctor.
-Raw evidence stays under ignored `build/private/qc/generation-audit-20261010/` and canonical run folders.
+**Completed follow-up validation:** clean implementation source `0dc0fab4` produced the optimized
+CLI and installed-weight decoder replay; focused UI routing/source `113fe187` passed the complete
+Python suite (**2,184 tests plus 2,576 subtests**, one existing skip). TSan
+`tsan-20261010-181435` passed **1,419 core tests**, with two registered skips and no reported races.
+Focused Design test08 (`macos-xcui-smoke-20261010-220929-aef190f4`) and Clone test09
+(`macos-xcui-smoke-20261010-221133-bbce943a`) each passed with complete final evidence/triage;
+their result bundles are pinned. Runner checks passed 54 tests plus 202 subtests and independent
+review. The broad ten-language smoke (`macos-xcui-smoke-20261010-214221-5dbf1811`) was deliberately
+interrupted after test00 passed and during test01; its partial evidence/exit 130 remain retained,
+not a full smoke PASS or product failure.
+
+**Installed-asset observations:** retained Clone run `clone-lane-20261010-214023-bd1a` acquired
+speaker/two-tracker pitch evidence without runner failures. Controls/replay run
+`clone-lane-20261010-221423-b26c` measured the identity control at 0 semitones and the synthetic
+octave/speed control at +12.032. French cache-only run `qc-takes-20261010-214051-aa9e` produced
+no agreed local defect events for Dylan or the retained Design take: the historical perceived
+defects remain undetected. All three strict gates correctly return NOT_ASSESSED. Decoder experiment
+`quality-decoder-851fd96943cd` completed with seed 42 and digest-bound installed bytes: history
+changes the waveform, but measured register changes only about 0.05 semitones in this one short
+English fixture. Fast QC passing all four arms does not establish improved quality or causality.
+The [report's validation addendum](audits/2026-10-10-generation-quality-investigation.md#14-remediation-validation-and-observed-limits)
+records exact scopes, source identity, metrics and the diagnostic reencoding/limiting boundaries.
+
+**Remaining qualification:** QC-04 remains planned, QC-06 in flight, QC-08/RF-14 open. Exact recent
+failing Clone/Design inputs and held-out labeled native-French/whisper/clone-fidelity data are
+unavailable. No automated accent/emotional-intent acceptance or shipping decoder correction is
+established. No phone, download, release decision, performance publication or push is included.
+Local Xcode 27.0 does not qualify pinned CI 26.6. Hook delivery was observed; persisted trust remains
+unconfirmed by doctor. Raw evidence stays under ignored
+`build/private/qc/generation-audit-20261010/` and canonical run folders.
 
 ### October 10 — generation quality investigation
 

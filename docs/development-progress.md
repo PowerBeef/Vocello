@@ -17,6 +17,37 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — stale roadmap reconciliation
+
+Reviewed the 14 stale in-flight items against source, tests, retained runs and existing remote CI.
+Two are now archived with evidence: **PA-05**, whose October 7 secrets-free release rehearsal passed
+packaging, verification and pinned-Xcode upload-command compatibility; and **PA-31**, whose approved
+streaming-state fix now has passing deterministic tests and clean-source Mac smoke. This does not
+claim credentialed release/publication or current-source remote CI.
+
+Four remain open but parked with concrete wake conditions: **ISU-4**, **ISU-5** and **PA-18** await
+physical-iPhone acceptance/capture; **BT-04** retains the deliberately deferred cells-free record
+format, triggered by demonstrated pressure on the 256 KiB cap. The iOS Settings plan is parked too.
+
+Eight return to the planned queue: **F-16**, **AUD-03**, **AUD-11**, **UIF-08**, **PA-19**, **PA-20**,
+**PA-30** and **BT-01**. Their notes distinguish implemented behavior from remaining local code or
+proof. In particular, initial long-form smoke does not prove replacement; CLI telemetry does not prove
+UI perf or memory qualification; post-change benches do not establish the sampler's before/after
+comparison; and the old eight-record memory replay was not found retained. Typed History errors and
+Mac memory calibration are implemented, so their obsolete remaining-work claims were corrected.
+Mixed items retain their non-phone work, while their physical acceptance is explicitly deferred.
+
+**Validation:** strict roadmap validation passes with zero warnings; generated output is fresh.
+Routed contracts and Python checks passed (2,053 tests + 2,483 subtests, one existing skip), and three
+independent read-only reviews found no lost obligations or unsupported closures. The first check hit
+sandbox restrictions on local HTTP/process fixtures; its summary and the successful same-command
+rerun log are retained untracked as `roadmap-reconciliation-20261010-check-01-summary.json` and
+`roadmap-reconciliation-20261010-check-02.log` under the diagnostics artifact directory.
+
+**Next:** keep the release-first plan as the priority; select its next coherent local checkpoint
+without starting phone work. The roadmap remains the sole item ledger and preserves every unfinished
+gate. This reconciliation ran no native/model/device lane, workflow dispatch or publication.
+
 ### October 10 — Codex engineering workflow migration
 
 Codex is the main developer. Root and website `AGENTS.md`, explicit native/tooling reference rules,

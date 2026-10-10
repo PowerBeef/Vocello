@@ -42,7 +42,7 @@
     {
       "id": "ios-settings-2026-08",
       "title": "iOS Settings information architecture and visual alignment",
-      "status": "active",
+      "status": "parked",
       "owner": "ios",
       "adopted": "2026-08-20",
       "goal": "Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.",
@@ -491,7 +491,7 @@
       "id": "F-16",
       "plan": "engineering-review-remediation-2026-08",
       "title": "P1 — transactionally accept long-form projects and replacement segments",
-      "status": "in-flight",
+      "status": "planned",
       "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.",
       "sourceOfTruth": [
         "Sources/iOS/Studio/IOSLongFormProject.swift",
@@ -501,8 +501,8 @@
         "Sources/iOSSupport/Services/DatabaseService.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift"
       ],
-      "updated": "2026-09-15",
-      "notes": "Shared journaled long-form acceptance is implemented on both platforms with fault tests for rollback, reconcile, corrupt state, identity refusal and compatibility, plus bounded-assembly tests; the coherent-tree checkpoint passed. The iOS native acceptance clause passed on September 7 (clean-source smoke 225523-62a57c2f: long-form and regeneration UI, exact initial and replacement transcripts, joined History IDs retained). Open: macOS native long-form/regeneration acceptance, the ownership-policy fixtures named in the gate, candidate acceptance under RF-10, and the September 4 V26-08/V26-10 findings (corrupt journals fail closed but block History without a repair journey; replaced joined WAVs and abandoned session candidates need a retention/ownership policy). Groups VRA-002 to VRA-007; VRA-020 is session-only continuation. Cross-reference F-06 (enqueue failure) and F-08 (terminal ownership). (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-10-10",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Shared journaled acceptance, rollback/reconcile, QC refusal, compatibility, cancellation and suspension tests pass (mac-test-20261010-040414). Corrupt-journal handling now permits unrelated standalone History and bounded private recovery export; the earlier blanket-block finding is obsolete. Clean-source Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 proves initial long-form generation and grouped History only: test06 checks the regeneration control but never performs replacement. Open local work: actual Mac replacement/regeneration acceptance, targeted recovery/export journeys and the full abandon/new-project/relaunch/replacement/delete/clear-all ownership matrix, including bounded replaced/abandoned outputs. RF-10 corrected-candidate qualification remains open. September 7 iOS acceptance is historical; current-candidate physical acceptance (RF-12) is deferred until phone work resumes. See docs/reference/long-form-generation.md; earlier history remains in git.",
       "evidence": [
         "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "commit:df79aa96"
@@ -661,7 +661,7 @@
       "id": "ISU-4",
       "plan": "ios-settings-2026-08",
       "title": "Refine Settings hub and shared purchase sheet; qualify the new navigation",
-      "status": "in-flight",
+      "status": "parked",
       "gate": "Six-entry hub with compact localized title in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.",
       "sourceOfTruth": [
         "Sources/iOS/Settings/SettingsScreen.swift",
@@ -677,8 +677,9 @@
         "file:scripts/repo_invariants.sh",
         "file:Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift"
       ],
-      "updated": "2026-09-21",
-      "notes": "Source hub/purchase-sheet work is implemented. September 21: localization runner PASS ios-xcui-localization-20260921-054309-966a91d7 covered Default, French-Default, AX-L, AX-XXXL and pseudo-AX-XXXL with restoration/crash checks. It exposed a truncated variation selection; the subsequent accessibility-size Menu label fix passed ios-xcui-control-audit-20260921-064147-ef16ae49, including visible-control clipping checks and screenshot inspection at all four sizes. Stateful audit 063335-d71bad24 observed/mutated/restored preferences and variation (9 PASS; 6 explicit blocks). Earlier failures remain retained. Full French accessibility-size coverage, spoken VoiceOver acceptance and successful local purchase lifecycle remain open; the localization pass predates the final picker-label change. See ISU-5 and docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json."
+      "updated": "2026-10-10",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. The Settings hub, detail routes and shared live-price purchase/export-retry sheet are implemented; IOSExportPurchaseTests cover success, pending, cancellation, verification and restore. Historical September 21 localization 054309-966a91d7 and control audit 064147-ef16ae49 passed their configured checks, but localization predates the final picker-label change. Remaining gate is current-source physical Settings/navigation qualification, French accessibility sizes, spoken VoiceOver, reduced effects and successful local purchase lifecycle. Deterministic tests and geometry audits do not establish those outcomes. Phone work is deferred by the maintainer; no completion claimed. See docs/reference/localization.md for retained source distinctions and failures.",
+      "unparkWhen": "A paired physical iPhone is available and the maintainer resumes current-source Settings/localization/accessibility and local purchase qualification, including French accessibility sizes and spoken VoiceOver; retain historical failures and obtain new source-bound evidence."
     },
     {
       "id": "AV-08",
@@ -1094,10 +1095,10 @@
       "id": "ISU-5",
       "plan": "ios-settings-2026-08",
       "title": "AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows",
-      "status": "in-flight",
-      "updated": "2026-09-21",
+      "status": "parked",
+      "updated": "2026-10-10",
       "gate": "Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.",
-      "notes": "September 11 source fixes capped dock growth, restored switch semantics, hid decorative tab icons and adapted App Language rows. September 21 localization 054309-966a91d7 completed all five configured layouts and language restoration. Earlier retained failures proved combined Auto-play title/description exceeded the viewport; accessibility sizes now separate the readable description from the reachable switch. The scroll helper uses bounded fully visible text anchors independent of reveal delta, with captured-geometry regressions. Final accessibility audit 064147-ef16ae49 passed and inspected screenshots confirm the expanded variation label wraps completely. French AX-XXXL and actual VoiceOver speech/role acceptance remain open; geometry and system audits do not establish spoken behavior. Full run IDs and source distinctions: docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. TabDock caps accessibility-size growth, IOSSettingsViews uses semantic toggles and SettingsScreen adapts App Language rows. The captured-bounds scroll regression and September 21 localization/control geometry checks exist; the final variation label wraps. Remaining gate is current-source physical English/French AX-XXXL and pseudo reachability/mutation, plus actual spoken VoiceOver switch-role acceptance. Existing geometry and system audits are historical evidence, not spoken acceptance. Phone work is deferred; retain failures and obtain new source-bound evidence when resumed. See ISU-4 and docs/reference/localization.md.",
       "evidence": [
         "file:Sources/iOS/App/TabDock.swift",
         "file:Sources/iOS/IOSSettingsViews.swift",
@@ -1107,7 +1108,8 @@
         "Sources/iOS/App/TabDock.swift",
         "Sources/iOS/Settings/SettingsScreen.swift",
         "scripts/ui_test.sh"
-      ]
+      ],
+      "unparkWhen": "A paired physical iPhone is available and the maintainer resumes current-source Settings/localization/accessibility and local purchase qualification, including French accessibility sizes and spoken VoiceOver; retain historical failures and obtain new source-bound evidence."
     },
     {
       "id": "AV-13",
@@ -1207,7 +1209,7 @@
     {
       "id": "AUD-03",
       "title": "Studio screens stop owning generation Tasks",
-      "status": "in-flight",
+      "status": "planned",
       "gate": "No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.",
       "sourceOfTruth": [
         "Sources/Views/Studio/MacCustomVoiceScreen.swift",
@@ -1216,9 +1218,9 @@
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P2 policy/refactor): all three macOS Studio views construct generation Tasks, contrary to the native rule, but register them with StudioGenerationCoordinator, which owns cancellation and stale-attempt completion. This does not independently establish a critical race or unowned cancellation. Move construction across the existing boundary without changing request snapshots. See project-review-2026-09-18.md. 2026-09-24: the three macOS Studio screens hand an immutable plan to MacStudioSingleTakeRunner (start, cancel through the engine barrier), tested over the real coordinator with a fake engine; the moved code routes to platform-ui promotion evidence. Open: macOS smoke and the cancellation journey (consent-bound UI lanes), and the iOS Studio views still construct their generation tasks (IOSGenerationModeViews). 2026-09-24: the consented macOS smoke run (macos-xcui-smoke-20260925-025800-7d5e7232) did not reach any test: the runner timed out enabling Automation Mode, which needs authentication on the M6 (infrastructure; maintainer: sudo automationmodetool enable-automationmode-without-authentication, session unlocked). The lane now refuses this before building.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. All three Mac Studio screens delegate immutable generation plans to MacStudioSingleTakeRunner over StudioGenerationCoordinator; fake-driven lifecycle tests pass. Clean-source full Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 passed, including cancellation, resolving the previous Automation Mode verification block. Open implementation: IOSGenerationModeViews still constructs generation tasks in all three modes. Move construction across the existing lifecycle boundary while preserving request snapshots, cancellation and prewarm ownership; verify deterministically. This local code work does not require a phone. Physical iOS acceptance is deferred until device work resumes; no independent critical race is asserted.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-10-10"
     },
     {
       "id": "AUD-04",
@@ -1276,14 +1278,14 @@
     {
       "id": "AUD-11",
       "title": "Use constant-time sampler membership without changing token order",
-      "status": "in-flight",
+      "status": "planned",
       "gate": "The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.",
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P3 optimization): Qwen3SamplerScratch appendRepetitionTokenID uses array.contains; its MLX array cache is invalidated only for a newly appended token, not every repeated token. An outer membership set exists but is not used by this check. Timing impact is unmeasured. Preserve insertion order, seeded parity, package isolation and the owned-package semantic-delta/inventory contract. See project-review-2026-09-18.md. 2026-09-24: the repetition dedup is a set membership test with the ordered index array unchanged; a focused sampler test and the seeded generate-loop replay pass. The consent-given M6 gate bench (no-regression check) is still to run.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Commit 814b664b implements set membership with ordered token storage/cache invalidation preserved; focused sampler and seeded production generate-loop tests pass in the full native suite. Qualified M6 gate benches already exist, so the old claim that none ran is obsolete. However mac-gate-bench-20260925-200552-0c056a16 compares sources that both contain the dedup change; pre-change retained evidence uses different M2 hardware/lineage. Open: a compatible pre/post-change gate comparison establishing no regression, with clean source identities and normal benchmark safeguards. October 10 telemetry parity compares telemetry modes on the same sampler and cannot close this clause. No measured optimization benefit is claimed.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-10-10"
     },
     {
       "id": "AUD-12",
@@ -1304,7 +1306,7 @@
       "id": "UIF-08",
       "plan": "macos-ui-fidelity-2026-09",
       "title": "Native acceptance of the iOS-derived screens on current source",
-      "status": "in-flight",
+      "status": "planned",
       "blockedBy": [],
       "gate": "On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.",
       "sourceOfTruth": [
@@ -1312,23 +1314,8 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "notes": "September 22 consolidated Mac acceptance on c66c5b79: full smoke 145946-95d3a54f PASS 13/13 including all ten languages and the new layout/recovery/content journeys; perf 162034-c8dcee40 passed 9/9 with 100% coverage. Identical source fingerprints include only the unchanged paused marketing edit; no retries or sampling. Required steps, crash checks and restoration passed. Performance retains idle 58.90 ms and Settings 70.45 ms warnings in cleanup-straddling blocks; fully enclosed maxima 16.667/16.797 ms. History scroll/filter maxima 125.72/174.07 ms remain exploratory, with no speedup claim. Dirty-source evidence is not release qualification. Detailed source-bound evidence and earlier separate failures: docs/reference/macos-ios-ui-reset-2026-09.md. Consolidated Mac execution is complete; the gate remains open for iPhone scroll/localization acceptance. No phone was used.",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-05",
-      "title": "Release path works end to end and is rehearsed",
-      "status": "in-flight",
-      "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
-      "sourceOfTruth": [
-        ".github/workflows/release.yml",
-        ".github/actions/native-toolchain/action.yml",
-        "config/toolchain.json",
-        "scripts/supply_chain_contract.py"
-      ],
-      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. 2026-09-22: release jobs moved onto the composite action with a release-tools input (a SHA-pinned gh; the pinned asc was removed by maintainer decision) and release-rehearsal.yml was added; closes when the first rehearsal is green and the altool upload check is done.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Clean committed 2d25ab98 smoke macos-xcui-smoke-20261010-081219-7d9d4c81 passed 13/13 and all seven ledger steps, with matching source fingerprints, ten languages/pseudo, window sizes, Cmd+,, missing models, genuine Studio links and error/retry journeys. UIInteractionPolicyTests contains the captured Pseudo-AX-XXXL anchor regression. Open local proof: the gate requires Mac perf on the same committed source; September 22 consolidated smoke/perf was dirty/exploratory, and October 10 CLI telemetry overhead is a different lane. Preserve that qualification limit and run the smallest missing Mac lane at a coherent checkpoint. Physical iOS scroll/localization acceptance, including Pseudo-AX-XXXL, is deferred until the phone is available. See docs/reference/macos-ios-ui-reset-2026-09.md for historical evidence and retained failures.",
+      "updated": "2026-10-10"
     },
     {
       "id": "PA-08",
@@ -1374,43 +1361,44 @@
     {
       "id": "PA-18",
       "title": "Public claims match what each download ships",
-      "status": "in-flight",
+      "status": "parked",
       "gate": "README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.",
       "sourceOfTruth": [
         "README.md",
         "website/src/sections/Engineering.jsx",
         "config/public-product-facts.json"
       ],
-      "notes": "External audit DOC-01 (High) plus WEB-01, WEB-04, WEB-05, DOC-06, DOC-07, DOC-08, SEC-10, SEC-13 and SEC-15, confirmed 2026-09-22. The v2.4.0 tag contains no AudioSeal code, yet the README describes the watermark and Article 50 marking next to the 2.4.0 download. AudioSeal is absent from the attribution manifest, NOTICES and ORIGINS, and AudioSealGenerator.swift cites a commit that is the UTMOSv2 pin. The website privacy policy update stays ASR-02. 2026-09-24: README, website and release-notes claims are scoped to the build each download ships (AudioSeal marking, Article 50, seed pinning and the 3.0 UI), facts match source, AudioSeal is credited in NOTICES/ORIGINS/the attribution manifest and the UTMOSv2 commit citation is gone, the privacy manifest declares 3B52.1, the website sends security headers (browser smoke passes), and the public-claims contract requires a version label on candidate claims. AudioSeal upstream reconstructed 2026-09-24 (ORIGINS.md): 0.2.0 = GitHub a0ce2564; generator_base.pth identical at every revision. Open: iPhone screenshots show the 2.x UI (device lane).",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. README/site claims are build-scoped, source facts and AudioSeal revision attribution are maintained, and website security-header configuration plus local browser/contracts checks pass. This does not prove deployed headers. The README and Hero explicitly disclose the historical 2.x iPhone capture. Open: replace those historical screenshots with genuine current-source physical-iPhone captures, then review the assets and update the disclosure. Keep the version-scoped claims and historical label until replacement; do not imply 3.0 device acceptance. Phone capture is deferred by the maintainer. Evidence: ORIGINS.md, NOTICES.md, generated attributions, website/vercel.json and the October 10 audit.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-10-10",
+      "unparkWhen": "A physical iPhone is available and the maintainer resumes genuine current-source screenshot capture/review; replace the historical assets before updating their disclosure."
     },
     {
       "id": "PA-19",
       "title": "Orchestrators and the generate loop have unit coverage",
-      "status": "in-flight",
+      "status": "planned",
       "gate": "TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.",
       "sourceOfTruth": [
         "Tests/VocelloCoreTests",
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"
       ],
-      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22: the real gaps were the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site. 2026-09-24: TTSEngineStore, StudioGenerationCoordinator, DatabaseService (real SQLite), IOSExportGate and the iPhone model inventory run over fakes in VocelloCoreTests; a tiny seeded talker drives the production generate loop and synthetic AudioSeal weights cover the marking transform in Qwen3RuntimeTests; the defect found became PA-31. 2026-09-25: the long-form coordinator and runner run over a fake engine (LivePreviewEstimate moved to SharedSupport; production services injected with defaults). Open: the macOS model manager with a downloader seam (its own test target, because of name collisions) and IOSModelDownloadCoordinator.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. TTSEngineStore, StudioGenerationCoordinator, real SQLite persistence, IOSExportGate, iPhone model inventory and long-form coordinator/runner tests exist and pass (mac-test-20261010-040414). Seeded tiny talker/production generate-loop and synthetic AudioSeal call-site fixtures also pass. Open deterministic coverage: the Mac ModelManagerViewModel downloader seam and separate target (name collisions), and concrete IOSModelDownloadCoordinator orchestration. Shared downloader helper tests do not establish those boundaries; this local implementation/testing work does not need a phone. DA-13 also retains concrete production-generation adapter/background-delivery integration boundaries; avoid duplicating that scope. Physical download acceptance stays deferred.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-25"
+      "updated": "2026-10-10"
     },
     {
       "id": "PA-20",
       "title": "Accessibility and localization reach every surface",
-      "status": "in-flight",
+      "status": "planned",
       "gate": "macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.",
       "sourceOfTruth": [
         "Sources/Services/MacInterfaceText.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
         "website/src/tokens.css"
       ],
-      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22. AUD-06 (modal exclusion) stays its own item. 2026-09-24: typed engine failures (including clone-reference and read-permission cases) reach both apps in the interface language; engine display strings, sizes, dates and Mac counts follow it; iOS toasts, launch failure and default voice names use IOSAppLanguage; the macOS microphone and Speech prompts have an InfoPlist catalog; VoiceOver announces Studio state changes; the inline player, sheets and editors scale with Dynamic Type; the saved-voice banner with an action stays (and leaves when its voice is deleted); website secondary text meets AA. Open: raw localizedDescription on Mac History, downloads, batch restart and playback; iOS download, import and History errors; untyped engine errors fall back to English; multi-count \"X of Y\" plurals need catalog substitutions; a physical VoiceOver and Dynamic Type check (consent-bound).",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Typed engine/persistence errors, interface-locale formatting, scalable controls, persistent action banners, state announcements and website contrast checks are implemented. Narrow the old blanket History finding: typed HistoryPersistenceError now maps through MacInterfaceText. Open code: untyped localizedDescription paths in MacHistoryFileActions, ModelManagerViewModel, MacLineBatchRunner, IOSModelDownloadCoordinator, IOSVoicesView and HistoryScreen; the untyped generation fallback in VocelloPresentationText; and multi-count catalog substitutions (cancelledPartial/clipsCompleted still take formatted Strings and ordinary stringUnit values). Finish typed localized mappings/plurals with deterministic coverage. Physical spoken VoiceOver and Dynamic Type acceptance remains deferred; source announcements and system audits do not prove spoken behavior.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-10-10"
     },
     {
       "id": "PA-25",
@@ -1442,7 +1430,7 @@
       "id": "PA-30",
       "plan": "project-audit-2026-09",
       "title": "Leftovers from PA-21, PA-22 and AUD-05",
-      "status": "in-flight",
+      "status": "planned",
       "blockedBy": [],
       "gate": "A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
       "sourceOfTruth": [
@@ -1451,29 +1439,14 @@
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Split out 2026-09-24. Done: the Clone picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before app suspension and a take meeting it waits in the outbox (IOS-11); a failed iOS clear shows an alert and a pending clear has its own notice on both platforms; a long-form acceptance interrupted by suspension completes after resume with its audio kept; an unreadable removal list is a notice Retry discards. 2026-09-25: iPhone Settings (Models & Files) offers a one-time, confirmed removal of audio that no row, queued or in-flight take, long-form project, saved voice or removal list references (regular files only, fail-closed, remembered per App Support root; the Mac is untouched). Open: the cleanup's device check, and ENG-06: the speech tokenizer is adopted across engines, safe while one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB) and needs a device memory re-qualification.",
-      "updated": "2026-09-25"
-    },
-    {
-      "id": "PA-31",
-      "plan": "project-audit-2026-09",
-      "title": "The engine store reports frontend state changes with the streaming engine",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
-      "sourceOfTruth": [
-        "Sources/iOS/TTSEngineStore.swift",
-        "Sources/Services/MacGenerationWarmupCoordinator.swift",
-        "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
-      ],
-      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only). 2026-09-24: landed (f46aa2ee); its macOS smoke check waits on the same Automation Mode setup as AUD-03.",
-      "updated": "2026-09-24"
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Failed/pending History clear copy, suspension/resume outbox handling, long-form audio preservation and unreadable-removal notices are implemented and tested. IOSLeftoverAudioCleanup is wired into Settings; deterministic tests protect references, regular-file boundaries, changed/unreadable state and root-scoped review. Open local design/code: ENG-06 owner-scoped resident tokenizer release; Qwen3TTS still uses a process-global residentSpeechTokenizer cache. A new ownership design may duplicate about 218 MB on iOS and must not land as qualified without the gate's device-memory requalification. Phone-dependent cleanup acceptance and tokenizer memory qualification are deferred. Keep the Mac outputs-folder exclusion and fail-closed cleanup policy; previous memory runs cannot qualify a new ownership design.",
+      "updated": "2026-10-10"
     },
     {
       "id": "BT-01",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Trustworthy memory evidence",
-      "status": "in-flight",
+      "status": "planned",
       "blockedBy": [],
       "gate": "Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.",
       "sourceOfTruth": [
@@ -1482,8 +1455,8 @@
         "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
         "config/memory-qualification-policy.json"
       ],
-      "notes": "Audit #1 #2 #3 #4 #16 #24 #25 #26 #64 #65 #66 #67 #68 #70 #90 V-4. Maintainer decisions 2026-09-25: one memory series per process; a maximum unobserved gap plus peak fidelity replaces >=95% coverage; memory-profile traces kept; retained-memory-v2; the open decisions delegated to the audit's recommendations. Landed 2026-09-25: routine cache clears apart from pressure (#24/#90); missed-peak report (#3 part 3); one iPhone band source (V-4); memory contract v2 (#1 #2 #66 #3 part 1 #4 #16); thread ports released (#64/#65); retained-memory-v2 beside v1 (#25/#26); traces kept (#69); marking exact check (#67); MetricKit once (#70). Wave 9: periodic samples skip task_threads and the floor tiers sample every 250 ms, keeping a provisional 1,000 ms gap floor until a floor-tier record calibrates it (#3 part 4); capture cost per sample (#65 part 2); iOS evidence judged on budget utilization, 0.92 fail and 0.80 warn, one JSON/Swift source (#68); derive_memory_calibration.py; per-stage peaks behind the gated QWENVOICE_MLX_STAGE_PEAKS (#3 part 2). Open: the M6 memory lane calibrates the gap bound and v2 bounds (AV-17 step 4); the iPhone memory lane checks the budget gate.",
-      "updated": "2026-09-25"
+      "notes": "Reviewed 2026-10-10 at 38d295c4. One-process unsummed memory and routine policy-clear behavior have deterministic tests; 357 registry records validate and the peak-miss report preserves historical undersampling. M6 mac-memory-qualification-20260926-011258-82f5f55c passed 11 takes with kernel peak >= MLX peak; 235a205d calibrated general gap and Mac retained-memory-v2 bounds, closing the old AV-17 step-4 note. Open local evidence: the original exact-eight-record offline UI replay was not found retained; reproduce/document it or reconcile that historical clause with equivalent explicit evidence before closure. Phone budget/retained-v2 qualification is deferred. Physical iPhone/8GB gap bounds stay provisional until unforced hardware evidence exists; floor-emulated exploratory results do not calibrate them. October 10 telemetry parity is not memory qualification.",
+      "updated": "2026-10-10"
     },
     {
       "id": "BT-03",
@@ -1505,16 +1478,17 @@
       "id": "BT-04",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Lineage identity, history and CI evidence tests",
-      "status": "in-flight",
+      "status": "parked",
       "blockedBy": [],
-      "gate": "Offline key replay links the canonical macOS UI records that measured the same thing (7 of 16 today; the rest changed screen recording or lost their source commit) with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.",
+      "gate": "Offline lineage replay links canonical macOS UI records that measured the same thing, with legacy keys unchanged; the complete benchmark-history suite runs on Linux without platform skips, and every manifest producer round-trips through validate_record. Deferred #76: if representative valid records cannot fit the 256 KiB cap after allowed delta reduction, version a cells-free format, prove offline compatibility and preserve all legacy keys and records.",
       "sourceOfTruth": [
         "scripts/benchmark_history.py",
         "scripts/publish_benchmark_history.py",
         "scripts/ci/classify_changes.py"
       ],
-      "notes": "Audit #8 #22 #23 #46 #47 #71 #73 #76 #91-#94. Maintainer decisions 2026-09-25: narrow each kind's key to what it measures, legacy keys byte-identical; the reviewed per-kind measurement version is the lineage design. Landed 2026-09-25: host probe mocked (#47), registry tests on Linux (#46), producer round-trips (#8), narrower CI routing (#91-#94, #73), lineage contract v1 (#22 #23 #34 c-d), HISTORY noise band and UI TTFC (#71). Wave 9: lineage contract 2 keys forced or emulated tiers, the seed policy and the cell aggregate version apart, and a default contract-2 record keeps its contract-1 key, so the M6 gate records keep their HISTORY baseline (replay had keyed them wrongly before). #76 (records store derived cells) was implemented, then reverted: the audit's recommendation is to defer until a record nears the 256 KiB cap, and a cells-free format would be one-way. Replay: 7 of 16 canonical macOS UI records link. Open: #76 deferred until a record nears the cap.",
-      "updated": "2026-09-25"
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Lineage replay now links 7 of 18 canonical Mac UI records (one source unavailable), with legacy keys frozen. benchmark_history has 88 tests, producers have 16 round-trip tests plus profile coverage, and probes are mocked. Existing Linux CI 37525535415 at 30e803a passed product/tooling and research suites; this is historical remote evidence, not current unpushed-source CI. Completed lineage/Linux/producer work stays recorded. Remaining #76 cells-free record format was deliberately reverted/deferred: trend-v1 deltas and the canonical cap test currently keep valid records below 256 KiB. Do not implement an irreversible format change merely to clear a stale item. Retain legacy records/keys and require versioned offline compatibility proof if the cap trigger is reached.",
+      "updated": "2026-10-10",
+      "unparkWhen": "A representative valid new record exceeds or demonstrably cannot fit the 256 KiB cap after trend-v1 deltas, or a planned measurement expansion establishes that need."
     },
     {
       "id": "BT-06",

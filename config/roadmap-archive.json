@@ -4610,6 +4610,49 @@
         "commit:e45d3ad2",
         "run:37522428199"
       ]
+    },
+    {
+      "id": "PA-05",
+      "title": "Release path works end to end and is rehearsed",
+      "status": "done",
+      "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        ".github/actions/native-toolchain/action.yml",
+        "config/toolchain.json",
+        "scripts/supply_chain_contract.py"
+      ],
+      "notes": "Closed after read-only verification 2026-10-10. Existing secrets-free release rehearsal 37627801468 (October 7, committed 30e803a18e0a73e6248cf65e0bd9cd77815b8d8b) succeeded: ad-hoc package, packaged DMG/CLI verification, release-evidence validation and pinned-Xcode altool upload-command support. release.yml uses the shared pinned-toolchain action in all three native jobs; the rehearsal routes on schedule and release inputs. This closes the stated toolchain/rehearsal/command-compatibility gate. It does not establish credentialed TestFlight upload, signing/notarization, public promotion or CI for the current unpushed source. Those release obligations remain in the release-first plan. No workflow was dispatched and no external write occurred.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-10-10",
+      "evidence": [
+        "run:37627801468",
+        "commit:30e803a18e0a73e6248cf65e0bd9cd77815b8d8b",
+        "file:.github/workflows/release-rehearsal.yml",
+        "file:.github/actions/native-toolchain/action.yml"
+      ]
+    },
+    {
+      "id": "PA-31",
+      "plan": "project-audit-2026-09",
+      "title": "The engine store reports frontend state changes with the streaming engine",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
+      "sourceOfTruth": [
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/Services/MacGenerationWarmupCoordinator.swift",
+        "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
+      ],
+      "notes": "Closed after source/test/evidence review 2026-10-10. Maintainer approved the frozen-behavior exception September 24; f46aa2ee publishes snapshotUpdates before the streaming guard, once per applied frontend-state change, and removes the strict expected failure. Streaming-snapshot and warmup-transition tests pass in mac-test-20261010-040414, including pending/dispatched warm distinction, invalidation and latest intent. Clean-source macos-xcui-smoke-20261010-081219-7d9d4c81 passed 13/13 with all required ledger steps, closing the previous Automation Mode acceptance block. The October 10 audit retains identities and limits; no device acceptance or broader generation boundary refactor is inferred.",
+      "updated": "2026-10-10",
+      "evidence": [
+        "commit:f46aa2ee",
+        "file:Tests/VocelloCoreTests/TTSEngineStoreTests.swift",
+        "run:mac-test-20261010-040414",
+        "run:macos-xcui-smoke-20261010-081219-7d9d4c81",
+        "doc:docs/audits/2026-10-10-codex-workflow-audit.md#expanded-local-validation-october-10"
+      ]
     }
   ]
 }

@@ -21,12 +21,12 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
-| `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
+| `project-audit-2026-09` | active | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | active | backend-and-platform | 5/14 (36%) |
 | `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
+| `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 
 ## Vocello 3.0 — release-first execution plan
 
@@ -101,12 +101,12 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 | --- | --- | --- | --- |
 | `AUD-01` | parked | iOS launch and deep-link dead ends | — |
 | `AUD-02` | parked | One owner for the iOS audio session | — |
-| `AUD-03` | in-flight | Studio screens stop owning generation Tasks | — |
+| `AUD-03` | planned | Studio screens stop owning generation Tasks | — |
 | `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
 | `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
-| `AUD-11` | in-flight | Use constant-time sampler membership without changing token order | — |
+| `AUD-11` | planned | Use constant-time sampler membership without changing token order | — |
 | `AUD-12` | parked | Migrate off the deprecated audio-session interruption keys | — |
 
 ### Open items in detail
@@ -119,7 +119,7 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
   gate: Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
-- **`AUD-03`** (in-flight) — Studio screens stop owning generation Tasks.
+- **`AUD-03`** (planned) — Studio screens stop owning generation Tasks.
   gate: No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.
 
 - **`AUD-04`** (parked) — Clone readiness reflects the context it actually has.
@@ -137,7 +137,7 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 - **`AUD-09`** (planned) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome.
 
-- **`AUD-11`** (in-flight) — Use constant-time sampler membership without changing token order.
+- **`AUD-11`** (planned) — Use constant-time sampler membership without changing token order.
   gate: The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.
 
 - **`AUD-12`** (parked) — Migrate off the deprecated audio-session interruption keys.
@@ -191,21 +191,22 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `BT-01` | in-flight | Trustworthy memory evidence | — |
+| `BT-01` | planned | Trustworthy memory evidence | — |
 | `BT-03` | in-flight | UI benchmark and ui-perf lanes ready for the M6 | — |
-| `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
+| `BT-04` | parked | Lineage identity, history and CI evidence tests | — |
 | `BT-06` | in-flight | Timing attribution, profiles and device-lane observers | — |
 
 ### Open items in detail
 
-- **`BT-01`** (in-flight) — Trustworthy memory evidence.
+- **`BT-01`** (planned) — Trustworthy memory evidence.
   gate: Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.
 
 - **`BT-03`** (in-flight) — UI benchmark and ui-perf lanes ready for the M6.
   gate: The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.
 
-- **`BT-04`** (in-flight) — Lineage identity, history and CI evidence tests.
-  gate: Offline key replay links the canonical macOS UI records that measured the same thing (7 of 16 today; the rest changed screen recording or lost their source commit) with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.
+- **`BT-04`** (parked) — Lineage identity, history and CI evidence tests.
+  gate: Offline lineage replay links canonical macOS UI records that measured the same thing, with legacy keys unchanged; the complete benchmark-history suite runs on Linux without platform skips, and every manifest producer round-trips through validate_record. Deferred #76: if representative valid records cannot fit the 256 KiB cap after allowed delta reduction, version a cells-free format, prove offline compatibility and preserve all legacy keys and records.
+  unparkWhen: A representative valid new record exceeds or demonstrably cannot fit the 256 KiB cap after trend-v1 deltas, or a planned measurement expansion establishes that need.
 
 - **`BT-06`** (in-flight) — Timing attribution, profiles and device-lane observers.
   gate: The token read has its own timer and signpost, a kept-trace macOS profile publishes per-take interval statistics that pass the 36x(tokens+1) completeness check, the iOS memory profile passes the VM auto-snapshot guard, and the iOS memory, clone-conditioning and gate waits poll only the sentinel and check that the process is alive.
@@ -242,7 +243,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-05` | parked | Medium — restore packaged macOS launch verification | `RF-10` |
 | `F-06` | parked | Medium — durably couple audio publication and History persistence | — |
 | `F-15` | parked | P1 — preserve macOS Voice Design language, seed, and variation at launch | `RF-10` |
-| `F-16` | in-flight | P1 — transactionally accept long-form projects and replacement segments | — |
+| `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `F-18` | parked | P1 — preserve pre-existing generation destinations across failure and cancellation | `RF-10` |
 | `F-20` | parked | P2 — make CLI signal cancellation graceful and bounded | `RF-10` |
 | `F-21` | parked | P1 — restore CLI batch admission and preserve partial outcomes | `RF-10` |
@@ -266,7 +267,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
   gate: Capture the complete Design draft and variation before asynchronous startup. Behavioral request-path tests prove explicit French, Auto, pinned/default seed, and subsequent UI edits cannot change the prepared request. Focused tests and macOS build pass; candidate acceptance proves visible selection-to-engine parity.
   unparkWhen: RF-10 unparks (a signed macOS candidate is authorized).
 
-- **`F-16`** (in-flight) — P1 — transactionally accept long-form projects and replacement segments.
+- **`F-16`** (planned) — P1 — transactionally accept long-form projects and replacement segments.
   gate: Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.
 
 - **`F-18`** (parked) — P1 — preserve pre-existing generation destinations across failure and cancellation.
@@ -401,27 +402,6 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
   gate: Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.
   unparkWhen: ISR-04 unparks (the original script bytes and the paired iPhone are available).
 
-## iOS Settings information architecture and visual alignment
-
-`ios-settings-2026-08` · **active** · ios · adopted 2026-08-20
-
-Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
-
-Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
-
-| Item | Status | Title | Blocked by |
-| --- | --- | --- | --- |
-| `ISU-4` | in-flight | Refine Settings hub and shared purchase sheet; qualify the new navigation | — |
-| `ISU-5` | in-flight | AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows | — |
-
-### Open items in detail
-
-- **`ISU-4`** (in-flight) — Refine Settings hub and shared purchase sheet; qualify the new navigation.
-  gate: Six-entry hub with compact localized title in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
-
-- **`ISU-5`** (in-flight) — AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows.
-  gate: Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.
-
 ## macOS UI reset — adapt the approved iOS implementation
 
 `macos-ui-fidelity-2026-09` · **active** · backend-and-platform · adopted 2026-09-15
@@ -432,11 +412,11 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-08` | in-flight | Native acceptance of the iOS-derived screens on current source | — |
+| `UIF-08` | planned | Native acceptance of the iOS-derived screens on current source | — |
 
 ### Open items in detail
 
-- **`UIF-08`** (in-flight) — Native acceptance of the iOS-derived screens on current source.
+- **`UIF-08`** (planned) — Native acceptance of the iOS-derived screens on current source.
   gate: On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.
 
 ## Takeover audit follow-ups
@@ -449,23 +429,18 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
-| `PA-18` | in-flight | Public claims match what each download ships | — |
-| `PA-19` | in-flight | Orchestrators and the generate loop have unit coverage | — |
-| `PA-20` | in-flight | Accessibility and localization reach every surface | — |
+| `PA-18` | parked | Public claims match what each download ships | — |
+| `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
+| `PA-20` | planned | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | in-flight | Low-severity backlog from the external audit | — |
-| `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
-| `PA-31` | in-flight | The engine store reports frontend state changes with the streaming engine | — |
+| `PA-30` | planned | Leftovers from PA-21, PA-22 and AUD-05 | — |
 | `PA-33` | planned | Engine-side lease for model deletion | — |
 
 ### Open items in detail
-
-- **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
-  gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
 
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
@@ -476,13 +451,14 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.
   gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
 
-- **`PA-18`** (in-flight) — Public claims match what each download ships.
+- **`PA-18`** (parked) — Public claims match what each download ships.
   gate: README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.
+  unparkWhen: A physical iPhone is available and the maintainer resumes genuine current-source screenshot capture/review; replace the historical assets before updating their disclosure.
 
-- **`PA-19`** (in-flight) — Orchestrators and the generate loop have unit coverage.
+- **`PA-19`** (planned) — Orchestrators and the generate loop have unit coverage.
   gate: TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.
 
-- **`PA-20`** (in-flight) — Accessibility and localization reach every surface.
+- **`PA-20`** (planned) — Accessibility and localization reach every surface.
   gate: macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.
 
 - **`PA-25`** (planned) — Docs and tooling stay proportional.
@@ -491,11 +467,8 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-26`** (in-flight) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
-- **`PA-30`** (in-flight) — Leftovers from PA-21, PA-22 and AUD-05.
+- **`PA-30`** (planned) — Leftovers from PA-21, PA-22 and AUD-05.
   gate: A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
-
-- **`PA-31`** (in-flight) — The engine store reports frontend state changes with the streaming engine.
-  gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
 
 - **`PA-33`** (planned) — Engine-side lease for model deletion.
   gate: Deleting a model's files takes an engine-side lease that refuses or waits out every load, warm (including a model-only warm that publishes no state) and generation of that model until the files are gone, with tests over the engine's operation gate.
@@ -591,3 +564,26 @@ Narrative authority: [`docs/reference/ios-device-testing.md#model-readiness`](re
 - **`VLR-07`** (parked) — Complete physical-device closure and publish the privacy-safe report.
   gate: After Mac/CLI localization, complete two consecutive no-retry 14-row closure physical-iPhone passes plus one 122-row characterization using new source-bound private maps and exact current source. Require typed transcription classification, correct short/medium/long French output, exact receipt parity, zero unexplained hard QC failures, WER/CER delta <= 0.01, speaker-similarity delta >= -0.02, governed Clone prosody fidelity or explicit reference rejection, and green Built-in/English Design/enrollment/Clone controls. Publish only a digest-pinned privacy-safe physical-device report; keep audio, text, names, paths, raw diagnostics, and device evidence untracked. Before RF-09 freeze, new live verification must refuse absent, unreadable, zero or non-finite source duration instead of silently bypassing timing checks. Preserve legacy evidence decoding separately. Describe the current min-start/max-end predicate as edge coverage only, add an interior-omission counterexample alongside WER checks, and do not claim complete speech-interval coverage without independent evidence.
   unparkWhen: The paired iPhone is available for two consecutive 14-row closure passes with the post-051f7e30 classifier.
+
+## iOS Settings information architecture and visual alignment
+
+`ios-settings-2026-08` · **parked** · ios · adopted 2026-08-20
+
+Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
+
+Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `ISU-4` | parked | Refine Settings hub and shared purchase sheet; qualify the new navigation | — |
+| `ISU-5` | parked | AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows | — |
+
+### Open items in detail
+
+- **`ISU-4`** (parked) — Refine Settings hub and shared purchase sheet; qualify the new navigation.
+  gate: Six-entry hub with compact localized title in three flat groups; five pushed detail pages retain every original setting, key, default, consent, model/folder route and tab dock. Shared purchase sheet uses live localized StoreKit price, full-width action, truthful states and explicit export retry without purchase-policy changes. Bilingual typed copy, source-bound navigation/control tests and deterministic checkpoint pass. Separate authorization precedes current-source physical English/French, Default/AX-L/AX-XXXL, VoiceOver/reduced-effects, navigation and local purchase acceptance; historical runs cannot substitute.
+  unparkWhen: A paired physical iPhone is available and the maintainer resumes current-source Settings/localization/accessibility and local purchase qualification, including French accessibility sizes and spoken VoiceOver; retain historical failures and obtain new source-bound evidence.
+
+- **`ISU-5`** (parked) — AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows.
+  gate: Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.
+  unparkWhen: A paired physical iPhone is available and the maintainer resumes current-source Settings/localization/accessibility and local purchase qualification, including French accessibility sizes and spoken VoiceOver; retain historical failures and obtain new source-bound evidence.

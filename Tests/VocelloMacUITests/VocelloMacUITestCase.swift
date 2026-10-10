@@ -695,7 +695,25 @@ class VocelloMacUITestCase: XCTestCase {
         if (editor.value as? String) != text {
             XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
         }
-        XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10) {
+        XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10, onTimeout: {
+            let observed = editor.value as? String
+            let expectedBytes = Array(text.utf8)
+            let observedBytes = Array((observed ?? "").utf8)
+            let prefix = zip(expectedBytes, observedBytes).prefix { $0 == $1 }.count
+            let values: [String: Any] = [
+                "expected": text,
+                "observed": observed as Any? ?? NSNull(),
+                "expectedCharacters": text.count,
+                "observedCharacters": observed?.count as Any? ?? NSNull(),
+                "firstDifferingUTF8Offset": prefix,
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys]) {
+                let evidence = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                evidence.name = "script-entry-mismatch"
+                evidence.lifetime = .keepAlways
+                self.add(evidence)
+            }
+        }) {
             editor.value as? String == text
         })
     }

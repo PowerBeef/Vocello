@@ -52,6 +52,22 @@ is unchanged, so its measurement version does not change. No benchmark history, 
 or human-listening claim is established. Hook startup reached this session; full trust/activation
 remains unverified by doctor.
 
+**Post-push validation:** `8c71d64b` is pushed. Pinned-Xcode CI passed contracts, Python and generic
+iOS compilation but exposed a region-checker error in the new publication test. A detached task and
+file-level helper preserve its explicit synchronization without capturing the XCTest type. The five
+publication tests, full TSan suite (1,400 passes, two policy skips), changed-file lint and both UI
+bundle compilations pass locally; pinned-compiler confirmation follows the correction push.
+
+The first Mac smoke, `macos-xcui-smoke-20261010-165217-29c94e48`, failed the Design editor's exact
+text-value assertion. The lead then interrupted the runner before source changes, leaving incomplete
+evidence and a canceled second journey. Retained evidence confirms the typing event but truncates
+the observed value, so the cause remains unresolved. A failure-only attachment now captures the full
+expected/observed values and mismatch offset; assertion, typing and timeout are unchanged. A new
+clean-checkpoint run will investigate this failure; it does not replace the failed run. Independent
+review found no actionable issue in either test correction. Offline triage of the earlier ordinary
+native run remains incomplete because its runtime sidecar misses the split verdict line, despite
+zero-failure raw XCTest totals and a successful canonical replay.
+
 ### October 10 — stale roadmap reconciliation
 
 Reviewed the 14 stale in-flight items against source, tests, retained runs and existing remote CI.

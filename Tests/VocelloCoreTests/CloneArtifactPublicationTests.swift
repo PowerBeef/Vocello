@@ -12,28 +12,23 @@ final class CloneArtifactPublicationTests: XCTestCase {
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         let entered = GenerationTaskStartGate()
         let resume = GenerationTaskStartGate()
-        let publication = Task {
-            // Return errors as values for the pinned compiler's region checker.
-            do {
-                let result = try await Self.persist(in: root, source: source, fingerprint: fingerprint) { staging in
-                    try writeArtifact(to: staging)
-                    await entered.open()
-                    await resume.wait()
-                }
-                return (result, nil as (any Error)?)
-            } catch { return (false, error) }
+        let publication = Task.detached { () async throws -> Bool in
+            try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
+                try writeArtifact(to: staging)
+                await entered.open()
+                await resume.wait()
+            }
         }
         await entered.wait()
         let deletingProcess = repository(in: root)
         do { try await deletingProcess.delete(id: "Voice") }
         catch {
             await resume.open()
-            _ = await publication.value
+            _ = await publication.result
             throw error
         }
         await resume.open()
-        let (published, error) = await publication.value
-        XCTAssertNil(error)
+        let published = try await publication.value
         XCTAssertFalse(published)
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Voice.clone_prompt").path))
         try assertNoStaging(in: root)
@@ -52,13 +47,13 @@ final class CloneArtifactPublicationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try makeVoice(in: root)
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
-        let published = try await Self.persist(in: root, source: source, fingerprint: fingerprint, checksTranscript: false) {
+        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint, checksTranscript: false) {
             try writeArtifact(to: $0)
         }
         XCTAssertTrue(published)
         XCTAssertEqual(try Data(contentsOf: artifact(in: root).appendingPathComponent("payload")), Data([4, 5, 6]))
         // Atomic replacement is covered as well as first publication.
-        let replaced = try await Self.persist(in: root, source: source, fingerprint: fingerprint) { staging in
+        let replaced = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
             try writeArtifact(to: staging, bytes: [7])
         }
         XCTAssertTrue(replaced)
@@ -73,7 +68,7 @@ final class CloneArtifactPublicationTests: XCTestCase {
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         try writeArtifact(to: artifact(in: root))
         do {
-            _ = try await Self.persist(in: root, source: source, fingerprint: fingerprint) { staging in
+            _ = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
                 try writeArtifact(to: staging, bytes: [9])
                 throw Injected.write
             }
@@ -90,7 +85,7 @@ final class CloneArtifactPublicationTests: XCTestCase {
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         // Inject replacement at the exact production suspension, after model
         // serialization and before repository publication. No scheduler delay.
-        let published = try await Self.persist(in: root, source: source, fingerprint: fingerprint) { staging in
+        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
             try writeArtifact(to: staging)
             let replacement = root.appendingPathComponent("replacement.wav")
             try Data(bytes).write(to: replacement)
@@ -102,15 +97,6 @@ final class CloneArtifactPublicationTests: XCTestCase {
         XCTAssertFalse(published)
         XCTAssertFalse(FileManager.default.fileExists(atPath: artifact(in: root).path))
         try assertNoStaging(in: root)
-    }
-
-    private static func persist(in root: URL, source: URL, fingerprint: String,
-                         checksTranscript: Bool = true,
-                         writer: @Sendable (URL) async throws -> Void) async throws -> Bool {
-        try await NativePreparedCloneConditioningCache.persistSavedVoiceCloneArtifact(
-            voicesDirectory: root.appendingPathComponent("voices"), artifactDirectory: artifact(in: root),
-            voiceID: "Voice", sourceURL: source, sourceFingerprint: fingerprint,
-            checksStoredTranscript: checksTranscript, expectedStoredTranscript: "old", persist: writer)
     }
 
     private func makeRoot() throws -> URL {
@@ -145,4 +131,13 @@ private func repository(in root: URL) -> PreparedVoiceRepository {
 private func writeArtifact(to url: URL, bytes: [UInt8] = [4, 5, 6]) throws {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     try Data(bytes).write(to: url.appendingPathComponent("payload"))
+}
+
+private func persistCloneArtifact(in root: URL, source: URL, fingerprint: String,
+                     checksTranscript: Bool = true,
+                     writer: @Sendable (URL) async throws -> Void) async throws -> Bool {
+    try await NativePreparedCloneConditioningCache.persistSavedVoiceCloneArtifact(
+        voicesDirectory: root.appendingPathComponent("voices"), artifactDirectory: artifact(in: root),
+        voiceID: "Voice", sourceURL: source, sourceFingerprint: fingerprint,
+        checksStoredTranscript: checksTranscript, expectedStoredTranscript: "old", persist: writer)
 }

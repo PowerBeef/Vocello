@@ -338,6 +338,7 @@ public enum VocelloUIWait {
     public static func condition(
         _ description: String,
         timeout: TimeInterval,
+        onTimeout: (() -> Void)? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,
         evaluate: @escaping () -> Bool
@@ -347,6 +348,8 @@ public enum VocelloUIWait {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: anchor)
         let result = XCTWaiter.wait(for: [expectation], timeout: timeout)
         guard result == .completed else {
+            // Capture specialized evidence before stop-on-failure aborts the test.
+            onTimeout?()
             VocelloUIFailureEvidence.capture(reason: description)
             XCTFail("Timed out after \(timeout)s waiting for \(description)", file: file, line: line)
             return false

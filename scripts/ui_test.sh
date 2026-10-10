@@ -31,7 +31,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
-  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors] [--long-form-segments N]
+  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
@@ -213,8 +213,10 @@ elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]
   [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
-  [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" || "$scenario_argument" == "generation-errors" ]] \
-    || die "macos smoke --scenario must be layout, studio-content, or generation-errors"
+  [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" \
+      || "$scenario_argument" == "generation-errors" || "$scenario_argument" == "design-enrollment" \
+      || "$scenario_argument" == "clone-reference" ]] \
+    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, or clone-reference"
 elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   scenario_argument="${scenario_argument:-lifecycle}"
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
@@ -416,6 +418,10 @@ if payload["lane"] == "marketing":
 if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20]:
     payload["scenario"] = sys.argv[20]
     payload["evidenceClass"] = "focused-smoke"
+    if sys.argv[20] in ("design-enrollment", "clone-reference"):
+        payload["modes"] = ["design" if sys.argv[20] == "design-enrollment" else "clone"]
+        payload["lengths"] = []
+        payload["warm"] = 0
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "foreground-exit":
     payload["scenario"] = "foreground-exit"
     payload["evidenceClass"] = "focused-smoke"
@@ -1589,6 +1595,8 @@ elif [[ "$platform" == "macos" ]]; then
       layout) only_test+="/test00_WindowSizesAndSettingsScene" ;;
       studio-content) only_test+="/test12_CrossLanguageStudioContent" ;;
       generation-errors) only_test+="/test11_GenerationErrorAndRecovery" ;;
+      design-enrollment) only_test+="/test08_DesignBriefAndCompletedPlayer" ;;
+      clone-reference) only_test+="/test09_CloneReferenceAndCompletedPlayer" ;;
     esac
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"

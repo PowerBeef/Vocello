@@ -148,6 +148,9 @@ Lanes:
 
 ```sh
 scripts/ui_test.sh macos smoke
+# Focused quality-input journeys through the same genuine controls and collectors:
+scripts/ui_test.sh macos smoke --scenario design-enrollment
+scripts/ui_test.sh macos smoke --scenario clone-reference
 scripts/ui_test.sh macos localization
 scripts/ui_test.sh macos benchmark
 # Filtered benchmark example:
@@ -159,6 +162,13 @@ scripts/ui_test.sh macos perf
 # Product image refresh (asset workflow, never acceptance or benchmark evidence):
 scripts/ui_test.sh macos marketing [--scenario all|models]
 ```
+
+`design-enrollment` runs the existing Design brief/player and actual-audio enrollment journey;
+`clone-reference` runs saved-reference hydration, editing and completed Clone playback. Each is
+recorded as `focused-smoke`, with its selected mode and no benchmark matrix. Neither constitutes
+full smoke, localization, automatic-ASR accuracy or acoustic-quality acceptance. Pure draft and
+recognition-operation tests cover pending/stale one-off references; these two journeys do not
+replace that coverage.
 
 The `marketing` lane refreshes the README and website images through genuine controls at a
 1040×680 window (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`; `--scenario models`

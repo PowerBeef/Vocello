@@ -69,6 +69,10 @@ discovery grid. The cepstral statistic is a precisely defined descriptive contra
 calibrated CPP or a clinical/phonation score**. Full-frame crop support, silence, short
 intervals, bandwidth limits and reference compatibility are retained. A low periodicity
 or high flatness measurement alone cannot identify whisper, devoicing or an inserted syllable.
+Strict expected-phone crops remain unavailable when shorter than the analysis support.
+Separate `expectedContextWindows` inspect 120 ms around a phone's timing center, cropped to
+the audio bounds; they disclose target timing, recognizer provenance and neighboring-phone
+contamination. A contextual measurement cannot be attributed to the target phone alone.
 The analysis bounds duration, array sizes, frame batches and window counts; it does not
 download or run another model. Existing two-tracker Clone register and speaker identity
 remain separate from this third pitch witness. Native accent and emotional intent explicitly

@@ -17,6 +17,32 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — installed-model perceptual evidence implementation
+
+Implemented the [research follow-up](audits/2026-10-10-perceptual-evidence-implementation.md):
+bounded French CTC pronunciation hypotheses and expected-phone occupancy windows, single-witness
+localized candidates, NumPy local acoustic measurements and independent pitch witness, private
+held-out event-panel evaluation, and training-only normalization for supervised folds. New QC
+runs retain separate perceptual evidence and timed event artifacts. Read-only reports and strict
+NOT_ASSESSED semantics remain. Independent review corrected malformed-cache handling, interval
+provenance/duration, cross-role take/reference split leakage and unsupported-dimension inheritance.
+
+First clean checkpoint `17554ec9` produced cache-only French, Clone and pitch-control runs without
+inference/downloads. Dylan retains 27 timed recognizer candidates; these are not confirmed defects.
+The independent pitch witness gives 0 for identical audio and +11.881 semitones for the octave/speed
+control, versus +12.032 from existing trackers. All three gates correctly exited 4. Strict expected
+phone crops exposed low short-interval support, so a separately labeled phone-centered context
+view was added while retaining phone-only unavailable evidence. No accent, whisper, emotional intent
+or Clone-fidelity acceptance policy is qualified. QC-06 stays in flight; QC-04/QC-08/RF-14 stay open.
+
+**Initial verification:** routed checks passed **2,207 tests plus 2,597 subtests**, one existing skip,
+contracts/privacy/invariants/roadmap. Native builds were not selected for these Python-only changes;
+prior native results remain separate. Hook delivery was observed, persisted trust remains unconfirmed.
+The context-window follow-up at `170eb020` passed a fresh routed check with **2,211 tests plus
+2,597 subtests**, one existing skip; the source tree stayed fixed throughout both full checks.
+Raw evidence and clean-checkpoint receipts remain ignored under
+`build/private/qc/perceptual-implementation-20261010/`; the implementation report lists exact run IDs.
+
 ### October 10 — broad automatic audio-quality research
 
 Completed the [primary-source research report](audits/2026-10-10-automatic-audio-quality-research.md)

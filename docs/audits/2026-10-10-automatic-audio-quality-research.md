@@ -839,3 +839,7 @@ build or acoustic experiment was needed for these documentation changes.
 Raw validation output remains ignored under `build/private/qc/automatic-quality-research-20261010/`.
 Startup hook delivery was observed; `doctor` cannot confirm persisted project hook trust. Research
 availability and recommendations do not change the current NOT_ASSESSED or release boundaries.
+
+The subsequent [installed-model implementation and retained-clip verification](2026-10-10-perceptual-evidence-implementation.md)
+records the first implemented experiments, review corrections, source identities and remaining
+qualification limits. It does not retroactively change this research-only delivery's evidence.

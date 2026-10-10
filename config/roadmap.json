@@ -1552,11 +1552,12 @@
       "sourceOfTruth": [
         "docs/reference/qc.md",
         "docs/audits/2026-10-10-generation-quality-investigation.md",
-        "docs/audits/2026-10-10-automatic-audio-quality-research.md"
+        "docs/audits/2026-10-10-automatic-audio-quality-research.md",
+        "docs/audits/2026-10-10-perceptual-evidence-implementation.md"
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Implemented/tested: strict NOT_ASSESSED coverage, signed reference register/voicing, current speaker identity, narrow French forensics, explicit Clone review/audio-only with stale-ASR guards, neutral French narrator starter, actual-audio Design enrollment, v3 request/completion receipts and nullable History v8 migration, bounded decoder replay. Installed controls measured identity at 0 and octave/speed change at +12.032 semitones. One fixed-codec English replay changes waveform but register by only about 0.05 semitones; no pitch repair is established. Dylan/Design yielded zero agreed local defect events. Native, TSan, full Python, generic iOS compile and focused Mac journeys passed; broad localization smoke remains interrupted/partial. No shipping decoder change, qualified accent/whisper/identity acceptance, regeneration or release qualification. Remaining: actual failing pairs, held-out paired reference/variety/local-defect data and broader causal replay; QC-08 finishing stays separate and RF-14 retains the release decision. Full evidence is in the investigation addendum."
+      "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone register/identity, explicit Clone transcript review/audio-only and stale-ASR guards, neutral French starter, actual-audio Design enrollment, private v3 receipts/History v8 and bounded decoder replay. Native/TSan/generic iOS/focused Mac journeys passed previously; broad localization smoke remains partial. Installed-cache follow-up adds bounded French CTC hypotheses/expected windows, single-witness events, independent DSP pitch/local acoustics, immutable held-out panel evaluation and training-only fold normalization. Retained Dylan exposes 27 timed candidates; these are not confirmed defects. Identity and octave/speed controls give independent register shifts 0/+11.881 st. No shipping decoder repair, qualified accent/whisper/identity acceptance, regeneration or release qualification is established. Remaining: exact failing pairs, representative variety/local-defect labels, held-out uncertainty and causal replay. QC-08 finishing stays separate; RF-14 retains the release decision. Details and source-bound evidence are in the linked audits."
     },
     {
       "id": "QC-08",

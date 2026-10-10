@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Edit|Write|MultiEdit|NotebookEdit).
+# Codex PreToolUse file guard, also callable with a hook JSON payload on stdin.
 #
 # Reads the normalized edit path and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one
 # command away. Path checks are plain `case` globs on the repository-relative
-# path; an agent worktree's `.claude/worktrees/<name>/` prefix is stripped first,
-# so the same files stay guarded inside worktrees. The hook never reads git
-# state and finishes in milliseconds.
+# path resolved against its Git checkout, including linked worktrees.
 
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
+file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" relative-paths)"
 [[ -n "$file_paths" ]] || exit 0
-root="$(cd "$HOOK_DIR/../.." && pwd)"
-root="$(cd "$root" && pwd -P)"
 
 block() {
   echo "generated-file guard: BLOCKED — $relative is generated or frozen; do not hand-edit it." >&2
@@ -25,10 +21,7 @@ block() {
 # The checkout is on a case-insensitive volume: docs/roadmap.md is docs/ROADMAP.md.
 shopt -s nocasematch
 while IFS= read -r file_path; do
-  relative="${file_path#"$root"/}"
-  if [[ "$relative" == .claude/worktrees/*/* ]]; then
-    relative="${relative#.claude/worktrees/*/}"
-  fi
+  relative="$file_path"
   case "$relative" in
   docs/ROADMAP.md)
     block "edit config/roadmap.json, then python3 scripts/roadmap.py render" ;;

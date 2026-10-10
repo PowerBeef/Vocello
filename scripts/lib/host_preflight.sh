@@ -15,7 +15,7 @@
 # (`kern.memorystatus_vm_pressure_level` > 1: 2 = warning, 4 = critical), and
 # prints the numbers either way. It also refuses while parallel work is active:
 # another process holds the host-wide native lock ($QVOICE_NATIVE_LOCK), or a
-# Claude Code agent worktree is locked (an agent is still running). Evidence
+# validated active-worker lease exists. An idle Git worktree lock is not activity. Evidence
 # lanes run alone. A non-timing model lane (audio-QC calibration takes:
 # `qc-takes`) passes `agents-allowed`: it measures outputs, not timing, so
 # code-only agents may work beside it (maintainer decision, 2026-09-29); they
@@ -65,17 +65,22 @@ require_quiet_host() {
                 ;;
         esac
     fi
-    local locked_worktrees
-    locked_worktrees="$(git -C "${ROOT_DIR:-$PWD}" worktree list --porcelain 2>/dev/null | grep -c '^locked' || true)"
-    case "$locked_worktrees" in ''|*[!0-9]*) locked_worktrees=0 ;; esac
-    local agents_note=""
-    if [ "$locked_worktrees" -gt 0 ]; then
-        if [ "$agents_allowed" -eq 1 ]; then
-            agents_note=" agents:$locked_worktrees(allowed)"
-        else
-            busy=1
-            parallel="$parallel active-agent-worktrees($locked_worktrees)"
-        fi
+    local agents_note="" worker_status=0
+    local worker_checker
+    worker_checker="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/active_workers.py"
+    if [ "$agents_allowed" -eq 1 ]; then
+        agents_note="$(python3 "$worker_checker" check --agents-allowed 2>&1)" || worker_status=$?
+    else
+        agents_note="$(python3 "$worker_checker" check 2>&1)" || worker_status=$?
+    fi
+    if [ "$worker_status" -eq 2 ]; then
+        echo "error: $lane: $agents_note" >&2
+        return 2
+    elif [ "$worker_status" -ne 0 ]; then
+        busy=1
+        parallel="$parallel $agents_note"
+    elif [ -n "$agents_note" ]; then
+        echo "==> [host] $lane: $agents_note" >&2
     fi
     if [ "$busy" -eq 1 ]; then
         if [ "${QVOICE_ALLOW_BUSY_HOST:-0}" = "1" ]; then

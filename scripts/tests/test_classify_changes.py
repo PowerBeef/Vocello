@@ -26,13 +26,17 @@ def git(cwd: Path, *arguments: str) -> str:
 
 
 class RoutingTests(unittest.TestCase):
-    def test_claude_configuration_routes_to_python_without_native_lanes(self) -> None:
-        for path in (".claude/settings.json", ".claude/skills/ios-lane/SKILL.md", ".claude/agents/xcresult-triage.md",
-                     ".claude/rules/native.md"):
+    def test_codex_configuration_routes_to_python_without_native_lanes(self) -> None:
+        for path in (".codex/hooks.json", ".agents/skills/vocello-ios-validation/SKILL.md", ".codex/agents/vocello-xcresult-triage.toml",
+                     ".codex/config.toml", ".agents/skills/vocello-debug/agents/openai.yaml"):
             with self.subTest(path=path):
                 lanes = MODULE.classify([path])
                 self.assertTrue(lanes["python"])
                 self.assertFalse(lanes["swift"] or lanes["ios"] or lanes["website"])
+
+    def test_generation_signature_helper_routes_both_native_consumers(self) -> None:
+        lanes = MODULE.classify(["scripts/project_generation.py"])
+        self.assertTrue(lanes["swift"] and lanes["ios"] and lanes["python"])
 
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()

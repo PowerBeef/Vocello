@@ -1,15 +1,3 @@
----
-paths:
-  - "Sources/**"
-  - "Packages/**"
-  - "Tests/**"
-  - "project.yml"
-  - "config/runtime-debug-knobs.json"
-  - "config/concurrency-safety.json"
-  - "config/runtime-refactor-contract.json"
-  - "config/model-artifact-receipts.json"
-  - "config/macos-entitlement-policy.json"
----
 # Native rule — engine, macOS app, iOS app
 
 References, read only what the change needs: `docs/reference/mlx-guide.md`,
@@ -20,8 +8,7 @@ Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scrip
 (`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
 `Tests/UIAutomationSupport` or `project.yml`; push CI compiles both bundles in the `macos-tests` and
 `ios-compile` jobs (`--gate`) but never executes them; a change only under `Tests/Vocello*UITests`
-skips the deterministic suites and TSan. Physical-device and macOS XCUITest lanes only when explicitly
-requested.
+skips the deterministic suites and TSan. Use the smallest relevant physical-device or macOS XCUITest lane at a coherent checkpoint.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
 
@@ -178,9 +165,9 @@ requested.
 - Treating `.cancelled` as failure or releasing ownership before the terminal barrier.
 - Using raw `ScrollView` on iOS; making color the only indicator; reintroducing a separate engine process.
 - Adding, moving or deleting a file under a globbed `Sources/`, `Tests/` or resource path without
-  `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit. The
-  reminder hook and `dev.sh check` react only to `project.yml`, and CI regenerates before building, so
-  CI can pass while local builds fail with "Build input file cannot be found".
+  `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit. The shared `scripts/project_generation.py` signature covers specifications, generators and
+  source/resource membership in regeneration, cache freshness and check planning. Content-only edits
+  do not invalidate generation; missing outputs always require it.
 - Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
   not, so hop with `await MainActor.run`. CI compile failures are in the run's
   `macos-deterministic-test-artifacts` artifact, not the job log.

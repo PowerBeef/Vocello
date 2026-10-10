@@ -24,7 +24,7 @@ decode-loop + output-quality work, shared by both platforms — the deep §A–�
 entitlement), [`ios-device-testing.md`](ios-device-testing.md) (how to build/bench on device),
 [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (the telemetry schema).
 
-**Source-of-truth rule (from `CLAUDE.md`): if this doc disagrees with the code, the code wins — fix
+**Source-of-truth rule (from `AGENTS.md`): if this doc disagrees with the code, the code wins — fix
 this doc.** All claims below are cited to a file or commit; re-verify before relying on a number.
 
 ---
@@ -369,7 +369,7 @@ without a new maintainer decision.
 (`project.yml` *and* owned `Packages/VocelloQwen3Core/Package.swift`) moved in lockstep and were kept
 after a same-day fixed-seed A/B on the canonical M2 floor: warm RTF within noise and identical QC
 verdict distributions (OPTIMIZATION.md §Q). A later bump follows the same procedure
-(OPTIMIZATION.md §E, `.claude/rules/native.md` "SPM pins move in lockstep"): explicit maintainer
+(OPTIMIZATION.md §E, `docs/reference/native-engineering.md` "SPM pins move in lockstep"): explicit maintainer
 authorization → lockstep pin bump → `regenerate_project.sh` → foundation builds → fixed-seed
 `vocello bench` vs the committed baseline + applicable automated language/prosody gates → keep only
 if RTF/quality/QC are unchanged.

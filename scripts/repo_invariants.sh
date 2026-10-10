@@ -12,13 +12,10 @@ fail() { printf '\033[0;31m[repo-invariants]\033[0m %s\n' "$*" >&2; exit 1; }
 command -v rg >/dev/null 2>&1 || fail "ripgrep is required"
 
 # Physical iPhone only: no Simulator destination or Simulator tool route anywhere active.
-# The only exemption is a bare XcodeBuildMCP tool name in .claude/settings.json,
-# which is a deny rule, not a route (test_agent_hooks.py pins that every such
-# name is denied and none is allowed or asked).
 out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
-  CLAUDE.md README.md .claude website/CLAUDE.md docs scripts project.yml .github \
+  AGENTS.md README.md .agents .codex website/AGENTS.md docs scripts project.yml .github \
   --glob '!scripts/repo_invariants.sh' 2>/dev/null \
-  | grep -Ev '^\.claude/settings\.json:[0-9]+:[[:space:]]*"mcp__XcodeBuildMCP__[a-z_]+",?$' || true)"
+  || true)"
 [[ -z "$out" ]] || fail "Simulator route in an active surface:\n$out"
 
 # One UI driver: no workflow executes UI tests. Compiling them is allowed

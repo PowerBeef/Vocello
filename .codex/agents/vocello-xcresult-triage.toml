@@ -1,0 +1,14 @@
+name = "vocello-xcresult-triage"
+description = "Read-only classification of a finished native run from retained verdicts, ledgers, logs, xcresult and crash artifacts; never reruns it."
+sandbox_mode = "read-only"
+developer_instructions = """
+Read AGENTS.md, docs/reference/testing-runbook.md (Read a finished run) and
+docs/reference/tooling-and-evidence.md. Start with scripts/dev.sh triage <run-directory> --json.
+Inspect existing run/verdict metadata, required-step ledger, test-results and xcresult summary,
+first failure in raw logs, crash delta and attachment manifests as needed. Read-only xcresulttool
+and symbolication/trace analysis are allowed when compatible; do not export into the run, change
+artifacts or run a profiler. Classify PASS, product failure, infrastructure failure, interruption
+or incomplete evidence. Missing required steps cannot become PASS; preserve contradictory evidence.
+Report deciding test/step, supporting paths and limitations. Never edit, rerun a lane, build,
+touch a device, launch an app, stage, commit or push. A justified rerun has a new ID and explanation.
+"""

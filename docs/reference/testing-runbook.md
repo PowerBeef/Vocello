@@ -25,7 +25,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 
 | Task | Authoritative procedure | Boundary |
 | --- | --- | --- |
-| Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, commit on `main`, push; CI is the gate; no UI/model/phone |
+| Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, scoped commit on `main`; push on explicit request; targeted acceptance at checkpoints |
 | macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes only when requested |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
@@ -36,24 +36,16 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Delivery bench | [Benchmarking procedure §4.6](benchmarking-procedure.md#46-delivery--prosody-cells) | Paired instructed/neutral takes with fail-closed instruction receipts; acoustic effects, not listener-proven delivery |
 | Audio QC | [QC v2](qc.md) | Models run one at a time after TTS exits; detectors calibrated on human recordings and checked by the maintainer's confirmations of flagged takes, thresholds frozen before the evaluation |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
-| Gate or contract changes | [Development workflow](development-workflow.md), `.claude/rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
+| Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/tooling-and-evidence.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
-## Claude Code QA shortcuts
+## Codex QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. The four explicit repository skills under
-`.claude/skills` are user-invoked shortcuts to the procedures below and add no gate or new evidence
-rule.
-
-| Work | Explicit shortcut | Authority |
-| --- | --- | --- |
-| macOS UI lanes | `/macos-ui-lane <lane>` | [macOS testing](macos-testing.md) |
-| iPhone XCUITest lanes | `/ios-lane <lane>` | [iOS testing](ios-device-testing.md) |
-| iPhone headless diagnostics | `/device-diagnostics <verb>` | [iOS testing](ios-device-testing.md) |
-| Release readiness, read-only | `/release-evidence <tag>` | [Quality promotion](quality-promotion.md) |
-
-Only an explicit device/UI/benchmark request authorizes its lane; publication is separately
-explicit. Hook guards are best-effort checks, not a permissions system. XcodeBuildMCP and Axiom can
-assist relevant discovery and diagnostics but never replace repository native UI/evidence routes.
+Routine edits use `scripts/dev.sh`; no skill is required. Six thin repository skills under
+`.agents/skills` select the existing iOS, macOS UI, device diagnostics, benchmark, debugging and
+read-only release-readiness procedures. See [tool routing](development-workflow.md#codex-setup-and-tool-routing).
+Local targeted validation is authorized at coherent checkpoints. Full matrices are task/release-specific;
+publication and external writes require specific authorization. Hook guards are supplementary,
+not a permissions system. XcodeBuildMCP and Axiom may assist diagnosis under native serialization.
 
 ### Read a finished run
 
@@ -107,8 +99,7 @@ a resident generator: neural evaluators start only after the TTS process exits, 
 Mac mini M6 runs QC v2's models one at a time under `build/cache/qc/run.lock` (the 8 GB Mac is a
 product floor, not an evaluator host); timing lanes refuse to start on a busy host. The busy-host rule is
 `require_quiet_host` in `scripts/lib/host_preflight.sh`: a one-minute load above twice the core
-count, a kernel memory-pressure level above normal, another holder of the native lock or a running
-agent worktree refuses the lane before any model loads (`qc-takes` passes `agents-allowed` and only
+count, a kernel memory-pressure level above normal, another holder of the native lock or a validated active-worker lease refuses the lane before any model loads (`qc-takes` passes `agents-allowed` and only
 records the agents).
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues for an explicitly exploratory run, which
 the publisher then classifies from the run's own load sample.

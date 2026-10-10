@@ -1,13 +1,3 @@
----
-paths:
-  - "scripts/**"
-  - ".github/**"
-  - "config/**"
-  - "benchmarks/**"
-  - "docs/**"
-  - ".claude/**"
-  - "CLAUDE.md"
----
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 
 References, read only what the change needs: `docs/reference/development-workflow.md` (local loop and
@@ -137,25 +127,23 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   floor, and a run off the contract's calibration profile or refresh interval, or under a contract
   marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
   instead of ceiling verdicts.
-- **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench|qc-takes|profile|telemetry-overhead|release-readiness`, the gate bench
-  (`macos_test.sh gate` with `QWENVOICE_GATE_BENCH=1`) and `release.yml` run only on explicit request, in the lead session, with no
-  parallel agent active, except that the non-timing audio-QC model runs (`qc-takes` and the QC v2
-  `scripts/qc.py` model runs, which measure outputs, not timing) may run beside code-only agents
-  (`require_quiet_host <lane> agents-allowed`; maintainer decision 2026-09-29). Timing lanes refuse to start on a busy host (`require_quiet_host` in
-  `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
-  level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;
-  `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues; the gate summarizer then reports a loaded,
-  throttled or low-power host as inconclusive, exit 3, from the busiest judged warm take's own load, and
-  each take keeps its `loadAverage1M`). Runner PASS
-  requires diagnostics, crash deltas and restoration; no retries; a failed run keeps its artifacts;
-  changed source needs new run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
+- **Targeted local acceptance.** Local device/UI/model/benchmark validation is authorized at coherent
+  checkpoints. Choose the smallest relevant existing lane; full matrices remain task/release-specific.
+  Run source-bound measurements on committed checkpoints in the lead session after joining workers.
+  The existing non-timing audio-QC exception may use `agents-allowed`; native serialization, load and
+  memory checks still apply. `require_quiet_host` uses live worker leases, not Git worktree locks.
+  Unavailable tracking requires explicit `QVOICE_LEAD_ONLY=1` after joining workers; unknown ownership
+  blocks even exploratory overrides. `QVOICE_ALLOW_BUSY_HOST=1` preserves exploratory classification,
+  never publication authority. Runner PASS requires diagnostics, crash deltas and restoration.
+  Preserve failures; a justified rerun gets a new ID and explanation. Source changes need new IDs.
+  XCUITest is never a packaging/notarization/upload prerequisite. Releases and external writes require
+  a specific request; pushes require an explicit request.
 - **TSan.** `config/tsan-policy.json` names the subset, the tests that skip under the sanitizer and the
   blocking decision; push CI and the nightly run it; never weaken deterministic or MLX runtime coverage
   to make it pass, and never relax the status without a new dated decision.
 - **Assistant state stays external.** Sessions, memory, credentials and personal settings never enter
   Git, CI or evidence. Track only shared instructions, reviewed hooks, rules, skills and subagents.
-  Claude Code settings, skill and subagent metadata and rule frontmatter are executable
+  Codex settings, skill and subagent metadata and agent configuration are executable
   configuration: their changes route to the existing Python tests (`test_agent_hooks.py`).
 
 ## Common mistakes

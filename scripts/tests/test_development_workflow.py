@@ -25,8 +25,8 @@ def commands(plan: dict) -> list[str]:
 
 class CheckPlanTests(unittest.TestCase):
     def test_prose_only_change_runs_no_native_lane(self) -> None:
-        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "CLAUDE.md",
-                                  ".claude/rules/native.md", ".claude/skills/ios-lane/SKILL.md"])
+        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "AGENTS.md",
+                                  "docs/reference/native-engineering.md", ".agents/skills/vocello-ios-validation/SKILL.md"])
         joined = commands(plan)
         self.assertFalse(any("macos_test.sh" in c or "build_foundation_targets" in c for c in joined))
         self.assertIn("git diff --check", joined)
@@ -52,7 +52,8 @@ class CheckPlanTests(unittest.TestCase):
         self.assertNotIn("scripts/macos_test.sh test", commands(plan))
 
     def test_project_change_regenerates_first_and_website_change_checks_site(self) -> None:
-        plan = MODULE.check_plan(["project.yml", "website/src/App.tsx"])
+        with mock.patch.object(MODULE, "project_generation_status", return_value={"needsRegeneration": True}):
+            plan = MODULE.check_plan(["project.yml", "website/src/App.tsx"])
         joined = commands(plan)
         self.assertEqual(joined[0], "./scripts/regenerate_project.sh --fast")
         self.assertIn("npm --prefix website run check", joined)
@@ -153,7 +154,7 @@ class LintTests(unittest.TestCase):
 class PythonSelectionTests(unittest.TestCase):
     def test_codex_configuration_selects_agent_hook_tests_even_when_added_or_deleted(self) -> None:
         for path in (".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md", ".codex/agents/xcresult-triage.toml",
-                     ".codex/config.toml", ".codex/removed.yaml", ".agents/new.yml"):
+                     ".codex/config.toml", ".codex/removed.yaml", ".agents/new.yml", ".claude/settings.json"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")

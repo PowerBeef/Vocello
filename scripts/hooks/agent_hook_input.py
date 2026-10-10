@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Normalize Claude Code hook input for the repository shell hooks.
+"""Normalize Codex hook input for the repository shell hooks.
 
 Bash calls expose the shell text as tool_input.command. File-edit tools expose
 their target as tool_input.file_path (Edit, Write, MultiEdit) or
 tool_input.notebook_path (NotebookEdit). Print one canonical absolute path per
 line. The git-actions mode prints every `git commit`/`git push` with the
 directory it runs in (the payload cwd, which follows an agent worktree unlike
-$CLAUDE_PROJECT_DIR, then `cd`, subshells and `git -C`); git-policy prints the
+the hook installation, then `cd`, subshells and `git -C`); git-policy prints the
 first forbidden git invocation. Both use git_commands.py. Never execute or
 persist tool input. This is a guardrail adapter, not a sandbox.
 """
@@ -36,17 +36,63 @@ def edit_paths(payload: dict, root: Path) -> list[str]:
     if not isinstance(tool_input, dict):
         raise ValueError("file-edit input must be an object")
     tool_name = str(payload.get("tool_name"))
-    key = EDIT_PATH_KEYS.get(tool_name)
-    if key is None:
-        raise ValueError(f"cannot inspect tool {tool_name!r}")
-    value = tool_input.get(key)
-    if not isinstance(value, str) or not value or any(c in value for c in "\n\r\0"):
-        raise ValueError(f"{tool_name} input needs a representable tool_input.{key}")
     cwd = Path(payload.get("cwd") or root)
     if not cwd.is_absolute():
         raise ValueError("hook cwd must be absolute")
-    path = Path(value)
-    return [str((path if path.is_absolute() else cwd / path).resolve())]
+    if tool_name == "apply_patch":
+        command = tool_input.get("command")
+        if not isinstance(command, str) or not command.startswith("*** Begin Patch\n"):
+            raise ValueError("apply_patch needs a complete tool_input.command patch")
+        values = []
+        lines = command.rstrip("\n").splitlines()
+        if lines[-1] != "*** End Patch":
+            raise ValueError("apply_patch needs an end marker")
+        operation = None
+        moved = False
+        for line in lines[1:-1]:
+            header = False
+            for prefix in ("*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "):
+                if line.startswith(prefix):
+                    if prefix == "*** Move to: ":
+                        if operation != "update" or moved:
+                            raise ValueError("move target must follow an update")
+                        moved = True
+                    else:
+                        operation = prefix.split()[1].lower()
+                        moved = False
+                    values.append(line[len(prefix):])
+                    header = True
+                    break
+            if header:
+                continue
+            if operation == "add" and line.startswith("+"):
+                continue
+            if operation == "update" and (line.startswith(("@@", "+", "-", " "))
+                                          or line == "*** End of File"):
+                continue
+            raise ValueError("unreadable apply_patch file operation")
+        if not values:
+            raise ValueError("apply_patch needs file headers and an end marker")
+    else:
+        key = EDIT_PATH_KEYS.get(tool_name)
+        if key is None:
+            raise ValueError(f"cannot inspect tool {tool_name!r}")
+        values = [tool_input.get(key)]
+    paths = []
+    for value in values:
+        if not isinstance(value, str) or not value or any(c in value for c in "\n\r\0"):
+            raise ValueError(f"{tool_name} needs representable paths")
+        path = Path(value)
+        paths.append(str((path if path.is_absolute() else cwd / path).resolve()))
+    return paths
+
+
+def checkout_root(cwd: Path, fallback: Path) -> Path:
+    """Resolve the actual checkout, including registered linked worktrees."""
+    import subprocess
+    result = subprocess.run(["git", "-C", str(cwd), "rev-parse", "--show-toplevel"],
+                            capture_output=True, text=True, check=False)
+    return Path(result.stdout.strip()).resolve() if result.returncode == 0 else fallback.resolve()
 
 
 def git_actions(payload: dict, root: Path) -> list[str]:
@@ -165,8 +211,8 @@ def file_policy(command: str, cwd: Path, root: Path, depth: int = 0) -> str:
             return violation
 
     def resolve(base: str | None, word: str) -> str | None:
-        for name, value in (("${PWD}", base), ("$PWD", base), ("${CLAUDE_PROJECT_DIR}", root_path),
-                            ("$CLAUDE_PROJECT_DIR", root_path)):
+        for name, value in (("${PWD}", base), ("$PWD", base), ("${VOCELLO_PROJECT_ROOT}", root_path),
+                            ("$VOCELLO_PROJECT_ROOT", root_path)):
             if word == name or word.startswith(name + "/"):
                 if value is None:
                     return None
@@ -190,6 +236,17 @@ def file_policy(command: str, cwd: Path, root: Path, depth: int = 0) -> str:
         return result
 
     def is_build_output(base: str | None, word: str) -> bool:
+        nonlocal build, cache
+        # Absolute operands and literal cd targets can name linked worktrees.
+        # Resolve it through Git, never through a client-specific directory name.
+        directory = Path(resolve(base, word) or base or cwd)
+        while not directory.exists() and directory != directory.parent:
+            directory = directory.parent
+        if not directory.is_dir():
+            directory = directory.parent
+        actual_root = checkout_root(directory, root)
+        build = os.path.realpath(actual_root / "build")
+        cache = os.path.join(build, "cache")
         name = os.path.basename(word.rstrip("/"))
         if any(char in name for char in "*?["):          # judge a glob by what it can reach
             parent = resolve(base, os.path.dirname(word.rstrip("/")) or ".")
@@ -260,6 +317,27 @@ def git_policy(payload: dict, root: Path) -> str:
         invocations = git_commands.git_invocations(command, cwd if cwd.is_absolute() else root)
         for invocation in invocations:
             category, reason = git_commands.policy_violation(invocation)
+            if category == "branch" and invocation.subcommand == "switch":
+                args = invocation.args
+                # Managed creation currently returns a detached checkout. Permit
+                # one non-resetting branch operation there, not on the lead.
+                if (len(args) in (2, 3) and args[0] in ("-c", "--create")
+                        and args[1].startswith("codex/") and len(args[1]) > 6
+                        and (len(args) == 2 or args[2] == "HEAD")
+                        and invocation.directory and not invocation.unsafe):
+                    import subprocess
+                    def metadata(where, flag):
+                        return subprocess.check_output(["git", "-C", str(where), "rev-parse",
+                                                        flag], text=True, stderr=subprocess.DEVNULL).strip()
+                    try:
+                        target_common = metadata(invocation.directory, "--git-common-dir")
+                        common = (invocation.directory / target_common).resolve()
+                        installed_common = (root / metadata(root, "--git-common-dir")).resolve()
+                        git_dir = Path(metadata(invocation.directory, "--absolute-git-dir")).resolve()
+                        if common == installed_common and git_dir.parent == common / "worktrees":
+                            category, reason = "", ""
+                    except (OSError, ValueError, subprocess.SubprocessError):
+                        pass  # Unverified ownership retains the original branch refusal.
             if category:
                 return f"{category}\t{reason}"
     except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
@@ -276,15 +354,24 @@ def main() -> int:
     except (ValueError, TypeError):
         # Preserve the historical shell hooks' permissive handling of absent
         # input. File guards must not silently skip an unreadable edit.
-        if mode != "paths":
+        if mode not in ("paths", "relative-paths"):
             return 0
         print("file guard: cannot inspect malformed hook input", file=sys.stderr)
         return 2
     try:
-        root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
-        if mode == "paths":
+        root = Path(os.environ.get("VOCELLO_PROJECT_ROOT") or Path(__file__).resolve().parents[2])
+        if mode in ("paths", "relative-paths"):
             for path in edit_paths(payload, root):
-                print(path)
+                if mode == "paths":
+                    print(path)
+                else:
+                    parent = Path(path).parent
+                    while not parent.exists() and parent != parent.parent:
+                        parent = parent.parent
+                    checkout = checkout_root(parent, root)
+                    print(os.path.relpath(path, checkout))
+        elif mode == "checkout":
+            print(checkout_root(Path(payload.get("cwd") or root), root))
         elif mode == "git-actions":
             for line in git_actions(payload, root):
                 print(line)

@@ -107,6 +107,17 @@ class ActiveWorkerTests(unittest.TestCase):
                 workers.lifecycle(payload, base=self.base, identity=self.identity)
         self.assertEqual(self.snapshot()["activeWorkers"], 0)
 
+    def test_successful_session_start_recovers_only_its_own_start_error(self) -> None:
+        self.apply("SessionStart")
+        workers.invalidate(self.event("SessionStart"), base=self.base)
+        self.assertEqual(self.snapshot()["unknownRecords"], 1)
+        self.apply("SessionStart")
+        self.assertTrue(self.snapshot()["trackingAvailable"])
+        workers.invalidate(self.event("SubagentStart", "unresolved"), base=self.base)
+        self.apply("SessionStart")
+        self.assertFalse(self.snapshot()["trackingAvailable"])
+        self.assertEqual(self.snapshot()["unknownRecords"], 1)
+
     def test_marker_names_hash_session_and_agent_without_storing_agent_text(self) -> None:
         self.apply("SubagentStart", "private-agent")
         files = list(self.base.glob("*.json"))

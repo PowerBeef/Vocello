@@ -292,7 +292,7 @@ class SettingsWiringTests(unittest.TestCase):
 
 
 class SimulatorToolGuardTests(unittest.TestCase):
-    def test_simulator_mcp_routes_are_blocked_and_device_routes_remain_available(self):
+    def test_physical_device_only_mcp_routes_preserve_device_discovery(self):
         for tool in ("mcp__xcodebuildmcp__build_sim", "mcp__XcodeBuildMCP__boot_sim",
                      "mcp__xcodebuildmcp__debug_attach_sim", "mcp__xcodebuildmcp__simctl"):
             with self.subTest(tool=tool):
@@ -320,6 +320,9 @@ class PolicyGuardTests(unittest.TestCase):
                 with self.subTest(command=command):
                     result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root, cwd=agent)
                     self.assertEqual(result.returncode, 2, result.stderr)
+            result = invoke("policy_guard.sh", {"command": f'rm -rf "{agent}/build/cache"'},
+                            tool_name="Bash", root=root, cwd=root)
+            self.assertEqual(result.returncode, 2, result.stderr)
             result = invoke("policy_guard.sh", {"command": "rm -rf build/scratch/probe"},
                             tool_name="Bash", root=root, cwd=agent)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -337,6 +340,9 @@ class PolicyGuardTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root)
                     self.assertEqual(result.returncode, 2, result.stderr)
+            result = invoke("policy_guard.sh", {"command": 'git -C "missing checkout" switch -c codex/scoped'},
+                            tool_name="Bash", root=root)
+            self.assertEqual(result.returncode, 2, result.stderr)
             for command in ("git switch -c topic", "git switch -c codex/scoped origin/main",
                             "git switch -C codex/scoped", "git checkout -b codex/scoped",
                             "git worktree add ../another", "git branch codex/scoped"):

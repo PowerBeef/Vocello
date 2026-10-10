@@ -444,6 +444,11 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
     ):
         raise PolicyError("hostNativeLock.defaultPath must stay under ~/Library/Caches/")
 
+    worker_root = document.get("hostWorkerDirectory")
+    if (not isinstance(worker_root, str) or not worker_root.startswith("~/Library/Caches/")
+            or ".." in PurePosixPath(worker_root).parts):
+        raise PolicyError("hostWorkerDirectory must stay under ~/Library/Caches/")
+
     analysis_lock = document.get("hostAnalysisLock")
     if not isinstance(analysis_lock, dict) or analysis_lock.get("schemaVersion") != 1:
         raise PolicyError("hostAnalysisLock must be a schema-v1 object")

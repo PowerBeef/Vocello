@@ -398,7 +398,7 @@
       "sourceOfTruth": [
         "docs/audits/2026-10-06-deep-audit.md",
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
-        ".claude/rules/native.md"
+        "docs/reference/native-engineering.md"
       ],
       "updated": "2026-10-06",
       "unparkWhen": null,
@@ -448,9 +448,9 @@
         "scripts/hooks/policy_guard.sh",
         "project.yml"
       ],
-      "updated": "2026-10-06",
+      "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "T3-01 and T5-01, the two P2s, fixed in 04bec09a. Open: T3-02 (P2, a UI lane's EXIT trap can mask its result) and the P3s: shell portability, test determinism, schema drift, stale docs and website copy."
+      "notes": "T3-01 and T5-01, the two P2s, fixed in 04bec09a. Open: T3-02 (P2, a UI lane's EXIT trap can mask its result) and the P3s: shell portability, test determinism, schema drift, stale docs and website copy. 2026-10-10 Codex migration addresses agent configuration, generation-membership freshness, live-worker tracking, read-only diagnostics/triage and selected scheduler-dependent tests. Acceptance evidence is recorded in the Codex workflow audit; unrelated prior findings remain open."
     },
     {
       "id": "DA-13",
@@ -463,11 +463,12 @@
         "docs/audits/2026-10-06-deep-audit.md",
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
-        "Sources/ContentView.swift"
+        "Sources/ContentView.swift",
+        "docs/audits/2026-10-10-codex-workflow-audit.md"
       ],
-      "updated": "2026-10-06",
+      "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Test gaps DA-09 left: a cancel after the terminal or after publish (needs the real streaming path), the CLI Batch, Bench and Models commands (not compiled into VocelloCoreTests), the trim early return when the prewarm slot throws, and the glue inside GenerationOutputAdapter.run around the tested choreography."
+      "notes": "Test gaps DA-09 left: a cancel after the terminal or after publish (needs the real streaming path), the CLI Batch, Bench and Models commands (not compiled into VocelloCoreTests), the trim early return when the prewarm slot throws, and the glue inside GenerationOutputAdapter.run around the tested choreography. 2026-10-10 Codex audit CW-06/CW-07 refines remaining coverage: GenerationOutputAdapter.runReservedTake already has scripted production-helper choreography tests; add a bounded seam for concrete run/EngineReservedTake integration. Add app-host-free dependency injection for IOSModelDownloadCoordinator background restore/adoption, cancel/progress fencing, durable background completion and stale operation generations. Keep physical-device model-download proof separate. These are coverage gaps, not reproduced product failures."
     },
     {
       "id": "F-15",
@@ -1211,7 +1212,7 @@
       "sourceOfTruth": [
         "Sources/Views/Studio/MacCustomVoiceScreen.swift",
         "Sources/Views/Studio/MacVoiceCloningScreen.swift",
-        ".claude/rules/native.md",
+        "docs/reference/native-engineering.md",
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],
@@ -1596,6 +1597,22 @@
       "updated": "2026-10-02",
       "unparkWhen": null,
       "notes": "From the 2026-10-02 external review: on fr-0101--dylan the per-sample silence rule (|x| < 0.001) sees one 236 ms run and flags nothing, though the take has two pauses over 350 ms against one comma (cadence:excess1 with frame-based silence). Touches GenerationOutputAdapter.swift (silence state, persisted pass, report), GenerationTelemetryRecord currentAlgorithmVersion 8 -> 9, config/audio-qc-stage0-{calibration,observations}.json, scripts/lib/audio_qc.py, the Swift tests that hard-code version 8 and the sample-exact dropout tests, test_audio_qc*.py, and the M6 gate baseline. Single takes have no fade, tail or gain today; only LongFormAssembly shapes joins."
+    },
+    {
+      "id": "DA-14",
+      "plan": "project-audit-2026-10",
+      "title": "Preserve historical History ID high-water across legacy upgrades",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Database/GenerationMigrations.swift",
+        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
+        "docs/audits/2026-10-10-codex-workflow-audit.md"
+      ],
+      "updated": "2026-10-10",
+      "unparkWhen": null,
+      "notes": "CW-05 characterization: retained id 41 and deleted id 900 become sqlite_sequence 41 after the v3 rebuild; the next inserted ID is 42. v5-to-current preserves the high-water. Workflow migration adds an explicitly named characterization test and leaves shipped migrations unchanged. Assess repair and actual outbox reachability separately."
     }
   ]
 }

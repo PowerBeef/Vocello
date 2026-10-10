@@ -63,8 +63,8 @@ LANE_COMPANION_JOBS = {
     "swift": ("macOS ThreadSanitizer subset",),
 }
 
-# Tracked Claude Code configuration (settings, skills, subagents, rules).
-CLAUDE_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh")
+# Tracked Codex configuration, skills and read-only agents.
+CODEX_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml")
 
 # Owned sources that no iOS target compiles. Anything else under Sources/ or
 # Tests/ can change the device build.
@@ -114,13 +114,13 @@ ROADMAP_FILES = ("config/roadmap.json", "config/roadmap-archive.json")
 # (followed by `python_import_closure`), are its inputs. The build-output
 # policy is loaded by every native build through scripts/lib/build_paths.sh,
 # which is how a shared library such as scripts/lib/jsonio.py reaches it.
-MACOS_LANE_SCRIPTS = ("scripts/macos_test.sh", "scripts/build.sh", "scripts/regenerate_project.sh",
+MACOS_LANE_SCRIPTS = ("scripts/project_generation.py", "scripts/macos_test.sh", "scripts/build.sh", "scripts/regenerate_project.sh",
                       "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                       "scripts/build_output_policy.py", "scripts/cli_version_contract.py",
                       "scripts/ci/restore_mtimes.py", "scripts/lib/xctest_summary.py",
                       "scripts/lib/storage_preflight.py", "scripts/build_ui_test_bundles.sh")
 # Inputs of the iOS generic compile (and its UI-test bundle) besides the sources themselves.
-IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
+IOS_BUILD_SCRIPTS = ("scripts/project_generation.py", "scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                      "scripts/lib/ios_platform_preflight.py", "scripts/lib/storage_preflight.py",
                      "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh")
@@ -236,11 +236,11 @@ def _is_macos_ui(path: str) -> bool:
 
 
 def _is_python(path: str) -> bool:
-    # Claude Code settings, skills, subagents and rule frontmatter execute or
+    # Codex hooks, skills and agents execute or
     # route repository code; config-only changes must exercise the hook adapter
     # and wiring tests even when no script changed.
-    if path.startswith(".claude/"):
-        return path.endswith(CLAUDE_CONFIG_SUFFIXES)
+    if path.startswith((".codex/", ".agents/", ".claude/")):
+        return path.endswith(CODEX_CONFIG_SUFFIXES)
     if path.startswith(QC_PATHS):
         return True
     if path.startswith("scripts/"):

@@ -60,11 +60,11 @@ summarizer's `xRT` column.
 2. **Telemetry is runtime-gated** — identical code in Release; off unless `QWENVOICE_DEBUG=1`,
    `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the in-process latch enables it, and always off under an
    explicit `QWENVOICE_NATIVE_TELEMETRY_MODE=off` (`vocello bench --telemetry off`).
-3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
-   The consent-bound lanes, never run unasked (`.claude/rules/release.md`, the `ask` rules in
-   `.claude/settings.json`), are `scripts/macos_test.sh memory|lang-bench|qc-takes|profile|telemetry-overhead|release-readiness`,
-   the gate bench (`gate` with `QWENVOICE_GATE_BENCH=1`), every `scripts/ui_test.sh` lane and every
-   `scripts/ios_device.sh` verb. `telemetry-overhead` needs the model fixture.
+3. **No CI execution gate** — routine CI validates evidence contracts and indices without models,
+   devices, native UI or Instruments. Targeted local benchmark/model/device/UI validation is authorized
+   at coherent committed checkpoints; full matrices remain task/release-specific. Join workers and
+   respect host serialization/load/memory checks. Reuse installed assets; new large downloads,
+   dependency changes and publication need a specific request. See `tooling-and-evidence.md`.
 4. **Lazy MLX caveat** — decode breakdown columns measure Swift wall-clock around lazy graph
    ops, not per-stage GPU compute. Use Instruments signposts for GPU attribution (§6.3).
 5. **PASS-only publication** — a successful repository benchmark publishes one allowlisted JSON
@@ -298,7 +298,7 @@ QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 scripts/macos_test.sh memory --label fl
 QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 scripts/ui_test.sh macos benchmark --label floor-emulated
 ```
 
-Each is a consent-bound lane like its unemulated form. The rows stamp `deviceClassForced=true`,
+Each follows the same targeted checkpoint and quiet-host policy as its unemulated form. The rows stamp `deviceClassForced=true`,
 `simulatedPhysicalMemoryMB` and `simulatedMetalWorkingSetMB`; the publisher classifies every such
 record `exploratory` (never canonical, never comparable, never a baseline or a chart point) and the
 record's `run.runtimePolicy`, on engine and macOS UI benchmark records alike, names
@@ -1290,7 +1290,7 @@ labels. **Never commit raw JSONL, WAVs, screenshots, result bundles, or traces**
 - Explicit frontend acceptance: `scripts/ui_test.sh macos smoke|benchmark`
 - Deterministic macOS platform gate: `scripts/macos_test.sh gate` (does not consume UI results)
 
-The engine regression net is a consent-bound local lane by design; ordinary CI never runs a model, a
+The engine regression net is a targeted local checkpoint lane; ordinary CI never runs a model, a
 device or XCUITest.
 
 ---

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code SessionStart hook: branch and dirty state, open agent worktrees, dev.sh status, the "Resume now"
+# Codex SessionStart hook: branch and dirty state, open agent worktrees, dev.sh status, the "Resume now"
 # head of docs/development-progress.md. Local-only, bounded, never fails.
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -10,7 +10,8 @@ with_deadline() {
   perl -e 'alarm shift @ARGV; exec @ARGV' "$@" 2>/dev/null
 }
 
-echo "== Vocello session start (CLAUDE.md: Start here) =="
+echo "== Vocello session start (AGENTS.md: Start here) =="
+echo "Repository hook reached this session. Run scripts/dev.sh doctor for configuration/trust limitations."
 echo
 echo "-- git --"
 with_deadline 3 git status --short --branch | head -n 20 || echo "(git unavailable)"

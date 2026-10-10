@@ -416,7 +416,7 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
         if action == "add":
             return "worktree", "`git worktree add` makes a hand-made worktree"
         if action == "move":
-            return "worktree", "`git worktree move` takes a worktree out of .claude/worktrees"
+            return "worktree", "`git worktree move` bypasses Codex worktree management"
         if action == "remove" and any(_long(a, "--force") or _short_has(a, "f") for a in args[2:]):
             return "worktree", ("put --force right after `git worktree remove` so discarding agent "
                                 "work asks first")

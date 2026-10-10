@@ -24,7 +24,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `project-audit-2026-09` | active | backend-and-platform | 22/34 (65%) |
-| `project-audit-2026-10` | active | backend-and-platform | 5/13 (38%) |
+| `project-audit-2026-10` | active | backend-and-platform | 5/14 (36%) |
 | `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
@@ -518,6 +518,7 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 | `DA-07` | planned | Playback and recording defects that need a device | — |
 | `DA-12` | planned | Guard, tooling, docs and website hygiene | — |
 | `DA-13` | planned | Follow-ups from the audit's second fix pass | — |
+| `DA-14` | planned | Preserve historical History ID high-water across legacy upgrades | — |
 
 ### Open items in detail
 
@@ -544,6 +545,9 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 
 - **`DA-13`** (planned) — Follow-ups from the audit's second fix pass.
   gate: Each follow-up the second pass's reviews found is fixed with a test or declined with a reason: the iPhone download-cancel dead ends (a final cancel record that cannot be written leaves Retry, which reinstalls; the kept-cancellable message is overwritten by the next progress tick and is English), a corrupt clear-History marker with no exit, set-aside History records kept forever, a blocked iPhone deletion losing its partial download, Mac drafts owned by the window, an engine-cancelled batch that does not say why, a refused Voices tap with no announcement, untyped English busy refusals in the engine, the voice-picker filter row at large text sizes, staging files left in a Files folder by a killed copy, the normalized clone cache outside the voice-store lock, and the release group's queued-run replacement.
+
+- **`DA-14`** (planned) — Preserve historical History ID high-water across legacy upgrades.
+  gate: Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 

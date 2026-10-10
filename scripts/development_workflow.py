@@ -93,7 +93,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     consumer, or tooling everything depends on changed, the whole suite runs.
     """
     root = root or ROOT
-    agent_inputs = [p for p in paths if p.startswith((".agents/", ".codex/"))
+    agent_inputs = [p for p in paths if p.startswith((".agents/", ".codex/", ".claude/"))
                     and p.endswith((".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"))]
     # Top-level benchmark contracts (record schemas, hardware profiles) are read
     # by the registry tests; published records under benchmarks/runs/ are not.

@@ -1,0 +1,4 @@
+# Inherit the selected model and host approval/sandbox policy.
+# The limit includes the lead. Keep the development Mac within its memory budget.
+[agents]
+max_concurrent_threads_per_session = 4

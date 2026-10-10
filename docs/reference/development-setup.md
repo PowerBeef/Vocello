@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-09-22
-summary: Set up a new Mac from a fresh clone — Xcode and its components, the pinned CLI tools, Python and website toolchains, Git, signing and permissions, models, and the Claude Code tooling — then verify with the repository's own checks.
+summary: Set up a new Mac from a fresh clone — Xcode and its components, the pinned CLI tools, Python and website toolchains, Git, signing and permissions, models, and the Codex tooling — then verify with the repository's own checks.
 sourceOfTruth:
   - config/toolchain.json
   - scripts/install_pinned_tools.sh
@@ -12,7 +12,7 @@ sourceOfTruth:
 # Development setup on a new Mac
 
 A fresh clone contains the whole project: source, the tracked Xcode project and schemes, contracts,
-scripts, CI, `CLAUDE.md` and the Claude Code configuration. What it cannot contain is the machine:
+scripts, CI, `AGENTS.md` and the Codex configuration. What it cannot contain is the machine:
 Xcode and its downloadable components, command-line tools, Python and Node toolchains, credentials,
 signing identities, privacy grants, downloaded models and caches. This guide sets those up in order.
 Versions are never repeated here; `config/toolchain.json` is the pin authority and the commands below
@@ -106,7 +106,7 @@ integration; `vercel link --repo` is needed only to use the Vercel CLI.
 
 Set a global identity (`git config --global user.name …` and `user.email …`) and do not add a
 repository-local override. HTTPS credentials come from `gh auth login` or the macOS keychain. There
-are no Git hooks, submodules or LFS files; the guards are Claude Code hooks. Release tags must be
+are no Git hooks, submodules or LFS files; the guards are supplementary Codex hooks. Release tags must be
 signed and GitHub-verified (`git tag -s`), so configure a signing key only if you cut releases
 ([`macos-release-qa.md`](macos-release-qa.md)).
 
@@ -145,46 +145,25 @@ Never copy `build/` from another machine; rebuild it.
   (`scripts/ios_device.sh device-state`). With the Apple ID signed in under Xcode → Settings →
   Accounts, the first `scripts/ios_device.sh build` creates the team development provisioning profile.
 
-## 8. Claude Code
+## 8. Codex
 
-Install Claude Code, open the clone and trust the folder. The tracked `CLAUDE.md`, `.claude/rules/`,
-`.claude/skills/`, `.claude/agents/` and `.claude/settings.json` (hooks and permissions) load from the
-clone; confirm with `/memory`, `/hooks`, `/permissions` and the `/` skill menu, as the
-[development workflow](development-workflow.md#claude-code-setup-and-tool-routing) describes.
-Personal overrides go in the ignored `.claude/settings.local.json`.
+Open the clone in Codex and read `AGENTS.md`. Repository skills live in `.agents/skills`, read-only
+agents in `.codex/agents`, concurrency settings in `.codex/config.toml` and supplementary hooks in
+`.codex/hooks.json`. Review project and hook trust in the client; changed hooks remain inactive until
+reviewed. See the [fresh-session procedure](development-workflow.md#codex-setup-and-tool-routing).
+Do not change global trust/settings automatically. Personal Claude overrides and old worktrees remain
+untracked and untouched by this migration.
 
-Optional user-scope assistance used by this workflow (none is required, and CI never depends on it):
+`scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
+models or touching devices. Detect MCP tools in the live session. Installed Axiom, MLX, Sosumi,
+Context7, XcodeBuildMCP, browser and GitHub tools are optional assistance, never CI dependencies.
+Use existing plugins when connected; no duplicate servers or automatic global installs.
+`.xcodebuildmcp/config.yaml` provides macOS and physical-device profiles, with scratch caches;
+repository scripts own canonical builds and host serialization. Native UI uses only XCUITest.
 
-```sh
-claude plugin marketplace add CharlesWiltgen/Axiom
-claude plugin install axiom@axiom-marketplace
-claude plugin marketplace add pbakaus/impeccable
-claude plugin install impeccable@impeccable
-for p in swift-lsp pyright-lsp chrome-devtools-mcp huggingface-skills vercel claude-md-management; do
-  claude plugin install "$p@claude-plugins-official"
-done
-
-claude mcp add -s user XcodeBuildMCP -- npx -y xcodebuildmcp@latest mcp
-claude mcp add -s user --transport http context7 https://mcp.context7.com/mcp
-claude mcp add -s user --transport http sosumi https://sosumi.ai/mcp
-
-brew install asccli   # tddworks asc CLI behind the asc-* App Store Connect skills
-```
-
-XcodeBuildMCP runs through `npx` (Node from section 2) and reads its workflows and the
-`macos`/`ios-device` profiles from the tracked `.xcodebuildmcp/config.yaml`; do not enable its
-Simulator workflow (the project settings deny its Simulator tools). The GitHub connector comes from
-the claude.ai account and needs no personal token; `gh` covers the same workflow. Claude in Chrome is
-the Chrome extension; use it for the website and, on explicit request, portal chores. The asc-*
-skills drive the tddworks `asc`; the repository itself pins no App Store Connect CLI.
-
-swift-lsp resolves symbols through a `buildServer.json` at the repository root. It is ignored because
-it holds machine paths; create it after the first build:
-
-```sh
-brew install xcode-build-server
-xcode-build-server config -project QwenVoice.xcodeproj -scheme QwenVoice --build_root "$PWD/build/cache/xcode/macos"
-```
+For a symbol server, `buildServer.json` is ignored because it holds machine paths. When explicitly
+setting up an installed xcode-build-server, its config can target the warm `build/cache/xcode/macos`
+arena. Optional setup never replaces pinned repository tools or authorizes installation/repinning.
 
 ## Troubleshooting
 

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Bash): the commit and push lint.
+# Codex PreToolUse hook (Bash): commit and push lint; --staged runs it directly.
 #
 # Fired for every Bash tool call. git_commands.py lists every `git commit` and
 # `git push` in the command (any global options, quoted `-C` paths, chains,
 # subshells, `bash -c`) with the checkout it acts on — the payload cwd, `cd`, or
-# `git -C` — not this script's location: $CLAUDE_PROJECT_DIR stays on the main
+# `git -C` — not this script's location: the hook may be installed on the main
 # checkout while an agent works in a worktree. Each one is judged separately; a
 # target set by a variable, `pushd`, `GIT_DIR` or `--git-dir`, or one that an
 # earlier `git checkout`/`switch`/`rebase` in the same command may move, fails
 # closed.
 #
 # Commits are allowed in exactly two places: the main checkout on `main`, and a
-# Claude Code agent worktree (<repo>/.claude/worktrees/<name>) on its
-# `worktree-*` branch, which the lead session later integrates into main.
+# registered linked worktree on a `codex/*` branch, which the lead integrates.
 # Pushes are allowed only from the main checkout on `main`. Commits also need
 # clean whitespace in the staged diff and no private path or credential in the
 # staged blobs; a commit that takes more than the index holds when the hook runs
@@ -23,7 +22,11 @@
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-payload="$(cat)"
+if [[ "${1:-}" == --staged ]]; then
+  payload="$(python3 -c 'import json, os; print(json.dumps({"cwd":os.getcwd(), "tool_input":{"command":"git commit"}}))')"
+else
+  payload="$(cat)"
+fi
 
 block() {
   echo "commit lint: BLOCKED — $1" >&2
@@ -62,14 +65,23 @@ while IFS= read -r line; do
   top="$(cd "$top" && pwd -P)"
   git_dir="$(cd "$(git -C "$target" rev-parse --absolute-git-dir)" && pwd -P)"
   common_dir="$(cd "$(git -C "$target" rev-parse --path-format=absolute --git-common-dir)" && pwd -P)"
-  main_root="$(dirname "$common_dir")"
+  hook_root="$(cd "$HOOK_DIR/../.." && pwd -P)"
+  hook_common="$(git -C "$hook_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+    || block "hook installation is not a repository checkout." "Use the repository's own commit check."
+  hook_common="$(cd "$hook_common" && pwd -P)"
+  [[ "$common_dir" == "$hook_common" ]] || block \
+    "target belongs to another repository." "Use the commit check installed in that repository."
   branch="$(git -C "$target" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 
   in_main_checkout=0
   [[ "$git_dir" == "$common_dir" ]] && in_main_checkout=1
   in_agent_worktree=0
-  if (( ! in_main_checkout )) && [[ "$(dirname "$top")" == "$main_root/.claude/worktrees" ]]; then
-    in_agent_worktree=1
+  if (( ! in_main_checkout )) && [[ "$git_dir" == "$common_dir"/worktrees/* ]]; then
+    # Registration, not a directory spelling, establishes linked checkout identity.
+    registered="$(git -C "$target" worktree list --porcelain | sed -n 's/^worktree //p')"
+    while IFS= read -r registered_root; do
+      [[ "$registered_root" == "$top" ]] && in_agent_worktree=1
+    done <<< "$registered"
   fi
 
   if [[ "$action" == push ]]; then
@@ -87,14 +99,14 @@ while IFS= read -r line; do
   if (( in_main_checkout )); then
     [[ "$branch" == main ]] || block \
       "commits in the main checkout are made directly on main (current: ${branch:-detached HEAD})." \
-      "Return to main without discarding work; agent work belongs in a .claude/worktrees/<name> worktree."
+      "Return to main without discarding work; agent work belongs in a Codex-managed linked worktree."
   elif (( in_agent_worktree )); then
-    [[ "$branch" == worktree-* ]] || block \
-      "agent worktrees commit only on their worktree-* branch (current: ${branch:-detached HEAD})." \
-      "Create worktrees through Agent isolation or EnterWorktree; never check out main or another branch there."
+    [[ "$branch" == codex/* ]] || block \
+      "agent worktrees commit only on their codex/* branch (current: ${branch:-detached HEAD})." \
+      "Use a Codex-managed worktree and a scoped codex/ branch based on the lead checkpoint."
   else
-    block "commits happen on main or in a Claude Code agent worktree under .claude/worktrees/ (CLAUDE.md: Main is the only published branch)." \
-      "This checkout is a linked worktree outside .claude/worktrees/; move the work to main or an agent worktree."
+    block "commits happen on main or in a registered Codex linked worktree (AGENTS.md)." \
+      "Use a registered worktree in this repository."
   fi
 
   if ! git -C "$top" diff --cached --check >/dev/null 2>&1; then

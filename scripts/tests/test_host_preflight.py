@@ -58,7 +58,7 @@ def run_preflight(
         process_shim.chmod(process_shim.stat().st_mode | stat.S_IEXEC)
         environment.update(env or {})
         return subprocess.run(
-            ["bash", "-c", f". '{LIB}'; {command}"],
+            ["bash", "-uc", f". '{LIB}'; {command}"],
             capture_output=True, text=True, env=environment, check=False,
             cwd=cwd or temporary,
         )

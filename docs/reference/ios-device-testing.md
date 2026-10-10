@@ -34,16 +34,15 @@ requires a connected phone, and together they are what routine commits, pushes a
 (push CI's `ios-compile` lane runs the same incremental compile). Missing models, a phone, or UI
 results must not block preserving and sharing development work.
 
-Everything below the compile is consent-bound: `scripts/ui_test.sh` and `scripts/ios_device.sh` are
-never run unasked; only an explicit QA or device request
-authorizes them. The timing verbs (`ios_device.sh gate`, `bench`, `lang-bench`, `memory`, and
-`ui_test.sh ios benchmark|perf`) additionally refuse to start on a busy Mac host:
-`require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
-core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
-or a locked agent worktree before the phone is touched, and
-`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
-Claude Code can use the explicit `/ios-lane` and `/device-diagnostics` shortcuts and triage the
-artifacts with the testing runbook or the read-only `xcresult-triage` subagent. These optional skills add no gate or evidence rule.
+Targeted physical-device validation is authorized at coherent checkpoints. Select the smallest relevant
+existing lane; full matrices remain task/release-specific. Timing verbs (`ios_device.sh gate`, `bench`,
+`lang-bench`, `memory`, and `ui_test.sh ios benchmark|perf`) require a committed checkpoint and quiet
+host after joining workers. `require_quiet_host` rejects excessive load, memory pressure, another
+native-lock holder or validated active-worker leases. Unknown ownership blocks measurement; if
+tracking is unavailable declare `QVOICE_LEAD_ONLY=1` only after joining workers.
+`QVOICE_ALLOW_BUSY_HOST=1` preserves explicitly exploratory classification. No new large download,
+release or external write is implied. Codex skills `vocello-ios-validation` and
+`vocello-device-diagnostics` call the scripts; `vocello-xcresult-triage` reads finished artifacts.
 
 ### Host toolchain prerequisite
 
@@ -185,7 +184,7 @@ exact local binary, then one headless Speed take through the diagnostics runner;
 model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
 generation take; every step lands in a required-step ledger with the verdict under
 `build/artifacts/ios/gates/<run>/`. It requires 15 GiB of host free space and a quiet
-host (`require_quiet_host ios-gate`), and it is consent-bound like every other device verb.
+host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint policy above.
 
 ### Explicit screen protection after device work
 
@@ -369,7 +368,7 @@ Do not repeat completed phases merely for a green aggregate or reuse a token aft
    and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
 4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
    rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
+   the roadmap, this guide, `AGENTS.md`, or any tracked file between shards.
 5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
    and the current narrative. A changed full-tree identity requires new acceptance identity;
    previous results remain history, never merged current-source PASS.

@@ -80,7 +80,7 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
             XCTAssertEqual(try sequence(in: db), 41, "Live ids survive the table rebuild")
             try insertNext(in: db)
             XCTAssertEqual(db.lastInsertedRowID, 42)
-            // The signed storage bit pattern must survive a subsequent open;
+            // The signed storage bit pattern must survive repeated migration;
             // nil stays nil for the historical row whose seed was not recorded.
             try db.execute(sql: "UPDATE generations SET seed = ? WHERE id = 41", arguments: [Int64.min])
         }
@@ -90,7 +90,7 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
         XCTAssertEqual(applied.count, 7)
         try migrator.migrate(queue)
         try queue.read { db in
-            XCTAssertEqual(try Generation.order(Generation.Columns.id).fetchAll(db), upgraded, "Reopening is idempotent")
+            XCTAssertEqual(try Generation.order(Generation.Columns.id).fetchAll(db), upgraded, "Repeated migration is idempotent")
             XCTAssertEqual(try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY identifier"), applied)
             XCTAssertEqual(try sequence(in: db), 42)
             XCTAssertEqual(upgraded[1].samplingSeed, UInt64(1) << 63)

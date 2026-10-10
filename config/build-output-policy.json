@@ -797,8 +797,9 @@
   ],
   "referencePolicy": {
     "scanRoots": [
-      "CLAUDE.md",
-      ".claude",
+      "AGENTS.md",
+      ".agents",
+      ".codex",
       ".github",
       ".xcodebuildmcp",
       "README.md",
@@ -867,5 +868,6 @@
       "$BUILD_DIR/DerivedData-memory-failure",
       "${BUILD_DIR}/DerivedData-memory-failure"
     ]
-  }
+  },
+  "hostWorkerDirectory": "~/Library/Caches/Vocello/active-workers"
 }

@@ -23,7 +23,7 @@ automatic structural guards plus one reviewed number per kind:
 - ``lineageMeasurementVersion``: the reviewed measurement version of the kind
   and platform (``LINEAGE_MEASUREMENT_VERSIONS``). A change that alters what
   the kind measures (an in-window driver action, a probe, the metric mapping
-  or aggregation) bumps it in the same change (.claude/rules/release.md). The
+  or aggregation) bumps it in the same change (docs/reference/tooling-and-evidence.md). The
   kind's path list (``LINEAGE_PATHS``) is the scope of that review;
   ``scripts/dev.sh check`` names changed files on it while this module is
   untouched. The memory contract version joins the key beside the evidence

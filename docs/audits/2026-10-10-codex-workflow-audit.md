@@ -223,3 +223,32 @@ unaffected; inspection through project inputs remains a DA-12 follow-up. A separ
 validation reports fourteen existing stale in-flight items; comparison with the preceding commit
 shows only DA-12 notes changed, with no item status/date changes. The canonical contract gate
 permits these warnings; their underlying work was not relabeled. DA-13/DA-14 remain open.
+
+## Setup remediation after clone integration, October 10
+
+The follow-up setup audit started at `a8b16b08` with a clean, synchronized `main`. Installed
+capabilities were sufficient: Axiom, Sosumi, Context7, XcodeBuildMCP and GitHub read probes succeeded;
+repository scripts and Playwright remain the execution authority. No additional plugin, model,
+global setting or toolchain installation was needed.
+
+| Finding | Source change and proof |
+| --- | --- |
+| Ambient system Python lacks pytest despite an installed pinned environment | `scripts/select_python.py` and `scripts/dev.sh` select an installed Python >=3.10, accept `VOCELLO_PYTHON`, and propagate the executable through a guarded child shim. Fake interpreter/PATH tests cover missing packages, malformed probes, explicit failure, relative paths, nested execution and recursion. No Python package is installed or modified. |
+| Doctor reports presence without package compatibility and misreads helper usage exits | `scripts/workflow_diagnostics.py` reports selected Python, package versions/pins, Node/npm major compatibility and distinct helper probe outcomes. `xclog --help` displaying usage with exit 1 is reported as such, without certifying successful diagnostic work. Hook activation remains conservative. |
+| SwiftPM stderr can split an XCTest stdout verdict; summary failure only warns | `scripts/macos_test.sh` preserves separate stdout/stderr streams and records native and summary collection statuses. `scripts/lib/xctest_summary.py --require-complete` requires nonempty, consistent All/Selected tests completion. Offline triage refuses a native-zero PASS with failed collection. Behavioral tests cover partial/missing logs and native failure/signal precedence. |
+| UI failure skips crash delta and summaries; EXIT cleanup can mask the result | `scripts/ui_test.sh` and `scripts/lib/ui_finalization.sh` collect available evidence after attempted tests, isolate callback exits, bound collectors and retire owned process groups/watchdogs/exporters. Separate collection receipts block incomplete PASS. Thirteen focused tests cover native failures, signals, timeouts, leftover descendants, cleanup failures and single export through the actual ledger helper. Independent review and host-capable replay passed. |
+| Website contains vulnerable development dependency | The lockfile alone advances `source-map-js` 1.2.1 to 1.2.2, the patched version for [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q). npm audit reports zero vulnerabilities; full website checks pass. No unrelated dependency changed. |
+
+Full host-capable Python validation passed **2,162 tests and 2,561 subtests**, with one existing skip.
+The checkpoint records native/SDK and focused UI integration evidence. Raw audit/remediation logs
+remain ignored under `build/artifacts/diagnostics/setup-audit-20261010`. Sandbox-only localhost and
+process-inspection failures, focused-test fixture corrections and an intentionally stopped duplicate
+contracts invocation remain retained; none is retrospectively promoted to PASS.
+
+The maintained workflow now documents interpreter selection, stable desktop conditions, exact
+release tools and wrapper-aware managed-worktree commands. Source measurement definitions and
+their versions are unchanged; these fixes improve evidence handling, not measured product behavior.
+DA-12 retains unrelated findings, DA-13/DA-14 retain application/test gaps, and CONV-21 retains local
+Xcode 27 versus pinned 26.6 qualification. Startup/command-guard and worker-event dispatch were
+observed, but persisted hook trust and every guard route remain unconfirmed. No phone, new model,
+human listening, release packaging, remote CI, deployment or publication acceptance is established.

@@ -17,6 +17,41 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — setup and evidence remediation
+
+Starting from clean `a8b16b08`, fixed installed-Python selection/child propagation and doctor
+compatibility reporting, separated runtime XCTest stdout from SwiftPM diagnostics, and made
+incomplete summaries fail independently of native test statuses. UI finalization now preserves
+the first native failure/signal while collecting available crash, summary and attachment evidence;
+bounded callbacks, owned process groups and exporter cleanup prevent abandoned collectors.
+The separate collection receipt blocks incomplete PASS. Independent tooling review found and
+verified fixes for relative interpreter paths and interrupted exporters, then found no remaining
+actionable issue. The website lockfile alone advances vulnerable `source-map-js` to patched 1.2.2;
+npm audit reports zero vulnerabilities. No extra plugin or installation was required.
+
+**Verified:** routed `check --since a8b16b08` passed contracts, **2,162 Python tests and 2,561
+subtests** (one existing skip), generic iOS compilation and complete website checks (19 Node and
+two browser tests). Native `mac-test-20261010-160951` passed **1,402 core tests and 182 runtime
+tests executed** (179 passes, three expected fixture skips), with complete/consistent sidecars,
+both summary statuses zero and offline triage PASS. Diagnostic stderr remains separately retained.
+Thirteen focused UI-finalization tests exercise actual timeout/signal process retirement and the
+real ledger helper without native UI execution. Review, ShellCheck, privacy, whitespace and strict
+roadmap validation pass. Detailed source references are in the workflow audit's setup-remediation
+section; raw evidence remains ignored under `setup-audit-20261010` and canonical runner directories.
+
+All delegated workers joined before native validation, with available tracking and zero active,
+stale or unknown leases. Initial restricted runs failed only on localhost/process/cache-lock
+access; those logs and `mac-test-20261010-160930` remain retained. A duplicate contracts invocation
+was intentionally stopped before another full suite. Interpreter fixture corrections and their
+failed checks are retained too; no earlier failure was relabeled.
+
+**Limits:** no phone or Simulator operation, model install, benchmark publication, human listening,
+release packaging, push or remote CI observation. Local Xcode remains 27.0 against pinned 26.6;
+current-source pinned-compiler and packaging qualification are still separate. Startup, command
+guards and worker events were observed; persisted hook trust and every route remain unconfirmed.
+The workflow documents stable desktop conditions and explicit release tools. DA-12 remains open
+for unrelated findings; DA-13/DA-14 and the release-first plan retain their unfinished obligations.
+
 ### October 10 — recover the unfinished clone work
 
 Integrated the useful residual work from `32654a87` onto `1aed259d`, preserving main's newer

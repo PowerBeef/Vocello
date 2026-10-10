@@ -94,6 +94,13 @@ fails once an entry is 30 days old.
 
 ## Python tests
 
+`scripts/dev.sh` selects an already-installed Python and propagates it to its child commands.
+Use `VOCELLO_PYTHON=/absolute/path/to/python3 scripts/dev.sh ...` for an explicit interpreter;
+this changes only that invocation, with no global PATH or package installation. `doctor --json`
+reports the selected executable, installed test-package versions and their pin compatibility.
+Keep CI's declared Python environment; a missing local package is a prerequisite failure, not a
+reason to skip tests. Standalone `python3` commands still use the caller's shell environment.
+
 pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs
 in about 65 to 90 seconds on the development Mac (Mac mini M6). `scripts/tests/conftest.py` marks
 modules by name: `research` (audio, delivery, prosody and device-analysis tooling) runs when those
@@ -274,6 +281,9 @@ payload. The adapter retains legacy file-edit payload support for callable regre
 File guards fail closed on unreadable paths/patches. Tokenized Git parsing handles global options,
 literal `-C`, chains, subshells and heredocs. Generated guards cover renamed sources and destinations.
 These cooperative guards cannot sandbox interpreter indirection or arbitrary external programs.
+When a tool wrapper does not forward its working directory in the hook payload, use literal
+`git -C <managed-checkout> switch -c codex/<scope>` for the initial branch creation. The registered
+checkout's Git metadata must establish ownership; never bypass the guard or commit detached.
 
 Trust is a separate host decision: trust the project and review the current hook definition in
 Codex's `/hooks` UI. New/changed untrusted definitions are skipped until reviewed. Managed-host policy
@@ -281,6 +291,9 @@ may prohibit repository hooks, and cloud orchestration does not support local co
 Do not self-approve hooks, bypass hook trust or modify global trust/settings to make a check pass.
 Report inactive/unverified hooks explicitly. `scripts/dev.sh doctor --json` inventories configuration,
 tools and configuration presence; it cannot establish MCP availability or persisted hook trust.
+The October 10 host smoke observed SessionStart and worker start/stop receipts, plus command-guard
+dispatch. Persisted trust and every guard route still require inspection of the current `/hooks`
+definition; those observations alone do not establish full activation.
 
 Safeguards are also callable without activation:
 
@@ -327,3 +340,20 @@ Use xcsym for retained crash symbolication and xcprof for existing trace inspect
 its simulator UI route conflicts with this project's physical-iPhone/XCUITest rules. Missing optional
 tools never block the script workflow; personal plugins, skills, accounts and credentials are not CI
 dependencies. Never install or change global configuration simply to satisfy a routing table.
+
+### Host and release prerequisites
+
+The development host may use a newer Xcode than the exact CI/release pin. `doctor` reports this
+mismatch without changing the selected developer directory. CONV-21 retains the compiler
+qualification boundary: local success does not establish pinned-compiler acceptance. Release
+checks consume exact tools from `config/toolchain.json`; select the existing pinned-tool bin
+directory when available and verify with `scripts/supply_chain_contract.py --installed release`.
+An ambient newer `gh` is fine for ordinary read-only inspection but cannot qualify a pinned release.
+Missing pinned tools require the existing authorized installation workflow before a release;
+do not repin dependencies or change global settings to make the inventory green.
+
+For macOS XCUITest, keep one stable interactive desktop session and avoid simultaneous UI work.
+Check visible blocking dialogs and competing automation before starting, then leave the desktop
+available until collection finishes. Report XCTest display/screenshot errors from retained evidence;
+the earlier Unity modal and display-ID error do not establish a causal link. Do not automatically
+close unrelated apps or modify display settings. Failed UI runs retain their original identities.

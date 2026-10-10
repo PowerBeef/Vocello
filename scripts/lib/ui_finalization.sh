@@ -10,7 +10,7 @@ ui_finalization_last_status=0
 # Monitor mode gives each background collector its own process group on the
 # system Bash 3.2 as well as newer shells. Never signal the caller's group.
 # Each callback has a 300-second default budget (124 on timeout), plus at most
-# three seconds to retire its group. A descendant left after callback success
+# six seconds of bounded cleanup grace. A descendant left after callback success
 # is retired and recorded as 125; neither case can establish collection PASS.
 ui_finalization_stop_group() {
   local group="$1"

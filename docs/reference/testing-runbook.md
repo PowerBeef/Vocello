@@ -62,6 +62,20 @@ subagent, and stops when the deciding evidence is clear:
 4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
    deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
 
+The SwiftPM runtime lane keeps XCTest stdout in `runtime.log` and diagnostic stderr in
+`runtime.stderr.log`, without merging concurrent writes. macOS test verdicts record native statuses
+and separate `core_summary` / `runtime_summary` collection statuses. A complete nonempty
+All/Selected tests trailer is required for these summaries; native success with incomplete evidence
+fails the lane. Inspect both streams before diagnosing a runtime failure. Historical failed or
+inconsistent summaries remain unchanged.
+
+UI runs retain `ui-finalization.json` and its log separately from native test status. After an
+attempted test, failure or interruption still triggers available crash-delta, strict summary and
+attachment collection, followed by owned-process cleanup. Each collector has a bounded budget;
+timeout, missing evidence or cleanup failure prevents PASS. The first native failure/signal remains
+the exit status. Read the collection receipt as well as the required-step ledger; neither a clean
+receipt nor passed test cases alone establishes successful run completion.
+
 For Swift review, the read-only `vocello-swift-review` subagent reads every Swift diff against the native
 domain rules, in parallel with the lead's verification; it adds no CI gate.
 

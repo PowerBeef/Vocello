@@ -41,7 +41,8 @@ class QualificationTests(unittest.TestCase):
             self.takes.append({"token": token, "audio": str(audio), "audioSHA256": digest,
                                "reference": None, "referenceSHA256": None})
             self.evidence.append({"token": token, "audioSHA256": digest, "durationSeconds": 1.0,
-                                  "inputStatus": "complete", "dimensions": {},
+                                  "inputStatus": "complete",
+                                  "dimensions": {"devoiced": {"inputStatus": "complete"}},
                                   "events": [dict(event("candidate"), source="fixture", status="candidate")]})
             panel_rows.append({"token": token, "audioSHA256": digest, "split": split,
                                "groups": {group: None if group == "reference" else f"{group}-{index}"
@@ -117,6 +118,7 @@ class QualificationTests(unittest.TestCase):
 
     def test_unavailable_input_is_coverage_loss_not_a_clean_pass(self):
         self.evidence[2]["inputStatus"] = "unavailable"
+        self.evidence[2]["dimensions"]["devoiced"]["inputStatus"] = "unavailable"
         _, report = self.evaluate()
         metrics = report["classes"]["devoiced"]
         self.assertEqual(metrics["inputCoverage"]["rate"], 0)
@@ -134,6 +136,25 @@ class QualificationTests(unittest.TestCase):
         self.evidence[2]["dimensions"] = {"devoiced": {"decision": "not-assessed"}}
         _, report = self.evaluate()
         self.assertEqual(report["classes"]["devoiced"]["inputCoverage"]["rate"], 0)
+
+    def test_missing_class_coverage_abstains_despite_complete_aggregate_input(self):
+        self.evidence[2]["dimensions"] = {}
+        _, report = self.evaluate()
+        metrics = report["classes"]["devoiced"]
+        self.assertEqual(metrics["inputCoverage"]["rate"], 0)
+        self.assertEqual(metrics["takes"][0]["inputStatus"], "unsupported")
+        self.assertEqual(metrics["truePositives"], 0)
+
+    def test_unknown_class_abstains_instead_of_borrowing_another_dimensions_coverage(self):
+        self.panel["classes"] = ["unknown-class"]
+        for row in self.panel["takes"]:
+            row["labelCoverage"] = {"unknown-class": "complete"}
+            row["events"] = []
+        _, report = self.evaluate()
+        metrics = report["classes"]["unknown-class"]
+        self.assertEqual(metrics["inputCoverage"]["rate"], 0)
+        self.assertEqual(metrics["assessedCleanClips"], 0)
+        self.assertIsNone(metrics["cleanClipFalsePositiveRate"])
 
     def test_unreviewed_empty_labels_do_not_become_negative_examples(self):
         row = self.panel["takes"][2]
@@ -190,13 +211,48 @@ class QualificationTests(unittest.TestCase):
         self.refused("reference group is missing")
 
     def test_reference_audio_identity_cannot_be_hidden_by_different_declared_groups(self):
+        reference = self.layout.private / "independent-reference.wav"
+        with wave.open(str(reference), "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(100)
+            handle.writeframes(struct.pack("<100h", *([9] * 100)))
         for index in (0, 2):
-            self.takes[index].update(reference=self.takes[1]["audio"],
-                                     referenceSHA256=self.takes[1]["audioSHA256"])
+            self.takes[index].update(reference=str(reference), referenceSHA256=q._digest(reference))
             self.panel["takes"][index]["groups"]["reference"] = f"reference-{index}"
-        self.refused("identical reference audio leaks")
+        self.refused("identical audio leaks")
         self.takes[2]["referenceSHA256"] = "f" * 64
         self.refused("reference bytes differ")
+
+    def test_recording_cannot_cross_splits_by_changing_take_and_reference_roles(self):
+        for take_index, reference_index in ((0, 2), (2, 0)):
+            with self.subTest(take_index=take_index, reference_index=reference_index):
+                original = copy.deepcopy(self.takes)
+                groups = copy.deepcopy(self.panel["takes"])
+                self.takes[reference_index].update(
+                    reference=self.takes[take_index]["audio"],
+                    referenceSHA256=self.takes[take_index]["audioSHA256"])
+                self.panel["takes"][reference_index]["groups"]["reference"] = "separate-declared-group"
+                self.refused("identical audio leaks")
+                self.takes = original
+                self.panel["takes"] = groups
+
+    def test_duration_uses_exact_sample_count_without_decimal_rounding(self):
+        audio = Path(self.takes[2]["audio"])
+        with wave.open(str(audio), "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(24000)
+            handle.writeframes(b"\x01\x00" * 24001)
+        digest = q._digest(audio)
+        self.takes[2]["audioSHA256"] = digest
+        self.panel["takes"][2]["audioSHA256"] = digest
+        self.evidence[2].update(audioSHA256=digest, durationSeconds=24001 / 24000)
+        _, report = self.evaluate()
+        self.assertEqual(report["classes"]["devoiced"]["truePositives"], 1)
+        self.evidence[2]["durationSeconds"] = round(24001 / 24000, 6)
+        with self.assertRaisesRegex(q.QualificationError, "duration differs"):
+            self.evaluate(name="rounded-duration")
 
     def test_malformed_or_out_of_duration_spans_are_refused(self):
         for start, end in ((-1, 0.2), (0.3, 0.2), (0.2, 0.2), (0.2, 1.1), (float("nan"), 0.2), (True, 0.2)):

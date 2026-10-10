@@ -195,7 +195,9 @@ def _load_panel(layout: store.Layout, panel_path: Path, run_ids: Iterable[str]) 
     panel_rows = panel.get("takes")
     if not isinstance(panel_rows, list) or not panel_rows:
         raise QualificationError("panel must enumerate its takes")
-    seen, grouped, audio_splits, reference_splits, result = set(), {}, {}, {}, []
+    # A recording must keep its split regardless of whether it is a take or a
+    # conditioning reference. Separate maps would miss cross-role leakage.
+    seen, grouped, audio_splits, result = set(), {}, {}, []
     for item in panel_rows:
         if not isinstance(item, dict):
             raise QualificationError("panel take must be an object")
@@ -241,9 +243,9 @@ def _load_panel(layout: store.Layout, panel_path: Path, run_ids: Iterable[str]) 
             reference = Path(take.get("reference") or "")
             if not reference.is_file() or _digest(reference) != reference_digest:
                 raise QualificationError("reference bytes differ from retained identity")
-            if reference_digest in reference_splits and reference_splits[reference_digest] != split:
-                raise QualificationError("identical reference audio leaks across panel splits")
-            reference_splits[reference_digest] = split
+            if reference_digest in audio_splits and audio_splits[reference_digest] != split:
+                raise QualificationError("identical audio leaks across panel splits (take/reference roles)")
+            audio_splits[reference_digest] = split
         if item.get("origin") not in {"human-observed", "synthetic-control"}:
             raise QualificationError("declare human-observed or synthetic-control label origin")
         coverage = item.get("labelCoverage")
@@ -311,8 +313,9 @@ def _metrics(rows: list[dict], class_id: str, minimum: float) -> dict:
         dimension = row["dimensions"].get(class_id) or {}
         if not isinstance(dimension, dict):
             raise QualificationError("retained class dimension must be an object")
-        status = dimension.get("inputStatus", "unsupported" if dimension.get("decision") == "not-assessed"
-                               else row["inputStatus"])
+        # Aggregate acquisition coverage cannot establish support for a class
+        # the retained analysis never assessed (e.g. accent or emotional intent).
+        status = dimension.get("inputStatus", "unsupported")
         if status not in INPUT_STATUS:
             raise QualificationError("dimension inputStatus must be explicit and supported")
         complete = status == "complete"

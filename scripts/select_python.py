@@ -55,7 +55,7 @@ def select_python(root=ROOT):
         executable = shutil.which(explicit) if explicit else None
         if not executable or not inspect_python(executable):
             raise ValueError("VOCELLO_PYTHON must name an executable Python 3.10 or newer; no fallback was used")
-        return executable
+        return os.path.abspath(executable)
     manifest = json.loads((root / "config/toolchain.json").read_text(encoding="utf-8"))
     pins = {name: manifest["native"][name]["version"] for name in PACKAGES}
     compatible = []
@@ -64,9 +64,9 @@ def select_python(root=ROOT):
         if report:
             compatible.append(executable)
             if all(report["packages"].get(name) == pin for name, pin in pins.items()):
-                return executable
+                return os.path.abspath(executable)
     if compatible:
-        return compatible[0]  # Read-only tools still work without test dependencies.
+        return os.path.abspath(compatible[0])  # Preserve venv symlinks and child cwd independence.
     raise ValueError("No executable Python 3.10 or newer found; set VOCELLO_PYTHON to an installed interpreter")
 
 

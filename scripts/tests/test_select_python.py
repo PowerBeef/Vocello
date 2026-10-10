@@ -76,3 +76,28 @@ class PythonSelectionTests(unittest.TestCase):
         result = subprocess.run([str(ROOT / "scripts/dev.sh"), "doctor", "--json"], env={**environment, "VOCELLO_PYTHON": "/missing/python3"}, text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("VOCELLO_PYTHON", result.stderr)
+
+    def test_relative_override_and_relative_path_survive_child_directory_change(self):
+        executable = self.root.resolve() / "bin/python3"
+        executable.parent.mkdir()
+        executable.symlink_to(sys.executable)
+        for override in ("bin/python3", "python3"):
+            with self.subTest(override=override):
+                environment = {**os.environ, "VOCELLO_PYTHON": override,
+                               "PATH": "bin" + os.pathsep + os.environ["PATH"]}
+                selected = subprocess.run([sys.executable, str(ROOT / "scripts/select_python.py")],
+                                          cwd=self.root, env=environment, text=True, capture_output=True, check=True)
+                self.assertEqual(selected.stdout.strip(), str(executable))
+                environment.update(VOCELLO_PYTHON=selected.stdout.strip(),
+                                   PATH=str(ROOT / "scripts/lib/python-bin") + os.pathsep + os.environ["PATH"])
+                completed = subprocess.run(["bash", "-c", "python3 -c 'import sys; print(sys.executable)'"],
+                                           cwd=ROOT, env=environment, text=True, capture_output=True, check=True)
+                self.assertEqual(Path(completed.stdout.strip()).resolve(), executable.resolve())
+
+    def test_nested_shim_rejects_self_reference_without_recursion(self):
+        environment = {**os.environ, "VOCELLO_PYTHON": "python3",
+                       "PATH": str(ROOT / "scripts/lib/python-bin") + os.pathsep + os.environ["PATH"]}
+        result = subprocess.run([str(ROOT / "scripts/lib/python-bin/python3"), "--version"],
+                                env=environment, text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("repository shim", result.stderr)

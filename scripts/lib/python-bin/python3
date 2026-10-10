@@ -5,4 +5,13 @@ if [[ -z "${VOCELLO_PYTHON:-}" ]]; then
     echo "error: repository python3 shim requires VOCELLO_PYTHON (use scripts/dev.sh)" >&2
     exit 1
 fi
-exec "$VOCELLO_PYTHON" "$@"
+selected="$(command -v -- "$VOCELLO_PYTHON" || true)"
+if [[ -z "$selected" || ! -x "$selected" ]]; then
+    echo "error: VOCELLO_PYTHON must name an executable installed interpreter" >&2
+    exit 1
+fi
+if [[ "$selected" -ef "${BASH_SOURCE[0]}" ]]; then
+    echo "error: VOCELLO_PYTHON resolves to the repository shim; select an installed interpreter path" >&2
+    exit 1
+fi
+exec "$selected" "$@"

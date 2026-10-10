@@ -6,6 +6,8 @@
 ui_finalization_attempted=0
 ui_finalization_status=0
 ui_finalization_last_status=0
+ui_finalization_in_progress=0
+ui_finalization_signal=0
 
 # Monitor mode gives each background collector its own process group on the
 # system Bash 3.2 as well as newer shells. Never signal the caller's group.
@@ -19,13 +21,21 @@ ui_finalization_stop_group() {
 }
 
 ui_finalization_step() {
-  local name="$1" status=0 interrupted=0 callback_pid watchdog_pid
+  local name="$1" status=0 interrupted=0 callback_pid="" watchdog_pid=""
   local monitoring=0 previous_int previous_term timeout_seconds
   shift
   timeout_seconds="${QVOICE_UI_COLLECTION_TIMEOUT_SECONDS:-300}"
   [[ "$timeout_seconds" =~ ^[0-9]+([.][0-9]+)?$ && "$timeout_seconds" != "0" ]] || timeout_seconds=300
   previous_int="$(trap -p INT)"
   previous_term="$(trap -p TERM)"
+  # Preserve intentional signal suppression in the EXIT finalizer. Otherwise
+  # finish this owned group before replaying the signal to the original trap.
+  if [[ "$previous_int" != "trap -- '' SIGINT" ]]; then
+    trap 'interrupted=130; trap "" INT TERM; [[ -z "$callback_pid" ]] || kill -TERM -- "-$callback_pid" 2>/dev/null || true' INT
+  fi
+  if [[ "$previous_term" != "trap -- '' SIGTERM" ]]; then
+    trap 'interrupted=143; trap "" INT TERM; [[ -z "$callback_pid" ]] || kill -TERM -- "-$callback_pid" 2>/dev/null || true' TERM
+  fi
   [[ "$-" != *m* ]] || monitoring=1
   set -m
   (set +m; trap - EXIT INT TERM; set +e; "$@") >>"$out/ui-finalization.log" 2>&1 &
@@ -43,14 +53,7 @@ ui_finalization_step() {
   ) >>"$out/ui-finalization.log" 2>&1 &
   watchdog_pid=$!
   (( monitoring != 0 )) || set +m
-  # Preserve intentional signal suppression in the EXIT finalizer. Otherwise
-  # finish this owned group before replaying the signal to the original trap.
-  if [[ "$previous_int" != "trap -- '' SIGINT" ]]; then
-    trap 'interrupted=130; trap "" INT TERM; kill -TERM -- "-$callback_pid" 2>/dev/null || true' INT
-  fi
-  if [[ "$previous_term" != "trap -- '' SIGTERM" ]]; then
-    trap 'interrupted=143; trap "" INT TERM; kill -TERM -- "-$callback_pid" 2>/dev/null || true' TERM
-  fi
+  (( interrupted == 0 )) || kill -TERM -- "-$callback_pid" 2>/dev/null || true
   wait "$callback_pid" 2>>"$out/ui-finalization.log" || status=$?
   if (( interrupted != 0 )); then
     # wait may return as soon as the parent trap runs, before callback cleanup.
@@ -75,10 +78,11 @@ ui_finalization_step() {
   (( status == 0 )) || ui_finalization_status=1
   ui_finalization_last_status="$status"
   printf '%s\t%s\n' "$name" "$status" >>"$out/ui-finalization.tsv"
-  trap - INT TERM
-  [[ -z "$previous_int" ]] || eval "$previous_int"
-  [[ -z "$previous_term" ]] || eval "$previous_term"
-  if (( interrupted == 130 )); then
+  if [[ -n "$previous_int" ]]; then eval "$previous_int"; else trap - INT; fi
+  if [[ -n "$previous_term" ]]; then eval "$previous_term"; else trap - TERM; fi
+  if (( interrupted != 0 && ui_finalization_in_progress == 1 )); then
+    (( ui_finalization_signal != 0 )) || ui_finalization_signal="$interrupted"
+  elif (( interrupted == 130 )); then
     kill -INT "$$"
   elif (( interrupted == 143 )); then
     kill -TERM "$$"
@@ -88,10 +92,26 @@ ui_finalization_step() {
 
 ui_finalize_collections() {
   (( ui_finalization_attempted == 0 )) || return "$ui_finalization_status"
+  local previous_int previous_term
+  previous_int="$(trap -p INT)"
+  previous_term="$(trap -p TERM)"
+  # Defer signal replay until every collector, cleanup and receipt has run.
+  # Install before marking attempted so the EXIT trap cannot skip partial work.
+  if [[ "$previous_int" != "trap -- '' SIGINT" ]]; then
+    trap '(( ui_finalization_signal != 0 )) || ui_finalization_signal=130; ui_finalization_status=1' INT
+  fi
+  if [[ "$previous_term" != "trap -- '' SIGTERM" ]]; then
+    trap '(( ui_finalization_signal != 0 )) || ui_finalization_signal=143; ui_finalization_status=1' TERM
+  fi
+  ui_finalization_in_progress=1
   ui_finalization_attempted=1
   collect_ui_evidence
   if [[ "$platform" == "macos" ]]; then
     ui_finalization_step cleanup cleanup_macos_run
+  fi
+  if (( ui_finalization_signal != 0 )); then
+    ui_finalization_status=1
+    printf 'interruption\t%s\n' "$ui_finalization_signal" >>"$out/ui-finalization.tsv"
   fi
   python3 - "$out/ui-finalization.tsv" "$out/ui-finalization.json" <<'PY'
 import json, pathlib, sys
@@ -107,6 +127,14 @@ output.write_text(json.dumps({"schemaVersion": 1, "steps": steps,
 PY
   local receipt_status=$?
   (( receipt_status == 0 )) || ui_finalization_status=1
+  ui_finalization_in_progress=0
+  if [[ -n "$previous_int" ]]; then eval "$previous_int"; else trap - INT; fi
+  if [[ -n "$previous_term" ]]; then eval "$previous_term"; else trap - TERM; fi
+  if (( ui_finalization_signal == 130 )); then
+    kill -INT "$$"
+  elif (( ui_finalization_signal == 143 )); then
+    kill -TERM "$$"
+  fi
   return "$ui_finalization_status"
 }
 

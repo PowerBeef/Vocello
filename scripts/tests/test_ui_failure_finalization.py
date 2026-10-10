@@ -300,6 +300,78 @@ ui_finalization_step attachments export_attachments
                             process.kill()
                             process.wait()
 
+    def test_immediate_collector_signal_finishes_cleanup_and_receipt(self):
+        for sig, code in (("TERM", 143), ("INT", 130)):
+            with self.subTest(signal=sig):
+                (self.out / "ui-finalization.tsv").unlink(missing_ok=True)
+                script = f'''set -euo pipefail
+source {shlex.quote(str(HELPER))}
+out={shlex.quote(str(self.out))}
+platform=macos
+interrupt_parent() {{ kill -{sig} "$$"; }}
+collect_ui_evidence() {{
+  ui_finalization_step summary interrupt_parent
+  ui_finalization_step attachments true
+}}
+cleanup_macos_run() {{ echo cleanup >>"$out/order-{sig}"; }}
+finish() {{
+  local original=$?
+  trap - EXIT
+  trap '' INT TERM
+  set +e
+  ui_finalize_collections
+  exit "$original"
+}}
+trap finish EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+ui_finalize_collections
+'''
+                result = subprocess.run(["bash", "-c", script], text=True,
+                                        capture_output=True, timeout=12)
+                self.assertEqual(result.returncode, code, result.stderr)
+                receipt = json.loads((self.out / "ui-finalization.json").read_text())
+                self.assertEqual(receipt["status"], "failed")
+                names = [step["step"] for step in receipt["steps"]]
+                self.assertEqual(names, ["summary", "attachments", "cleanup", "interruption"])
+                self.assertEqual((self.out / f"order-{sig}").read_text(), "cleanup\n")
+
+    def test_native_failure_precedes_signal_during_attachment_export(self):
+        script = f'''set -euo pipefail
+source {shlex.quote(str(HELPER))}
+out={shlex.quote(str(self.out))}
+platform=macos
+result="$out/result.xcresult"
+step_ledger="$out/ledger"
+run_finalized=0
+candidate_collection_needed=0
+candidate_collection_attempted=0
+ui_test_attempted=1
+mac_crash_delta_attempted=1
+attachments_attempted=0
+warn() {{ :; }}
+note() {{ :; }}
+write_test_summary() {{ return 0; }}
+export_attachments() {{ kill -TERM "$$"; }}
+cleanup_macos_run() {{ echo cleanup >>"$out/order"; }}
+required_steps_finalize() {{ return 1; }}
+write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
+{function("run_xcodebuild")}
+{function("collect_ui_evidence")}
+{function("cleanup_ui_run")}
+trap cleanup_ui_run EXIT
+trap 'exit 143' TERM
+run_xcodebuild bash -c 'exit 65'
+'''
+        result = subprocess.run(["bash", "-c", script], text=True,
+                                capture_output=True, timeout=12)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertEqual((self.out / "metadata").read_text(), "failed 65\n")
+        self.assertEqual((self.out / "order").read_text(), "cleanup\n")
+        receipt = json.loads((self.out / "ui-finalization.json").read_text())
+        self.assertEqual(receipt["status"], "failed")
+        self.assertIn({"step": "attachments", "exitCode": 143}, receipt["steps"])
+
     def test_successful_finalization_is_idempotent(self):
         script = f'''
 set -euo pipefail

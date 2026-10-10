@@ -873,6 +873,7 @@ collect_ui_evidence() {
 
 cleanup_ui_run() {
   local original=$? collection_status=0 status
+  (( ${ui_primary_native_exit_code:-0} == 0 )) || original="$ui_primary_native_exit_code"
   trap - EXIT
   # Further signals must not interrupt bounded evidence/ownership cleanup and
   # erase the first signal's exit status.
@@ -1295,6 +1296,9 @@ run_xcodebuild() {
   done
   local -a pipeline_status=("${PIPESTATUS[@]}")
   local status=${pipeline_status[0]}
+  if (( status != 0 && ${ui_primary_native_exit_code:-0} == 0 )); then
+    ui_primary_native_exit_code="$status"
+  fi
   set -e
   if (( status != 0 )); then
     warn "xcodebuild exited $status; final diagnostics follow (complete log: $log_path)"

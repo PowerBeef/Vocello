@@ -86,7 +86,7 @@ Codex migration; final acceptance must cite the integration checks rather than t
 | CW-02 / P2 | `host_preflight.sh` counts `git worktree list --porcelain` entries beginning `locked` as active agents. A retained lock is not a live worker; an active worker need not own a locked worktree. | [`active_workers.py`](../../scripts/active_workers.py) and lifecycle hooks track live ownership and reject stale/reused-process identities. Preserve load, memory, native-lock, and exploratory classification. If tracking is unavailable, measurements use lead-only execution. |
 | CW-03 / P2 | Hook normalization understands Claude `Edit`/`Write` payloads; configuration, CI classification, and invariant scans name `.claude`/`CLAUDE.md`. Copying settings would miss Codex patch paths and leave new configuration untested. | Migrate instructions, skill discovery, agents, hook schema/payload adapters, routing, scanners, and direct checks together. Cover multiple-file patches, renames, spaces, managed worktrees, and inactive-hook reporting. Hooks supplement repository checks and do not become release authority. |
 | CW-04 / P2 coverage/reliability | Baseline seed tests migrate an empty database; coordinator assertions include fixed yield counts and 50 ms sleeps in `ActiveGenerationCoordinatorTests`. These do not prove a populated old-schema upgrade or establish that the competing task entered its critical boundary. | Add populated upgrade fixtures without editing shipped migrations; replace selected scheduler assumptions with explicit fake/continuation synchronization and bounded test completion. Preserve XCTest and app-host-free execution. |
-| CW-05 / P2 characterized migration invariant | A populated v2 fixture retaining row 41 after deleting row 900 characterizes the v3 rebuild: copying survivors into `generations_v3` and dropping/renaming the old table reduces `sqlite_sequence` from 900 to 41; the next insert obtains 42. This contradicts the assumption that historical IDs are never reused across that upgrade. | Record `GenerationMigrationUpgradeTests.testV3RebuildCurrentlyResetsDeletedHighWaterToLargestRetainedID` in [`DatabaseServiceTests.swift`](../../Tests/VocelloCoreTests/DatabaseServiceTests.swift) and a dedicated roadmap follow-up. The native test author independently reproduced the same DDL with Python sqlite3; native GRDB execution remains pending integration validation. Do not alter the shipped v3 migration in workflow work. No current-user data-loss incident or reachable journal failure is established by this characterization; repair strategy and upgrade compatibility need separate design. |
+| CW-05 / P2 characterized migration invariant | A populated v2 fixture retaining row 41 after deleting row 900 characterizes the v3 rebuild: copying survivors into `generations_v3` and dropping/renaming the old table reduces `sqlite_sequence` from 900 to 41; the next insert obtains 42. This contradicts the assumption that historical IDs are never reused across that upgrade. | Record `GenerationMigrationUpgradeTests.testV3RebuildCurrentlyResetsDeletedHighWaterToLargestRetainedID` in [`DatabaseServiceTests.swift`](../../Tests/VocelloCoreTests/DatabaseServiceTests.swift) and a dedicated roadmap follow-up. The native test author independently reproduced the same DDL with Python sqlite3; native GRDB execution passed in the lead's 70-test focused acceptance run. Do not alter the shipped v3 migration in workflow work. No current-user data-loss incident or reachable journal failure is established by this characterization; repair strategy and upgrade compatibility need separate design. |
 | CW-06 / P2 coverage gap | Production `GenerationOutputAdapter.runReservedTake` is tested over `ScriptedReservedTake`; concrete `run` construction and the complete loaded-model output path are not tested together by that fixture. | Defer a bounded production-adapter integration seam; retain helper tests and explicit model proof. This refines October E7-02/DA-09 rather than reopening the old claim of zero choreography coverage. |
 | CW-07 / P2 coverage gap | Pure ledger, cancellation ordering, and downloader tests exist, but `IOSModelDownloadCoordinator` itself is absent from the standalone app-host-free compile list. Its concrete background-session construction and AppPaths/relay ownership couple it to the app. | Defer dependency injection for coordinator orchestration (restore/adoption, cancel-progress fencing, durable UIKit completion, operation-generation staleness). Keep the opt-in real-iPhone lifecycle lane; do not silently add downloads to CI. |
 
@@ -110,7 +110,7 @@ identities, target isolation, and scripts for expensive lanes. Codex should impr
 authorities rather than create competing build, device, measurement, or release pipelines.
 
 The development loop is targeted tests and changed-file lint while editing, routed checks and diff
-review before a scoped commit, then the smallest relevant explicit runtime/model/UI lane at a
+review before a scoped commit, then the smallest relevant runtime/model/UI lane at a
 coherent committed checkpoint. Use [`workflow_diagnostics.py`](../../scripts/workflow_diagnostics.py)
 through `scripts/dev.sh doctor` for read-only capability inventory and `triage` for retained-run
 classification. An infrastructure failure, interruption, incomplete evidence, and product failure
@@ -121,3 +121,48 @@ MLX guidance, authoritative documentation tools, verified diagnostic helpers, Xc
 browser inspection, and GitHub inspection can improve a session, but scripts own canonical evidence.
 No global configuration mutation, dependency repin, new large asset download, push, external write,
 deployment, or release is implied by read-only readiness or local validation.
+
+
+## Integrated acceptance, October 10
+
+The lead integrated the isolated tooling, native-test and documentation commits on local `main`,
+then validated the combined tree. Existing unpushed commits were preserved. Canonical raw logs
+remain untracked under `build/artifacts/diagnostics/codex-workflow-20261010/`; native drivers also
+retain their normal build/test artifacts. These are local verification results, not qualified
+performance records or release evidence.
+
+| Check | Result and evidence |
+| --- | --- |
+| Repository contracts and selected broad Python consumers | PASS: 2,125 tests, 2,519 subtests, one existing skip; `contracts-attempt4.log`. Contracts include catalog, supply chain, security, roadmap, benchmark registry, generated references and invariants. |
+| Native deterministic regression | PASS: 70 tests across GenerationMigrationUpgradeTests, DatabaseServiceTests, ActiveGenerationCoordinatorTests and TTSEngineStoreTests; `native-core-attempt1.log` and `build/artifacts/macos/tests/core-test.test-results.json`. Five populated upgrade tests include the v3 sequence characterization. |
+| Generic physical-device SDK compile | PASS: iOS app and standalone logic-test bundle; `ios-compile-attempt1.log`. No phone/simulator or iOS test execution. |
+| Native UI bundle compilation | PASS: macOS and iOS build-for-testing only; `ui-bundles-attempt1.log`. No UI execution. |
+| Website final acceptance | PASS: lint, deterministic Node/render contracts, production build and two Playwright viewport journeys; `website-attempt3.log`. |
+| Changed-file lint, privacy and whitespace | PASS: `lint-attempt2.log`; subsequent guard-only changes covered by targeted regression and final whitespace/privacy checks. |
+| Codex fresh prompt initialization | Root and website AGENTS discovered in the proper scopes; all six repository skills discovered. Raw prompt output remains untracked and must not be published. |
+| Codex app-server configuration discovery | Effective concurrency four, inherited subagent model, six skills, and ten project hook handlers reported enabled/trusted without hook-schema warnings. No trust or global configuration was changed by the migration. |
+| Custom-agent and lifecycle limits | Both read-only agent TOMLs pass metadata validation. The active collaboration API has no custom-profile selector, and fresh prompt initialization did not expose the two profiles. An ephemeral read-only session reported AGENTS but no worker receipt was observed; actual SessionStart/SubagentStart/Stop/tool-event delivery remains unverified. Use documented lead-only fallback until it is established. |
+
+A read-only independent review covered substantive Swift changes and the hook/worker implementation;
+findings were fixed and checked. Subsequent focused guard regressions cover absolute linked-checkout
+cache operands, missing repository identity, session error recovery and Bash nounset compatibility.
+
+Retained unsuccessful attempts have distinct logs and were not replaced:
+
+- `contracts-attempt1.log` found stale README charts, reproduced on the pre-migration checkout.
+  The generator resynchronized charts/README and the website from existing qualified record
+  `macos-xcui-benchmark-20261007-015814-74f026be` (one-record compatible pool). No new benchmark ran.
+- `contracts-attempt2.log` found a fixture method name matching the existing simulator-route literal
+  invariant. Renaming that test preserved the invariant. `contracts-attempt3.log` exposed one
+  planner-test mock error plus sandbox-denied loopback/process-inventory fixtures; the mock was
+  corrected, and attempt four passed with those local capabilities.
+- `website-attempt1.log` retained the sandbox-denied preview-server bind; subsequent attempts used
+  localhost access. `lint-final.log` retained the denied SwiftLint cache write; attempt two passed.
+- Initial Codex prompt probes were sandbox-blocked; scoped diagnostic reruns initialized successfully.
+  Configuration discovery and behavioral fixtures do not establish runtime hook-event delivery.
+
+Local Xcode 27.0 differs from CI's pinned 26.6; local compilation does not establish pinned-compiler
+or remote CI acceptance. Installed gh also differs from its pin; no pins/installations were changed.
+No physical device, model inference, listening, measured benchmark, TSan, release, deployment, push
+or external publication ran for this migration. CW-05 is tracked by DA-14; CW-06/CW-07 refine DA-13.
+Existing unrelated DA-12 and release work remain open.

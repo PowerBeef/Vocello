@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-25
+reviewed: 2026-10-10
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,33 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### October 10 — Codex engineering workflow migration
+
+Codex is the main developer. Root and website `AGENTS.md`, explicit native/tooling reference rules,
+six repository skills, two read-only agent profiles and one `.codex/hooks.json` replace tracked Claude
+configuration; personal untracked overrides and historical evidence remain. Local targeted validation
+and scoped main commits are authorized. Pushes, including the existing 21 unpushed commits, require
+an explicit request. Source-bound measurements use committed checkpoints after joining workers.
+
+The [takeover audit](audits/2026-10-10-codex-workflow-audit.md) records source ownership, diagrams,
+coverage boundaries, review findings and acceptance. Shared generation signatures now cover specs,
+generators and membership; content-only edits reuse the cache. Live worker leases replace Git locks
+as activity evidence, with a conservative explicit lead-only fallback. `dev.sh doctor`, offline
+`triage` and JSON dry-run planning expose the canonical workflow. Populated schema upgrades and
+concurrency handshakes extend the app-host-free XCTest suites.
+
+**Verified:** 70 native tests; generic iOS app/logic compilation; both UI bundles compiled;
+2,125 Python tests and 2,519 subtests with the contracts gate; website acceptance; changed-file lint.
+Failed infrastructure/fixture attempts remain in distinct ignored logs. Stale public charts reproduced
+at baseline were resynchronized from existing qualified evidence, with no new benchmark.
+Fresh Codex discovery verified AGENTS, six skills, concurrency four and ten enabled/trusted hook
+handlers. Custom profile invocation and actual hook event delivery remain unverified in this host
+interface; do not infer worker tracking from configuration. See the audit for exact limits.
+
+**Next:** DA-14 designs the characterized v3 deleted-ID high-water repair; DA-13 retains concrete
+production-adapter integration and background-download orchestration coverage. Existing release work
+remains the priority; no release, push, device/model campaign or external publication ran here.
 
 ### October 6, evening — audit second pass: 35 of the 41 P1/P2 findings fixed, release path hardened
 

@@ -14,7 +14,7 @@ case "${1:-}" in
     . "$ROOT_DIR/scripts/lib/build_paths.sh"
     exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
     ;;
-  status)
+  status|doctor|triage)
     # Read-only and run by the SessionStart hook: no build-path policy subprocess.
     exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
     ;;
@@ -22,7 +22,7 @@ case "${1:-}" in
     cat >&2 <<'EOF'
 usage: scripts/dev.sh <command>
 
-  check [--dry-run] [--paths P...] [--since REF]
+  check [--dry-run [--json]] [--paths P...] [--since REF]
                            lint, contracts, selected tests, native lanes the dirty tree touches
                            (--since: also everything committed since REF, e.g. origin/main)
   lint                     git diff --check, privacy scan, shellcheck on changed shell
@@ -35,6 +35,8 @@ usage: scripts/dev.sh <command>
   regen                    regenerate derived artifacts
   ci                       exactly what push CI runs, serially
   status                   branch, dirty paths, lanes, primary plan
+  doctor [--json]          read-only prerequisites and optional capabilities
+  triage RUN [--json]      summarize retained evidence without rerunning
 EOF
     exit 2
     ;;

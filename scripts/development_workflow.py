@@ -93,8 +93,8 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     consumer, or tooling everything depends on changed, the whole suite runs.
     """
     root = root or ROOT
-    agent_inputs = [p for p in paths if p.startswith(".claude/")
-                    and p.endswith((".json", ".md", ".py", ".sh"))]
+    agent_inputs = [p for p in paths if p.startswith((".agents/", ".codex/"))
+                    and p.endswith((".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"))]
     # Top-level benchmark contracts (record schemas, hardware profiles) are read
     # by the registry tests; published records under benchmarks/runs/ are not.
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
@@ -110,6 +110,8 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     if agent_inputs:
         selected.update({"scripts/tests/test_agent_hooks.py"})
     for changed in inputs:
+        if changed in agent_inputs:
+            continue  # Additions, modifications and deletions all use behavioral hook tests.
         if not (root / changed).is_file():
             return {"mode": "full", "tests": [], "reason": "deleted or missing tooling input"}
         affected = {changed}
@@ -121,8 +123,6 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
                 break
             affected = expanded
         tests = affected & test_paths
-        if not tests and changed in agent_inputs:
-            continue  # Claude settings, skill, subagent and rule metadata are covered above
         if not tests:
             return {"mode": "full", "tests": [], "reason": "no known test consumer for changed input"}
         selected.update(tests)
@@ -267,10 +267,18 @@ def lineage_review_paths(paths: list[str]) -> list[str]:
     return sorted(set(paths) & watched)
 
 
+def project_generation_status(paths: list[str]) -> dict | None:
+    generation = _load("scripts/project_generation.py")
+    if not generation.relevant_paths(paths, ROOT):
+        return None
+    return generation.status(ROOT)
+
+
 def check_plan(paths: list[str]) -> dict:
     lanes = lanes_for(paths)
     commands: list[list[str]] = []
-    if "project.yml" in paths:
+    generation = project_generation_status(paths)
+    if generation and generation["needsRegeneration"]:
         commands.append(["./scripts/regenerate_project.sh", "--fast"])
     commands.extend(lint_commands(paths))
     commands.append(["./scripts/check_project_inputs.sh", "--local"])
@@ -284,7 +292,7 @@ def check_plan(paths: list[str]) -> dict:
     if bundles:
         commands.append(["./scripts/build_ui_test_bundles.sh", bundles])
     return {"changedPaths": paths, "lanes": lanes, "commands": commands,
-            "lineageReviewPaths": lineage_review_paths(paths)}
+            "lineageReviewPaths": lineage_review_paths(paths), "projectGeneration": generation}
 
 
 # Mirrors .github/workflows/ci.yml: contracts, routing-independent lanes, then
@@ -354,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="lint, contracts, selected tests and the native lanes the dirty tree touches")
     check.add_argument("--dry-run", action="store_true", help="print the commands without running them")
+    check.add_argument("--json", action="store_true", help="emit structured planning data (requires --dry-run)")
     check.add_argument("--paths", nargs="+", help="plan for these paths instead of the dirty tree")
     check.add_argument("--since", metavar="REF",
                        help="also plan for everything committed since REF (for example origin/main): "
@@ -370,14 +379,28 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("ios", help="generic device-SDK compile (incremental)")
     sub.add_parser("build", help="dev-signed macOS app build (for running, not verification)")
     sub.add_parser("run", help="build and launch the macOS app")
-    sub.add_parser("regen", help="regenerate derived artifacts (and the project if project.yml changed)")
+    sub.add_parser("regen", help="regenerate derived artifacts and stale project inputs or membership")
     sub.add_parser("ci", help="exactly what push CI runs, serially")
     sub.add_parser("status", help="branch, dirty paths, lanes, primary plan")
+    doctor_parser = sub.add_parser("doctor", help="read-only prerequisite and optional capability inventory")
+    doctor_parser.add_argument("--json", action="store_true")
+    triage_parser = sub.add_parser("triage", help="read retained run evidence without rerunning or rewriting it")
+    triage_parser.add_argument("run_directory", type=Path)
+    triage_parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    if args.command == "check" and args.json and not args.dry_run:
+        parser.error("check --json requires --dry-run")
 
     try:
         command = args.command
-        if command == "status":
+        if command in {"doctor", "triage"}:
+            diagnostics = _load("scripts/workflow_diagnostics.py")
+            report = diagnostics.doctor(ROOT) if command == "doctor" else diagnostics.triage(args.run_directory)
+            if args.json:
+                print(json.dumps(report, indent=2))
+            else:
+                diagnostics.print_report(report)
+        elif command == "status":
             print_status()
         elif command == "check":
             if args.since:
@@ -395,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
                     f"a kind measures, bump its LINEAGE_MEASUREMENT_VERSIONS entry in {LINEAGE_IDENTITY}",
                     file=sys.stderr, flush=True,
                 )
-            if args.dry_run:
+            if args.dry_run and args.json:
+                print(json.dumps(plan, indent=2))
+            elif args.dry_run:
                 lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")
                 for entry in plan["commands"]:
@@ -431,12 +456,12 @@ def main(argv: list[str] | None = None) -> int:
             run_commands([["./scripts/build.sh", "run"]])
         elif command == "regen":
             commands = list(REGEN_COMMANDS)
-            if "project.yml" in changed_paths():
+            if _load("scripts/project_generation.py").status(ROOT)["needsRegeneration"]:
                 commands.insert(0, ["./scripts/regenerate_project.sh", "--fast"])
             run_commands(commands)
         elif command == "ci":
             run_commands(CI_COMMANDS)
-    except (OSError, WorkflowError) as error:
+    except (OSError, ValueError, WorkflowError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0

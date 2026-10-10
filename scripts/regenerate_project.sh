@@ -24,7 +24,7 @@ cd "$PROJECT_DIR"
 # shellcheck source=lib/build_paths.sh
 . "$SCRIPT_DIR/lib/build_paths.sh"
 GENERATION_CACHE_DIR="$QVOICE_XCODE_SOURCE_PACKAGES/.qwenvoice-cache"
-GENERATION_STAMP="$GENERATION_CACHE_DIR/project.yml.sha256"
+GENERATION_STAMP="$GENERATION_CACHE_DIR/project-generation.sha256"
 
 if ! command -v xcodegen >/dev/null 2>&1; then
     echo "error: xcodegen is required to regenerate the project." >&2
@@ -45,6 +45,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+generation_digest="$(python3 "$SCRIPT_DIR/project_generation.py" digest)"
 echo "==> Backing up entitlements..."
 cp "$ENTITLEMENTS" "$BACKUP"
 
@@ -62,10 +63,7 @@ python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py"
 # renderers succeed so a later build never regenerates the same project merely
 # because an unrelated repository check failed.
 mkdir -p "$GENERATION_CACHE_DIR"
-generation_digest="$(/usr/bin/shasum -a 256 project.yml | awk '{print $1}')"
-generation_stamp_next="$(mktemp "$GENERATION_CACHE_DIR/project.yml.sha256.next.XXXXXX")"
-printf '%s\n' "$generation_digest" > "$generation_stamp_next"
-mv -f "$generation_stamp_next" "$GENERATION_STAMP"
+python3 "$SCRIPT_DIR/project_generation.py" record --stamp "$GENERATION_STAMP" --expected-signature "$generation_digest"
 
 if [[ "$MODE" == "verify" ]]; then
     bash "$SCRIPT_DIR/check_project_inputs.sh"

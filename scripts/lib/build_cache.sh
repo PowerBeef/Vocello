@@ -28,7 +28,6 @@ if [[ -z "${QVOICE_BUILD_ROOT:-}" ]]; then
 fi
 
 BUILD_CACHE_DIR="${BUILD_CACHE_DIR:-$QVOICE_XCODE_SOURCE_PACKAGES/.qwenvoice-cache}"
-PROJECT_YML="$ROOT_DIR/project.yml"
 PROJECT_FILE="$ROOT_DIR/QwenVoice.xcodeproj"
 PROJECT_RESOLVED="$PROJECT_FILE/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 QVOICE_ACTIVE_PACKAGE_LOCK=""
@@ -161,27 +160,14 @@ sha256_of() {
     fi
 }
 
-# Skip the XcodeGen regeneration step when project.yml hasn't changed
-# since the project was last generated. On cache miss, regenerate only the
-# project graph. Repository-wide validation belongs to the explicit checkpoint
-# and pre-commit lanes, not every build invocation.
+# Use the same source membership/specification signature as regeneration and
+# local check planning. Content-only edits remain Xcode incremental-build inputs.
 ensure_project_regenerated() {
-    mkdir -p "$BUILD_CACHE_DIR"
-    local cache_file="$BUILD_CACHE_DIR/project.yml.sha256"
-    local current
-    current="$(sha256_of "$PROJECT_YML")"
-    if [ -z "$current" ]; then
-        echo "error: project.yml not found at $PROJECT_YML" >&2
-        return 1
-    fi
-
-    local cached=""
-    if [ -f "$cache_file" ]; then
-        cached="$(cat "$cache_file" 2>/dev/null || true)"
-    fi
-
-    if [ -d "$PROJECT_FILE" ] && [ "$current" = "$cached" ]; then
-        echo "==> project.yml unchanged; skipping XcodeGen"
+    local cache_file="$BUILD_CACHE_DIR/project-generation.sha256"
+    local current="" cached=""
+    current="$(python3 "$ROOT_DIR/scripts/project_generation.py" digest --root "$ROOT_DIR")" || return 1
+    if python3 "$ROOT_DIR/scripts/project_generation.py" check --root "$ROOT_DIR" --stamp "$cache_file"; then
+        echo "==> Project generation inputs unchanged; skipping XcodeGen"
         python3 "$ROOT_DIR/scripts/generate_cli_scheme.py" --check >/dev/null \
             || python3 "$ROOT_DIR/scripts/generate_cli_scheme.py"
         python3 "$ROOT_DIR/scripts/generate_ios_logic_scheme.py" --check >/dev/null \
@@ -189,11 +175,13 @@ ensure_project_regenerated() {
         return 0
     fi
 
-    echo "==> Regenerating Xcode project (project.yml changed or project missing)..."
-    bash "$ROOT_DIR/scripts/regenerate_project.sh" --fast
+    echo "==> Regenerating Xcode project (generation inputs changed or output missing)..."
+    bash "$ROOT_DIR/scripts/regenerate_project.sh" --fast || return 1
+    # A custom cache root used by a caller must receive the same validated stamp.
+    python3 "$ROOT_DIR/scripts/project_generation.py" record --root "$ROOT_DIR" --stamp "$cache_file" --expected-signature "$current" || return 1
     cached="$(cat "$cache_file" 2>/dev/null || true)"
     if [[ "$cached" != "$current" ]]; then
-        echo "error: project regeneration did not publish the expected project.yml digest" >&2
+        echo "error: generation inputs changed during project regeneration" >&2
         return 1
     fi
 }

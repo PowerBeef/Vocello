@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import subprocess
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -150,13 +151,13 @@ class LintTests(unittest.TestCase):
 
 
 class PythonSelectionTests(unittest.TestCase):
-    def test_claude_configuration_selects_agent_hook_tests(self) -> None:
-        for path in (".claude/settings.json", ".claude/skills/ios-lane/SKILL.md", ".claude/agents/xcresult-triage.md",
-                     ".claude/rules/native.md"):
+    def test_codex_configuration_selects_agent_hook_tests_even_when_added_or_deleted(self) -> None:
+        for path in (".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md", ".codex/agents/xcresult-triage.toml",
+                     ".codex/config.toml", ".codex/removed.yaml", ".agents/new.yml"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")
-                self.assertIn("scripts/tests/test_agent_hooks.py", selection["tests"])
+                self.assertEqual(selection["tests"], ["scripts/tests/test_agent_hooks.py"])
 
     def test_real_tooling_dependency_selection_reaches_consumers(self) -> None:
         selection = MODULE.python_test_selection(["scripts/analyze_prosody.py"])
@@ -180,7 +181,7 @@ class PythonSelectionTests(unittest.TestCase):
         self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")
 
     def test_instruction_changes_do_not_select_python(self) -> None:
-        for path in ("CLAUDE.md", "website/CLAUDE.md", "docs/reference/development-workflow.md"):
+        for path in ("AGENTS.md", "website/AGENTS.md", "docs/reference/development-workflow.md"):
             with self.subTest(path=path):
                 self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 
@@ -246,6 +247,19 @@ class CommandRunnerTests(unittest.TestCase):
         run.assert_not_called()
         self.assertIn("git diff --check", buffer.getvalue())
         self.assertIn("lanes: none", buffer.getvalue())
+
+    def test_json_dry_run_is_the_exact_executable_plan(self) -> None:
+        buffer = io.StringIO()
+        expected = MODULE.check_plan(["docs/reference/cli.md"])
+        with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer):
+            self.assertEqual(MODULE.main(["check", "--dry-run", "--json", "--paths", "docs/reference/cli.md"]), 0)
+        run.assert_not_called()
+        self.assertEqual(json.loads(buffer.getvalue()), expected)
+
+    def test_json_requires_dry_run(self) -> None:
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            MODULE.main(["check", "--json"])
+        self.assertEqual(error.exception.code, 2)
 
     def test_a_clean_tree_dry_run_plans_no_lane_and_points_at_since(self) -> None:
         stdout, stderr = io.StringIO(), io.StringIO()

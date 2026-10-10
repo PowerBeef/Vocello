@@ -240,9 +240,21 @@ _run_mac_test_bundle() {
 # Structured per-bundle summary next to the raw log: <log>.test-results.json.
 write_mac_test_summary() {
   local log_path="$1"
-  [[ -f "$log_path" ]] || return 0
-  python3 "$SCRIPT_DIR/lib/xctest_summary.py" "$log_path" "${log_path%.log}.test-results.json" --quiet \
-    || warn "test summary inconsistent or unparsable for $log_path"
+  local status=0
+  python3 "$SCRIPT_DIR/lib/xctest_summary.py" "$log_path" "${log_path%.log}.test-results.json" --quiet --require-complete \
+    || status=$?
+  if (( status != 0 )); then
+    warn "test summary incomplete or unparsable for $log_path (status $status)"
+  fi
+  return "$status"
+}
+
+# SwiftPM diagnostics can be written between fragments of an XCTest stdout line.
+# Keep both streams verbatim, with only verdict stdout entering the parser.
+run_runtime_test_command() {
+  local log_path="$1"
+  shift
+  "$@" > "$log_path" 2> "${log_path%.log}.stderr.log"
 }
 
 # Opt-in llvm-cov export for the directly run bundles. The build must have used
@@ -893,24 +905,27 @@ cmd_core_test() {
   fi
   local build_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test-build.log"
   local test_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test.log"
-  rm -f "$test_log"
+  rm -f "$test_log" "${test_log%.log}.test-results.json" "${test_log%.log}.verdict.txt"
   set +e
-  local build_st=0 st=0
+  local build_st=0 st=0 summary_st=0
   build_mac_test_bundles "$build_log" || build_st=$?
   if (( build_st == 0 )); then
     run_mac_test_bundle VocelloCoreTests "$test_log" 0 "$test_filter" || st=$?
-    write_mac_test_summary "$test_log"
+    write_mac_test_summary "$test_log" || summary_st=$?
   else
     st="$build_st"
   fi
   set -e
-  if (( st == 0 )); then
+  printf 'build=%s\ncore=%s\ncore_summary=%s\n' "$build_st" "$st" "$summary_st" \
+    > "${test_log%.log}.verdict.txt"
+  if (( st == 0 && summary_st == 0 )); then
     note "core-test PASS"
   elif (( build_st != 0 )); then
     warn "core-test BUILD FAIL (see build/artifacts/macos/tests/core-test-build.log)"
   else
     warn "core-test FAIL (see build/artifacts/macos/tests/core-test.log)"
   fi
+  (( st != 0 )) || st="$summary_st"
   return "$st"
 }
 
@@ -925,22 +940,22 @@ cmd_tsan() {
   local run_id
   run_id="tsan-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
-  local build_st=0 core_st=0
+  local build_st=0 core_st=0 core_summary_st=0
   mkdir -p "$artifacts"
   note "tsan: deterministic core subset"
   set +e
   QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles "$artifacts/build.log" || build_st=$?
   if (( build_st == 0 )); then
     run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" 1 || core_st=$?
-    write_mac_test_summary "$artifacts/core.log"
+    write_mac_test_summary "$artifacts/core.log" || core_summary_st=$?
   else
     core_st="$build_st"
   fi
   set -e
-  printf 'build=%s\ncore=%s\n' \
-    "$build_st" "$core_st" > "$artifacts/verdict.txt"
+  printf 'build=%s\ncore=%s\ncore_summary=%s\n' \
+    "$build_st" "$core_st" "$core_summary_st" > "$artifacts/verdict.txt"
   cat "$artifacts/verdict.txt" >&2
-  if (( build_st == 0 && core_st == 0 )); then
+  if (( build_st == 0 && core_st == 0 && core_summary_st == 0 )); then
     note "tsan characterization PASS · artifacts → $artifacts"
     return 0
   fi
@@ -1423,6 +1438,7 @@ cmd_test() {
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   mkdir -p "$artifacts"
   local test_build_st=0 core_st=0 runtime_st=0 coverage_st=0
+  local core_summary_st=0 runtime_summary_st=0
   local products="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release"
 
   if (( coverage )); then
@@ -1438,7 +1454,7 @@ cmd_test() {
     note "test: VocelloCoreTests"
     LLVM_PROFILE_FILE="$artifacts/profraw/core-%p.profraw" \
       run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" || core_st=$?
-    write_mac_test_summary "$artifacts/core.log"
+    write_mac_test_summary "$artifacts/core.log" || core_summary_st=$?
     if (( coverage )); then
       write_mac_coverage "$artifacts" "$products" || coverage_st=$?
     fi
@@ -1492,14 +1508,13 @@ cmd_test() {
         # TF32 also avoids MLX's NAX float32 GEMM path, whose runtime-compiled
         # kernel is not accepted by the Metal compiler bundled with Xcode 26.5
         # on GitHub's macOS 26 runner. No test is skipped or moved off Metal.
-        MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
+        run_runtime_test_command "$artifacts/runtime.log" env MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
           --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
           --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
           --skip-build \
           ${coverage:+--enable-code-coverage} \
-          --filter Qwen3RuntimeTests \
-          > "$artifacts/runtime.log" 2>&1 || runtime_st=$?
-        write_mac_test_summary "$artifacts/runtime.log"
+          --filter Qwen3RuntimeTests || runtime_st=$?
+        write_mac_test_summary "$artifacts/runtime.log" || runtime_summary_st=$?
         if (( coverage )); then
           local codecov_path
           codecov_path="$(swift test --package-path "$runtime_package" \
@@ -1516,7 +1531,7 @@ cmd_test() {
       else
         runtime_st=1
       fi
-      if (( runtime_st == 0 )); then
+      if (( runtime_st == 0 && runtime_summary_st == 0 )); then
         write_build_provenance "$QVOICE_SWIFTPM_RUNTIME_CACHE/last-build.json" \
           "scripts/macos_test.sh runtime" Qwen3RuntimeTests Debug \
           "platform=macOS,arch=arm64" arm64 Onone unsigned \
@@ -1536,8 +1551,8 @@ cmd_test() {
   fi
 
   set -e
-  printf 'test_build=%s\ncore=%s\nruntime=%s\n' \
-    "$test_build_st" "$core_st" "$runtime_st" \
+  printf 'test_build=%s\ncore=%s\nruntime=%s\ncore_summary=%s\nruntime_summary=%s\n' \
+    "$test_build_st" "$core_st" "$runtime_st" "$core_summary_st" "$runtime_summary_st" \
     > "$artifacts/verdict.txt"
   if (( coverage )); then
     # Non-blocking in this pass: coverage is measured and retained, never a verdict input.
@@ -1548,7 +1563,7 @@ cmd_test() {
     fi
   fi
   cat "$artifacts/verdict.txt" >&2
-  if (( core_st == 0 && runtime_st == 0 )); then
+  if (( core_st == 0 && runtime_st == 0 && core_summary_st == 0 && runtime_summary_st == 0 )); then
     note "test verdict: PASS · artifacts → $artifacts"
   else
     warn "test verdict: FAIL · artifacts → $artifacts"

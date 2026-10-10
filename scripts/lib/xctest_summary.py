@@ -16,7 +16,7 @@ an "Executed N tests" trailer is cross-checked when present.
 Usage:
     python3 scripts/lib/xctest_summary.py LOG OUT.json [--quiet]
     exit 0 when the log parsed (even with failures); 3 when the trailer count
-    disagrees with the parsed cases, which means the log is truncated or foreign.
+    disagrees with the parsed cases, or --require-complete lacks terminal evidence.
 """
 from __future__ import annotations
 
@@ -31,11 +31,12 @@ EXECUTED = re.compile(r"Executed (\d+) tests?, with (?:(\d+) tests? skipped and 
 # A whole-bundle total follows the "All tests" suite verdict; a log that ran several
 # bundles (one xcodebuild invocation, or concatenated runs) has one per bundle.
 BUNDLE_TOTAL = re.compile(
-    r"Test Suite 'All tests' (?:passed|failed) at [^\n]*\n[ \t]*Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?"
+    r"Test Suite '(?:All|Selected) tests' (?:passed|failed) at [^\n]*\n[ \t]*Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?"
 )
+BUNDLE_START = re.compile(r"Test Suite '(?:All|Selected) tests' started at")
 
 
-def summarize(log_text: str, source: str = "") -> dict:
+def summarize(log_text: str, source: str = "", *, require_complete: bool = False) -> dict:
     tests = [
         {
             # "Module.Suite" as XCTest prints it; the bare suite is the last component.
@@ -70,12 +71,19 @@ def summarize(log_text: str, source: str = "") -> dict:
         # reported but never compared against the per-test verdict count.
         payload["executed"] = {"total": executed, "skipped": skipped_trailer, "failureAssertions": failures}
         payload["consistent"] = executed == len(tests) and skipped_trailer == skipped
+    if require_complete:
+        # A partial case list or a nested-suite trailer cannot certify a run.
+        # Selected XCTest invocations have the same terminal contract as All tests.
+        payload["complete"] = bool(tests and bundle_totals
+                                   and len(BUNDLE_START.findall(log_text)) == len(bundle_totals))
+        payload["consistent"] = bool(payload.get("consistent") and payload["complete"])
     return payload
 
 
-def write_summary(log_path: pathlib.Path, out_path: pathlib.Path, *, quiet: bool = False) -> int:
+def write_summary(log_path: pathlib.Path, out_path: pathlib.Path, *, quiet: bool = False,
+                  require_complete: bool = False) -> int:
     text = log_path.read_text(encoding="utf-8", errors="replace")
-    payload = summarize(text, source=str(log_path))
+    payload = summarize(text, source=str(log_path), require_complete=require_complete)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not quiet:
@@ -91,11 +99,13 @@ def main(argv=None) -> int:
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("out", type=pathlib.Path)
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--require-complete", action="store_true",
+                        help="require a nonempty, complete All/Selected tests run")
     args = parser.parse_args(argv)
     if not args.log.is_file():
         print(f"xctest_summary: missing log {args.log}", file=sys.stderr)
         return 2
-    return write_summary(args.log, args.out, quiet=args.quiet)
+    return write_summary(args.log, args.out, quiet=args.quiet, require_complete=args.require_complete)
 
 
 if __name__ == "__main__":

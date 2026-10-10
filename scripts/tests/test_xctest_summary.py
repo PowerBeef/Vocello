@@ -28,6 +28,7 @@ Test Suite 'All tests' failed at 2026-09-11 04:32:19.401.
 """
 
 SWIFT_TEST_LOG = """\
+Test Suite 'All tests' started at 2026-09-11 04:33:59.000.
 Test Case '-[Qwen3RuntimeTests.ParityTests testFixture]' started.
 /path/ParityTests.swift:20: Test skipped - fixtures unset
 Test Case '-[Qwen3RuntimeTests.ParityTests testFixture]' skipped (0.001 seconds).
@@ -72,6 +73,20 @@ class SummarizeTests(unittest.TestCase):
         self.assertNotIn("consistent", payload)
         self.assertEqual(payload["counts"]["total"], 1)
 
+    def test_strict_summary_requires_nonempty_terminal_run(self):
+        for text in ("", "warning: no tests", "Test Case '-[A.B c]' passed (0.100 seconds).\n",
+                     XCTEST_LOG.replace("Test Suite 'All tests' failed", "Test Suite 'Nested tests' failed"),
+                     XCTEST_LOG + "Test Suite 'All tests' started at later\n"):
+            with self.subTest(text=text):
+                self.assertFalse(summary.summarize(text, require_complete=True)["consistent"])
+
+    def test_strict_summary_accepts_all_selected_and_product_failure(self):
+        for text in (XCTEST_LOG, SWIFT_TEST_LOG, XCTEST_LOG.replace("All tests", "Selected tests")):
+            with self.subTest(text=text):
+                payload = summary.summarize(text, require_complete=True)
+                self.assertTrue(payload["complete"])
+                self.assertTrue(payload["consistent"])
+
 
 class WriteSummaryTests(unittest.TestCase):
     def test_write_summary_emits_sorted_json_and_exit_codes(self):
@@ -93,6 +108,15 @@ class WriteSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             missing = pathlib.Path(temp) / "nope.log"
             self.assertEqual(summary.main([str(missing), str(pathlib.Path(temp) / "o.json")]), 2)
+
+    def test_cli_strict_mode_retains_partial_results_and_fails_collection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            log, out = pathlib.Path(temp) / "partial.log", pathlib.Path(temp) / "out.json"
+            log.write_text("Test Case '-[A.B c]' passed (0.100 seconds).\n", encoding="utf-8")
+            self.assertEqual(summary.main([str(log), str(out), "--quiet", "--require-complete"]), 3)
+            payload = json.loads(out.read_text())
+            self.assertEqual(payload["counts"]["passed"], 1)
+            self.assertFalse(payload["complete"])
 
 
 if __name__ == "__main__":

@@ -68,6 +68,7 @@ SEVERITY_RANK = {"none": 0, "mild": 1, "moderate": 2, "severe": 3}
 DEFAULT_MIN_SEVERITY = "moderate"
 DEFAULT_FOLDS = 5
 DEFAULT_POOLED_MIN_POSITIVE = 10
+TRANSFORM_CONTRACT = "training-only/1"
 SCORING_CHANGED = "scoring code (feature, detector, phone or pitch code, detectors.json or norms)"
 
 
@@ -337,13 +338,17 @@ def fit(layout: Layout, *, batches: Iterable[str] | None = None, runs: Iterable[
     labelled = [row for row in label_rows(layout, batches, rater) if row["token"] in features]
     if not labelled:
         raise FitError("no labelled takes with features")
-    norm = detector_lib.normalization(features.values(), detector_lib.feature_names(config))
+    names = detector_lib.feature_names(config)
+    norm = detector_lib.normalization((features[token] for token in sorted({row["token"] for row in labelled})), names)
     k = settings["crossValidationFolds"]
     folds = []
     for fold in range(k):
         training = fold_training(labelled, fold, k)
+        fold_norm = detector_lib.normalization(
+            (features[token] for token in sorted({row["token"] for row in training})), names)
         folds.append({"fold": fold, "takes": len(training), "labelSetDigest": label_set_digest(training),
-                      "detectors": {detector["id"]: fit_detector(detector, training, features, norm, settings)
+                      "normalization": fold_norm,
+                      "detectors": {detector["id"]: fit_detector(detector, training, features, fold_norm, settings)
                                     for detector in config["detectors"]}})
     fitted = {detector["id"]: fit_detector(detector, labelled, features, norm, settings)
               for detector in config["detectors"]}
@@ -355,7 +360,8 @@ def fit(layout: Layout, *, batches: Iterable[str] | None = None, runs: Iterable[
         "models": identities, "rater": rater,
         "labelSet": {"batches": sorted({row["batch"] for row in labelled}), "takes": len(labelled),
                      "digest": label_set_digest(labelled)},
-        "crossValidation": {"k": k, "salt": label.FOLD_SALT, "folds": folds},
+        "crossValidation": {"k": k, "salt": label.FOLD_SALT, "transformContract": TRANSFORM_CONTRACT,
+                            "folds": folds},
         "normalization": norm, "detectors": fitted,
     }
     if reuse_reason is not None:
@@ -530,6 +536,9 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
     validation = document.get("crossValidation") or {}
     if document.get("schema") != THRESHOLDS_SCHEMA or validation.get("salt") != label.FOLD_SALT:
         raise FitError(f"{thresholds.name} has no out-of-fold models; refit with this qc.py")
+    if (validation.get("transformContract") != TRANSFORM_CONTRACT
+            or any(not isinstance(entry.get("normalization"), dict) for entry in validation.get("folds", []))):
+        raise FitError(f"{thresholds.name} has no training-only fold transforms; refit with this qc.py")
     config = detector_lib.load_config(layout)
     if document.get("scoringSHA256") != detector_lib.scoring_identity(layout)["sha256"]:
         raise FitError(f"{thresholds.name} was fitted with other {SCORING_CHANGED} than the current; refit")
@@ -564,7 +573,7 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
     if earlier and not (isinstance(reuse, str) and reuse.strip()):
         raise FitError(f"{earlier} already scored this label set; label new takes, or refit with "
                        "--reuse-reason to declare why it is scored again")
-    folds = {entry["fold"]: entry["detectors"] for entry in validation["folds"]}
+    folds = {entry["fold"]: entry for entry in validation["folds"]}
     norm = document["normalization"]
     pool_norms = norms_lib.load(layout)  # a report-only detector scores with its provisional rule, as in runs
     rules = config["levels"]
@@ -581,13 +590,16 @@ def evaluate(layout: Layout, *, thresholds: Path | None = None, batches: Iterabl
             if not usable(row, detector["class"]):
                 continue
             fitted = None
+            row_norm = norm
             if not report_only:
-                fitted = folds[label.fold_for_family(row["family"], k)].get(detector["id"]) or {}
+                fold = folds[label.fold_for_family(row["family"], k)]
+                fitted = fold["detectors"].get(detector["id"]) or {}
+                row_norm = fold["normalization"]
                 if fitted.get("reportOnly", True):
                     unscored += 1
                     continue
             outcome = detector_lib.score(detector, features[row["token"]]["features"], row["language"], fitted,
-                                         norm, norms=pool_norms)
+                                         row_norm, norms=pool_norms)
             flagged = outcome["cut"] is not None and outcome["score"] is not None \
                 and outcome["score"] >= outcome["cut"]
             scored.append((row, flagged))

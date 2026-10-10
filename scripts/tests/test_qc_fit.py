@@ -270,6 +270,48 @@ class FitEvalTests(unittest.TestCase):
             self.assertTrue(fitted["trainedFamilies"])
         self.assertEqual(evaluation["detectors"]["pause.anomalous"]["unscored"], 0)
 
+    def test_fold_normalization_never_reads_its_heldout_features_or_unlabelled_takes(self):
+        first = store.read_json(fit.fit(self.layout))
+        for row in self.rows:
+            if label.fold_for_family(self.families[row["token"]], 5) == 0:
+                row["features"]["pause.longest_gap_seconds"] = feature(10000.0)
+        self.write_features()
+        second = store.read_json(fit.fit(self.layout))
+        self.assertEqual(first["crossValidation"]["folds"][0]["normalization"],
+                         second["crossValidation"]["folds"][0]["normalization"])
+        self.assertNotEqual(first["normalization"], second["normalization"])
+        self.rows.extend({"token": f"unlabelled-{index}", "language": "french", "features": {
+            "pause.longest_gap_seconds": feature(999999.0)}} for index in range(500))
+        self.write_features()
+        third = store.read_json(fit.fit(self.layout))
+        self.assertEqual(second["normalization"], third["normalization"])
+
+    def test_evaluation_uses_training_only_fold_normalization_and_refuses_legacy_transform(self):
+        path = fit.fit(self.layout)
+        thresholds = store.read_json(path)
+        self.commit(path)
+        actual = []
+        by_features = {store.canonical_json(row["features"]): row["token"] for row in self.rows}
+        original = detectors.score
+
+        def score(detector, features, language, fitted, norm, **kwargs):
+            if detector["id"] == "pause.anomalous":
+                token = by_features[store.canonical_json(features)]
+                fold = label.fold_for_family(self.families[token], 5)
+                actual.append(norm == thresholds["crossValidation"]["folds"][fold]["normalization"])
+            return original(detector, features, language, fitted, norm, **kwargs)
+
+        with mock.patch.object(detectors, "score", score):
+            fit.evaluate(self.layout)
+        self.assertEqual(actual, [True] * 400)
+        next_path = fit.fit(self.layout)
+        legacy = store.read_json(next_path)
+        del legacy["crossValidation"]["transformContract"]
+        store.write_json_atomic(next_path, legacy)
+        self.commit(next_path)
+        with self.assertRaisesRegex(fit.FitError, "training-only fold transforms"):
+            fit.evaluate(self.layout, thresholds=next_path)
+
     def test_a_label_set_is_evaluated_once_unless_a_reuse_is_declared(self):
         first = fit.fit(self.layout)
         self.commit(first)

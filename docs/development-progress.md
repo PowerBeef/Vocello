@@ -42,31 +42,43 @@ diagnostics directory `clone-integration-20261010`; native runs are `mac-test-20
 `tsan-20261010-124657`. The first replay caught an overlong roadmap note; its failure is retained.
 Sandbox-only lock/lint-cache failures and successful retries are retained too.
 
-**Limits and next:** macOS smoke follows on the clean committed checkpoint with installed assets;
-no phone or simulator lane ran. Local Xcode is 27.0; pinned-Xcode CI remains to observe after the
-requested push. A SwiftPM warning split one runtime verdict line: raw XCTest reports 182 executed,
-three skipped and zero failures, while the JSON sidecar misses that one pass. DA-12 retains the
-reporting follow-up; DA-13 retains normalized-audio cache ownership and production-adapter/background
-delivery coverage. Enrollment confidence bounds are provisional; output-verification/WER behavior
-is unchanged, so its measurement version does not change. No benchmark history, ASR-accuracy claim
-or human-listening claim is established. Hook startup reached this session; full trust/activation
-remains unverified by doctor.
+**Pinned-compiler verification:** `8c71d64b` first exposed a region-checker error in the new
+publication test under pinned Xcode 26.6. `17909608` uses a detached task and file-level helper,
+preserving explicit synchronization without capturing the XCTest type. Five focused publication
+tests, full local TSan, lint and both UI bundle compilations passed. Pinned CI
+[38070471497](https://github.com/PowerBeef/Vocello/actions/runs/38070471497) passed all required gates,
+including deterministic macOS tests, TSan and generic iOS compilation. The automatically triggered
+release rehearsal on the earlier commit failed at that same test compiler error; app compilation
+and iOS prerequisites passed, but packaging verification was not reached or rerun.
 
-**Post-push validation:** `8c71d64b` is pushed. Pinned-Xcode CI passed contracts, Python and generic
-iOS compilation but exposed a region-checker error in the new publication test. A detached task and
-file-level helper preserve its explicit synchronization without capturing the XCTest type. The five
-publication tests, full TSan suite (1,400 passes, two policy skips), changed-file lint and both UI
-bundle compilations pass locally; pinned-compiler confirmation follows the correction push.
+**Mac UI evidence on clean `17909608`:** `macos-xcui-smoke-20261010-170800-edfd9563` executed all
+13 journeys: 12 passed, including layout, Custom/Design/Clone generation, cancellation, recording,
+History, long-form, batch, missing models, recovery and cross-language Studio content. Navigation
+failed during a Portuguese screenshot with XCTest's display-ID lookup error. Independent triage
+classified screenshot infrastructure failure, with no demonstrated product defect; unrelated Unity
+Editor modal interference was also logged, without proof of causation. The failed run lacks its
+required crash-delta step and remains failed/incomplete. A justified focused rerun on the same source,
+`macos-xcui-localization-20261010-181249-a94b1f80`, passed navigation and all ten interface languages;
+offline triage confirms PASS with no missing steps. Together these runs provide passing results for
+each journey, without converting the failed full run into a PASS.
 
-The first Mac smoke, `macos-xcui-smoke-20261010-165217-29c94e48`, failed the Design editor's exact
-text-value assertion. The lead then interrupted the runner before source changes, leaving incomplete
-evidence and a canceled second journey. Retained evidence confirms the typing event but truncates
-the observed value, so the cause remains unresolved. A failure-only attachment now captures the full
-expected/observed values and mismatch offset; assertion, typing and timeout are unchanged. A new
-clean-checkpoint run will investigate this failure; it does not replace the failed run. Independent
-review found no actionable issue in either test correction. Offline triage of the earlier ordinary
-native run remains incomplete because its runtime sidecar misses the split verdict line, despite
-zero-failure raw XCTest totals and a successful canonical replay.
+The earlier `macos-xcui-smoke-20261010-165217-29c94e48` failed Design's exact editor-value assertion
+and was intentionally interrupted before source changes, canceling the next journey. The precise
+mismatch remains unknown because the retained value was truncated. A reviewed failure-only attachment
+now records complete expected/observed values and the mismatch offset; assertion, typing and timeout
+are unchanged. That exact assertion passed in the subsequent full run. All failed evidence remains
+retained under its original identity; no product fix or root-cause claim is inferred from a rerun.
+
+**Limits and next:** no phone or simulator lane ran; installed assets were reused. Local Xcode is
+27.0, while the corrected code also passed pinned-Xcode CI. A SwiftPM warning split one local runtime
+verdict line: raw XCTest reports 182 executed, three skipped and zero failures, while the JSON sidecar
+misses one pass. Offline triage of that ordinary run remains incomplete despite the successful
+canonical replay. DA-12 retains that reporting follow-up; DA-13 retains normalized-audio cache
+ownership and production-adapter/background delivery coverage. Enrollment confidence bounds remain
+provisional; output-verification/WER behavior and its measurement version are unchanged. No benchmark
+history, ASR-accuracy or human-listening claim is established. Hook startup reached this session;
+full trust/activation remains unverified by doctor. Continue from the existing release-first plan;
+no unfinished roadmap item was closed by this integration.
 
 ### October 10 — stale roadmap reconciliation
 

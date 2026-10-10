@@ -154,9 +154,11 @@ def _profile(raw, rate, size, step, batch_frames, minimum_correlation):
     return profile
 
 
-def _window(profile, start, end, duration, *, source, phone=None, voiced_target=None, centered=False):
+def _window(profile, start, end, duration, *, source, phone=None, voiced_target=None, alignment_source=None, centered=False):
     result = {"start": _number(start), "end": _number(end), "source": source,
               "decision": "not-assessed", "uncertainties": []}
+    if isinstance(alignment_source, str) and alignment_source:
+        result["alignmentSource"] = alignment_source[:64]
     if phone is not None:
         result["phone"] = str(phone)[:64]
     if isinstance(voiced_target, bool):
@@ -209,7 +211,8 @@ def _windows(items, profile, duration, source):
                            "decision": "not-assessed", "frames": 0})
             continue
         result.append(_window(profile, item.get("start"), item.get("end"), duration, source=source,
-                              phone=item.get("phone"), voiced_target=item.get("voicedTarget")))
+                              phone=item.get("phone"), voiced_target=item.get("voicedTarget"),
+                              alignment_source=item.get("alignmentSource", item.get("source"))))
     return result, truncated
 
 
@@ -263,7 +266,8 @@ def analyze(samples, rate, *, expected_windows: Iterable[Mapping] | None = None,
 
     max_seconds is a rejection bound (no silent truncation); batch_frames is capped
     at 256 and additionally by MAX_BATCH_SAMPLES. Expected and recognized windows
-    accept {start, end, phone?, voicedTarget?}; each collection is bounded to 2048.
+    accept {start, end, phone?, voicedTarget?, alignmentSource?}; a supplied source
+    is also preserved as alignmentSource. Each collection is bounded to 2048.
     Short, silent, nonfinite or unsupported audio cannot yield an assessed verdict.
     `reference` is another analyze() result, compared only with compatible settings.
     """

@@ -190,6 +190,16 @@ class AcousticControlsTests(unittest.TestCase):
         self.assertEqual(value["expectedWindows"][0]["reason"], "invalid-window-collection")
         self.assertEqual(value["decision"], "not-assessed")
 
+    def test_expected_and_recognized_windows_preserve_alignment_witness(self):
+        value = acoustics.analyze(tone(), RATE, expected_windows=[
+            {"phone": "a", "start": .1, "end": .3, "source": "phones"},
+            {"phone": "a", "start": .2, "end": .4, "source": "phonesB"}],
+            recognized_windows=[{"phone": "a", "start": .1, "end": .3, "alignmentSource": "phonesB"}])
+        self.assertEqual([window["alignmentSource"] for window in value["expectedWindows"]], ["phones", "phonesB"])
+        self.assertTrue(all(window["source"] == "expected" for window in value["expectedWindows"]))
+        self.assertEqual(value["recognizedWindows"][0]["source"], "recognized")
+        self.assertEqual(value["recognizedWindows"][0]["alignmentSource"], "phonesB")
+
     def test_bandwidth_and_unanalyzed_tail_are_reported(self):
         value = acoustics.analyze(tone(seconds=.993, rate=8000), 8000)
         self.assertIsNone(value["summary"]["medianHighToLowBandDb"])

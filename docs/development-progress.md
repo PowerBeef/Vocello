@@ -32,17 +32,24 @@ as activity evidence, with a conservative explicit lead-only fallback. `dev.sh d
 `triage` and JSON dry-run planning expose the canonical workflow. Populated schema upgrades and
 concurrency handshakes extend the app-host-free XCTest suites.
 
-**Verified:** 70 native tests; generic iOS app/logic compilation; both UI bundles compiled;
-2,125 Python tests and 2,519 subtests with the contracts gate; website acceptance; changed-file lint.
-Failed infrastructure/fixture attempts remain in distinct ignored logs. Stale public charts reproduced
-at baseline were resynchronized from existing qualified evidence, with no new benchmark.
-Fresh Codex discovery verified AGENTS, six skills, concurrency four and ten enabled/trusted hook
-handlers. Custom profile invocation and actual hook event delivery remain unverified in this host
-interface; do not infer worker tracking from configuration. See the audit for exact limits.
+**Verified:** full native suites (1,357 core + 178 runtime passes; three unavailable runtime fixtures
+skipped), TSan (1,355 passes, two policy skips), generic iOS app/logic compilation, both UI bundles,
+2,125 Python tests and 2,519 subtests, website acceptance and lint. Full macOS smoke passed all 13
+journeys, including ten interface languages, generation, cancellation, recording, History and
+error recovery. Local telemetry parity/overhead passed with installed assets and optimized receipts.
+Both model-dependent runs used clean committed `2d25ab98`; no benchmark history was published.
+The [audit](audits/2026-10-10-codex-workflow-audit.md#expanded-local-validation-october-10) records
+run identities, skips, source limits and the retained failures. A sanitizer assertion exposed a
+cancellation-ordering assumption in a test; the synchronized correction and rerun passed. Local RTF
+summary and diagnostic-JSON triage defects found during validation were also corrected and tested.
+Fresh Codex invocation verified both custom read-only profiles, startup context, live subagent
+registration/completion and post-patch reminders, alongside instruction/skill discovery. Hook
+activation remains a host observation, not something doctor can infer from configuration alone.
 
 **Next:** DA-14 designs the characterized v3 deleted-ID high-water repair; DA-13 retains concrete
 production-adapter integration and background-download orchestration coverage. Existing release work
-remains the priority; no release, push, device/model campaign or external publication ran here.
+remains the priority. The phone is unavailable: no physical-device lane or simulator ran. No release,
+push, new model download, human listening or external publication occurred.
 
 ### October 6, evening — audit second pass: 35 of the 41 P1/P2 findings fixed, release path hardened
 

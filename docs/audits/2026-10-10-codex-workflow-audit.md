@@ -141,7 +141,7 @@ performance records or release evidence.
 | Changed-file lint, privacy and whitespace | PASS: `lint-attempt2.log`; subsequent guard-only changes covered by targeted regression and final whitespace/privacy checks. |
 | Codex fresh prompt initialization | Root and website AGENTS discovered in the proper scopes; all six repository skills discovered. Raw prompt output remains untracked and must not be published. |
 | Codex app-server configuration discovery | Effective concurrency four, inherited subagent model, six skills, and ten project hook handlers reported enabled/trusted without hook-schema warnings. No trust or global configuration was changed by the migration. |
-| Custom-agent and lifecycle limits | Both read-only agent TOMLs pass metadata validation. The active collaboration API has no custom-profile selector, and fresh prompt initialization did not expose the two profiles. An ephemeral read-only session reported AGENTS but no worker receipt was observed; actual SessionStart/SubagentStart/Stop/tool-event delivery remains unverified. Use documented lead-only fallback until it is established. |
+| Initial custom-agent and lifecycle limits | Both read-only agent TOMLs passed metadata validation. At initial integration the collaboration API exposed no custom-profile selector, and prompt initialization did not expose the profiles or a worker receipt. Runtime event delivery was unverified at that checkpoint; the follow-up below records new host evidence. |
 
 A read-only independent review covered substantive Swift changes and the hook/worker implementation;
 findings were fixed and checked. Subsequent focused guard regressions cover absolute linked-checkout
@@ -164,5 +164,62 @@ Retained unsuccessful attempts have distinct logs and were not replaced:
 Local Xcode 27.0 differs from CI's pinned 26.6; local compilation does not establish pinned-compiler
 or remote CI acceptance. Installed gh also differs from its pin; no pins/installations were changed.
 No physical device, model inference, listening, measured benchmark, TSan, release, deployment, push
-or external publication ran for this migration. CW-05 is tracked by DA-14; CW-06/CW-07 refine DA-13.
+or external publication ran during initial migration acceptance. CW-05 is tracked by DA-14; CW-06/CW-07 refine DA-13.
 Existing unrelated DA-12 and release work remain open.
+
+## Expanded local validation, October 10
+
+The maintainer requested all available local validation and explicitly excluded the unavailable
+phone. The campaign began at `2fa22910`; documentation corrections landed in `4f080c82` and a
+cancellation-test synchronization correction in `2d25ab98`. Both model-dependent runs captured
+clean `2d25ab9894552b64a5d4f2c36fc061c31f4c20ed` with matching before/after fingerprints. No
+source changed during either run. Raw evidence remains ignored under
+`build/artifacts/diagnostics/codex-validation-20261010-2fa22910/` and canonical runner directories.
+
+| Check | Recorded result |
+| --- | --- |
+| Full deterministic contracts/Python | PASS: 2,125 tests and 2,519 subtests, one existing skip; `ci-attempt1.log`. This includes hook payload/guard, routing, regeneration, worker ownership and triage fixtures. |
+| Full native deterministic suites | PASS: 1,357 core and 178 owned-runtime tests; three runtime fixtures skipped because exported AudioSeal fixtures/replay inputs were absent. `mac-test-20261010-040414` retains build, logs, counts and verdict. |
+| ThreadSanitizer | Initial `tsan-20261010-040527`: 1,354 passes, one assertion failure, two policy skips. After the test fix, `tsan-20261010-040953`: 1,355 passes, two policy skips, no failures or sanitizer race warnings. Both runs remain retained. |
+| Focused cancellation regression | PASS: seven `IOSShutdownCancellationReasonTests`; `cancellation-focused-attempt1.log`. Independent read-only Swift review found no actionable issue in the correction. |
+| CLI and generic iOS compile | PASS: CLI build/version, iOS app and standalone logic bundle. The generic iOS compile passed again after the test-method rename. `ci-step-5-attempt1.log`, `ci-step-6-attempt1.log`, `ios-after-test-fix-attempt1.log`. |
+| UI compilation and website | PASS: both UI bundles compiled; installed website supply-chain check, lint, Node/render checks, production build and two Playwright journeys. `ci-step-7-attempt1.log` through `ci-step-9-attempt1.log`. |
+| Full macOS XCUITest smoke | PASS: 13 tests, zero failures/skips; `macos-xcui-smoke-20261010-081219-7d9d4c81`. All seven ledgered steps passed, including source provenance, crash delta, playback capture and result retention. The run covers ten interface languages, window sizes, generation/history/playback, cancellation, recording, long-form, line batches, Design/Clone, missing-model links, output-error recovery and cross-language content. |
+| Local telemetry parity/overhead | PASS: `telemetry-overhead-20261010-092004-a54c987f`; three counterbalanced telemetry-mode rotations, six measured warm takes per mode, seed 1264849675, matching PCM, no failures/inconclusive reasons. Paired RTF/TTFC intervals stayed within 5% lightweight/10% verbose limits. Optimized CLI receipt, source snapshot and raw arms remain local; this lane is deliberately ineligible for benchmark-history publication. |
+| Interfaces and guards | Doctor and JSON check planning completed read-only; triage preserves the original failed TSan run and the passing TSan/UI/telemetry results. RTF-fix routed checks passed 2,059 tests/2,476 subtests; final triage/roadmap/docs routed checks passed 2,053 tests/2,483 subtests, each with one existing skip. Lint, privacy and whitespace passed. |
+
+`dev.sh ci` stopped at its initial sanitizer assertion; it was not retrospectively marked successful.
+The remaining canonical CI commands ran serially and passed, followed by the corrected sanitizer
+run. The assertion had assumed `take.cancel()` meant its cancellation handler had already recorded
+`.user` before a subsequent shutdown. Registration does not establish handler installation. The
+corrected test awaits completed caller cancellation before testing a later shutdown; its name now
+states that narrower guarantee. No production cancellation code or sanitizer policy changed.
+
+Two further reporting defects were reproduced and corrected:
+
+- The local long-form summary printed audio/wall as RTF (2.38 for approximately 159.4 seconds
+  audio/67.1 seconds wall). It now prints wall/audio, consistent with the repository definition.
+  Synthetic producer tests cover faster/slower-than-real-time and zero-audio cases. The original
+  smoke output remains unchanged. This local summary is outside published benchmark records;
+  no measurement window, registry metric, comparison key or historical record changed.
+- Triage ignored the telemetry lane's terminal `verdict.json` and returned incomplete evidence.
+  It now recognizes that schema's PASS, failure and inconclusive outcomes while rejecting incomplete
+  or contradictory metadata. It copies no raw failure detail, reruns no lane and cannot use a local
+  diagnostic to clear missing UI evidence. Both triage outputs remain retained separately.
+
+Fresh session evidence now confirms root instructions, all six repository skills, invocation of
+both custom read-only agent profiles, SessionStart context, SubagentStart/Stop worker registration
+and post-patch reminders. A live review produced one active worker and completion returned zero,
+with tracking available and no stale/unknown leases. Doctor remains deliberately unable to infer
+hook activation from files. Actual SessionEnd and every blocked PreToolUse event were not exercised
+individually; behavioral hook tests remain the evidence for those guards. No global trust changed.
+
+Limits: physical-iPhone tests, background download/device orchestration, release/deployment,
+publication, new model downloads and human listening did not run. UI/performance history was not
+published, and no timing trend or product-quality claim follows from this campaign. Private runtime
+fixtures remain unavailable. Xcode 27.0 differs from CI's pinned 26.6; no remote CI was triggered.
+Xcode also reported duplicate generated-project group references with target membership explicitly
+unaffected; inspection through project inputs remains a DA-12 follow-up. A separate strict roadmap
+validation reports fourteen existing stale in-flight items; comparison with the preceding commit
+shows only DA-12 notes changed, with no item status/date changes. The canonical contract gate
+permits these warnings; their underlying work was not relabeled. DA-13/DA-14 remain open.

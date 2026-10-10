@@ -1,9 +1,9 @@
 # Contributing to Vocello
 
-Thank you for helping improve Vocello. This guide is the human contribution path. Claude Code,
+Thank you for helping improve Vocello. This guide is the human contribution path. Codex,
 the repository's coding agent (a lead session on `main`, optionally with parallel agents in
-integrated worktrees), follows [`CLAUDE.md`](CLAUDE.md) and the
-[development workflow](docs/reference/development-workflow.md#claude-code-development-workflow).
+integrated worktrees), follows [`AGENTS.md`](AGENTS.md) and the
+[development workflow](docs/reference/development-workflow.md).
 
 ## Before starting
 
@@ -60,7 +60,7 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 - Code and machine-readable contracts take precedence over prose.
 - Update relevant documentation in the same change when behavior, public facts, commands, platform support, models, or test contracts change.
 - Keep dated run details in preserved evidence/checkpoints, not general instructions. During a frozen acceptance campaign, record progress untracked; a deliberate source/documentation checkpoint creates a new acceptance identity.
-- Keep dependencies pinned. MLX dependency changes require the backend review and benchmark process in [`.claude/rules/native.md`](.claude/rules/native.md).
+- Keep dependencies pinned. MLX dependency changes require the backend review and benchmark process in the [native engineering rules](docs/reference/native-engineering.md).
 - Keep external Actions pinned to the full SHA in [`config/toolchain.json`](config/toolchain.json).
   Dependabot proposals must update that manifest and the adjacent workflow version comment together.
 - Do not commit prompts, transcripts, usernames, device identifiers, absolute paths, secrets, raw telemetry, WAV evidence, screenshots from test results, traces, or `.xcresult` bundles.
@@ -75,4 +75,4 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 - [ ] No generated build output or private evidence is tracked.
 - [ ] The pull request explains test coverage and any intentionally deferred device, model, or UI acceptance.
 
-For architecture and ownership, use [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the [domain rules](.claude/rules/). Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/Vocello/security/advisories/new).
+For architecture and ownership, use [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the [native engineering rules](docs/reference/native-engineering.md). Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/Vocello/security/advisories/new).

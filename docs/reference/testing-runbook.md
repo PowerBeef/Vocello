@@ -49,7 +49,7 @@ not a permissions system. XcodeBuildMCP and Axiom may assist diagnosis under nat
 
 ### Read a finished run
 
-Claude reads the artifacts directly, or hands the run directory to the read-only `xcresult-triage`
+Codex reads the artifacts directly, or hands the run directory to the read-only `vocello-xcresult-triage`
 subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.
@@ -62,7 +62,7 @@ subagent, and stops when the deciding evidence is clear:
 4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
    deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
 
-For Swift review, the read-only `swift-review` subagent reads every Swift diff against the native
+For Swift review, the read-only `vocello-swift-review` subagent reads every Swift diff against the native
 domain rules, in parallel with the lead's verification; it adds no CI gate.
 
 ## Model readiness

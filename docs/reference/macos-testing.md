@@ -95,11 +95,13 @@ The gate bench, `profile`, `telemetry-overhead`, `lang-bench`, `memory` and `qc-
 deterministic gate without a bench does not check, so it can run beside an agent or a native build):
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
 core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
-or a locked agent worktree before any model loads, and
+or a validated active-worker lease before any model loads, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
-`memory`, `lang-bench`, `qc-takes`, `profile`, `telemetry-overhead`, `gate` and `release-readiness`
-are consent-bound (`ask` rules in `.claude/settings.json`; explicit
-request required) and are never run unasked; the storage floors every lane checks first are listed under Instruments profiles below.
+Local targeted validation is authorized at coherent checkpoints; full matrices remain specific to
+the task or release. Join workers before measured lanes and use the session's worker registration,
+or the documented lead-only fallback when tracking is unavailable. Releases, publication and other
+external writes require a specific request. The storage floors every lane checks first are listed
+under Instruments profiles below.
 
 ## Blocking ThreadSanitizer subset
 

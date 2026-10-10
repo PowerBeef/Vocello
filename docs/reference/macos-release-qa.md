@@ -96,7 +96,7 @@ release-readiness and artifact checks.
    regenerate `benchmarks/HISTORY.md`; do not append to that generated file manually. An optional
    subjective listening note may be added later with `scripts/benchmark_history.py annotate`.
 4. **Static audits** (release-sized changesets): use the relevant installed macOS skills (Axiom auditors, the
-   `swift-review` subagent) plus direct code review for SwiftUI architecture/performance, memory, concurrency, signing,
+   `vocello-swift-review` subagent) plus direct code review for SwiftUI architecture/performance, memory, concurrency, signing,
    and security/privacy. Scope findings to changed surfaces; fix or explicitly defer them.
 5. **Version bump**: `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml`'s project-level
    `settings.base` (shared by every generated target) → `./scripts/regenerate_project.sh`.

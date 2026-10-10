@@ -10,6 +10,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/host_preflight.sh"
 . "$ROOT_DIR/scripts/lib/shared.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
+. "$ROOT_DIR/scripts/lib/ui_finalization.sh"
 . "$ROOT_DIR/scripts/lib/dev_signing.sh"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 # Every macOS UI lane compiles the app at -O (benchmark-grade), so it shares the
@@ -134,6 +135,10 @@ retain_result=0
 candidate_evidence=""
 candidate_collection_needed=0
 candidate_collection_attempted=0
+ui_test_attempted=0
+mac_crash_delta_attempted=0
+attachments_attempted=0
+attachments_status=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --preinstalled-candidate) candidate_evidence="${2:?--preinstalled-candidate requires a directory}"; shift 2 ;;
@@ -523,11 +528,33 @@ if [[ "$lane" == "control-audit" ]]; then
 fi
 
 export_attachments() {
-  [[ -d "$result" ]] || return 0
-  rm -rf "$out/attachments"
-  if ! xcrun xcresulttool export attachments --path "$result" \
-      --output-path "$out/attachments" >"$out/attachments.log" 2>&1; then
+  [[ -d "$result" ]] || { warn "missing XCUITest result bundle"; return 2; }
+  attachments_attempted=1
+  if ! python3 - "$result" "$out/attachments" <<'PY' >"$out/attachments.log" 2>&1
+import os, signal, subprocess, sys
+p = subprocess.Popen(["xcrun", "xcresulttool", "export", "attachments", "--path", sys.argv[1],
+                      "--output-path", sys.argv[2]], start_new_session=True)
+try:
+    raise SystemExit(p.wait(timeout=60))
+except subprocess.TimeoutExpired:
+    def stop_group(sig):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:
+            pass
+    stop_group(signal.SIGTERM)
+    try:
+        p.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        pass
+    # Retire export descendants even if their parent already responded to TERM.
+    stop_group(signal.SIGKILL)
+    p.wait()
+    raise SystemExit(124)
+PY
+  then
     warn "could not export xcresult attachments (see $out/attachments.log)"
+    return 1
   fi
 }
 
@@ -682,8 +709,8 @@ mac_ui_preflight() {
 write_test_summary() {
   # One writer for every lane (scripts/lib/xctest_summary.py); the macOS unit lane
   # uses the same module, so triage reads a single test-results.json shape.
-  [[ -f "$out/xcodebuild.log" ]] || return 0
-  python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json"
+  [[ -f "$out/xcodebuild.log" ]] || { warn "missing XCUITest log"; return 2; }
+  python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json" --require-complete
 }
 
 # The crash marker is stamped by arm_mac_crash_marker right before the app
@@ -700,7 +727,8 @@ arm_mac_crash_marker() {
 check_mac_crash_delta() {
   local root="$HOME/Library/Logs/DiagnosticReports" new
   [[ -f "$mac_crash_marker" ]] || { echo "crash marker was never armed" >"$out/new-crashes.txt"; return 1; }
-  new="$(find "$root" -name 'Vocello-*.ips' -newer "$mac_crash_marker" -print 2>/dev/null || true)"
+  new="$(find "$root" -name 'Vocello-*.ips' -newer "$mac_crash_marker" -print 2>"$out/crash-delta.log")" \
+    || { echo "could not inspect macOS crash reports" >"$out/new-crashes.txt"; return 1; }
   [[ -z "$new" ]] || { printf '%s\n' "$new" >"$out/new-crashes.txt"; return 1; }
   return 0
 }
@@ -800,23 +828,44 @@ cleanup_macos_run() {
   rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
 }
 
-cleanup_ui_run() {
-  local status=$?
-  trap - EXIT
-  set +e
-  [[ "$platform" != "macos" ]] || cleanup_macos_run
+collect_ui_evidence() {
   if (( candidate_collection_needed == 1 && candidate_collection_attempted == 0 )); then
-    collect_candidate_forensics || status=1
+    candidate_collection_attempted=1
+    ui_finalization_step candidate-forensics collect_candidate_forensics
+    attachments_attempted=1
   fi
-  if (( run_finalized == 0 )); then
+  if [[ "$platform" == "macos" ]] && (( ui_test_attempted == 1 && mac_crash_delta_attempted == 0 )); then
+    mac_crash_delta_attempted=1
+    ui_finalization_step crash-delta required_step_run "$step_ledger" crash-delta check_mac_crash_delta
+  fi
+  if (( ui_test_attempted == 1 )); then
+    ui_finalization_step test-summary write_test_summary
+    if (( attachments_attempted == 0 )); then
+      ui_finalization_step attachments export_attachments
+    fi
+  fi
+}
+
+cleanup_ui_run() {
+  local original=$? collection_status=0 status
+  trap - EXIT
+  # Further signals must not interrupt bounded evidence/ownership cleanup and
+  # erase the first signal's exit status.
+  trap '' INT TERM
+  set +e
+  ui_finalize_collections || collection_status=$?
+  status="$(ui_final_exit_status "$original" "$collection_status")"
+  if (( run_finalized == 0 || status != 0 )); then
     (( status != 0 )) || status=1
     required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
-    write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status"
+    write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status" || true
   fi
   exit "$status"
 }
 
 trap cleanup_ui_run EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 derive_team() {
   if [[ -n "${QWENVOICE_DEVELOPMENT_TEAM:-}" ]]; then
@@ -1228,7 +1277,11 @@ run_xcodebuild() {
   else
     note "xcodebuild completed; complete log retained at $log_path"
   fi
-  export_attachments
+  # Attachment export is independent evidence; retain its failure without
+  # replacing the native xcodebuild result. Finalization blocks PASS on gaps.
+  attachments_attempted=1
+  ui_finalization_step attachments export_attachments
+  attachments_status="$ui_finalization_last_status"
   return "$status"
 }
 
@@ -1406,9 +1459,10 @@ candidate_inventory() {
 }
 
 candidate_attachments() {
-  [[ -d "$result" ]] || return 1
-  xcrun xcresulttool export attachments --path "$result" \
-    --output-path "$out/attachments" >"$out/attachments.log" 2>&1
+  if (( attachments_attempted == 1 )); then
+    return "$attachments_status"
+  fi
+  export_attachments
 }
 
 candidate_crash_delta() {
@@ -1473,15 +1527,17 @@ PY
     xcrun devicectl device install app --device "$device" "$runner" \
       --timeout 120 --quiet >"$out/candidate-runner-install.log" 2>&1 || return 1
   local test_status=0 collection_status=0
+  ui_test_attempted=1
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -xctestrun "$out/candidate.xctestrun" -destination "id=$device" \
     -resultBundlePath "$result" -parallel-testing-enabled NO || test_status=$?
   collect_candidate_forensics || collection_status=$?
-  (( test_status == 0 && collection_status == 0 ))
+  (( test_status == 0 )) || return "$test_status"
+  return "$collection_status"
 }
 
 if [[ -n "$candidate_evidence" ]]; then
-  run_preinstalled_candidate || die "preinstalled candidate proof failed; retained evidence: $out"
+  run_preinstalled_candidate || { status=$?; warn "preinstalled candidate proof failed; retained evidence: $out"; exit "$status"; }
 elif [[ "$platform" == "macos" ]]; then
   terminate_macos_app
   if [[ "$lane" == "marketing" ]]; then
@@ -1620,11 +1676,13 @@ WAV
       || die "$platform $lane needs a quiet host after the build (load within 2x cores, no memory pressure)"
   fi
   arm_mac_crash_marker
+  ui_test_attempted=1
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$MAC_DERIVED" \
     -resultBundlePath "$result" -only-testing:"$only_test" \
-    || die "macOS XCUITest failed (see $out/xcodebuild.log)"
+    || { status=$?; warn "macOS XCUITest failed (see $out/xcodebuild.log)"; exit "$status"; }
+  mac_crash_delta_attempted=1
   required_step_run "$step_ledger" crash-delta check_mac_crash_delta \
     || die "new Vocello crash report detected (see $out/new-crashes.txt)"
   summarize_long_form_project_if_present "$out"
@@ -1771,7 +1829,8 @@ else
   fi
   note "physical-iPhone XCUITest $lane on $device → $out"
   xcuitest_status=0
-  if ! required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
+  ui_test_attempted=1
+  if required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
       -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
       -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
       -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
@@ -1783,7 +1842,9 @@ else
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       SWIFT_OPTIMIZATION_LEVEL=-O; then
-    xcuitest_status=1
+    xcuitest_status=0
+  else
+    xcuitest_status=$?
     warn "physical-iPhone XCUITest failed; collecting forensics before returning failure"
   fi
   # Preserve the result-owned OS/build identity for delayed, offline evidence
@@ -1989,7 +2050,9 @@ PY
     fi
   fi
   if (( xcuitest_status != 0 || dsym_status != 0 || model_diagnostics_status != 0 || startup_parity_status != 0 || control_audit_status != 0 || crash_delta_status != 0 || smoke_diagnostics_status != 0 || purchase_status != 0 )); then
-    die "physical-iPhone $lane failed; complete available forensics are preserved in $out"
+    warn "physical-iPhone $lane failed; complete available forensics are preserved in $out"
+    (( xcuitest_status == 0 )) || exit "$xcuitest_status"
+    exit 1
   fi
   write_build_provenance "$IOS_DERIVED/last-build.json" \
     "scripts/ui_test.sh ios $lane" VocelloiOSUI Release "id=$device" arm64 \
@@ -2007,6 +2070,8 @@ PY
     || die "iOS ui-perf evidence gate failed"
 fi
 
+ui_finalize_collections \
+  || die "UI evidence collection or owned-process cleanup failed (see $out/ui-finalization.json)"
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 note "per-test results:"
 # A summary that disagrees with the log's own totals (exit 3) means the log is

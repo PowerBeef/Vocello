@@ -77,6 +77,9 @@ final class CriticalMemoryReliefAdmission {
     private var holderCount = 0
     private var waiters: [Waiter] = []
 
+    /// Number of callers currently suspended behind relief admission.
+    var pendingWaiterCount: Int { waiters.count }
+
     var isClosed: Bool {
         holderCount > 0
     }
@@ -225,6 +228,9 @@ actor ActiveGenerationCoordinator {
 actor GenerationTaskStartGate {
     private var isOpen = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Number of tasks that have reached the closed start barrier.
+    var pendingWaiterCount: Int { waiters.count }
 
     func wait() async {
         guard !isOpen else { return }

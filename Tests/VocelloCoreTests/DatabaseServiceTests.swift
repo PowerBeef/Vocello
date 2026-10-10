@@ -2,6 +2,160 @@ import Foundation
 import GRDB
 import XCTest
 
+/// Populated historical schemas are upgraded by the shipped migrator, rather
+/// than recreating a current-schema database and only testing its readers.
+final class GenerationMigrationUpgradeTests: XCTestCase {
+    func testPopulatedV1UpgradesWithoutChangingRetainedHistory() throws {
+        try assertUpgrade(from: "v1_create_generations")
+    }
+
+    func testPopulatedV2UpgradesWithoutChangingRetainedHistory() throws {
+        try assertUpgrade(from: "v2_add_sortOrder")
+    }
+
+    func testPopulatedV5UpgradesWithoutChangingLongFormHistory() throws {
+        try assertUpgrade(from: "v5_add_long_form_project", hasLongFormColumns: true)
+    }
+
+    func testV5UpgradePreservesDeletedAutoincrementHighWater() throws {
+        let queue = try seededQueue(upTo: "v5_add_long_form_project")
+        try insertAndDeleteHighWater(in: queue)
+
+        try GenerationMigrations.makeMigrator().migrate(queue)
+
+        try queue.write { db in
+            XCTAssertEqual(try sequence(in: db), 900)
+            try insertNext(in: db)
+            XCTAssertEqual(db.lastInsertedRowID, 901, "Additive migrations preserve ids of deleted takes")
+        }
+    }
+
+    /// Characterizes the shipped v3 rebuild; this is a documented upgrade
+    /// limitation, not a claim that old deleted ids remain reserved. The
+    /// rebuild retains live ids but copies no deleted sqlite_sequence bound.
+    func testV3RebuildCurrentlyResetsDeletedHighWaterToLargestRetainedID() throws {
+        for version in ["v1_create_generations", "v2_add_sortOrder"] {
+            let queue = try seededQueue(upTo: version)
+            try insertAndDeleteHighWater(in: queue)
+
+            try GenerationMigrations.makeMigrator().migrate(queue)
+
+            try queue.write { db in
+                XCTAssertEqual(try sequence(in: db), 41, version)
+                try insertNext(in: db)
+                XCTAssertEqual(db.lastInsertedRowID, 42, "\(version): v3 currently loses the deleted high-water mark")
+            }
+        }
+    }
+
+    private func assertUpgrade(from version: String, hasLongFormColumns: Bool = false) throws {
+        let queue = try seededQueue(upTo: version)
+        let retainedColumns = "id, text, mode, modelTier, voice, emotion, speed, audioPath, duration, createdAt"
+            + (hasLongFormColumns ? ", longFormProjectID, longFormRole" : "")
+        let retainedQuery = "SELECT \(retainedColumns) FROM generations ORDER BY id"
+        let before = try queue.read { try Row.fetchAll($0, sql: retainedQuery) }
+
+        let migrator = GenerationMigrations.makeMigrator()
+        try migrator.migrate(queue)
+
+        try queue.write { db in
+            XCTAssertEqual(try Row.fetchAll(db, sql: retainedQuery), before, version)
+            XCTAssertEqual(Set(try db.columns(in: "generations").map(\.name)), [
+                "id", "text", "mode", "modelTier", "voice", "emotion", "speed", "audioPath",
+                "duration", "createdAt", "longFormProjectID", "longFormRole", "seed",
+            ])
+            let rows = try Generation.order(Generation.Columns.id).fetchAll(db)
+            XCTAssertEqual(rows.map(\.id), [3, 41])
+            XCTAssertEqual(rows.map(\.audioPath), ["/nonexistent/shared-history.wav", "/nonexistent/shared-history.wav"])
+            XCTAssertTrue(rows.allSatisfy { $0.seed == nil }, "Pre-v6 seeds must remain unknown")
+            XCTAssertNil(rows[0].voice)
+            XCTAssertNil(rows[0].emotion)
+            XCTAssertNil(rows[0].speed)
+            XCTAssertNil(rows[0].duration)
+            XCTAssertNil(rows[0].longFormProjectID)
+            XCTAssertNil(rows[0].longFormRole)
+            XCTAssertEqual(rows[1].longFormProjectID, hasLongFormColumns ? "historical-project" : nil)
+            XCTAssertEqual(rows[1].longFormRole, hasLongFormColumns ? "joined" : nil)
+            try assertIndexes(in: db)
+            XCTAssertEqual(try sequence(in: db), 41, "Live ids survive the table rebuild")
+            try insertNext(in: db)
+            XCTAssertEqual(db.lastInsertedRowID, 42)
+            // The signed storage bit pattern must survive a subsequent open;
+            // nil stays nil for the historical row whose seed was not recorded.
+            try db.execute(sql: "UPDATE generations SET seed = ? WHERE id = 41", arguments: [Int64.min])
+        }
+
+        let upgraded = try queue.read { try Generation.order(Generation.Columns.id).fetchAll($0) }
+        let applied = try queue.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY identifier") }
+        XCTAssertEqual(applied.count, 7)
+        try migrator.migrate(queue)
+        try queue.read { db in
+            XCTAssertEqual(try Generation.order(Generation.Columns.id).fetchAll(db), upgraded, "Reopening is idempotent")
+            XCTAssertEqual(try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY identifier"), applied)
+            XCTAssertEqual(try sequence(in: db), 42)
+            XCTAssertEqual(upgraded[1].samplingSeed, UInt64(1) << 63)
+            XCTAssertNil(upgraded[0].samplingSeed)
+            try assertIndexes(in: db)
+        }
+    }
+
+    private func seededQueue(upTo version: String) throws -> DatabaseQueue {
+        let queue = try DatabaseQueue()
+        try GenerationMigrations.makeMigrator().migrate(queue, upTo: version)
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO generations (id, text, mode, modelTier, voice, emotion, speed, audioPath, duration, createdAt)
+                VALUES (3, 'older retained take', 'custom', 'speed', NULL, NULL, NULL,
+                        '/nonexistent/shared-history.wav', NULL, '2025-01-01 12:00:00'),
+                       (41, 'newer retained take', 'design', 'quality', 'narrator', 'calm', 0.9,
+                        '/nonexistent/shared-history.wav', 2.5, '2025-02-01 12:00:00')
+                """)
+            if version == "v2_add_sortOrder" {
+                try db.execute(sql: "UPDATE generations SET sortOrder = CASE id WHEN 41 THEN 0 ELSE 1 END")
+            }
+            if version == "v5_add_long_form_project" {
+                try db.execute(sql: """
+                    UPDATE generations SET longFormProjectID = 'historical-project', longFormRole = 'joined' WHERE id = 41
+                    """)
+            }
+        }
+        return queue
+    }
+
+    private func insertAndDeleteHighWater(in queue: DatabaseQueue) throws {
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO generations (id, text, mode, modelTier, audioPath)
+                VALUES (900, 'deleted take', 'custom', 'speed', '/nonexistent/deleted-history.wav')
+                """)
+            try db.execute(sql: "DELETE FROM generations WHERE id = 900")
+            XCTAssertEqual(try sequence(in: db), 900)
+        }
+    }
+
+    private func sequence(in db: Database) throws -> Int64? {
+        try Int64.fetchOne(db, sql: "SELECT seq FROM sqlite_sequence WHERE name = 'generations'")
+    }
+
+    private func insertNext(in db: Database) throws {
+        try db.execute(sql: """
+            INSERT INTO generations (text, mode, modelTier, audioPath)
+            VALUES ('post-upgrade take', 'custom', 'speed', '/nonexistent/post-upgrade.wav')
+            """)
+    }
+
+    private func assertIndexes(in db: Database) throws {
+        let indexes = try db.indexes(on: "generations")
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: indexes.map { ($0.name, $0.columns) }), [
+            "idx_generations_createdAt": ["createdAt"],
+            "idx_generations_longFormProjectID": ["longFormProjectID"],
+            "idx_generations_audioPath": ["audioPath"],
+        ])
+        XCTAssertFalse(try XCTUnwrap(indexes.first { $0.name == "idx_generations_audioPath" }).isUnique,
+                       "Multiple takes can legitimately reference the same audio")
+    }
+}
+
 /// PA-19: the History database service both apps share, opened on a private
 /// directory through its root-directory seam. The page query, the long-form
 /// acceptance journal and error classification have their own suites; these

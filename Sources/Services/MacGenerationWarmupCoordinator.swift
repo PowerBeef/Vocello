@@ -335,6 +335,14 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         }
     }
 
+    /// Joins scheduled and dispatched work, including a deferred intent the
+    /// dispatched task schedules as it settles. Does not start or cancel work.
+    func waitForScheduledWarmupCompletion() async {
+        while let task = pendingTask ?? dispatchedTask {
+            await task.value
+        }
+    }
+
     func cancelPendingWarmup() {
         revision += 1
         pendingTask?.cancel()

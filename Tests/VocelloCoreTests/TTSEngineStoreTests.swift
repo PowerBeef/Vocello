@@ -757,11 +757,12 @@ final class TTSEngineStoreTests: XCTestCase {
         await waitUntil("the store to publish the cold load") { store.loadState == .starting }
         engine.releasePrefetch()
         await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+        await coordinator.waitForScheduledWarmupCompletion()
 
         XCTAssertEqual(engine.prefetchSawCancellation, [false])
         await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
         coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 1, "A completed warm is not repeated for the same intent")
     }
 
@@ -782,7 +783,7 @@ final class TTSEngineStoreTests: XCTestCase {
         coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
         engine.releasePrefetch()
         await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
 
         XCTAssertEqual(engine.prefetchSawCancellation, [false])
         XCTAssertEqual(engine.prefetchCount, 1)
@@ -813,7 +814,7 @@ final class TTSEngineStoreTests: XCTestCase {
         engine.releasePrefetch()
 
         await waitUntil("the flipped-back intent to warm again") { engine.prefetchSawCancellation.count == 2 }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchSawCancellation, [true, false])
         XCTAssertEqual(engine.prefetchCount, 2)
     }
@@ -840,7 +841,7 @@ final class TTSEngineStoreTests: XCTestCase {
         engine.releasePrefetch()
 
         await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchSawCancellation, [false])
         XCTAssertEqual(engine.prefetchCount, 1)
     }
@@ -871,7 +872,7 @@ final class TTSEngineStoreTests: XCTestCase {
         XCTAssertEqual(engine.prefetchSawCancellation, [true, false])
         await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
         coordinator.scheduleWarmupIfNeeded(context: newIntent, snapshot: store.snapshot, ttsEngineStore: store)
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 2, "The new intent's warm completed")
     }
 
@@ -897,7 +898,7 @@ final class TTSEngineStoreTests: XCTestCase {
         engine.releaseUnload()
 
         await waitUntil("the new model to warm") { engine.prefetchSawCancellation.count == 1 }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchSawCancellation, [false])
         XCTAssertEqual(engine.unloadCount, 1)
         XCTAssertEqual(engine.prefetchCount, 1)
@@ -932,7 +933,7 @@ final class TTSEngineStoreTests: XCTestCase {
         await waitUntil("the idle unload to reach the store") { store.loadState == .idle }
 
         coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 1, "The unload sticks on \(deviceClass)")
     }
 
@@ -955,14 +956,14 @@ final class TTSEngineStoreTests: XCTestCase {
             snapshot: store.snapshot,
             ttsEngineStore: store
         )
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "Nothing warms while the engine starts")
 
         engine.isReady = true
         await waitUntil("the kept intent to warm once the engine is ready") { engine.prefetchCount == 1 }
         await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
         XCTAssertEqual(engine.prefetchSawCancellation, [false])
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 1, "The retried intent warms once")
     }
 
@@ -984,7 +985,7 @@ final class TTSEngineStoreTests: XCTestCase {
             snapshot: store.snapshot,
             ttsEngineStore: store
         )
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "Nothing warms during the take")
 
         engine.loadState = .loaded(modelID: "pro_custom")
@@ -1022,7 +1023,7 @@ final class TTSEngineStoreTests: XCTestCase {
             await waitUntil("\(label): the unload to reach the store") {
                 store.loadState == .idle && store.snapshot.isReady
             }
-            try await Task.sleep(for: .milliseconds(50))
+            await coordinator.waitForScheduledWarmupCompletion()
             XCTAssertEqual(engine.prefetchCount, 0, "\(label): the unload sticks")
             subscription.cancel()
         }
@@ -1042,7 +1043,7 @@ final class TTSEngineStoreTests: XCTestCase {
         let context = customWarmContext(.mid16GBMac)
 
         coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
-        try await Task.sleep(for: .milliseconds(50))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "The guarded band refuses the warm")
 
         dial.set(MemoryHeadroomDial.healthy)
@@ -1073,7 +1074,7 @@ final class TTSEngineStoreTests: XCTestCase {
         await waitUntil("the failure to reach the store") { store.loadState == .failed(message: "The take failed.") }
         engine.loadState = .idle
         await waitUntil("the dismissal to reach the store") { store.loadState == .idle }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "A failure drops the kept intent")
     }
 
@@ -1097,13 +1098,13 @@ final class TTSEngineStoreTests: XCTestCase {
             snapshot: store.snapshot,
             ttsEngineStore: store
         )
-        try await Task.sleep(for: .milliseconds(50))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "The guarded band refuses the warm")
 
         dial.set(MemoryHeadroomDial.healthy)
         engine.loadState = .idle
         await waitUntil("the idle unload to reach the store") { store.loadState == .idle }
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "The unload sticks")
         XCTAssertEqual(store.loadState, .idle)
     }
@@ -1128,7 +1129,7 @@ final class TTSEngineStoreTests: XCTestCase {
         defer { subscription.cancel() }
 
         browseOutsideStudio(coordinator, store: store)
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 0, "Browsing a cold engine warms nothing on \(deviceClass)")
         XCTAssertEqual(engine.ensureLoadedCount, 0)
         XCTAssertEqual(store.loadState, .idle)
@@ -1144,7 +1145,7 @@ final class TTSEngineStoreTests: XCTestCase {
         engine.loadState = .idle
         await waitUntil("the idle unload to reach the store") { store.loadState == .idle }
         browseOutsideStudio(coordinator, store: store)
-        try await Task.sleep(for: .milliseconds(30))
+        await coordinator.waitForScheduledWarmupCompletion()
         XCTAssertEqual(engine.prefetchCount, 1, "Browsing does not reload the released weights on \(deviceClass)")
         XCTAssertEqual(engine.ensureLoadedCount, 0)
     }
@@ -1321,7 +1322,7 @@ final class TTSEngineStoreTests: XCTestCase {
                 snapshot: weights.store.snapshot,
                 ttsEngineStore: weights.store
             )
-            try await Task.sleep(for: .milliseconds(50))
+            await warmup.waitForScheduledWarmupCompletion()
             let events = await weights.loads.events
             XCTAssertEqual(events.filter { $0 == "capabilities" }.count, 1, "No warm starts from .failed")
             XCTAssertEqual(events.filter { $0 == "load" }.count, 1)

@@ -42,6 +42,15 @@ private actor TestGenerationGate {
     }
 }
 
+private extension GenerationTaskStartGate {
+    /// The acknowledgement and wait share the gate actor, so a later read of
+    /// pendingWaiterCount observes the waiter after it suspended at the barrier.
+    func wait(entered: XCTestExpectation) async {
+        entered.fulfill()
+        await wait()
+    }
+}
+
 private enum TestMemoryPressureAction: Equatable, Sendable {
     case admissionClosed
     case observed(NativeMemoryTrimLevel)
@@ -112,11 +121,15 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     func testCancellationRetainsOwnershipUntilTaskTerminates() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
+        let cancellationRequested = expectation(description: "typed cancellation reached the worker")
         let worker = Task {
             await terminalGate.wait()
         }
         let registration = try await coordinator.register(
-            cancel: { _ in worker.cancel() },
+            cancel: { _ in
+                worker.cancel()
+                cancellationRequested.fulfill()
+            },
             waitForTermination: { _ = await worker.result }
         )
 
@@ -124,10 +137,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             await coordinator.cancelCurrent(reason: .memoryPressure)
         }
 
-        for _ in 0..<100 {
-            if await coordinator.currentCancellationReason != nil { break }
-            await Task.yield()
-        }
+        await fulfillment(of: [cancellationRequested], timeout: 5)
         let cancellationReason = await coordinator.currentCancellationReason
         let isActiveWhileCancelling = await coordinator.hasActiveGeneration
         XCTAssertEqual(cancellationReason, .memoryPressure)
@@ -159,22 +169,23 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         for expectedReason in reasons {
             let coordinator = ActiveGenerationCoordinator()
             let terminalGate = TestGenerationGate()
+            let cancellationRequested = expectation(description: "worker received \(expectedReason)")
             let worker = Task {
                 await terminalGate.wait()
                 try Task.checkCancellation()
             }
             let registration = try await coordinator.register(
-                cancel: { _ in worker.cancel() },
+                cancel: { _ in
+                    worker.cancel()
+                    cancellationRequested.fulfill()
+                },
                 waitForTermination: { _ = await worker.result }
             )
 
             let cancellation = Task {
                 await coordinator.cancelCurrent(reason: expectedReason)
             }
-            for _ in 0..<100 {
-                if await coordinator.currentCancellationReason != nil { break }
-                await Task.yield()
-            }
+            await fulfillment(of: [cancellationRequested], timeout: 5)
 
             await terminalGate.open()
             await cancellation.value
@@ -299,29 +310,35 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     func testFirstCancellationReasonWinsAcrossConcurrentRequests() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
+        let cancellationRequested = expectation(description: "first cancellation reached the worker")
+        let terminalWaitsEntered = expectation(description: "both cancellation requests joined termination")
+        terminalWaitsEntered.expectedFulfillmentCount = 2
         let worker = Task {
             await terminalGate.wait()
             try Task.checkCancellation()
         }
         let registration = try await coordinator.register(
-            cancel: { _ in worker.cancel() },
-            waitForTermination: { _ = await worker.result }
+            cancel: { _ in
+                worker.cancel()
+                cancellationRequested.fulfill()
+            },
+            waitForTermination: {
+                terminalWaitsEntered.fulfill()
+                _ = await worker.result
+            }
         )
 
         let criticalCancellation = Task {
             await coordinator.cancelCurrent(reason: .memoryPressure)
         }
-        for _ in 0..<100 {
-            if await coordinator.currentCancellationReason == .memoryPressure { break }
-            await Task.yield()
-        }
+        await fulfillment(of: [cancellationRequested], timeout: 5)
         let firstReason = await coordinator.currentCancellationReason
         XCTAssertEqual(firstReason, .memoryPressure)
 
         let laterCancellation = Task {
             await coordinator.cancelCurrent(reason: .shutdown)
         }
-        await Task.yield()
+        await fulfillment(of: [terminalWaitsEntered], timeout: 5)
         let reasonAfterLaterRequest = await coordinator.currentCancellationReason
         XCTAssertEqual(
             reasonAfterLaterRequest,
@@ -513,21 +530,27 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     func testGenerationTaskStartGateHoldsEveryWaiterUntilOpened() async {
         let gate = GenerationTaskStartGate()
         let passed = TestCallLog()
+        let firstEntered = expectation(description: "first task entered the start gate")
+        let secondEntered = expectation(description: "second task entered the start gate")
         let first = Task {
-            await gate.wait()
+            await gate.wait(entered: firstEntered)
             passed.append("first")
         }
         let second = Task {
-            await gate.wait()
+            await gate.wait(entered: secondEntered)
             passed.append("second")
         }
-        for _ in 0..<50 { await Task.yield() }
+        await fulfillment(of: [firstEntered, secondEntered], timeout: 5)
+        let blocked = await gate.pendingWaiterCount
+        XCTAssertEqual(blocked, 2, "both tasks reached and remain suspended at the closed barrier")
         XCTAssertEqual(passed.entries, [], "no waiter passes a closed gate")
 
         await gate.open()
         await first.value
         await second.value
         XCTAssertEqual(Set(passed.entries), ["first", "second"])
+        let settled = await gate.pendingWaiterCount
+        XCTAssertEqual(settled, 0)
 
         // Opening again is harmless, and an open gate admits at once.
         await gate.open()
@@ -581,14 +604,17 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         admission.close()
         admission.close()
         let entered = TestLockedValue<Bool>()
+        let waiterEntered = expectation(description: "waiter entered relief admission")
         let waiter = Task { @MainActor in
+            waiterEntered.fulfill()
             try await admission.waitUntilOpen()
             entered.store(true)
         }
-        for _ in 0..<20 { await Task.yield() }
+        await fulfillment(of: [waiterEntered], timeout: 5)
+        XCTAssertEqual(admission.pendingWaiterCount, 1)
 
         admission.reopen()
-        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(admission.pendingWaiterCount, 1, "one relief holder still owns the blocked waiter")
         XCTAssertTrue(admission.isClosed)
         XCTAssertFalse(admission.allowsProactiveOperation)
         XCTAssertNil(entered.value)
@@ -596,6 +622,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         admission.reopen()
         try await waiter.value
         XCTAssertFalse(admission.isClosed)
+        XCTAssertEqual(admission.pendingWaiterCount, 0)
         XCTAssertEqual(entered.value, true)
 
         // An unpaired reopen cannot drive the count below zero.
@@ -644,17 +671,20 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             await engine.ensureModelLoadedIfNeeded(id: "relief-fixture-model")
         }
         await coordinator.waitUntilLoadBegins()
+        let trimEntered = expectation(description: "full unload entered the relief barrier")
         let trim = Task { @MainActor in
+            trimEntered.fulfill()
             await engine.trimMemory(level: .fullUnload, reason: "test_caller_full_unload")
         }
-        for _ in 0..<50 { await Task.yield() }
-        try await Task.sleep(nanoseconds: 50_000_000)
+        await fulfillment(of: [trimEntered], timeout: 5)
+        XCTAssertEqual(engine.pendingModelOperationReliefCount, 1, "the trim is blocked on the in-flight load")
         let whileLoading = await coordinator.events
         XCTAssertEqual(whileLoading, ["load-begin"], "a full unload must not run under a suspended load")
 
         await coordinator.releaseLoad()
         await load.value
         await trim.value
+        XCTAssertEqual(engine.pendingModelOperationReliefCount, 0)
 
         let events = await coordinator.events
         let loadEnd = try XCTUnwrap(events.firstIndex(of: "load-end"))

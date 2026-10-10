@@ -448,6 +448,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         criticalMemoryReliefAdmission.close()
     }
 
+    /// Relief callers suspended until the current load, prime or prewarm ends.
+    var pendingModelOperationReliefCount: Int { modelOperationQuiescenceWaiters.count }
+
     private func waitForModelOperationsToQuiesce() async {
         while activeModelOperation != nil {
             await withCheckedContinuation { continuation in

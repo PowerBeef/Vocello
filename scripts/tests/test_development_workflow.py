@@ -205,6 +205,17 @@ class CommandRunnerTests(unittest.TestCase):
                 MODULE.run_commands([["false"], ["true"]])
         self.assertEqual(calls, [["false"]])
 
+    def test_pytest_uses_running_interpreter_and_missing_dependencies_stop_before_execution(self) -> None:
+        import sys
+        self.assertEqual(MODULE.PYTEST[0], sys.executable)
+        diagnostics = mock.Mock()
+        diagnostics.python_dependency_problems.return_value = ["missing pytest"]
+        with mock.patch.object(MODULE, "_load", return_value=diagnostics), \
+                mock.patch.object(MODULE.subprocess, "run") as run:
+            with self.assertRaisesRegex(MODULE.WorkflowError, "VOCELLO_PYTHON"):
+                MODULE.run_commands([MODULE.PYTEST])
+            run.assert_not_called()
+
     def test_ci_commands_mirror_the_push_workflow(self) -> None:
         joined = [" ".join(command) for command in MODULE.CI_COMMANDS]
         for expected in (

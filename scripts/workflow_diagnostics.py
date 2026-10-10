@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import importlib.util
 import json
 import os
@@ -10,6 +11,7 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,11 +24,37 @@ TOOLS = {"python3": ["--version"], "git": ["--version"], "xcodegen": ["--version
 def _probe(command: list[str]) -> dict:
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
-        lines = result.stdout.strip().splitlines()
+        lines = (result.stdout + "\n" + result.stderr).strip().splitlines()
         line = next((entry for entry in lines if re.search(r"\d+\.\d+", entry)), lines[0] if lines else None)
-        return {"exitCode": result.returncode, "version": line}
+        return {"exitCode": result.returncode, "version": line,
+                "usageDisplayed": any(re.search(r"(?i)\b(usage|options|commands):", entry) for entry in lines)}
     except (OSError, subprocess.SubprocessError):
-        return {"exitCode": None, "version": None}
+        return {"exitCode": None, "version": None, "usageDisplayed": False}
+
+
+def python_module_inventory(manifest: dict) -> dict:
+    modules = {}
+    for module, package in (("pytest", "pytest"), ("xdist", "pytest-xdist"), ("numpy", "numpy")):
+        available = importlib.util.find_spec(module) is not None
+        try:
+            version = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            version = None
+        pin = manifest.get("native", {}).get(package, {}).get("version")
+        modules[module] = {"available": available, "version": version, "pinnedVersion": pin,
+                           "matchesPin": version == pin if version and pin else None}
+    return modules
+
+
+def python_dependency_problems(root: Path = ROOT) -> list[str]:
+    manifest = json.loads((root / "config/toolchain.json").read_text(encoding="utf-8"))
+    problems = []
+    for name, entry in python_module_inventory(manifest).items():
+        if not entry["available"]:
+            problems.append(f"missing {name}")
+        elif entry["matchesPin"] is not True:
+            problems.append(f"{name} {entry['version'] or 'unknown'} (required {entry['pinnedVersion']})")
+    return problems
 
 
 def doctor(root: Path = ROOT) -> dict:
@@ -35,13 +63,18 @@ def doctor(root: Path = ROOT) -> dict:
     manifest_path = root / "config/toolchain.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
     for tool, flags in TOOLS.items():
-        executable = shutil.which(tool)
-        probe = _probe([executable, *flags]) if executable else {"exitCode": None, "version": None}
-        pin = manifest.get("artifactPins", {}).get("ripgrep" if tool == "rg" else tool, {}).get("version")
-        version = re.search(r"\b(\d+\.\d+(?:\.\d+)?)\b", probe["version"] or "")
-        matches = (version[1] == pin) if pin and version else None
+        executable = sys.executable if tool == "python3" else shutil.which(tool)
+        probe = ({"exitCode": 0, "version": "Python " + ".".join(map(str, sys.version_info[:3]))}
+                 if tool == "python3" else _probe([executable, *flags]) if executable
+                 else {"exitCode": None, "version": None})
+        major_pin = tool in {"node", "npm"}
+        pin = (manifest.get("website", {}) if major_pin else manifest.get("artifactPins", {})).get(
+            "ripgrep" if tool == "rg" else tool, {}).get("version")
+        version = re.search(r"(?<![\d.])(\d+\.\d+(?:\.\d+)?)(?![\d.])", probe["version"] or "")
+        matches = ((version[1].split(".")[0] if major_pin else version[1]) == pin) if pin and version else None
         tools[tool] = {"available": executable is not None, "path": executable, **probe,
-                       "pinnedVersion": pin, "matchesPin": matches}
+                       "pinnedVersion": pin, "pinPolicy": "major" if major_pin else "exact" if pin else None,
+                       "matchesPin": matches}
     xcode = {"available": False, "developerDirectory": None, "version": None}
     if executable := shutil.which("xcode-select"):
         selection = _probe([executable, "-p"])
@@ -59,17 +92,26 @@ def doctor(root: Path = ROOT) -> dict:
     # Capability presence is not proof that a plugin/server is exposed to this chat.
     helper_root = Path.home() / ".codex/plugins/cache/axiom-marketplace/axiom"
     helpers = {}
-    versions = sorted(helper_root.glob("*/bin")) if helper_root.is_dir() else []
+    versions = sorted(helper_root.glob("*/bin"), key=lambda path: tuple(
+        int(part) for part in re.findall(r"\d+", path.parent.name))) if helper_root.is_dir() else []
     for name in ("axbuild", "xclog", "xcprof", "xcproject", "xcsym", "xcui"):
         candidates = [directory / name for directory in versions if (directory / name).is_file()]
         path = candidates[-1] if candidates else None
         executable = bool(path and os.access(path, os.X_OK))
         probe = _probe([os.fspath(path), "--help"]) if executable else {"exitCode": None}
+        probe_status = ("missing" if path is None else "not-executable" if not executable
+                        else "success" if probe["exitCode"] == 0
+                        else "usage-nonzero" if probe.get("usageDisplayed")
+                        else "failed" if probe["exitCode"] is not None else "unavailable")
         helpers[name] = {"path": os.fspath(path) if path else None, "executable": executable,
-                         "helpProbePassed": probe["exitCode"] == 0}
+                         "helpProbePassed": probe["exitCode"] == 0, "helpProbeExitCode": probe["exitCode"],
+                         "helpProbeStatus": probe_status}
     hooks = root / ".codex/hooks.json"
     return {"schemaVersion": 1, "readOnly": True, "tools": tools, "xcode": xcode,
-            "pythonModules": {name: importlib.util.find_spec(name) is not None for name in ("pytest", "xdist", "numpy")},
+            "pythonModules": {name: entry["available"] for name, entry in python_module_inventory(manifest).items()},
+            "pythonModuleDetails": python_module_inventory(manifest),
+            "pythonSelection": {"executable": sys.executable, "override": os.environ.get("VOCELLO_PYTHON"),
+                                "minimumVersion": "3.10", "meetsMinimum": sys.version_info >= (3, 10)},
             "codex": {"instructionsPresent": (root / "AGENTS.md").is_file(),
                       "skills": sorted(path.parent.name for path in (root / ".agents/skills").glob("*/SKILL.md")),
                       "agentDefinitions": sorted(path.name for path in (root / ".codex/agents").glob("*.toml")),
@@ -241,6 +283,9 @@ def triage(run_directory: Path) -> dict:
         evidence.append("new-crashes.txt")
         issues.append("nonempty crash-delta marker requires inspection; it may contain a crash or a collection failure")
     codes = {key: int(value) for key, value in re.findall(r"^(test_build|build|core|runtime)=(-?\d+)\s*$", verdict_text, re.M)}
+    for step, value in re.findall(r"^(core_summary|runtime_summary)=(-?\d+)\s*$", verdict_text, re.M):
+        if int(value):
+            issues.append(f"test summary collection failed: {step} (exit {value})")
     for step, code in codes.items():
         if code:
             failed_steps.append({"step": step, "exitCode": code, "evidence": "verdict.txt"})
@@ -315,6 +360,11 @@ def print_report(report: dict) -> None:
             print(f"{name}: {tool['version'] or ('present; version probe failed' if tool['available'] else 'missing')}{drift}")
         xcode_drift = f" (CI pin: {report['xcode']['pinnedVersion']}; differs)" if report["xcode"]["matchesPin"] is False else ""
         print(f"Xcode: {report['xcode']['version'] or 'not detected'}{xcode_drift}")
+        print(f"Selected Python: {report['pythonSelection']['executable']}")
+        for name, entry in report["pythonModuleDetails"].items():
+            detail = entry["version"] or ("present; version unknown" if entry["available"] else "missing")
+            pin = f" (pin: {entry['pinnedVersion']})" if entry["pinnedVersion"] else ""
+            print(f"Python {name}: {detail}{pin}")
         print(f"Codex hooks: {'configured' if report['codex']['hooksConfigured'] else 'missing'}; activation unconfirmed")
         print(report["codex"]["hookActivationNote"])
         print(f"MCP availability: {report['codex']['mcpAvailability']}")

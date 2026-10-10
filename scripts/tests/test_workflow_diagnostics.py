@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -144,6 +145,15 @@ class TriageTests(unittest.TestCase):
         self.write("verdict.txt", "GATE: INCONCLUSIVE\n")
         self.assertEqual(MODULE.triage(self.root)["verdict"], "inconclusive")
 
+    def test_collection_failure_blocks_native_pass_but_preserves_native_failure(self):
+        for code, expected in ((0, "incomplete"), (1, "failure-unclassified"), (143, "interrupted")):
+            with self.subTest(code=code):
+                self.write("verdict.txt", f"test_build=0\ncore={code}\nruntime=0\ncore_summary=0\nruntime_summary=1\n")
+                report = MODULE.triage(self.root)
+                self.assertEqual(report["verdict"], expected)
+                self.assertTrue(any("runtime_summary" in issue for issue in report["issues"]))
+                self.assertFalse(any(entry["step"] == "runtime_summary" for entry in report["failedSteps"]))
+
     def test_diagnosed_failure_with_zero_exit_code_remains_product_failure(self):
         self.run_metadata("diagnosedFailure", 0)
         self.ledger()
@@ -256,6 +266,51 @@ class DoctorTests(unittest.TestCase):
         self.assertFalse(report["tools"]["codex"]["available"])
         self.assertFalse(report["xcode"]["available"])
         self.assertFalse(report["codex"]["hooksConfigured"])
+
+    def test_running_python_and_package_versions_are_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config").mkdir()
+            (root / "config/toolchain.json").write_text(json.dumps({"native": {
+                "pytest": {"version": "9.1.1"}, "pytest-xdist": {"version": "3.8.0"}, "numpy": {"version": "2.4.6"}}}))
+            with mock.patch.object(MODULE.shutil, "which", return_value=None), \
+                    mock.patch.object(MODULE.Path, "home", return_value=root), \
+                    mock.patch.object(MODULE.importlib.metadata, "version", side_effect=lambda name: {"pytest": "9.1.1", "pytest-xdist": "3.8.0", "numpy": "2.0.0"}[name]), \
+                    mock.patch.object(MODULE.importlib.util, "find_spec", return_value=object()):
+                report = MODULE.doctor(root)
+                problems = MODULE.python_dependency_problems(root)
+            self.assertEqual(report["tools"]["python3"]["path"], sys.executable)
+            self.assertEqual(report["pythonSelection"]["executable"], sys.executable)
+            self.assertTrue(report["pythonModuleDetails"]["pytest"]["matchesPin"])
+            self.assertFalse(report["pythonModuleDetails"]["numpy"]["matchesPin"])
+            self.assertEqual(problems, ["numpy 2.0.0 (required 2.4.6)"])
+
+    def test_major_pins_and_usage_nonzero_helpers_have_explicit_semantics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config").mkdir()
+            (root / "config/toolchain.json").write_text(json.dumps({"website": {"node": {"version": "24"}, "npm": {"version": "11"}}}))
+            for version in ("9.0.0", "27.3.1"):
+                helper = root / ".codex/plugins/cache/axiom-marketplace/axiom" / version / "bin/xclog"
+                helper.parent.mkdir(parents=True)
+                helper.write_text("#!/bin/sh\n")
+                helper.chmod(0o755)
+            def fake_run(command, **kwargs):
+                if command[-1] == "--help":
+                    return subprocess.CompletedProcess(command, 1, "", "Usage: xclog COMMAND\n")
+                return subprocess.CompletedProcess(command, 0, "v24.21.0" if command[0].endswith("node") else "12.0.0", "")
+            with mock.patch.object(MODULE.shutil, "which", side_effect=lambda tool: f"/tools/{tool}" if tool in {"node", "npm"} else None), \
+                    mock.patch.object(MODULE.Path, "home", return_value=root), \
+                    mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run):
+                report = MODULE.doctor(root)
+            self.assertTrue(report["tools"]["node"]["matchesPin"])
+            self.assertEqual(report["tools"]["node"]["pinPolicy"], "major")
+            self.assertFalse(report["tools"]["npm"]["matchesPin"])
+            helper = report["axiomHelpers"]["xclog"]
+            self.assertIn("27.3.1", helper["path"])
+            self.assertFalse(helper["helpProbePassed"])
+            self.assertEqual(helper["helpProbeStatus"], "usage-nonzero")
+            self.assertEqual(helper["helpProbeExitCode"], 1)
 
     def test_doctor_and_triage_route_without_workflow_execution(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(WORKFLOW, "run_commands") as run:

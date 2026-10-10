@@ -131,7 +131,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     return {"mode": "selected", "tests": sorted(selected), "reason": "transitive local test consumers"}
 
 
-PYTEST = ["python3", "-m", "pytest", "-n", "auto"]
+PYTEST = [sys.executable, "-m", "pytest", "-n", "auto"]
 
 
 def python_test_commands(selection: dict) -> list[list[str]]:
@@ -332,6 +332,12 @@ def run_commands(commands: list[list[str]]) -> None:
     for index, command in enumerate(commands, start=1):
         print(f"==> [dev {index}/{len(commands)}] {_display(command)}", flush=True)
         command_started = time.monotonic()
+        if command[:4] == PYTEST[:4]:
+            diagnostics = _load("scripts/workflow_diagnostics.py")
+            problems = diagnostics.python_dependency_problems(ROOT)
+            if problems:
+                raise WorkflowError("selected Python test dependencies: " + "; ".join(problems)
+                                    + ". Select an installed environment with VOCELLO_PYTHON; no packages were installed")
         completed = subprocess.run(command, cwd=ROOT, check=False)
         elapsed = time.monotonic() - command_started
         print(f"==> [dev] completed in {elapsed:.1f}s (exit {completed.returncode})", flush=True)

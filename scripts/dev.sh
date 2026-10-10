@@ -6,6 +6,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Read-only discovery prefers an already-installed interpreter with the pinned
+# test packages. An explicit override never silently falls back to another Python.
+VOCELLO_PYTHON="$(python3 "$ROOT_DIR/scripts/select_python.py")"
+export VOCELLO_PYTHON
+export PATH="$ROOT_DIR/scripts/lib/python-bin:$PATH"
+
 case "${1:-}" in
   check|lint|contracts|py|test|ios|build|run|regen|ci)
     # The lane scripts compute their own build paths; exporting them here keeps

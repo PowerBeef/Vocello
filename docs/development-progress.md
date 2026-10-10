@@ -17,6 +17,29 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — broad automatic audio-quality research
+
+Completed the [primary-source research report](audits/2026-10-10-automatic-audio-quality-research.md)
+covering Clone register/identity, French accent/phonetics, local whisper/devoicing, false starts,
+liaison, emotional intent, learned judges, corpus metrics, data rights and statistical qualification.
+Three read-only researchers examined separate domains; the lead reconciled recommendations with
+current installed models and source. ZIPA posteriors and segmentation-free GOP already exist;
+the next work is richer competing hypotheses, expected-interval acoustics and held-out evidence.
+Current ReDimNet2+ is retained. Several attractive checkpoints/data are noncommercial, English-only,
+unreleased or otherwise unqualified for the reported French failures.
+
+The ordered experiments start with installed/cache-only evidence, then one independent DSP witness
+and one modest French phone challenger if specifically authorized. No acoustic inference, model/data
+download, audio upload, native/phone operation or acceptance-policy change was performed. QC-06 stays
+in flight; QC-04/QC-08/RF-14 stay planned. Historical zero-event French results and NOT_ASSESSED
+boundaries remain unchanged. Hook delivery was observed; doctor cannot confirm persisted trust.
+**Verified:** routed check passed contracts, privacy, strict roadmap validation and **2,082 selected
+Python tests plus 2,502 subtests**, with one existing skip. Independent French and judge/statistics
+review clarified the French WavLM `/ɥ/` inventory gap and duration-control semantics. Final prose
+and that inventory clarification received a separate contracts-only check. New report/file links
+resolve and every roadmap status, gate, dependency and unblock condition is unchanged. Raw checks
+remain ignored under `build/private/qc/automatic-quality-research-20261010/`.
+
 ### October 10 — generation quality remediation
 
 Implemented the investigation's immediate safeguards: explicit Clone transcript review/audio-only

@@ -1551,7 +1551,8 @@
       "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).",
       "sourceOfTruth": [
         "docs/reference/qc.md",
-        "docs/audits/2026-10-10-generation-quality-investigation.md"
+        "docs/audits/2026-10-10-generation-quality-investigation.md",
+        "docs/audits/2026-10-10-automatic-audio-quality-research.md"
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,

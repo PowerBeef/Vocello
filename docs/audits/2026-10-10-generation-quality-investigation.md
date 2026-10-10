@@ -19,6 +19,11 @@ nonnative-sounding French despite valid settings, and how to detect those failur
 It traces the complete request and audio lifecycle, reconciles the supplied historical reports,
 and proposes experiments that distinguish application defects from model limitations.
 
+The subsequent [automatic audio-quality research report](2026-10-10-automatic-audio-quality-research.md)
+compares primary-source detection methods, exact model/data rights, French and domain coverage,
+localization limits and an ordered qualification plan. It expands the research recommendations
+without changing the observed results or acceptance boundaries below.
+
 Sections 1–12 preserve the original investigation and proposal at the checkpoint above. They made
 no application or detector changes. Sections 13–14 record the subsequent remediation, validation
 and installed-model observations. Historical findings below are not claims that remediated defects

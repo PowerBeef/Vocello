@@ -10,7 +10,7 @@ import Synchronization
 /// to pre-fill the editable transcript and propose separate reference-language metadata when
 /// enrolling a recorded voice. It never selects the language of a future Clone output.
 ///
-/// Enrollment remains intentionally best-effort and single-pass. Benchmark output verification uses
+/// Enrollment remains best-effort, with one finalized pass per locale. Benchmark output verification uses
 /// `verificationEvidence` instead: it pins one locale and requires three independent recognition
 /// passes over the same immutable file, stopping early once consensus is impossible.
 enum VoiceClipTranscriber {
@@ -101,7 +101,7 @@ enum VoiceClipTranscriber {
 
     struct EnrollmentEvidence: Codable, Sendable, Equatable {
         static let currentSchemaVersion = 1
-        static let currentAlgorithmVersion = "apple-speech-enrollment-v1"
+        static let currentAlgorithmVersion = "apple-speech-enrollment-v2"
 
         var schemaVersion: Int
         var algorithmVersion: String
@@ -243,6 +243,10 @@ enum VoiceClipTranscriber {
     private static let outputVerificationEdgeAllowanceFraction = 0.15
     private static let earlyExitScore = 0.85
     private static let minimumUsableScore = 0.2
+    /// Provisional enrollment-selection bounds, not measured ASR accuracy.
+    /// Language gates plausible output; acoustic confidence ranks locales.
+    private static let earlyExitConfidence = 0.8
+    private static let minimumUsableConfidence = 0.3
     private static let authorizationTimeout: Duration = .seconds(30)
     private static let recognitionPassTimeout: Duration = .seconds(45)
 
@@ -327,43 +331,128 @@ enum VoiceClipTranscriber {
             )
         }
 
+        let localeCandidates = candidates.map {
+            EnrollmentLocaleCandidate(localeIdentifier: $0.locale.identifier, language: $0.language)
+        }
+        return await enrollmentResult(
+            candidates: localeCandidates,
+            authorization: authorization,
+            recognize: { index in
+                await recognizeDetailed(
+                    url: url,
+                    candidate: candidates[index],
+                    authorizationStatus: authorization,
+                    passIndex: index + 1
+                )
+            }
+        )
+    }
+
+    struct EnrollmentLocaleCandidate: Sendable, Equatable {
+        var localeIdentifier: String
+        var language: Qwen3SupportedLanguage
+    }
+
+    /// How one finished pass weighs in the enrollment locale choice.
+    struct EnrollmentPassScore: Sendable, Equatable {
+        /// Probability that the pass's own text is in its recognizer's language.
+        var languageScore: Double
+        /// The recognizer's mean segment confidence; nil when it reported none.
+        var confidence: Double?
+    }
+
+    /// Enrollment locale selection v2 (U27). A recognizer for locale L writes
+    /// L, so the language of its own output mostly confirms L, not the audio:
+    /// an en-US pass over French audio can read as fluent English. The
+    /// language score is therefore only a gate (text that does not even look
+    /// like its recognizer's language is noise); passes are compared by the
+    /// recognizer's reported confidence; a reported-confidence pass stops the
+    /// search only when both scores clear their provisional bounds.
+    /// Without a reported confidence a pass ranks by its language score and
+    /// may stop the search on it, as before.
+    static func enrollmentPassRanksAbove(_ lhs: EnrollmentPassScore, _ rhs: EnrollmentPassScore) -> Bool {
+        let lhsConfidence = lhs.confidence ?? 0
+        let rhsConfidence = rhs.confidence ?? 0
+        if lhsConfidence != rhsConfidence { return lhsConfidence > rhsConfidence }
+        return lhs.languageScore > rhs.languageScore
+    }
+
+    static func enrollmentPassEndsSearch(_ pass: EnrollmentPassScore) -> Bool {
+        guard pass.languageScore >= earlyExitScore else { return false }
+        guard let confidence = pass.confidence else { return true }
+        return confidence >= earlyExitConfidence
+    }
+
+    /// The winner is used only when its text passes the language gate and its
+    /// reported confidence clears the floor.
+    static func enrollmentPassIsUsable(_ pass: EnrollmentPassScore) -> Bool {
+        guard pass.languageScore >= minimumUsableScore else { return false }
+        guard let confidence = pass.confidence else { return true }
+        return confidence >= minimumUsableConfidence
+    }
+
+    /// Absence keeps the historical best-effort fallback; reported zero is
+    /// genuine zero confidence and must fail the floor rather than bypass it.
+    /// Malformed reported values also fail closed instead of becoming absent.
+    static func reportedConfidence(_ averageConfidence: Double?) -> Double? {
+        guard let averageConfidence else { return nil }
+        guard averageConfidence.isFinite, (0 ... 1).contains(averageConfidence) else { return 0 }
+        return averageConfidence
+    }
+
+    /// The selection over injected recognition passes (`recognize` returns the
+    /// pass for candidate `index`), so it is tested without Speech.
+    static func enrollmentResult(
+        candidates: [EnrollmentLocaleCandidate],
+        authorization: AuthorizationState,
+        scoreLanguage: @Sendable (String, Qwen3SupportedLanguage) -> Double = {
+            languageMatchScore(text: $0, expected: $1)
+        },
+        recognize: @Sendable (Int) async -> RecognitionPass
+    ) async -> EnrollmentResult {
         var attempts: [EnrollmentLocaleAttempt] = []
-        var best: (text: String, language: Qwen3SupportedLanguage, score: Double, confidence: Double)?
+        var best: (text: String, language: Qwen3SupportedLanguage, score: EnrollmentPassScore)?
         for (offset, candidate) in candidates.enumerated() {
-            let pass = await recognizeDetailed(
-                url: url,
-                candidate: candidate,
-                authorizationStatus: authorization,
-                passIndex: offset + 1
-            )
+            let pass = await recognize(offset)
             let trimmed = pass.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = trimmed?.isEmpty == false ? trimmed : nil
-            let score = text.map { languageMatchScore(text: $0, expected: candidate.language) }
+            let languageScore = text.map { scoreLanguage($0, candidate.language) }
+            let confidence = reportedConfidence(pass.averageConfidence)
             attempts.append(EnrollmentLocaleAttempt(
                 order: offset + 1,
-                localeIdentifier: candidate.locale.identifier,
+                localeIdentifier: candidate.localeIdentifier,
                 language: candidate.language.rawValue,
                 recognizerAvailable: pass.recognizerAvailable,
                 supportsOnDeviceRecognition: pass.supportsOnDeviceRecognition,
                 status: pass.finalResultStatus,
                 transcriptDigest: text.map(Self.sha256),
                 transcriptCharacters: text?.count ?? 0,
-                languageScore: score,
-                averageConfidence: pass.averageConfidence
+                languageScore: languageScore,
+                averageConfidence: confidence
             ))
-            if pass.finalResultStatus == .finalResult, let text, let score {
-                let confidence = pass.averageConfidence ?? 0
-                if best == nil
-                    || score > best!.score
-                    || (score == best!.score && confidence > best!.confidence) {
-                    best = (text, candidate.language, score, confidence)
+            guard pass.finalResultStatus == .finalResult, let text, let languageScore else { continue }
+            let score = EnrollmentPassScore(
+                languageScore: languageScore,
+                confidence: confidence
+            )
+            // A pass that fails the language gate never displaces one that
+            // passes it; among gated passes the recognizer's confidence wins.
+            let gated = score.languageScore >= minimumUsableScore
+            if let current = best {
+                let currentGated = current.score.languageScore >= minimumUsableScore
+                if gated != currentGated {
+                    if gated { best = (text, candidate.language, score) }
+                } else if enrollmentPassRanksAbove(score, current.score) {
+                    best = (text, candidate.language, score)
                 }
-                if score >= earlyExitScore { break }
+            } else {
+                best = (text, candidate.language, score)
             }
+            if gated, enrollmentPassEndsSearch(score) { break }
         }
 
         let outcome: EnrollmentOutcome
-        if let best, best.score < minimumUsableScore {
+        if let best, !enrollmentPassIsUsable(best.score) {
             outcome = .lowConfidence
         } else if best != nil {
             outcome = .success
@@ -372,7 +461,7 @@ enum VoiceClipTranscriber {
         }
         let accepted = outcome == .success ? best : nil
         let language = accepted.map {
-            $0.score >= confidentLanguageScore ? $0.language : .auto
+            $0.score.languageScore >= confidentLanguageScore ? $0.language : .auto
         } ?? .auto
         return EnrollmentResult(
             text: accepted?.text,
@@ -384,8 +473,8 @@ enum VoiceClipTranscriber {
                 outcome: outcome,
                 attempts: attempts,
                 bestLanguage: best?.language.rawValue,
-                bestLanguageScore: best?.score,
-                bestTranscriptConfidence: best?.confidence
+                bestLanguageScore: best?.score.languageScore,
+                bestTranscriptConfidence: best?.score.confidence
             )
         )
     }

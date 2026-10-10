@@ -14,6 +14,9 @@ private struct CloneReferenceSessionState: Equatable {
     var isDragOver = false
     /// A rejected drop (wrong file type); the dock error bar stays for takes.
     var dropError: String?
+    /// The reference intent this screen saw primed, so an idle unload is not
+    /// undone by priming the same reference again (U18).
+    var primingIntent = CloneProactivePrimingIntent()
 }
 
 /// The iOS-derived Studio canvas with a native reference popover. Reference
@@ -722,6 +725,7 @@ struct MacVoiceCloningScreen: View {
     }
 
     private func clearReference() {
+        session.primingIntent.reset()
         draft.clearReference()
         session.transcriptLoadError = nil
         session.hydratedSavedVoiceID = nil
@@ -804,14 +808,12 @@ struct MacVoiceCloningScreen: View {
         return true
     }
 
-    /// A transcript hydrated from a saved voice belongs to the old audio, so it
-    /// clears with the selection; a hand-typed transcript is kept.
+    /// A new clip clears the transcript of the one it replaces, whether it was
+    /// hydrated from a saved voice, recognized or typed for it, and recognition
+    /// runs for the new clip (U14): a transcript of other words sent with this
+    /// audio would misalign every in-context take.
     private func replaceReference(with path: String) {
-        if draft.selectedSavedVoiceID != nil {
-            draft.referenceTranscript = ""
-        }
-        draft.referenceAudioPath = path
-        draft.selectedSavedVoiceID = nil
+        draft.replaceReferenceAudio(with: path)
         session.transcriptLoadError = nil
         session.hydratedSavedVoiceID = nil
         autoTranscribeReference(path: path)
@@ -819,10 +821,11 @@ struct MacVoiceCloningScreen: View {
 
     /// Best-effort on-device transcription of a fresh reference clip (saved
     /// voices hydrate their sidecar instead). Fills the transcript only if it
-    /// is still empty when the pass finishes; the reference language never
-    /// selects the target language.
+    /// is still empty when the pass finishes, so an edit made meanwhile wins;
+    /// the reference language never selects the target language.
     private func autoTranscribeReference(path: String) {
         transcriptionTask?.cancel()
+        transcriptionTask = nil
         guard draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         switch VoiceClipTranscriber.availability() {
         case .denied:
@@ -878,14 +881,22 @@ struct MacVoiceCloningScreen: View {
             await ttsEngineStore.cancelClonePreparationIfNeeded()
             return
         }
+        let reference = CloneReference(
+            audioPath: refPath,
+            transcript: draft.trimmedReferenceTranscript,
+            preparedVoiceID: draft.selectedSavedVoiceID
+        )
+        let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
+        // Seen primed already: an idle unload since then sticks (U18).
+        guard session.primingIntent.shouldPrime(key: requestKey) else { return }
         do {
             try await ttsEngineStore.ensureCloneReferencePrimed(
                 modelID: model.id,
-                reference: CloneReference(
-                    audioPath: refPath,
-                    transcript: draft.trimmedReferenceTranscript,
-                    preparedVoiceID: draft.selectedSavedVoiceID
-                )
+                reference: reference
+            )
+            session.primingIntent.recordPrime(
+                key: requestKey,
+                preparationState: ttsEngineStore.clonePreparationState
             )
         } catch {
             if DebugMode.isEnabled {

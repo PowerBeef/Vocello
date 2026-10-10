@@ -1395,6 +1395,9 @@ struct IOSVoiceCloningView: View {
 
     @State private var transcriptLoadError: String?
     @State private var hydratedSavedVoiceID: String?
+    /// The reference intent this screen saw primed, so an idle unload is not
+    /// undone by priming the same reference again (U18).
+    @State private var clonePrimingIntent = CloneProactivePrimingIntent()
     @State private var isTranscriptExpanded = false
     @State private var isScriptFocused = false
 
@@ -1665,6 +1668,8 @@ struct IOSVoiceCloningView: View {
             }
             .task(id: clonePrimingTaskID) {
                 guard isActive else {
+                    // Leaving Clone ends the priming intent; coming back primes again.
+                    clonePrimingIntent.reset()
                     await ttsEngine.cancelClonePreparationIfNeeded()
                     return
                 }
@@ -2111,6 +2116,15 @@ struct IOSVoiceCloningView: View {
                 if ttsEngine.clonePreparationState.phase != .failed || ttsEngine.clonePreparationState.identityKey != clonePrimingRequestKey {
                     try? await ttsEngine.ensureCloneReferencePrimed(modelID: model.id, reference: reference)
                 }
+                // A14-03 (U25), as the Mac runner does: a Stop or a foreground
+                // exit accepted while priming ran finds no generation at the
+                // barrier, which completes at once, so this task ends here
+                // before it is submitted and claims the shared player, which a
+                // take started meanwhile may already own.
+                guard !Task.isCancelled, coordinator.isAttemptRunning,
+                      coordinator.activeAttempt == attempt else {
+                    throw CancellationError()
+                }
 
                 let result = try await IOSSingleTakeGenerationExecutor.run(
                     plan: plan,
@@ -2160,15 +2174,20 @@ struct IOSVoiceCloningView: View {
             return
         }
 
+        let reference = CloneReference(
+            audioPath: refPath,
+            transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+            preparedVoiceID: draft.selectedSavedVoiceID
+        )
+        let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
+        // Seen primed already: an idle unload since then sticks (U18).
+        guard clonePrimingIntent.shouldPrime(key: requestKey) else { return }
         do {
             try await ttsEngine.ensureCloneReferencePrimed(
                 modelID: model.id,
-                reference: CloneReference(
-                    audioPath: refPath,
-                    transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
-                    preparedVoiceID: draft.selectedSavedVoiceID
-                )
+                reference: reference
             )
+            clonePrimingIntent.recordPrime(key: requestKey, preparationState: ttsEngine.clonePreparationState)
         } catch {
             if TelemetryGate.resolvedEnabled {
                 print("[IOSVoiceCloningView] clone priming failed: \(DiagnosticPrivacy.summary(of: error))")
@@ -2225,6 +2244,7 @@ struct IOSVoiceCloningView: View {
     }
 
     private func clearReference() {
+        clonePrimingIntent.reset()
         draft.clearReference()
         transcriptLoadError = nil
         hydratedSavedVoiceID = nil

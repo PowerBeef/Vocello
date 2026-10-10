@@ -6,6 +6,20 @@ import XCTest
 /// `generate` option helpers (compiled into this bundle by path), plus where the
 /// CLI finds its trust anchors (SEC-09).
 final class CLIArgumentsTests: XCTestCase {
+    func testCloneReferenceExplainsAudioOnlyAndPreservesSavedTranscriptOverride() {
+        let raw = GenerateCommand.rawCloneReference(audioPath: "reference.wav", transcript: nil)
+        XCTAssertTrue(raw.conditioningMode.isXVectorOnly)
+        XCTAssertNotNil(GenerateCommand.rawReferenceConditioningNote(for: raw))
+        let explicit = GenerateCommand.rawCloneReference(audioPath: "reference.wav", transcript: "Words")
+        XCTAssertNil(GenerateCommand.rawReferenceConditioningNote(for: explicit))
+        let voice = PreparedVoice(id: "Voice", name: "Voice", audioPath: "voices/Voice.wav", hasTranscript: true)
+        let saved = GenerateCommand.savedVoiceCloneReference(voice, transcriptOverride: "Corrected words")
+        XCTAssertEqual(saved.transcript, "Corrected words")
+        XCTAssertEqual(saved.preparedVoiceID, voice.id)
+        XCTAssertNil(GenerateCommand.rawReferenceConditioningNote(for: saved))
+        XCTAssertNil(GenerateCommand.savedVoiceCloneReference(voice, transcriptOverride: nil).transcript)
+    }
+
     // MARK: - Args
 
     func testArgsParsesValuesFlagsAndPositionals() {

@@ -402,6 +402,22 @@ private enum Qwen3StreamingGenerationMode: String, Sendable {
 enum Qwen3TextConditioningMode: String, Sendable {
     case streamingTrailingText = "streaming_trailing_text"
     case fullTextNonStreaming = "full_text_non_streaming"
+
+    /// The layout a request actually prepared, as `text_conditioning_mode`
+    /// records it (P05-08). Custom and Design honor the requested mode; a
+    /// clone ignores it: ICL always lays the full target text over the
+    /// reference codes, and a speaker-only clone always streams its trailing
+    /// text. `cloneInContextLearning` is nil for a request that is no clone.
+    static func recordedLabel(
+        requested: Qwen3TextConditioningMode,
+        cloneInContextLearning: Bool?
+    ) -> String {
+        switch cloneInContextLearning {
+        case true?: "icl_full_text_overlay"
+        case false?: Self.streamingTrailingText.rawValue
+        case nil: requested.rawValue
+        }
+    }
 }
 
 private enum Qwen3StreamStepEvalPolicy: String, Sendable {
@@ -3369,8 +3385,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
         storePreparationBooleanFlags(preparationBooleanFlags)
         mergePreparationTimingsMS(preparationTimingsMS)
+        let cloneInContextLearning: Bool? = if let voiceClonePrompt {
+            voiceClonePrompt.iclMode
+        } else if refAudio != nil, refText != nil, speechTokenizer.hasEncoder {
+            true
+        } else {
+            nil
+        }
         storePreparationStringFlags([
-            "text_conditioning_mode": textConditioningMode.rawValue,
+            "text_conditioning_mode": Qwen3TextConditioningMode.recordedLabel(
+                requested: textConditioningMode,
+                cloneInContextLearning: cloneInContextLearning
+            ),
         ])
 
         // Cap max tokens based on text length

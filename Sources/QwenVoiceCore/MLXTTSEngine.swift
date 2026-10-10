@@ -198,6 +198,22 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         scheduleIdleUnloadIfNeeded(modelID: modelID, mode: mode, isBatch: isBatch)
     }
 
+    /// The capability profile a take or a prime of `modelID` loads, from its
+    /// registry mode (U19); a model the registry does not know loads every
+    /// capability, as before.
+    private func loadCapabilityProfile(forModelID modelID: String) -> NativeLoadCapabilityProfile {
+        Self.loadCapabilityProfile(for: modelRegistry.model(id: modelID)?.mode)
+    }
+
+    nonisolated static func loadCapabilityProfile(for mode: GenerationMode?) -> NativeLoadCapabilityProfile {
+        switch mode {
+        case .custom: .customOnly
+        case .design: .designOnly
+        case .clone: .cloneOnly
+        case nil: .fullCapabilities
+        }
+    }
+
     private func applyMemoryPolicyIfKnown(modelID: String, isBatch: Bool) {
         guard let mode = modelRegistry.model(id: modelID)?.mode else { return }
         allocatorControl.applyPolicy(
@@ -301,14 +317,52 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     private func canIdleUnload(modelID: String) -> Bool {
+        Self.idleUnloadAllowed(
+            loadState: loadState,
+            modelID: modelID,
+            hasActiveModelOperation: activeModelOperation != nil,
+            clonePreparationPhase: clonePreparationState.phase
+        )
+    }
+
+    /// A model published `.loaded` with no operation in flight idle-unloads.
+    /// A primed reference is a cache, not ownership (U18): a successful prime
+    /// arms the idle unload, which must be able to run, and the unload drops
+    /// the prime with the weights. A prime in progress owns the model, and a
+    /// failed preparation keeps the failure's own path (PA-32).
+    nonisolated static func idleUnloadAllowed(
+        loadState: EngineLoadState,
+        modelID: String,
+        hasActiveModelOperation: Bool,
+        clonePreparationPhase: ClonePreparationPhase
+    ) -> Bool {
         guard case .loaded(let loadedModelID) = loadState,
               loadedModelID == modelID,
-              activeModelOperation == nil,
-              clonePreparationState.phase == .idle
-        else {
+              !hasActiveModelOperation else {
             return false
         }
-        return true
+        switch clonePreparationPhase {
+        case .idle, .primed:
+            return true
+        case .preparing, .failed:
+            return false
+        }
+    }
+
+    /// The runtime drops every primed reference whenever it loads a model,
+    /// unloads, hard-trims or invalidates saved-voice caches. A published
+    /// `.primed` it no longer backs is stale: the reference shows as ready and
+    /// the next take skips its on-demand prime (U18). Re-derived after the
+    /// operations that can load another model.
+    private func reconcilePrimedClonePreparationWithRuntime() async {
+        guard clonePreparationState.phase == .primed,
+              let key = clonePreparationState.identityKey else { return }
+        let stillPrimed = await runtime.isClonePrimed(uiIdentityKey: key)
+        // Re-read after the hop: a newer prime may have replaced the state.
+        guard !stillPrimed,
+              clonePreparationState.phase == .primed,
+              clonePreparationState.identityKey == key else { return }
+        clonePreparationState = .idle
     }
 
     /// PA-32 (maintainer decision 2026-09-25): a non-cancelled failure that
@@ -539,13 +593,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         case clonePriming
         case diagnosticCodecReplay
         case diagnosticCodecRoundTrip
+        /// A saved voice's files are being removed; no prime or prebuild of it
+        /// may run meanwhile (U26).
+        case savedVoiceDeletion
 
         var isGeneration: Bool {
             switch self {
             case .generation:
                 return true
             case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming,
-                 .diagnosticCodecReplay, .diagnosticCodecRoundTrip:
+                 .diagnosticCodecReplay, .diagnosticCodecRoundTrip, .savedVoiceDeletion:
                 return false
             }
         }
@@ -999,9 +1056,17 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         do {
             loadState = .starting
             applyMemoryPolicyIfKnown(modelID: id, isBatch: false)
-            _ = try await runtime.loadModel(id: id)
+            _ = try await runtime.loadModel(
+                id: id,
+                capabilityProfile: loadCapabilityProfile(forModelID: id)
+            )
             loadState = .loaded(modelID: id)
-            clonePreparationState = .idle
+            // A load of the model already resident keeps its primed reference.
+            if clonePreparationState.phase == .primed {
+                await reconcilePrimedClonePreparationWithRuntime()
+            } else {
+                clonePreparationState = .idle
+            }
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
@@ -1038,13 +1103,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         cancelIdleUnload()
         do {
             applyMemoryPolicyIfKnown(modelID: id, isBatch: false)
-            _ = try await runtime.loadModel(id: id)
+            _ = try await runtime.loadModel(
+                id: id,
+                capabilityProfile: loadCapabilityProfile(forModelID: id)
+            )
             loadState = .loaded(modelID: id)
+            await reconcilePrimedClonePreparationWithRuntime()
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
             await settleCancelledModelOperation()
         } catch {
             handle(error)
+            await reconcilePrimedClonePreparationWithRuntime()
             await scheduleIdleUnloadAfterFailure()
         }
     }
@@ -1065,6 +1135,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             _ = try await runtime.prepareInteractiveReadiness(for: request)
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
+            await reconcilePrimedClonePreparationWithRuntime()
             scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
             await settleCancelledModelOperation()
@@ -1104,6 +1175,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
+            await reconcilePrimedClonePreparationWithRuntime()
             scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
             return diagnostics
         } catch {
@@ -1421,6 +1493,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
+            // A take that loaded its model dropped a reference primed for
+            // another one (U18).
+            await reconcilePrimedClonePreparationWithRuntime()
             let delivery = eventRouter.snapshot(for: deliveryGenerationID)
             await recordEventDeliveryLossIfNeeded(delivery, request: request)
             let deliveryAnnotated = Self.annotatingEventDelivery(result, delivery: delivery)
@@ -1508,6 +1583,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     )
                     loadState = .loaded(modelID: request.modelID)
                     visibleErrorMessage = nil
+                    // The retry's cleanup unloaded, which dropped any prime (U18).
+                    await reconcilePrimedClonePreparationWithRuntime()
                     let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                     await recordEventDeliveryLossIfNeeded(delivery, request: request)
                     let deliveryAnnotated = Self.annotatingEventDelivery(retryResult, delivery: delivery)
@@ -1721,6 +1798,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private func settleCancelledModelOperation() async {
         if let modelID = await runtime.loadedModelID() {
             loadState = .loaded(modelID: modelID)
+            await reconcilePrimedClonePreparationWithRuntime()
             scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
         } else {
             loadState = .idle
@@ -2107,7 +2185,29 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
         }
         await cancelClonePreparationIfNeeded()
+        // U26: a prime or the commit-time prebuild of this voice persists its
+        // clone prompt after its last cancellation check, which would put
+        // `<id>.clone_prompt` back after the files go. The deletion waits for
+        // the running model operation and holds one of its own, so neither
+        // starts again until the voice is gone.
+        let operationID: UUID
+        do {
+            operationID = try await beginUserModelOperation(.savedVoiceDeletion)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw MLXTTSEngineError.generationFailed(
+                "Wait for the current generation to finish before deleting this voice."
+            )
+        }
+        cancelIdleUnload()
+        defer {
+            finishModelOperation(id: operationID)
+            rearmIdleUnloadIfResident()
+        }
         await runtime.invalidatePreparedVoiceCaches()
+        // The prime that was waited for may have published `.primed`.
+        await reconcilePrimedClonePreparationWithRuntime()
         // Captured with no suspension before the call below resolves the same
         // repository, so the identity check sees the store that was used.
         let repository = preparedVoiceRepository
@@ -2117,6 +2217,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
+    }
+
+    /// A model operation that does not publish a model (a saved-voice
+    /// deletion, the commit-time prebuild) cancels the pending idle unload so
+    /// it cannot fire mid-operation and decline without re-arming (P04-05);
+    /// once the operation has finished, the resident model gets it back.
+    private func rearmIdleUnloadIfResident() {
+        guard idleUnloadToken == nil,
+              !criticalMemoryReliefAdmission.isClosed,
+              case .loaded(let modelID) = loadState,
+              canIdleUnload(modelID: modelID) else { return }
+        scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
     }
 
     nonisolated fileprivate static func preparedVoice(from record: PreparedVoiceStorageRecord) -> PreparedVoice {
@@ -2168,31 +2280,36 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     private func prebuildClonePromptIfPossible(for voice: PreparedVoice) {
         guard voice.hasTranscript,
-              let transcript = try? String(
-                contentsOf: voice.audioURL.deletingPathExtension().appendingPathExtension("txt"),
-                encoding: .utf8
-              ),
               let activeCloneModelID = loadState.currentModelID,
               modelRegistry.model(id: activeCloneModelID)?.mode == .clone,
               allowsProactiveWarmOperations else {
             return
         }
-        let cloneReference = CloneReference(
-            audioPath: voice.audioPath,
-            transcript: transcript,
-            preparedVoiceID: voice.id
-        )
+        let cloneReference = Self.savedVoicePrebuildReference(for: voice)
         Task { @MainActor [weak self] in
             guard let self,
                   let operationID = self.beginProactiveModelOperation(.clonePriming) else {
                 return
             }
-            defer { self.finishModelOperation(id: operationID) }
+            // P04-05: an idle unload due meanwhile would decline (an operation
+            // is in flight) and never re-arm; it is re-armed once this ends.
+            self.cancelIdleUnload()
+            defer {
+                self.finishModelOperation(id: operationID)
+                self.rearmIdleUnloadIfResident()
+            }
             await self.runtime.prebuildSavedVoiceClonePrompt(
                 modelID: activeCloneModelID,
                 reference: cloneReference
             )
         }
+    }
+
+    /// Stored text remains sidecar-owned during prebuild, so publication can
+    /// reject same-audio replacements that changed the saved transcript. Only
+    /// an explicit caller override is allowed to bypass that sidecar check.
+    nonisolated static func savedVoicePrebuildReference(for voice: PreparedVoice) -> CloneReference {
+        CloneReference(audioPath: voice.audioPath, preparedVoiceID: voice.id)
     }
 
     public func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio {

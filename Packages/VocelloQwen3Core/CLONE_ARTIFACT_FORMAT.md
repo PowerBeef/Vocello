@@ -36,7 +36,9 @@ Schema 3 binds the required `speakerFeatureVersion` directly in every manifest, 
 model repository and pinned revision, installed model artifact version and integrity-manifest
 digest, language, source-audio fingerprint, transcript presence/digest, x-vector mode,
 runtime-profile signature, and creation time. Raw audio, transcript text, user paths, and voice
-descriptions are not stored as identity metadata.
+descriptions are not stored as identity metadata. The prompt tensors do not depend on the target
+language (prompt creation takes none), so Vocello binds every artifact under the one language value
+`auto` and a single artifact serves takes in every language.
 
 The composite runtime-contract signature includes that immutable installed-artifact identity, the
 validated Qwen runtime topology, and the speaker-feature algorithm identifier. The current feature

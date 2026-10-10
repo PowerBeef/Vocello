@@ -512,8 +512,9 @@ enum GenerateCommand {
         return try DeliveryInstructionCell.resolveStrict(raw).id
     }
 
-    /// Build the clone reference from either a saved voice (--voice <name|id>)
-    /// or a raw reference clip (--reference <wav> [--transcript "…"]).
+    /// Build the clone reference from either a saved voice (--voice <name|id>
+    /// [--transcript "…"]) or a raw reference clip (--reference <wav>
+    /// [--transcript "…"]).
     @MainActor
     static func resolveCloneReference(_ args: Args, runtime: CLIRuntime) async throws -> CloneReference {
         if let ref = args.string("reference") {
@@ -521,7 +522,11 @@ enum GenerateCommand {
             guard FileManager.default.fileExists(atPath: path) else {
                 throw CLIError("reference audio not found: \(path)")
             }
-            return CloneReference(audioPath: path, transcript: args.string("transcript"), preparedVoiceID: nil)
+            let reference = rawCloneReference(audioPath: path, transcript: args.string("transcript"))
+            if let conditioningNote = rawReferenceConditioningNote(for: reference) {
+                note(conditioningNote)
+            }
+            return reference
         }
         let name = try args.require("voice", "a saved voice name/id, or --reference <wav>")
         let voices = try await runtime.engine.listPreparedVoices()
@@ -529,7 +534,29 @@ enum GenerateCommand {
             let avail = voices.map(\.name).joined(separator: ", ")
             throw CLIError("no saved voice '\(name)' (have: \(avail.isEmpty ? "none" : avail))")
         }
-        return CloneReference(audioPath: voice.audioPath, transcript: nil, preparedVoiceID: voice.id)
+        return savedVoiceCloneReference(voice, transcriptOverride: args.string("transcript"))
+    }
+
+    /// A raw `--reference` clip conditions on `--transcript` only (P15-05): the
+    /// engine reads a same-stem `.txt` sidecar for saved voices alone, so a
+    /// file that happens to sit beside the clip is never used silently.
+    static func rawCloneReference(audioPath: String, transcript: String?) -> CloneReference {
+        CloneReference(audioPath: audioPath, transcript: transcript, preparedVoiceID: nil)
+    }
+
+    /// The note a raw reference without a transcript prints: the take runs on
+    /// the speaker embedding alone, while the app transcribes a fresh clip and
+    /// conditions on its words, so the two differ for the same clip.
+    static func rawReferenceConditioningNote(for reference: CloneReference) -> String? {
+        guard reference.preparedVoiceID == nil, reference.conditioningMode.isXVectorOnly else { return nil }
+        return "no --transcript: this clone uses audio-only (x-vector) conditioning; "
+            + "pass --transcript with the clip's words for transcript-backed cloning"
+    }
+
+    /// A saved voice conditions on its stored transcript; `--transcript`
+    /// overrides it for this take instead of being dropped (P15-05).
+    static func savedVoiceCloneReference(_ voice: PreparedVoice, transcriptOverride: String?) -> CloneReference {
+        CloneReference(audioPath: voice.audioPath, transcript: transcriptOverride, preparedVoiceID: voice.id)
     }
 
     /// Refuses, before the engine boots, a script one take cannot speak: empty,
@@ -663,7 +690,9 @@ enum GenerateCommand {
           --voice-brief  (design) voice description
           --voice        (clone) saved voice name or id
           --reference    (clone) path to a reference .wav (alternative to --voice)
-          --transcript   (clone) transcript of the --reference clip
+          --transcript   (clone) transcript of the --reference clip (without it the
+                         clip conditions audio-only); with --voice, replaces the
+                         saved transcript for this take
           --confirm-consent  (clone) required: confirms you own or have permission
                          to clone this voice (ignored by other modes)
           --delivery     optional delivery style (custom and design; refused in clone)

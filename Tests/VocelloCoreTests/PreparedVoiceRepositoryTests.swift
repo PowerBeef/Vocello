@@ -22,6 +22,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             case .beforeCandidatePublication: matches = phase == "prepare"
             case .beforeAudioPublication: matches = phase == "replace"
             case .beforeTransactionCleanup: matches = phase == "delete"
+            case .beforeClonePromptPublication: matches = phase == "publish"
             default: matches = false
             }
             guard matches else { return }
@@ -40,13 +41,24 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             _ = try await worker.commit(id: candidate.id)
         case "delete":
             _ = try await worker.delete(id: "Same")
+        case "publish":
+            let voices = shared.appendingPathComponent("voices")
+            let audio = voices.appendingPathComponent("Same.wav")
+            let staging = voices.appendingPathComponent(".clone-prompt-staging-test")
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            try Data([4]).write(to: staging.appendingPathComponent("payload"))
+            _ = try await worker.publishClonePromptArtifact(
+                from: staging, to: voices.appendingPathComponent("Same.clone_prompt/model/digest"),
+                voiceID: "Same", sourceURL: audio,
+                sourceFingerprint: NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: audio),
+                checksStoredTranscript: true, expectedStoredTranscript: "old")
         default: XCTFail("Unknown fixture phase")
         }
     }
 
     func testTwoNativeProcessesExcludePreparationReplacementAndDeletion() async throws {
         try NativeHelperProcess.skipUnderThreadSanitizer()
-        for phase in ["prepare", "replace", "delete"] {
+        for phase in ["prepare", "replace", "delete", "publish"] {
             let shared = root.appendingPathComponent(phase)
             try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
             let child = NativeHelperProcess.xctest(
@@ -69,13 +81,20 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
             do { try await competing.reconcile(); XCTFail("Live transaction must not be recovered") }
             catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
+            if phase == "publish" {
+                do { try await competing.delete(id: "Same"); XCTFail("Delete must share the prompt publication lock") }
+                catch { XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy) }
+            }
             try Data().write(to: shared.appendingPathComponent("release"), options: .atomic)
             while child.isRunning, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
             XCTAssertFalse(child.isRunning)
             guard !child.isRunning else { continue }
             XCTAssertEqual(child.terminationStatus, 0)
             let voices = try await competing.list()
-            XCTAssertEqual(voices.map(\.id), phase == "replace" ? ["Same"] : [])
+            XCTAssertEqual(voices.map(\.id), ["replace", "publish"].contains(phase) ? ["Same"] : [])
+            if phase == "publish" {
+                XCTAssertEqual(try Data(contentsOf: shared.appendingPathComponent("voices/Same.clone_prompt/model/digest/payload")), Data([4]))
+            }
             if phase == "replace" {
                 XCTAssertEqual(try Data(contentsOf: XCTUnwrap(voices.first).audioURL), Data([1, 2, 3]))
                 XCTAssertEqual(try String(contentsOf: shared.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "new")
@@ -637,6 +656,48 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Bank Base.wav").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Bank Base.clone_prompt").path))
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Renamed Base.mp3")), Data([9, 8, 7]))
+    }
+
+    /// U16: Replace reference keeps the name, so the store must accept its own
+    /// ID (spaces and apostrophes kept) as the replaced voice, and refuse the
+    /// underscored form the Mac sheet used to send.
+    func testReplacingKeepsTheNameWhenTheReplacedIDIsTheStoreID() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let original = try await repository.prepare(
+            name: "Grandma Rose's",
+            audioURL: try writeSource(named: "first.wav", bytes: [1, 2, 3]),
+            transcript: "old",
+            qualityWarnings: [],
+            replacingVoiceID: nil
+        )
+        _ = try await repository.commit(id: original.id)
+
+        do {
+            _ = try await repository.prepare(
+                name: "Grandma Rose's",
+                audioURL: try writeSource(named: "second.wav", bytes: [4, 5, 6]),
+                transcript: "new",
+                qualityWarnings: [],
+                replacingVoiceID: "Grandma_Roses"
+            )
+            XCTFail("A sanitized ID names no saved voice and must not replace one")
+        } catch {
+            XCTAssertEqual(error as? PreparedVoiceRepositoryError, .duplicateName("Grandma Rose's"))
+        }
+
+        let replacement = try await repository.prepare(
+            name: "Grandma Rose's",
+            audioURL: try writeSource(named: "third.wav", bytes: [7, 8, 9]),
+            transcript: "new",
+            qualityWarnings: [],
+            replacingVoiceID: "Grandma Rose's"
+        )
+        _ = try await repository.commit(id: replacement.id)
+
+        let ids = (try await repository.list()).map(\.id)
+        XCTAssertEqual(ids, ["Grandma Rose's"])
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Grandma Rose's.wav")), Data([7, 8, 9]))
     }
 
     func testDeleteRemovesOnlySelectedVoiceAndPromptArtifacts() async throws {

@@ -1,9 +1,104 @@
 @preconcurrency import AVFoundation
 import Foundation
+import CryptoKit
+import VocelloQwen3Core
 @testable import QwenVoiceCore
 import XCTest
 
 final class CloneConditioningContractTests: XCTestCase {
+    func testCachedConditioningKeepsCurrentTranscriptOwnership() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("Voice.wav")
+        try Self.writeSineWAV(sampleRate: 24_000, seconds: 1, to: source)
+        try "Same words".write(to: source.deletingPathExtension().appendingPathExtension("txt"),
+                               atomically: true, encoding: .utf8)
+        let cache = NativePreparedCloneConditioningCache(capacity: 4)
+        for (text, expectedMode) in [("Same words", ResolvedCloneTranscriptMode.inline),
+                                     (nil, .sidecar), ("Same words", .inline)] as [(String?, ResolvedCloneTranscriptMode)] {
+            let resolved = try await cache.resolve(modelID: "clone", reference:
+                CloneReference(audioPath: source.path, transcript: text, preparedVoiceID: "Voice"),
+                sampleRate: 24_000, audioPreparationService: NativeAudioPreparationService(),
+                normalizedCloneReferenceDirectory: root.appendingPathComponent("normalized"))
+            XCTAssertEqual(resolved.transcriptMode, expectedMode)
+            XCTAssertEqual(resolved.normalizedReference.sourceURL, source)
+            XCTAssertEqual(resolved.resolvedTranscript, "Same words")
+            if expectedMode == .sidecar {
+                XCTAssertEqual(resolved.cloneCacheHit, true, "Exercise the shared conditioning cache")
+            }
+        }
+    }
+
+    func testPromptIdentityUsesHistoricalAutoArtifactWithoutWeakeningProvenance() throws {
+        let reference = GenerationSemantics.internalCloneReferenceIdentity(
+            modelID: "pro_clone_speed", normalizedReferencePath: "reference.wav",
+            referenceFingerprint: "audio-digest", conditioningMode: .transcriptBacked("Words."))
+        let artifact = try XCTUnwrap(GenerationSemantics.ClonePromptModelArtifactIdentity(
+            repository: "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+            revision: String(repeating: "a", count: 40), artifactVersion: "artifact-v1",
+            integrityManifestDigest: String(repeating: "a", count: 64)))
+        let identity = NativePreparedCloneConditioningCache.clonePromptIdentity(
+            referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "runtime")
+        let historical = GenerationSemantics.ClonePromptIdentity(
+            referenceIdentity: reference, language: "auto", modelArtifactIdentity: artifact,
+            qwenRuntimeProfileSignature: "runtime", speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion)
+        XCTAssertEqual(identity, historical)
+        XCTAssertNotEqual(identity, NativePreparedCloneConditioningCache.clonePromptIdentity(
+            referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "new-runtime"))
+        let digest = NativePreparedCloneConditioningCache.clonePromptArtifactDigest(
+            modelID: "pro_clone_speed", internalIdentityKey: reference.legacyKey)
+        let previousPrimeDigest = SHA256.hash(data: Data("pro_clone_speed|\(reference.legacyKey)|auto".utf8))
+            .prefix(16).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, previousPrimeDigest)
+    }
+
+    func testRawSidecarIsIgnoredWhileSavedVoiceAndExplicitTranscriptAreUsed() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let audio = root.appendingPathComponent("reference.wav")
+        try "Unreviewed notes".write(to: audio.deletingPathExtension().appendingPathExtension("txt"),
+                                    atomically: true, encoding: .utf8)
+        let raw = CloneReference(audioPath: audio.path)
+        let saved = CloneReference(audioPath: audio.path, preparedVoiceID: "Voice")
+        for (reference, expected) in [(raw, nil), (saved, "Unreviewed notes")] as [(CloneReference, String?)] {
+            let result = try NativePreparedCloneConditioningCache.resolveTranscript(
+                requestedTranscript: nil, normalizedAudioURL: audio,
+                readsSavedVoiceSidecar: NativePreparedCloneConditioningCache.readsTranscriptSidecar(for: reference))
+            XCTAssertEqual(result.transcript, expected)
+            XCTAssertEqual(NativePreparedCloneConditioningCache.anticipatedConditioningMode(for: reference).usesTranscript,
+                           expected != nil)
+        }
+        let explicit = try NativePreparedCloneConditioningCache.resolveTranscript(
+            requestedTranscript: "Corrected words", normalizedAudioURL: audio, readsSavedVoiceSidecar: true)
+        XCTAssertEqual(explicit.transcript, "Corrected words")
+        XCTAssertEqual(explicit.mode, .inline)
+        let prebuild = MLXTTSEngine.savedVoicePrebuildReference(for:
+            PreparedVoice(id: "Voice", name: "Voice", audioPath: audio.path, hasTranscript: true))
+        XCTAssertNil(prebuild.transcript, "Stored text must not masquerade as a caller override")
+        let storedPrebuild = try NativePreparedCloneConditioningCache.resolveTranscript(
+            requestedTranscript: prebuild.transcript, normalizedAudioURL: audio,
+            readsSavedVoiceSidecar: NativePreparedCloneConditioningCache.readsTranscriptSidecar(for: prebuild))
+        XCTAssertEqual(storedPrebuild.transcript, "Unreviewed notes")
+        XCTAssertEqual(storedPrebuild.mode, .sidecar)
+    }
+
+    func testPrimedCachePermitsIdleUnloadButPreparationKeepsItsModel() {
+        for phase in [ClonePreparationPhase.idle, .primed] {
+            XCTAssertTrue(MLXTTSEngine.idleUnloadAllowed(loadState: .loaded(modelID: "clone"), modelID: "clone",
+                hasActiveModelOperation: false, clonePreparationPhase: phase))
+            XCTAssertFalse(MLXTTSEngine.idleUnloadAllowed(loadState: .loaded(modelID: "clone"), modelID: "clone",
+                hasActiveModelOperation: true, clonePreparationPhase: phase))
+        }
+        XCTAssertFalse(MLXTTSEngine.idleUnloadAllowed(loadState: .loaded(modelID: "clone"), modelID: "clone",
+            hasActiveModelOperation: false, clonePreparationPhase: .preparing))
+        XCTAssertEqual(MLXTTSEngine.loadCapabilityProfile(for: .clone), .cloneOnly)
+        XCTAssertEqual(MLXTTSEngine.loadCapabilityProfile(for: .design), .designOnly)
+        XCTAssertEqual(MLXTTSEngine.loadCapabilityProfile(for: .custom), .customOnly)
+        XCTAssertEqual(MLXTTSEngine.loadCapabilityProfile(for: nil), .fullCapabilities)
+    }
+
     func testMissingEmptyAndWhitespaceTranscriptsUseXVectorOnly() {
         for transcript in [nil, "", "  \n\t"] as [String?] {
             let reference = CloneReference(

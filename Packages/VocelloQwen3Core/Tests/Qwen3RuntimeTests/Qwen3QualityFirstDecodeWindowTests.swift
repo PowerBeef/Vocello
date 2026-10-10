@@ -8,6 +8,28 @@ import XCTest
 /// generated frame counts. Code 0 is a legal codec token, so a generated 0
 /// (inside the take or at its tail) never shortens the output.
 final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
+    // MARK: - Recorded text conditioning (P05-08)
+
+    /// Custom and Design record the mode they were asked for, which they
+    /// honor; a clone records the layout it always uses, whatever was asked.
+    func testRecordedTextConditioningNamesTheLayoutThePreparationUsed() {
+        for requested in [Qwen3TextConditioningMode.streamingTrailingText, .fullTextNonStreaming] {
+            XCTAssertEqual(
+                Qwen3TextConditioningMode.recordedLabel(requested: requested, cloneInContextLearning: nil),
+                requested.rawValue
+            )
+            XCTAssertEqual(
+                Qwen3TextConditioningMode.recordedLabel(requested: requested, cloneInContextLearning: true),
+                "icl_full_text_overlay"
+            )
+            XCTAssertEqual(
+                Qwen3TextConditioningMode.recordedLabel(requested: requested, cloneInContextLearning: false),
+                "streaming_trailing_text",
+                "a quality-first speaker-only clone still streams its trailing text"
+            )
+        }
+    }
+
     // MARK: - Window math
 
     func testWindowWithoutReferenceCoversEveryGeneratedFrame() {

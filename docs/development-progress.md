@@ -17,6 +17,41 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — recover the unfinished clone work
+
+Integrated the useful residual work from `32654a87` onto `1aed259d`, preserving main's newer
+hydration, cancellation, delivery and language fixes. Clip-bound transcripts, actual saved-voice
+replacement IDs, draft invalidation, language-correct warm intents, model capability profiles and
+language-independent clone prompts now share the existing runtime and UI ownership boundaries.
+Primed caches permit idle unload; on-demand work still primes before a take. The iOS take path
+checks attempt ownership again after priming.
+
+Fixed all three review findings: prompt publication revalidates source audio and stored text under
+the cross-process replacement/delete lock; explicit zero or malformed ASR confidence cannot use
+the missing-confidence fallback; replacing a clip clears inherited/detected language while keeping
+an explicit user choice. Prebuilds and conditioning-cache hits also retain request-local transcript
+ownership. Deterministic suspension tests and the native helper process cover publication races.
+An independent read-only Swift review found no remaining actionable issue.
+
+**Verified before the checkpoint:** 122 focused tests; complete phone-free CI replay (`ci-02.log`):
+2,128 Python tests + 2,532 subtests (one existing skip), 1,402 core tests, 182 runtime tests executed
+(three expected fixture skips, zero failures), TSan (1,400 passes, two policy skips), CLI identity,
+generic iOS app/logic compilation, both UI bundles and website checks (19 Node + two browser tests).
+Changed-file lint, privacy and strict roadmap checks pass. Raw evidence stays under the ignored
+diagnostics directory `clone-integration-20261010`; native runs are `mac-test-20261010-124549` and
+`tsan-20261010-124657`. The first replay caught an overlong roadmap note; its failure is retained.
+Sandbox-only lock/lint-cache failures and successful retries are retained too.
+
+**Limits and next:** macOS smoke follows on the clean committed checkpoint with installed assets;
+no phone or simulator lane ran. Local Xcode is 27.0; pinned-Xcode CI remains to observe after the
+requested push. A SwiftPM warning split one runtime verdict line: raw XCTest reports 182 executed,
+three skipped and zero failures, while the JSON sidecar misses that one pass. DA-12 retains the
+reporting follow-up; DA-13 retains normalized-audio cache ownership and production-adapter/background
+delivery coverage. Enrollment confidence bounds are provisional; output-verification/WER behavior
+is unchanged, so its measurement version does not change. No benchmark history, ASR-accuracy claim
+or human-listening claim is established. Hook startup reached this session; full trust/activation
+remains unverified by doctor.
+
 ### October 10 — stale roadmap reconciliation
 
 Reviewed the 14 stale in-flight items against source, tests, retained runs and existing remote CI.

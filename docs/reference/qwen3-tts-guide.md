@@ -242,8 +242,9 @@ Qwen3PromptAssembly(
 ```
 
 - Requires the **Base** model and the speaker encoder.
-- A transcript (`refText`) improves quality but is optional. Vocello also accepts a sidecar `.txt`
-  file next to the reference audio. Inline or sidecar text selects typed transcript-backed ICL
+- A transcript (`refText`) improves quality but is optional. A saved voice also uses its `.txt`
+  transcript sidecar; a one-off reference uses only the inline transcript, never a file that
+  happens to sit beside it. Inline or saved-voice text selects typed transcript-backed ICL
   conditioning; absent, empty, or whitespace-only text selects true speaker-embedding-only
   x-vector conditioning rather than falling back to Voice Design.
 - The Base model **does not follow delivery/emotion instructions**. To get a styled clone, use **design-then-clone**: generate a styled reference clip with Voice Design, build a clone prompt from it, then generate with the Base model using that prompt.
@@ -389,13 +390,16 @@ Implemented in `Sources/QwenVoiceCore/NativeCloneSupport.swift`.
 1. **Reference normalization**
    - Compute a SHA-256 fingerprint of the source file.
    - Convert to canonical 24 kHz mono WAV if needed.
-   - Mirror a sidecar `.txt` transcript if present.
+   - For a saved voice, mirror its sidecar `.txt` transcript if present.
    - Cache the normalized result with LRU eviction.
 
 2. **Transcript resolution**
    - Inline transcript from the UI/CLI.
-   - Else sidecar `<audio>.txt`.
+   - Else, for a saved voice only, its sidecar `<audio>.txt`.
    - Else `nil` (the model can still clone from audio alone, but quality drops).
+   - The clone prompt built from the reference (codec codes, speaker embedding, transcript) does
+     not depend on the target language, so one prompt, in memory and persisted, serves a prime,
+     the saved-voice prebuild and takes in every language.
 
 3. **Reference decoding**
    - Load the normalized WAV into an `MLXArray` at the model's sample rate.
@@ -426,9 +430,14 @@ Implemented in `Sources/QwenVoiceCore/NativeCloneSupport.swift`.
      produces a speaker-embedding-only prompt.
    - Priming and direct generation consume the same typed prompt. The prompt is cached in memory
      and persisted under `voicesDirectory`, keyed by model ID, reference fingerprint,
-     conditioning mode, language, transcript hash when present, pinned model revision, artifact
+     conditioning mode, the fixed `auto` prompt-language key, transcript hash when present, pinned model revision, artifact
      version, installed integrity-manifest digest, runtime profile, and speaker-feature algorithm
      version. Changed weights or a frontend/runtime change invalidates both cache tiers.
+   - Saved-voice persistence stages model output privately, then validates the audio digest and
+     store-owned transcript under the repository's cross-process mutation lock before atomic
+     publication. Delete/replacement wins over stale prompt work. Contention skips caching; an
+     explicit inline transcript remains a request override. Normalized-audio cache ownership is
+     a separate open follow-up in DA-13.
    - Re-use the same prompt across multiple generations to avoid recomputing speaker features.
 
 ---

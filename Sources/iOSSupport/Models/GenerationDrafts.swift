@@ -177,6 +177,41 @@ struct VoiceCloningDraft: Equatable {
         referenceAudioPath = nil
         referenceTranscript = ""
     }
+
+    /// A one-off clip (imported, dropped or recorded) becomes the reference
+    /// (U14). A transcript describes the clip it was hydrated, recognized or
+    /// typed for, and the Studio shows the transcript field only while a clip
+    /// is set, so any transcript here belongs to the clip being replaced: it
+    /// is cleared, and recognition runs for the new clip, unless the same
+    /// one-off file is chosen again. Returns whether the transcript was
+    /// cleared.
+    @discardableResult
+    mutating func replaceReferenceAudio(with path: String) -> Bool {
+        let clearsTranscript = selectedSavedVoiceID != nil || referenceAudioPath != path
+        if clearsTranscript {
+            referenceTranscript = ""
+        }
+        referenceAudioPath = path
+        selectedSavedVoiceID = nil
+        return clearsTranscript
+    }
+
+    /// The saved voice was deleted: a draft that uses it drops the reference,
+    /// as the iPhone Voices screen does, so a voice re-created under the same
+    /// name never inherits this draft's transcript (U14).
+    mutating func savedVoiceWasDeleted(id: String) {
+        guard selectedSavedVoiceID == id else { return }
+        clearReference()
+    }
+
+    /// The saved voice's reference was replaced in place: its audio, and with
+    /// it the transcript that describes it, are new. The draft's transcript
+    /// (hydrated from, or edited for, the old clip) is dropped, so the Studio
+    /// hydrates the voice from disk again (U14).
+    mutating func savedVoiceReferenceWasReplaced(id: String) {
+        guard selectedSavedVoiceID == id else { return }
+        referenceTranscript = ""
+    }
 }
 
 enum SavedVoiceCloneHydrationAction: Equatable {
@@ -213,6 +248,40 @@ enum SavedVoiceCloneHydration {
         }
 
         return .applyFromDisk
+    }
+}
+
+/// The Clone Studio's proactive prime of one reference intent (U18).
+///
+/// A prime no longer pins the model: the idle unload releases a primed clone
+/// model like any other. Releasing it closes engine admission for a moment,
+/// which re-runs the screen's priming task with the same reference; priming
+/// again then would reload the weights the unload just released, and again
+/// after every idle window. A reference intent the screen saw primed is not
+/// primed again until it changes (another reference, transcript or model) or
+/// the screen is entered again; the take still primes on demand.
+struct CloneProactivePrimingIntent: Equatable {
+    private(set) var primedKey: String?
+    private var currentKey: String?
+
+    mutating func shouldPrime(key: String) -> Bool {
+        if currentKey != key {
+            currentKey = key
+            primedKey = nil
+        }
+        return key != primedKey
+    }
+
+    /// Records `key` once the engine publishes it primed.
+    mutating func recordPrime(key: String, preparationState: ClonePreparationState) {
+        guard currentKey == key, preparationState.isPrimed, preparationState.key == key else { return }
+        primedKey = key
+    }
+
+    /// Leaving the screen ends the intent; returning to it primes again.
+    mutating func reset() {
+        currentKey = nil
+        primedKey = nil
     }
 }
 

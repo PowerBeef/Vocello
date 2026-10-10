@@ -485,6 +485,10 @@ targets:
       - path: Sources/VocelloCLI/GenerateCommand.swift
       - path: Sources/VocelloCLI/ModesCommand.swift
       - path: Sources/iOSSupport/Models/Generation.swift
+      # Clone draft and enrollment configuration are deterministic value types.
+      - path: Sources/iOSSupport/Models/GenerationDrafts.swift
+      - path: Sources/iOSSupport/Models/Voice.swift
+      - path: Sources/Views/Voices/SavedVoiceSheetConfiguration.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift

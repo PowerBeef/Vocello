@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "7debb84e7dceda1759415890d81c5c590e0b956dc7338c807fc79adf3281c1a9",
+      "sha256": "01bd9a78abb1a5469dac639a03a622c22092b52a07df3954958cc7d3c4253d03",
       "upstreamStatus": "modified"
     },
     {
@@ -218,7 +218,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
-      "sha256": "3e25f3ed7f906de56df9a76b7a68f74f6381c6310846b16a48b023bbdc0e4b7f",
+      "sha256": "37d8dabc9162799b890f6503d35f7836002f78e525f599d06fc289ed8c5f6005",
       "upstreamStatus": "added"
     },
     {

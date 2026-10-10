@@ -2,6 +2,54 @@ import Combine
 import Foundation
 import QwenVoiceCore
 
+/// The language a Studio take of a draft resolves, for the warm of that draft
+/// (P01-05, P02-05, P12-07). The warm request carries canonical English warm
+/// text, so a warm sent with the draft's Auto selection resolved English (and
+/// its diction reinforcement) for any script, and a take of a French script
+/// under Auto missed the warmed prewarm and design conditioning. The warm
+/// carries the take's own resolution as an explicit language instead. An
+/// explicit selection is returned as is; Auto runs the engine's detection on
+/// the script, which loads a language recognizer, so callers resolve it off
+/// the main actor after typing pauses (`resolve`).
+enum MacWarmLanguageResolution {
+    static func takeLanguageHint(
+        mode: GenerationMode,
+        selectedLanguage: Qwen3SupportedLanguage,
+        script: String
+    ) -> String {
+        guard selectedLanguage == .auto else { return selectedLanguage.rawValue }
+        let payload: GenerationRequest.Payload
+        switch mode {
+        case .custom:
+            payload = .custom(speakerID: GenerationSemantics.canonicalCustomWarmSpeaker, deliveryStyle: nil)
+        case .design:
+            payload = .design(voiceDescription: "", deliveryStyle: nil)
+        case .clone:
+            // A Clone warm primes the reference; its prompt has no language.
+            return selectedLanguage.rawValue
+        }
+        return GenerationSemantics.qwenLanguageHint(
+            for: GenerationRequest(
+                mode: mode,
+                modelID: "",
+                text: script,
+                outputPath: "",
+                shouldStream: false,
+                payload: payload
+            )
+        )
+    }
+
+    @concurrent
+    static func resolve(
+        mode: GenerationMode,
+        selectedLanguage: Qwen3SupportedLanguage,
+        script: String
+    ) async -> String {
+        takeLanguageHint(mode: mode, selectedLanguage: selectedLanguage, script: script)
+    }
+}
+
 @MainActor
 final class MacGenerationWarmupCoordinator: ObservableObject {
     /// Benchmark hook: when `QWENVOICE_SUPPRESS_WARMUP` is set (`1`/`true`/`on`/`yes`),

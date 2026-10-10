@@ -177,6 +177,7 @@ actor NativePreparedCloneConditioningCache {
         let normalizedReferenceOutcome = try await normalizeCloneReference(
             reference.audioURL,
             referenceFingerprint: referenceFingerprint,
+            mirrorsTranscriptSidecar: Self.readsTranscriptSidecar(for: reference),
             using: audioPreparationService,
             normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory
         )
@@ -185,7 +186,8 @@ actor NativePreparedCloneConditioningCache {
         let referenceQualityWarnings = Self.referenceQualityWarnings(for: normalizedReference)
         let transcriptResolution = try Self.resolveTranscript(
             requestedTranscript: requestedTranscript,
-            normalizedAudioURL: normalizedReference.normalizedURL
+            normalizedAudioURL: normalizedReference.normalizedURL,
+            readsSavedVoiceSidecar: Self.readsTranscriptSidecar(for: reference)
         )
         let conditioningMode = CloneConditioningMode(
             transcript: transcriptResolution.transcript
@@ -207,9 +209,11 @@ actor NativePreparedCloneConditioningCache {
             return ResolvedCloneConditioning(
                 uiIdentity: uiIdentity,
                 internalIdentity: internalIdentity,
-                normalizedReference: cached.normalizedReference,
+                normalizedReference: normalizedReference,
                 resolvedTranscript: cached.resolvedTranscript,
-                transcriptMode: cached.transcriptMode,
+                // Equal conditioning text can originate from an explicit
+                // override or the store. Publication ownership is per request.
+                transcriptMode: transcriptResolution.mode,
                 conditioningMode: cached.conditioningMode,
                 referenceAudio: cached.referenceAudio,
                 preparedVoiceID: reference.preparedVoiceID,
@@ -271,12 +275,41 @@ actor NativePreparedCloneConditioningCache {
         )
     }
 
+    /// The language component every clone prompt is keyed and persisted under.
+    ///
+    /// A clone prompt holds the reference's codec codes, its speaker embedding
+    /// and its transcript; `makeCloneHandle` takes no language, so one prompt
+    /// serves a take in every target language (U17). Priming and the saved-voice
+    /// prebuild have no script to resolve a language from, and keying the prompt
+    /// by the take's language made the first take after a prime miss both the
+    /// in-memory prompt and its artifact and rebuild it on the critical path.
+    /// The constant is the historical "auto" component, so the artifacts primes
+    /// and prebuilds already persisted stay adoptable; artifacts an earlier take
+    /// persisted under a concrete language are no longer adopted (a saved voice's
+    /// go with the voice, transient ones age out of their retention window).
+    static let clonePromptLanguageKey = "auto"
+
+    /// The in-memory identity of the prompt built from `referenceIdentity`;
+    /// it carries no target language (see `clonePromptLanguageKey`).
+    static func clonePromptIdentity(
+        referenceIdentity: GenerationSemantics.CloneReferenceIdentity,
+        modelArtifactIdentity: GenerationSemantics.ClonePromptModelArtifactIdentity,
+        runtimeProfileSignature: String?
+    ) -> GenerationSemantics.ClonePromptIdentity {
+        GenerationSemantics.ClonePromptIdentity(
+            referenceIdentity: referenceIdentity,
+            language: clonePromptLanguageKey,
+            modelArtifactIdentity: modelArtifactIdentity,
+            qwenRuntimeProfileSignature: runtimeProfileSignature,
+            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion
+        )
+    }
+
     func resolveVoiceClonePrompt(
         for conditioning: ResolvedCloneConditioning,
         modelID: String,
         model: UnsafeSpeechGenerationModel,
         voicesDirectory: URL?,
-        language: String? = nil,
         modelRuntimeIdentity: ModelRuntimeIdentity
     ) async throws -> ResolvedCloneConditioning {
         guard model.supportsOptimizedVoiceClone,
@@ -295,17 +328,14 @@ actor NativePreparedCloneConditioningCache {
                 "The selected model is missing immutable clone-prompt artifact provenance."
             )
         }
-        let promptIdentity = GenerationSemantics.ClonePromptIdentity(
+        let promptIdentity = Self.clonePromptIdentity(
             referenceIdentity: conditioning.internalIdentity,
-            language: language,
             modelArtifactIdentity: modelArtifactIdentity,
-            qwenRuntimeProfileSignature: modelRuntimeIdentity.runtimeProfileSignature,
-            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion
+            runtimeProfileSignature: modelRuntimeIdentity.runtimeProfileSignature
         )
         let artifactMetadata = clonePromptArtifactMetadata(
             modelID: modelID,
             conditioning: conditioning,
-            language: language,
             xVectorOnlyMode: creationContract.xVectorOnlyMode,
             modelArtifactIdentity: modelArtifactIdentity,
             clonePromptRuntimeSignature: promptIdentity.runtimeContractSignature
@@ -314,8 +344,7 @@ actor NativePreparedCloneConditioningCache {
             voicesDirectory: voicesDirectory,
             preparedVoiceID: conditioning.preparedVoiceID,
             modelID: modelID,
-            conditioning: conditioning,
-            language: language
+            conditioning: conditioning
         )
         let resolveStartedAt = ContinuousClock.now
         if let artifactDirectory,
@@ -373,11 +402,23 @@ actor NativePreparedCloneConditioningCache {
         let promptBuildMS = promptBuildStartedAt.elapsedMilliseconds
         cacheCloneHandle(handle, for: promptIdentity)
         if let artifactDirectory {
-            try await model.engine.persistCloneArtifact(
-                handle,
-                to: artifactDirectory,
-                metadata: artifactMetadata.fillingCreatedAtIfNeeded()
-            )
+            let metadata = artifactMetadata.fillingCreatedAtIfNeeded()
+            if let voiceID = conditioning.preparedVoiceID, let voicesDirectory,
+               let sourceFingerprint = conditioning.internalIdentity.referenceFingerprint {
+                _ = try await Self.persistSavedVoiceCloneArtifact(
+                    voicesDirectory: voicesDirectory,
+                    artifactDirectory: artifactDirectory,
+                    voiceID: voiceID,
+                    sourceURL: conditioning.normalizedReference.sourceURL,
+                    sourceFingerprint: sourceFingerprint,
+                    checksStoredTranscript: conditioning.transcriptMode != .inline,
+                    expectedStoredTranscript: conditioning.resolvedTranscript
+                ) { staging in
+                    try await model.engine.persistCloneArtifact(handle, to: staging, metadata: metadata)
+                }
+            } else if conditioning.preparedVoiceID == nil {
+                try await model.engine.persistCloneArtifact(handle, to: artifactDirectory, metadata: metadata)
+            }
             if conditioning.preparedVoiceID == nil, let voicesDirectory {
                 Self.pruneTransientClonePromptArtifacts(in: voicesDirectory)
             }
@@ -391,6 +432,50 @@ actor NativePreparedCloneConditioningCache {
                 "clone_prompt_resolve": resolveStartedAt.elapsedMilliseconds,
             ]
         )
+    }
+
+    /// Model work writes privately, then the repository validates source
+    /// ownership and publishes under the delete/replacement lock. A concurrent
+    /// deletion may discard persistence without invalidating this take's handle.
+    @discardableResult
+    static func persistSavedVoiceCloneArtifact(
+        voicesDirectory: URL,
+        artifactDirectory: URL,
+        voiceID: String,
+        sourceURL: URL,
+        sourceFingerprint: String,
+        checksStoredTranscript: Bool,
+        expectedStoredTranscript: String?,
+        persist: @Sendable (URL) async throws -> Void
+    ) async throws -> Bool {
+        let staging = voicesDirectory.appendingPathComponent(".clone-prompt-staging-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        try await persist(staging)
+        let repository = PreparedVoiceRepository(
+            appSupportDirectory: voicesDirectory.deletingLastPathComponent(),
+            supportedAudioExtensions: MLXTTSEngine.supportedSavedVoiceAudioExtensions
+        )
+        do {
+            return try await repository.publishClonePromptArtifact(
+                from: staging, to: artifactDirectory, voiceID: voiceID,
+                sourceURL: sourceURL, sourceFingerprint: sourceFingerprint,
+                checksStoredTranscript: checksStoredTranscript,
+                expectedStoredTranscript: expectedStoredTranscript
+            )
+        } catch PreparedVoiceRepositoryError.storeBusy {
+            // A prompt is a rebuildable cache; never delay a take or hold an
+            // executor while another process owns the saved-voice transaction.
+            return false
+        }
+    }
+
+    /// Only a saved voice reads the transcript sidecar beside its reference
+    /// (P12-09). A one-off reference is used in place, so a same-stem `.txt`
+    /// next to it is whatever the user keeps there (notes, a whole-episode
+    /// transcript), not a transcript anyone reviewed for this clip; without an
+    /// inline transcript it conditions audio-only, as the Studio shows it.
+    static func readsTranscriptSidecar(for reference: CloneReference) -> Bool {
+        reference.preparedVoiceID != nil
     }
 
     private func insert(_ conditioning: CachedConditioning) {
@@ -415,6 +500,7 @@ actor NativePreparedCloneConditioningCache {
     private func normalizeCloneReference(
         _ sourceURL: URL,
         referenceFingerprint: String,
+        mirrorsTranscriptSidecar: Bool,
         using audioPreparationService: any AudioPreparationService,
         normalizedCloneReferenceDirectory: URL
     ) async throws -> NormalizedCloneReferenceOutcome {
@@ -426,7 +512,9 @@ actor NativePreparedCloneConditioningCache {
                referenceFingerprint: referenceFingerprint
            ) {
             touchNormalizedReference(cacheKey)
-            try Self.mirrorTranscriptSidecarIfNeeded(from: sourceURL, to: cachedResult.normalizedURL)
+            if mirrorsTranscriptSidecar {
+                try Self.mirrorTranscriptSidecarIfNeeded(from: sourceURL, to: cachedResult.normalizedURL)
+            }
             return NormalizedCloneReferenceOutcome(
                 result: cachedResult,
                 reusedExistingOutput: true
@@ -460,7 +548,9 @@ actor NativePreparedCloneConditioningCache {
         }
 
         let result = try await audioPreparationService.normalizeAudio(normalizationRequest)
-        try Self.mirrorTranscriptSidecarIfNeeded(from: sourceURL, to: result.normalizedURL)
+        if mirrorsTranscriptSidecar {
+            try Self.mirrorTranscriptSidecarIfNeeded(from: sourceURL, to: result.normalizedURL)
+        }
         normalizedReferenceCache[cacheKey] = result
         touchNormalizedReference(cacheKey)
         while normalizedReferenceLRUKeys.count > capacity {
@@ -681,12 +771,16 @@ actor NativePreparedCloneConditioningCache {
         return (peak, Float((sumSquares / Double(sampleCount)).squareRoot()))
     }
 
-    private static func resolveTranscript(
+    static func resolveTranscript(
         requestedTranscript: String?,
-        normalizedAudioURL: URL
+        normalizedAudioURL: URL,
+        readsSavedVoiceSidecar: Bool
     ) throws -> (transcript: String?, mode: ResolvedCloneTranscriptMode) {
         if let requestedTranscript {
             return (requestedTranscript, .inline)
+        }
+        guard readsSavedVoiceSidecar else {
+            return (nil, .none)
         }
 
         let sidecarURL = normalizedAudioURL.deletingPathExtension().appendingPathExtension("txt")
@@ -740,6 +834,9 @@ actor NativePreparedCloneConditioningCache {
     ) -> CloneConditioningMode {
         if reference.conditioningMode.usesTranscript {
             return reference.conditioningMode.normalized
+        }
+        guard readsTranscriptSidecar(for: reference) else {
+            return .xVectorOnly
         }
 
         let sidecarURL = reference.audioURL
@@ -822,8 +919,7 @@ actor NativePreparedCloneConditioningCache {
         voicesDirectory: URL?,
         preparedVoiceID: String?,
         modelID: String,
-        conditioning: ResolvedCloneConditioning? = nil,
-        language: String? = nil
+        conditioning: ResolvedCloneConditioning? = nil
     ) -> URL? {
         guard let voicesDirectory else { return nil }
         if let preparedVoiceID {
@@ -834,19 +930,17 @@ actor NativePreparedCloneConditioningCache {
             let modelRoot = root.appendingPathComponent(modelID, isDirectory: true)
             guard let conditioning else { return modelRoot }
             return modelRoot.appendingPathComponent(
-                clonePromptArtifactDigest(
+                Self.clonePromptArtifactDigest(
                     modelID: modelID,
-                    conditioning: conditioning,
-                    language: language
+                    internalIdentityKey: conditioning.internalIdentityKey
                 ),
                 isDirectory: true
             )
         }
         guard let conditioning else { return nil }
-        let digest = clonePromptArtifactDigest(
+        let digest = Self.clonePromptArtifactDigest(
             modelID: modelID,
-            conditioning: conditioning,
-            language: language
+            internalIdentityKey: conditioning.internalIdentityKey
         )
         return Self.transientClonePromptRootDirectory(in: voicesDirectory)
             .appendingPathComponent(digest, isDirectory: true)
@@ -909,18 +1003,18 @@ actor NativePreparedCloneConditioningCache {
         )
     }
 
-    private func clonePromptArtifactDigest(
+    /// The artifact directory name of a prompt: the v1 digest input of model,
+    /// reference identity and the language component, which is always
+    /// `clonePromptLanguageKey` (U17), so a prime, a prebuild and a take in any
+    /// language name the same directory.
+    static func clonePromptArtifactDigest(
         modelID: String,
-        conditioning: ResolvedCloneConditioning,
-        language: String?
+        internalIdentityKey: String
     ) -> String {
-        let normalizedLanguage = (language ?? "auto")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
         let identity = [
             modelID,
-            conditioning.internalIdentityKey,
-            normalizedLanguage.isEmpty ? "auto" : normalizedLanguage,
+            internalIdentityKey,
+            clonePromptLanguageKey,
         ].joined(separator: "|")
         let digest = SHA256.hash(data: Data(identity.utf8))
             .prefix(16)
@@ -932,32 +1026,23 @@ actor NativePreparedCloneConditioningCache {
     private func clonePromptArtifactMetadata(
         modelID: String,
         conditioning: ResolvedCloneConditioning,
-        language: String?,
         xVectorOnlyMode: Bool,
         modelArtifactIdentity: GenerationSemantics.ClonePromptModelArtifactIdentity,
         clonePromptRuntimeSignature: String
     ) -> VocelloQwen3CloneArtifactMetadata {
-        let normalizedLanguage = Self.normalizedClonePromptLanguage(language)
-        return VocelloQwen3CloneArtifactMetadata(
+        VocelloQwen3CloneArtifactMetadata(
             modelID: modelID,
             modelRepository: modelArtifactIdentity.repository,
             modelRevision: modelArtifactIdentity.revision,
             modelArtifactVersion: modelArtifactIdentity.artifactVersion,
             modelIntegrityManifestDigest: modelArtifactIdentity.integrityManifestDigest,
-            language: normalizedLanguage,
+            language: Self.clonePromptLanguageKey,
             sourceAudioFingerprint: conditioning.normalizedReference.fingerprint,
             transcriptHash: conditioning.resolvedTranscript.map(Self.sha256Hex(text:)),
             hasTranscript: conditioning.resolvedTranscript != nil,
             xVectorOnlyMode: xVectorOnlyMode,
             runtimeProfileSignature: clonePromptRuntimeSignature
         )
-    }
-
-    private static func normalizedClonePromptLanguage(_ language: String?) -> String {
-        let normalized = (language ?? "auto")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        return normalized.isEmpty ? "auto" : normalized
     }
 
     private static func sha256Hex(text: String) -> String {
@@ -968,8 +1053,11 @@ actor NativePreparedCloneConditioningCache {
 
 }
 
-enum NativeSavedVoiceNaming {
-    static func normalizedName(_ rawName: String) -> String {
+/// The saved-voice store's ID for a name: the name without path and control
+/// characters. Public so the macOS sheet checks names exactly as the store
+/// will (U16).
+public enum NativeSavedVoiceNaming {
+    public static func normalizedName(_ rawName: String) -> String {
         rawName
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(

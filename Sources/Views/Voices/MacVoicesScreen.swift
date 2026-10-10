@@ -28,6 +28,10 @@ struct MacVoicesScreen: View {
     /// (`IOSVoicesView`); the desktop did not, which left a staged Clone
     /// handoff aimed at a `wavPath` that no longer exists.
     let onVoiceDeleted: (String) -> Void
+    /// Reported after Replace reference committed new audio for the voice with
+    /// this ID, so a Clone draft that uses it drops the old clip's transcript
+    /// (U14).
+    var onVoiceReferenceReplaced: (String) -> Void = { _ in }
 
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
     @State private var actionAlert: MacVoicesAlertState?
@@ -237,6 +241,7 @@ private extension MacVoicesScreen {
         let transcript = (try? voice.loadTranscript()).flatMap { $0 } ?? ""
         voiceBeingReplaced = voice
         savedVoiceSheetConfiguration = .replaceReference(
+            voiceID: voice.id,
             name: voice.name,
             transcript: transcript,
             referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
@@ -255,6 +260,9 @@ private extension MacVoicesScreen {
         // were already tombstoned before the new voice was published.
         if let replacedVoice, replacedVoice.id != voice.id {
             savedVoicesViewModel.removeVoiceFromVisibleState(id: replacedVoice.id)
+        }
+        if let replacedVoice {
+            onVoiceReferenceReplaced(replacedVoice.id)
         }
         Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
     }

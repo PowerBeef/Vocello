@@ -39,6 +39,22 @@ struct ContentView: View {
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
     private var cloneConsentAcknowledged = false
     @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
+    /// The language an Auto Built-in Voice or Voice Design take resolves for
+    /// its script, detected off the main actor once typing pauses, so the warm
+    /// of that draft is keyed like its take (P01-05, P02-05, P12-07).
+    @State private var autoWarmLanguageHints: [GenerationMode: String] = [:]
+
+    /// The task identity of one mode's warm-language resolution: the script
+    /// matters only while the selection is Auto.
+    private struct WarmLanguageInput: Equatable {
+        let selected: Qwen3SupportedLanguage
+        let script: String
+
+        init(selected: Qwen3SupportedLanguage, script: String) {
+            self.selected = selected
+            self.script = selected == .auto ? script : ""
+        }
+    }
 
     private var canUseSavedVoicesInVoiceCloning: Bool {
         modelManager.hasInstalledVariant(for: .clone)
@@ -158,6 +174,20 @@ struct ContentView: View {
         .onChange(of: appModel.selectedItem) { _, newValue in handleSelectionChange(newValue) }
         .onChange(of: customVoiceDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceDesignDraft) { _, _ in handleGenerationDraftChange() }
+        .task(id: WarmLanguageInput(selected: customVoiceDraft.selectedLanguage, script: customVoiceDraft.text)) {
+            await resolveAutoWarmLanguage(
+                for: .custom,
+                selected: customVoiceDraft.selectedLanguage,
+                script: customVoiceDraft.text
+            )
+        }
+        .task(id: WarmLanguageInput(selected: voiceDesignDraft.selectedLanguage, script: voiceDesignDraft.text)) {
+            await resolveAutoWarmLanguage(
+                for: .design,
+                selected: voiceDesignDraft.selectedLanguage,
+                script: voiceDesignDraft.text
+            )
+        }
         .onChange(of: voiceCloningDraft) { _, _ in handleGenerationDraftChange() }
         // Recording consent changes the Clone warm target from model-only to primed.
         .onChange(of: cloneConsentAcknowledged) { _, _ in handleGenerationDraftChange() }
@@ -286,10 +316,20 @@ struct ContentView: View {
                     // The staged handoff carries the voice's `wavPath`, and
                     // deleting the voice removes that file. Left in place it
                     // would stage Voice Cloning against a reference that is no
-                    // longer there. `IOSVoicesView` has always cleared it.
+                    // longer there. `IOSVoicesView` has always cleared it, and
+                    // the Clone draft that uses the voice too (U14).
                     if pendingVoiceCloningHandoff?.savedVoiceID == voiceID {
                         pendingVoiceCloningHandoff = nil
                     }
+                    voiceCloningDraft.savedVoiceWasDeleted(id: voiceID)
+                },
+                onVoiceReferenceReplaced: { voiceID in
+                    // New audio under the same voice: the staged handoff and
+                    // the Clone draft carry the old clip's transcript (U14).
+                    if pendingVoiceCloningHandoff?.savedVoiceID == voiceID {
+                        pendingVoiceCloningHandoff = nil
+                    }
+                    voiceCloningDraft.savedVoiceReferenceWasReplaced(id: voiceID)
                 }
             )
         case .settings:
@@ -364,6 +404,40 @@ struct ContentView: View {
         scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
+    /// Debounced like the screens' own detection: the detector loads a
+    /// language recognizer per call, so it never runs per keystroke and reads
+    /// off the main actor (MAC-22). A change of the resolved language is a
+    /// change of warm intent.
+    private func resolveAutoWarmLanguage(
+        for mode: GenerationMode,
+        selected: Qwen3SupportedLanguage,
+        script: String
+    ) async {
+        guard selected == .auto else {
+            if autoWarmLanguageHints[mode] != nil { autoWarmLanguageHints[mode] = nil }
+            return
+        }
+        if !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+        }
+        let resolved = await MacWarmLanguageResolution.resolve(
+            mode: mode,
+            selectedLanguage: selected,
+            script: script
+        )
+        guard !Task.isCancelled, autoWarmLanguageHints[mode] != resolved else { return }
+        autoWarmLanguageHints[mode] = resolved
+        handleGenerationDraftChange()
+    }
+
+    /// The language the warm of `mode`'s draft carries: an explicit selection
+    /// as is, Auto as the take resolves it for the current script once known.
+    private func warmLanguageHint(for mode: GenerationMode, selected: Qwen3SupportedLanguage) -> String {
+        guard selected == .auto else { return selected.rawValue }
+        return autoWarmLanguageHints[mode] ?? selected.rawValue
+    }
+
     // MARK: - Helper methods
 
     /// The one route to a destination; returns whether the shell is (or now
@@ -424,7 +498,7 @@ struct ContentView: View {
                 deliveryInstructionCellID: model.supportsInstructionControl
                     ? customVoiceDraft.resolvedDeliveryProfile.instructionCellID
                     : nil,
-                languageHint: customVoiceDraft.selectedLanguage.rawValue
+                languageHint: warmLanguageHint(for: .custom, selected: customVoiceDraft.selectedLanguage)
             )
             reference = nil
         case .design:
@@ -432,7 +506,7 @@ struct ContentView: View {
                 brief: voiceDesignDraft.voiceDescription,
                 deliveryStyle: voiceDesignDraft.emotion,
                 bucket: GenerationSemantics.designWarmBucket(for: voiceDesignDraft.text),
-                languageHint: voiceDesignDraft.selectedLanguage.rawValue
+                languageHint: warmLanguageHint(for: .design, selected: voiceDesignDraft.selectedLanguage)
             )
             reference = nil
         case .clone:

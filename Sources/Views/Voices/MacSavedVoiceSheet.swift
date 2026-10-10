@@ -3,154 +3,6 @@ import QwenVoiceCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
-    let id = UUID()
-    let title: String
-    let subtitle: String
-    let confirmLabel: String
-    let initialName: String
-    let initialAudioPath: String
-    let initialTranscript: String
-    let initialReferenceLanguage: Qwen3SupportedLanguage
-    let initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource
-    /// Normalized name of an existing saved voice that this enrollment
-    /// replaces. The duplicate-name guard ignores this name so the user can
-    /// keep the same identifier; the repository replaces the old assets in
-    /// the same commit. Nil for the add, cloneResult and designResult flows.
-    let replacingNormalizedName: String?
-
-    init(
-        title: String,
-        subtitle: String,
-        confirmLabel: String,
-        initialName: String,
-        initialAudioPath: String,
-        initialTranscript: String,
-        initialReferenceLanguage: Qwen3SupportedLanguage = .auto,
-        initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource = .existing,
-        replacingNormalizedName: String? = nil
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.confirmLabel = confirmLabel
-        self.initialName = initialName
-        self.initialAudioPath = initialAudioPath
-        self.initialTranscript = initialTranscript
-        self.initialReferenceLanguage = initialReferenceLanguage
-        self.initialTranscriptReadySource = initialTranscriptReadySource
-        self.replacingNormalizedName = replacingNormalizedName
-    }
-
-    static let manualAdd = SavedVoiceSheetConfiguration(
-        title: MacInterfaceText.savedVoiceAddTitle,
-        subtitle: MacInterfaceText.savedVoiceAddSubtitle,
-        confirmLabel: MacInterfaceText.savedVoiceAddConfirm,
-        initialName: "",
-        initialAudioPath: "",
-        initialTranscript: ""
-    )
-
-    static func cloneResult(
-        suggestedName: String,
-        audioPath: String,
-        transcript: String
-    ) -> SavedVoiceSheetConfiguration {
-        SavedVoiceSheetConfiguration(
-            title: MacInterfaceText.historySaveToSavedVoices,
-            subtitle: MacInterfaceText.savedVoiceCloneSubtitle,
-            confirmLabel: MacInterfaceText.historySaveToSavedVoices,
-            initialName: suggestedName,
-            initialAudioPath: audioPath,
-            initialTranscript: transcript,
-            initialReferenceLanguage: PromptLanguageDetector.detect(transcript)
-        )
-    }
-
-    static func designResult(
-        voiceDescription: String,
-        audioPath: String,
-        transcript: String
-    ) -> SavedVoiceSheetConfiguration {
-        SavedVoiceSheetConfiguration(
-            title: MacInterfaceText.savedVoiceDesignTitle,
-            subtitle: MacInterfaceText.savedVoiceDesignSubtitle,
-            confirmLabel: MacInterfaceText.historySaveToSavedVoices,
-            initialName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
-            initialAudioPath: audioPath,
-            initialTranscript: transcript,
-            initialReferenceLanguage: PromptLanguageDetector.detect(transcript)
-        )
-    }
-
-    /// The Saved Voices "Replace reference" flow: the existing name and
-    /// transcript are pre-filled and the audio path stays blank so the user
-    /// picks a new clip. The duplicate-name guard skips the existing entry.
-    static func replaceReference(
-        name: String,
-        transcript: String,
-        referenceLanguage: Qwen3SupportedLanguage = .auto
-    ) -> SavedVoiceSheetConfiguration {
-        SavedVoiceSheetConfiguration(
-            title: MacInterfaceText.savedVoiceReplaceTitle,
-            subtitle: MacInterfaceText.savedVoiceReplaceSubtitle,
-            confirmLabel: MacInterfaceText.savedVoiceReplaceConfirm,
-            initialName: name,
-            initialAudioPath: "",
-            initialTranscript: transcript,
-            initialReferenceLanguage: referenceLanguage == .auto
-                ? PromptLanguageDetector.detect(transcript)
-                : referenceLanguage,
-            replacingNormalizedName: SavedVoiceNameSanitizer.normalizedName(name)
-        )
-    }
-}
-
-enum SavedVoiceNameSanitizer {
-    static func normalizedName(_ rawName: String) -> String {
-        rawName
-            .replacingOccurrences(
-                of: #"[^\w\s-]"#,
-                with: "",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: " ", with: "_")
-    }
-}
-
-enum SavedVoiceNameSuggestion {
-    /// Interface-language fallback (`vocello.mac.savedVoice.designedVoiceFallback`).
-    static var designedVoiceFallback: String { MacInterfaceText.savedVoiceDesignedVoiceFallback }
-
-    static func designResultName(
-        from voiceDescription: String,
-        fallback: String = designedVoiceFallback,
-        maxLength: Int = 36
-    ) -> String {
-        let normalized = SavedVoiceNameSanitizer.normalizedName(voiceDescription)
-        guard !normalized.isEmpty else { return fallback }
-        guard normalized.count > maxLength else { return normalized }
-
-        let components = normalized.split(separator: "_")
-        var shortened = ""
-        for component in components {
-            let separator = shortened.isEmpty ? "" : "_"
-            let candidate = shortened + separator + component
-            if candidate.count > maxLength {
-                break
-            }
-            shortened = candidate
-        }
-
-        if shortened.isEmpty {
-            shortened = String(normalized.prefix(maxLength))
-                .trimmingCharacters(in: CharacterSet(charactersIn: "_-"))
-        }
-
-        return shortened.isEmpty ? fallback : shortened
-    }
-}
-
 /// The saved-voice enrollment sheet in the iOS save-voice language
 /// (`IOSSaveVoiceSheet`): labeled field sections on the dark canvas, the
 /// transcription review status with its audio-only confirmation, the
@@ -174,7 +26,7 @@ struct MacSavedVoiceSheet: View {
     @State private var name: String
     @State private var audioPath: String
     @State private var transcript: String
-    @State private var referenceLanguage: Qwen3SupportedLanguage
+    @State private var referenceLanguageSelection: ReferenceLanguageSelection
     @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var isSaving = false
@@ -185,6 +37,7 @@ struct MacSavedVoiceSheet: View {
     /// Clips recorded in this sheet, removed when it closes (MAC-25).
     @State private var recordedClips = ReferenceClipStashTracker()
     @State private var errorMessage: String?
+    /// The store IDs of the saved voices, for the duplicate-name check.
     @State private var existingNormalizedNames: Set<String> = []
     /// When non-nil, the staged voice has quality warnings and the user is
     /// being asked whether to publish it or discard the private candidate.
@@ -208,11 +61,14 @@ struct MacSavedVoiceSheet: View {
         _name = State(initialValue: configuration.initialName)
         _audioPath = State(initialValue: configuration.initialAudioPath)
         _transcript = State(initialValue: configuration.initialTranscript)
-        _referenceLanguage = State(initialValue: configuration.initialReferenceLanguage)
+        _referenceLanguageSelection = State(
+            initialValue: ReferenceLanguageSelection(initialLanguage: configuration.initialReferenceLanguage)
+        )
         _transcriptionReview = State(
             initialValue: ReferenceTranscriptionReviewState(
                 initialTranscript: configuration.initialTranscript,
-                readySource: configuration.initialTranscriptReadySource
+                readySource: configuration.initialTranscriptReadySource,
+                transcriptClip: configuration.initialTranscriptClip
             )
         )
         _transcriptionEvidence = State(initialValue: nil)
@@ -222,25 +78,22 @@ struct MacSavedVoiceSheet: View {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var normalizedName: String {
-        SavedVoiceNameSanitizer.normalizedName(trimmedName)
-    }
-
+    /// In the store's own normalization (U16); in the replace-reference flow
+    /// the user keeps the same identifier, and only a different saved voice's
+    /// name is a collision.
     private var validationMessage: String? {
-        guard !trimmedName.isEmpty else { return nil }
-
-        if normalizedName.isEmpty {
+        switch SavedVoiceSheetConfiguration.nameIssue(
+            for: trimmedName,
+            existingVoiceIDs: existingNormalizedNames,
+            replacingVoiceID: configuration.replacingVoiceID
+        ) {
+        case nil:
+            return nil
+        case .needsCharacters:
             return MacInterfaceText.savedVoiceNameNeedsCharacters
+        case .exists(let storeID):
+            return MacInterfaceText.savedVoiceNameExists(storeID)
         }
-
-        // In the replace-reference flow the user keeps the same identifier;
-        // only a different saved voice's name is a collision.
-        if existingNormalizedNames.contains(normalizedName)
-            && normalizedName != configuration.replacingNormalizedName {
-            return MacInterfaceText.savedVoiceNameExists(normalizedName)
-        }
-
-        return nil
     }
 
     private var canSubmit: Bool {
@@ -276,6 +129,17 @@ struct MacSavedVoiceSheet: View {
                     .lineLimit(2)
             }
         }
+    }
+
+    private var referenceLanguage: Qwen3SupportedLanguage {
+        referenceLanguageSelection.language
+    }
+
+    private var referenceLanguageBinding: Binding<Qwen3SupportedLanguage> {
+        Binding(
+            get: { referenceLanguage },
+            set: { referenceLanguageSelection.select($0) }
+        )
     }
 
     private var requiresReferenceLanguageConfirmation: Bool {
@@ -398,7 +262,7 @@ struct MacSavedVoiceSheet: View {
                     : VocelloPresentationText.referenceLanguageDetail,
                 captionTint: requiresReferenceLanguageConfirmation ? MacTheme.Status.guarded : nil
             ) {
-                Picker(VocelloPresentationText.referenceLanguageTitle, selection: $referenceLanguage) {
+                Picker(VocelloPresentationText.referenceLanguageTitle, selection: referenceLanguageBinding) {
                     Text(VocelloPresentationText.referenceLanguagePlaceholder)
                         .tag(Qwen3SupportedLanguage.auto)
                     ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
@@ -466,7 +330,7 @@ struct MacSavedVoiceSheet: View {
                     transcriptionReview.awaitAudio()
                 }
             } else {
-                autoTranscribeIfNeeded(path: newPath)
+                referenceClipChanged(to: newPath)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -619,6 +483,30 @@ struct MacSavedVoiceSheet: View {
 
     // MARK: - Transcription review
 
+    /// A new clip (recorded, browsed, typed, or after Discard and re-record):
+    /// the transcript of another recording is cleared with its evidence and
+    /// recognition runs for this one, so Save waits for it (U15). A path that
+    /// names no file yet (typing in progress) changes nothing.
+    private func referenceClipChanged(to path: String) {
+        let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard FileManager.default.fileExists(atPath: trimmedPath) else { return }
+        if transcriptionReview.referenceClipChanged(to: trimmedPath) {
+            transcriptionTask?.cancel()
+            transcriptionTask = nil
+            transcriptionEvidence = nil
+            transcript = ""
+            referenceLanguageSelection.referenceClipChanged()
+        }
+        autoTranscribeIfNeeded(path: path)
+    }
+
+    /// The clip the field's text now describes: the chosen file, if there is one.
+    private var currentClip: String? {
+        let trimmedPath = audioPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty, FileManager.default.fileExists(atPath: trimmedPath) else { return nil }
+        return trimmedPath
+    }
+
     /// Starts the on-device transcriber and binds its result to one operation
     /// generation; cancellation is cooperative, so the generation check is the
     /// final authority.
@@ -648,9 +536,8 @@ struct MacSavedVoiceSheet: View {
                 )
                 if applied {
                     transcript = recognizedText
-                    if referenceLanguage == .auto {
-                        referenceLanguage = result.language
-                    }
+                    transcriptionReview.bindTranscript(to: trimmedPath)
+                    referenceLanguageSelection.applyDetectedLanguage(result.language)
                 }
             } else {
                 transcriptionReview.finishWithoutTranscript(
@@ -670,9 +557,8 @@ struct MacSavedVoiceSheet: View {
         transcriptionTask?.cancel()
         transcriptionTask = nil
         transcriptionReview.userEditedTranscript(newValue)
-        if referenceLanguage == .auto {
-            referenceLanguage = PromptLanguageDetector.detect(newValue)
-        }
+        transcriptionReview.bindTranscript(to: currentClip)
+        referenceLanguageSelection.applyDetectedLanguage(PromptLanguageDetector.detect(newValue))
     }
 
     private func confirmAudioOnly() {
@@ -680,6 +566,7 @@ struct MacSavedVoiceSheet: View {
         transcriptionTask = nil
         transcript = ""
         transcriptionReview.confirmAudioOnly()
+        transcriptionReview.bindTranscript(to: currentClip)
     }
 
     private func unavailableReason(
@@ -744,7 +631,7 @@ struct MacSavedVoiceSheet: View {
                     transcript: transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? nil
                         : transcript.trimmingCharacters(in: .whitespacesAndNewlines),
-                    replacingVoiceID: configuration.replacingNormalizedName,
+                    replacingVoiceID: configuration.replacingVoiceID,
                     enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
                         referenceLanguage: referenceLanguage,
                         reviewState: transcriptionReview,

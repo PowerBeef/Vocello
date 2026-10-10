@@ -652,6 +652,14 @@ back, complete a post-publication commit, or finish a user-confirmed delete with
 The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
 for noninteractive CLI and diagnostics.
 
+Saved-voice clone prompts serialize to a private staging directory without holding the store
+lock. `PreparedVoiceRepository.publishClonePromptArtifact` then takes the same cross-process lock
+as replacement/delete, reconciles transactions, and rechecks the source audio digest and any
+store-owned transcript before atomic publication. A deleted or changed reference cannot publish
+its old prompt. Lock contention skips this rebuildable cache; model-write failures retain their
+error and clean staging. Explicit request transcripts remain overrides; prebuilds resolve the
+store transcript, and conditioning-cache hits retain the current request's transcript ownership.
+
 The three macOS Studio modes generate through the shared pipeline: a per-mode
 `StudioGenerationCoordinator` owned by `MacAppModel` holds the attempt-scoped terminal state,
 `IOSSingleTakeGenerationExecutor` runs the take, and `MacStudioSingleTakeGenerationHooks` owns the
@@ -666,7 +674,9 @@ single-take executor and the macOS hooks) and a long-form project on the shared 
 owned by `MacAppModel` and both under the mode's `StudioGenerationCoordinator` attempt, so the
 canvas locks and shows the live card as during a single take. Voice Cloning primes the clone
 reference proactively (`ensureCloneReferencePrimed`)
-and again on demand before the take. Request assembly for every mode is centralized in the pure
+and again on demand before the take. A primed reference does not hold the model: the idle unload
+releases it, and the screen primes the same reference again only once it changes or the screen is
+entered again. Request assembly for every mode is centralized in the pure
 `MacStudioGenerationRequestFactory`, which preserves the exact UI language, reference
 transcript/voice identity, prompt, seed, variation, and generation identity before the engine call.
 Clone Auto is then resolved by shared `GenerationSemantics` from the target text; reference-language

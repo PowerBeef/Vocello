@@ -108,7 +108,7 @@ actor PreparedVoiceRepository {
     private let supportedAudioExtensions: Set<String>
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
-    enum FaultPoint: Sendable { case beforeCandidatePublication, beforeAudioPublication, beforeRestoreAsset, beforeCandidateCleanup, beforeTransactionCleanup }
+    enum FaultPoint: Sendable { case beforeCandidatePublication, beforeAudioPublication, beforeRestoreAsset, beforeCandidateCleanup, beforeTransactionCleanup, beforeClonePromptPublication }
     private let fault: @Sendable (FaultPoint) throws -> Void
 
     init(
@@ -445,6 +445,54 @@ actor PreparedVoiceRepository {
         // All assets are tombstoned: a cleanup failure cannot resurrect them.
         removeDerivedCloneReferences(ofVoiceAudioIn: transactionDirectory)
         try? removeTransaction(transactionDirectory)
+    }
+
+    /// Publishes a completely staged prompt only while its source still belongs
+    /// to this voice. The same cross-process lock covers delete/replacement and
+    /// the final move; no lock survives an actor suspension or model work.
+    @discardableResult
+    func publishClonePromptArtifact(
+        from staging: URL,
+        to destination: URL,
+        voiceID: String,
+        sourceURL: URL,
+        sourceFingerprint: String,
+        checksStoredTranscript: Bool,
+        expectedStoredTranscript: String?
+    ) throws -> Bool {
+        let lock = try acquireStoreLock()
+        defer { releaseStoreLock(lock) }
+        try reconcileLocked()
+        try validateIdentifier(voiceID)
+        let promptRoot = voicesDirectory.appendingPathComponent("\(voiceID).clone_prompt", isDirectory: true)
+        guard sourceURL.standardizedFileURL.deletingLastPathComponent() == voicesDirectory.standardizedFileURL,
+              sourceURL.deletingPathExtension().lastPathComponent == voiceID,
+              supportedAudioExtensions.contains(sourceURL.pathExtension.lowercased()),
+              staging.standardizedFileURL.deletingLastPathComponent() == voicesDirectory.standardizedFileURL,
+              staging.lastPathComponent.hasPrefix(".clone-prompt-staging-"),
+              destination.standardizedFileURL.deletingLastPathComponent().deletingLastPathComponent()
+                == promptRoot.standardizedFileURL else {
+            throw PreparedVoiceRepositoryError.invalidIdentifier
+        }
+        try fault(.beforeClonePromptPublication)
+        guard fileManager.fileExists(atPath: sourceURL.path),
+              try sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
+              try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: sourceURL)
+                == sourceFingerprint else { return false }
+        if checksStoredTranscript {
+            let transcriptURL = voicesDirectory.appendingPathComponent("\(voiceID).txt")
+            let stored = fileManager.fileExists(atPath: transcriptURL.path)
+                ? try String(contentsOf: transcriptURL, encoding: .utf8) : nil
+            guard NativePreparedCloneConditioningCache.normalizedTranscript(stored)
+                == expectedStoredTranscript else { return false }
+        }
+        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
+        } else {
+            try fileManager.moveItem(at: staging, to: destination)
+        }
+        return true
     }
 
     /// Cross-process exclusion, not just actor isolation. Never block a Swift

@@ -42,16 +42,61 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
         let showsProgress: Bool
     }
 
+    /// The reference clip the transcript under review describes (U15): the one
+    /// it was recognized, read, supplied or typed for.
+    enum TranscriptClip: Equatable, Sendable {
+        /// No clip yet: an empty field, or one typed before any clip was
+        /// chosen, which may describe the clip picked next.
+        case unbound
+        /// Recognized, read, supplied or typed for this clip (its path).
+        case clip(String)
+        /// Supplied for a clip this review never shows: the reference that a
+        /// Replace reference flow replaces.
+        case replacedReference
+    }
+
     private(set) var phase: Phase
     private(set) var operationGeneration: UInt64 = 0
+    private(set) var transcriptClip: TranscriptClip
 
     init(
         initialTranscript: String,
-        readySource: ReadySource = .sidecar
+        readySource: ReadySource = .sidecar,
+        transcriptClip: TranscriptClip = .unbound
     ) {
         phase = initialTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? .awaitingAudio
             : .ready(readySource)
+        self.transcriptClip = transcriptClip
+    }
+
+    /// The transcript now describes `clip`, or no clip yet when nil: it was
+    /// recognized or confirmed for that clip, or the user edited it while
+    /// that clip was chosen.
+    mutating func bindTranscript(to clip: String?) {
+        transcriptClip = clip.map(TranscriptClip.clip) ?? .unbound
+    }
+
+    /// The reference clip became `clip` (U15). Only a transcript bound to that
+    /// same clip, or typed while no clip was chosen, still describes it; any
+    /// other one belongs to a different recording. Returns whether the caller
+    /// clears its transcript and starts recognition for the new clip. The
+    /// review then awaits it, so Save stays blocked until recognition, an edit
+    /// or the audio-only confirmation resolves it, and a recognizer result for
+    /// the previous clip can no longer apply.
+    mutating func referenceClipChanged(to clip: String) -> Bool {
+        switch transcriptClip {
+        case .clip(let bound) where bound == clip:
+            return false
+        case .unbound where phase == .ready(.manual):
+            transcriptClip = .clip(clip)
+            return false
+        case .unbound, .clip, .replacedReference:
+            operationGeneration &+= 1
+            phase = .awaitingAudio
+            transcriptClip = .unbound
+            return true
+        }
     }
 
     mutating func awaitAudio() {
@@ -222,5 +267,32 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
                 showsProgress: false
             )
         }
+    }
+}
+
+/// Enrollment language follows the current clip until the user chooses a
+/// language explicitly. A detected or inherited language belongs to its old
+/// clip and must not silently label a replacement recording.
+struct ReferenceLanguageSelection: Equatable, Sendable {
+    private(set) var language: Qwen3SupportedLanguage
+    private(set) var isAutomatic = true
+
+    init(initialLanguage: Qwen3SupportedLanguage = .auto) {
+        language = initialLanguage
+    }
+
+    mutating func select(_ language: Qwen3SupportedLanguage) {
+        self.language = language
+        isAutomatic = language == .auto
+    }
+
+    mutating func applyDetectedLanguage(_ language: Qwen3SupportedLanguage) {
+        guard isAutomatic else { return }
+        self.language = language
+    }
+
+    mutating func referenceClipChanged() {
+        guard isAutomatic else { return }
+        language = .auto
     }
 }

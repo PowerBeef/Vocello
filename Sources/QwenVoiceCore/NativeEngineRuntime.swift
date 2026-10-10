@@ -430,6 +430,9 @@ actor NativeEngineRuntime {
     private var voicesDirectory: URL?
     private var activeModelID: String?
     private var primedCloneReferenceKeys: Set<GenerationSemantics.CloneReferenceIdentity> = []
+    /// The UI identity keys the primes in `primedCloneReferenceKeys` published;
+    /// cleared with them.
+    private var primedCloneUIIdentityKeys: Set<String> = []
     private var clonePrimeTimingOverridesMS: [GenerationSemantics.CloneReferenceIdentity: [String: Int]] = [:]
     private var activeClonePrimeToken: UUID?
     private var activeDesignConditioningWarmIdentity: GenerationSemantics.DesignConditioningIdentity?
@@ -493,8 +496,19 @@ actor NativeEngineRuntime {
         await telemetryRecorder?.mark(stage: .unload)
     }
 
-    func loadModel(id: String) async throws -> NativeModelLoadResult {
-        try await loadModel(id: id, preserveActiveClonePrimeToken: false)
+    /// A load outside a take or a prime. The engine passes the profile of the
+    /// model's own mode, the one its takes and primes load (U19): a Base model
+    /// loaded `.cloneOnly` cannot serve `.fullCapabilities`, so the old default
+    /// reloaded identical weights from disk and dropped the primed reference.
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile = .fullCapabilities
+    ) async throws -> NativeModelLoadResult {
+        try await loadModel(
+            id: id,
+            capabilityProfile: capabilityProfile,
+            preserveActiveClonePrimeToken: false
+        )
     }
 
     /// The model this runtime last loaded and has not unloaded since, if any.
@@ -674,6 +688,7 @@ actor NativeEngineRuntime {
             activeDesignStreamStepWarmSource = nil
             activeCloneConditioningIdentity = nil
             primedCloneReferenceKeys.removeAll()
+            primedCloneUIIdentityKeys.removeAll()
             clonePrimeTimingOverridesMS.removeAll()
             allocatorControl.clearCache()
             await clearQwen3MemoryCachesIfNeeded()
@@ -965,16 +980,13 @@ actor NativeEngineRuntime {
                 sampleRate: model.sampleRate,
                 signpostGenerationID: generationID
             )
-            let cloneLanguage = GenerationSemantics.qwenLanguageHint(
-                for: request,
-                resolvedCloneTranscript: conditioning.resolvedTranscript
-            )
+            // The prompt carries no target language (U17), so the one a prime
+            // or the saved-voice prebuild built serves this take.
             conditioning = try await preparedCloneConditioningCache.resolveVoiceClonePrompt(
                 for: conditioning,
                 modelID: request.modelID,
                 model: model,
                 voicesDirectory: voicesDirectory,
-                language: cloneLanguage,
                 modelRuntimeIdentity: loadResult.modelRuntimeIdentity
             )
             cloneConditioning = conditioning
@@ -1445,6 +1457,15 @@ actor NativeEngineRuntime {
             reference: reference,
             sampleRate: model.sampleRate
         )
+        // Already primed: the prompt and the prewarm it needs are in place, so
+        // the prompt is not adopted from disk again (P05-04).
+        if primedCloneReferenceKeys.contains(conditioning.internalIdentity) {
+            try ensureActiveClonePrimeToken(token)
+            primedCloneUIIdentityKeys.insert(conditioning.uiIdentityKey)
+            return NativeClonePrimeResult(uiIdentityKey: conditioning.uiIdentityKey)
+        }
+        // Only the prewarm below takes a language; it warms the kernels the
+        // take runs, and the prompt itself is language-independent (U17).
         let cloneLanguage = GenerationSemantics.qwenLanguageHint(
             for: GenerationRequest(
                 mode: .clone,
@@ -1461,12 +1482,12 @@ actor NativeEngineRuntime {
             modelID: modelID,
             model: model,
             voicesDirectory: voicesDirectory,
-            language: cloneLanguage,
             modelRuntimeIdentity: loadResult.modelRuntimeIdentity
         )
         try ensureActiveClonePrimeToken(token)
 
         if primedCloneReferenceKeys.contains(resolvedConditioning.internalIdentity) {
+            primedCloneUIIdentityKeys.insert(resolvedConditioning.uiIdentityKey)
             return NativeClonePrimeResult(uiIdentityKey: resolvedConditioning.uiIdentityKey)
         }
 
@@ -1487,11 +1508,20 @@ actor NativeEngineRuntime {
         timingOverrides.merge(primeTimings) { _, rhs in rhs }
         clonePrimeTimingOverridesMS[resolvedConditioning.internalIdentity] = timingOverrides
         primedCloneReferenceKeys.insert(resolvedConditioning.internalIdentity)
+        primedCloneUIIdentityKeys.insert(resolvedConditioning.uiIdentityKey)
         return NativeClonePrimeResult(uiIdentityKey: resolvedConditioning.uiIdentityKey)
     }
 
     func cancelClonePreparation() {
         activeClonePrimeToken = nil
+    }
+
+    /// Whether the reference a prime published under `uiIdentityKey` is still
+    /// primed here. A model load, an unload, a hard trim or a saved-voice
+    /// invalidation drops every primed reference, so the engine re-derives
+    /// its published `.primed` state from this (U18).
+    func isClonePrimed(uiIdentityKey: String) -> Bool {
+        primedCloneUIIdentityKeys.contains(uiIdentityKey)
     }
 
     /// A saved reference is about to disappear or be replaced. Clear every
@@ -1529,22 +1559,13 @@ actor NativeEngineRuntime {
                 reference: reference,
                 sampleRate: loadResult.model.sampleRate
             )
+            // Keyed without a language, like every prompt, so the first take of
+            // the new voice in any language adopts it (U17).
             _ = try await preparedCloneConditioningCache.resolveVoiceClonePrompt(
                 for: conditioning,
                 modelID: modelID,
                 model: loadResult.model,
                 voicesDirectory: voicesDirectory,
-                language: GenerationSemantics.qwenLanguageHint(
-                    for: GenerationRequest(
-                        mode: .clone,
-                        modelID: modelID,
-                        text: lightweightWarmupText,
-                        outputPath: "",
-                        shouldStream: false,
-                        payload: .clone(reference: reference)
-                    ),
-                    resolvedCloneTranscript: conditioning.resolvedTranscript
-                ),
                 modelRuntimeIdentity: loadResult.modelRuntimeIdentity
             )
         } catch {
@@ -2301,6 +2322,7 @@ actor NativeEngineRuntime {
         activeDesignStreamStepWarmSource = nil
         activeCloneConditioningIdentity = nil
         primedCloneReferenceKeys.removeAll()
+        primedCloneUIIdentityKeys.removeAll()
         clonePrimeTimingOverridesMS.removeAll()
         if !preserveActiveClonePrimeToken {
             activeClonePrimeToken = nil

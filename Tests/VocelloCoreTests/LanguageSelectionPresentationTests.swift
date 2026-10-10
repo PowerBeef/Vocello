@@ -68,6 +68,19 @@ final class LanguageSelectionPresentationTests: XCTestCase {
         XCTAssertEqual(request.languageHint, Qwen3SupportedLanguage.german.rawValue)
     }
 
+    func testFrenchDefaultsDoNotRequestAForeignAccentAndAuthoredBriefsRemainVerbatim() {
+        let starter = VoiceDesignBriefCatalog.startingPoints(in: .french)[0]
+        XCTAssertFalse(starter.contains("britannique"))
+        XCTAssertEqual(VoiceDesignBriefCatalog.placeholder(in: .french), starter)
+        let authored = "Une voix avec un accent britannique."
+        let request = MacStudioGenerationRequestFactory.voiceDesign(
+            modelID: "design-model", text: LanguageFixtures.french, outputPath: "/tmp/design.wav",
+            language: .french, voiceDescription: authored, deliveryStyle: "", seed: 7, variation: nil
+        )
+        guard case .design(let brief, _) = request.payload else { return XCTFail("Expected Design") }
+        XCTAssertEqual(brief, authored)
+    }
+
     func testDeliveryPresentationNeverReplacesCanonicalInstruction() throws {
         let preset = try XCTUnwrap(EmotionPreset.preset(id: "happy"))
         let profile = DeliveryProfile.preset(preset, intensity: preset.shippedIntensity)

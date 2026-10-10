@@ -288,6 +288,45 @@ enum VoiceClipTranscriber {
         )
     }
 
+    /// File paths are not identities: a recording can be replaced in place while
+    /// recognition awaits permission or another locale. Hash off the UI actor and
+    /// reject a result unless it describes the same bytes at completion.
+    @concurrent
+    static func audioContentIdentity(url: URL) async throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var digest = SHA256()
+        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
+            try Task.checkCancellation()
+            digest.update(data: data)
+        }
+        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    @concurrent
+    static func stableEnrollmentResult(
+        url: URL,
+        recognize: @Sendable (URL) async -> EnrollmentResult = { await VoiceClipTranscriber.enrollmentResult(url: $0) }
+    ) async -> EnrollmentResult? {
+        guard let before = try? await audioContentIdentity(url: url), !Task.isCancelled else { return nil }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VocelloReference-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let snapshot = directory.appendingPathComponent("reference").appendingPathExtension(url.pathExtension)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: url, to: snapshot)
+        } catch { return nil }
+        // Recognition sees an immutable private copy. Even A -> B -> A at the
+        // original path cannot make B's words arrive attached to A's identity.
+        guard let copied = try? await audioContentIdentity(url: snapshot), copied == before,
+              !Task.isCancelled else { return nil }
+        let result = await recognize(snapshot)
+        guard !Task.isCancelled, let after = try? await audioContentIdentity(url: url),
+              before == after else { return nil }
+        return result
+    }
+
     static func transcribe(url: URL) async -> (text: String, language: Qwen3SupportedLanguage)? {
         let result = await enrollmentResult(url: url)
         guard let text = result.text else { return nil }

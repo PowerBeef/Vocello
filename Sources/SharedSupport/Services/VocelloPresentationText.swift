@@ -532,6 +532,20 @@ struct VocelloPresentationText: Sendable {
         )
     }
 
+    var generatedReferenceTranscriptNotice: String {
+        localization.string(localized: "vocello.enrollment.generated_transcript_notice",
+            defaultValue: "The generation script describes the request. Review the words actually spoken in this clip.",
+            comment: "Explains why a generated reference is transcribed again before saving a voice."
+        )
+    }
+
+    var reviewReferenceTranscript: String {
+        localization.string(localized: "vocello.clone.review_transcript",
+            defaultValue: "Use this reviewed transcript",
+            comment: "Explicit confirmation of the reference transcript before voice cloning."
+        )
+    }
+
     var useAudioOnly: String {
         localization.string(localized: "vocello.enrollment.use_audio_only",
             defaultValue: "Use audio only",
@@ -832,6 +846,8 @@ extension VocelloPresentationText {
     static var referenceLanguageConfirmation: String { Self().referenceLanguageConfirmation }
     static var referenceLanguageDetail: String { Self().referenceLanguageDetail }
     static var referenceLanguagePlaceholder: String { Self().referenceLanguagePlaceholder }
+    static var generatedReferenceTranscriptNotice: String { Self().generatedReferenceTranscriptNotice }
+    static var reviewReferenceTranscript: String { Self().reviewReferenceTranscript }
     static var useAudioOnly: String { Self().useAudioOnly }
     static var useAudioOnlyHint: String { Self().useAudioOnlyHint }
     static var cloningConsentRequired: String { Self().cloningConsentRequired }

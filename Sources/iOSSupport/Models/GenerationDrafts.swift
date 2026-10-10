@@ -149,13 +149,101 @@ struct VoiceCloningDraft: Equatable {
     var pinnedSeed: UInt64?
     var referenceAudioPath: String?
     var selectedLanguage = Qwen3SupportedLanguage.auto
-    var referenceTranscript = ""
+    var referenceTranscript = "" {
+        didSet {
+            guard oldValue != referenceTranscript else { return }
+            referenceReview.userEditedTranscript(referenceTranscript)
+            referenceReview.bindTranscript(to: referenceAudioPath)
+            referenceOperation = UUID()
+        }
+    }
     var text = ""
+    private(set) var referenceReview = ReferenceTranscriptionReviewState(initialTranscript: "")
+    private(set) var referenceOperation = UUID()
+
+    init(
+        selectedSavedVoiceID: String? = nil,
+        pinnedSeed: UInt64? = nil,
+        referenceAudioPath: String? = nil,
+        selectedLanguage: Qwen3SupportedLanguage = .auto,
+        referenceTranscript: String = "",
+        text: String = ""
+    ) {
+        self.selectedSavedVoiceID = selectedSavedVoiceID
+        self.pinnedSeed = pinnedSeed
+        self.referenceAudioPath = referenceAudioPath
+        self.selectedLanguage = selectedLanguage
+        self.referenceTranscript = referenceTranscript
+        self.text = text
+        referenceReview = ReferenceTranscriptionReviewState(
+            initialTranscript: referenceTranscript, readySource: .manual,
+            transcriptClip: referenceAudioPath.map { .clip($0) } ?? .unbound
+        )
+    }
+
+    var trimmedReferenceTranscript: String? {
+        ReferenceTranscriptionReviewState.conditioningLine(referenceTranscript)
+    }
+
+    /// ASR completion never changes an admitted audio-only intent. Automatic text
+    /// must be reviewed explicitly; editing it is also an explicit review decision.
+    var isReferenceReady: Bool {
+        referenceAudioPath != nil && referenceReview.allowsSave(transcript: referenceTranscript)
+            && referenceReview.phase != .ready(.automatic)
+    }
+
+    mutating func reviewReferenceTranscript() {
+        guard trimmedReferenceTranscript != nil else { return }
+        referenceReview.userEditedTranscript(referenceTranscript)
+        referenceReview.bindTranscript(to: referenceAudioPath)
+    }
+
+    mutating func confirmAudioOnly() {
+        referenceOperation = UUID()
+        referenceTranscript = ""
+        referenceReview.confirmAudioOnly()
+        referenceReview.bindTranscript(to: referenceAudioPath)
+    }
+
+    struct TranscriptionOperation: Equatable, Sendable {
+        let generation: UInt64
+        let identity: UUID
+        let audioPath: String?
+    }
+
+    mutating func beginReferenceTranscription() -> TranscriptionOperation {
+        referenceOperation = UUID()
+        return TranscriptionOperation(generation: referenceReview.beginAutomaticTranscription(),
+                                      identity: referenceOperation, audioPath: referenceAudioPath)
+    }
+
+    mutating func acceptReferenceTranscript(_ text: String, generation: TranscriptionOperation) {
+        guard generation.identity == referenceOperation, generation.audioPath == referenceAudioPath,
+              referenceReview.acceptAutomaticTranscript(text, generation: generation.generation,
+                                                       currentTranscript: referenceTranscript) else { return }
+        let automaticReview = referenceReview
+        referenceTranscript = text
+        // The observer handles user edits; recognition retains its original source.
+        referenceReview = automaticReview
+        referenceReview.bindTranscript(to: referenceAudioPath)
+    }
+
+    mutating func referenceTranscriptionUnavailable(
+        generation: TranscriptionOperation,
+        reason: ReferenceTranscriptionReviewState.UnavailableReason = .recognitionFailed
+    ) {
+        guard generation.identity == referenceOperation, generation.audioPath == referenceAudioPath else { return }
+        referenceReview.finishWithoutTranscript(reason: reason, generation: generation.generation,
+                                                currentTranscript: referenceTranscript)
+    }
+
+    mutating func invalidateReferenceTranscription() {
+        referenceOperation = UUID()
+        referenceReview.invalidate()
+    }
 
     mutating func applySavedVoice(_ voice: Voice, transcript: String) {
-        selectedSavedVoiceID = voice.id
-        referenceAudioPath = voice.wavPath
-        referenceTranscript = transcript
+        applySavedVoiceSelection(id: voice.id, wavPath: voice.wavPath, transcript: transcript)
     }
 
     mutating func applySavedVoiceSelection(
@@ -166,6 +254,11 @@ struct VoiceCloningDraft: Equatable {
         selectedSavedVoiceID = id
         referenceAudioPath = wavPath
         referenceTranscript = transcript
+        referenceReview.invalidate()
+        referenceOperation = UUID()
+        referenceReview = ReferenceTranscriptionReviewState(initialTranscript: transcript, readySource: .sidecar,
+                                                            transcriptClip: .clip(wavPath))
+        if trimmedReferenceTranscript == nil { referenceReview.confirmAudioOnly() }
     }
 
     func referencesSavedVoice(_ voice: Voice) -> Bool {
@@ -176,23 +269,26 @@ struct VoiceCloningDraft: Equatable {
         selectedSavedVoiceID = nil
         referenceAudioPath = nil
         referenceTranscript = ""
+        referenceReview.awaitAudio()
+        referenceOperation = UUID()
     }
 
     /// A one-off clip (imported, dropped or recorded) becomes the reference
     /// (U14). A transcript describes the clip it was hydrated, recognized or
     /// typed for, and the Studio shows the transcript field only while a clip
     /// is set, so any transcript here belongs to the clip being replaced: it
-    /// is cleared, and recognition runs for the new clip, unless the same
-    /// one-off file is chosen again. Returns whether the transcript was
-    /// cleared.
+    /// is cleared. Every explicit selection starts a new review, including a
+    /// path whose contents may have been replaced. Returns whether text was cleared.
     @discardableResult
     mutating func replaceReferenceAudio(with path: String) -> Bool {
-        let clearsTranscript = selectedSavedVoiceID != nil || referenceAudioPath != path
-        if clearsTranscript {
-            referenceTranscript = ""
-        }
+        // An explicit selection is a new operation even at the same path: the
+        // recording may have been replaced in place since the previous selection.
+        let clearsTranscript = !referenceTranscript.isEmpty
+        referenceTranscript = ""
         referenceAudioPath = path
         selectedSavedVoiceID = nil
+        referenceReview.awaitAudio()
+        referenceOperation = UUID()
         return clearsTranscript
     }
 
@@ -211,6 +307,8 @@ struct VoiceCloningDraft: Equatable {
     mutating func savedVoiceReferenceWasReplaced(id: String) {
         guard selectedSavedVoiceID == id else { return }
         referenceTranscript = ""
+        referenceReview.awaitAudio()
+        referenceOperation = UUID()
     }
 }
 

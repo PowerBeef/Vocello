@@ -187,8 +187,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceDesign_saveVoiceButton"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_nameField"), timeout: 20))
-        XCTAssertTrue(VocelloUIWait.value(element("voicesEnroll_transcriptField"),
-                                          contains: "The harbor is quiet", timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_generatedTranscriptNotice"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_transcriptionStatus"), timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voicesEnroll_cancelButton"), timeout: 20))
         XCTAssertTrue(button("voiceDesign_saveVoiceButton").exists,
                       "Cancelling enrollment must leave the generated take available to save")

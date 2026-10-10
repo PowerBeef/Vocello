@@ -32,6 +32,17 @@ final class SavedVoiceSheetConfigurationTests: XCTestCase {
         )
     }
 
+    func testDesignedTakeScriptIsIntentAndCannotBypassTranscriptionReview() {
+        let configuration = SavedVoiceSheetConfiguration.designResult(
+            voiceDescription: "A warm narrator", audioPath: "/tmp/design.wav", transcript: "The intended words."
+        )
+        XCTAssertEqual(configuration.initialTranscript, "")
+        XCTAssertTrue(configuration.generatedReference)
+        let state = ReferenceTranscriptionReviewState(initialTranscript: configuration.initialTranscript)
+        XCTAssertFalse(state.allowsSave(transcript: configuration.initialTranscript))
+        XCTAssertEqual(configuration.initialTranscriptClip, .unbound)
+    }
+
     /// The sheet checks names as the store normalizes them: spaces and
     /// apostrophes stay, so "Grandma Rose" is its own ID, a duplicate is found
     /// before saving, and the voice being replaced is not a collision.

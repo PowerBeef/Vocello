@@ -14,13 +14,14 @@ final class CloneReferenceDraftTests: XCTestCase {
         XCTAssertNil(draft.selectedSavedVoiceID)
     }
 
-    func testChoosingTheSameOneOffClipAgainKeepsItsTranscript() {
+    func testChoosingTheSamePathAgainStartsANewReferenceReview() {
         var draft = VoiceCloningDraft()
         draft.referenceAudioPath = "/tmp/u14-clip-a.wav"
         draft.referenceTranscript = "Corrected by hand."
 
-        XCTAssertFalse(draft.replaceReferenceAudio(with: "/tmp/u14-clip-a.wav"))
-        XCTAssertEqual(draft.referenceTranscript, "Corrected by hand.")
+        XCTAssertTrue(draft.replaceReferenceAudio(with: "/tmp/u14-clip-a.wav"))
+        XCTAssertEqual(draft.referenceTranscript, "")
+        XCTAssertFalse(draft.isReferenceReady)
     }
 
     func testAOneOffClipReplacingASavedVoiceDropsItsHydratedTranscript() {
@@ -93,6 +94,77 @@ final class CloneReferenceDraftTests: XCTestCase {
             .acceptCurrentDraft
         )
         XCTAssertEqual(audioOnlyDraft.referenceTranscript, "")
+    }
+
+    func testAutomaticTranscriptNeedsReviewBeforeCloning() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let operation = draft.beginReferenceTranscription()
+        XCTAssertFalse(draft.isReferenceReady)
+        draft.acceptReferenceTranscript("  Bonjour\n le monde.  ", generation: operation)
+        XCTAssertEqual(draft.trimmedReferenceTranscript, "Bonjour le monde.")
+        XCTAssertFalse(draft.isReferenceReady)
+        draft.reviewReferenceTranscript()
+        XCTAssertTrue(draft.isReferenceReady)
+    }
+
+    func testAudioOnlyDecisionRejectsLateAutomaticResult() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let operation = draft.beginReferenceTranscription()
+        draft.confirmAudioOnly()
+        draft.acceptReferenceTranscript("Late recognized words", generation: operation)
+        XCTAssertNil(draft.trimmedReferenceTranscript)
+        XCTAssertTrue(draft.isReferenceReady)
+        XCTAssertEqual(draft.referenceReview.phase, .audioOnlyConfirmed)
+    }
+
+    func testAtoBtoASelectionRejectsTheFirstOperation() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let first = draft.beginReferenceTranscription()
+        draft.replaceReferenceAudio(with: "/tmp/b.wav")
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let current = draft.beginReferenceTranscription()
+        draft.acceptReferenceTranscript("Stale A", generation: first)
+        XCTAssertEqual(draft.referenceTranscript, "")
+        draft.acceptReferenceTranscript("Current A", generation: current)
+        XCTAssertEqual(draft.referenceTranscript, "Current A")
+    }
+
+    func testEditingThenClearingRejectsEarlierRecognition() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let operation = draft.beginReferenceTranscription()
+        draft.referenceTranscript = "My words"
+        draft.referenceTranscript = ""
+        draft.acceptReferenceTranscript("Earlier words", generation: operation)
+        XCTAssertEqual(draft.referenceTranscript, "")
+        XCTAssertFalse(draft.isReferenceReady)
+    }
+
+    func testSavedAudioOnlyChoiceStaysReadyAndReviewedSidecarsNormalize() {
+        var draft = VoiceCloningDraft()
+        draft.applySavedVoiceSelection(id: "voice", wavPath: "/tmp/voice.wav", transcript: "")
+        XCTAssertTrue(draft.isReferenceReady)
+        XCTAssertEqual(draft.referenceReview.phase, .audioOnlyConfirmed)
+        draft.applySavedVoiceSelection(id: "voice", wavPath: "/tmp/voice.wav", transcript: "  Bonjour\n monde  ")
+        XCTAssertTrue(draft.isReferenceReady)
+        XCTAssertEqual(draft.trimmedReferenceTranscript, "Bonjour monde")
+    }
+
+    func testSamePathReplacementAndClearRejectOldOperations() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        let first = draft.beginReferenceTranscription()
+        draft.replaceReferenceAudio(with: "/tmp/a.wav")
+        draft.acceptReferenceTranscript("Old contents", generation: first)
+        XCTAssertEqual(draft.referenceTranscript, "")
+        let second = draft.beginReferenceTranscription()
+        draft.clearReference()
+        draft.acceptReferenceTranscript("After clearing", generation: second)
+        XCTAssertFalse(draft.isReferenceReady)
+        XCTAssertEqual(draft.referenceTranscript, "")
     }
 
     private func temporaryDirectory(_ label: String) throws -> URL {

@@ -139,12 +139,12 @@ enum StudioPromptContent {
         ("Whisper", "Soft, close-mic breath"), ("Calm", "Slower, reassuring"),
     ]))
 
-    // Translated starter content preserves each brief's intent, including any requested accent.
-    // Selecting French does not silently replace a British-accent request with a Quebec accent.
+    // French defaults do not request a foreign accent. Authored or previously saved
+    // briefs remain unchanged; examples are inserted only by explicit selection.
     // These examples are editable suggestions, not a claim of measured multilingual adherence.
     private static let translations: [Qwen3SupportedLanguage: Copy] = [
         .french: Copy(starters: [
-            "Un narrateur à la voix masculine grave, chaleureuse et résonnante dans les basses, avec un léger accent britannique.",
+            "Un narrateur à la voix masculine grave, chaleureuse et résonnante dans les basses.",
             "Une jeune femme à la voix claire, énergique et naturelle, comme dans une conversation.",
             "Un homme âgé à la voix grave et rocailleuse, au débit lent et intime, comme à la radio tard le soir.",
             "Une jeune femme à la voix douce et légèrement soufflée, délicate et rassurante.",

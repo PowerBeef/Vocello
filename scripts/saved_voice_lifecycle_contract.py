@@ -146,7 +146,7 @@ def validate(root: Path) -> None:
     mac_saved_voice_sheet = _read(root, "Sources/Views/Voices/MacSavedVoiceSheet.swift")
     for token in (
         "ReferenceTranscriptionReviewState(",
-        "VoiceClipTranscriber.enrollmentResult(",
+        "VoiceClipTranscriber.stableEnrollmentResult(",
         "VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(",
         '"voicesEnroll_transcriptionStatus"',
         '"voicesEnroll_referenceLanguagePicker"',

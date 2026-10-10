@@ -108,8 +108,8 @@
       "path": "Sources/iOS/IOSGenerationModeViews.swift",
       "screen": "Studio generation modes",
       "scenario": "stateful",
-      "reason": "Mode-specific warnings, Voice Design, and Clone handoffs are governed by visible controls.",
-      "interactiveOccurrenceCount": 4
+      "reason": "Mode-specific warnings, Voice Design enrollment, and Clone transcript review/audio-only decisions are governed by visible controls.",
+      "interactiveOccurrenceCount": 7
     },
     {
       "path": "Sources/iOS/IOSGenerationSetupCards.swift",

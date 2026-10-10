@@ -62,7 +62,7 @@ enum MacStudioGenerationRequestFactory {
             payload: .clone(
                 reference: CloneReference(
                     audioPath: referenceAudioPath,
-                    transcript: referenceTranscript,
+                    transcript: referenceTranscript.flatMap(ReferenceTranscriptionReviewState.conditioningLine),
                     preparedVoiceID: preparedVoiceID
                 )
             ),

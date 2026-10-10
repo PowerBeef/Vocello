@@ -15,6 +15,7 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
     let initialTranscript: String
     let initialReferenceLanguage: Qwen3SupportedLanguage
     let initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource
+    let generatedReference: Bool
     /// The store ID of an existing saved voice that this enrollment replaces.
     /// The duplicate-name guard ignores this name so the user can keep the
     /// same identifier; the repository replaces the old assets in the same
@@ -30,7 +31,8 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         initialTranscript: String,
         initialReferenceLanguage: Qwen3SupportedLanguage = .auto,
         initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource = .existing,
-        replacingVoiceID: String? = nil
+        replacingVoiceID: String? = nil,
+        generatedReference: Bool = false
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -41,6 +43,7 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         self.initialReferenceLanguage = initialReferenceLanguage
         self.initialTranscriptReadySource = initialTranscriptReadySource
         self.replacingVoiceID = replacingVoiceID
+        self.generatedReference = generatedReference
     }
 
     static let manualAdd = SavedVoiceSheetConfiguration(
@@ -79,8 +82,11 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
             confirmLabel: MacInterfaceText.historySaveToSavedVoices,
             initialName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
             initialAudioPath: audioPath,
-            initialTranscript: transcript,
-            initialReferenceLanguage: PromptLanguageDetector.detect(transcript)
+            // The requested script is intent, not evidence of what was spoken.
+            // Opening the sheet runs recognition against this generated waveform.
+            initialTranscript: "",
+            initialReferenceLanguage: PromptLanguageDetector.detect(transcript),
+            generatedReference: true
         )
     }
 

@@ -577,9 +577,12 @@ struct IOSVoiceDesignView: View {
     @State private var isSaveSheetPresented = false
     @State private var saveSheetSuggestedName = ""
     @State private var saveSheetTranscript = ""
-    /// The shared review of the take's transcript (A8-02): the script is the
-    /// existing transcript; an emptied one needs the audio-only confirmation.
+    /// Review the words actually recognized in the generated waveform. The
+    /// intended script is never passed off as acoustic transcription evidence.
     @State private var saveSheetReview = ReferenceTranscriptionReviewState(initialTranscript: "")
+    @State private var saveSheetEvidence: VoiceClipTranscriber.EnrollmentEvidence?
+    @State private var saveSheetOperation = UUID()
+    @State private var saveSheetTranscriptionTask: Task<Void, Never>?
     @State private var saveError: String?
     /// Voice that was just enrolled but has quality warnings; user is
     /// being asked whether to keep or discard. Mirrors the macOS
@@ -753,6 +756,9 @@ struct IOSVoiceDesignView: View {
                 set: { isPresented in
                     isSaveSheetPresented = isPresented
                     if !isPresented {
+                        saveSheetOperation = UUID()
+                        saveSheetTranscriptionTask?.cancel()
+                        saveSheetReview.invalidate()
                         saveSheetSuggestedName = ""
                         saveSheetTranscript = ""
                         saveError = nil
@@ -765,19 +771,27 @@ struct IOSVoiceDesignView: View {
                         suggestedName: $saveSheetSuggestedName,
                         transcript: $saveSheetTranscript,
                         transcriptionReview: saveSheetReview,
+                        generatedReference: true,
                         errorMessage: saveError,
                         // A save or a review decision in flight holds the
                         // sheet open, so Cancel never closes a save that still
                         // commits the voice.
                         isSaving: isSavingVoice || isVoiceReviewDecisionInFlight,
                         clipAudioURL: URL(fileURLWithPath: saveSheetCandidate.audioPath),
-                        onTranscriptEdited: { saveSheetReview.userEditedTranscript($0) },
+                        onTranscriptEdited: {
+                            saveSheetTranscriptionTask?.cancel()
+                            saveSheetReview.userEditedTranscript($0)
+                        },
                         onUseAudioOnly: {
+                            saveSheetTranscriptionTask?.cancel()
                             saveSheetTranscript = ""
                             saveSheetReview.confirmAudioOnly()
                         },
                         onCancel: {
                             guard !isSavingVoice, !isVoiceReviewDecisionInFlight else { return }
+                            saveSheetOperation = UUID()
+                            saveSheetTranscriptionTask?.cancel()
+                            saveSheetReview.invalidate()
                             isSaveSheetPresented = false
                             saveSheetSuggestedName = ""
                             saveSheetTranscript = ""
@@ -785,7 +799,7 @@ struct IOSVoiceDesignView: View {
                         },
                         onSave: {
                             // Claimed synchronously at the tap, before the task runs.
-                            guard !isSavingVoice else { return }
+                            guard !isSavingVoice, saveSheetReview.allowsSave(transcript: saveSheetTranscript) else { return }
                             isSavingVoice = true
                             Task {
                                 defer { isSavingVoice = false }
@@ -804,7 +818,7 @@ struct IOSVoiceDesignView: View {
                                         enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
                                             referenceLanguage: PromptLanguageDetector.detect(transcript),
                                             reviewState: saveSheetReview,
-                                            evidence: nil,
+                                            evidence: saveSheetEvidence,
                                             generatedSourceMode: GenerationMode.design.rawValue
                                         )
                                     )
@@ -941,17 +955,37 @@ struct IOSVoiceDesignView: View {
         saveError ?? IOSInterfaceText.qualitySummary(candidate.qualityWarnings)
     }
 
-    /// Open the (existing) save-voice sheet for the take's own clip, prefilled with a name
-    /// suggestion from its brief and its script as the transcript (A10-01).
+    /// Enroll this take's own waveform. Its script is a request, so recognition
+    /// supplies the editable transcript rather than assuming exact adherence.
     private func presentSaveDesignedVoice() {
         guard ttsEngine.supportsSavedVoiceMutation, let candidate = currentSavedVoiceCandidate else { return }
         saveSheetCandidate = candidate
         saveSheetSuggestedName = suggestedDesignedVoiceName(brief: candidate.voiceDescription)
-        saveSheetTranscript = candidate.transcript
-        saveSheetReview = ReferenceTranscriptionReviewState(
-            initialTranscript: candidate.transcript,
-            readySource: .existing
-        )
+        saveSheetTranscript = ""
+        saveSheetReview = ReferenceTranscriptionReviewState(initialTranscript: "")
+        saveSheetEvidence = nil
+        saveSheetOperation = UUID()
+        let operation = saveSheetOperation
+        let generation = saveSheetReview.beginAutomaticTranscription()
+        saveSheetTranscriptionTask?.cancel()
+        saveSheetTranscriptionTask = Task { @MainActor in
+            let result = await VoiceClipTranscriber.stableEnrollmentResult(
+                url: URL(fileURLWithPath: candidate.audioPath)
+            )
+            guard !Task.isCancelled, saveSheetOperation == operation,
+                  saveSheetReview.isCurrent(generation: generation) else { return }
+            saveSheetEvidence = result?.evidence
+            if let text = result?.text,
+               saveSheetReview.acceptAutomaticTranscript(text, generation: generation,
+                                                         currentTranscript: saveSheetTranscript) {
+                saveSheetTranscript = text
+                saveSheetReview.bindTranscript(to: candidate.audioPath)
+            } else {
+                saveSheetReview.finishWithoutTranscript(reason: .recognitionFailed, generation: generation,
+                                                        currentTranscript: saveSheetTranscript)
+            }
+            saveSheetTranscriptionTask = nil
+        }
         saveError = nil
         isSaveSheetPresented = true
     }
@@ -1398,6 +1432,7 @@ struct IOSVoiceCloningView: View {
     /// The reference intent this screen saw primed, so an idle unload is not
     /// undone by priming the same reference again (U18).
     @State private var clonePrimingIntent = CloneProactivePrimingIntent()
+    @State private var transcriptionTask: Task<Void, Never>?
     @State private var isTranscriptExpanded = false
     @State private var isScriptFocused = false
 
@@ -1509,7 +1544,8 @@ struct IOSVoiceCloningView: View {
     }
 
     private var clonePrimingRequestKey: String? {
-        guard let model = cloneModel,
+        guard draft.isReferenceReady, transcriptLoadError == nil,
+              let model = cloneModel,
               ttsEngine.isReady,
               isModelAvailable,
               let referenceAudioPath = draft.referenceAudioPath else {
@@ -1523,7 +1559,7 @@ struct IOSVoiceCloningView: View {
         return GenerationSemantics.cloneReferenceIdentityKey(
             modelID: model.id,
             refAudio: referenceAudioPath,
-            refText: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript
+            refText: draft.trimmedReferenceTranscript
         )
     }
 
@@ -1570,7 +1606,8 @@ struct IOSVoiceCloningView: View {
             && cloneConsentAcknowledged
             && allowsExecution
             && isModelAvailable
-            && draft.referenceAudioPath != nil
+            && draft.isReferenceReady
+            && transcriptLoadError == nil
             && scriptLimitState.hasSpeakableText
             && !scriptLimitState.isOverLimit
             && !ttsEngine.hasActiveGeneration
@@ -1587,6 +1624,7 @@ struct IOSVoiceCloningView: View {
         if draft.referenceAudioPath == nil {
             return IOSInterfaceText.chooseReferenceDetail
         }
+        if !draft.isReferenceReady { return draft.referenceReview.status.message }
         if let cloneContextStatus {
             switch cloneContextStatus {
             case .waitingForHydration:
@@ -1648,6 +1686,15 @@ struct IOSVoiceCloningView: View {
 
     var body: some View {
         pageContent
+            .task(id: draft.referenceAudioPath) {
+                isTranscriptExpanded = !draft.isReferenceReady
+                autoTranscribeReferenceIfNeeded()
+            }
+            .onDisappear {
+                transcriptionTask?.cancel()
+                transcriptionTask = nil
+                draft.invalidateReferenceTranscription()
+            }
             .task(id: promptText) {
                 try? await Task.sleep(for: .milliseconds(350))
                 guard !Task.isCancelled else { return }
@@ -1676,9 +1723,15 @@ struct IOSVoiceCloningView: View {
                 await syncCloneReferencePriming()
             }
             .onChange(of: isActive) { _, active in
-                guard active else { return }
+                guard active else {
+                    transcriptionTask?.cancel()
+                    transcriptionTask = nil
+                    draft.invalidateReferenceTranscription()
+                    return
+                }
                 consumePendingSavedVoiceHandoffIfNeeded()
                 syncSavedVoiceSelectionState()
+                autoTranscribeReferenceIfNeeded()
             }
             .onChange(of: pendingSavedVoiceHandoff) { _, _ in
                 consumePendingSavedVoiceHandoffIfNeeded()
@@ -1729,6 +1782,40 @@ struct IOSVoiceCloningView: View {
                 onPlayerExpand: expandInlinePlayer,
                 onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
             )
+            if draft.referenceAudioPath != nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(draft.referenceReview.status.message)
+                        .font(.caption)
+                        .accessibilityIdentifier("voiceCloning_referenceReviewStatus")
+                    DisclosureGroup(IOSInterfaceText.transcript, isExpanded: $isTranscriptExpanded) {
+                        TextField(IOSInterfaceText.transcriptPlaceholder, text: Binding(
+                            get: { draft.referenceTranscript }, set: {
+                                transcriptionTask?.cancel()
+                                transcriptionTask = nil
+                                draft.referenceTranscript = $0
+                            }
+                        ), axis: .vertical)
+                            .accessibilityIdentifier("voiceCloning_transcriptInput")
+                    }
+                    .accessibilityIdentifier("voiceCloning_transcriptDisclosure")
+                    if !draft.isReferenceReady {
+                        if draft.trimmedReferenceTranscript != nil {
+                            Button(VocelloPresentationText.reviewReferenceTranscript) {
+                                transcriptionTask?.cancel()
+                                draft.reviewReferenceTranscript()
+                            }
+                            .accessibilityIdentifier("voiceCloning_reviewTranscriptButton")
+                        }
+                        Button(VocelloPresentationText.useAudioOnly) {
+                            transcriptionTask?.cancel()
+                            transcriptionTask = nil
+                            draft.confirmAudioOnly()
+                        }
+                        .accessibilityIdentifier("voiceCloning_useAudioOnlyButton")
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -1775,7 +1862,7 @@ struct IOSVoiceCloningView: View {
                     languageHint: draft.selectedLanguage.rawValue,
                     voiceDescription: nil,
                     refAudio: refPath,
-                    refText: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+                    refText: draft.trimmedReferenceTranscript,
                     preparedVoiceID: draft.selectedSavedVoiceID
                 ),
                 ttsEngine: ttsEngine,
@@ -2011,18 +2098,23 @@ struct IOSVoiceCloningView: View {
     /// Best-effort on-device transcription when the reference sidecar / handoff
     /// transcript is still empty (record→enroll before auto-transcribe finished).
     private func autoTranscribeReferenceIfNeeded() {
-        let trimmed = draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty else { return }
-        guard let path = draft.referenceAudioPath else { return }
-        Task {
-            guard let result = await VoiceClipTranscriber.transcribe(
-                url: URL(fileURLWithPath: path)
-            ) else { return }
-            guard !Task.isCancelled else { return }
-            guard draft.referenceAudioPath == path else { return }
-            if draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                draft.referenceTranscript = result.text
+        // Saved audio-only voices are an already reviewed choice. Never convert
+        // that intent to transcript-backed conditioning after a delayed callback.
+        guard !draft.isReferenceReady, draft.trimmedReferenceTranscript == nil,
+              let path = draft.referenceAudioPath else { return }
+        transcriptionTask?.cancel()
+        let generation = draft.beginReferenceTranscription()
+        let operation = draft.referenceOperation
+        transcriptionTask = Task { @MainActor in
+            let result = await VoiceClipTranscriber.stableEnrollmentResult(url: URL(fileURLWithPath: path))
+            guard !Task.isCancelled, draft.referenceAudioPath == path,
+                  draft.referenceOperation == operation else { return }
+            if let text = result?.text {
+                draft.acceptReferenceTranscript(text, generation: generation)
+            } else {
+                draft.referenceTranscriptionUnavailable(generation: generation)
             }
+            transcriptionTask = nil
         }
     }
 
@@ -2041,6 +2133,15 @@ struct IOSVoiceCloningView: View {
             coordinator.rejectStart(IOSAppLanguage.shared.presentation.installModel(named: model.name))
             return
         }
+        ensureSelectedSavedVoiceHydratedIfNeeded()
+        guard draft.isReferenceReady, transcriptLoadError == nil else {
+            coordinator.rejectStart(draft.referenceReview.status.message)
+            return
+        }
+        let currentDraft = draft
+        let currentPrompt = promptText
+        let currentVoiceName = selectedVoice?.name
+        let currentVariation = IOSGenerationVariationPreference.requestValue()
         if scriptLimitState.routesToLongForm {
             guard let refPath = draft.referenceAudioPath else {
                 coordinator.rejectStart(IOSAppLanguage.shared.presentation.referenceAudioRequired)
@@ -2072,8 +2173,7 @@ struct IOSVoiceCloningView: View {
                 }
             }
             do {
-                ensureSelectedSavedVoiceHydratedIfNeeded()
-                guard let refPath = draft.referenceAudioPath else {
+                guard let refPath = currentDraft.referenceAudioPath else {
                     throw NSError(
                         domain: "QVoice.AppGeneration",
                         code: 4,
@@ -2085,25 +2185,25 @@ struct IOSVoiceCloningView: View {
                 // transcript, voice, language or seed) must not change it.
                 let reference = CloneReference(
                     audioPath: refPath,
-                    transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
-                    preparedVoiceID: draft.selectedSavedVoiceID
+                    transcript: currentDraft.trimmedReferenceTranscript,
+                    preparedVoiceID: currentDraft.selectedSavedVoiceID
                 )
-                let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
-                let voiceName = selectedVoice?.name
+                let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: currentPrompt)
+                let voiceName = currentVoiceName
                     ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
                 let plan = try IOSSingleTakeGenerationPlan(
                     request: GenerationRequest(
                         mode: .clone,
                         modelID: model.id,
-                        text: promptText,
+                        text: currentPrompt,
                         outputPath: outputPath,
                         shouldStream: true,
                         streamingInterval: GenerationSemantics.appStreamingInterval,
-                        languageHint: draft.selectedLanguage.rawValue,
+                        languageHint: currentDraft.selectedLanguage.rawValue,
                         payload: .clone(reference: reference),
                         generationID: generationID,
-                        seed: draft.pinnedSeed,
-                        variation: IOSGenerationVariationPreference.requestValue()
+                        seed: currentDraft.pinnedSeed,
+                        variation: currentVariation
                     ),
                     modelTier: model.tier,
                     historyVoice: voiceName,
@@ -2176,7 +2276,7 @@ struct IOSVoiceCloningView: View {
 
         let reference = CloneReference(
             audioPath: refPath,
-            transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+            transcript: draft.trimmedReferenceTranscript,
             preparedVoiceID: draft.selectedSavedVoiceID
         )
         let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
@@ -2196,6 +2296,8 @@ struct IOSVoiceCloningView: View {
     }
 
     private func applySavedVoice(_ voice: Voice) {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
         do {
             let transcript = try SavedVoiceCloneHydration.loadTranscript(for: voice)
             draft.applySavedVoice(voice, transcript: transcript)
@@ -2216,11 +2318,12 @@ struct IOSVoiceCloningView: View {
     /// `ensureCloneReferencePrimed` remains the on-demand fallback.
     private func primeSelectedCloneVoiceProactively() {
         guard !ttsEngine.hasActiveGeneration else { return }
-        guard let model = TTSModel.model(for: .clone), modelManager.isAvailable(model) else { return }
+        guard draft.isReferenceReady, transcriptLoadError == nil,
+              let model = TTSModel.model(for: .clone), modelManager.isAvailable(model) else { return }
         let reference = draft.referenceAudioPath.map { path in
             CloneReference(
                 audioPath: path,
-                transcript: draft.referenceTranscript.isEmpty ? nil : draft.referenceTranscript,
+                transcript: draft.trimmedReferenceTranscript,
                 preparedVoiceID: draft.selectedSavedVoiceID
             )
         }
@@ -2244,6 +2347,8 @@ struct IOSVoiceCloningView: View {
     }
 
     private func clearReference() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
         clonePrimingIntent.reset()
         draft.clearReference()
         transcriptLoadError = nil

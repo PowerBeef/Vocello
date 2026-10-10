@@ -93,7 +93,8 @@ struct MacVoiceCloningScreen: View {
     private var canRunBatch: Bool {
         ttsEngineStore.isReady
             && cloneConsentAcknowledged
-            && draft.referenceAudioPath != nil
+            && draft.isReferenceReady
+            && session.transcriptLoadError == nil
             && isModelAvailable
             && !ttsEngineStore.hasActiveGeneration
     }
@@ -102,14 +103,16 @@ struct MacVoiceCloningScreen: View {
         ttsEngineStore.isReady
             && cloneConsentAcknowledged
             && isModelAvailable
-            && draft.referenceAudioPath != nil
+            && draft.isReferenceReady
+            && session.transcriptLoadError == nil
             && draft.hasText
             && !ttsEngineStore.hasActiveGeneration
             && !coordinator.isGenerating
     }
 
     private var clonePrimingRequestKey: String? {
-        guard let model = cloneModel,
+        guard draft.isReferenceReady, session.transcriptLoadError == nil,
+              let model = cloneModel,
               ttsEngineStore.isReady,
               isModelAvailable,
               let referenceAudioPath = draft.referenceAudioPath else {
@@ -151,7 +154,13 @@ struct MacVoiceCloningScreen: View {
     }
 
     private var readinessDescriptor: VoiceCloningReadinessDescriptor {
-        MacVoiceCloningReadiness.describe(
+        if draft.referenceAudioPath != nil, !draft.isReferenceReady {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: false, title: MacInterfaceText.cloningReferenceSection,
+                detail: draft.referenceReview.status.message, trailingText: nil
+            )
+        }
+        return MacVoiceCloningReadiness.describe(
             engineReady: ttsEngineStore.isReady,
             isModelAvailable: isModelAvailable,
             modelDisplayName: modelDisplayName,
@@ -247,6 +256,10 @@ struct MacVoiceCloningScreen: View {
         .onAppear {
             reconcileGenerationVariantSelection()
             consumePendingSavedVoiceHandoffIfNeeded()
+            if draft.selectedSavedVoiceID == nil, !draft.isReferenceReady,
+               let path = draft.referenceAudioPath {
+                autoTranscribeReference(path: path)
+            }
         }
         .task(id: draft.text) {
             // Debounced: the detector loads a language recognizer per call, so it
@@ -285,6 +298,7 @@ struct MacVoiceCloningScreen: View {
         .onDisappear {
             transcriptionTask?.cancel()
             transcriptionTask = nil
+            draft.invalidateReferenceTranscription()
         }
         .sheet(item: $presentedSheet) { presentedSheet in
             switch presentedSheet {
@@ -357,6 +371,7 @@ struct MacVoiceCloningScreen: View {
             referenceStatus
             if draft.referenceAudioPath != nil {
                 transcriptField
+                referenceReviewControls
                 if let message = session.transcriptionUnavailableMessage {
                     Label(message, systemImage: "waveform.badge.mic")
                         .macType(.caption)
@@ -638,7 +653,11 @@ struct MacVoiceCloningScreen: View {
                 .foregroundStyle(MacTheme.Text.secondary)
             TextField(
                 MacInterfaceText.cloningTranscriptPlaceholder,
-                text: $draft.referenceTranscript,
+                text: Binding(get: { draft.referenceTranscript }, set: {
+                    transcriptionTask?.cancel()
+                    transcriptionTask = nil
+                    draft.referenceTranscript = $0
+                }),
                 axis: .vertical
             )
                 .lineLimit(1 ... 3)
@@ -662,6 +681,31 @@ struct MacVoiceCloningScreen: View {
         .help(MacInterfaceText.cloningTranscriptHelp)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voiceCloning_transcriptField")
+    }
+
+    private var referenceReviewControls: some View {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
+            Label(draft.referenceReview.status.message, systemImage: draft.referenceReview.status.symbolName)
+                .macType(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("voiceCloning_referenceReviewStatus")
+            if !draft.isReferenceReady {
+                if draft.trimmedReferenceTranscript != nil {
+                    Button(VocelloPresentationText.reviewReferenceTranscript) {
+                        transcriptionTask?.cancel()
+                        draft.reviewReferenceTranscript()
+                    }
+                    .accessibilityIdentifier("voiceCloning_reviewTranscriptButton")
+                }
+                Button(VocelloPresentationText.useAudioOnly) {
+                    transcriptionTask?.cancel()
+                    transcriptionTask = nil
+                    draft.confirmAudioOnly()
+                }
+                .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
+                .accessibilityIdentifier("voiceCloning_useAudioOnlyButton")
+            }
+        }
     }
 
     private func warningCard(
@@ -705,6 +749,8 @@ struct MacVoiceCloningScreen: View {
     }
 
     private func applySavedVoice(_ voice: Voice) {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
         do {
             let transcript = try SavedVoiceCloneHydration.loadTranscript(for: voice)
             draft.applySavedVoice(voice, transcript: transcript)
@@ -725,6 +771,8 @@ struct MacVoiceCloningScreen: View {
     }
 
     private func clearReference() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
         session.primingIntent.reset()
         draft.clearReference()
         session.transcriptLoadError = nil
@@ -826,24 +874,31 @@ struct MacVoiceCloningScreen: View {
     private func autoTranscribeReference(path: String) {
         transcriptionTask?.cancel()
         transcriptionTask = nil
-        guard draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard draft.trimmedReferenceTranscript == nil else { return }
+        let generation = draft.beginReferenceTranscription()
         switch VoiceClipTranscriber.availability() {
         case .denied:
             session.transcriptionUnavailableMessage = MacInterfaceText.cloningSpeechRecognitionOff
+            draft.referenceTranscriptionUnavailable(generation: generation, reason: .permissionDenied)
             return
         case .siriDisabled:
             session.transcriptionUnavailableMessage = MacInterfaceText.cloningSiriRequired
+            draft.referenceTranscriptionUnavailable(generation: generation, reason: .siriDisabled)
             return
         case .available, .notDetermined:
             session.transcriptionUnavailableMessage = nil
         }
+        let operation = draft.referenceOperation
         transcriptionTask = Task { @MainActor in
-            guard let result = await VoiceClipTranscriber.transcribe(url: URL(fileURLWithPath: path)) else { return }
-            guard !Task.isCancelled else { return }
-            guard draft.referenceAudioPath == path else { return }
-            if draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                draft.referenceTranscript = result.text
+            let result = await VoiceClipTranscriber.stableEnrollmentResult(url: URL(fileURLWithPath: path))
+            guard !Task.isCancelled, draft.referenceAudioPath == path,
+                  draft.referenceOperation == operation else { return }
+            if let text = result?.text {
+                draft.acceptReferenceTranscript(text, generation: generation)
+            } else {
+                draft.referenceTranscriptionUnavailable(generation: generation)
             }
+            transcriptionTask = nil
         }
     }
 
@@ -852,7 +907,7 @@ struct MacVoiceCloningScreen: View {
         switch VoiceClipTranscriber.availability() {
         case .available, .notDetermined:
             session.transcriptionUnavailableMessage = nil
-            if let path = draft.referenceAudioPath {
+            if !draft.isReferenceReady, let path = draft.referenceAudioPath {
                 autoTranscribeReference(path: path)
             }
         case .denied, .siriDisabled:
@@ -940,6 +995,10 @@ struct MacVoiceCloningScreen: View {
         }
 
         ensureSelectedSavedVoiceHydratedIfNeeded()
+        guard draft.isReferenceReady, session.transcriptLoadError == nil else {
+            isReferencePresented = true
+            return
+        }
         let currentDraft = draft
         guard let refPath = currentDraft.referenceAudioPath else {
             coordinator.rejectStart(MacInterfaceText.cloningReferenceRequired)

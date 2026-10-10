@@ -11,7 +11,6 @@ import Foundation
 enum TranscriptNormalization {
     /// Every run of whitespace collapsed to one space; nil when nothing is left.
     static func conditioningLine(_ raw: String) -> String? {
-        let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return collapsed.isEmpty ? nil : collapsed
+        ReferenceTranscriptionReviewState.conditioningLine(raw)
     }
 }

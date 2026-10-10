@@ -225,6 +225,12 @@ struct MacSavedVoiceSheet: View {
                     }
                 }
 
+                if configuration.generatedReference {
+                    Text(VocelloPresentationText.generatedReferenceTranscriptNotice)
+                        .macType(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("voicesEnroll_generatedTranscriptNotice")
+                }
                 TextEditor(text: transcriptBinding)
                     .macType(.body)
                     .scrollContentBackground(.hidden)
@@ -316,6 +322,7 @@ struct MacSavedVoiceSheet: View {
         .task {
             speechAvailability = VoiceClipTranscriber.availability()
             await loadExistingVoiceNames()
+            autoTranscribeIfNeeded(path: audioPath)
         }
         .onChange(of: name) { _, _ in
             errorMessage = nil
@@ -522,10 +529,17 @@ struct MacSavedVoiceSheet: View {
         transcriptionEvidence = nil
         let generation = transcriptionReview.beginAutomaticTranscription()
         transcriptionTask = Task { @MainActor in
-            let result = await VoiceClipTranscriber.enrollmentResult(
+            let stableResult = await VoiceClipTranscriber.stableEnrollmentResult(
                 url: URL(fileURLWithPath: trimmedPath)
             )
-            guard !Task.isCancelled, audioPath == path else { return }
+            guard !Task.isCancelled, audioPath == path,
+                  transcriptionReview.isCurrent(generation: generation) else { return }
+            guard let result = stableResult else {
+                transcriptionReview.finishWithoutTranscript(reason: .recognitionFailed, generation: generation,
+                                                            currentTranscript: transcript)
+                transcriptionTask = nil
+                return
+            }
             transcriptionEvidence = result.evidence
 
             if let recognizedText = result.text {
@@ -635,7 +649,9 @@ struct MacSavedVoiceSheet: View {
                     enrollmentMetadata: try VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(
                         referenceLanguage: referenceLanguage,
                         reviewState: transcriptionReview,
-                        evidence: transcriptionEvidence
+                        evidence: transcriptionEvidence,
+                        generatedSourceMode: configuration.generatedReference
+                            && audioPath == configuration.initialAudioPath ? GenerationMode.design.rawValue : nil
                     )
                 )
                 // MAC-12: Cancel arrived while the candidate was being staged.

@@ -73638,6 +73638,138 @@
           }
         }
       }
+    },
+    "vocello.clone.review_transcript": {
+      "comment": "Explicit confirmation of the reference transcript before voice cloning.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this reviewed transcript"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser cette transcription vérifiée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar esta transcripción revisada"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diesen geprüften Text verwenden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa questa trascrizione verificata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar esta transcrição revisada"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用已核对的转写文本"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認済みの文字起こしを使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검토한 전사 사용"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Использовать проверенную расшифровку"
+          }
+        }
+      }
+    },
+    "vocello.enrollment.generated_transcript_notice": {
+      "comment": "Explains why a generated reference is transcribed again before saving a voice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The generation script describes the request. Review the words actually spoken in this clip."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le texte de génération décrit la demande. Vérifiez les mots réellement prononcés dans cet extrait."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El texto de generación describe la solicitud. Revisa las palabras que realmente se dicen en este clip."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Generierungstext beschreibt die Anfrage. Prüfe die tatsächlich in diesem Clip gesprochenen Wörter."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il testo di generazione descrive la richiesta. Verifica le parole effettivamente pronunciate in questa clip."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O texto de geração descreve o pedido. Revise as palavras realmente faladas neste clipe."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成脚本描述的是请求。请核对片段中实际说出的内容。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成用の原稿は依頼内容です。このクリップで実際に話された言葉を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 대본은 요청 내용을 나타냅니다. 이 클립에서 실제로 말한 내용을 검토하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Текст генерации описывает запрос. Проверьте слова, действительно произнесённые в этом фрагменте."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

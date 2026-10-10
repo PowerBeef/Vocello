@@ -341,6 +341,7 @@ struct IOSSaveVoiceSheet: View {
     @Binding var suggestedName: String
     @Binding var transcript: String
     var transcriptionReview: ReferenceTranscriptionReviewState? = nil
+    var generatedReference = false
     var referenceLanguage: Binding<Qwen3SupportedLanguage>? = nil
     var requiresReferenceLanguageConfirmation = false
     let errorMessage: String?
@@ -419,6 +420,12 @@ struct IOSSaveVoiceSheet: View {
 
                     if let clipAudioURL {
                         clipReviewCard(url: clipAudioURL)
+                    }
+                    if generatedReference {
+                        Text(IOSAppLanguage.shared.presentation.generatedReferenceTranscriptNotice)
+                            .font(.caption)
+                            .foregroundStyle(Theme.Text.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     fieldSection(label: IOSInterfaceText.voiceName) {

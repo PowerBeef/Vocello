@@ -7,6 +7,11 @@ import QwenVoiceCore
 /// sidecar, an existing reviewed transcript, or a user's edit. Both Apple frontends use this
 /// exact policy; platform views only render the resulting status and actions.
 struct ReferenceTranscriptionReviewState: Equatable, Sendable {
+    static func conditioningLine(_ raw: String) -> String? {
+        let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
+    }
+
     enum ReadySource: Equatable, Sendable {
         case sidecar
         case automatic

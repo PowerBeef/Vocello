@@ -1097,7 +1097,7 @@ sample_rate = assembly.get("sampleRate") or 24_000
 audio = frames / sample_rate if sample_rate else 0
 segment_rows = (manifest.get("execution") or {}).get("segments", [])
 segments = len(segment_rows)
-rtf = audio / wall if wall else 0
+rtf = wall / audio if audio else 0
 lines = [
     f"long-form project: {segments} segments, audio {audio:.1f}s, "
     f"wall {wall:.1f}s (plan+stream+QC+assembly), project RTF {rtf:.2f}"

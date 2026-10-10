@@ -37,10 +37,14 @@ final class IOSShutdownCancellationReasonTests: XCTestCase {
     }
 
     @MainActor
-    func testCancellingTheSwiftTaskFirstReportsUser() async throws {
-        // Why the order matters: the task-first path loses the typed reason.
+    func testSettledCallerCancellationKeepsUserWhenShutdownArrivesLater() async throws {
+        // Registration can precede installation of the caller's cancellation
+        // handler. Join the cancelled take to prove .user was processed before
+        // issuing shutdown; task scheduling alone cannot establish that order.
         let outcome = try await runHeldTake { engine, take in
-            try await Self.cancel(engine, take: take, order: .taskThenBarrier, reason: .shutdown)
+            take.cancel()
+            _ = await take.value
+            try await engine.cancelActiveGeneration(reason: .shutdown)
         }
         XCTAssertTrue(outcome.error is CancellationError)
         XCTAssertEqual(outcome.terminal, outcome.cancelled(.user))

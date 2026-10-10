@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import QwenVoiceCore
 import XCTest
 
 /// Populated historical schemas are upgraded by the shipped migrator, rather
@@ -15,6 +16,68 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
 
     func testPopulatedV5UpgradesWithoutChangingLongFormHistory() throws {
         try assertUpgrade(from: "v5_add_long_form_project", hasLongFormColumns: true)
+    }
+
+    func testPopulatedV7UpgradeRetainsSignedSeedAndUnknownReceipt() throws {
+        let queue = try seededQueue(upTo: "v7_index_generations_audioPath")
+        try queue.write { db in
+            try db.execute(sql: "UPDATE generations SET seed = ? WHERE id = 41", arguments: [Int64.min])
+        }
+        let migrator = GenerationMigrations.makeMigrator()
+        try migrator.migrate(queue)
+        try migrator.migrate(queue)
+        try queue.read { db in
+            let rows = try Generation.order(Generation.Columns.id).fetchAll(db)
+            XCTAssertEqual(rows.map(\.id), [3, 41])
+            XCTAssertEqual(rows[1].samplingSeed, UInt64(1) << 63)
+            XCTAssertTrue(rows.allSatisfy { $0.completionReceipt == nil })
+            XCTAssertEqual(try sequence(in: db), 41)
+        }
+    }
+
+    func testReceiptPersistsWithRowAndRecoveryEntryWhileOldJournalsDecode() throws {
+        let queue = try DatabaseQueue()
+        try GenerationMigrations.makeMigrator().migrate(queue)
+        let request = GenerationRequest(
+            mode: .custom, modelID: "pro_custom_speed", text: "Receipt fixture.",
+            outputPath: "/nonexistent/receipt.wav", shouldStream: false,
+            languageHint: "french", payload: .custom(speakerID: "aiden", deliveryStyle: nil),
+            seed: UInt64.max
+        )
+        let receipt = GenerationCompletionReceipt(
+            request: GenerationRequestReceipt(
+                request: request, generationID: UUID(), effectiveSeed: UInt64.max,
+                warmState: .cold, predecessorIdentityDigest: nil, retryAttempt: 0, operationGeneration: 1
+            ), outputWAVDigest: String(repeating: "a", count: 64),
+            durationSeconds: 2, finishReason: .maxTokens, usedStreaming: false
+        )
+        var record = Generation(
+            text: request.text, mode: "custom", modelTier: "speed", voice: "aiden", emotion: nil,
+            speed: nil, audioPath: request.outputPath, duration: 2, createdAt: Date(),
+            seed: -1, completionReceipt: receipt
+        )
+        try queue.write { db in try record.insert(db) }
+        let fetched = try queue.read { try Generation.fetchOne($0) }
+        XCTAssertEqual(fetched, record)
+        XCTAssertEqual(fetched?.samplingSeed, UInt64.max)
+        let entry = GenerationHistoryOutboxEntry(operation: .append, generation: record)
+        let encoded = try JSONEncoder().encode(entry)
+        XCTAssertEqual(try JSONDecoder().decode(GenerationHistoryOutboxEntry.self, from: encoded), entry)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var generation = try XCTUnwrap(object["generation"] as? [String: Any])
+        generation.removeValue(forKey: "completionReceipt")
+        object["generation"] = generation
+        let old = try JSONDecoder().decode(
+            GenerationHistoryOutboxEntry.self, from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertNil(old.generation.completionReceipt)
+        XCTAssertEqual(old.generation.samplingSeed, UInt64.max)
+
+        try queue.write { db in
+            try db.execute(sql: "UPDATE generations SET completionReceipt = 'malformed' WHERE id = ?", arguments: [record.id])
+        }
+        XCTAssertThrowsError(try queue.read { try Generation.fetchOne($0) })
     }
 
     func testV5UpgradePreservesDeletedAutoincrementHighWater() throws {
@@ -62,7 +125,7 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
             XCTAssertEqual(try Row.fetchAll(db, sql: retainedQuery), before, version)
             XCTAssertEqual(Set(try db.columns(in: "generations").map(\.name)), [
                 "id", "text", "mode", "modelTier", "voice", "emotion", "speed", "audioPath",
-                "duration", "createdAt", "longFormProjectID", "longFormRole", "seed",
+                "duration", "createdAt", "longFormProjectID", "longFormRole", "seed", "completionReceipt",
             ])
             let rows = try Generation.order(Generation.Columns.id).fetchAll(db)
             XCTAssertEqual(rows.map(\.id), [3, 41])
@@ -87,7 +150,7 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
 
         let upgraded = try queue.read { try Generation.order(Generation.Columns.id).fetchAll($0) }
         let applied = try queue.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY identifier") }
-        XCTAssertEqual(applied.count, 7)
+        XCTAssertEqual(applied.count, 8)
         try migrator.migrate(queue)
         try queue.read { db in
             XCTAssertEqual(try Generation.order(Generation.Columns.id).fetchAll(db), upgraded, "Repeated migration is idempotent")

@@ -21,7 +21,7 @@ public enum GenerationStartupBoundary: String, CaseIterable, Codable, Hashable, 
 }
 
 public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 2
+    public static let currentSchemaVersion = 3
 
     public let schemaVersion: Int
     public let generationID: String
@@ -55,9 +55,20 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
     public let referenceTranscriptDigest: String?
     public let referenceTranscriptCharacters: Int?
     public let referenceAudioDigest: String?
+    /// Source-file content identity is above; this identifies the normalized
+    /// WAV actually consumed for conditioning, which may have different bytes.
+    public let normalizedReferenceAudioDigest: String?
+    public let referenceTranscriptSource: String?
     public let modelArtifactVersion: String?
     public let modelIntegrityManifestDigest: String?
     public let speechTokenizerDigest: String?
+    /// Actual prepared runtime and sampling values. Nil in legacy receipts;
+    /// missing identity is never reconstructed from current catalog defaults.
+    public let modelRuntimeIdentity: ModelRuntimeIdentity?
+    public let samplingPolicy: Qwen3SamplingPolicy?
+    /// Registered diagnostic-only EOS hold, when present in the prepared
+    /// sampling configuration. Nil with a policy means the hold is disabled.
+    public let samplingEOSSuppressionFrames: Int?
     public let seed: UInt64
     public let seedSource: String
     public let variation: String
@@ -76,7 +87,11 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         conditioningMode: String? = nil,
         referenceTranscript: String? = nil,
         referenceAudioDigest: String? = nil,
+        normalizedReferenceAudioDigest: String? = nil,
+        referenceTranscriptSource: String? = nil,
         modelRuntimeIdentity: ModelRuntimeIdentity? = nil,
+        samplingPolicy: Qwen3SamplingPolicy? = nil,
+        samplingEOSSuppressionFrames: Int? = nil,
         generationID: UUID,
         effectiveSeed: UInt64,
         warmState: EngineWarmState,
@@ -138,14 +153,29 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
             deliveryID ?? "",
             instructionDigest ?? "",
             instructionLanguage?.rawValue ?? "",
+            storedLanguageSelection,
             language,
             resolvedConditioningMode,
             normalizedReferenceTranscript.map(Self.sha256) ?? "",
             referenceAudioDigest ?? "",
+            normalizedReferenceAudioDigest ?? "",
+            referenceTranscriptSource ?? "",
             modelRuntimeIdentity?.speechTokenizerDigest ?? "",
             String(effectiveSeed),
             variation,
             request.shouldStream ? "streaming" : "quality-first",
+        ] + Self.samplingIdentityComponents(samplingPolicy) + [
+            modelRuntimeIdentity?.resolvedModelID ?? "",
+            modelRuntimeIdentity?.modelVariant ?? "",
+            modelRuntimeIdentity?.modelRepository ?? "",
+            modelRuntimeIdentity?.huggingFaceRevision ?? "",
+            modelRuntimeIdentity?.artifactVersion ?? "",
+            modelRuntimeIdentity?.integrityManifestDigest ?? "",
+            modelRuntimeIdentity?.runtimeProfileSignature ?? "",
+            modelRuntimeIdentity?.quantization ?? "",
+            modelRuntimeIdentity?.nativeLoadCapabilityProfile ?? "",
+            modelRuntimeIdentity?.fixtureDigest ?? "",
+            samplingEOSSuppressionFrames.map(String.init) ?? "none",
         ])
 
         self.schemaVersion = Self.currentSchemaVersion
@@ -179,6 +209,8 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         self.referenceTranscriptDigest = normalizedReferenceTranscript.map(Self.sha256)
         self.referenceTranscriptCharacters = normalizedReferenceTranscript?.count ?? 0
         self.referenceAudioDigest = Self.validatedDigest(referenceAudioDigest)
+        self.normalizedReferenceAudioDigest = Self.validatedDigest(normalizedReferenceAudioDigest)
+        self.referenceTranscriptSource = referenceTranscriptSource
         self.modelArtifactVersion = modelRuntimeIdentity?.artifactVersion
         self.modelIntegrityManifestDigest = Self.validatedDigest(
             modelRuntimeIdentity?.integrityManifestDigest
@@ -186,6 +218,9 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         self.speechTokenizerDigest = Self.validatedDigest(
             modelRuntimeIdentity?.speechTokenizerDigest
         )
+        self.modelRuntimeIdentity = modelRuntimeIdentity
+        self.samplingPolicy = samplingPolicy
+        self.samplingEOSSuppressionFrames = samplingEOSSuppressionFrames
         self.seed = effectiveSeed
         self.seedSource = request.seed == nil ? "generated" : "requested"
         self.variation = variation
@@ -210,6 +245,15 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
         }
     }
 
+    private static func samplingIdentityComponents(_ policy: Qwen3SamplingPolicy?) -> [String] {
+        guard let policy else { return ["sampling-unavailable"] }
+        return [String(policy.algorithmVersion), String(policy.effectiveSeed)]
+            + [policy.talker, policy.subtalker].flatMap {
+                [String($0.temperature), String($0.topP), String($0.topK), String($0.minP)]
+            }
+            + [String(policy.repetitionPenalty), String(policy.maximumCodecTokens)]
+    }
+
     private static func validatedDigest(_ value: String?) -> String? {
         guard let value = value?.lowercased(),
               value.count == 64,
@@ -223,5 +267,41 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
 
     private static func sha256(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// A completed take's local, privacy-safe provenance. This binds the prepared
+/// request to the published WAV, independently of opt-in telemetry. Digests
+/// identify content; they do not retain scripts, transcripts or reference paths,
+/// and cannot reconstruct those inputs. Nil fields mean evidence unavailable.
+public struct GenerationCompletionReceipt: Hashable, Codable, Sendable {
+    public static let currentSchemaVersion = 1
+
+    public let schemaVersion: Int
+    public let request: GenerationRequestReceipt
+    public let outputWAVDigest: String?
+    public let durationSeconds: Double
+    public let finishReason: GenerationFinishReason?
+    public let usedStreaming: Bool
+    public let decoderHistoryMode: String?
+    public let decoderHistoryVersion: Int?
+
+    public init(
+        request: GenerationRequestReceipt,
+        outputWAVDigest: String?,
+        durationSeconds: Double,
+        finishReason: GenerationFinishReason?,
+        usedStreaming: Bool,
+        decoderHistoryMode: String? = nil,
+        decoderHistoryVersion: Int? = nil
+    ) {
+        self.schemaVersion = Self.currentSchemaVersion
+        self.request = request
+        self.outputWAVDigest = outputWAVDigest
+        self.durationSeconds = durationSeconds
+        self.finishReason = finishReason
+        self.usedStreaming = usedStreaming
+        self.decoderHistoryMode = decoderHistoryMode
+        self.decoderHistoryVersion = decoderHistoryVersion
     }
 }

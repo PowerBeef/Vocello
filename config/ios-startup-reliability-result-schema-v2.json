@@ -35,11 +35,38 @@
         "tMS": {"type": "integer", "minimum": 0}
       }
     },
+    "samplingStage": {
+      "type": "object", "additionalProperties": false, "required": ["temperature", "topP", "topK", "minP"],
+      "properties": {
+        "temperature": {"type": "number", "minimum": 0}, "topP": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "topK": {"type": "integer", "minimum": 1}, "minP": {"type": "number", "minimum": 0, "exclusiveMaximum": 1}
+      }
+    },
+    "samplingPolicy": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["algorithmVersion", "effectiveSeed", "talker", "subtalker", "repetitionPenalty", "maximumCodecTokens"],
+      "properties": {
+        "algorithmVersion": {"type": "integer", "minimum": 1}, "effectiveSeed": {"type": "integer", "minimum": 0},
+        "talker": {"$ref": "#/$defs/samplingStage"}, "subtalker": {"$ref": "#/$defs/samplingStage"},
+        "repetitionPenalty": {"type": "number", "exclusiveMinimum": 0}, "maximumCodecTokens": {"type": "integer", "minimum": 1}
+      }
+    },
+    "modelRuntimeIdentity": {
+      "type": ["object", "null"], "additionalProperties": false, "required": ["resolvedModelID"],
+      "properties": {
+        "resolvedModelID": {"$ref": "#/$defs/safeID"}, "modelVariant": {"type": ["string", "null"]},
+        "modelRepository": {"type": ["string", "null"]}, "huggingFaceRevision": {"type": ["string", "null"]},
+        "artifactVersion": {"type": ["string", "null"]}, "quantization": {"type": ["string", "null"]},
+        "integrityManifestDigest": {"$ref": "#/$defs/nullableSHA256"}, "speechTokenizerDigest": {"$ref": "#/$defs/nullableSHA256"},
+        "runtimeProfileSignature": {"type": ["string", "null"]}, "nativeLoadCapabilityProfile": {"type": ["string", "null"]},
+        "fixtureDigest": {"$ref": "#/$defs/nullableSHA256"}
+      }
+    },
     "receipt": {
       "type": "object", "additionalProperties": false,
       "required": ["schemaVersion", "generationID", "generationIdentityDigest", "requestIdentityDigest", "sessionIdentityDigest", "prewarmIdentityDigest", "modelID", "instructionCharacters", "language", "seed", "seedSource", "variation", "streaming", "warmState", "retryAttempt", "operationGeneration"],
       "properties": {
-        "schemaVersion": {"enum": [1, 2]}, "generationID": {"type": "string", "format": "uuid"},
+        "schemaVersion": {"enum": [1, 2, 3]}, "generationID": {"type": "string", "format": "uuid"},
         "generationIdentityDigest": {"$ref": "#/$defs/sha256"}, "requestIdentityDigest": {"$ref": "#/$defs/sha256"},
         "sessionIdentityDigest": {"$ref": "#/$defs/sha256"}, "prewarmIdentityDigest": {"$ref": "#/$defs/sha256"},
         "modelID": {"$ref": "#/$defs/safeID"}, "speakerID": {"type": ["string", "null"]},
@@ -51,7 +78,10 @@
         "normalizedTargetTextDigest": {"$ref": "#/$defs/nullableSHA256"}, "normalizedTargetTextCharacters": {"type": ["integer", "null"], "minimum": 0},
         "referenceTranscriptDigest": {"$ref": "#/$defs/nullableSHA256"}, "referenceTranscriptCharacters": {"type": ["integer", "null"], "minimum": 0},
         "referenceAudioDigest": {"$ref": "#/$defs/nullableSHA256"}, "modelArtifactVersion": {"type": ["string", "null"]},
+        "normalizedReferenceAudioDigest": {"$ref": "#/$defs/nullableSHA256"}, "referenceTranscriptSource": {"enum": ["inline", "sidecar", "none", null]},
         "modelIntegrityManifestDigest": {"$ref": "#/$defs/nullableSHA256"}, "speechTokenizerDigest": {"$ref": "#/$defs/nullableSHA256"},
+        "modelRuntimeIdentity": {"$ref": "#/$defs/modelRuntimeIdentity"}, "samplingPolicy": {"$ref": "#/$defs/samplingPolicy"},
+        "samplingEOSSuppressionFrames": {"type": ["integer", "null"], "minimum": 0, "maximum": 256},
         "seed": {"type": "integer", "minimum": 0}, "seedSource": {"enum": ["requested", "generated"]},
         "variation": {"enum": ["expressive", "balanced", "consistent"]}, "streaming": {"type": "boolean"},
         "warmState": {"enum": ["cold", "warm"]}, "predecessorIdentityDigest": {"$ref": "#/$defs/nullableSHA256"},

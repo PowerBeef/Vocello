@@ -2290,9 +2290,10 @@ struct StreamingExecutionContext: Sendable {
             "outputReadableWAV": "true",
             "outputAtomicallyPublished": "true",
         ]
-        let publishedWAVDigest: String? = telemetryWorkPlan.writesSink
-            ? try? SamplingTakeEvidence.sha256FileDigest(at: outputURL)
-            : nil
+        // History provenance is always on, even when telemetry is off. The
+        // digest remains optional on an I/O failure; missing identity must not
+        // be mistaken for complete replay evidence.
+        let publishedWAVDigest = try? SamplingTakeEvidence.sha256FileDigest(at: outputURL)
         if let wavDigest = publishedWAVDigest {
             let plannedSeed = request.seed
                 ?? stringFlags["sampling_effective_seed"].flatMap(UInt64.init)
@@ -2381,7 +2382,16 @@ struct StreamingExecutionContext: Sendable {
             diagnosticBooleanFlags: finalBooleanFlags,
             diagnosticStringFlags: finalStringFlags,
             telemetrySummary: summary,
-            audioQC: finalAudioQC
+            audioQC: finalAudioQC,
+            completionReceipt: GenerationCompletionReceipt(
+                request: requestReceipt,
+                outputWAVDigest: publishedWAVDigest,
+                durationSeconds: durationSeconds,
+                finishReason: resolvedFinishReason,
+                usedStreaming: request.shouldStream,
+                decoderHistoryMode: finalStringFlags["clone_decoder_history_mode"],
+                decoderHistoryVersion: finalStringFlags["clone_decoder_history_version"].flatMap(Int.init)
+            )
         )
     }
 

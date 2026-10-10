@@ -103,6 +103,15 @@ enum GenerationMigrations {
             )
         }
 
+        migrator.registerMigration("v8_add_completion_receipt") { db in
+            try db.alter(table: "generations") { t in
+                // No backfill: historical effective inputs were not retained.
+                // The receipt is encoded as one JSON value with the row, so
+                // row saves and recovery cannot commit partial provenance.
+                t.add(column: "completionReceipt", .text)
+            }
+        }
+
         return migrator
     }
 }

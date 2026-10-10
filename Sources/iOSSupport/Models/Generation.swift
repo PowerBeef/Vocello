@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import QwenVoiceCore
 
 /// A record of a single TTS generation, stored in SQLite via GRDB.
 struct Generation: Identifiable, Codable, Hashable, Sendable {
@@ -21,6 +22,9 @@ struct Generation: Identifiable, Codable, Hashable, Sendable {
     /// The engine's effective sampling seed for this take (UInt64 stored as
     /// its Int64 bit pattern), or nil for rows recorded before v6 (DP-15).
     var seed: Int64?
+    /// Versioned provenance stored with this row and its recovery journal.
+    /// Legacy/assembled outputs have no single-request receipt.
+    var completionReceipt: GenerationCompletionReceipt? = nil
     /// Display-friendly date string in the interface locale (PA-20: never the
     /// process locale, which ignores the in-app language).
     func formattedDate(in localization: VocelloLocalization) -> String {
@@ -59,10 +63,10 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
 
     enum Columns: String, ColumnExpression {
         case id, text, mode, modelTier, voice, emotion, speed, audioPath, duration, createdAt
-        case longFormProjectID, longFormRole, seed
+        case longFormProjectID, longFormRole, seed, completionReceipt
     }
 
-    init(row: Row) {
+    init(row: Row) throws {
         id = row[Columns.id]
         text = row[Columns.text]
         mode = row[Columns.mode]
@@ -76,6 +80,13 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
         longFormProjectID = row[Columns.longFormProjectID]
         longFormRole = row[Columns.longFormRole]
         seed = row[Columns.seed]
+        // GRDB's Codable record encoder stores nested Codable values as JSON.
+        // A malformed stored receipt fails the read instead of disappearing.
+        let receiptJSON: String? = row[Columns.completionReceipt]
+        completionReceipt = try receiptJSON.map {
+            try Self.databaseJSONDecoder(for: Columns.completionReceipt.rawValue)
+                .decode(GenerationCompletionReceipt.self, from: Data($0.utf8))
+        }
     }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {

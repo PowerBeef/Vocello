@@ -105,7 +105,8 @@ final class MacStudioSingleTakeGenerationHooks: MacStudioSingleTakeHooks {
             audioPath: result.audioPath,
             duration: result.durationSeconds,
             createdAt: Date(),
-            seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+            seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) },
+            completionReceipt: result.completionReceipt
         )
     }
 }

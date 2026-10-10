@@ -1953,7 +1953,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             diagnosticBooleanFlags: booleans,
             diagnosticStringFlags: strings,
             telemetrySummary: result.telemetrySummary,
-            audioQC: result.audioQC
+            audioQC: result.audioQC,
+            completionReceipt: result.completionReceipt
         )
     }
 
@@ -1982,7 +1983,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             diagnosticBooleanFlags: booleans,
             diagnosticStringFlags: result.diagnosticStringFlags,
             telemetrySummary: result.telemetrySummary,
-            audioQC: result.audioQC
+            audioQC: result.audioQC,
+            completionReceipt: result.completionReceipt
         )
     }
 

@@ -40,6 +40,7 @@ enum GenerateCommand {
         let modelArtifactVersion: String?
         let modelIntegrityManifestDigest: String?
         let speechTokenizerDigest: String?
+        let completionReceipt: GenerationCompletionReceipt?
         let audioQC: AudioQCReport?
         let firstChunkMS: Double?
         let chunks: Int?
@@ -291,6 +292,7 @@ enum GenerateCommand {
                 speechTokenizerDigest: result.diagnosticStringFlags[
                     "request_receipt_speech_tokenizer_digest"
                 ],
+                completionReceipt: result.completionReceipt,
                 audioQC: result.audioQC,
                 firstChunkMS: firstChunkMS, chunks: chunkCount))
         } else {

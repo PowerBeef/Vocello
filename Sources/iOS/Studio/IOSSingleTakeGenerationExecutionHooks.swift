@@ -66,7 +66,8 @@ final class IOSStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
                 audioPath: result.audioPath,
                 duration: result.durationSeconds,
                 createdAt: Date(),
-                seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) }
+                seed: result.observedSamplingSeed.map { Int64(bitPattern: $0) },
+                completionReceipt: result.completionReceipt
             ),
             caller: plan.persistenceCaller
         )

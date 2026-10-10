@@ -208,6 +208,9 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             (2, "english", "auto", "english", False),
             (2, "auto", None, "english", False),
             (2, "auto", "auto", None, False),
+            (3, "auto", "auto", "french", True),
+            (3, "french", "french", "english", False),
+            (3, "auto", None, "french", False),
         ]
         for version, planned, stored, resolved, accepted in cases:
             with self.subTest(version=version, planned=planned, stored=stored, resolved=resolved):
@@ -217,7 +220,7 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                     row["language"] = planned
                     receipt = take["requestReceipt"]
                     receipt.update(schemaVersion=version, language=resolved)
-                    if version == 2:
+                    if version >= 2:
                         receipt.update(
                             storedLanguageSelection=stored, finalModelLanguage=resolved,
                             languageTokenMode="nothink" if resolved == "auto" else "think",
@@ -234,6 +237,42 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 else:
                     with self.assertRaises(MODULE.ContractError):
                         MODULE.validate_result(self.plan_path, artifacts, "run-1")
+
+    def test_receipt_v3_validates_effective_sampling_and_private_safe_identity(self):
+        result, _, _ = self.result_fixture()
+        receipt = dict(result["takes"][0]["requestReceipt"])
+        receipt.update(
+            schemaVersion=3, storedLanguageSelection="english", finalModelLanguage="english",
+            languageTokenMode="think", conditioningMode="custom_voice",
+            normalizedTargetTextDigest=self.plan["scriptSHA256"],
+            normalizedTargetTextCharacters=self.plan["scriptCharacters"], referenceTranscriptCharacters=0,
+            modelFacingInstructionLanguage="english",
+            normalizedReferenceAudioDigest="a" * 64, referenceTranscriptSource="none",
+            modelRuntimeIdentity={"resolvedModelID": receipt["modelID"], "modelRepository": "fixture/model",
+                                  "huggingFaceRevision": "b" * 40, "integrityManifestDigest": "c" * 64},
+            samplingPolicy={"algorithmVersion": 2, "effectiveSeed": receipt["seed"],
+                            "talker": {"temperature": 0.7, "topP": 0.9, "topK": 40, "minP": 0},
+                            "subtalker": {"temperature": 0.8, "topP": 0.95, "topK": 30, "minP": 0.01},
+                            "repetitionPenalty": 1.05, "maximumCodecTokens": 1024},
+        )
+        MODULE.validate_receipt(receipt, "fixture")
+        mutations = [
+            lambda r: r["samplingPolicy"].update(effectiveSeed=1),
+            lambda r: r["samplingPolicy"].update(algorithmVersion=True),
+            lambda r: r["samplingPolicy"].update(repetitionPenalty=0),
+            lambda r: r["samplingPolicy"]["talker"].update(topP=1.1),
+            lambda r: r["samplingPolicy"]["subtalker"].update(topK=0),
+            lambda r: r["samplingPolicy"]["talker"].update(temperature=float("nan")),
+            lambda r: r["modelRuntimeIdentity"].update(referencePath="/private/reference.wav"),
+            lambda r: r["modelRuntimeIdentity"].update(modelRepository="/private/models"),
+            lambda r: r.update(normalizedReferenceAudioDigest="not-a-digest"),
+        ]
+        for index, mutate in enumerate(mutations):
+            with self.subTest(mutation=index):
+                invalid = json.loads(json.dumps(receipt))
+                mutate(invalid)
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.validate_receipt(invalid, "fixture")
 
     def test_read_only_validation_preserves_files_and_failed_outcome(self):
         result, artifacts, result_path = self.result_fixture()

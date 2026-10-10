@@ -110,7 +110,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertEqual(receipt.deliveryID, "calm.strong")
         XCTAssertEqual(receipt.speakerID, "vivian")
         XCTAssertEqual(receipt.language, "english")
-        XCTAssertEqual(receipt.schemaVersion, 2)
+        XCTAssertEqual(receipt.schemaVersion, 3)
         XCTAssertEqual(receipt.storedLanguageSelection, "english")
         XCTAssertEqual(receipt.detectedTargetLanguage, "english")
         XCTAssertEqual(receipt.finalModelLanguage, "english")
@@ -212,6 +212,104 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertEqual(decoded.schemaVersion, 1)
         XCTAssertNil(decoded.finalModelLanguage)
         XCTAssertEqual(decoded.language, "english")
+    }
+
+    func testReceiptV2DecodesWithoutEffectivePolicyOrRuntimeIdentity() throws {
+        let current = makeCompletionReceipt().request
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as? [String: Any]
+        )
+        object["schemaVersion"] = 2
+        object.removeValue(forKey: "samplingPolicy")
+        object.removeValue(forKey: "modelRuntimeIdentity")
+        object.removeValue(forKey: "normalizedReferenceAudioDigest")
+        object.removeValue(forKey: "referenceTranscriptSource")
+        object.removeValue(forKey: "samplingEOSSuppressionFrames")
+        let decoded = try JSONDecoder().decode(
+            GenerationRequestReceipt.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertEqual(decoded.schemaVersion, 2)
+        XCTAssertNil(decoded.samplingPolicy)
+        XCTAssertNil(decoded.modelRuntimeIdentity)
+    }
+
+    func testCompletionReceiptRoundTripsEffectiveRequestAndOutputWithoutPrivateInputs() throws {
+        let receipt = makeCompletionReceipt()
+        let result = GenerationResult(
+            audioPath: "/private/completed.wav", durationSeconds: 3.25,
+            streamSessionDirectory: nil, usedStreaming: true, finishReason: .eos,
+            completionReceipt: receipt
+        )
+        let decoded = try JSONDecoder().decode(GenerationResult.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(decoded, result)
+        XCTAssertEqual(decoded.observedSamplingSeed, UInt64.max)
+        XCTAssertEqual(receipt.request.storedLanguageSelection, "auto")
+        XCTAssertEqual(receipt.request.finalModelLanguage, "french")
+        XCTAssertEqual(receipt.request.samplingPolicy?.effectiveSeed, UInt64.max)
+        XCTAssertEqual(receipt.request.samplingPolicy?.subtalker.topK, 40)
+        XCTAssertEqual(receipt.request.modelRuntimeIdentity?.huggingFaceRevision, "fixture-revision")
+        XCTAssertEqual(receipt.request.normalizedReferenceAudioDigest, String(repeating: "d", count: 64))
+        XCTAssertEqual(receipt.request.referenceTranscriptSource, "inline")
+        XCTAssertEqual(receipt.decoderHistoryMode, "generated_only")
+        XCTAssertEqual(receipt.outputWAVDigest, String(repeating: "e", count: 64))
+        let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(receipt), encoding: .utf8))
+        for forbidden in ["/private", "Bonjour, cette phrase est privée.", "texte de référence privé"] {
+            XCTAssertFalse(encoded.contains(forbidden))
+        }
+    }
+
+    func testLegacyResultDoesNotInventCompletionEvidence() throws {
+        let legacy = Data(#"{"audioPath":"/tmp/legacy.wav","durationSeconds":1,"usedStreaming":false}"#.utf8)
+        let result = try JSONDecoder().decode(GenerationResult.self, from: legacy)
+        XCTAssertNil(result.completionReceipt)
+        XCTAssertNil(result.observedSamplingSeed)
+    }
+
+    func testRequestIdentityBindsEffectiveSamplingAndArtifactRevision() {
+        let baseline = makeCompletionReceipt().request
+        let changedSampling = makeCompletionReceipt(topK: 99).request
+        let changedArtifact = makeCompletionReceipt(revision: "next-revision").request
+        XCTAssertNotEqual(baseline.requestIdentityDigest, changedSampling.requestIdentityDigest)
+        XCTAssertNotEqual(baseline.requestIdentityDigest, changedArtifact.requestIdentityDigest)
+        XCTAssertEqual(baseline.sessionIdentityDigest, changedArtifact.sessionIdentityDigest)
+    }
+
+    private func makeCompletionReceipt(topK: Int = 40, revision: String = "fixture-revision") -> GenerationCompletionReceipt {
+        let request = GenerationRequest(
+            mode: .clone, modelID: "pro_clone_speed", text: "Bonjour, cette phrase est privée.",
+            outputPath: "/private/completed.wav", shouldStream: true, languageHint: "auto",
+            payload: .clone(reference: CloneReference(
+                audioPath: "/private/reference.wav",
+                conditioningMode: .transcriptBacked("texte de référence privé")
+            )), seed: UInt64.max, variation: .consistent
+        )
+        let sampling = Qwen3SamplingPolicy(
+            algorithmVersion: 2, effectiveSeed: UInt64.max,
+            talker: SamplingStage(temperature: 0.7, topP: 0.9, topK: topK, minP: 0.02),
+            subtalker: SamplingStage(temperature: 0.8, topP: 0.95, topK: topK, minP: 0.03),
+            repetitionPenalty: 1.05, maximumCodecTokens: 1024
+        )
+        let receipt = GenerationRequestReceipt(
+            request: request, modelFacingText: request.text, modelFacingLanguage: "french",
+            conditioningMode: "clone_transcript_backed", referenceTranscript: "texte de référence privé",
+            referenceAudioDigest: String(repeating: "a", count: 64),
+            normalizedReferenceAudioDigest: String(repeating: "d", count: 64),
+            referenceTranscriptSource: "inline",
+            modelRuntimeIdentity: ModelRuntimeIdentity(
+                resolvedModelID: "pro_clone_speed", modelRepository: "fixture/model",
+                huggingFaceRevision: revision, artifactVersion: "fixture-v1", quantization: "4bit",
+                integrityManifestDigest: String(repeating: "b", count: 64),
+                speechTokenizerDigest: String(repeating: "c", count: 64), runtimeProfileSignature: "fixture-profile"
+            ), samplingPolicy: sampling,
+            generationID: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            effectiveSeed: UInt64.max, warmState: .warm, predecessorIdentityDigest: nil,
+            retryAttempt: 0, operationGeneration: 1
+        )
+        return GenerationCompletionReceipt(
+            request: receipt, outputWAVDigest: String(repeating: "e", count: 64), durationSeconds: 3.25,
+            finishReason: .eos, usedStreaming: true, decoderHistoryMode: "generated_only", decoderHistoryVersion: 1
+        )
     }
 
     func testReceiptSeparatesVerbatimRoutingFromActualDesignInstructionLanguage() {

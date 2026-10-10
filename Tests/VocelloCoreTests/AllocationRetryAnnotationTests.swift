@@ -16,6 +16,17 @@ final class AllocationRetryAnnotationTests: XCTestCase {
             longestSilenceMS: 600,
             durationSeconds: 4
         )
+        let receipt = GenerationCompletionReceipt(
+            request: GenerationRequestReceipt(
+                request: GenerationRequest(
+                    mode: .custom, modelID: "pro_custom_speed", text: "Fixture.",
+                    outputPath: "fixture.wav", shouldStream: true,
+                    payload: .custom(speakerID: "aiden", deliveryStyle: nil), seed: 19
+                ), generationID: UUID(), effectiveSeed: 19, warmState: .warm,
+                predecessorIdentityDigest: nil, retryAttempt: 1, operationGeneration: 1
+            ), outputWAVDigest: String(repeating: "a", count: 64), durationSeconds: 1.25,
+            finishReason: .eos, usedStreaming: true
+        )
         let original = GenerationResult(
             audioPath: "fixture.wav",
             durationSeconds: 1.25,
@@ -24,7 +35,8 @@ final class AllocationRetryAnnotationTests: XCTestCase {
             diagnosticTimingsMS: ["existing": 4],
             diagnosticBooleanFlags: ["existing": true],
             diagnosticStringFlags: ["identity": "fixture"],
-            audioQC: audioQC
+            audioQC: audioQC,
+            completionReceipt: receipt
         )
 
         let annotated = MLXTTSEngine.annotatingAllocationRetry(
@@ -44,11 +56,13 @@ final class AllocationRetryAnnotationTests: XCTestCase {
         XCTAssertEqual(annotated.diagnosticBooleanFlags["allocationRetryStreamingUsed"], true)
         XCTAssertEqual(annotated.diagnosticStringFlags["identity"], "fixture")
         XCTAssertEqual(annotated.audioQC, audioQC)
+        XCTAssertEqual(annotated.completionReceipt, receipt)
         let decoded = try JSONDecoder().decode(
             GenerationResult.self,
             from: JSONEncoder().encode(annotated)
         )
         XCTAssertEqual(decoded.audioQC, audioQC)
+        XCTAssertEqual(decoded.completionReceipt, receipt)
     }
 
     func testNoRetryIsExplicitRatherThanSilentlyUnannotated() {

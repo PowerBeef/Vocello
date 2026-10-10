@@ -199,12 +199,15 @@ def validate_receipt(value: Any, field: str) -> None:
         "referenceTranscriptDigest", "referenceTranscriptCharacters",
         "referenceAudioDigest", "modelArtifactVersion",
         "modelIntegrityManifestDigest", "speechTokenizerDigest",
+        "modelRuntimeIdentity", "samplingPolicy",
+        "samplingEOSSuppressionFrames",
+        "normalizedReferenceAudioDigest", "referenceTranscriptSource",
     }
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ContractError(f"{field} does not match request-receipt schema v1")
-    if value["schemaVersion"] not in {1, 2}:
+    if value["schemaVersion"] not in {1, 2, 3}:
         raise ContractError(f"{field} uses an unsupported schema")
-    if value["schemaVersion"] == 2:
+    if value["schemaVersion"] >= 2:
         v2_required = {
             "storedLanguageSelection", "finalModelLanguage", "languageTokenMode", "conditioningMode",
             "normalizedTargetTextDigest", "normalizedTargetTextCharacters",
@@ -227,6 +230,7 @@ def validate_receipt(value: Any, field: str) -> None:
         "instructionDigest", "predecessorIdentityDigest", "normalizedTargetTextDigest",
         "referenceTranscriptDigest", "referenceAudioDigest", "modelIntegrityManifestDigest",
         "speechTokenizerDigest",
+        "normalizedReferenceAudioDigest",
     ):
         child = value.get(key)
         if child is not None and (not isinstance(child, str) or not SHA256.fullmatch(child)):
@@ -257,6 +261,11 @@ def validate_receipt(value: Any, field: str) -> None:
         raise ContractError(f"{field}.instructionLanguage is invalid")
     if value.get("modelFacingInstructionLanguage") not in LANGUAGES | {None}:
         raise ContractError(f"{field}.modelFacingInstructionLanguage is invalid")
+    if value.get("referenceTranscriptSource") not in {None, "inline", "sidecar", "none"}:
+        raise ContractError(f"{field}.referenceTranscriptSource is invalid")
+    eos_frames = value.get("samplingEOSSuppressionFrames")
+    if eos_frames is not None and (not isinstance(eos_frames, int) or isinstance(eos_frames, bool) or not 0 <= eos_frames <= 256):
+        raise ContractError(f"{field}.samplingEOSSuppressionFrames is invalid")
     if value["seedSource"] not in {"requested", "generated"} or value["warmState"] not in {"cold", "warm"}:
         raise ContractError(f"{field} has invalid seed or warm-state vocabulary")
     if not isinstance(value["streaming"], bool):
@@ -269,6 +278,55 @@ def validate_receipt(value: Any, field: str) -> None:
         child = value.get(key)
         if child is not None and (not isinstance(child, int) or isinstance(child, bool) or not 0 <= child <= 100000):
             raise ContractError(f"{field}.{key} is out of bounds")
+    identity = value.get("modelRuntimeIdentity")
+    if identity is not None:
+        allowed_identity = {
+            "resolvedModelID", "modelVariant", "modelRepository", "huggingFaceRevision",
+            "artifactVersion", "quantization", "integrityManifestDigest", "speechTokenizerDigest",
+            "runtimeProfileSignature", "nativeLoadCapabilityProfile", "fixtureDigest",
+        }
+        if not isinstance(identity, dict) or "resolvedModelID" not in identity or set(identity) - allowed_identity:
+            raise ContractError(f"{field}.modelRuntimeIdentity has invalid fields")
+        for key, child in identity.items():
+            if child is None and key != "resolvedModelID":
+                continue
+            if not isinstance(child, str) or not child or len(child) > 256:
+                raise ContractError(f"{field}.modelRuntimeIdentity.{key} is invalid")
+            if key in {"integrityManifestDigest", "speechTokenizerDigest", "fixtureDigest"}:
+                if not SHA256.fullmatch(child):
+                    raise ContractError(f"{field}.modelRuntimeIdentity.{key} is not SHA-256")
+            elif key == "modelRepository":
+                if not re.fullmatch(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+", child):
+                    raise ContractError(f"{field}.modelRuntimeIdentity.modelRepository is invalid")
+            elif not re.fullmatch(r"[A-Za-z0-9._:-]+", child):
+                raise ContractError(f"{field}.modelRuntimeIdentity.{key} is invalid")
+    sampling = value.get("samplingPolicy")
+    if sampling is not None:
+        keys = {"algorithmVersion", "effectiveSeed", "talker", "subtalker", "repetitionPenalty", "maximumCodecTokens"}
+        if not isinstance(sampling, dict) or set(sampling) != keys:
+            raise ContractError(f"{field}.samplingPolicy has invalid fields")
+        for key, maximum in (("algorithmVersion", 2**31 - 1), ("maximumCodecTokens", 2**31 - 1), ("effectiveSeed", 2**64 - 1)):
+            child = sampling[key]
+            minimum = 0 if key == "effectiveSeed" else 1
+            if not isinstance(child, int) or isinstance(child, bool) or not minimum <= child <= maximum:
+                raise ContractError(f"{field}.samplingPolicy.{key} is invalid")
+        if sampling["effectiveSeed"] != value["seed"]:
+            raise ContractError(f"{field}.samplingPolicy.effectiveSeed disagrees with seed")
+        penalty = sampling["repetitionPenalty"]
+        if not isinstance(penalty, (int, float)) or isinstance(penalty, bool) or not math.isfinite(penalty) or penalty <= 0:
+            raise ContractError(f"{field}.samplingPolicy.repetitionPenalty is invalid")
+        for key in ("talker", "subtalker"):
+            stage = sampling[key]
+            if not isinstance(stage, dict) or set(stage) != {"temperature", "topP", "topK", "minP"}:
+                raise ContractError(f"{field}.samplingPolicy.{key} has invalid fields")
+            for name in ("temperature", "topP", "minP"):
+                child = stage[name]
+                if not isinstance(child, (int, float)) or isinstance(child, bool) or not math.isfinite(child):
+                    raise ContractError(f"{field}.samplingPolicy.{key}.{name} is invalid")
+            if stage["temperature"] < 0 or not 0 < stage["topP"] <= 1 or not 0 <= stage["minP"] < 1:
+                raise ContractError(f"{field}.samplingPolicy.{key} is out of bounds")
+            if not isinstance(stage["topK"], int) or isinstance(stage["topK"], bool) or stage["topK"] <= 0:
+                raise ContractError(f"{field}.samplingPolicy.{key}.topK is invalid")
 
 
 def validate_timeline(value: Any, field: str) -> None:
@@ -841,7 +899,7 @@ def validate_result(
             "speakerID": planned["speakerID"], "deliveryID": planned["deliveryID"],
             # v2 separates the requested selection from the model-facing
             # resolution. v1 retains its historical single-field comparison.
-            ("storedLanguageSelection" if receipt["schemaVersion"] == 2 else "language"): planned["language"],
+            ("storedLanguageSelection" if receipt["schemaVersion"] >= 2 else "language"): planned["language"],
             "seed": planned["seed"],
             "variation": planned["variation"], "streaming": planned["streaming"],
         }

@@ -1161,6 +1161,15 @@ actor NativeEngineRuntime {
         }
         await telemetrySampler?.captureBoundary("after_preparation")
         let predecessorDigest = BenchRunContext.telemetryNotes()["startupPredecessorIdentityDigest"]
+        let referenceAudioDigest: String?
+        let normalizedReferenceAudioDigest: String?
+        if let reference = cloneConditioning?.normalizedReference {
+            referenceAudioDigest = try? SamplingTakeEvidence.sha256FileDigest(at: reference.sourceURL)
+            normalizedReferenceAudioDigest = try? SamplingTakeEvidence.sha256FileDigest(at: reference.normalizedURL)
+        } else {
+            referenceAudioDigest = nil
+            normalizedReferenceAudioDigest = nil
+        }
         let requestReceipt = GenerationRequestReceipt(
             request: request,
             resolvedInstruction: resolvedInstruction(from: actorRequest),
@@ -1175,8 +1184,12 @@ actor NativeEngineRuntime {
                 cloneConditioning: cloneConditioning
             ),
             referenceTranscript: cloneConditioning?.resolvedTranscript,
-            referenceAudioDigest: cloneConditioning?.normalizedReference.fingerprint,
+            referenceAudioDigest: referenceAudioDigest,
+            normalizedReferenceAudioDigest: normalizedReferenceAudioDigest,
+            referenceTranscriptSource: cloneConditioning?.transcriptMode.rawValue,
             modelRuntimeIdentity: loadResult.modelRuntimeIdentity,
+            samplingPolicy: Self.receiptSamplingPolicy(samplingConfiguration),
+            samplingEOSSuppressionFrames: samplingConfiguration.eosSuppressionFrames,
             generationID: generationID,
             effectiveSeed: samplingConfiguration.effectiveSeed,
             warmState: loadResult.didLoad ? .cold : .warm,
@@ -2357,6 +2370,29 @@ actor NativeEngineRuntime {
         return nextRequestID
     }
 
+    private static func receiptSamplingPolicy(
+        _ configuration: VocelloQwen3SamplingConfiguration
+    ) -> Qwen3SamplingPolicy {
+        Qwen3SamplingPolicy(
+            algorithmVersion: configuration.algorithmVersion,
+            effectiveSeed: configuration.effectiveSeed,
+            talker: SamplingStage(
+                temperature: Double(configuration.talker.temperature),
+                topP: Double(configuration.talker.topP),
+                topK: configuration.talker.topK,
+                minP: Double(configuration.talker.minP)
+            ),
+            subtalker: SamplingStage(
+                temperature: Double(configuration.subtalker.temperature),
+                topP: Double(configuration.subtalker.topP),
+                topK: configuration.subtalker.topK,
+                minP: Double(configuration.subtalker.minP)
+            ),
+            repetitionPenalty: Double(configuration.repetitionPenalty),
+            maximumCodecTokens: configuration.maxNewTokens
+        )
+    }
+
     /// Build the immutable generation plan in shadow mode from values already
     /// resolved by the shipping path. Failure is diagnostic-only: it never
     /// starts model work and cannot reject an otherwise valid generation.
@@ -2387,19 +2423,6 @@ actor NativeEngineRuntime {
             request: request,
             policy: memoryPolicy
         )
-        let talker = SamplingStage(
-            temperature: Double(samplingConfiguration.talker.temperature),
-            topP: Double(samplingConfiguration.talker.topP),
-            topK: samplingConfiguration.talker.topK,
-            minP: Double(samplingConfiguration.talker.minP)
-        )
-        let subtalker = SamplingStage(
-            temperature: Double(samplingConfiguration.subtalker.temperature),
-            topP: Double(samplingConfiguration.subtalker.topP),
-            topK: samplingConfiguration.subtalker.topK,
-            minP: Double(samplingConfiguration.subtalker.minP)
-        )
-
         do {
             let talkerKVWindow = NativeMemoryPolicyResolver
                 .resolvedTalkerKVGeneratedWindow()
@@ -2407,14 +2430,7 @@ actor NativeEngineRuntime {
                 for: request.mode,
                 effectiveStreamingInterval: effectiveInterval
             )
-            let samplingPolicy = Qwen3SamplingPolicy(
-                algorithmVersion: samplingConfiguration.algorithmVersion,
-                effectiveSeed: samplingConfiguration.effectiveSeed,
-                talker: talker,
-                subtalker: subtalker,
-                repetitionPenalty: Double(samplingConfiguration.repetitionPenalty),
-                maximumCodecTokens: samplingConfiguration.maxNewTokens
-            )
+            let samplingPolicy = receiptSamplingPolicy(samplingConfiguration)
             let outputPolicy = ProductOutputPlan(
                 destinationPath: request.outputPath,
                 shouldStream: request.shouldStream,

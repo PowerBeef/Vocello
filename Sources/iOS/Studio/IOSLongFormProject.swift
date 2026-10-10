@@ -969,6 +969,7 @@ final class IOSLongFormProjectRunner {
                     duration: result.durationSeconds
                 )
                 record.seed = Int64(bitPattern: seed)
+                record.completionReceipt = result.completionReceipt
                 segments[index].historyRecord = record
                 segments[index].generationID = generationID
                 let persistence = await services.persistSegment(record, caller: "IOSLongFormSegment")
@@ -1230,6 +1231,7 @@ final class IOSLongFormProjectRunner {
                 duration: result.durationSeconds
             )
             record.seed = Int64(bitPattern: replacementSeed)
+            record.completionReceipt = result.completionReceipt
             segments[segmentIndex].historyRecord = record
             segments[segmentIndex].qualityReport = report
             segments[segmentIndex].generationID = generationID

@@ -1219,6 +1219,9 @@ public struct GenerationResult: Hashable, Codable, Sendable {
     /// Persisted-WAV quality evidence for a normal generation. Optional for
     /// legacy IPC rows and synthetic/assembled results that predate QC v5.
     public let audioQC: AudioQCReport?
+    /// Durable take provenance, independent of diagnostics/telemetry opt-in.
+    /// Absent for old results and assembled outputs without a single request.
+    public let completionReceipt: GenerationCompletionReceipt?
 
     public init(
         audioPath: String,
@@ -1230,7 +1233,8 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         diagnosticBooleanFlags: [String: Bool] = [:],
         diagnosticStringFlags: [String: String] = [:],
         telemetrySummary: TelemetrySummary? = nil,
-        audioQC: AudioQCReport? = nil
+        audioQC: AudioQCReport? = nil,
+        completionReceipt: GenerationCompletionReceipt? = nil
     ) {
         self.audioPath = audioPath
         self.durationSeconds = durationSeconds
@@ -1242,14 +1246,17 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         self.diagnosticStringFlags = diagnosticStringFlags
         self.telemetrySummary = telemetrySummary
         self.audioQC = audioQC
+        self.completionReceipt = completionReceipt
     }
 
     /// The effective sampling seed the engine actually used for this take
     /// (requested or generated), as reported through the diagnostics wire.
     /// This is what a "pin this take's seed" control persists: replaying it
-    /// with the same parameters reproduces the take (DP-15).
+    /// with the same parameters supports replay comparison. The seed alone
+    /// does not promise reproducibility across model/runtime/input changes.
     public var observedSamplingSeed: UInt64? {
-        diagnosticStringFlags["sampling_effective_seed"].flatMap(UInt64.init)
+        completionReceipt?.request.seed
+            ?? diagnosticStringFlags["sampling_effective_seed"].flatMap(UInt64.init)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1263,6 +1270,7 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         case diagnosticStringFlags
         case telemetrySummary
         case audioQC
+        case completionReceipt
     }
 
     public init(from decoder: Decoder) throws {
@@ -1277,6 +1285,7 @@ public struct GenerationResult: Hashable, Codable, Sendable {
         diagnosticStringFlags = try container.decodeIfPresent([String: String].self, forKey: .diagnosticStringFlags) ?? [:]
         telemetrySummary = try container.decodeIfPresent(TelemetrySummary.self, forKey: .telemetrySummary)
         audioQC = try container.decodeIfPresent(AudioQCReport.self, forKey: .audioQC)
+        completionReceipt = try container.decodeIfPresent(GenerationCompletionReceipt.self, forKey: .completionReceipt)
     }
 
     public var audioURL: URL {

@@ -7,7 +7,7 @@ import React from "react";
     one (the anchor). The provenance line below mirrors the chart footer, as the generator prints
     it: "Record <anchor>" for one record, "Median of N records through <anchor>" for more. Today
     the pool is one record,
-    benchmarks/runs/ui-generation/macos-xcui-benchmark-20260927-101957-c37aa311.json; the
+    benchmarks/runs/ui-generation/macos-xcui-benchmark-20261007-015814-74f026be.json; the
     generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
     faster, below 1.0 audio is produced quicker than it plays. This record was published after the
@@ -24,9 +24,9 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.32, 0.28, 0.27] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.31, 0.28, 0.27] },
   { name: "Voice Design", tone: "var(--mode-design)", takes: [0.31, 0.27, 0.26] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.31, 0.28, 0.27] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.32, 0.28, 0.27] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;
@@ -110,7 +110,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.27 to 0.32, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.31. Every bar sits below the real-time line at 1.0."
+      aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.27 to 0.31, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.32. Every bar sits below the real-time line at 1.0."
     >
       {gridlines}
       {rows}
@@ -155,7 +155,7 @@ export const Engineering = () => (
       </div>
 
       <p className="perf-provenance">
-        Record <span className="perf-mono">c37aa311</span> in{" "}
+        Record <span className="perf-mono">74f026be</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

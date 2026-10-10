@@ -236,12 +236,17 @@ global setting or toolchain installation was needed.
 | Ambient system Python lacks pytest despite an installed pinned environment | `scripts/select_python.py` and `scripts/dev.sh` select an installed Python >=3.10, accept `VOCELLO_PYTHON`, and propagate the executable through a guarded child shim. Fake interpreter/PATH tests cover missing packages, malformed probes, explicit failure, relative paths, nested execution and recursion. No Python package is installed or modified. |
 | Doctor reports presence without package compatibility and misreads helper usage exits | `scripts/workflow_diagnostics.py` reports selected Python, package versions/pins, Node/npm major compatibility and distinct helper probe outcomes. `xclog --help` displaying usage with exit 1 is reported as such, without certifying successful diagnostic work. Hook activation remains conservative. |
 | SwiftPM stderr can split an XCTest stdout verdict; summary failure only warns | `scripts/macos_test.sh` preserves separate stdout/stderr streams and records native and summary collection statuses. `scripts/lib/xctest_summary.py --require-complete` requires nonempty, consistent All/Selected tests completion. Offline triage refuses a native-zero PASS with failed collection. Behavioral tests cover partial/missing logs and native failure/signal precedence. |
-| UI failure skips crash delta and summaries; EXIT cleanup can mask the result | `scripts/ui_test.sh` and `scripts/lib/ui_finalization.sh` collect available evidence after attempted tests, isolate callback exits, bound collectors and retire owned process groups/watchdogs/exporters. Separate collection receipts block incomplete PASS. Thirteen focused tests cover native failures, signals, timeouts, leftover descendants, cleanup failures and single export through the actual ledger helper. Independent review and host-capable replay passed. |
+| UI failure skips crash delta and summaries; EXIT cleanup can mask the result | `scripts/ui_test.sh` and `scripts/lib/ui_finalization.sh` collect available evidence after attempted tests, isolate callback exits, bound collectors and retire owned process groups/watchdogs/exporters. Separate collection receipts block incomplete PASS. Fifteen focused tests cover native failures, immediate/intermediate signals, timeouts, leftover descendants, cleanup/receipt completion and single export through the actual ledger helper. The final correction (`fceedbd3`) installs handlers before launching collectors and defers signal replay until cleanup/receipt completion; native failure is captured before attachment export. Independent review and host-capable replay passed. |
 | Website contains vulnerable development dependency | The lockfile alone advances `source-map-js` 1.2.1 to 1.2.2, the patched version for [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q). npm audit reports zero vulnerabilities; full website checks pass. No unrelated dependency changed. |
 
-Full host-capable Python validation passed **2,162 tests and 2,561 subtests**, with one existing skip.
-The checkpoint records native/SDK and focused UI integration evidence. Raw audit/remediation logs
-remain ignored under `build/artifacts/diagnostics/setup-audit-20261010`. Sandbox-only localhost and
+Routed host-capable acceptance passed **2,162 tests and 2,561 subtests**, with one existing skip;
+final code at `fceedbd3` passed the full suite again with **2,164 tests and 2,563 subtests** and the
+same skip. The checkpoint records native/SDK evidence. Final layout-only XCUITest
+`macos-xcui-smoke-20261010-202730-f25c860e` passed one test, with zero failures/skips, complete
+collection receipt and offline triage PASS. The earlier layout PASS at `fbacfb1a`
+(`macos-xcui-smoke-20261010-201304-7b10ecec`) remains retained; the signal-handling correction
+justified the new run identity. Neither focused run establishes full-smoke/performance acceptance.
+Raw audit/remediation logs remain ignored under `build/artifacts/diagnostics/setup-audit-20261010`. Sandbox-only localhost and
 process-inspection failures, focused-test fixture corrections and an intentionally stopped duplicate
 contracts invocation remain retained; none is retrospectively promoted to PASS.
 

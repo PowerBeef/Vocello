@@ -25,8 +25,11 @@ incomplete summaries fail independently of native test statuses. UI finalization
 the first native failure/signal while collecting available crash, summary and attachment evidence;
 bounded callbacks, owned process groups and exporter cleanup prevent abandoned collectors.
 The separate collection receipt blocks incomplete PASS. Independent tooling review found and
-verified fixes for relative interpreter paths and interrupted exporters, then found no remaining
-actionable issue. The website lockfile alone advances vulnerable `source-map-js` to patched 1.2.2;
+verified fixes for relative interpreter paths and interrupted exporters. A final fake-driven
+check also reproduced an immediate-signal launch race and interrupted-finalizer re-entry;
+`fceedbd3` defers signal replay until cleanup/receipt completion and retains an earlier native
+failure before attachment export. A further independent review found no actionable issue. The
+website lockfile alone advances vulnerable `source-map-js` to patched 1.2.2;
 npm audit reports zero vulnerabilities. No extra plugin or installation was required.
 
 **Verified:** routed `check --since a8b16b08` passed contracts, **2,162 Python tests and 2,561
@@ -34,10 +37,16 @@ subtests** (one existing skip), generic iOS compilation and complete website che
 two browser tests). Native `mac-test-20261010-160951` passed **1,402 core tests and 182 runtime
 tests executed** (179 passes, three expected fixture skips), with complete/consistent sidecars,
 both summary statuses zero and offline triage PASS. Diagnostic stderr remains separately retained.
-Thirteen focused UI-finalization tests exercise actual timeout/signal process retirement and the
-real ledger helper without native UI execution. Review, ShellCheck, privacy, whitespace and strict
-roadmap validation pass. Detailed source references are in the workflow audit's setup-remediation
-section; raw evidence remains ignored under `setup-audit-20261010` and canonical runner directories.
+Final code at `fceedbd3` passed the full Python suite again: **2,164 tests and 2,563 subtests**,
+with the same existing skip. Fifteen focused UI-finalization tests (eight subtests) exercise actual
+timeout/signal process retirement, cleanup/receipt completion and the real ledger helper.
+Layout-only XCUITest `macos-xcui-smoke-20261010-202730-f25c860e` passed on that clean checkpoint:
+one test, zero failures/skips, all required steps and collection receipt passed, offline triage PASS
+with no issues. Earlier layout PASS `macos-xcui-smoke-20261010-201304-7b10ecec` remains retained;
+the new ID was justified by the subsequent signal-handling change. This focused lane does not
+establish full-smoke or performance acceptance. Review, ShellCheck, privacy, whitespace, contracts
+and strict roadmap validation pass. Detailed source references are in the workflow audit's
+setup-remediation section; raw evidence remains ignored under `setup-audit-20261010` and canonical runner directories.
 
 All delegated workers joined before native validation, with available tracking and zero active,
 stale or unknown leases. Initial restricted runs failed only on localhost/process/cache-lock

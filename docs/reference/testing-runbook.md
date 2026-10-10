@@ -73,7 +73,9 @@ UI runs retain `ui-finalization.json` and its log separately from native test st
 attempted test, failure or interruption still triggers available crash-delta, strict summary and
 attachment collection, followed by owned-process cleanup. Each collector has a bounded budget;
 timeout, missing evidence or cleanup failure prevents PASS. The first native failure/signal remains
-the exit status. Read the collection receipt as well as the required-step ledger; neither a clean
+the exit status. Signals during finalization are replayed after remaining collectors, owned-process
+cleanup and receipt writing; an earlier native failure retains precedence over a later collection signal.
+Read the collection receipt as well as the required-step ledger; neither a clean
 receipt nor passed test cases alone establishes successful run completion.
 
 For Swift review, the read-only `vocello-swift-review` subagent reads every Swift diff against the native

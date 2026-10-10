@@ -693,7 +693,7 @@ Terminal Developer Tools permission, PA-10's `.p12` export.
 
 Wave 9 (all three BT tracks plus their review fixes) is on `main` with CI green; BT-02 closed.
 The maintainer asked for an autonomous, self-validating audio QC harness: the audit
-([audio QC audit](audits/2026-09-25-audio-qc-speech-analysis-audit.md), plan
+(retired v1 audio QC audit, retained in Git history before `4051f87b`; [current QC guidance](reference/qc.md), plan
 `audio-qc-audit-2026-09`, AQ-01 to AQ-09) was adversarially verified, and the maintainer accepted
 all nine recommendations; DP-28 and AV-07 are superseded, PA-32 is decided. Headless M6 lanes
 (maintainer consent: everything but the iPhone): gate compares pass (the 2-3% timing drift is
@@ -945,7 +945,8 @@ identity and no retries or terminal failures. Native QC: 173 pass/43 warn/0 hard
 Whisper, paired acoustics and NISQA completed. French scored higher on NISQA (4.197 vs 3.875), while
 English passed more delivery acoustic checks (44/96 vs 26/96); WER was 7.46% EN vs 8.19% FR with
 small-cohort uncertainty and numerical/homophone transcription caveats. No production change or
-semantic superiority claim follows. See [the report](reference/french-delivery-pilot-2026-09-21.md).
+semantic superiority claim follows. The retired `french-delivery-pilot-2026-09-21.md` report remains
+in Git history before `4051f87b`; see [current QC guidance](reference/qc.md).
 Raw evidence and fixed representative pairs remain untracked under `french-instruction-pilot-20260921`.
 The optimized CLI build, focused tests, routed check and harness CI passed. DP-31/DP-32 remain open;
 confirmation is separate. The paused Mac marketing-test edit is untouched.

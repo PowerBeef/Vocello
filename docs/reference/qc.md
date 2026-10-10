@@ -1,9 +1,10 @@
 # Audio QC v2
 
-QC v2 is the audio QC harness, rebuilt on 2026-10-01. It is calibrated on human recordings and checked by the maintainer's ears:
+QC v2 is the local audio QC harness, rebuilt on 2026-10-01. It produces diagnostic evidence;
+calibration and qualification apply to individual dimensions and exact scoring identities:
 - a few strong specialist models score every take: two speech recognition (ASR) families, two phone recognizers and a G2P; for clones only, two pitch trackers and a speaker embedder;
 - small detectors turn their outputs into flags with time-localized evidence;
-- every detector is calibrated on human read speech (the controls): its cut lets about 1% of human recordings reach it, and speakers the calibration never saw measure that rate (see [Calibration on human controls](#calibration-on-human-controls));
+- some detectors have historical human-read-speech calibration (controls), measuring unusualness rather than request compliance; clone register/identity and accent/local phonation acceptance remain unqualified;
 - the maintainer hears only flagged takes and answers "usable" or "unusable" in chat; those confirmations measure each detector's precision (see [Chat confirmation](#chat-confirmation));
 - once labels accumulate, thresholds can also be fitted on them and evaluated out of fold, once per label set (see [Supervised fit](#supervised-fit-when-labels-accumulate)).
 
@@ -12,6 +13,28 @@ The maintainer cannot label a hundred clips by ear, so on 2026-10-05 the calibra
 **Status (2026-10-06): a report-only diagnostic.** Thirty-nine blind confirmations (confirm-1 to confirm-7, `benchmarks/qc/eval-v1.json`) found the flags no better than chance. Flagged takes were unusable 9 of 29 times (31%, 95% bounds 15-51%): lone flags 4 of 16 and agreeing flags 5 of 13. Unflagged takes shuffled in blind were unusable 2 of 5 times. About a third of the takes the maintainer heard were unusable, flagged or not. What makes a take unusable to the maintainer (a whispered syllable, a false start, over-linking, delivery, a heavy accent) sits inside the human range, while the detectors mostly catch accent and pacing the maintainer often accepts. A warn therefore means "unusual for human read speech", not "defective": it never fails a lane, no detector can reach fail at this precision, and no release decision leans on it. The maintainer closed the confirmation work there; take quality is judged by ear, and the product follow-ups are open roadmap items.
 
 Everything runs locally on the Mac, one model at a time, and no model weights enter Git.
+
+**October 10 remediation:** `flags/2` separates execution, input coverage, qualification and
+per-dimension decisions. A successful run is not audio-quality acceptance. Strict `gate` exits
+**4 (`NOT_ASSESSED`)** when required evidence or a qualified decision boundary is missing, stale
+or incomplete. Exit 0 means only that the lane's required dimensions are assessed and passed;
+it does not establish native accent, naturalness or emotion compliance. Failures remain 1,
+execution errors 2 and qualified warnings 3. `--legacy-exit` explicitly requests historical
+0/1/2/3 exit behavior; its report still discloses coverage and cannot grant quality acceptance.
+
+Scoring identity now includes coverage and narrow phonetic evidence code. Frozen thresholds
+are unchanged; their old scoring hashes do not qualify the new implementation. Recalibration
+requires a new threshold/evaluation identity and held-out evidence, never an edited old hash.
+The [generation investigation](../audits/2026-10-10-generation-quality-investigation.md) explains
+the calibration, domain and human-confirmation limits.
+
+Clone reports retain signed output-minus-reference register offset, two-tracker agreeing voiced
+duration/coverage and pitch ranges, plus speaker similarity. French reports retain original IPA,
+strict local substitutions/insertions, two-recognizer agreement and vowel/sonorant energy and
+periodicity. They automate evidence collection; recognizer agreement is not proof of accent,
+whisper or liaison defects. All supported French varieties remain acceptable unless the request
+explicitly specifies a variety. These new evidence views are uncalibrated and abstain from
+automatic acceptance.
 
 ## Why v2
 
@@ -50,9 +73,11 @@ All commands go through `python3 scripts/qc.py`.
 | `label serve --batch NAME [--port 8765] [--rater ID]` | Serves the listening page on 127.0.0.1. `--acoustic-only-languages zh,ja,ko,ru` hides the script and the linguistic classes for those languages. `--rater` defaults to the protocol's rater; each rater keeps their own labels. |
 | `label export --batch NAME [--rater ID]` | Summarizes one rater's labels: counts per class, severity and language, and intra-rater kappa from the blind repeats. |
 | `run --takes <manifest or qc-takes run> --lane NAME [--models roles or ids]` | Scores the takes with the lane's models (see [Lanes](#lanes)), one at a time; `--models` limits which run now, and the rest come from the cache. Then it runs the excerpt test, the features and the detectors, and prints the run id. |
+| `run --cache-only --takes <manifest> --lane NAME` | Rechecks audio digests and recomputes features/decisions using current-identity cached outputs only; never runs inference, G2P or the excerpt model test. Missing evidence stays unavailable. |
+| `report --run ID --json` | Reads retained evidence, recomputes current coverage qualification and includes clone fidelity and narrow French local evidence; does not rerun models. |
 | `language-bench takes --platform macos\|ios --run-id ID --plan PLAN --corpus CORPUS --diagnostics DIR [--wav-dir DIR] --output FILE` | Writes a lang-bench run's planned takes as a takes manifest, each WAV bound to the digest its generation published. |
 | `language-bench evidence --run QC_RUN --output FILE` | Writes the two ASR families' recognitions of a QC run for the language publisher, with each take's two-family verdict. Exits 0 when every take met its outcome, 1 when one did not, and 2 when a recognition is missing. |
-| `gate --lane NAME [--run ID]` | Exits 0 pass, 3 warn, 1 fail, or 2 error (no run, or a gating detector missing its inputs). |
+| `gate --lane NAME [--run ID] [--json] [--legacy-exit]` | Strict: 0 assessed pass, 1 detected failure, 2 execution/error, 3 qualified warning, 4 not assessed. A qualified failure retains precedence over incomplete coverage. Legacy mode preserves old exit behavior explicitly. |
 | `queue --top N [--run ID] [--batch NAME]` | Writes the most suspicious unlabelled takes of a run as a label batch, which `label serve --batch NAME` opens. |
 | `calibrate --controls <controls runs…> [--runs <generated runs…>] [--quantile 0.99] [--min-controls 150] [--reuse-reason TEXT]` | Calibrates the detectors on human recordings, with no label, and writes `config/qc/thresholds-v<N>.json` (`method: "human-reference"`; see [Calibration on human controls](#calibration-on-human-controls)). `--runs` adds the share of generated takes each reference would flag. |
 | `confirm next --run ID [--n 5] [--languages french,english] [--name NAME] [--mix-agreement] [--unflagged K]` | Copies up to `--n` takes the run flagged under neutral names for the maintainer to hear, blind, and writes them as a confirm batch (see [Chat confirmation](#chat-confirmation)). Never a clone or a human control. |

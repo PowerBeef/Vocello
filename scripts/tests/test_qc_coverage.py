@@ -15,6 +15,7 @@ class CoverageTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.layout = store.Layout(Path(self.temp.name))
         self.config = detectors.load_config()
+        store.write_json_atomic(self.layout.config / "detectors.json", self.config)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -113,6 +114,29 @@ class CoverageTests(unittest.TestCase):
                     lane="clone-lane", controls={"one"})
         self.assertEqual(flags["assessment"]["requiredDimensions"], 0)
         self.assertEqual(self.gate(flags)[0], 4)  # a control-only run cannot accept a clone
+
+    def test_previously_qualified_decision_abstains_after_runner_change(self):
+        flags = self.score(self.baseline())
+        flags["takes"] = [{"assessment": {"identity.drift": {"required": True, "decision": "pass"}}, "flags": []}]
+        flags["assessment"] = assessment.summarize(flags["takes"], [])
+        flags["modelIdentities"] = {"speaker": {"id": self.config["models"]["speaker"], "runnerSHA256": "old"}}
+        with patch.object(lanes.models, "load_registry", return_value=[{"id": self.config["models"]["speaker"]}]), \
+             patch.object(lanes.runtime, "runner_identity", return_value="old"):
+            self.assertEqual(self.gate(flags)[0], 0)
+        with patch.object(lanes.models, "load_registry", return_value=[{"id": self.config["models"]["speaker"]}]), \
+             patch.object(lanes.runtime, "runner_identity", return_value="new"):
+            code, text = self.gate(flags, json_output=True)
+            self.assertEqual(code, 4)
+            self.assertIn("stale-or-missing-runner-identity", text)
+            flags["takes"][0]["flags"] = [{"level": "fail"}]
+            self.assertEqual(self.gate(flags)[0], 4)
+            flags["takes"][0]["token"] = "one"
+            store.write_json_atomic(self.layout.runs / "clone-test/flags.json", flags)
+            store.write_json_atomic(self.layout.runs / "clone-test/features.json", {
+                "scoringSHA256": flags["scoringSHA256"], "takes": [{"token": "one"}]})
+            report = lanes.report(self.layout, "clone-test")
+            self.assertEqual(report["takes"][0]["assessment"]["identity.drift"]["qualification"], "stale")
+            self.assertEqual(report["takes"][0]["recordedAssessment"]["identity.drift"]["decision"], "pass")
 
 
 class EvidenceTests(unittest.TestCase):

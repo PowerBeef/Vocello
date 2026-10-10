@@ -783,7 +783,6 @@ def compose_device_results(
                 if sentinel.get("resolvedLanguageHint") != row["expectedFinalLanguage"]:
                     failures.append("sentinel-resolvedLanguageHint-mismatch")
                 receipt_expected = {
-                    "schemaVersion": 2,
                     "storedLanguageSelection": row["expectedStoredLanguage"],
                     "detectedTargetLanguage": row["targetLanguage"],
                     "finalModelLanguage": row["expectedFinalLanguage"],
@@ -793,6 +792,8 @@ def compose_device_results(
                     "instructionDigest": row.get("expectedInstructionDigest"),
                     "modelFacingInstructionLanguage": row.get("expectedInstructionLanguage"),
                 }
+                if type(receipt.get("schemaVersion")) is not int or receipt["schemaVersion"] not in (2, 3):
+                    failures.append("receipt-schemaVersion-mismatch")
                 for key, expected_value in receipt_expected.items():
                     if receipt.get(key) != expected_value:
                         failures.append(f"receipt-{key}-mismatch")
@@ -1205,7 +1206,6 @@ def execute_plan(
                 "clone_transcript_backed" if row["mode"] == "clone" else "voice_design"
             )
             checks = {
-                "requestReceiptSchemaVersion": 2,
                 "storedLanguageSelection": row["expectedStoredLanguage"],
                 "detectedTargetLanguage": row["targetLanguage"],
                 "finalModelLanguage": row["expectedFinalLanguage"],
@@ -1220,6 +1220,11 @@ def execute_plan(
                 key: {"expected": expected, "observed": payload.get(key)}
                 for key, expected in checks.items() if payload.get(key) != expected
             }
+            receipt_version = payload.get("requestReceiptSchemaVersion")
+            if type(receipt_version) is not int or receipt_version not in (2, 3):
+                mismatches["requestReceiptSchemaVersion"] = {
+                    "expected": [2, 3], "observed": receipt_version,
+                }
             if row.get("transcriptDigest") is not None and payload.get("referenceTranscriptDigest") != row["transcriptDigest"]:
                 mismatches["referenceTranscriptDigest"] = {
                     "expected": row["transcriptDigest"],

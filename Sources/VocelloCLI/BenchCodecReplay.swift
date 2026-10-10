@@ -21,7 +21,7 @@ enum BenchCodecReplay {
     }
 
     private struct Report: Encodable {
-        let schemaVersion = 1
+        let schemaVersion = 2
         let sourceTakeSHA256: String
         let sourceReceipt: GenerationRequestReceipt
         let trace: StartupReliabilityArtifactEvidence
@@ -38,6 +38,13 @@ enum BenchCodecReplay {
         let expectedPauseCount: Int
         let pauseExpectationSource: String
         let runID: String
+        var referenceWAVSHA256: String?
+        var referenceCodecSHA256: String?
+        var referenceFrameCount: Int?
+        var referencePrimedIncremental: ReplayOutput?
+        var referencePrimedProductionNonStreaming: ReplayOutput?
+        var referencePrimedArtifactRoot: String?
+        var referenceEncoderInput: String?
         var status = "started"
         var failureCode: String?
         var elapsedSeconds: Double?
@@ -81,27 +88,46 @@ enum BenchCodecReplay {
         let pauseCount = try StartupReliabilityDiagnosticEvidence.replayExpectedPauseCount(
             report: take.audioQC, failureCode: take.failureCode, receipt: receipt, script: script
         )
-        guard receipt.schemaVersion == 2,
+        let isClone = receipt.conditioningMode == "clone_transcript_backed"
+        guard (2...3).contains(receipt.schemaVersion),
               receipt.generationID == take.generationID.uuidString,
-              receipt.conditioningMode == "custom_voice",
-              let speakerID = receipt.speakerID,
+              (receipt.conditioningMode == "custom_voice" && receipt.speakerID != nil) || isClone,
               let expectedTokenizer = receipt.speechTokenizerDigest,
               receipt.modelIntegrityManifestDigest != nil,
               take.diagnosticArtifacts.filter({ $0.kind == .codecTrace }).count == 1,
               let evidence = take.diagnosticArtifacts.first(where: { $0.kind == .codecTrace }) else {
-            throw CLIError("Replay requires a correlated CustomVoice v2 take and complete codec identity.")
+            throw CLIError("Replay requires a correlated CustomVoice or transcript-backed Clone v2/v3 take and complete codec identity.")
         }
         let trace = try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(
             data: Data(contentsOf: traceURL), evidence: evidence
         )
+        let referenceSamples: [Float]?
+        let referenceDigest: String?
+        if isClone {
+            guard receipt.schemaVersion == 3, let expected = receipt.normalizedReferenceAudioDigest,
+                  let path = args.string("reference-wav") else {
+                throw CLIError("Clone replay requires a v3 conditioning-WAV digest and --reference-wav (canonical mono PCM16 24 kHz, at most 60 seconds).")
+            }
+            referenceSamples = try CodecRoundTripEvidence.verifiedInputSamples(
+                CodecRoundTripEvidence.readBoundedInput(at: URL(fileURLWithPath: path)), expectedSHA256: expected
+            )
+            referenceDigest = expected
+        } else {
+            guard args.string("reference-wav") == nil else { throw CLIError("Reference history applies only to transcript-backed Clone takes.") }
+            referenceSamples = nil
+            referenceDigest = nil
+        }
         let dataDirectory = CLIPaths.dataDirectory(override: args.string("data-dir"))
         let context = try CLIRuntime.bootstrapRegistryOnly(dataDirectory: dataDirectory, manifestOverride: nil)
         let catalogURL = try CLIRuntime.locateProductionCatalogURL()
         let catalog = try ProductionModelCatalog(contentsOf: catalogURL)
         // The iOS base ID and macOS scoped ID must resolve to the SAME artifact.
         let candidates = context.registry.models.filter {
-            $0.mode == .custom && $0.id.hasSuffix("_speed")
+            $0.mode == (isClone ? .clone : .custom)
                 && $0.artifactVersion == receipt.modelArtifactVersion
+                && ($0.id.hasSuffix("_speed") || $0.id.hasSuffix("_quality"))
+                && ($0.id == receipt.modelID
+                    || $0.id == receipt.modelID + "_" + (receipt.modelRuntimeIdentity?.modelVariant ?? "speed"))
         }
         guard candidates.count == 1, let model = candidates.first else {
             throw CLIError("No unambiguous installed model matches the source receipt.")
@@ -117,7 +143,7 @@ enum BenchCodecReplay {
             ModelAssetIntegrityManifest.self, from: Data(contentsOf: manifestURL)
         )
         guard (receipt.modelID == model.id || receipt.modelID == artifact.modelID),
-              context.registry.allSpeakers.contains(where: { $0.id == speakerID }),
+              (isClone || context.registry.allSpeakers.contains(where: { $0.id == receipt.speakerID })),
               installedManifest.repo == artifact.repo,
               installedManifest.revision.count == 40,
               installedManifest.revision.allSatisfy({ "0123456789abcdef".contains($0) }),
@@ -149,15 +175,26 @@ enum BenchCodecReplay {
         )
         let reportURL = output.appendingPathComponent("codec-replay-result.json")
         try write(report, to: reportURL)
-        let start = Date()
+        let clock = ContinuousClock()
+        let start = clock.now
         var runtime: CLIRuntime?
         do {
             let loaded = try await CLIRuntime.bootstrap(dataDirectory: dataDirectory, manifestOverride: nil)
             runtime = loaded
+            // This request grants only diagnostic loading; it never synthesizes
+            // the empty text or conditions a new clone prompt.
+            let payload: GenerationRequest.Payload
+            if isClone {
+                payload = .clone(reference: CloneReference(audioPath: "", transcript: nil))
+            } else if let speakerID = receipt.speakerID {
+                payload = .custom(speakerID: speakerID, deliveryStyle: nil)
+            } else {
+                throw CLIError("CustomVoice replay requires a recorded speaker.")
+            }
             let request = GenerationRequest(
-                mode: .custom, modelID: model.id, text: "", outputPath: "",
+                mode: isClone ? .clone : .custom, modelID: model.id, text: "", outputPath: "",
                 shouldStream: receipt.streaming, languageHint: receipt.language,
-                payload: .custom(speakerID: speakerID, deliveryStyle: nil),
+                payload: payload,
                 generationID: take.generationID, seed: receipt.seed, captureCodecTrace: true
             )
             let replay = try await loaded.engine.replayStartupReliabilityCodecTrace(
@@ -175,20 +212,60 @@ enum BenchCodecReplay {
                 appSupportDirectory: output, runID: runID, generationID: take.generationID, expectedPauseCount: pauseCount
             )
             report.productionNonStreaming = ReplayOutput(artifact: full.0, audioQC: full.1)
+            if let referenceSamples {
+                let encoded = try await loaded.engine.codecRoundTrip(modelID: model.id, samples: referenceSamples)
+                let joined = try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
+                    referenceFrames: encoded.codes, generatedFrames: trace.frames,
+                    generatedRanges: evidence.codecChunkRanges ?? []
+                )
+                report.referenceWAVSHA256 = referenceDigest
+                report.referenceCodecSHA256 = digest(try CodecRoundTripEvidence.codesData(encoded.codes))
+                report.referenceFrameCount = encoded.codes.count
+                report.referenceEncoderInput = "clone_reference_encoder_input_trailing_silence_500ms"
+                report.referencePrimedArtifactRoot = "reference-primed"
+                try write(report, to: reportURL)
+                let primed = try await loaded.engine.replayStartupReliabilityCodecTrace(
+                    request: request, frames: joined.frames, incrementalRanges: joined.ranges
+                )
+                let primedRoot = output.appendingPathComponent("reference-primed", isDirectory: true)
+                let primedIncremental = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                    samples: StartupReliabilityDiagnosticEvidence.generatedReplayWindow(
+                        samples: primed.incrementalAudio, referenceFrameCount: encoded.codes.count,
+                        generatedFrameCount: trace.frames.count, sampleRate: primed.sampleRate
+                    ), sampleRate: primed.sampleRate, kind: .incrementalReplayAudio,
+                    appSupportDirectory: primedRoot, runID: runID, generationID: take.generationID,
+                    expectedPauseCount: pauseCount
+                )
+                report.referencePrimedIncremental = ReplayOutput(artifact: primedIncremental.0, audioQC: primedIncremental.1)
+                try write(report, to: reportURL)
+                let primedFull = try StartupReliabilityDiagnosticEvidence.persistReplayAudio(
+                    samples: StartupReliabilityDiagnosticEvidence.generatedReplayWindow(
+                        samples: primed.fullAudio, referenceFrameCount: encoded.codes.count,
+                        generatedFrameCount: trace.frames.count, sampleRate: primed.sampleRate
+                    ), sampleRate: primed.sampleRate, kind: .fullReplayAudio,
+                    appSupportDirectory: primedRoot, runID: runID, generationID: take.generationID,
+                    expectedPauseCount: pauseCount
+                )
+                report.referencePrimedProductionNonStreaming = ReplayOutput(artifact: primedFull.0, audioQC: primedFull.1)
+            }
             try await loaded.engine.unloadModel()
             runtime = nil
             report.status = "replay_complete" // NOT a generation or audio-quality PASS.
-            report.elapsedSeconds = Date().timeIntervalSince(start)
+            report.elapsedSeconds = elapsedSeconds(start.duration(to: clock.now))
             try write(report, to: reportURL)
             emitJSON(report)
         } catch {
             if let runtime { try? await runtime.engine.unloadModel() }
             report.status = error is CancellationError ? "cancelled" : "failed"
             report.failureCode = error is CancellationError ? "cancelled" : "codec_replay_failed"
-            report.elapsedSeconds = Date().timeIntervalSince(start)
+            report.elapsedSeconds = elapsedSeconds(start.duration(to: clock.now))
             try write(report, to: reportURL)
             throw error
         }
+    }
+
+    private static func elapsedSeconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 
     private static func digest(_ data: Data) -> String {

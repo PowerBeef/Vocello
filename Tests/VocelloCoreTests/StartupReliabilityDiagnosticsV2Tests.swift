@@ -5,6 +5,52 @@ import VocelloQwen3Core
 import XCTest
 
 final class StartupReliabilityDiagnosticsV2Tests: XCTestCase {
+    func testReferencePrimedReplayPreservesGeneratedTokensAndPartitions() throws {
+        let reference = Array(repeating: Array(repeating: Int32(1), count: 16), count: 31)
+        let generated = Array(repeating: Array(repeating: Int32(2), count: 16), count: 9)
+        let joined = try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
+            referenceFrames: reference, generatedFrames: generated,
+            generatedRanges: [.init(start: 0, endExclusive: 4), .init(start: 4, endExclusive: 9)]
+        )
+        XCTAssertEqual(joined.frames, reference + generated)
+        XCTAssertEqual(joined.ranges, [
+            .init(start: 0, endExclusive: 25), .init(start: 25, endExclusive: 31),
+            .init(start: 31, endExclusive: 35), .init(start: 35, endExclusive: 40)
+        ])
+        let invalidRanges: [[StartupReliabilityCodecFrameRange]] = [[], [.init(start: 1, endExclusive: 9)],
+            [.init(start: 0, endExclusive: 4), .init(start: 3, endExclusive: 9)]]
+        for ranges in invalidRanges {
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
+                referenceFrames: reference, generatedFrames: generated, generatedRanges: ranges
+            ))
+        }
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
+            referenceFrames: [], generatedFrames: generated, generatedRanges: [.init(start: 0, endExclusive: 9)]
+        ))
+        var invalidCodes = reference
+        invalidCodes[0][1] = 2_048
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
+            referenceFrames: invalidCodes, generatedFrames: generated, generatedRanges: [.init(start: 0, endExclusive: 9)]
+        ))
+    }
+
+    func testReferencePrimedReplayWindowRejectsPartialAndNonFiniteOutput() throws {
+        let reference = Array(repeating: Float(-0.5), count: 1_920)
+        let generated = Array(repeating: Float(0.25), count: 3_840)
+        XCTAssertEqual(try StartupReliabilityDiagnosticEvidence.generatedReplayWindow(
+            samples: reference + generated, referenceFrameCount: 1, generatedFrameCount: 2, sampleRate: 24_000
+        ), generated)
+        for samples in [Array((reference + generated).dropLast()), reference + generated + [0],
+                        reference + generated.dropLast() + [Float.nan]] {
+            XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.generatedReplayWindow(
+                samples: samples, referenceFrameCount: 1, generatedFrameCount: 2, sampleRate: 24_000
+            ))
+        }
+        XCTAssertThrowsError(try StartupReliabilityDiagnosticEvidence.generatedReplayWindow(
+            samples: reference + generated, referenceFrameCount: 1, generatedFrameCount: 2, sampleRate: 48_000
+        ))
+    }
+
     func testDeviceTakeEncoderFeedsRealHostValidatorWithoutInventingQC() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -1773,8 +1773,12 @@ enum BenchCommand {
           --no-summary   skip the aggregator and registry; parent diagnostic lane owns publication
           --codec-replay <take.json> --take-sha256 <digest> --codec-trace <trace.bin>
                          --output-dir <new-directory>: internal diagnostics only;
-                         replay collected CustomVoice Speed codes without synthesis
+                         replay collected CustomVoice codes without synthesis
                          or publication. Requires QWENVOICE_DEBUG=1 and exact model identity.
+                         Transcript-backed Clone v3 takes additionally require
+                         --reference-wav <canonical-wav> matching the receipt's normalized
+                         reference digest. Adds reference-primed arms with identical
+                         generated tokens, preserving the cold arms; no quality PASS.
                          For a token-limit take without final QC, also provide
                          --script-file <file> matching the original model-facing text receipt.
           --codec-roundtrip <job.json> --output-dir <new-directory>: internal

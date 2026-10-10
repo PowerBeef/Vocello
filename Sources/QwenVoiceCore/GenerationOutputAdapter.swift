@@ -2106,6 +2106,7 @@ struct StreamingExecutionContext: Sendable {
         )
         let finalWAVFinishStartedAt = ContinuousClock.now
         let finalAudioQC: AudioQCReport
+        let publishedWAVDigest: String?
         var rejectedAudioQC: AudioQCReport?
         do {
             // Finalize the hidden staging file first. Fast QC owns the exact
@@ -2183,6 +2184,9 @@ struct StreamingExecutionContext: Sendable {
                 }
                 throw Self.finalAudioQCRejectionError(flags: finalAudioQC.flags)
             }
+            // Bind this generation's validated bytes before the destination
+            // can be replaced by another writer after publication.
+            publishedWAVDigest = try? SamplingTakeEvidence.sha256FileDigest(at: stagingURL)
             try finalWriter.publish()
             // The exact staged bytes were validated above. Publication commits
             // them; a later destination lookup could observe another writer.
@@ -2293,7 +2297,6 @@ struct StreamingExecutionContext: Sendable {
         // History provenance is always on, even when telemetry is off. The
         // digest remains optional on an I/O failure; missing identity must not
         // be mistaken for complete replay evidence.
-        let publishedWAVDigest = try? SamplingTakeEvidence.sha256FileDigest(at: outputURL)
         if let wavDigest = publishedWAVDigest {
             let plannedSeed = request.seed
                 ?? stringFlags["sampling_effective_seed"].flatMap(UInt64.init)

@@ -1096,3 +1096,133 @@ authoritative files; named symbols and line anchors below identify the reviewed 
   [XLSR phone model](https://huggingface.co/facebook/wav2vec2-xlsr-53-espeak-cv-ft).
   Exact pinned runner/checkpoint identities in the repository take precedence over evolving upstream
   APIs. In particular, FCPE checkpoint licensing is not interchangeable across releases.
+
+## 13. Remediation implementation — October 10
+
+Sections 1–12 describe the investigation checkpoint at `19358824` and its parent. This addendum
+records subsequent engineering changes; the original observations and failed evidence remain
+historical evidence. Implementation does not retrospectively qualify earlier takes.
+
+### 13.1 Coverage-aware QC and automated evidence
+
+`scripts/qc/assessment.py` separates input acquisition from decision qualification. Each dimension
+records required features, missing evidence, voiced agreement duration where relevant, qualification,
+decision and explicit reasons. `flags/2` retains overall execution separately from coverage and
+detected defects. Runner failures remain execution errors even if every detector is report-only.
+
+Strict `qc.py gate` adds exit 4, `NOT_ASSESSED`, for missing or unqualified required dimensions.
+A genuinely qualified failure still fails when another dimension is incomplete; stale scoring or
+runner identity instead invalidates current acceptance and retains the historical flags separately.
+`--legacy-exit` preserves old process-exit behavior explicitly, without turning missing coverage
+into a quality claim. Lane wrappers now distinguish operational completion from assessed quality.
+
+Scoring identity includes feature, detector, assessment, narrow phonetic and lane decision code.
+Frozen thresholds/configuration are unchanged. New source identity therefore invalidates old
+calibration; changing a hash in a frozen file would conceal this boundary and is prohibited.
+Retained reporting checks current required runner identities before accepting historical qualified
+decisions. Stale per-dimension decisions become `not-assessed`, with original assessments retained.
+
+Clone analysis now exposes signed output-minus-reference register in semitones, agreeing voiced
+duration for both clips, tracker agreement coverage and pitch range. Speaker evidence remains a
+separate dimension. Short, unvoiced or disagreeing tracks abstain rather than becoming a negative
+quality score. The acquisition minimum is not a product-quality tolerance. No two-semitone,
+cosine-similarity or accent probability threshold has been invented.
+
+`scripts/qc/forensics.py` preserves recognizers' original IPA tokens, stress, length and diacritics.
+A separate narrow alignment keeps rhotic distinctions and inserted vowels instead of broad
+phone folding or optional-schwa forgiveness. Local agreement retains both recognizers' evidence;
+approximate timing disagreement prevents temporal consensus. Descriptive vowel/sonorant windows
+include energy relative to the clip's speech median, periodicity and spectral centroid. These can
+localize hypotheses such as a quiet/unvoiced syllable, but are explicitly uncalibrated: rhotics can
+vary legitimately, G2P can prefer one variety, recognizers share bias and periodicity is not itself
+whisper or emotion ground truth. Native-accent acceptance remains `not-assessed`.
+
+`qc.py run --cache-only` revalidates audio/reference hashes and uses exact-current cached model
+outputs without running inference, transcript G2P or excerpt model tests. `qc.py report --run ID
+--json` reads retained evidence without rerunning models. Full installed-model execution remains
+sequential under the canonical QC lock. Neither mode silently downloads assets.
+
+### 13.2 User input and reference conditioning
+
+One-off Clone now owns typed readiness in `VoiceCloningDraft`, shared by Mac/iOS. A pending ASR
+task or unreviewed automatic transcript cannot enable generation. The user reviews/edits the
+transcript or explicitly selects audio-only conditioning. A completed ASR task cannot later change
+that admitted choice. Saved, already reviewed reference intent remains usable.
+
+Recognition is bound to an operation generation, UUID, path and content identity. The shared
+transcriber recognizes an immutable temporary copy whose content is checked before/after copying,
+then rechecks the selected source before returning. Replacement, cancellation, an A→B→A selection,
+same-path mutation and a user edit invalidate stale completion. Temporary recognition files are
+removed. Conditioning whitespace normalization is shared; iOS snapshots the short-take draft at
+the Generate action. Its transcript editor remains accessible during edits and after ASR failure.
+
+The French bright-presenter starter no longer requests a British accent. User-authored briefs are
+unchanged; selecting French still does not override an intentionally requested accent. The default
+analysis accepts supported French varieties rather than assuming Metropolitan French.
+
+Saving a generated Design voice no longer preloads the intended script as verified reference
+transcription. The sheet explains the origin, recognizes the actual audio and applies the existing
+review/audio-only enrollment policy. This prevents a falsely certain script from entering future
+transcript-backed Clone conditioning; it does not guarantee ASR correctness.
+
+### 13.3 Durable request/completion provenance
+
+`GenerationRequestReceipt` v3 records actual prepared talker/subtalker sampling, effective seed,
+language resolution, conditioning route, transcript source, complete available model runtime
+identity and separate SHA-256 hashes of original and normalized reference WAVs. The earlier
+reference field used a path/size/mtime fingerprint with only 16 hex characters; validation discarded
+it rather than retaining a content digest. The new normalized digest binds the waveform actually
+consumed for conditioning.
+
+`GenerationCompletionReceipt` binds that request to final WAV content, duration, finish reason and
+execution mode. The digest is captured from the validated staging WAV before atomic publication,
+so another writer replacing the destination cannot alter this take's provenance. It is available
+with telemetry disabled. Result annotations preserve it through event-delivery and allocation retry
+paths, CLI JSON and both platform completion hooks.
+
+History migration v8 adds a nullable JSON column through an additive migration. Existing rows and
+recovery journals decode with no receipt; provenance is never reconstructed from current defaults.
+The existing outbox/transaction paths preserve receipts across failed writes and recovery. Long-form
+segments retain their own receipts; an assembled output has no invented single synthesis request.
+Raw prompts, transcripts, private paths and audio are not added to receipt fields. Hashes support
+correlation, not reconstruction. Application build SHA remains unavailable in current runtime
+metadata and is not promised. Optional missing hashes/decoder-history fields mean unavailable.
+
+### 13.4 Controlled decoder-history diagnosis
+
+The existing internal `bench --codec-replay` interface now accepts transcript-backed Clone v3
+takes with `--reference-wav`. The canonical mono PCM16/24 kHz reference is checked against the
+receipt's normalized SHA-256 and the existing 60-second diagnostic bound before loading a model
+or creating output. Exact scoped model/variant, catalog bytes and tokenizer identity remain required;
+shared artifact-version strings alone cannot distinguish Speed from Quality.
+
+The diagnostic preserves the original cold incremental and cold 25-frame arms. The same installed
+tokenizer encoder produces reference codes using Clone's 500 ms trailing-silence input. The existing
+reset-per-arm replay then receives reference+generated codes: reference chunks use 25 frames and
+generated chunks keep the captured original partitions. A separate 25-frame arm uses the combined
+sequence. Both primed arms remove the exact reference-frame sample prefix and retain the exact
+generated sequence. Invalid code shapes/ranges, oversized combined traces, partial output,
+non-finite PCM or an unexpected timebase fail rather than silently producing a comparison.
+
+Artifacts and hashes remain separate for all arms, including the reference-code digest, frame count
+and encoder semantics. Replay duration uses a monotonic clock. Existing diagnostic PCM limiting
+applies; this is neither new synthesis nor a watermark/publication equivalence test. A completed
+replay is `replay_complete`, never quality PASS. Shipping Clone decoding remains unchanged until
+shipped-weight evidence establishes whether the history difference is harmful and what correction
+preserves content, identity, latency and memory.
+
+### 13.5 Qualification and remaining acceptance
+
+The implemented mechanisms remove misleading acceptance and ambiguous input state. They automate
+measurement and localization of the reported dimensions; they do not establish a universal
+replacement for listening. Exact recent failing Clone/Design examples were not supplied with the
+remediation request. Existing retained examples can exercise acquisition and forensic reporting,
+but cannot retrospectively supply missing request provenance or an independent dialect/accent
+ground-truth split.
+
+QC-06 therefore remains open for paired clone calibration, French local-defect challenge data and
+qualified acceptance. Bounded automatic regeneration/selection remains conditional on that evidence.
+QC-08's Fast QC v9 silence/finishing/loudness changes retain their existing human-control calibration
+and new-lineage prerequisites; no unqualified signal reshaping is activated as an accent fix.
+RF-14's release decision/listening gate remains unchanged. Phone acceptance is deferred. Validation
+and actual installed-asset observations are recorded in the existing development checkpoint.

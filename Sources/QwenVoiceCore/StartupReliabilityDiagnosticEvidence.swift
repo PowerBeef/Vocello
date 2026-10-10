@@ -110,7 +110,7 @@ public enum StartupReliabilityDiagnosticEvidence {
         script: String?
     ) throws -> Int {
         if let count = report?.cadence?.expectedPauseCount, count >= 0, script == nil { return count }
-        guard receipt.schemaVersion == 2, let script else { throw EvidenceError.invalidIdentity }
+        guard (2...3).contains(receipt.schemaVersion), let script else { throw EvidenceError.invalidIdentity }
         let normalized = script.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty, normalized.count == receipt.normalizedTargetTextCharacters,
               sha256(Data(normalized.utf8)) == receipt.normalizedTargetTextDigest else {
@@ -123,6 +123,52 @@ public enum StartupReliabilityDiagnosticEvidence {
             throw EvidenceError.invalidIdentity
         }
         return count
+    }
+
+    /// Holds generated codec tokens and their partitions fixed while supplying
+    /// reference history to the same reset-per-arm decoder. Reference chunks
+    /// use the production 25-frame schedule; no reference PCM is published.
+    public static func referencePrimedReplayInput(
+        referenceFrames: [[Int32]], generatedFrames: [[Int32]],
+        generatedRanges: [StartupReliabilityCodecFrameRange]
+    ) throws -> (frames: [[Int32]], ranges: [StartupReliabilityCodecFrameRange]) {
+        guard !referenceFrames.isEmpty, !generatedFrames.isEmpty,
+              referenceFrames.count <= maximumCodecFrames - generatedFrames.count else {
+            throw EvidenceError.traceOutOfBounds
+        }
+        _ = try CodecRoundTripEvidence.codesData(referenceFrames)
+        _ = try CodecRoundTripEvidence.codesData(generatedFrames)
+        var next = 0
+        for range in generatedRanges {
+            guard range.start == next, range.endExclusive > next,
+                  range.endExclusive <= generatedFrames.count else { throw EvidenceError.invalidRanges }
+            next = range.endExclusive
+        }
+        guard next == generatedFrames.count else { throw EvidenceError.invalidRanges }
+        let prefixCount = referenceFrames.count
+        let prefix = stride(from: 0, to: prefixCount, by: 25).map {
+            StartupReliabilityCodecFrameRange(start: $0, endExclusive: min(prefixCount, $0 + 25))
+        }
+        let suffix = generatedRanges.map {
+            StartupReliabilityCodecFrameRange(
+                start: prefixCount + $0.start, endExclusive: prefixCount + $0.endExclusive
+            )
+        }
+        return (referenceFrames + generatedFrames, prefix + suffix)
+    }
+
+    /// The catalog tokenizer contract fixes 1,920 samples per frame at 24 kHz.
+    /// Refuse partial, non-finite or differently shaped diagnostic output rather
+    /// than silently trimming it into a seemingly successful comparison.
+    public static func generatedReplayWindow(
+        samples: [Float], referenceFrameCount: Int, generatedFrameCount: Int, sampleRate: Int
+    ) throws -> [Float] {
+        guard referenceFrameCount > 0, generatedFrameCount > 0,
+              referenceFrameCount <= maximumCodecFrames - generatedFrameCount,
+              sampleRate == 24_000,
+              samples.count == (referenceFrameCount + generatedFrameCount) * 1_920,
+              samples.allSatisfy(\.isFinite) else { throw EvidenceError.invalidReplay }
+        return Array(samples[(referenceFrameCount * 1_920)...])
     }
 
     public static func failureClassification(

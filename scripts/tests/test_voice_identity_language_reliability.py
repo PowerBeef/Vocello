@@ -422,6 +422,21 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         tampered = json.loads(first_path.read_text(encoding="utf-8"))
         passing = copy.deepcopy(tampered)
 
+        for version, accepted in ((3, True), (4, False), (True, False)):
+            versioned = copy.deepcopy(passing)
+            versioned["requestReceipt"]["schemaVersion"] = version
+            first_path.write_text(json.dumps(versioned), encoding="utf-8")
+            version_report = VLR.compose_device_results(
+                plan=plan, contract=self.contract, diagnostics_root=diagnostics,
+                transcription=transcription,
+                output=self.root / f"receipt-version-{version}-summary.json",
+            )
+            self.assertEqual(
+                "receipt-schemaVersion-mismatch" not in version_report["takes"][0]["failures"],
+                accepted,
+            )
+        first_path.write_text(json.dumps(passing), encoding="utf-8")
+
         rejected = copy.deepcopy(passing)
         rejected["outputVerification"] = {
             "algorithmVersion": "language-output-verifier-v3",

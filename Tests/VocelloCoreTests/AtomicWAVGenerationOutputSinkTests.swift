@@ -31,13 +31,16 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         let second = try IncrementalPCM16WAVFileWriter(sampleRate: 24_000, outputURL: output)
         try first.append(pcmSamples: [100, 200, 300])
         try second.append(pcmSamples: [400, 500, 600])
-        let firstData = try Data(contentsOf: first.finishStaging())
+        let firstStaging = try first.finishStaging()
+        let firstData = try Data(contentsOf: firstStaging)
+        let firstDigest = try SamplingTakeEvidence.sha256FileDigest(at: firstStaging)
         let secondData = try Data(contentsOf: second.finishStaging())
         try first.publish()
         XCTAssertEqual(try Data(contentsOf: output), firstData)
         try second.publish()
         first.discard()
         XCTAssertEqual(try Data(contentsOf: output), secondData)
+        XCTAssertNotEqual(firstDigest, try SamplingTakeEvidence.sha256FileDigest(at: output))
         XCTAssertEqual(try fm.contentsOfDirectory(atPath: output.deletingLastPathComponent().path), ["output.wav"])
     }
 

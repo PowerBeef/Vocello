@@ -1544,7 +1544,7 @@
       "id": "QC-06",
       "plan": "qc-v2-2026-10",
       "title": "Product follow-ups surfaced by QC",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [
         "QC-03"
       ],
@@ -1555,7 +1555,7 @@
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Historical leads: October 1 register analysis, retained 804-take variation experiment, and maintainer-confirmed Dylan whisper/false-start/liaison defects. Earlier spelling diagnosis was withdrawn for recognizer bias; short tail alone does not prove cutoff. October 10 investigation finds no current accent detector or qualified clone-pitch cut, a British-accent French Design starter, optional-ASR conditioning changes, and streaming versus quality-first Clone decoder-history asymmetry. Proposed work: coverage-aware verdicts, paired reference-register/identity qualification, narrow French pronunciation/local-defect assessment, explicit Clone readiness, durable request receipts, and identical-codec decoder replay. These are source findings and hypotheses, not reproduced causes of the recent Clone/Design complaints. No product fix, automatic-quality gate or release acceptance is claimed; RF-14 retains that decision."
+      "notes": "Historical leads and acceptance limits are documented in the October 10 generation-quality investigation. Remediation implemented: coverage-aware QC/strict NOT_ASSESSED, signed reference register and voiced coverage, current-identity speaker evidence, narrow French phonetic/acoustic forensics, explicit Clone review/audio-only readiness with stale-ASR guards, accent-neutral French starter, actual-audio Design enrollment, durable v3 request/completion receipts with nullable History v8 migration, and identical-codec reference-history diagnostic replay. No shipping decoder change, calibrated accent/whisper/identity acceptance, bounded regeneration or release qualification is claimed. Remaining: actual failing clone pairs and held-out paired reference/variety/local-defect qualification; decoder hypothesis evaluation on shipped weights; QC-08 finishing qualification remains separate. RF-14 retains the quality decision."
     },
     {
       "id": "QC-08",

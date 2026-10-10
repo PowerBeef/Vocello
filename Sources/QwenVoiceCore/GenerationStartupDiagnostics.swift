@@ -247,11 +247,16 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
 
     private static func samplingIdentityComponents(_ policy: Qwen3SamplingPolicy?) -> [String] {
         guard let policy else { return ["sampling-unavailable"] }
-        return [String(policy.algorithmVersion), String(policy.effectiveSeed)]
-            + [policy.talker, policy.subtalker].flatMap {
-                [String($0.temperature), String($0.topP), String($0.topK), String($0.minP)]
-            }
-            + [String(policy.repetitionPenalty), String(policy.maximumCodecTokens)]
+        var components = [String(policy.algorithmVersion), String(policy.effectiveSeed)]
+        for distribution in [policy.talker, policy.subtalker] {
+            components.append(String(distribution.temperature))
+            components.append(String(distribution.topP))
+            components.append(String(distribution.topK))
+            components.append(String(distribution.minP))
+        }
+        components.append(String(policy.repetitionPenalty))
+        components.append(String(policy.maximumCodecTokens))
+        return components
     }
 
     private static func validatedDigest(_ value: String?) -> String? {

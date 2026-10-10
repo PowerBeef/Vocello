@@ -8,6 +8,25 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
     private let maxAbsoluteTolerance: Float = 1e-5
     private let rmsTolerance: Float = 1e-6
 
+    func testReferenceHistoryComparisonKeepsGeneratedWindowAndPartitionInvariant() throws {
+        MLXRandom.seed(0xC0DEC0DE)
+        let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())
+        let reference = fixtureCodes(tokenCount: 31, offset: 3)
+        let generated = fixtureCodes(tokenCount: 48)
+        let joined = concatenated([reference, generated], axis: 2)
+        let combined = decode(decoder, codes: joined, partitions: repeatedPartitions(total: 79, size: 25), timing: false)
+        let primed = decode(decoder, codes: joined, partitions: [25, 6, 1, 2, 3, 4, 12, 25, 1], timing: false)
+        // The tiny fixture upsamples by four; the shipped tokenizer's checked
+        // contract uses 1,920. The exact prefix cut is independent of code zero.
+        let referenceSamples = 31 * 4
+        assertWaveform(Array(primed.dropFirst(referenceSamples)),
+                       matches: Array(combined.dropFirst(referenceSamples)), label: "reference-primed partitions")
+        let cold = decode(decoder, codes: generated, partitions: [1, 2, 3, 4, 12, 25, 1], timing: false)
+        XCTAssertEqual(cold.count, primed.count - referenceSamples)
+        assertWaveform(decode(decoder, codes: generated, partitions: [48], timing: false),
+                       matches: cold, label: "primed arm must not contaminate later cold replay")
+    }
+
     func testFixedAndRandomizedPartitionsAreWaveformInvariant() throws {
         MLXRandom.seed(0xC0DEC0DE)
         let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())

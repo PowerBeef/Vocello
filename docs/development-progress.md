@@ -17,6 +17,37 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — generation quality remediation
+
+Implemented the investigation's immediate safeguards: explicit Clone transcript review/audio-only
+selection, stale-recognition rejection with immutable copies/content identity, accent-neutral French
+Design starter, actual-audio transcription during generated Design enrollment, and versioned private
+request/completion receipts preserved through History, outbox recovery and CLI JSON. History migration
+v8 is additive; populated previous-schema and legacy-journal tests pass. QC now separates execution,
+coverage and qualification, returns NOT_ASSESSED for missing/unqualified/stale evidence, and retains
+signed reference-pitch, identity and French phonetic evidence without inventing acceptance thresholds.
+A bounded, digest-bound Clone decoder replay compares cold and reference-primed histories with the
+same generated codes; production decoder behavior remains unchanged. Independent review found and
+verified corrections for model selection, published-output digest ownership, the iOS transcript
+editor and stale QC decisions. VLR accepts supported receipt versions 2/3 and rejects unknown versions.
+
+**Verified before model experiments:** routed `check --since 19358824` passed contracts, privacy,
+ShellCheck/SwiftLint, **2,110 Python tests plus 2,510 subtests** (one existing skip), generic iOS app and
+logic-test compilation, and the affected optimized macOS UI-bundle compilation. Native run
+`mac-test-20261010-173151` passed **1,421 core tests** and **180 runtime tests**, with three expected
+runtime skips and complete/consistent summaries. The final receipt-compatibility changes passed
+11 focused tests. The earlier compiler failure (`mac-test-20261010-172830`) and initial Python
+fixture/tree-identity failures remain retained. Source was frozen for the successful full suite.
+Root changed only the supported receipt-version check after that Python pass; its focused rerun passed.
+
+**Remaining qualification:** QC-06 is in flight; QC-08 and RF-14 remain open. Exact recent failing
+Clone/Design inputs and held-out labeled native-French/whisper/clone-fidelity data are unavailable.
+No automated native-accent or emotional-intent acceptance is established. Installed-asset probes,
+UI execution and decoder observations follow on a committed checkpoint. No phone, model download,
+release decision, benchmark publication or push is included. Local Xcode 27.0 does not qualify the
+pinned CI 26.6 compiler. Hook delivery was observed; persisted trust remains unconfirmed by doctor.
+Raw evidence stays under ignored `build/private/qc/generation-audit-20261010/` and canonical run folders.
+
 ### October 10 — generation quality investigation
 
 Completed a [detailed end-to-end investigation](audits/2026-10-10-generation-quality-investigation.md)

@@ -354,6 +354,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
         "thresholdsReason": reason, "scoringSHA256": scoring["sha256"], "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
         "assessment": assessment_lib.summarize(out_takes, errors),
+        "modelIdentities": identities,
     }
 
 
@@ -402,6 +403,8 @@ def gate(layout: Layout, lane: str, run_id: str | None = None, *, legacy_exit: b
     if not legacy_exit:
         if errors or assessment.get("execution") == "error":
             code = EXIT_ERROR
+        elif str(assessment.get("reason", "")).startswith("stale"):
+            code = EXIT_NOT_ASSESSED
         elif worst == "fail":
             code = EXIT_FAIL
         elif assessment.get("coverage") != "complete":
@@ -418,7 +421,7 @@ def gate(layout: Layout, lane: str, run_id: str | None = None, *, legacy_exit: b
         import json
         print(json.dumps(result, sort_keys=True))
     else:
-        decision = ("ERROR" if code == EXIT_ERROR else "FAIL" if worst == "fail" else
+        decision = ("ERROR" if code == EXIT_ERROR else "NOT_ASSESSED" if code == EXIT_NOT_ASSESSED else "FAIL" if worst == "fail" else
                     "NOT_ASSESSED" if assessment.get("coverage") != "complete" else assessment.get("decision"))
         print(f"qc gate {lane}: run {flags['run']}: {decision}; execution={assessment['execution']}; "
               f"coverage={assessment['coverage']}; detected={worst}; errors={len(errors)}; "
@@ -501,6 +504,30 @@ def effective_assessment(layout: Layout, flags: dict[str, Any]) -> dict[str, Any
     current = assessment_lib.summarize(flags["takes"], flags.get("errors") or [], flags.get("models"))
     if flags.get("scoringSHA256") != detector_lib.scoring_identity(layout)["sha256"]:
         current.update(coverage="not-assessed", decision="not-assessed", reason="stale-scoring-identity")
+    else:
+        required = {name for take in flags["takes"] for name, value in take.get("assessment", {}).items()
+                    if value.get("required") and value.get("decision") in ("pass", "warn", "fail")}
+        if not required:
+            return current
+        config = detector_lib.load_config(layout)
+        roles = set().union(*(detector_lib.detector_roles(detector) for detector in config["detectors"]
+                              if detector["id"] in required))
+        if not roles:
+            return current
+        registry = {model["id"]: model for model in models.load_registry(layout)}
+        stale = []
+        for role in sorted(roles):
+            expected = (flags.get("modelIdentities") or {}).get(role) or {}
+            model = registry.get(config["models"].get(role))
+            try:
+                identity = runtime.runner_identity(layout, model) if model else None
+            except (runtime.RunnerError, OSError):
+                identity = None
+            if not identity or expected.get("id") != (model or {}).get("id") or expected.get("runnerSHA256") != identity:
+                stale.append(role)
+        if stale:
+            current.update(coverage="not-assessed", decision="not-assessed", reason="stale-or-missing-runner-identity",
+                           unavailableRoles=stale)
     return current
 
 def report(layout: Layout, run_id: str) -> dict[str, Any]:
@@ -515,15 +542,16 @@ def report(layout: Layout, run_id: str) -> dict[str, Any]:
     effective = effective_assessment(layout, flags)
     if not current:
         effective.update(coverage="not-assessed", decision="not-assessed", reason="stale-or-inconsistent-scoring-identity")
+    stale = not current or str(effective.get("reason", "")).startswith("stale")
     takes = []
     for take in flags["takes"]:
         entry = dict(take, phoneticEvidence=rows.get(take["token"], {}).get("phoneticEvidence"),
                      diagnostics={name: value for name, value in rows.get(take["token"], {}).get("features", {}).items()
                                   if name.startswith(("pitch.", "speaker.", "pause.", "end."))})
-        if not current:
+        if stale:
             entry["recordedAssessment"] = entry.get("assessment")
             entry["assessment"] = {name: dict(value, decision="not-assessed", qualification="stale",
-                                              reasons=value.get("reasons", []) + ["stale-scoring-identity"])
+                                              reasons=value.get("reasons", []) + [effective.get("reason", "stale-identity")])
                                    for name, value in (entry.get("assessment") or {}).items()}
         takes.append(entry)
     return {"schema": "vocello.qc.report/1", "run": run_id, "lane": flags["lane"],

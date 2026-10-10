@@ -874,7 +874,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 both apps since 2026-09-15) and `Sources/SharedSupport/Database/GenerationMigrations.swift`. `generations`
 table (current schema, after migrations `v1_create_generations` →
 `v2_add_sortOrder` → `v3_drop_sortOrder` → `v4_index_generations_createdAt` →
-`v5_add_long_form_project` → `v6_add_seed` → `v7_index_generations_audioPath`):
+`v5_add_long_form_project` → `v6_add_seed` → `v7_index_generations_audioPath` →
+`v8_add_completion_receipt`):
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -891,6 +892,7 @@ table (current schema, after migrations `v1_create_generations` →
 | `longFormProjectID` | text | owning long-form plan digest; NULL for ordinary takes (v5) |
 | `longFormRole` | text | `segment` / `joined` within a project; NULL otherwise (v5) |
 | `seed` | integer | the engine's effective sampling seed, UInt64 stored as its Int64 bit pattern; NULL for pre-v6 rows (v6, DP-15). Powers "Pin seed for new takes" in History: a pinned seed rides every subsequent request of that mode's draft, reproducing the take with identical settings |
+| `completionReceipt` | text | nullable versioned JSON binding actual prepared request/sampling/model/reference identity to validated published-WAV digest, duration and completion; NULL for legacy rows and joined long-form outputs without a single synthesis request (v8) |
 
 Indexes `idx_generations_createdAt` on `createdAt` and
 `idx_generations_longFormProjectID` on `longFormProjectID`, and (v7) `idx_generations_audioPath` on `audioPath`. `DatabaseService`
@@ -921,6 +923,13 @@ commit; only a successful database transaction removes the sidecar. Startup and 
 reconcile retained entries. Both History screens read bounded pages (`GenerationHistoryPageQuery`,
 500 entries, a long-form project counted once); sort, mode filter and search run in SQL over the whole
 table, and a read takes the SQLite writer only while a long-form journal is pending (AUD-05).
+The optional completion receipt travels inside the existing outbox and long-form segment journals;
+legacy journals decode with it absent. Request receipt v3 records actual effective talker/subtalker
+sampling, model runtime identity and separate content hashes for source and normalized reference.
+It retains no raw prompt, reference path or transcript. The final WAV digest is captured from the
+validated staging file before publication, so a later destination replacement cannot change this
+take's receipt. Receipts support forensic correlation; hashes do not reconstruct unavailable inputs,
+and unavailable application build identity remains unavailable.
 Database open, migration, read, write, and delete failures are reduced
 to typed privacy-safe classifications; an unavailable store never masquerades as empty History or
 turns a destructive operation into a successful no-op. Both platforms expose a recovery banner:

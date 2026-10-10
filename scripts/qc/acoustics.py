@@ -10,7 +10,9 @@ Input is mono, normalized PCM. Frame timestamps refer to full-window support:
 start = i * hop, end = start + window, center = (start + end) / 2. No padding.
 Phone windows use only frames fully inside their bounds; the uniform discovery
 grid uses frame centers and records overlapping support. No recognized error is
-needed to supply expected windows. No window constitutes a defect decision.
+needed to supply expected windows. Separate phone-centered context windows can
+include neighboring phones; they never replace strict phone support or establish
+phone-only evidence. No window constitutes a defect decision.
 """
 from __future__ import annotations
 
@@ -50,7 +52,7 @@ def _empty(reason, settings=None):
     return {"schema": SCHEMA, "inputStatus": "unavailable", "reason": reason,
             "qualification": "uncalibrated", "decision": "not-assessed",
             "settings": settings or {}, "coverage": {}, "summary": {},
-            "pitchWitness": {}, "expectedWindows": [], "recognizedWindows": [],
+            "pitchWitness": {}, "expectedWindows": [], "expectedContextWindows": [], "recognizedWindows": [],
             "intervals": [], "referenceComparison": {"inputStatus": "unavailable",
                                                         "reason": "missing-reference"},
             "uncertainties": [reason]}
@@ -216,6 +218,35 @@ def _windows(items, profile, duration, source):
     return result, truncated
 
 
+def _expected_contexts(windows, profile, duration, context_seconds):
+    """Summarize the existing profile around valid targets, never padding PCM.
+
+    `windows` is the already bounded strict inventory, including valid targets
+    too short for an analysis frame. Keep invalid targets unavailable instead of
+    silently moving them into the recording. Context support can mix phones.
+    """
+    contexts = []
+    for target in windows:
+        start, end = target.get("start"), target.get("end")
+        valid = ((target.get("inputStatus") == "complete"
+                  or target.get("reason") == "no-full-analysis-frame")
+                 and start is not None and end is not None and end > start)
+        center = (start + end) / 2 if valid else None
+        context_start = max(0., center - context_seconds / 2) if valid else None
+        context_end = min(duration, center + context_seconds / 2) if valid else None
+        context = _window(profile, context_start, context_end, duration, source="expected-context",
+                          phone=target.get("phone"), voiced_target=target.get("voicedTarget"),
+                          alignment_source=target.get("alignmentSource"))
+        context.update(targetStart=start, targetEnd=end)
+        context["uncertainties"].append("context-may-include-adjacent-phones")
+        if not valid:
+            context["reason"] = "invalid-target-window"
+        elif center - context_seconds / 2 < 0 or center + context_seconds / 2 > duration:
+            context["uncertainties"].append("context-cropped-to-audio-bounds")
+        contexts.append(context)
+    return contexts
+
+
 def compare(take, reference):
     """Reference-conditioned descriptive differences; never a pitch-fidelity verdict."""
     result = {"inputStatus": "unavailable", "decision": "not-assessed",
@@ -261,18 +292,21 @@ def compare(take, reference):
 def analyze(samples, rate, *, expected_windows: Iterable[Mapping] | None = None,
             recognized_windows: Iterable[Mapping] | None = None, reference=None,
             window_seconds=.060, hop_seconds=.010, interval_seconds=.250,
-            max_seconds=120., batch_frames=128):
+            expected_context_seconds=.120, max_seconds=120., batch_frames=128):
     """Analyze at most max_seconds without padding or copying whole audio to float64.
 
     max_seconds is a rejection bound (no silent truncation); batch_frames is capped
     at 256 and additionally by MAX_BATCH_SAMPLES. Expected and recognized windows
     accept {start, end, phone?, voicedTarget?, alignmentSource?}; a supplied source
     is also preserved as alignmentSource. Each collection is bounded to 2048.
+    Separate expectedContextWindows reuse the profile around the target center,
+    crop to audio bounds, and explicitly disclose adjacent-phone uncertainty.
     Short, silent, nonfinite or unsupported audio cannot yield an assessed verdict.
     `reference` is another analyze() result, compared only with compatible settings.
     """
     settings = {"windowSeconds": window_seconds, "hopSeconds": hop_seconds,
-                "intervalSeconds": interval_seconds, "maximumDurationSeconds": max_seconds,
+                "intervalSeconds": interval_seconds, "expectedContextSeconds": expected_context_seconds,
+                "maximumDurationSeconds": max_seconds,
                 "fminHz": 50, "fmaxHz": 800, "candidateMinimumCorrelation": .6,
                 "nearBestCorrelationTolerance": .02,
                 "minimumComparisonPitchFrames": MIN_COMPARISON_PITCH_FRAMES,
@@ -280,12 +314,12 @@ def analyze(samples, rate, *, expected_windows: Iterable[Mapping] | None = None,
                 "cepstralContrastDefinition": "real-natural-log-relative-power-cepstrum-peak-minus-search-band-median",
                 "cepstralContrastUnits": "natural-log-power-cepstrum",
                 "spectralBandsHz": {"flatnessAndTilt": [300, 4000], "low": [100, 1000], "high": [2000, 5000]}}
-    numeric = (rate, window_seconds, hop_seconds, interval_seconds, max_seconds)
+    numeric = (rate, window_seconds, hop_seconds, interval_seconds, expected_context_seconds, max_seconds)
     if not all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
                for value in numeric):
         return _empty("invalid-analysis-settings")
     if not (2000 <= rate <= 192000 and .04 <= window_seconds <= .120 and .002 <= hop_seconds <= window_seconds
-            and .05 <= interval_seconds <= 5 and max_seconds <= 600
+            and .05 <= interval_seconds <= 5 and window_seconds <= expected_context_seconds <= 1 and max_seconds <= 600
             and isinstance(batch_frames, int) and not isinstance(batch_frames, bool) and 1 <= batch_frames <= 256):
         return _empty("unsupported-analysis-settings")
     try:
@@ -331,6 +365,8 @@ def analyze(samples, rate, *, expected_windows: Iterable[Mapping] | None = None,
         if truncated:
             result["inputStatus"] = "partial"
             result["uncertainties"].append(source + "-window-limit-exceeded")
+    result["expectedContextWindows"] = _expected_contexts(
+        result["expectedWindows"], profile, duration, expected_context_seconds)
     for index in range(int(math.ceil(duration / interval_seconds))):
         start = index * interval_seconds
         result["intervals"].append(_window(profile, start, min(duration, start + interval_seconds), duration,

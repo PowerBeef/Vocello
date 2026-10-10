@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -199,6 +200,77 @@ class AcousticControlsTests(unittest.TestCase):
         self.assertTrue(all(window["source"] == "expected" for window in value["expectedWindows"]))
         self.assertEqual(value["recognizedWindows"][0]["source"], "recognized")
         self.assertEqual(value["recognizedWindows"][0]["alignmentSource"], "phonesB")
+
+    def test_short_phone_has_separate_context_without_replacing_strict_evidence(self):
+        with patch.object(acoustics, "_profile", wraps=acoustics._profile) as profile:
+            value = acoustics.analyze(tone(), RATE, expected_windows=[
+                {"phone": "a", "start": .49, "end": .51, "source": "phonesB", "voicedTarget": True}])
+        self.assertEqual(profile.call_count, 1)  # Context must not run DSP a second time.
+        strict = value["expectedWindows"][0]
+        self.assertEqual(strict["inputStatus"], "unavailable")
+        self.assertEqual(strict["reason"], "no-full-analysis-frame")
+        context = value["expectedContextWindows"][0]
+        self.assertEqual(context["inputStatus"], "complete")
+        self.assertEqual((context["targetStart"], context["targetEnd"]), (.49, .51))
+        self.assertAlmostEqual(context["end"] - context["start"], .12)
+        self.assertEqual(context["alignmentSource"], "phonesB")
+        self.assertEqual(context["source"], "expected-context")
+        self.assertTrue(context["voicedTarget"])
+        self.assertEqual(context["decision"], "not-assessed")
+        self.assertIn("context-may-include-adjacent-phones", context["uncertainties"])
+        self.assertAlmostEqual(context["pitchWitnessMedianHz"], 200, delta=.1)
+        self.assertEqual(value["settings"]["expectedContextSeconds"], .12)
+        self.assertEqual(value["decision"], "not-assessed")
+
+    def test_expected_context_edges_crop_to_pcm_and_retain_target_bounds(self):
+        value = acoustics.analyze(tone(), RATE, expected_windows=[
+            {"phone": "a", "start": 0., "end": .02, "source": "phones"},
+            {"phone": "a", "start": .98, "end": 1., "source": "phonesB"}])
+        first, last = value["expectedContextWindows"]
+        self.assertEqual((first["targetStart"], first["targetEnd"]), (0., .02))
+        self.assertEqual((last["targetStart"], last["targetEnd"]), (.98, 1.))
+        self.assertEqual(first["start"], 0.)
+        self.assertEqual(last["end"], 1.)
+        for context in (first, last):
+            self.assertEqual(context["inputStatus"], "complete")
+            self.assertGreater(context["frames"], 0)
+            self.assertGreaterEqual(context["analysisSupportStart"], context["start"])
+            self.assertLessEqual(context["analysisSupportEnd"], context["end"])
+            self.assertIn("context-cropped-to-audio-bounds", context["uncertainties"])
+            self.assertIn("context-may-include-adjacent-phones", context["uncertainties"])
+            self.assertEqual(context["decision"], "not-assessed")
+
+    def test_invalid_phone_timings_never_become_valid_context(self):
+        windows = [{"start": start, "end": end, "source": "phones"} for start, end in (
+            (None, .2), ("bad", .2), (.3, .2), (-.0000001, .02), (.98, 1.000001), (.1, float("nan")))]
+        value = acoustics.analyze(tone(), RATE, expected_windows=windows)
+        self.assertEqual(len(value["expectedContextWindows"]), len(windows))
+        for context in value["expectedContextWindows"]:
+            self.assertEqual(context["inputStatus"], "unavailable")
+            self.assertEqual(context["reason"], "invalid-target-window")
+            self.assertEqual(context["frames"], 0)
+            self.assertEqual(context["alignmentSource"], "phones")
+            self.assertEqual(context["decision"], "not-assessed")
+        json.dumps(value, allow_nan=False)
+
+    def test_context_duration_changes_only_context_and_bounded_inventory_is_shared(self):
+        windows = [{"phone": "a", "start": .49, "end": .51, "source": "phones"}]
+        default = acoustics.analyze(tone(), RATE, expected_windows=windows)
+        wider = acoustics.analyze(tone(), RATE, expected_windows=windows, expected_context_seconds=.2)
+        self.assertEqual(default["expectedWindows"], wider["expectedWindows"])
+        self.assertEqual(default["summary"], wider["summary"])
+        self.assertEqual(default["pitchWitness"], wider["pitchWitness"])
+        context = wider["expectedContextWindows"][0]
+        self.assertAlmostEqual(context["end"] - context["start"], .2)
+        bounded = acoustics.analyze(tone(), RATE, expected_windows=(
+            dict(windows[0]) for _ in range(acoustics.MAX_WINDOWS + 1)))
+        self.assertEqual(len(bounded["expectedWindows"]), acoustics.MAX_WINDOWS)
+        self.assertEqual(len(bounded["expectedContextWindows"]), acoustics.MAX_WINDOWS)
+        self.assertEqual(bounded["inputStatus"], "partial")
+        for invalid in (.01, 2, float("nan")):
+            abstained = acoustics.analyze(tone(), RATE, expected_context_seconds=invalid)
+            self.assertEqual(abstained["inputStatus"], "unavailable")
+            json.dumps(abstained, allow_nan=False)
 
     def test_bandwidth_and_unanalyzed_tail_are_reported(self):
         value = acoustics.analyze(tone(seconds=.993, rate=8000), 8000)

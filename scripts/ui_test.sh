@@ -530,31 +530,56 @@ fi
 export_attachments() {
   [[ -d "$result" ]] || { warn "missing XCUITest result bundle"; return 2; }
   attachments_attempted=1
-  if ! python3 - "$result" "$out/attachments" <<'PY' >"$out/attachments.log" 2>&1
+  local export_status=0
+  if python3 - "$result" "$out/attachments" <<'PY' >"$out/attachments.log" 2>&1
 import os, signal, subprocess, sys
-p = subprocess.Popen(["xcrun", "xcresulttool", "export", "attachments", "--path", sys.argv[1],
-                      "--output-path", sys.argv[2]], start_new_session=True)
+
+class ExportInterrupted(BaseException):
+    def __init__(self, signum):
+        self.signum = signum
+
+def interrupted(signum, _frame):
+    raise ExportInterrupted(signum)
+
+for sig in (signal.SIGINT, signal.SIGTERM):
+    signal.signal(sig, interrupted)
+p = None
+status = 1
 try:
-    raise SystemExit(p.wait(timeout=60))
+    p = subprocess.Popen(["xcrun", "xcresulttool", "export", "attachments", "--path", sys.argv[1],
+                          "--output-path", sys.argv[2]], start_new_session=True)
+    status = p.wait(timeout=60)
 except subprocess.TimeoutExpired:
-    def stop_group(sig):
+    status = 124
+except ExportInterrupted as interruption:
+    status = 128 + interruption.signum
+finally:
+    # Signals can arrive while the export group is being retired. Preserve the
+    # first outcome and always finish cleanup before returning it to the shell.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    if p is not None:
+        def stop_group(sig):
+            try:
+                os.killpg(p.pid, sig)
+            except ProcessLookupError:
+                pass
+        stop_group(signal.SIGTERM)
         try:
-            os.killpg(p.pid, sig)
-        except ProcessLookupError:
+            p.wait(timeout=2)
+        except subprocess.TimeoutExpired:
             pass
-    stop_group(signal.SIGTERM)
-    try:
-        p.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        pass
-    # Retire export descendants even if their parent already responded to TERM.
-    stop_group(signal.SIGKILL)
-    p.wait()
-    raise SystemExit(124)
+        # Retire descendants even when the export parent already exited.
+        stop_group(signal.SIGKILL)
+        p.wait()
+raise SystemExit(status)
 PY
   then
+    return 0
+  else
+    export_status=$?
     warn "could not export xcresult attachments (see $out/attachments.log)"
-    return 1
+    return "$export_status"
   fi
 }
 

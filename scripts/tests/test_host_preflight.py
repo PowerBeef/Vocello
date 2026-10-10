@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import stat
 import subprocess
@@ -17,6 +18,7 @@ LIB = ROOT / "scripts/lib/host_preflight.sh"
 def run_preflight(
     *, load: str, cores: str, level: str, env: dict[str, str] | None = None,
     cwd: Path | None = None, command: str = "require_quiet_host fixture-lane",
+    workers: list[dict] | None = None, ownership: str = "live",
 ) -> subprocess.CompletedProcess:
     """Run `require_quiet_host` (or `command`) against a fake `sysctl` answering the given values."""
     with tempfile.TemporaryDirectory() as temporary:
@@ -37,6 +39,23 @@ def run_preflight(
         # Isolate from the real host lock and from this checkout's worktrees.
         environment.pop("QVOICE_NATIVE_LOCK", None)
         environment.pop("ROOT_DIR", None)
+        environment.pop("QVOICE_WORKER_SESSION", None)
+        environment["QVOICE_LEAD_ONLY"] = "1"
+        environment["QVOICE_WORKER_DIRECTORY"] = str(Path(temporary) / "workers")
+        worker_directory = Path(environment["QVOICE_WORKER_DIRECTORY"])
+        worker_directory.mkdir()
+        for index, record in enumerate(workers or []):
+            (worker_directory / f"lease-{index}.json").write_text(json.dumps(record))
+        process_shim = Path(temporary) / "ps"
+        process_shim.write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" = "-p" ] && [ "$2" = "43210" ]; then\n'
+            + ({"live": "echo '1 Sat Oct 10 12:00:00 2026 /opt/bin/codex'\n",
+                "reused": "echo '1 Sun Oct 11 12:00:00 2026 /opt/bin/codex'\n",
+                "dead": "exit 1\n", "denied": "echo denied >&2; exit 1\n"}[ownership])
+            + "else\nexit 1\nfi\n"
+        )
+        process_shim.chmod(process_shim.stat().st_mode | stat.S_IEXEC)
         environment.update(env or {})
         return subprocess.run(
             ["bash", "-c", f". '{LIB}'; {command}"],
@@ -89,44 +108,63 @@ class HostPreflightTests(unittest.TestCase):
                                   env={"QVOICE_NATIVE_LOCK": str(lock)})
             self.assertEqual(stale.returncode, 0, stale.stderr)
 
-    def test_a_locked_agent_worktree_refuses(self) -> None:
+    def test_an_idle_locked_worktree_does_not_block_measurement(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary) / "repo"
             git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
             subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
             subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "i"], check=True)
-            worktree = repo / ".claude" / "worktrees" / "agent"
-            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "worktree-agent",
+            worktree = repo / "managed worktrees" / "agent"
+            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "codex/agent",
                             str(worktree)], check=True)
             idle = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
             self.assertEqual(idle.returncode, 0, idle.stderr)
             subprocess.run(["git", "-C", str(repo), "worktree", "lock", str(worktree)], check=True)
-            busy = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
-            self.assertEqual(busy.returncode, 1)
-            self.assertIn("active-agent-worktrees(1)", busy.stderr)
-            allowed = run_preflight(load="0.50", cores="8", level="1", cwd=repo,
-                                    env={"QVOICE_ALLOW_BUSY_HOST": "1"})
-            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            locked = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            self.assertNotIn("active-agent-worktrees", locked.stderr)
+
+    @staticmethod
+    def worker_record(kind: str = "worker") -> dict:
+        return {"schemaVersion": 1, "kind": kind, "pid": 43210,
+                "started": "Sat Oct 10 12:00:00 2026", "session": "fixture-session-hash"}
+
+    def test_active_lease_blocks_even_without_git_worktree(self) -> None:
+        result = run_preflight(load="0.50", cores="8", level="1", workers=[self.worker_record()])
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("active-workers(1)", result.stderr)
+        for ownership in ("dead", "reused"):
+            with self.subTest(ownership=ownership):
+                result = run_preflight(load="0.50", cores="8", level="1",
+                                       workers=[self.worker_record()], ownership=ownership)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_unknown_tracking_requires_declaration_and_cannot_use_busy_override(self) -> None:
+        missing = run_preflight(load="0.50", cores="8", level="1", env={"QVOICE_LEAD_ONLY": ""})
+        self.assertEqual(missing.returncode, 2, missing.stderr)
+        self.assertIn("tracking unavailable", missing.stderr)
+        known = run_preflight(load="0.50", cores="8", level="1",
+                              workers=[self.worker_record("session")],
+                              env={"QVOICE_LEAD_ONLY": "", "QVOICE_WORKER_SESSION": "fixture-session-hash"})
+        self.assertEqual(known.returncode, 0, known.stderr)
+        for record, ownership in ((self.worker_record(), "denied"), ({"schemaVersion": 2}, "live"),
+                                  (self.worker_record("tracking-error"), "live")):
+            with self.subTest(record=record, ownership=ownership):
+                unknown = run_preflight(load="20.00", cores="8", level="4", workers=[record],
+                                        ownership=ownership, env={"QVOICE_ALLOW_BUSY_HOST": "1"})
+                self.assertEqual(unknown.returncode, 2, unknown.stderr)
+                self.assertIn("unreadable ownership", unknown.stderr)
 
     def test_a_non_timing_model_lane_runs_beside_code_only_agents(self) -> None:
-        # qc-takes measures outputs, not timing: a locked agent worktree is recorded, not refused.
-        with tempfile.TemporaryDirectory() as temporary:
-            repo = Path(temporary) / "repo"
-            git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
-            subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
-            subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "i"], check=True)
-            worktree = repo / ".claude" / "worktrees" / "agent"
-            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "worktree-agent",
-                            str(worktree)], check=True)
-            subprocess.run(["git", "-C", str(repo), "worktree", "lock", str(worktree)], check=True)
-            allowed = run_preflight(load="0.50", cores="8", level="1", cwd=repo,
-                                    command="require_quiet_host fixture-lane agents-allowed")
-            self.assertEqual(allowed.returncode, 0, allowed.stderr)
-            self.assertIn("agents:1(allowed)", allowed.stderr)
-            # Load and memory pressure still refuse it.
-            pressured = run_preflight(load="0.50", cores="8", level="2", cwd=repo,
+        # qc-takes measures outputs, not timing: validated workers are recorded.
+        allowed = run_preflight(load="0.50", cores="8", level="1", workers=[self.worker_record()],
+                                command="require_quiet_host fixture-lane agents-allowed")
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        self.assertIn("agents:1(allowed)", allowed.stderr)
+        for load, level in (("0.50", "2"), ("20.00", "1")):
+            pressured = run_preflight(load=load, cores="8", level=level, workers=[self.worker_record()],
                                       command="require_quiet_host fixture-lane agents-allowed")
-            self.assertEqual(pressured.returncode, 1)
+            self.assertEqual(pressured.returncode, 1, pressured.stderr)
         unknown = run_preflight(load="0.50", cores="8", level="1", command="require_quiet_host fixture-lane sometimes")
         self.assertEqual(unknown.returncode, 2)
 

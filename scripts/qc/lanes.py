@@ -49,7 +49,7 @@ from qc import assessment as assessment_lib
 from qc import detectors as detector_lib
 from qc import features as feature_lib
 from qc import fit as fit_lib
-from qc import label, models, runtime, store, forensics
+from qc import label, models, runtime, store, forensics, acoustics, evidence
 from qc import norms as norms_lib
 from qc.store import Layout
 
@@ -166,6 +166,14 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
 
         params = config.get("params", {})
         context = feature_lib.build_context(reference_results, params)
+        context["referenceResults"] = reference_results
+        context["referenceAcoustics"] = {}
+        for reference in references:
+            try:
+                audio = feature_lib.read_wav(reference["audio"])
+            except (OSError, ValueError):
+                continue
+            context["referenceAcoustics"][reference["audioSHA256"]] = acoustics.analyze(*audio)
         rows = []
         for take in takes:
             local = {}
@@ -177,10 +185,11 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
                                                           dict(config["models"]))
                 diagnostic = forensics.french(expected, {role: feature_lib.outputs(results_by_token[take["token"]], role)
                                                         for role in ("phones", "phonesB")})
-                diagnostic.update(local)
+                diagnostic.update({key: value for key, value in local.items() if key != "perceptualEvidence"})
             rows.append({"token": take["token"], "takeID": take.get("takeID"), "language": take.get("language"),
                          "mode": take.get("mode"), "hasReference": bool(take.get("referenceSHA256")),
-                         "features": values, "phoneticEvidence": diagnostic})
+                         "features": values, "phoneticEvidence": diagnostic,
+                         "perceptualEvidence": local.get("perceptualEvidence")})
         model_report["excerptTest"] = excerpt_test(
             layout, takes, rows, {role: role_models.get(role) for role in EXCERPT_ROLES},
             {role: identities.get(role, {}) for role in EXCERPT_ROLES}, params,
@@ -203,6 +212,8 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     flags.update(run=run_id, lane=lane, models=model_report)
     flags["assessment"] = assessment_lib.summarize(flags["takes"], flags["errors"], model_report)
     store.write_json_atomic(directory / "flags.json", flags, indent=None)
+    store.write_json_atomic(directory / "events.json",
+        evidence.events_document(run_id, scoring["sha256"], identities, takes, rows), indent=None)
     counts = flags["summary"]
     echo(f"qc run: {run_id}: {len(takes)} takes; flagged fail={counts['fail']} warn={counts['warn']} "
          f"report-only={counts['report-only']}; errors={len(flags['errors'])}")
@@ -546,6 +557,7 @@ def report(layout: Layout, run_id: str) -> dict[str, Any]:
     takes = []
     for take in flags["takes"]:
         entry = dict(take, phoneticEvidence=rows.get(take["token"], {}).get("phoneticEvidence"),
+                     perceptualEvidence=rows.get(take["token"], {}).get("perceptualEvidence"),
                      diagnostics={name: value for name, value in rows.get(take["token"], {}).get("features", {}).items()
                                   if name.startswith(("pitch.", "speaker.", "pause.", "end."))})
         if stale:

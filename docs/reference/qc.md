@@ -36,6 +36,81 @@ whisper or liaison defects. All supported French varieties remain acceptable unl
 explicitly specifies a variety. These new evidence views are uncalibrated and abstain from
 automatic acceptance.
 
+### Installed-model perceptual evidence
+
+Each new run also retains `perceptualEvidence` in `features.json` and a separate
+`events.json` (`vocello.qc.events/1`). `report --json` reads these artifacts without
+inference. Historical runs are preserved; a cache-only recomputation receives a new run ID.
+The additional source files participate in scoring identity, invalidating old calibration
+for the new implementation without rewriting historical thresholds.
+
+Use the repository-selected installed Python for direct QC commands when the ambient
+`python3` lacks NumPy. This selects an existing interpreter; it does not install anything:
+
+```sh
+QVOICE_QC_PYTHON="$(python3 scripts/select_python.py)"
+"$QVOICE_QC_PYTHON" scripts/qc.py report --run RUN_ID --json
+"$QVOICE_QC_PYTHON" scripts/qc.py qualify --panel PRIVATE.json --runs RUN_ID --json
+```
+
+French pronunciation evidence keeps original IPA, narrow alignment and single-witness
+localized candidates separately. Bounded CTC path scoring compares canonical expected phones,
+explicit G2P optional variants and any reviewed full paths in the private take's
+`pronunciationAlternatives` array (`{id, phones, reason}`). It reports inventory gaps,
+constrained versus greedy sequence fit, posterior entropy and expected-phone timing windows.
+Those windows come from canonical CTC occupancy even when no greedy error was emitted;
+they are approximate model timing, not forced-alignment truth. A plausible alternative does
+not certify pronunciation or excuse a defect. Missing posteriors, unsupported phones,
+impossible paths and work limits produce explicit unavailable evidence.
+
+`qc.acoustics` adds a NumPy-only autocorrelation pitch witness, spectral flatness, tilt,
+band ratios and `cepstralPeakContrast` on expected windows, recognized windows and a uniform
+discovery grid. The cepstral statistic is a precisely defined descriptive contrast, **not
+calibrated CPP or a clinical/phonation score**. Full-frame crop support, silence, short
+intervals, bandwidth limits and reference compatibility are retained. A low periodicity
+or high flatness measurement alone cannot identify whisper, devoicing or an inserted syllable.
+The analysis bounds duration, array sizes, frame batches and window counts; it does not
+download or run another model. Existing two-tracker Clone register and speaker identity
+remain separate from this third pitch witness. Native accent and emotional intent explicitly
+remain not assessed.
+
+Posterior loading accepts only the exact audio/model cache filename, rejects symlinks and
+unsafe/malformed or oversized NPZ members, disables pickle, and records the bytes read.
+Older runner JSON does not attest the posterior digest: the recorded digest identifies the
+observed cache bytes, not an original inference receipt. Audio and current runner identities
+are checked by the normal lane before feature extraction.
+
+### Held-out event evaluation
+
+`qc.py qualify --panel PRIVATE.json --runs RUN_ID ... [--name NAME] [--json]` evaluates
+retained candidates against a private `vocello.qc.panel/1` manifest. It writes an immutable
+private report under `build/private/qc/qualification/`; it never modifies thresholds or
+acceptance levels. Panel creation requires observed annotations, not detector-generated labels.
+Repeated events of the same class are permitted. Zero candidates cannot establish quality
+acceptance, and missing/unsupported evidence is an abstention.
+
+A panel binds `id`, `purpose` (`challenge` or `deployment`), exact `scoringSHA256`,
+`models` (each role's `id` and `runnerSHA256`), `annotationProtocolSHA256`, `classes`,
+`policy` (`minimumIntersectionOverUnion`) and `policySHA256` (SHA-256 of canonical policy JSON).
+Each take binds `token`, `audioSHA256`, `split` (`train`, `calibration`, `heldout`),
+`groups` (`speaker`, `reference`, `source`, `prompt`, `derived`), `origin`
+(`human-observed` or `synthetic-control`), per-class `labelCoverage` (`complete`,
+`positive-only`, `uncertain`, `unreviewed`), and `events` (`id`, `class`, `start`, `end`).
+Use opaque private group IDs; reference may be null only for a take without a reference.
+Reuse of a group or audio across splits is rejected. The policy's overlap setting defines
+annotation matching, not a defect threshold. The initial exported candidate class is
+`pronunciation`; evidence for other classes must remain unavailable until a producer exists.
+
+Evaluation verifies WAV identity/duration, exact scoring/model/policy bindings and bounded
+event intervals, matches predictions to labels one-to-one, and reports class metrics and
+coverage on held-out takes. Challenge panels describe their enriched sample; they do not
+estimate deployed prevalence. Unreviewed or positive-only annotations cannot supply verified
+negative examples. Every report remains `not-qualified`: eventual release acceptance still
+requires representative, independently labeled failures and clean controls, uncertainty and
+slice analysis, declared tolerances, and a separately reviewed policy change. The existing
+supervised `fit` path now learns each fold's normalization from that fold's training rows;
+all-data transforms are used only by the final all-data fit.
+
 ## Why v2
 
 The v1 harness missed defects the maintainer heard at once: clone pitch drift, cut-offs, accented French and the broken syllables of `fr-0101--dylan`. Its synthetic injectors often did not carry the defect they were named for, so detectors qualified on positives that were not positive. Its pitch tracker, pYIN, dropped voicing across pitch steps, the very breaks it was meant to find. No judge measured phonemes, so the ASR families turned stutters and mispronunciations into plausible words. V2 introduced human-reference calibration and listening confirmation for selected detectors; that does not qualify every required dimension. Current scoring changes invalidate historical calibration until a new qualified threshold/evaluation identity is established.
@@ -75,6 +150,7 @@ All commands go through `python3 scripts/qc.py`.
 | `run --takes <manifest or qc-takes run> --lane NAME [--models roles or ids]` | Scores the takes with the lane's models (see [Lanes](#lanes)), one at a time; `--models` limits which run now, and the rest come from the cache. Then it runs the excerpt test, the features and the detectors, and prints the run id. |
 | `run --cache-only --takes <manifest> --lane NAME` | Rechecks audio digests and recomputes features/decisions using current-identity cached outputs only; never runs inference, G2P or the excerpt model test. Missing evidence stays unavailable. |
 | `report --run ID --json` | Reads retained evidence, recomputes current coverage qualification and includes clone fidelity and narrow French local evidence; does not rerun models. |
+| `qualify --panel FILE --runs RUN_ID ... [--name NAME] [--json]` | Validates a private held-out annotation panel against retained event artifacts and writes report-only candidate metrics; never promotes acceptance. |
 | `language-bench takes --platform macos\|ios --run-id ID --plan PLAN --corpus CORPUS --diagnostics DIR [--wav-dir DIR] --output FILE` | Writes a lang-bench run's planned takes as a takes manifest, each WAV bound to the digest its generation published. |
 | `language-bench evidence --run QC_RUN --output FILE` | Writes the two ASR families' recognitions of a QC run for the language publisher, with each take's two-family verdict. Exits 0 when every take met its outcome, 1 when one did not, and 2 when a recognition is missing. |
 | `gate --lane NAME [--run ID] [--json] [--legacy-exit]` | Strict: 0 assessed pass, 1 detected failure, 2 execution/error, 3 qualified warning, 4 not assessed. A qualified failure retains precedence over incomplete coverage. Legacy mode preserves old exit behavior explicitly. |
@@ -140,7 +216,7 @@ The venvs are built from v2's own copy of the pinned standalone CPython (`cpytho
 Results are content-addressed: `results/<model-id>/<audioSHA256>[.<variantKey>].json`.
 - **Variant key:** G2P and speaker results also depend on the take's text, language and reference clip. `qc.store.variant_key` hashes those three into the variant key, and the job hands it to the runner as `variantKey`.
 - **Runner identity:** `runnerSHA256` digests the runner file and the `qc` modules it imports (transitively, helpers such as `runners/_kit.py` and `runners/speech_common.py` included), the registry `version` and every pin. Changing any of them re-scores that model's takes, and only that model's: a `qc/phones.py` edit re-runs the phone recognizers and the G2P only. A package name (`from qc import phones`) adds no file, so editing the command line, features, detectors or lanes re-scores nothing.
-- **Scoring identity:** `qc.detectors.scoring_identity` digests `config/qc/detectors.json`, the scoring code (`qc/features.py`, `qc/detectors.py`, `qc/phones.py`, `qc/pitch.py`) and the newest norms file. The human-reference score (its percentile rank and quantile grid) lives in `qc/detectors.py`, so it is scoring code too. Runs record the identity in `features.json`; thresholds apply only to features scored by the same code, configuration and norms, and `run` otherwise stays report-only and says why. A change to any of them is a new identity: rerun `run` on the controls and the pool (their model results come from the cache) before the next `calibrate`.
+- **Scoring identity:** `qc.detectors.scoring_identity` digests `config/qc/detectors.json`, the source files in `qc.detectors.SCORING_SOURCES` (including coverage, narrow phonetics, pronunciation, local acoustics, fidelity and orchestration) and the newest norms file. The human-reference score (its percentile rank and quantile grid) lives in `qc/detectors.py`, so it is scoring code too. Runs record the identity in `features.json`; thresholds apply only to features scored by the same code, configuration and norms, and `run` otherwise stays report-only and says why. A change to any of them is a new identity: rerun `run` on the controls and the pool (their model results come from the cache) before the next `calibrate`.
 
 ## Detectors
 

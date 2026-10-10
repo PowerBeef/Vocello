@@ -1143,6 +1143,11 @@ def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, An
     out.update(rate_features(expected_phones(take, results, layout, model_ids)[0], span, pauses))
     out.update(pitch_features(take, results, context, params))
     out.update(speaker_features(take, results))
+    if diagnostics is not None:
+        from qc import evidence
+        expected, words = expected_phones(take, results, layout, model_ids)
+        diagnostics["perceptualEvidence"] = evidence.analyze(take, results, context, layout=layout,
+            model_ids=model_ids, expected=expected, words=words, audio=audio)
     return out
 
 

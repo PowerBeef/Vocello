@@ -227,6 +227,20 @@ def cmd_report(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
+def cmd_qualify(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import qualification
+    try:
+        path, value = qualification.evaluate(layout, args.panel, run_ids=args.runs, name=args.name)
+    except (ValueError, OSError, KeyError) as error:
+        print(f"qc qualify: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    if args.json:
+        _print_json(value)
+    else:
+        print(f"qc qualify: wrote {path}; candidate metrics only; acceptance policy unchanged")
+    return EXIT_OK
+
+
 def cmd_queue(args: argparse.Namespace, layout: Layout) -> int:
     from qc import lanes
 
@@ -464,6 +478,13 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--run", required=True)
     report.add_argument("--json", action="store_true")
     report.set_defaults(handler=cmd_report)
+
+    qualify = commands.add_parser("qualify", help="evaluate retained candidate events against a private held-out panel; never promotes gates")
+    qualify.add_argument("--panel", required=True)
+    qualify.add_argument("--runs", nargs="+", required=True)
+    qualify.add_argument("--name")
+    qualify.add_argument("--json", action="store_true")
+    qualify.set_defaults(handler=cmd_qualify)
 
     queue = commands.add_parser("queue", help="write a listening queue the label tool opens as a batch")
     queue.add_argument("--top", type=int, default=40)

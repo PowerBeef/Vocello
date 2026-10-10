@@ -53,7 +53,8 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
         )
         var record = Generation(
             text: request.text, mode: "custom", modelTier: "speed", voice: "aiden", emotion: nil,
-            speed: nil, audioPath: request.outputPath, duration: 2, createdAt: Date(),
+            speed: nil, audioPath: request.outputPath, duration: 2,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             seed: -1, completionReceipt: receipt
         )
         try queue.write { db in try record.insert(db) }

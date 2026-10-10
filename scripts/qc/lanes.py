@@ -28,7 +28,11 @@ negative control, such as the language bench's pinned hint over a script in
 another language, or the clone lane's other speakers) is scored and flagged,
 but always at report-only: it never gates.
 
-`gate` turns a run's flags into an exit code: 0 pass, 3 warn, 1 fail, 2 error.
+`gate` defaults to coverage-v2: 0 assessed pass, 3 warn, 1 fail, 2 execution
+error, 4 missing/unqualified/stale coverage. `--legacy-exit` deliberately preserves
+the historical 0/1/2/3 flag policy without claiming quality acceptance. Features
+and flags retain per-dimension input coverage, qualification and decisions.
+`run --cache-only` never invokes a runner; `report` reads retained evidence only.
 `queue` writes the most suspicious unlabelled takes as a label batch, which
 `label serve` opens.
 """
@@ -41,17 +45,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from qc import assessment as assessment_lib
 from qc import detectors as detector_lib
 from qc import features as feature_lib
 from qc import fit as fit_lib
-from qc import label, models, runtime, store
+from qc import label, models, runtime, store, forensics
 from qc import norms as norms_lib
 from qc.store import Layout
 
 FEATURES_SCHEMA = "vocello.qc.features/1"
-FLAGS_SCHEMA = "vocello.qc.flags/1"
+FLAGS_SCHEMA = "vocello.qc.flags/2"
 LEVEL_RANK = {"report-only": 0, "warn": 1, "fail": 2}
-EXIT_PASS, EXIT_FAIL, EXIT_ERROR, EXIT_WARN = 0, 1, 2, 3
+EXIT_PASS, EXIT_FAIL, EXIT_ERROR, EXIT_WARN, EXIT_NOT_ASSESSED = 0, 1, 2, 3, 4
 PITCH_ROLES = ("pitchA", "pitchB")
 EXCERPT_ROLES = ("phones", "phonesB")  # the phone recognizers the excerpt test runs on a pause alone
 LANE_RE = detector_lib.LANE_NAME
@@ -83,23 +88,26 @@ def _reference_takes(takes: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None = None,
         echo: Callable[[str], None] = lambda line: print(line, file=sys.stderr, flush=True),
-        runner: Callable[..., runtime.RunnerReport] = runtime.run_runner) -> Path:
+        runner: Callable[..., runtime.RunnerReport] = runtime.run_runner, cache_only: bool = False) -> Path:
     if not LANE_RE.fullmatch(lane):
         raise ValueError(f"invalid lane name: {lane!r}")
     config = detector_lib.load_config(layout)
     manifest = store.load_takes(takes_path)
     takes = [dict(take) for take in manifest["takes"]]
     for take in takes:
-        if not take.get("audioSHA256"):
-            take["audioSHA256"] = store.audio_sha256(take["audio"])
-        if take.get("reference") and not take.get("referenceSHA256"):
-            take["referenceSHA256"] = store.audio_sha256(take["reference"])
+        for path_key, digest_key in (("audio", "audioSHA256"), ("reference", "referenceSHA256")):
+            if not take.get(path_key):
+                continue
+            actual = store.audio_sha256(take[path_key])
+            if take.get(digest_key) and take[digest_key] != actual:
+                raise ValueError(f"take {take['token']}: {digest_key} no longer matches audio")
+            take[digest_key] = actual
     references = _reference_takes(takes)
     role_models = _role_models(config, models.load_registry(layout))
     selected = roles or detector_lib.lane_roles(config, lane)
     model_report: dict[str, Any] = {}
     with runtime.run_lock(layout):
-        for role in selected:
+        for role in ([] if cache_only else selected):
             model = role_models.get(role)
             if model is None:
                 model_report[role] = {"id": config["models"].get(role), "error": "not registered"}
@@ -147,7 +155,7 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
 
         # A second G2P pass, after the ASR roles ran (or were read from the cache): the transcripts'
         # phones for asr.phonetic_error_*. The cache is keyed by text, so only new transcripts run.
-        if role_models.get("g2p") is not None and {"g2p", "asrA", "asrB"} & set(selected):
+        if not cache_only and role_models.get("g2p") is not None and {"g2p", "asrA", "asrB"} & set(selected):
             transcripts = feature_lib.transcript_g2p_takes(takes, results_by_token, layout, dict(config["models"]))
             if transcripts:
                 try:
@@ -160,14 +168,23 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
         context = feature_lib.build_context(reference_results, params)
         rows = []
         for take in takes:
+            local = {}
             values = feature_lib.extract(take, results_by_token[take["token"]], context, params=params,
-                                         layout=layout, model_ids=dict(config["models"]))
+                                         layout=layout, model_ids=dict(config["models"]), diagnostics=local)
+            diagnostic = None
+            if take.get("language") == "french":
+                expected, _ = feature_lib.expected_phones(take, results_by_token[take["token"]], layout,
+                                                          dict(config["models"]))
+                diagnostic = forensics.french(expected, {role: feature_lib.outputs(results_by_token[take["token"]], role)
+                                                        for role in ("phones", "phonesB")})
+                diagnostic.update(local)
             rows.append({"token": take["token"], "takeID": take.get("takeID"), "language": take.get("language"),
-                         "features": values})
+                         "mode": take.get("mode"), "hasReference": bool(take.get("referenceSHA256")),
+                         "features": values, "phoneticEvidence": diagnostic})
         model_report["excerptTest"] = excerpt_test(
             layout, takes, rows, {role: role_models.get(role) for role in EXCERPT_ROLES},
             {role: identities.get(role, {}) for role in EXCERPT_ROLES}, params,
-            run_now={role for role in EXCERPT_ROLES if role in selected}, runner=runner, echo=echo)
+            run_now=set() if cache_only else {role for role in EXCERPT_ROLES if role in selected}, runner=runner, echo=echo)
 
     run_id = f"{lane}-{utc_stamp()}-{secrets.token_hex(2)}"
     directory = layout.runs / run_id
@@ -176,6 +193,7 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     store.write_json_atomic(directory / "takes.json", dict(manifest, takes=takes), indent=None)
     store.write_json_atomic(directory / "features.json", {
         "schema": FEATURES_SCHEMA, "run": run_id, "lane": lane, "source": manifest.get("source"),
+        "cacheOnly": cache_only,
         "detectorsVersion": config["version"], "detectorsSHA256": detector_lib.config_digest(layout),
         "scoringSHA256": scoring["sha256"],
         "scoring": {"files": scoring["files"], "norms": scoring["norms"]}, "models": identities, "takes": rows,
@@ -183,6 +201,7 @@ def run(layout: Layout, takes_path: str, lane: str, *, roles: list[str] | None =
     controls = {take["token"] for take in takes if take.get("control")}
     flags = score_run(layout, config, rows, identities, lane=lane, controls=controls, scoring=scoring)
     flags.update(run=run_id, lane=lane, models=model_report)
+    flags["assessment"] = assessment_lib.summarize(flags["takes"], flags["errors"], model_report)
     store.write_json_atomic(directory / "flags.json", flags, indent=None)
     counts = flags["summary"]
     echo(f"qc run: {run_id}: {len(takes)} takes; flagged fail={counts['fail']} warn={counts['warn']} "
@@ -285,7 +304,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     summary = {level: 0 for level in LEVEL_RANK}
     for row in rows:
         control = row["token"] in controls
-        flags, scores, raw = [], {}, {}
+        flags, scores, raw, assessments = [], {}, {}, {}
         for detector in config["detectors"]:
             fitted = thresholds["detectors"].get(detector["id"]) if applicable else None
             if fitted and fitted.get("reportOnly"):
@@ -296,6 +315,15 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
             level = levels.get(detector["id"], {}).get(row["language"], "report-only")
             if control or detector["id"] not in gated:
                 level = "report-only"
+            relevant = detector["id"] in gated
+            # Clone dimensions also belong in descriptive voice-reliability reports.
+            if lane == "voice-reliability" and detector["id"] in ("prosody.pitch", "identity.drift"):
+                relevant = True
+            qualified = bool(fitted and outcome.get("cut") is not None and level != "report-only"
+                             and outcome.get("scope") not in (None, "provisional", "uncalibrated"))
+            assessment = assessment_lib.dimension(detector, row["features"], outcome,
+                                                  qualified=qualified, relevant=relevant, control=control)
+            assessments[detector["id"]] = assessment
             if outcome["score"] is None:
                 if level != "report-only":
                     errors.append({"token": row["token"], "detector": detector["id"], "reason": "missing-inputs"})
@@ -310,10 +338,12 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
                 if outcome.get("rule"):
                     flag["rule"] = outcome["rule"]
                 flags.append(flag)
+                if assessment["decision"] == "pass":
+                    assessment["decision"] = level
         if flags:
             summary[max((flag["level"] for flag in flags), key=LEVEL_RANK.__getitem__)] += 1
         entry = {"token": row["token"], "takeID": row.get("takeID"), "language": row["language"],
-                 "flags": flags, "scores": scores, "rawScores": raw}
+                 "flags": flags, "scores": scores, "rawScores": raw, "assessment": assessments}
         if control:
             entry["control"] = True
         out_takes.append(entry)
@@ -323,6 +353,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
         "thresholdsMethod": thresholds.get("method", "logistic") if applicable else None,
         "thresholdsReason": reason, "scoringSHA256": scoring["sha256"], "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
+        "assessment": assessment_lib.summarize(out_takes, errors),
     }
 
 
@@ -347,7 +378,8 @@ def lane_runs(layout: Layout, lane: str | None = None) -> list[Path]:
     return sorted(runs, key=lambda path: path.stat().st_mtime)
 
 
-def gate(layout: Layout, lane: str, run_id: str | None = None) -> int:
+def gate(layout: Layout, lane: str, run_id: str | None = None, *, legacy_exit: bool = False,
+         json_output: bool = False) -> int:
     runs = [layout.runs / run_id] if run_id else lane_runs(layout, lane)[-1:]
     if not runs or not (runs[0] / "flags.json").is_file():
         print(f"qc gate: no run of lane {lane}", file=sys.stderr)
@@ -363,14 +395,35 @@ def gate(layout: Layout, lane: str, run_id: str | None = None) -> int:
                 worst = "fail"
             elif flag["level"] == "warn" and worst == "pass":
                 worst = "warn"
-    summary = flags["summary"]
-    note = "" if flags.get("levelsFromEval") else \
-        f" (report-only: {flags.get('thresholdsReason') or 'no evaluated thresholds'})"
-    print(f"qc gate {lane}: run {flags['run']}: {worst}; takes {len(flags['takes'])}, fail {summary['fail']}, "
-          f"warn {summary['warn']}, report-only {summary['report-only']}, errors {len(flags['errors'])}{note}")
-    if flags["errors"]:
-        return EXIT_ERROR
-    return {"fail": EXIT_FAIL, "warn": EXIT_WARN}.get(worst, EXIT_PASS)
+    assessment = effective_assessment(layout, flags)
+    errors = flags.get("errors") or []
+    legacy_code = EXIT_ERROR if errors else {"fail": EXIT_FAIL, "warn": EXIT_WARN}.get(worst, EXIT_PASS)
+    code = legacy_code
+    if not legacy_exit:
+        if errors or assessment.get("execution") == "error":
+            code = EXIT_ERROR
+        elif worst == "fail":
+            code = EXIT_FAIL
+        elif assessment.get("coverage") != "complete":
+            code = EXIT_NOT_ASSESSED
+        elif worst == "warn":
+            code = EXIT_WARN
+        else:
+            code = EXIT_PASS
+    result = {"schema": "vocello.qc.gate/2", "run": flags["run"], "lane": lane,
+              "exitCode": code, "exitPolicy": "legacy-v1" if legacy_exit else "coverage-v2",
+              "detectedDefects": worst, "assessment": assessment,
+              "thresholdsReason": flags.get("thresholdsReason"), "errors": len(errors)}
+    if json_output:
+        import json
+        print(json.dumps(result, sort_keys=True))
+    else:
+        decision = ("ERROR" if code == EXIT_ERROR else "FAIL" if worst == "fail" else
+                    "NOT_ASSESSED" if assessment.get("coverage") != "complete" else assessment.get("decision"))
+        print(f"qc gate {lane}: run {flags['run']}: {decision}; execution={assessment['execution']}; "
+              f"coverage={assessment['coverage']}; detected={worst}; errors={len(errors)}; "
+              f"exit-policy={result['exitPolicy']} (report-only: {flags.get('thresholdsReason') or 'see qualification'})")
+    return code
 
 
 def queue(layout: Layout, top: int, *, run_id: str | None = None, name: str | None = None) -> Path:
@@ -437,3 +490,43 @@ def parse_roles(value: str | None, config: dict[str, Any]) -> list[str] | None:
         else:
             raise ValueError(f"unknown model or role: {item}")
     return roles
+
+
+
+def effective_assessment(layout: Layout, flags: dict[str, Any]) -> dict[str, Any]:
+    recorded = flags.get("assessment") or {}
+    if recorded.get("schema") != assessment_lib.SCHEMA:
+        return {"execution": "unknown", "coverage": "not-assessed", "decision": "not-assessed",
+                "reason": "legacy-report"}
+    current = assessment_lib.summarize(flags["takes"], flags.get("errors") or [], flags.get("models"))
+    if flags.get("scoringSHA256") != detector_lib.scoring_identity(layout)["sha256"]:
+        current.update(coverage="not-assessed", decision="not-assessed", reason="stale-scoring-identity")
+    return current
+
+def report(layout: Layout, run_id: str) -> dict[str, Any]:
+    """Read existing evidence only. No models, downloads, waveform mutation or re-scoring."""
+    if not run_id or Path(run_id).name != run_id:
+        raise ValueError("run must be an existing run id")
+    directory = layout.runs / run_id
+    flags = store.read_json(directory / "flags.json")
+    features = store.read_json(directory / "features.json")
+    rows = {row["token"]: row for row in features["takes"]}
+    current = features.get("scoringSHA256") == flags.get("scoringSHA256") == detector_lib.scoring_identity(layout)["sha256"]
+    effective = effective_assessment(layout, flags)
+    if not current:
+        effective.update(coverage="not-assessed", decision="not-assessed", reason="stale-or-inconsistent-scoring-identity")
+    takes = []
+    for take in flags["takes"]:
+        entry = dict(take, phoneticEvidence=rows.get(take["token"], {}).get("phoneticEvidence"),
+                     diagnostics={name: value for name, value in rows.get(take["token"], {}).get("features", {}).items()
+                                  if name.startswith(("pitch.", "speaker.", "pause.", "end."))})
+        if not current:
+            entry["recordedAssessment"] = entry.get("assessment")
+            entry["assessment"] = {name: dict(value, decision="not-assessed", qualification="stale",
+                                              reasons=value.get("reasons", []) + ["stale-scoring-identity"])
+                                   for name, value in (entry.get("assessment") or {}).items()}
+        takes.append(entry)
+    return {"schema": "vocello.qc.report/1", "run": run_id, "lane": flags["lane"],
+            "assessment": effective, "recordedAssessment": flags.get("assessment"),
+            "currentScoringIdentity": current, "models": features.get("models"),
+            "runnerExecution": flags.get("models"), "takes": takes}

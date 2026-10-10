@@ -350,7 +350,7 @@ class ModelFeatureTests(unittest.TestCase):
         self.assertGreaterEqual(plain["pitch.octave_jumps"]["value"], 1)
         # build_context measures each reference clip's register on the clip itself.
         context = features.build_context({"r" * 64: results}, config()["params"])
-        self.assertEqual(set(context), {"referencePitch"})
+        self.assertEqual(set(context), {"referencePitch", "referencePitchSummary"})
         self.assertIn("r" * 64, context["referencePitch"])
 
     def test_speaker_drift_against_the_clone_reference(self):
@@ -497,7 +497,36 @@ class LaneTests(unittest.TestCase):
         self.assertTrue(features_doc["models"]["asrA"]["available"])
         self.assertTrue(features_doc["models"]["phones"]["available"])
         self.assertFalse(features_doc["models"]["phonesB"]["available"])  # not registered here
-        self.assertEqual(lanes.gate(self.layout, "pool"), lanes.EXIT_PASS)  # report-only never gates
+        self.assertEqual(lanes.gate(self.layout, "pool", legacy_exit=True), lanes.EXIT_PASS)  # report-only never gates
+
+    def test_cache_only_never_invokes_a_runner_and_retains_coverage(self):
+        self.run_lane(roles=("asrA", "phones"))
+        directory = lanes.run(self.layout, str(self.manifest), "pool", cache_only=True,
+            runner=lambda *args, **kwargs: self.fail("cache-only invoked model"), echo=lambda line: None)
+        doc = store.read_json(directory / "features.json")
+        self.assertTrue(doc["cacheOnly"])
+        self.assertTrue(doc["models"]["asrA"]["available"])
+        result = lanes.report(self.layout, directory.name)
+        self.assertTrue(result["currentScoringIdentity"])
+        self.assertEqual(result["assessment"]["coverage"], "incomplete")
+        self.assertEqual(result["takes"][0]["phoneticEvidence"]["nativeAccentDecision"], "not-assessed")
+        features_path = directory / "features.json"
+        changed = store.read_json(features_path)
+        changed["scoringSHA256"] = "stale"
+        store.write_json_atomic(features_path, changed)
+        stale = lanes.report(self.layout, directory.name)
+        self.assertFalse(stale["currentScoringIdentity"])
+        self.assertEqual(stale["assessment"]["decision"], "not-assessed")
+        self.assertTrue(all(item["decision"] == "not-assessed"
+                            for item in stale["takes"][0]["assessment"].values()))
+
+    def test_changed_manifest_audio_digest_is_rejected_before_inference(self):
+        manifest = store.read_json(self.manifest)
+        manifest["takes"][0]["audioSHA256"] = "0" * 64
+        store.write_json_atomic(self.manifest, manifest)
+        with self.assertRaisesRegex(ValueError, "no longer matches audio"):
+            self.run_lane()
+        self.assertEqual(self.calls, [])
 
     def test_phones_heard_in_the_pause_alone_clear_the_pause_flag(self):
         self.excerpt_phones = [{"phone": "t", "start": 0.0, "end": 0.04, "prob": 0.9},
@@ -527,7 +556,7 @@ class LaneTests(unittest.TestCase):
     def gate_line(self, lane):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            code = lanes.gate(self.layout, lane)
+            code = lanes.gate(self.layout, lane, legacy_exit=True)
         return code, output.getvalue()
 
     def test_gate_levels_come_from_the_evaluation_of_the_thresholds(self):
@@ -538,7 +567,7 @@ class LaneTests(unittest.TestCase):
         self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_FAIL)
         self.write_evaluated_thresholds({"pause.anomalous": "report-only", "level.loudness": "warn"})
         self.run_lane("clone")
-        self.assertEqual(lanes.gate(self.layout, "clone"), lanes.EXIT_WARN)
+        self.assertEqual(lanes.gate(self.layout, "clone", legacy_exit=True), lanes.EXIT_WARN)
         self.assertEqual(lanes.gate(self.layout, "no-such-lane"), lanes.EXIT_ERROR)
 
     def test_thresholds_of_other_scoring_code_leave_a_run_report_only(self):

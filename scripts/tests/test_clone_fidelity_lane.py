@@ -191,7 +191,7 @@ class CloneFidelityLaneTests(unittest.TestCase):
             for name in (plan[0]["name"], "reference.wav"):
                 with open(os.path.join(run_dir, name), "wb") as handle:
                     handle.write(name.encode())
-            for code, verdict in ((0, "pass"), (3, "warn"), (1, "fail"), (2, "error")):
+            for code, verdict in ((0, "pass"), (3, "warn"), (1, "fail"), (2, "error"), (4, "not-assessed")):
                 with self.subTest(code=code):
                     result = score_takes(
                         plan, run_dir, os.path.join(run_dir, "reference.wav"), "run",
@@ -237,7 +237,7 @@ class CloneFidelityLaneTests(unittest.TestCase):
             argv = ["clone_fidelity_lane.py", "--voice", "VoiceX", "--takes", "2", "--controls", "1",
                     "--reference-gender", "female", "--data-dir", data, "--run-dir", run_dir]
             for verdict, code, exit_code in (("pass", 0, None), ("warn", 3, None), ("fail", 1, 1),
-                                             ("error", 2, 2)):
+                                             ("error", 2, 2), ("not-assessed", 4, 4)):
                 events.clear()
                 with mock.patch.object(lane, "repo_root", return_value=root), \
                         mock.patch.object(lane, "generate_all", side_effect=generate), \
@@ -254,7 +254,7 @@ class CloneFidelityLaneTests(unittest.TestCase):
                 self.assertEqual(events, expected)
                 with open(os.path.join(run_dir, "clone-fidelity-report.json"), encoding="utf-8") as handle:
                     written = json.load(handle)
-                self.assertEqual(written["laneVersion"], 5)
+                self.assertEqual(written["laneVersion"], 6)
                 self.assertEqual(written["qcGate"]["verdict"], verdict)
                 self.assertEqual(written["qcGate"]["lane"], "clone-lane")
                 self.assertEqual("fidelity" in written, verdict != "error")

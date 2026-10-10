@@ -76,6 +76,9 @@ class Agreement:
             "agreeing": int(self.agree.sum()),
             "octaveDisagreements": int(self.octave.sum()),
             "agreeRatio": float(self.agree.sum() / both) if both else None,
+            "agreeingSeconds": float(self.agree.sum() * self.hop),
+            "voicedEitherSeconds": float(voiced_any * self.hop),
+            "agreeingFrameFraction": float(self.agree.mean()) if self.agree.size else None,
             "octaveRatio": float(self.octave.sum() / both) if both else None,
             "voicingAgreement": float(both / voiced_any) if voiced_any else None,
         }
@@ -148,6 +151,8 @@ def agreeing_frames(
     octave apart (1200 +/- `octave_tolerance_cents`) are flagged in `octave`; they never agree.
     """
     track_a, track_b = as_track(a), as_track(b)
+    if not all(np.isfinite(track.hop) and track.hop > 0 and track.f0.ndim == 1 for track in (track_a, track_b)):
+        raise ValueError("pitch tracks require a positive finite hop and one-dimensional F0")
     step = float(hop) if hop else min(track_a.hop, track_b.hop)
     duration = max((track_a.f0.size - 1) * track_a.hop, (track_b.f0.size - 1) * track_b.hop, 0.0)
     frames = int(np.floor(duration / step + 1e-9)) + 1

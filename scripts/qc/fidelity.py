@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 
-from qc import models, pitch, store
+from qc import models, pitch, store, runtime, assessment
 from qc.store import Layout
 
 ROLES = ("pitchA", "pitchB", "speaker")
@@ -37,7 +37,11 @@ def _identities(layout: Layout, features: dict[str, Any]) -> dict[str, tuple[dic
         identity = (features.get("models") or {}).get(role) or {}
         model = registry.get(identity.get("id"))
         runner_sha = identity.get("runnerSHA256")
-        out[role] = (model, runner_sha) if model is not None and runner_sha else None
+        try:
+            current = runtime.runner_identity(layout, model) if model else None
+        except runtime.RunnerError:
+            current = None
+        out[role] = (model, runner_sha) if current == runner_sha and runner_sha else None
     return out
 
 
@@ -56,7 +60,7 @@ def similarity(a: Any, b: Any) -> float | None:
     """Cosine similarity of two embeddings (1 is the same direction)."""
 
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    if a.size == 0 or a.shape != b.shape:
+    if a.size == 0 or a.shape != b.shape or a.ndim != 1 or not np.isfinite(a).all() or not np.isfinite(b).all():
         return None
     norm = float(np.linalg.norm(a) * np.linalg.norm(b))
     return None if norm == 0 else float(np.dot(a, b)) / norm
@@ -72,15 +76,29 @@ def _round(value: Any, digits: int = 4) -> float | None:
 def pitch_section(take_tracks: tuple[Any, Any] | None, reference_tracks: tuple[Any, Any] | None) -> dict[str, Any]:
     if take_tracks is None or None in take_tracks:
         return {"available": False}
-    summary = pitch.summarize(*take_tracks)
+    try:
+        summary = pitch.summarize(*take_tracks)
+    except (ValueError, TypeError, KeyError):
+        return {"available": False, "reason": "invalid-pitch-tracks"}
     median = summary["takeMedianSt"]
     reference_median = None
+    reference_summary = None
     if reference_tracks is not None and None not in reference_tracks:
-        reference_median = pitch.summarize(*reference_tracks)["takeMedianSt"]
+        try:
+            reference_summary = pitch.summarize(*reference_tracks)
+            reference_median = reference_summary["takeMedianSt"]
+        except (ValueError, TypeError, KeyError):
+            reference_summary = None
     shift = summary["sustainedShift"]
     tone = summary["toneRun"]
     return {
-        "available": median is not None,
+        "available": median is not None and reference_median is not None,
+        "qualification": "uncalibrated", "decision": "uncertain" if median is not None and reference_median is not None
+            and summary["agreement"]["agreeingSeconds"] >= assessment.MIN_AGREEING_SECONDS
+            and reference_summary["agreement"]["agreeingSeconds"] >= assessment.MIN_AGREEING_SECONDS else "not-assessed",
+        "agreeingSeconds": _round(summary["agreement"]["agreeingSeconds"]),
+        "referenceAgreeingSeconds": _round(reference_summary["agreement"]["agreeingSeconds"]) if reference_summary else None,
+        "agreeingFrameFraction": _round(summary["agreement"]["agreeingFrameFraction"]),
         "takeMedianSemitones": _round(median, 3),
         "referenceMedianSemitones": _round(reference_median, 3),
         "registerShiftSemitones": _round(pitch.register_offset(median, reference_median), 3),
@@ -104,9 +122,11 @@ def identity_section(speaker: dict[str, Any] | None) -> dict[str, Any]:
                for window in speaker.get("windows") or [] if window.get("embedding")]
     windows = [(value, window) for value, window in windows if value is not None]
     worst = min(windows, key=lambda item: item[0]) if windows else None
+    value = similarity(speaker["whole"], reference)
     return {
-        "available": True,
-        "similarity": _round(similarity(speaker["whole"], reference)),
+        "available": value is not None,
+        "qualification": "uncalibrated", "decision": "uncertain" if value is not None else "not-assessed",
+        "similarity": _round(value),
         "worstWindowSimilarity": _round(worst[0]) if worst else None,
         "worstWindow": {"start": worst[1].get("start"), "end": worst[1].get("end")} if worst else None,
         "windows": len(windows),
@@ -138,6 +158,7 @@ def take_fidelity(layout: Layout, run_id: str) -> list[dict[str, Any]]:
             "control": bool(take.get("control")),
             "pitch": pitch_section(tracks, reference_tracks),
             "identity": identity_section(speaker),
+            "assessment": entry.get("assessment"),
             "flags": [{"detector": flag["detector"], "class": flag["class"], "level": flag["level"]}
                       for flag in entry.get("flags", [])],
         })

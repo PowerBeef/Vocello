@@ -1667,6 +1667,7 @@ PY
   case "$gates_st" in
     0) gates_verdict=PASS ;;
     3) gates_verdict=WARN ;;
+    4) gates_verdict=NOT_ASSESSED ;;
     1) gates_verdict=FAIL ;;
     *) gates_verdict=ERROR ;;
   esac

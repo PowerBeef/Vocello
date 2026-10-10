@@ -1031,13 +1031,28 @@ def pitch_features(take: dict[str, Any], results: dict[str, Any], context: dict[
     trackers' disagreement, and the register offset from the clone reference (None without one)."""
 
     names = ("pitch.sustained_shift_st", "pitch.octave_jumps", "pitch.register_offset_st",
-             "pitch.tracker_disagreement")
+             "pitch.tracker_disagreement", "pitch.register_offset_signed_st", "pitch.agreeing_seconds",
+             "pitch.reference_agreeing_seconds", "pitch.agreeing_frame_fraction", "pitch.voicing_agreement",
+             "pitch.range_p10_p90_st", "pitch.reference_range_p10_p90_st")
     out = {name: feature() for name in names}
     track_a, track_b = outputs(results, "pitchA"), outputs(results, "pitchB")
     if pitch is None or track_a is None or track_b is None:
         return out
-    agreement = pitch.agreeing_frames(track_a, track_b, cents=params.get("pitchAgreeCents", 50))
+    try:
+        agreement = pitch.agreeing_frames(track_a, track_b, cents=params.get("pitchAgreeCents", 50))
+    except (ValueError, TypeError, KeyError):
+        return out
     summary = agreement.summary()
+    out["pitch.agreeing_seconds"] = feature(summary["agreeingSeconds"])
+    out["pitch.agreeing_frame_fraction"] = feature(summary["agreeingFrameFraction"])
+    out["pitch.voicing_agreement"] = feature(summary["voicingAgreement"])
+    voiced = agreement.consensus.semitones
+    voiced = voiced[np.isfinite(voiced)]
+    if voiced.size:
+        out["pitch.range_p10_p90_st"] = feature(np.percentile(voiced, 90) - np.percentile(voiced, 10))
+    reference_summary = context.get("referencePitchSummary", {}).get(take.get("referenceSHA256") or "", {})
+    out["pitch.reference_agreeing_seconds"] = feature(reference_summary.get("agreeingSeconds"))
+    out["pitch.reference_range_p10_p90_st"] = feature(reference_summary.get("rangeP10P90St"))
     if summary.get("agreeRatio") is not None:
         out["pitch.tracker_disagreement"] = feature(1.0 - summary["agreeRatio"])
     shift = pitch.sustained_shifts(agreement)
@@ -1049,6 +1064,7 @@ def pitch_features(take: dict[str, Any], results: dict[str, Any], context: dict[
     reference = context.get("referencePitch", {}).get(take.get("referenceSHA256") or "")
     if median is not None and reference is not None:
         out["pitch.register_offset_st"] = feature(abs(median - reference))
+        out["pitch.register_offset_signed_st"] = feature(median - reference)
     return out
 
 
@@ -1056,7 +1072,7 @@ def pitch_features(take: dict[str, Any], results: dict[str, Any], context: dict[
 
 def _cosine_distance(a: Any, b: Any) -> float | None:
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    if a.size == 0 or a.shape != b.shape:
+    if a.size == 0 or a.shape != b.shape or a.ndim != 1 or not np.isfinite(a).all() or not np.isfinite(b).all():
         return None
     norm = float(np.linalg.norm(a) * np.linalg.norm(b))
     return None if norm == 0 else 1.0 - float(np.dot(a, b)) / norm
@@ -1093,7 +1109,8 @@ def speaker_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str,
 
 def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, Any], *,
             params: dict[str, Any], layout: store.Layout, model_ids: dict[str, str],
-            load_audio: Callable[[str], tuple[np.ndarray, int]] = read_wav) -> dict[str, Feature]:
+            load_audio: Callable[[str], tuple[np.ndarray, int]] = read_wav,
+            diagnostics: dict[str, Any] | None = None) -> dict[str, Feature]:
     """Every feature of one take. `results` maps role -> the take's cached result."""
 
     audio = None
@@ -1106,6 +1123,10 @@ def extract(take: dict[str, Any], results: dict[str, Any], context: dict[str, An
     pauses: list[float] = []
     if audio is not None:
         profile = frame_profile(audio[0], audio[1])
+        if diagnostics is not None and take.get("language") == "french":
+            from qc import forensics
+            diagnostics["localAcoustics"] = forensics.local_acoustics(
+                {role: outputs(results, role) for role in ("phones", "phonesB")}, profile, _speech_frames(profile)[1])
         out.update(signal_features(audio[0], audio[1], params, profile=profile))
         out.update(pause_features(audio[0], audio[1], profile=profile))
         out.update(end_features(audio[0], audio[1], profile=profile))
@@ -1131,17 +1152,30 @@ def take_pitch_median(results: dict[str, Any], params: dict[str, Any]) -> float 
     track_a, track_b = outputs(results, "pitchA"), outputs(results, "pitchB")
     if pitch is None or track_a is None or track_b is None:
         return None
-    return pitch.take_median_semitones(
-        pitch.agreeing_frames(track_a, track_b, cents=params.get("pitchAgreeCents", 50)))
+    try:
+        return pitch.take_median_semitones(
+            pitch.agreeing_frames(track_a, track_b, cents=params.get("pitchAgreeCents", 50)))
+    except (ValueError, TypeError, KeyError):
+        return None
 
 
 def build_context(reference_results: dict[str, dict[str, Any]], params: dict[str, Any]) -> dict[str, Any]:
     """What a run's takes are scored against: each clone reference's median pitch in semitones
     (`referencePitch`, by the reference's audio digest), measured on the clip itself."""
 
-    reference_pitch = {}
+    reference_pitch, summaries = {}, {}
     for reference_sha, results in reference_results.items():
         median = take_pitch_median(results, params)
         if median is not None:
             reference_pitch[reference_sha] = median
-    return {"referencePitch": reference_pitch}
+        a, b = outputs(results, "pitchA"), outputs(results, "pitchB")
+        if pitch is not None and a is not None and b is not None:
+            try:
+                agreement = pitch.agreeing_frames(a, b, cents=params.get("pitchAgreeCents", 50))
+            except (ValueError, TypeError, KeyError):
+                continue
+            values = agreement.consensus.semitones
+            values = values[np.isfinite(values)]
+            summaries[reference_sha] = dict(agreement.summary(), rangeP10P90St=
+                float(np.percentile(values, 90) - np.percentile(values, 10)) if values.size else None)
+    return {"referencePitch": reference_pitch, "referencePitchSummary": summaries}

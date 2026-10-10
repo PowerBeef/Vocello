@@ -4,13 +4,13 @@
     python3 scripts/qc.py models list|fetch|verify|prune
     python3 scripts/qc.py runtimes setup|verify
     python3 scripts/qc.py label sample|serve|export
-    python3 scripts/qc.py run | gate | queue | calibrate | fit | eval | norms
+    python3 scripts/qc.py run | gate | report | queue | calibrate | fit | eval | norms
     python3 scripts/qc.py controls build|report
     python3 scripts/qc.py confirm next|record
     python3 scripts/qc.py language-bench takes|evidence
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
-3 gate warn. See docs/reference/qc.md.
+3 gate warn, 4 gate not assessed (coverage-v2). See docs/reference/qc.md.
 """
 
 from __future__ import annotations
@@ -187,7 +187,7 @@ def cmd_run(args: argparse.Namespace, layout: Layout) -> int:
 
     try:
         roles = lanes.parse_roles(args.models, detectors.load_config(layout))
-        directory = lanes.run(layout, args.takes, args.lane, roles=roles)
+        directory = lanes.run(layout, args.takes, args.lane, roles=roles, cache_only=args.cache_only)
     except runtime.LockBusy as error:
         print(f"qc run: {error}", file=sys.stderr)
         return EXIT_ERROR
@@ -202,10 +202,29 @@ def cmd_gate(args: argparse.Namespace, layout: Layout) -> int:
     from qc import lanes
 
     try:
-        return lanes.gate(layout, args.lane, args.run)
+        return lanes.gate(layout, args.lane, args.run, legacy_exit=args.legacy_exit, json_output=args.json)
     except (ValueError, OSError) as error:
         print(f"qc gate: {error}", file=sys.stderr)
         return EXIT_ERROR
+
+
+def cmd_report(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import lanes
+    try:
+        value = lanes.report(layout, args.run)
+    except (ValueError, OSError, KeyError) as error:
+        print(f"qc report: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    if args.json:
+        _print_json(value)
+    else:
+        summary = value["assessment"]
+        print(f"qc report {args.run}: coverage={summary['coverage']}; "
+              f"current-scoring={value['currentScoringIdentity']}; no native-accent acceptance")
+        for take in value["takes"]:
+            print(f"  {take['token']}: " + ", ".join(
+                f"{name}={item['decision']}" for name, item in take.get("assessment", {}).items() if item["required"]))
+    return EXIT_OK
 
 
 def cmd_queue(args: argparse.Namespace, layout: Layout) -> int:
@@ -413,6 +432,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "name, such as pool, for every role")
     run.add_argument("--models", help="comma-separated roles or model ids to run now (default the lane's "
                                       "models); the others are read from the cache")
+    run.add_argument("--cache-only", action="store_true", help="rescore verified cached results only; never invokes models")
     run.set_defaults(handler=cmd_run)
 
     bench = commands.add_parser("language-bench", help="the language lanes: takes manifest and recognitions")
@@ -433,10 +453,17 @@ def build_parser() -> argparse.ArgumentParser:
     evidence.add_argument("--output", required=True)
     bench.set_defaults(handler=cmd_language_bench)
 
-    gate = commands.add_parser("gate", help="exit 0 pass, 3 warn, 1 fail, 2 error for a lane run")
+    gate = commands.add_parser("gate", help="exit 0 assessed pass, 3 warn, 1 fail, 2 error, 4 not assessed")
     gate.add_argument("--lane", required=True)
     gate.add_argument("--run", help="run id (default the lane's newest)")
+    gate.add_argument("--legacy-exit", action="store_true", help="explicit v1 0/1/2/3 exits; never asserts quality acceptance")
+    gate.add_argument("--json", action="store_true")
     gate.set_defaults(handler=cmd_gate)
+
+    report = commands.add_parser("report", help="inspect retained coverage and local phonetic/fidelity evidence")
+    report.add_argument("--run", required=True)
+    report.add_argument("--json", action="store_true")
+    report.set_defaults(handler=cmd_report)
 
     queue = commands.add_parser("queue", help="write a listening queue the label tool opens as a batch")
     queue.add_argument("--top", type=int, default=40)

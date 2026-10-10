@@ -1130,6 +1130,7 @@ PY
   case "$gates_st" in
     0) gates_verdict=PASS ;;
     3) gates_verdict=WARN ;;
+    4) gates_verdict=NOT_ASSESSED ;;
     1) gates_verdict=FAIL ;;
     *) gates_verdict=ERROR ;;
   esac
@@ -1384,7 +1385,7 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
     qc_status="ERROR"
     if qc_run="$(python3 "$SCRIPT_DIR/qc.py" run --takes "$artifacts" --lane qc-takes \
         2> >(tee "$artifacts/logs/qc-run.log" >&2))" && [[ -n "$qc_run" ]]; then
-      qc_status="PASS"
+      qc_status="COMPLETE"
       qc_gate="$(python3 "$SCRIPT_DIR/qc.py" gate --lane qc-takes --run "$qc_run" 2>&1 | tail -n 1)" || true
       if python3 "$SCRIPT_DIR/qc.py" queue --top 50 --run "$qc_run" --batch "queue-$qc_run" \
           >"$artifacts/logs/qc-queue.log" 2>&1; then

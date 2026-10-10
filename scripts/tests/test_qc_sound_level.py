@@ -224,15 +224,15 @@ class TranscriptLaneTests(unittest.TestCase):
         takes = []
         rate = 16000
         tone = (0.1 * np.sin(2 * np.pi * 150 * np.arange(rate) / rate) * 32767).astype("<i2")
-        for take_id, script in self.SCRIPTS.items():
+        for index, (take_id, script) in enumerate(self.SCRIPTS.items()):
             path = self.root / f"{take_id}.wav"
             with wave.open(str(path), "wb") as writer:
                 writer.setnchannels(1)
                 writer.setsampwidth(2)
                 writer.setframerate(rate)
-                writer.writeframes(tone.tobytes())
+                writer.writeframes((tone + index).astype("<i2").tobytes())
             takes.append({"takeID": take_id, "token": store.take_token("pool", take_id), "audio": str(path),
-                          "audioSHA256": store.sha256_text(take_id), "language": "french", "text": script,
+                          "audioSHA256": store.audio_sha256(path), "language": "french", "text": script,
                           "mode": "custom", "voice": "v", "cell": "standard", "reference": None,
                           "referenceSHA256": None, "finishReason": "eos", "family": take_id.split("--")[0]})
         self.takes = {take["token"]: take for take in takes}

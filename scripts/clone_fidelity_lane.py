@@ -68,10 +68,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # none by default, and no discovery of the other saved voices.
 # 4 (2026-09-25, audit decision 1a): the speech-emotion column is gone with its
 # retired judge (trained on non-commercial corpora).
+# 6 (2026-10-10): explicit missing/unqualified coverage exits4, separate from defects.
 # 5 (2026-10-01, QC v2): ReDimNet2+ identity and FCPE/SwiftF0 pitch against the
 # reference clip, and the QC v2 lane gate, replace the ECAPA similarity, the
 # pYIN prosody distances and the v1 lane gates (CAM++ similarity, onset drift).
-LANE_VERSION = 5
+LANE_VERSION = 6
 FIXED_TEXT = (
     "The harbor lights flickered as the evening ferry pulled away, and she "
     "wondered how many more crossings the old captain had left in him."
@@ -79,7 +80,7 @@ FIXED_TEXT = (
 FIXED_TEXT_LANGUAGE = "english"
 GATED_LANE = "clone-lane"
 QC_TAKES_FILE = "qc-takes.json"
-GATE_VERDICTS = {0: "pass", 3: "warn", 1: "fail", 2: "error"}
+GATE_VERDICTS = {4: "not-assessed", 0: "pass", 3: "warn", 1: "fail", 2: "error"}
 # Separation of same-voice from different-voice similarity (audit #103): enough
 # negatives to estimate it, and a reproducible bootstrap for its intervals.
 MINIMUM_CALIBRATION_NEGATIVES = 8
@@ -351,7 +352,7 @@ def score_takes(plan, run_dir, reference, label, *, layout=None, run=None, gate=
     """Score every take with QC v2 after the last generation, then gate the clone takes.
 
     Returns ``(run_id, verdict, exit_code)``: the gate's verdict (pass, warn,
-    fail; ``error`` when it could not be computed) and its exit code.
+    fail, not-assessed; ``error`` when it could not be computed) and its exit code.
     """
     from qc import lanes, runtime, store
     from qc.store import Layout
@@ -504,10 +505,10 @@ def main():
         "separation": (report.get("speakerSimilarity") or {}).get("separation"),
         "qcGate": verdict,
     }, indent=2))
-    if verdict in ("fail", "error"):
+    if verdict in ("fail", "error", "not-assessed"):
         # A warn gate's flags report above; a fail gate or a gate that could not
-        # be computed fails the lane.
-        raise SystemExit(1 if verdict == "fail" else 2)
+        # be computed fails the lane; missing qualification exits4 independently.
+        raise SystemExit(code)
 
 
 if __name__ == "__main__":

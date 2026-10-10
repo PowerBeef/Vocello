@@ -149,6 +149,38 @@ class TriageTests(unittest.TestCase):
         self.ledger()
         self.assertEqual(MODULE.triage(self.root)["verdict"], "product-failure")
 
+    def diagnostic_verdict(self, status="pass"):
+        return {"schemaVersion": 2, "runID": "telemetry-overhead-fixture", "status": status,
+                "completedAt": "2026-10-10T00:00:00Z", "inconclusiveReasons": [],
+                "summary": {"failures": []}}
+
+    def test_local_telemetry_verdicts_are_readonly_and_preserve_outcomes(self):
+        for status, expected in (("pass", "PASS"), ("fail", "failure-unclassified"),
+                                 ("inconclusive", "inconclusive")):
+            with self.subTest(status=status):
+                data = self.diagnostic_verdict(status)
+                data["summary"]["failures"] = ["private diagnostic detail"] if status == "fail" else []
+                self.write("verdict.json", data)
+                before = self.snapshot()
+                with mock.patch.object(MODULE.subprocess, "run", side_effect=AssertionError("no rerun")):
+                    report = MODULE.triage(self.root)
+                self.assertEqual(report["verdict"], expected)
+                self.assertEqual(report["runID"], data["runID"])
+                self.assertIn("verdict.json", report["evidence"])
+                self.assertNotIn("private diagnostic detail", json.dumps(report))
+                self.assertEqual(before, self.snapshot())
+
+    def test_incomplete_or_contradictory_diagnostic_verdict_cannot_pass(self):
+        for changes in ({"completedAt": None}, {"schemaVersion": 99}, {"status": []},
+                        {"runID": "unknown-lane"}, {"summary": []},
+                        {"summary": {"failures": ["failure"]}}, {"inconclusiveReasons": ["busy"]}):
+            with self.subTest(changes=changes):
+                self.write("verdict.json", self.diagnostic_verdict() | changes)
+                self.assertEqual(MODULE.triage(self.root)["verdict"], "incomplete")
+        self.write("verdict.json", self.diagnostic_verdict())
+        self.run_metadata()
+        self.assertEqual(MODULE.triage(self.root)["verdict"], "incomplete", "a diagnostic cannot mask missing UI ledger")
+
     def test_malformed_evidence_blocks_pass(self):
         self.run_metadata()
         self.ledger()

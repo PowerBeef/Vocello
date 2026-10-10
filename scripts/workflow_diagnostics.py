@@ -119,6 +119,28 @@ def triage(run_directory: Path) -> dict:
 
     run = read_json("run.json")
     ledger = read_json("required-steps.json")
+    diagnostic = read_json("verdict.json")
+    diagnostic_status = None
+    if diagnostic:
+        # The telemetry-overhead lane has a terminal local verdict rather than
+        # UI run metadata/a step ledger. Report it without requalifying timings.
+        summary = diagnostic.get("summary")
+        diagnostic_id = diagnostic.get("runID")
+        candidate = diagnostic.get("status")
+        if (diagnostic.get("schemaVersion") != 2
+                or not isinstance(diagnostic_id, str) or not diagnostic_id.startswith("telemetry-overhead-")
+                or candidate not in ("pass", "fail", "inconclusive")
+                or not isinstance(diagnostic.get("completedAt"), str) or not diagnostic["completedAt"]
+                or not isinstance(summary, dict) or not isinstance(summary.get("failures"), list)
+                or not isinstance(diagnostic.get("inconclusiveReasons"), list)):
+            issues.append("unsupported or incomplete diagnostic verdict")
+        elif (candidate != "fail" and summary["failures"]
+              or candidate == "pass" and diagnostic["inconclusiveReasons"]):
+            issues.append("diagnostic verdict contradicts recorded failures or inconclusive reasons")
+        else:
+            diagnostic_status = candidate
+            if candidate == "fail":
+                failed_steps.append({"step": "telemetry-overhead", "exitCode": None, "evidence": "verdict.json"})
     ledger_valid = False
     interrupted = False
     if run and ledger is None:
@@ -223,13 +245,14 @@ def triage(run_directory: Path) -> dict:
         if code:
             failed_steps.append({"step": step, "exitCode": code, "evidence": "verdict.txt"})
             interrupted |= code in {130, 143, -2, -15}
-    status = run.get("status") if run else None
+    status = run.get("status") if run else diagnostic_status
     interrupted |= bool(run and run.get("exitCode") in (130, 143, -2, -15))
     restoration = any("restor" in entry["step"] for entry in failed_steps) or any("restor" in step for step in missing_steps)
     native_terminal = {"test_build", "core", "runtime"} <= codes.keys() or {"build", "core"} <= codes.keys()
     recorded_pass = bool((run and status == "passed" and run.get("exitCode") == 0 and run.get("finishedAt"))
                          or (ledger_valid and ledger and ledger.get("status") == "passed" and ledger.get("completedAt"))
                          or (native_terminal and not any(codes.values()))
+                         or diagnostic_status == "pass"
                          or re.search(r"^(GATE|RELEASE READINESS): PASS\s*$", verdict_text, re.M))
     if classification and not any("crash" in entry["step"] for entry in failed_steps):
         verdict = classification
@@ -241,13 +264,13 @@ def triage(run_directory: Path) -> dict:
         verdict = "product-failure"
     elif failed_steps or status == "failed" or (ledger and ledger.get("status") == "failed" and not missing_steps) or re.search(r"^(GATE|RELEASE READINESS): FAIL\s*$", verdict_text, re.M):
         verdict = "failure-unclassified"
-    elif re.search(r"^GATE: INCONCLUSIVE\s*$", verdict_text, re.M):
+    elif diagnostic_status == "inconclusive" or re.search(r"^GATE: INCONCLUSIVE\s*$", verdict_text, re.M):
         verdict = "inconclusive"
     elif recorded_pass and not missing_steps and not issues and (not ledger or ledger_valid and ledger.get("status") == "passed"):
         verdict = "PASS"
     else:
         verdict = "incomplete"
-    if not run and not ledger and not verdict_text:
+    if not run and not ledger and not verdict_text and not diagnostic:
         issues.append("no runner verdict or required-step ledger; passing tests alone cannot prove run completion")
     artifacts: list[str] = []
     truncated = False
@@ -264,7 +287,7 @@ def triage(run_directory: Path) -> dict:
             truncated = True
             break
     return {"schemaVersion": 1, "readOnly": True, "runDirectory": os.fspath(root),
-            "runID": run.get("runID") if run else ledger.get("runID") if ledger else None,
+            "runID": run.get("runID") if run else ledger.get("runID") if ledger else diagnostic.get("runID") if diagnostic else None,
             "verdict": verdict, "recordedStatus": status, "failedSteps": failed_steps, "failedTests": failed_tests,
             "missingRequiredSteps": missing_steps, "issues": issues, "evidence": sorted(set(evidence)),
             "artifacts": artifacts, "artifactsTruncated": truncated,

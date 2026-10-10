@@ -47,7 +47,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
 | `RF-12` | parked | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
 | `RF-13` | parked | implement the one-time iOS Design and Clone export unlock before freeze | — |
-| `RF-14` | planned | Decide the 3.0 bar for take quality by ear (about one take in three unusable) | — |
+| `RF-14` | planned | Decide the 3.0 take-quality bar from reviewed failures and qualified evidence | — |
 
 ### Open items in detail
 
@@ -86,7 +86,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
   unparkWhen: Rerun scripts/ui_test.sh ios purchase --scenario exports on the paired iPhone, then the remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization.
 
-- **`RF-14`** (planned) — Decide the 3.0 bar for take quality by ear (about one take in three unusable).
+- **`RF-14`** (planned) — Decide the 3.0 take-quality bar from reviewed failures and qualified evidence.
   gate: The maintainer decides how 3.0 ships against the take quality heard by ear: either a recorded risk decision that ships the current rate as a known limitation, or the product changes from QC-06 (register anchoring, regenerate-on-outlier, the fr-0101 defect classes) that land before RF-09 freeze, each measured by blind listening against the current rate. Models, seeds, prompts and QC stay unchanged without that evidence.
 
 ## Specialist-audit remediation

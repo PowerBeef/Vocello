@@ -17,6 +17,42 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — generation quality investigation
+
+Completed a [detailed end-to-end investigation](audits/2026-10-10-generation-quality-investigation.md)
+at `566306f5`, covering the supplied emotion/QC reports, current input and generation ownership,
+Clone conditioning, decoder streaming, publication, playback, History and offline quality scoring.
+Three read-only reviewers traced separate domains; focused review corrected source links, Auto
+fallback wording and the distinction between an uncalibrated z-score and confidence.
+
+**Verified:** pure current-code scoring reproductions return clone-lane PASS with missing clone
+pitch/identity inputs and with an uncalibrated 12-semitone synthetic register-offset feature. These
+are policy demonstrations, not waveform detection tests. The retained Dylan take still has no flags;
+the latest 957-take QC run includes 320 clones but no pitch/speaker outputs. Historical Dylan pitch
+caches match the audio but not current runner identities, so their descriptive statistics do not
+qualify current detectors. Current source also shows the British-accent French Design starter,
+optional-ASR conditioning changes and different Clone decoder histories between streaming and
+quality-first. None is yet proven to explain the user's recent Clone/Design examples.
+
+The report proposes coverage-aware verdicts, separate pitch/identity/pronunciation/intent assessment,
+complete private request receipts and controlled causal experiments. QC-04/QC-06/QC-08 and RF-14
+link the findings; RF-14 wording now distinguishes the enriched heard sample from population failure
+prevalence. All statuses and the existing release gate remain unchanged. Private source extraction,
+capability inventory and reproducible policy evidence remain ignored under
+`build/private/qc/generation-audit-20261010/`.
+
+**Documentation validation:** routed `scripts/dev.sh check` passed contracts, privacy, roadmap and
+**2,062 selected Python tests plus 2,489 subtests** (one existing skip). The initial restricted run's
+21 failures came from loopback/process-access fixtures; that failed evidence remains retained beside
+the separately identified host-access rerun. Existing historical benchmark memory warnings remain.
+All report file links resolve, staged lint passes, and a structural comparison confirms every roadmap
+status and gate is unchanged. No native build was needed for these documentation-only changes.
+
+**Limits:** no new synthesis, acoustic inference, human listening, model download, native/phone run,
+release decision or push. The exact recent Clone reference/output pair and French Design request
+remain unavailable. No application or detector behavior changed. Startup hook delivery was observed;
+`doctor` still cannot establish persisted hook trust or every route's activation.
+
 ### October 10 — setup and evidence remediation
 
 Starting from clean `a8b16b08`, fixed installed-Python selection/child propagation and doctor

@@ -329,17 +329,18 @@
     {
       "id": "RF-14",
       "plan": "release-first-3-0-2026-09",
-      "title": "Decide the 3.0 bar for take quality by ear (about one take in three unusable)",
+      "title": "Decide the 3.0 take-quality bar from reviewed failures and qualified evidence",
       "status": "planned",
       "blockedBy": [],
       "gate": "The maintainer decides how 3.0 ships against the take quality heard by ear: either a recorded risk decision that ships the current rate as a known limitation, or the product changes from QC-06 (register anchoring, regenerate-on-outlier, the fr-0101 defect classes) that land before RF-09 freeze, each measured by blind listening against the current rate. Models, seeds, prompts and QC stay unchanged without that evidence.",
       "sourceOfTruth": [
         "benchmarks/qc/eval-v1.json",
-        "docs/reference/qc.md"
+        "docs/reference/qc.md",
+        "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
-      "updated": "2026-10-06",
+      "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "From QC v2's blind confirmations (2026-10-05/06): 11 of 34 decisive answers on French and English Built-in and Design takes were unusable (32%, bounds 17-51%), flagged or not. Heard reasons: a whispered syllable, a false start, over-linked liaison, delivery and pacing, pauses, and a heavy accent (often still usable). QC v2 cannot find these takes automatically, so any fix is judged by ear on blind batches (qc.py confirm --unflagged)."
+      "notes": "2026-10-05/06 confirmations: 11 of 34 decisive judgments among 39 reviewed French/English Built-in and Design takes were unusable. This enriched sample excludes clones and does not estimate population failure prevalence; only five decisive unflagged controls were heard. The October 10 generation-quality investigation reproduces missing clone-coverage PASS and documents accent/local-defect gaps. QC-06 owns proposed automatic detection qualification; no qualified substitute for the existing release gate is established. Preserve the recorded listening evidence and release decision requirement until an explicit acceptance-policy decision changes it."
     },
     {
       "id": "DA-02",
@@ -1529,11 +1530,12 @@
       ],
       "gate": "lang-bench, qc-takes, the clone lane and the iOS lane's Mac-side check run qc.py; gate exit codes 0/3/1/2; the listening queue opens in the label tool; one real run of each passes.",
       "sourceOfTruth": [
-        "docs/reference/qc.md"
+        "docs/reference/qc.md",
+        "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
-      "updated": "2026-10-06",
+      "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Wired: lang-bench (Qwen3-ASR + Whisper, language version 6) and qc-takes run asrA, asrB, g2p, phones, phonesB; the clone lane (version 5) and voice-reliability run speaker, pitchA, pitchB, and the clone detectors gate only in the clone lane. QC v2 is report-only since 2026-10-06 (QC-03): its warn never fails a lane. One real run of each only when the maintainer asks for it.",
+      "notes": "Wired: lang-bench and qc-takes run ASR/G2P/phone roles; clone-lane and voice-reliability configure speaker and both pitch roles. QC v2 remains report-only since October 6. October 10 audit: all nine retained feature runs lack pitch/speaker outputs; the 957-take run includes 320 clones but does not assess clone fidelity. Current scoring can return clone-lane PASS with missing clone inputs or an uncalibrated 12-semitone synthetic feature offset. Next: distinguish execution, qualified coverage and per-defect decisions; version/test any exit-contract change and qualify real lane runs. Phone-dependent acceptance remains deferred.",
       "legacyIds": [
         "BT-05"
       ]
@@ -1548,11 +1550,12 @@
       ],
       "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).",
       "sourceOfTruth": [
-        "docs/reference/qc.md"
+        "docs/reference/qc.md",
+        "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
-      "updated": "2026-10-06",
+      "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "From the 2026-10-01 register analysis and the maintainer's listening. fr-0101--dylan (Built-in Dylan, a Chinese voice, reading French; external review 2026-10-02, maintainer confirmation by ear 2026-10-05): the last syllable of \"abattus\" is whispered (3.07-3.43 s), a short false start precedes \"obstruaient\" (3.92 s) inside a 0.82 s pause, \"ormes abattus\" is over-linked as \"orme-euz-abattus\", and the take ends 0.02 s after its last sound. The maintainer rates all three severe: the take is unusable. The earlier 'spelling pronunciation' diagnosis is withdrawn (ZIPA recognizer bias). The 804-take sampling-variation experiment is kept for the register question; QC v2 measures pitch for clones only, so that analysis is product work, not QC. 2026-10-06: the blind confirmations put about a third of heard takes at unusable, flagged or not; RF-14 owns the release decision on that rate, and these follow-ups are its candidates."
+      "notes": "Historical leads: October 1 register analysis, retained 804-take variation experiment, and maintainer-confirmed Dylan whisper/false-start/liaison defects. Earlier spelling diagnosis was withdrawn for recognizer bias; short tail alone does not prove cutoff. October 10 investigation finds no current accent detector or qualified clone-pitch cut, a British-accent French Design starter, optional-ASR conditioning changes, and streaming versus quality-first Clone decoder-history asymmetry. Proposed work: coverage-aware verdicts, paired reference-register/identity qualification, narrow French pronunciation/local-defect assessment, explicit Clone readiness, durable request receipts, and identical-codec decoder replay. These are source findings and hypotheses, not reproduced causes of the recent Clone/Design complaints. No product fix, automatic-quality gate or release acceptance is claimed; RF-14 retains that decision."
     },
     {
       "id": "QC-08",
@@ -1566,9 +1569,10 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "config/audio-qc-stage0-calibration.json",
-        "scripts/lib/audio_qc.py"
+        "scripts/lib/audio_qc.py",
+        "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
-      "updated": "2026-10-02",
+      "updated": "2026-10-10",
       "unparkWhen": null,
       "notes": "From the 2026-10-02 external review: on fr-0101--dylan the per-sample silence rule (|x| < 0.001) sees one 236 ms run and flags nothing, though the take has two pauses over 350 ms against one comma (cadence:excess1 with frame-based silence). Touches GenerationOutputAdapter.swift (silence state, persisted pass, report), GenerationTelemetryRecord currentAlgorithmVersion 8 -> 9, config/audio-qc-stage0-{calibration,observations}.json, scripts/lib/audio_qc.py, the Swift tests that hard-code version 8 and the sample-exact dropout tests, test_audio_qc*.py, and the M6 gate baseline. Single takes have no fade, tail or gain today; only LongFormAssembly shapes joins."
     },

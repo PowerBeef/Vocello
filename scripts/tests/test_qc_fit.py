@@ -195,7 +195,8 @@ class FitEvalTests(unittest.TestCase):
         self.assertEqual(set(thresholds["scoring"]["files"]),
                          {"config/qc/detectors.json", "scripts/qc/features.py", "scripts/qc/detectors.py",
                           "scripts/qc/phones.py", "scripts/qc/pitch.py", "scripts/qc/forensics.py", "scripts/qc/assessment.py", "scripts/qc/lanes.py",
-                          "scripts/qc/evidence.py", "scripts/qc/pronunciation.py", "scripts/qc/acoustics.py", "scripts/qc/fidelity.py"})
+                          "scripts/qc/evidence.py", "scripts/qc/pronunciation.py", "scripts/qc/acoustics.py", "scripts/qc/fidelity.py",
+                          "scripts/qc/candidates.py", "scripts/qc/boundary.py"})
         self.assertEqual((thresholds["labelSet"]["takes"], len(thresholds["labelSet"]["digest"])), (400, 64))
         validation = thresholds["crossValidation"]
         self.assertEqual((validation["k"], validation["salt"], len(validation["folds"])), (5, label.FOLD_SALT, 5))

@@ -78,6 +78,36 @@ download or run another model. Existing two-tracker Clone register and speaker i
 remain separate from this third pitch witness. Native accent and emotional intent explicitly
 remain not assessed.
 
+`qc.candidates` adds two report-only acoustic producers. `phonation-anomaly` nominates
+low-periodicity, noise-like frames near canonical vowel/sonorant windows, including windows
+with no recognizer error. Each target needs joint signal/spectral support; unsupported targets
+abstain and mixed coverage is partial. Acoustic support extends into neighboring phones.
+`short-fragment` scans the full WAV at 20 ms support/5 ms hops for isolated 20–200 ms energy
+bursts, then checks coverage against either phone inventory with a 20 ms margin. It does not
+require a phone error or treat missing F0 as zero. Missing inventories yield partial coverage;
+aligned bursts are counted separately. Clicks, breaths, ordinary transitions and expected
+contextual devoicing remain confounds. Fixed extraction settings in each result are uncalibrated,
+not quality thresholds. Both producers bound duration (120 s), alignment windows (2,048),
+candidates (128) and target provenance (16 per candidate).
+
+`qc.boundary` exports French `boundary-pronunciation` candidates for vowel-bearing insertions
+at verified narrow word joins, including a disclosed optional-suffix heuristic of at most two
+phones. A canonical optional vowel cannot appear as an insertion. A private take may therefore
+provide `boundaryPronunciationHypotheses`: full reviewed paths with `id`, narrow canonical
+`boundaryIndex`, `phones`, `reason` and `provenance` (`kind: human-reviewed`, `sourceSHA256`,
+`annotationId`, opaque `reviewerId`, `targetVariety`). Changes must stay within two canonical
+phones of that join. A timed canonical vowel omitted by a reviewed path becomes a descriptive
+`reviewed-boundary-vowel-disagreement`. Caller-supplied provenance must be bound to authentic
+annotation bytes; structural validation alone does not authenticate a reviewer. No hypothesis
+is invented from a broad historical label. Missing reviewed paths remain explicitly unavailable
+in producer coverage; complete canonical insertion coverage does not establish reviewed coverage.
+
+Events retain per-producer coverage, candidate provenance and uncertainty. Invalid intervals or
+export truncation downgrade that dimension to partial and record losses. These three new class
+names are **not aliases** for `devoiced`, `stutter` or `mispronunciation`. Existing semantic labels
+cannot qualify them without independently reviewed matching definitions and protected examples.
+Zero nominations, or complete input coverage, never implies absence of an audible defect.
+
 Posterior loading accepts only the exact audio/model cache filename, rejects symlinks and
 unsafe/malformed or oversized NPZ members, disables pickle, and records the bytes read.
 Older runner JSON does not attest the posterior digest: the recorded digest identifies the
@@ -109,8 +139,9 @@ Each take binds `token`, `audioSHA256`, `split` (`train`, `calibration`, `heldou
 `positive-only`, `uncertain`, `unreviewed`), and `events` (`id`, `class`, `start`, `end`).
 Use opaque private group IDs; reference may be null only for a take without a reference.
 Reuse of a group or audio across splits is rejected. The policy's overlap setting defines
-annotation matching, not a defect threshold. The initial exported candidate class is
-`pronunciation`; evidence for other classes must remain unavailable until a producer exists.
+annotation matching, not a defect threshold. Exported observation classes are `pronunciation`,
+`phonation-anomaly`, `short-fragment` and `boundary-pronunciation`; semantic defect classes and
+native-accent/intent evidence remain unavailable for automatic acceptance.
 
 Evaluation verifies WAV identity/duration, exact scoring/model/policy bindings and bounded
 event intervals, matches predictions to labels one-to-one, and reports class metrics and

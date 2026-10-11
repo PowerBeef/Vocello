@@ -21,6 +21,8 @@ from collections.abc import Iterable, Mapping
 
 import numpy as np
 
+from qc import candidates
+
 SCHEMA = "vocello.qc.local-acoustic-evidence/1"
 MAX_WINDOWS = 2048
 MAX_BATCH_SAMPLES = 524288
@@ -367,6 +369,11 @@ def analyze(samples, rate, *, expected_windows: Iterable[Mapping] | None = None,
             result["uncertainties"].append(source + "-window-limit-exceeded")
     result["expectedContextWindows"] = _expected_contexts(
         result["expectedWindows"], profile, duration, expected_context_seconds)
+    result["candidateProducers"] = {
+        "phonation-anomaly": candidates.phonation(profile, expected_windows, duration),
+        "short-fragment": candidates.fragments(raw, rate, profile, expected_windows,
+                                               recognized_windows, duration),
+    }
     for index in range(int(math.ceil(duration / interval_seconds))):
         start = index * interval_seconds
         result["intervals"].append(_window(profile, start, min(duration, start + interval_seconds), duration,

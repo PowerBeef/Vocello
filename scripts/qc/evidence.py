@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from qc import acoustics, fidelity, pronunciation, store
+from qc import acoustics, boundary, fidelity, pronunciation, store
 
 SCHEMA = "vocello.qc.perceptual-evidence/1"
 EVENTS_SCHEMA = "vocello.qc.events/1"
@@ -105,6 +105,9 @@ def analyze(take, results, context, *, layout, model_ids, expected, words, audio
         diagnostic = pronunciation.analyze(expected, words, outputs, posteriors=posteriors,
                                            alternatives=take.get("pronunciationAlternatives"))
         result["pronunciation"] = diagnostic
+        result["boundaryPronunciation"] = boundary.analyze(expected, words, diagnostic,
+            reviewed_boundaries=take.get("boundaryPronunciationHypotheses"),
+            duration_seconds=result["audioDurationSeconds"])
         for role, entry in diagnostic.get("roles", {}).items():
             for window in (entry.get("posterior") or {}).get("expectedWindows", []):
                 expected_windows.append(dict(window, source=role))
@@ -139,7 +142,7 @@ def analyze(take, results, context, *, layout, model_ids, expected, words, audio
 
 
 def events_document(run_id, scoring_sha, models, takes, rows):
-    """Export timed recognizer disagreements as candidates, never defect verdicts."""
+    """Export bounded timed observations as candidates, never defect verdicts."""
     entries = []
     for take, row in zip(takes, rows, strict=True):
         evidence = row.get("perceptualEvidence") or {}
@@ -154,7 +157,7 @@ def events_document(run_id, scoring_sha, models, takes, rows):
         for role, diagnostic in (evidence.get("pronunciation") or {}).get("roles", {}).items():
             for candidate in diagnostic.get("localizedCandidates", []):
                 start, end = candidate.get("start"), candidate.get("end")
-                if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in (start, end)):
+                if not all(type(x) in (int, float) and math.isfinite(x) for x in (start, end)):
                     continue
                 if start < 0 or end <= start or duration is None or end > duration:
                     continue
@@ -162,14 +165,42 @@ def events_document(run_id, scoring_sha, models, takes, rows):
                     "start": start, "end": end, "source": role, "status": "candidate",
                     "candidateType": candidate.get("type")})
         pronunciation_status = (evidence.get("pronunciation") or {}).get("inputStatus", "unavailable")
+        dimensions = {"pronunciation": {"inputStatus": pronunciation_status, "decision": "not-assessed"},
+            "nativeAccent": {"inputStatus": "unsupported", "decision": "not-assessed"},
+            "emotionalIntent": {"inputStatus": "unsupported", "decision": "not-assessed"}}
+        producers = (evidence.get("localAcoustics") or {}).get("candidateProducers") or {}
+        producers = {**producers, "boundary-pronunciation": evidence.get("boundaryPronunciation") or {}}
+        for name, limit in (("phonation-anomaly", 128), ("short-fragment", 128), ("boundary-pronunciation", 256)):
+            producer = producers.get(name) or {}
+            dimensions[name] = {"inputStatus": producer.get("inputStatus", "unavailable"),
+                "decision": "not-assessed", "qualification": "uncalibrated",
+                "coverage": producer.get("coverage", {})}
+            if producer.get("reason"):
+                dimensions[name]["reason"] = producer["reason"]
+            observations = producer.get("candidates") or []
+            if not isinstance(observations, (list, tuple)):
+                dimensions[name].update(inputStatus="partial", export={"reason": "invalid-candidate-collection"})
+                continue
+            rejected, truncated = 0, max(0, len(observations) - limit)
+            for candidate in observations[:limit]:
+                if not isinstance(candidate, dict) or candidate.get("class") != name or candidate.get("status") != "candidate":
+                    rejected += 1
+                    continue
+                start, end = candidate.get("start"), candidate.get("end")
+                if not all(type(x) in (int, float) and math.isfinite(x) for x in (start, end)):
+                    rejected += 1
+                    continue
+                if duration is None or not 0 <= start < end <= duration:
+                    rejected += 1
+                    continue
+                events.append(dict(candidate, id=f"{name}-{len(events)}"))
+            if rejected or truncated:
+                dimensions[name].update(inputStatus="partial", export={"reason": "candidate-export-loss",
+                    "rejected": rejected, "truncated": truncated})
         entries.append({"token": take["token"], "audioSHA256": take["audioSHA256"],
                         "durationSeconds": duration, "inputStatus": pronunciation_status,
                         "durationSource": "decoded-pcm", "manifestDurationMismatch":
                             take.get("durationSeconds") is not None and take["durationSeconds"] != duration,
-                        "events": events, "dimensions": {"pronunciation": {
-                            "inputStatus": pronunciation_status,
-                            "decision": "not-assessed"},
-                            "nativeAccent": {"inputStatus": "unsupported", "decision": "not-assessed"},
-                            "emotionalIntent": {"inputStatus": "unsupported", "decision": "not-assessed"}}})
+                        "events": events, "dimensions": dimensions})
     return {"schema": EVENTS_SCHEMA, "run": run_id, "scoringSHA256": scoring_sha,
             "models": models, "qualification": "uncalibrated", "decision": "not-assessed", "takes": entries}

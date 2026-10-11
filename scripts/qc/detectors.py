@@ -191,7 +191,8 @@ def config_digest(layout: Layout = Layout()) -> str:
 # The code that turns runner results into features and detector scores. `qc/features.py` imports
 # `qc/phones.py` and `qc/pitch.py` by name at run time, so they are listed rather than scanned.
 SCORING_SOURCES = ("qc/features.py", "qc/detectors.py", "qc/phones.py", "qc/pitch.py", "qc/forensics.py", "qc/assessment.py", "qc/lanes.py",
-                   "qc/evidence.py", "qc/pronunciation.py", "qc/acoustics.py", "qc/fidelity.py")
+                   "qc/evidence.py", "qc/pronunciation.py", "qc/acoustics.py", "qc/fidelity.py",
+                   "qc/candidates.py", "qc/boundary.py")
 
 
 def scoring_identity(layout: Layout = Layout()) -> dict[str, Any]:

@@ -98,6 +98,50 @@ class EvidenceTests(unittest.TestCase):
             [{"token": "one", "audioSHA256": self.digest}], [{}])
         self.assertEqual(result["takes"][0]["inputStatus"], "unavailable")
         self.assertEqual(result["decision"], "not-assessed")
+        for name in ("phonation-anomaly", "short-fragment", "boundary-pronunciation"):
+            self.assertEqual(result["takes"][0]["dimensions"][name]["inputStatus"], "unavailable")
+
+    def test_new_producers_export_separate_classes_with_provenance(self):
+        take = {"token": "one", "audioSHA256": self.digest}
+        producers = {name: {"inputStatus": "partial", "candidates": [{"class": name,
+            "start": .1, "end": .2, "status": "candidate", "source": "witness",
+            "candidateType": "observation", "uncertainties": ["confounded"],
+            "expectedTargets": [{"phone": "y", "source": "phones"}]}]}
+            for name in ("phonation-anomaly", "short-fragment", "boundary-pronunciation")}
+        diagnostic = {"audioDurationSeconds": 1, "localAcoustics": {"candidateProducers": producers},
+            "boundaryPronunciation": producers["boundary-pronunciation"]}
+        row = evidence.events_document("run", "b" * 64, {}, [take], [{"perceptualEvidence": diagnostic}])["takes"][0]
+        self.assertEqual({event["class"] for event in row["events"]}, set(producers))
+        self.assertEqual(len({event["id"] for event in row["events"]}), 3)
+        self.assertTrue(all(event["uncertainties"] == ["confounded"] for event in row["events"]))
+        self.assertEqual(row["inputStatus"], "unavailable")
+        self.assertEqual(row["dimensions"]["phonation-anomaly"]["inputStatus"], "partial")
+        self.assertNotIn("devoiced", row["dimensions"])
+
+    def test_new_event_intervals_and_collection_are_bounded(self):
+        base = {"class": "short-fragment", "status": "candidate", "start": .1, "end": .2}
+        observations = [dict(base, start=start, end=end) for start, end in (
+            (True, .2), (.1, float("inf")), (float("nan"), .2), (-.1, .2), (.2, .1), (.1, 1.01))]
+        observations += [base] * 200
+        diagnostic = {"audioDurationSeconds": 1, "localAcoustics": {"candidateProducers": {
+            "short-fragment": {"inputStatus": "complete", "candidates": observations}}}}
+        row = evidence.events_document("run", "b" * 64, {}, [{"token": "one", "audioSHA256": self.digest}],
+            [{"perceptualEvidence": diagnostic}])["takes"][0]
+        self.assertEqual(len(row["events"]), 122)
+        self.assertTrue(all(event["start"] == .1 and event["end"] == .2 for event in row["events"]))
+        self.assertEqual(row["dimensions"]["short-fragment"]["inputStatus"], "partial")
+        self.assertEqual(row["dimensions"]["short-fragment"]["export"]["rejected"], 6)
+        self.assertEqual(row["dimensions"]["short-fragment"]["export"]["truncated"], 78)
+
+    def test_reviewed_boundary_input_is_forwarded_without_fabrication(self):
+        hypotheses = [{"id": "reviewed"}]
+        with patch.object(evidence.pronunciation, "analyze", return_value={}), \
+             patch.object(evidence.boundary, "analyze", return_value={}) as producer:
+            evidence.analyze({"language": "french", "audioSHA256": self.digest,
+                "boundaryPronunciationHypotheses": hypotheses}, {}, {}, layout=self.layout,
+                model_ids={}, expected=["a"], words=[], audio=None)
+        self.assertIs(producer.call_args.kwargs["reviewed_boundaries"], hypotheses)
+        self.assertIsNone(producer.call_args.kwargs["duration_seconds"])
 
     def test_measured_duration_overrides_manifest_hint_without_rounding(self):
         duration = 24001 / 24000

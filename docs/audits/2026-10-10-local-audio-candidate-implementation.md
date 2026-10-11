@@ -176,6 +176,9 @@ missing recognizers and corrupt/untimed alignments. None establishes deployed ac
 
 ## Retained-audio regression: blocked before execution
 
+This section records the initial attempts. The authorized cache-only follow-up below completed
+the regression after changing the host-posture policy; the four original refusal logs remain intact.
+
 Four separately retained host preflights refused execution at the clean implementation checkpoint.
 All confirmed available worker tracking with zero active workers, zero stale records and zero unknown
 records. Load was within the twelve-core limit; kernel memory-pressure level remained **2 (warning)**,
@@ -204,13 +207,12 @@ work, not executed validation. Use a new preflight filename when resuming; never
 
 ## Next qualification work
 
-First execute the prepared thirteen-clip cache-only development regression on a committed clean
-checkpoint after host preflight passes. Preserve four new run IDs, exact WAV/reference identities,
-scoring/model bindings, strict gate exits and artifact digests. Verify unchanged pre-existing
-acoustics, pronunciation, Clone pitch/identity and generic candidate counts. Compare new nominations
-with historical windows only as descriptive training overlap; do not call them semantic detections.
+The thirteen-clip cache-only development regression completed in the authorized follow-up below.
+Its source/run identities, exact WAV/reference bytes, scoring/model bindings, strict gate exits and
+artifact digests are retained. Existing measurements are unchanged. New nominations overlap historical
+windows as descriptive training evidence; they are not qualified semantic detections.
 
-Then obtain independently reviewed phonation/fragment/boundary definitions and appropriate positives,
+Obtain independently reviewed phonation/fragment/boundary definitions and appropriate positives,
 complete negatives and uncertainty labels. Reviewed boundary paths need genuine linguistic annotation
 for the target variety. Keep prototype-exposed Dylan in training, retain the thirteen old protected
 confirmations, and address the historical speaker overlap when creating a new disjoint evaluation.
@@ -222,3 +224,78 @@ independently labeled accent examples and causal generation replay remain separa
 These producers do not fix pitch conditioning or non-native French generation, and a language detector
 recognizing French would not by itself validate native accent. New models/downloads or production
 generation interventions need their own scoped work and existing authorization boundaries.
+
+## Authorized cache-only follow-up
+
+The maintainer requested removing the pressure refusal for this analysis. Commit `d52d5ae9` adds
+`check_cache_only_host`: host load and pressure are recorded without blocking deterministic cached
+audio rescoring. Live worker ownership and native-lock serialization remain mandatory, including
+when the busy-host override is set. Ordinary `require_quiet_host` measurement behavior is unchanged.
+Performance, memory, generation and inference lanes retain their pressure checks. Shared instructions,
+the benchmark skill and maintained runbooks now distinguish these operations explicitly.
+
+The change passed independent read-only review, fifteen host-preflight tests and twenty-nine focused
+host/worker tests including twenty-three subtests. Full routed checks passed **2,305 tests and 2,685
+subtests**, with one existing skip, contracts/privacy/invariants and generic iOS app/logic-bundle
+compilation without a phone. The larger test count reflects the selected routing as well as new tests;
+it is not a claim that fifty-seven new tests were authored. Existing timing/memory benchmark meaning
+is unchanged, so no measurement lineage or compatible baseline was repinned.
+
+At clean source `d52d5ae941f66aae7448f5b26cfa2ae449d97f10`, the new posture check recorded load
+3.33 on twelve cores, memory pressure level 2, zero active/stale/unknown workers and no conflicting
+native lock. This is deterministic offline evidence, with no performance or memory qualification
+claim. The ordinary QC CLI then processed thirteen retained development clips in four fresh runs:
+
+| Retained inputs | Run ID | Execution | Strict gate |
+|---|---|---|---|
+| French Design and annotated Dylan | `qc-takes-20261011-021302-bf41` | Complete | 4, NOT_ASSESSED |
+| Seven training comparisons | `qc-takes-20261011-021303-b652` | Complete | 4, NOT_ASSESSED |
+| Existing English/French Clone pairs | `clone-lane-20261011-021303-19f8` | Complete | 4, NOT_ASSESSED |
+| Identical-reference and octave/speed controls | `clone-lane-20261011-021304-7e0e` | Complete | 4, NOT_ASSESSED |
+
+All runs used `--cache-only` with no inference or download. All thirteen historical held-out
+confirmation clips stayed excluded. WAV/reference identities, authentic retained annotation/protocol
+bindings and identical configured model IDs/runner digests across old/new runs were verified. Existing
+acoustic fields, pronunciation diagnostics, Clone pitch/identity and generic candidate counts are
+exactly unchanged. New scoring identity is
+`e68fe4dd2b063f24ddfbc20f242fa086d1d831d780bdf816b17abb7b310cd2f9`.
+
+### Dylan: improved localization, still training evidence
+
+| Historical annotation | New observation overlapping it | Intersection / union | Interpretation |
+|---|---|---:|---|
+| Whispered/devoiced region, 3.07–3.43 s | Phonation candidate, 3.05–3.25 s | 0.474 | Low-periodicity contextual evidence near expected `/y/`; not a qualified whisper verdict. |
+| False-start region, 3.92–3.98 s | Isolated unaligned burst, 3.90–3.98 s | 0.750 | Recovers an acoustic candidate where generic recognizer events had none; not a confirmed stutter classification. |
+| Broad pronunciation region, 2.16–2.84 s | Boundary vowel observations, 2.48–2.52 and 2.56–2.58 s | 0.059 / 0.029 | Separate recognizer witnesses around an optional-suffix join; does not identify the exact disputed vowel or prove wrong liaison. |
+
+The phonation candidate uses fifteen overlapping frames and two expected `/y/` targets supplied
+by different recognizers. Its median correlation is 0.268 and median level −34.55 dBFS. These
+contextual measurements can include neighboring phones; the full human-marked region is not covered.
+The short-fragment candidate uses thirteen overlapping energy frames, peak −26.99 dBFS and flank
+contrast 37.31 dB. Its longer-context correlation remains descriptive and is not a burst-only F0.
+No extraction setting was changed to force these particular overlaps after observing this run.
+
+No reviewed boundary path was fabricated. All relevant French runs still explicitly report reviewed
+comparison unavailable. The canonical optional-vowel limitation therefore remains open even though
+some boundary insertions overlap the broad historical pronunciation mark.
+
+### Comparison evidence prevents premature acceptance
+
+The three historically acceptable French Built-in comparisons yield phonation candidate counts
+15, 14 and 3; short-fragment counts 2, 2 and 0; and boundary counts 3, 0 and 0. Dylan yields 6, 1
+and 4 respectively. The two objectionable French Design comparisons yield phonation counts 5 and
+11, no short fragments, and boundary counts 2 and 6. Whole-clip verdicts do not establish class-complete
+negative annotations, but the overlap already prevents treating any nomination as automatic failure.
+No matched acceptable French Design training controls were borrowed from the held-out partition.
+
+English clips have unavailable French phonation/boundary evidence. The identical-reference control
+still nominates one short fragment, and the octave/speed control two; the latter has unknown alignment
+and partial fragment coverage. These are not validated local-defect positives or negatives. The
+unchanged Clone/control pitch results remain measurement sanity evidence, not quality qualification.
+
+Raw source and posture receipts, command ledger, feature/event artifacts, gates, artifact digests,
+regression script and verification receipt remain ignored under
+`build/private/qc/cache-analysis-routing-20261010/`. The earlier failed check and pressure refusals
+were preserved. No human listening, new labels, audio upload, automatic acceptance, repair or release
+claim was introduced. Next work is independent defect definitions/localized labels and complete
+negatives, genuine reviewed boundary paths, exact failing Clone pairs and accent/causal qualification.

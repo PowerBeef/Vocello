@@ -17,6 +17,29 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — cache-only pressure policy and completed regression
+
+Maintainer-authorized `d52d5ae9` removes the pressure/load refusal for deterministic cached-audio
+analysis. `check_cache_only_host` records posture and preserves worker ownership/native-lock checks;
+performance, memory, generation and inference lanes retain their ordinary preflight. Shared
+instructions, skill and runbooks agree. Independent review found no blockers. Full routed checks
+passed **2,305 tests plus 2,685 subtests**, one existing skip, and phone-free generic iOS compilation.
+
+The [retained follow-up](audits/2026-10-10-local-audio-candidate-implementation.md#authorized-cache-only-follow-up)
+ran thirteen development clips at clean `d52d5ae9` with zero workers and pressure level 2 recorded.
+Four new cache-only runs completed with strict gate 4, NOT_ASSESSED. The fragment producer now
+overlaps the marked false start at 3.90–3.98 s (IoU 0.75); phonation overlaps the whisper at
+3.05–3.25 s (IoU 0.474). Boundary candidates overlap the broad pronunciation mark but reviewed
+paths remain unavailable. Acceptable clips also nominate, so these are training observations,
+not automatic defect/quality decisions. Existing measurements and generic candidate counts are
+unchanged; all thirteen historical held-out confirmations remain excluded.
+
+Receipts, gates, comparisons and checks are ignored under
+`build/private/qc/cache-analysis-routing-20261010/`; earlier refusals/failures remain intact.
+No inference, download, new listening or phone operation. Next: independently reviewed class
+definitions/localized labels and complete negatives, genuine reviewed boundary paths, exact failing
+Clone pairs and accent/causal qualification. QC-06 stays in flight; QC-04/QC-08/RF-14 stay open.
+
 ### October 10 — local audio candidate producers
 
 Implemented [phonation, fragment and boundary candidates](audits/2026-10-10-local-audio-candidate-implementation.md)
@@ -31,7 +54,7 @@ one existing skip. The first full run's scoring-source test mismatch and success
 remain separately retained. Raw checks, doctor, verification receipt and a prepared private regression
 script are ignored under `build/private/qc/local-candidates-20261010/`.
 
-**Next:** run the thirteen retained development clips cache-only at a clean checkpoint when host
+**Initial follow-up (superseded by the completed regression above):** run the thirteen retained development clips cache-only at a clean checkpoint when host
 preflight passes. Four attempts confirmed zero workers and acceptable load but memory pressure level
 2; the guard requires 1. No new audio run started and no new candidate hit/miss result is claimed.
 Do not overwrite refusal logs or infer normal pressure from free-memory percentage. The benchmark

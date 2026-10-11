@@ -91,6 +91,11 @@ Strict phone-only missingness remains intact.
 
 ## Retained-clip observations
 
+The subsequent [regression-panel experiment](2026-10-10-retained-audio-regression-panel.md) recovered
+byte-bound timed Dylan annotations from the existing training batch and added acceptable/objectionable
+training comparisons. It documents the missed false start and candidate-count overlap; the observations
+below are diagnostic measurements, not evidence of qualified defect discrimination.
+
 All observations reuse the earlier private WAVs and cached model outputs. The first integrated
 checkpoint produced the following immutable runs:
 

@@ -24,6 +24,13 @@ compares primary-source detection methods, exact model/data rights, French and d
 localization limits and an ordered qualification plan. It expands the research recommendations
 without changing the observed results or acceptance boundaries below.
 
+The later [retained regression-panel experiment](2026-10-10-retained-audio-regression-panel.md)
+recovers exact timed Dylan annotations from private `batch-1`, preserves their training split and
+compares current diagnostic candidates with previously reviewed training clips. It narrows the data
+gap to independent qualification examples and exact recent failing pairs; the exposed Dylan intervals
+are available as development anchors. Generic candidates still miss the marked false start and overlap
+substantially in count between acceptable and objectionable French clips.
+
 Sections 1–12 preserve the original investigation and proposal at the checkpoint above. They made
 no application or detector changes. Sections 13–14 record the subsequent remediation, validation
 and installed-model observations. Historical findings below are not claims that remediated defects

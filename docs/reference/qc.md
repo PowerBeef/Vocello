@@ -86,6 +86,13 @@ are checked by the normal lane before feature extraction.
 
 ### Held-out event evaluation
 
+The [retained regression-panel experiment](../audits/2026-10-10-retained-audio-regression-panel.md)
+recovered three timed human annotations on the exact Dylan WAV from private `batch-1`. It is an
+already exposed training example, not held-out truth. Later whole-clip confirmations do not supply
+complete local-defect negatives. Acceptable French comparisons produce as many generic candidates
+as objectionable examples, and the marked false start has no overlapping exported event. Preserve
+these distinctions when building panels; a candidate count or class-agnostic overlap is not detection.
+
 `qc.py qualify --panel PRIVATE.json --runs RUN_ID ... [--name NAME] [--json]` evaluates
 retained candidates against a private `vocello.qc.panel/1` manifest. It writes an immutable
 private report under `build/private/qc/qualification/`; it never modifies thresholds or

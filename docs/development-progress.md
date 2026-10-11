@@ -17,6 +17,32 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — retained audio regression panel
+
+Assembled the [private development panel](audits/2026-10-10-retained-audio-regression-panel.md)
+at clean source `545bc80a`, recovering exact Dylan WAV identity and three timed severe maintainer
+annotations from `batch-1`. These are existing training observations, not new held-out truth.
+All 40 historical reviewed clips have intact audio/protocol bindings; the thirteen held-out
+confirmations remain excluded from new scoring. Seven training comparisons produced new cache-only
+run `qc-takes-20261011-005911-3d20`, with zero acquisition errors and strict NOT_ASSESSED exit 4.
+
+The marked whisper region has measurable low-periodicity spectral evidence. No generic event overlaps
+the marked 60 ms false start; expected-phone paths also omit that interval. Acceptable French clips
+produce 18–29 generic candidates, versus 19–27 on the examined objectionable clips. Candidate counts
+cannot resolve the reported quality problem. Existing Clone/control measurements are preserved;
+exact recent failing Clone pairs and independently labeled accent examples remain unavailable.
+The development-only panel correctly refuses held-out metrics. Next work is focused phonation,
+unaligned-fragment and reviewed boundary-pronunciation candidate producers, followed by independent
+qualification. No shipping or acceptance-policy change; QC-06 stays in flight and QC-04/QC-08/RF-14 open.
+
+**Verified:** 47 targeted qualification/acoustic tests plus 38 subtests passed. Routed checks passed
+contracts/privacy/invariants/strict roadmap and **2,211 tests plus 2,597 subtests**, one existing skip.
+The initial sandbox-restricted fixture/process failures and justified host-capable rerun are retained;
+final prose received a contracts-only check. Raw private inventory, source receipts and checks are under
+`build/private/qc/regression-panel-20261010/`. No model inference/download, new listening, audio upload,
+native build or phone operation. Host preflight verified no active workers and normal load/memory.
+Hook delivery was observed; persisted activation remains unconfirmed by doctor.
+
 ### October 10 — installed-model perceptual evidence implementation
 
 Implemented the [research follow-up](audits/2026-10-10-perceptual-evidence-implementation.md):

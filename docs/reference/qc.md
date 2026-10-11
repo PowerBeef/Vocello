@@ -41,6 +41,9 @@ automatic acceptance.
 Each new run also retains `perceptualEvidence` in `features.json` and a separate
 `events.json` (`vocello.qc.events/1`). `report --json` reads these artifacts without
 inference. Historical runs are preserved; a cache-only recomputation receives a new run ID.
+For cache-only analysis, use `check_cache_only_host` from `scripts/lib/host_preflight.sh` to record
+host load/pressure without a hard stop. Worker ownership and native serialization remain checked.
+The ordinary quiet-host guard still applies to inference/generation and performance/memory lanes.
 The additional source files participate in scoring identity, invalidating old calibration
 for the new implementation without rewriting historical thresholds.
 

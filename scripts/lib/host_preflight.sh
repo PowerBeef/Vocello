@@ -9,6 +9,7 @@
 #
 #   require_quiet_host <lane> [agents-allowed]
 #   settle_host_load <lane> <max-seconds>   (after the lane's own build)
+#   check_cache_only_host                  (records posture; no pressure stop)
 #
 # Refuses (exit 1) when the 1-minute load average exceeds twice the core count
 # or the kernel reports memory pressure above normal
@@ -25,6 +26,23 @@
 # from the run's own load sample. No dependency on the caller's note/warn/die.
 
 require_quiet_host() {
+    _qvoice_check_host measurement "$@"
+}
+
+# Deterministic rescoring of existing audio/cache bytes makes no latency or
+# memory-qualification claim. Record host posture without blocking on it.
+# Worker ownership and native serialization remain mandatory.
+check_cache_only_host() {
+    if [ "$#" -ne 0 ]; then
+        echo "error: check_cache_only_host takes no arguments" >&2
+        return 2
+    fi
+    _qvoice_check_host cache-only qc-cache-analysis
+}
+
+_qvoice_check_host() {
+    local posture_policy="$1"
+    shift
     local lane="${1:-}" agents_allowed=0
     if [ "${2:-}" = "agents-allowed" ]; then
         agents_allowed=1
@@ -46,7 +64,9 @@ require_quiet_host() {
     limit=$(( cores * 2 ))
     local busy=0 parallel=""
     if [ "$load_hundredths" -gt $(( limit * 100 )) ] || [ "$level" -gt 1 ]; then
-        busy=1
+        if [ "$posture_policy" = "measurement" ]; then
+            busy=1
+        fi
     fi
     local lock_owner=""
     if [ -n "${QVOICE_NATIVE_LOCK:-}" ] && [ -d "$QVOICE_NATIVE_LOCK" ]; then
@@ -83,6 +103,10 @@ require_quiet_host() {
         echo "==> [host] $lane: $agents_note" >&2
     fi
     if [ "$busy" -eq 1 ]; then
+        if [ "$posture_policy" = "cache-only" ]; then
+            echo "error: $lane must run alone; parallel work is active:$parallel. Cache-only posture reporting does not bypass ownership or native serialization." >&2
+            return 1
+        fi
         if [ "${QVOICE_ALLOW_BUSY_HOST:-0}" = "1" ]; then
             echo "==> [host] $lane: continuing on a busy host by request (load1m=${load:-?} limit=$limit cores=$cores memoryPressureLevel=$level${parallel:+ parallel:$parallel})" >&2
             return 0
@@ -94,7 +118,11 @@ require_quiet_host() {
         echo "error: wait for the load to settle or close other work; QVOICE_ALLOW_BUSY_HOST=1 runs anyway and the run's own load sample decides its classification." >&2
         return 1
     fi
-    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level$agents_note" >&2
+    local posture_note=""
+    if [ "$posture_policy" = "cache-only" ]; then
+        posture_note=" posture=record-only"
+    fi
+    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level$posture_note$agents_note" >&2
     return 0
 }
 

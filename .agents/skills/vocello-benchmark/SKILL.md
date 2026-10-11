@@ -10,7 +10,10 @@ docs/reference/qc.md and docs/reference/tooling-and-evidence.md as relevant. Ins
 script help before choosing the smallest applicable `scripts/macos_test.sh` or `scripts/ios_device.sh`
 lane. Source-bound measurements run on committed checkpoints with complete source identity,
 fixed seeds, optimized-build receipts, compatible baselines and required memory qualification.
-Join/stop workers first, keep host-wide native serialization and load/memory preflight. If worker
+Join/stop workers first and keep host-wide native serialization. Performance, memory and model
+inference/generation lanes retain load/memory preflight. Cache-only rescoring of existing audio/results
+uses `check_cache_only_host`: record load/pressure without blocking, retain ownership/native-lock
+checks, and make no latency or memory-qualification claim. If worker
 tracking is unavailable explicitly declare lead-only only after joining them. Installed assets only;
 large downloads and publication need specific authorization. Do not edit source during a run.
 Fast QC gates differ from report-only QC v2 (`scripts/qc.py`); automated scores do not imply human

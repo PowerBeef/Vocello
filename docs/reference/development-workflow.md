@@ -251,6 +251,10 @@ all clients on the host are instrumented, so the lead still checks its known wor
 `QVOICE_ALLOW_BUSY_HOST=1` path remains explicitly exploratory; it cannot override unknown worker
 ownership and cannot make a loaded measurement publishable. Only existing non-timing audio-QC
 model lanes may pass `agents-allowed`; they still respect host load/memory/native serialization.
+Cache-only audio rescoring uses `check_cache_only_host` instead: load and memory pressure are
+recorded without blocking. This deterministic analysis makes no latency or memory-qualification
+claim; worker ownership and native-lock checks remain. Do not use it for inference, generation,
+UI, performance or memory measurements.
 
 ## Codex setup and tool routing
 

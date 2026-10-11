@@ -134,6 +134,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   Run source-bound measurements on committed checkpoints in the lead session after joining workers.
   The existing non-timing audio-QC exception may use `agents-allowed`; native serialization, load and
   memory checks still apply. `require_quiet_host` uses live worker leases, not Git worktree locks.
+  Cache-only analysis of existing audio/results uses `check_cache_only_host`: load and pressure are
+  recorded without refusal. Worker ownership and native serialization still apply; this mode makes
+  no timing/memory qualification claim and does not authorize inference or native generation.
   Unavailable tracking requires explicit `QVOICE_LEAD_ONLY=1` after joining workers; unknown ownership
   blocks even exploratory overrides. `QVOICE_ALLOW_BUSY_HOST=1` preserves exploratory classification,
   never publication authority. Runner PASS requires diagnostics, crash deltas and restoration.

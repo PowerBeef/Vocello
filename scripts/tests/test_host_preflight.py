@@ -84,6 +84,46 @@ class HostPreflightTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("memoryPressureLevel=2", result.stderr)
 
+    def test_cache_only_analysis_records_pressure_and_load_without_refusal(self) -> None:
+        for load, level in (("0.50", "1"), ("0.50", "2"), ("20.00", "4")):
+            with self.subTest(load=load, level=level):
+                result = run_preflight(load=load, cores="8", level=level, command="check_cache_only_host")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"memoryPressureLevel={level}", result.stderr)
+                self.assertIn(f"load1m={load}", result.stderr)
+                self.assertIn("posture=record-only", result.stderr)
+                self.assertNotIn("busy host by request", result.stderr)
+
+    def test_cache_only_analysis_retains_worker_ownership_checks(self) -> None:
+        active = run_preflight(load="20.00", cores="8", level="2", workers=[self.worker_record()],
+            command="check_cache_only_host", env={"QVOICE_ALLOW_BUSY_HOST": "1"})
+        self.assertEqual(active.returncode, 1, active.stderr)
+        unknown = run_preflight(load="20.00", cores="8", level="2", workers=[self.worker_record()],
+            ownership="denied", command="check_cache_only_host", env={"QVOICE_ALLOW_BUSY_HOST": "1"})
+        self.assertEqual(unknown.returncode, 2, unknown.stderr)
+        missing = run_preflight(load="0.50", cores="8", level="1", command="check_cache_only_host",
+            env={"QVOICE_LEAD_ONLY": ""})
+        self.assertEqual(missing.returncode, 2, missing.stderr)
+
+    def test_cache_only_analysis_retains_native_serialization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / "native-build.lock"
+            lock.mkdir()
+            holder = subprocess.Popen(["sleep", "30"])
+            try:
+                (lock / "pid").write_text(f"{holder.pid}\n")
+                result = run_preflight(load="20.00", cores="8", level="2", command="check_cache_only_host",
+                    env={"QVOICE_NATIVE_LOCK": str(lock), "QVOICE_ALLOW_BUSY_HOST": "1"})
+            finally:
+                holder.kill()
+                holder.wait()
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn(f"native-lock(pid {holder.pid})", result.stderr)
+
+    def test_cache_only_analysis_cannot_allow_agents_or_take_a_measurement_lane(self) -> None:
+        result = run_preflight(load="0.50", cores="8", level="1", command="check_cache_only_host benchmark")
+        self.assertEqual(result.returncode, 2, result.stderr)
+
     def test_explicit_override_continues_and_says_so(self) -> None:
         result = run_preflight(load="20.00", cores="8", level="4", env={"QVOICE_ALLOW_BUSY_HOST": "1"})
         self.assertEqual(result.returncode, 0, result.stderr)

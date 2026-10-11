@@ -87,6 +87,8 @@ CI compiler accepts the change. Run CI observation only after an explicitly requ
   a justified rerun gets a new ID and explanation. Fast QC gates and report-only QC v2 differ;
   automated scores cannot imply human listening or unsupported quality claims. Debug retained
   verdicts/logs first, then symbolication, LLDB or profiling as indicated.
+  Cache-only audio analysis uses `check_cache_only_host`: record load/pressure without blocking;
+  retain worker/native-lock checks and make no latency or memory-qualification claim.
 - **Privacy/output:** no PII, private paths, prompts, transcripts, credentials or raw diagnostics in
   Git. Persist failure summaries through `DiagnosticPrivacy`. `config/build-output-policy.json`
   owns caches/artifacts; never clear whole caches to resolve contention. Raw failures stay untracked.

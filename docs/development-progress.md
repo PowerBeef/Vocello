@@ -17,6 +17,30 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — local audio candidate producers
+
+Implemented [phonation, fragment and boundary candidates](audits/2026-10-10-local-audio-candidate-implementation.md)
+at clean checkpoint `5b141b4c` (boundary integration `e69f3f9d`). Existing QC artifacts now retain
+three separate observation classes, bounded acoustic extraction, reviewed boundary-path support,
+per-target signal availability and explicit export-loss coverage. No semantic defect aliases,
+acceptance-policy changes, model inference/downloads, native changes or phone operations.
+Independent review's two P2 coverage findings were fixed and rechecked with no remaining blockers.
+
+**Verified:** full routed contracts/privacy/invariants/roadmap and **2,248 tests plus 2,636 subtests**,
+one existing skip. The first full run's scoring-source test mismatch and successful corrected rerun
+remain separately retained. Raw checks, doctor, verification receipt and a prepared private regression
+script are ignored under `build/private/qc/local-candidates-20261010/`.
+
+**Next:** run the thirteen retained development clips cache-only at a clean checkpoint when host
+preflight passes. Four attempts confirmed zero workers and acceptable load but memory pressure level
+2; the guard requires 1. No new audio run started and no new candidate hit/miss result is claimed.
+Do not overwrite refusal logs or infer normal pressure from free-memory percentage. The benchmark
+skill requires preserving this preflight; no busy-host override was requested. Keep the thirteen
+historical held-out confirmations excluded. Then obtain independent class definitions, complete
+negatives and reviewed boundary paths; canonical G2P optional vowels can hide the disputed realization.
+Exact failing Clone pairs, accent qualification and causal replay remain open. QC-06 stays in flight;
+QC-04/QC-08/RF-14 remain open. Doctor still reports hook activation unconfirmed.
+
 ### October 10 — retained audio regression panel
 
 Assembled the [private development panel](audits/2026-10-10-retained-audio-regression-panel.md)

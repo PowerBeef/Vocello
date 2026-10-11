@@ -1554,11 +1554,12 @@
         "docs/audits/2026-10-10-generation-quality-investigation.md",
         "docs/audits/2026-10-10-automatic-audio-quality-research.md",
         "docs/audits/2026-10-10-perceptual-evidence-implementation.md",
-        "docs/audits/2026-10-10-retained-audio-regression-panel.md"
+        "docs/audits/2026-10-10-retained-audio-regression-panel.md",
+        "docs/audits/2026-10-10-local-audio-candidate-implementation.md"
       ],
       "updated": "2026-10-10",
       "unparkWhen": null,
-      "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone register/identity, transcript review/audio-only and stale-ASR guards, neutral French starter, actual-audio Design enrollment, private v3 receipts/History v8 and bounded decoder replay. Native/TSan/generic iOS/focused Mac journeys passed previously; broad localization smoke remains partial. Installed-cache follow-up adds French CTC/expected windows, single-witness events, independent DSP acoustics, private panel evaluation and training-only fold normalization. Regression inventory recovers three timed Dylan annotations on exact bytes, all training; thirteen held-out confirmations remain excluded. Seven training comparisons expose candidate-count overlap and a missed false start; strict gate remains 4. Next: phonation/unaligned-fragment/boundary candidate producers, exact failing Clone pairs, independently labeled accent/local-defect examples, uncertainty and causal replay. No qualified perceptual acceptance, shipping decoder repair, regeneration or release qualification. QC-08 finishing and RF-14 release decision remain separate. Linked audits retain evidence and limits."
+      "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone evidence, transcript review, French starter, actual-audio Design enrollment, private receipts and bounded replay. CTC windows, DSP acoustics and event panels expose coverage limits. Three report-only producers now nominate phonation anomalies, unaligned bursts and reviewed word-boundary vowel disagreements; independent review fixed target-local availability and export-loss coverage. Routed checks pass 2248 tests/2636 subtests. Retained inventory has three timed Dylan labels, all training; thirteen held-out confirmations remain protected. New thirteen-clip cache-only regression has not started: four quiet-host checks refused memory pressure level 2 despite zero workers. Next: normal-pressure regression, independently defined/localized defect and accent examples, reviewed pronunciation paths, exact failing Clone pairs and causal replay. No qualified acceptance, shipping decoder repair or regeneration. QC-08/RF-14 remain separate. Linked audits preserve failures and limits."
     },
     {
       "id": "QC-08",

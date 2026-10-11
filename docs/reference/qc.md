@@ -1,5 +1,8 @@
 # Audio QC v2
 
+The [ordered remediation implementation](audio-quality-remediation.md) covers independent local
+review, real-failure reproduction, protected qualification, causal fixes and separate Fast QC finishing.
+
 QC v2 is the local audio QC harness, rebuilt on 2026-10-01. It produces diagnostic evidence;
 calibration and qualification apply to individual dimensions and exact scoring identities:
 - a few strong specialist models score every take: two speech recognition (ASR) families, two phone recognizers and a G2P; for clones only, two pitch trackers and a speaker embedder;

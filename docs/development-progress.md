@@ -17,6 +17,15 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 10 — ordered quality remediation implementation
+
+The maintainer authorized the [five-step implementation](reference/audio-quality-remediation.md),
+then requested a pause at the next safe point. **Paused before implementation code changes.**
+The plan and two read-only source investigations are complete; all delegated work has finished.
+No build, model run, audio experiment or download started in this batch. Resume at step 1: private
+review/provenance around the existing evaluator. Missing independent labels and actual failing Clone
+pairs remain evidence gaps, never fabricated truth. Phone work stays deferred; no push requested.
+
 ### October 10 — cache-only pressure policy and completed regression
 
 Maintainer-authorized `d52d5ae9` removes the pressure/load refusal for deterministic cached-audio

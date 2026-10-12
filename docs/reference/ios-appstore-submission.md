@@ -163,7 +163,8 @@ command-bound archive/IPA and TestFlight upload, not a development build substit
 The existing stateful control audit inspects/dismisses purchase options but blocks transaction actions.
 A separately authorized physical StoreKit/sandbox session must qualify purchase/restore/pending/
 cancel/refund and all paid/free export paths, followed by processed-candidate checks. Do not fake
-entitlements for the 201-take campaign; prepare the approved test purchase before freezing it.
+entitlements for the release acceptance (RF-15, risk-based since 2026-10-12) or the later 201-take
+campaign; prepare the approved test purchase before freezing it.
 
 - [x] Approve product identifier/reference name, USD 19.99 and automatic regional pricing; create
       the non-consumable and price schedule under explicit authorization, leaving Family Sharing off.

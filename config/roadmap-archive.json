@@ -4680,6 +4680,21 @@
         "file:scripts/hooks/agent_guard.py",
         "doc:docs/audits/2026-10-12-claude-code-takeover-audit.md#follow-up-decisions-da-15-closed"
       ]
+    },
+    {
+      "id": "CONV-20",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Device re-verification of the frozen iOS behavior",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.",
+      "sourceOfTruth": [
+        "config/ios-control-audit.json",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "updated": "2026-10-12",
+      "notes": "Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. September 21 device window: stateful control audit ios-xcui-control-audit-20260921-063335-d71bad24 completed with limitations (9 PASS, 4 blocked prerequisites, 2 preservation blocks; restoration and crash checks passed). Accessibility audit ios-xcui-control-audit-20260921-064147-ef16ae49 passed with the variation control visible at all four sizes. Smoke ios-xcui-smoke-20260921-060820-9ba0262c failed model readiness: all three installed production models showed Update Available; generation and long-form were not qualified. The subsequently selected redundant localization test was interrupted; smoke now selects only its two documented journeys. No prior pass is promoted to current-source full smoke.",
+      "supersededBy": "RF-15"
     }
   ]
 }

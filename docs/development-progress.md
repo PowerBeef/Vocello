@@ -17,6 +17,40 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 12 — roadmap rebaselined onto the iOS 3.0 App Store submission
+
+**Why.** Between September 4 and October 12:
+- The primary plan was handed to other work four times, and the release items were parked each time.
+- Fewer than 60 of 975 commits named a release item.
+- Twelve new plans were adopted, five of them to work through audit findings.
+
+**Maintainer decisions:**
+- A one-week timeboxed blind A/B of the four engine fixes (RF-14). The rest of the defect rate ships
+  as a known limitation.
+- A risk-based device gate (RF-15). The 201-take campaign and the full matrix follow the submission.
+- Privacy and rights answers recorded by the maintainer, with no paid counsel.
+- Apply now.
+
+**Roadmap changes** ([path and rules](reference/release-first-execution-2026-09.md)):
+- `focusLock` makes `release-first-3-0-2026-09` the only plan with live work, at most two items in
+  flight. The other fifteen plans are parked, including the new `post-3-0-backlog-2026-10`.
+- The release plan has 24 items with due dates through November 2, in eight steps.
+- AUD-01/02/07/09, F-01, F-16 and DA-04 are re-homed as release blockers.
+- CONV-20 is superseded by RF-15. RF-16 (submission) and RF-17 (exact-tag promotion) are new.
+- CONV-21, RF-06, RF-08 and RF-10 moved to the backlog.
+
+**Tooling.**
+- `roadmap.py validate` enforces the focus lock, the in-flight cap, the post-freeze commit naming and
+  overdue due dates, with tests.
+- `scripts/dev.sh status`, shown at session start, lists the next unblocked release items by due date.
+- `CLAUDE.md` gains the release-focus rule.
+
+**Next.**
+- Step 1, due October 16: the decision items RF-02, ASR-02, ASR-04 and ASR-09.
+- RF-14, due October 19: the A/B timebox.
+
+No code, model, device, account or push.
+
 ### October 12 — tool routing follows the maintainer's plugin changes
 
 **Setup changes.**

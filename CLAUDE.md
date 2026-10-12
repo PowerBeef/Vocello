@@ -102,6 +102,17 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 ## Hard boundaries
 
+- **Release focus (until the 3.0 iOS submission):** the `focusLock` in `config/roadmap.json` makes
+  `release-first-3-0-2026-09` the only plan with live work, at most two items in flight
+  (`roadmap.py validate` enforces it).
+  - **Classify every new finding.** A release blocker joins that plan with a due date. A release
+    blocker is an App Review rejection risk, a crash or hang, data loss, a broken purchase or restore,
+    or a privacy or metadata mismatch on iOS.
+  - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
+  - **Ask the maintainer** before starting work outside the plan, and open no new plans or audits.
+  - **After the freeze**, every commit names a release item in its subject.
+
+  Path, decisions and rules: `docs/reference/release-first-execution-2026-09.md`.
 - **Main is the only published branch:** commit on local `main`; push only `main`, fast-forward, on
   explicit request. No hand-made branches or worktrees, ref rewrites or force pushes.
 - **Agents:** at most four active including the lead, inheriting its model. Editing agents run through

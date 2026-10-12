@@ -126,7 +126,7 @@ keep their existing dispositions (CW-05 under DA-14, CW-06 and CW-07 under DA-13
 ## Fresh-session acceptance (DA-15)
 
 Start `claude` at the repository root and confirm: the SessionStart banner ("CLAUDE.md: Start here");
-`/memory` lists `CLAUDE.md` and no `AGENTS.md`; `/hooks` shows eight entries; `/permissions` reports no
+`/memory` lists `CLAUDE.md` and no `AGENTS.md`; `/hooks` lists the project hooks; `/permissions` reports no
 invalid rule; `QVOICE_WORKER_SESSION` is set and `python3 scripts/active_workers.py status` reports
 `trackingAvailable: true`; a trivial subagent moves `activeWorkers` to 1 and back; `git switch -c smoke`
 and an Edit of a generated file are refused; reading a Swift source loads `.claude/rules/native.md`;

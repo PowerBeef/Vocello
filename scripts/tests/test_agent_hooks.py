@@ -199,8 +199,8 @@ class EditGuardTests(unittest.TestCase):
 class SettingsWiringTests(unittest.TestCase):
     EXPECTED = {
         ("SessionStart", "startup|resume|clear|compact|fork"): {"worker_lifecycle.py", "session_start.sh"},
-        ("PreToolUse", "^Bash$"): {"commit_lint.sh", "policy_guard.sh"},
-        ("PreToolUse", EDIT_MATCHER): {"generated_file_guard.sh"},
+        ("PreToolUse", "^Bash$"): {"commit_lint.sh", "policy_guard.sh", "agent_guard.py"},
+        ("PreToolUse", EDIT_MATCHER): {"generated_file_guard.sh", "agent_guard.py"},
         ("PreToolUse", "^mcp__"): {"simulator_tool_guard.py"},
         ("PostToolUse", EDIT_MATCHER): {"project_yml_reminder.sh"},
         ("SubagentStart", "*"): {"worker_lifecycle.py"},
@@ -253,7 +253,11 @@ class SettingsWiringTests(unittest.TestCase):
         cases = [("worker_lifecycle.py", {"hook_event_name": event, "session_id": "fixture", "agent_id": "a"}, 0)
                  for event in ("SessionStart", "SubagentStart", "SubagentStop", "SessionEnd")]
         cases += [("simulator_tool_guard.py", {"tool_name": "mcp__x__list_schemes"}, 0),
-                  ("simulator_tool_guard.py", {"tool_name": "mcp__x__boot" + SIM_SUFFIX}, 2)]
+                  ("simulator_tool_guard.py", {"tool_name": "mcp__x__boot" + SIM_SUFFIX}, 2),
+                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                      "tool_input": {"command": "scripts/dev.sh build"}}, 2),
+                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                      "tool_input": {"command": "git status"}}, 0)]
         for interpreter in sorted(interpreters):
             for name, payload, expected in cases:
                 with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
@@ -312,6 +316,82 @@ class SettingsWiringTests(unittest.TestCase):
                     self.assertTrue(results)
                     self.assertEqual(any(r.returncode == 2 for r in results), blocked)
                     self.assertTrue(all(r.returncode in (0, 2) for r in results))
+
+
+class AgentGuardTests(unittest.TestCase):
+    """Only subagent hook input carries agent_id; the lead's calls pass through untouched."""
+
+    def guard(self, tool_input, *, tool_name="Bash", agent=True, cwd=ROOT, root=ROOT):
+        payload = {"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": tool_input,
+                   "cwd": str(cwd), **({"agent_id": "agent-1", "agent_type": "general-purpose"} if agent else {})}
+        hooks = fixture_hooks(root)
+        return subprocess.run(["python3", str(hooks / "agent_guard.py")], input=json.dumps(payload), text=True,
+                              capture_output=True, timeout=20, cwd=cwd,
+                              env=dict(os.environ, CLAUDE_PROJECT_DIR=str(root)))
+
+    def test_agents_cannot_run_native_device_model_or_measured_work(self):
+        for command in ("xcodebuild -scheme QwenVoice build", "xcrun xctest -XCTest A b.xctest", "swift build",
+                        "swift test --package-path Packages/VocelloQwen3Core", "scripts/dev.sh build",
+                        "./scripts/dev.sh test --only A", "scripts/dev.sh ios", "scripts/dev.sh check",
+                        "scripts/macos_test.sh test", "bash scripts/ui_test.sh ios smoke", "scripts/ios_device.sh doctor",
+                        "./scripts/build.sh cli", "scripts/build_ui_test_bundles.sh macos",
+                        "xcrun devicectl device process launch x", "python3 scripts/qc.py run --x",
+                        '"$(python3 scripts/select_python.py)" scripts/qc.py run --x', "build/vocello custom --text hi",
+                        "build/vocello models install pro_custom", "env QVOICE_LEAD_ONLY=1 scripts/macos_test.sh qc-takes",
+                        "echo ok && scripts/dev.sh build", "bash -c 'xcodebuild build'",
+                        "sh <<'EOF'\nscripts/dev.sh build\nEOF\n", "git pu" "sh origin main"):
+            with self.subTest(command=command):
+                result = self.guard({"command": command})
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("agent guard: BLOCKED", result.stderr)
+                self.assertEqual(self.guard({"command": command}, agent=False).returncode, 0)
+
+    def test_agents_keep_research_and_deterministic_checks(self):
+        for command in ("git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
+                        "scripts/dev.sh lint", "scripts/dev.sh check --dry-run --json", "scripts/dev.sh status",
+                        "scripts/dev.sh triage build/artifacts/x --json", "scripts/dev.sh regen",
+                        "./scripts/regenerate_project.sh --fast", "python3 -m pytest scripts/tests/test_x.py -k foo",
+                        "python3 scripts/qc.py report --run R --json", "build/vocello models list",
+                        "xcrun xcresulttool get object --path r.xcresult", "xcrun devicectl list devices",
+                        "cat scripts/macos_test.sh", "grep -n xcodebuild scripts/build.sh", "swift --version",
+                        "cat > notes.md <<'EOF'\nscripts/dev.sh build\nEOF\n", "npm --prefix website run check"):
+            with self.subTest(command=command):
+                result = self.guard({"command": command})
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_agents_commit_only_in_their_own_worktree(self):
+        with tempfile.TemporaryDirectory(prefix="vocello agent commits ") as tmp:
+            root = Path(tmp).resolve() / "main checkout"
+            initialize_repo(root)
+            worktree = root / ".claude/worktrees/agent-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "worktree-agent-1", str(worktree)],
+                           check=True)
+            commit = "git com" "mit -m x"
+            blocked = self.guard({"command": commit}, cwd=root, root=root)
+            self.assertEqual(blocked.returncode, 2, blocked.stderr)
+            self.assertIn("own worktree", blocked.stderr)
+            self.assertEqual(self.guard({"command": f"git -C '{root}' com" "mit -m x"}, cwd=worktree, root=root).returncode, 2)
+            self.assertEqual(self.guard({"command": commit}, cwd=worktree, root=root).returncode, 0)
+            self.assertEqual(self.guard({"command": commit}, cwd=root, root=root, agent=False).returncode, 0)
+
+    def test_agents_never_edit_the_roadmap_or_checkpoint(self):
+        with tempfile.TemporaryDirectory(prefix="vocello agent edits ") as tmp:
+            root = Path(tmp).resolve() / "main checkout"
+            initialize_repo(root)
+            worktree = root / ".claude/worktrees/agent-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "worktree-agent-1", str(worktree)],
+                           check=True)
+            for tool in EDIT_TOOLS:
+                for path, cwd in (("config/roadmap.json", root), ("docs/development-progress.md", root),
+                                  ("config/roadmap.json", worktree), (str(worktree / "docs/development-progress.md"), root)):
+                    with self.subTest(tool=tool, path=path, cwd=cwd.name):
+                        result = self.guard(edit(path, tool), tool_name=tool, cwd=cwd, root=root)
+                        self.assertEqual(result.returncode, 2, result.stderr)
+                        self.assertEqual(self.guard(edit(path, tool), tool_name=tool, cwd=cwd, root=root,
+                                                    agent=False).returncode, 0)
+                with self.subTest(tool=tool, path="ordinary"):
+                    self.assertEqual(self.guard(edit("Sources/A.swift", tool), tool_name=tool, cwd=worktree,
+                                                root=root).returncode, 0)
 
 
 class PermissionTests(unittest.TestCase):

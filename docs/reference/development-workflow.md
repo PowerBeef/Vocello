@@ -218,7 +218,8 @@ Preserve the original failure. Investigate it before a rerun; record the reason 
 ## Parallel agents and worktrees
 
 Use selective parallelism for disjoint editing, research, review or triage. At most four agents may be
-active including the lead, inheriting the selected model; this limit is an instruction, not a setting.
+active including the lead, inheriting the selected model. This limit is an instruction: a hook cap would
+misread a subagent that died without SubagentStop as still active until its session ends.
 One full Python suite and one browser acceptance run at a time on the 16 GB development host.
 Agents doing native work remain code-only; the lead owns native builds and all measured lanes.
 
@@ -227,7 +228,10 @@ Create editing agents with the Agent tool and `isolation: "worktree"`. Claude Co
 `.claude/settings.json`), so commit the lead checkpoint first: dirty files do not carry over. An unchanged
 agent worktree is removed automatically. Inspect Git metadata and commit identity; a directory name is not
 proof of repository identity. Give each worker a disjoint file set and clear validation limits; the
-SubagentStart hook repeats the agent rules to every subagent. Hand-made branches and worktrees stay denied.
+SubagentStart hook repeats the agent rules to every subagent, and `agent_guard.py` enforces them: only a
+subagent's hook input carries `agent_id`, so it alone is refused pushes, commits in the main checkout,
+native builds and tests, device, model and measured-lane scripts and edits of `config/roadmap.json` or
+`docs/development-progress.md`. Hand-made branches and worktrees stay denied.
 
 Agents make scoped commits on their `worktree-*` branch and never push, modify the roadmap/checkpoint or
 run models, devices, native UI or native builds. The lead reviews each commit, integrates with
@@ -278,8 +282,8 @@ and never builds or touches a phone.
 | Event | Tool/event matcher | Handler | Effect |
 | --- | --- | --- | --- |
 | SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; bounded local Git/status/checkpoint context |
-| PreToolUse | Bash | commit_lint.sh, policy_guard.sh | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards |
-| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh | Refuses hand edits of generated and frozen files, naming the generator |
+| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent limits |
+| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
 | PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py | Refuses unsupported-destination tool routes |
 | PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
 | SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration with agent rules, completion and conservative teardown |
@@ -328,8 +332,8 @@ sources, and still route the retired `.codex/` and `.agents/` prefixes so a dele
 tests; config-only edits exercise behavioral checks without triggering native builds.
 
 For a fresh-session smoke check, start a new `claude` session at the repository root. Confirm the
-SessionStart output ("CLAUDE.md: Start here"), `/memory` (CLAUDE.md and no AGENTS.md), `/hooks` (eight
-entries), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SESSION` and
+SessionStart output ("CLAUDE.md: Start here"), `/memory` (CLAUDE.md and no AGENTS.md), `/hooks` (the
+project hooks), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SESSION` and
 `python3 scripts/active_workers.py status` reporting `trackingAvailable: true`, a trivial subagent moving
 `activeWorkers` to 1 and back, harmless guard fixtures refused (`git switch -c smoke`, an Edit of a
 generated file), no unsupported-destination MobileBuildMCP tools offered, a rule loading when a matching

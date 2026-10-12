@@ -108,7 +108,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   the Agent tool with `isolation: "worktree"` (`.claude/worktrees/<name>` on `worktree-<name>`, based on
   local HEAD; commit the checkpoint first because uncommitted files do not carry over). Give each a
   disjoint file set. Agents commit only on their branch, never push, never run native builds, devices,
-  models or measured lanes, and never edit the roadmap or checkpoint. The lead integrates with
+  models or measured lanes, and never edit the roadmap or checkpoint; `agent_guard.py` enforces this
+  for every call that carries an `agent_id`. The lead integrates with
   `git cherry-pick` or `git merge --ff-only`, validates warm on `main`, then runs `git worktree remove
   .claude/worktrees/<name>` and `git branch -d worktree-<name>`. Never discard unintegrated work.
 - **Native execution:** every Xcode/SwiftPM build and test goes through the repository scripts and the
@@ -143,7 +144,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 - **`.claude/settings.json`** wires the repository guards from `scripts/hooks/`: `session_start.sh` and
   `worker_lifecycle.py` (SessionStart), `commit_lint.sh` and `policy_guard.sh` (Bash),
-  `generated_file_guard.sh` (Edit/Write/MultiEdit/NotebookEdit), `simulator_tool_guard.py` (MCP tools),
+  `generated_file_guard.sh` (Edit/Write/MultiEdit/NotebookEdit), `agent_guard.py` (subagent Bash and
+  edits), `simulator_tool_guard.py` (MCP tools),
   `project_yml_reminder.sh` (after edits) and `worker_lifecycle.py` (SubagentStart/Stop, SessionEnd).
   Permissions allow the routine loop and local lanes; ask before pushes, destructive git, model
   installs, cache cleanup, installers, global settings and external writes; deny force or non-main

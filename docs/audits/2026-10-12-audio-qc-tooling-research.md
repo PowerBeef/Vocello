@@ -532,7 +532,7 @@ integration therefore takes one of two routes:
 - Track new checkpoints with the `hf` CLI and `hf-mcp-server` instead of browsing. Examples: a LACI
   code release, a French CTC model, or Kyutai's MLX timestamps.
 
-### 3.11 Listening, labeling and crowdsourcing: fixing the label shortage
+### 3.11 Listening and labeling: fixing the label shortage
 
 **Listening lab.** Extend the existing local label page, `scripts/qc/label.py`. It already stores
 severity and start/end times per class and has keyboard shortcuts. Make it phone-first:
@@ -553,13 +553,14 @@ severity and start/end times per class and has keyboard shortcuts. Make it phone
 - **(b) A private claude.ai Artifact**, included in the Claude plan.
   - Labels live in its `db` under per-user paths. Clips are published files (FLAC). Claude reads the
     labels through ArtifactData.
-  - It works from anywhere and can invite other raters.
+  - It works from anywhere and can invite unpaid volunteer listeners.
   - It is an external write. Use it only for built-in and Design voices on CC0 scripts, never for
     clone references of real people.
 
 **Listeners.**
-- Paid crowdsourcing (Prolific, Podonos) is dropped.
-- Labels come from the maintainer, plus any volunteer native-French listeners invited to the same page.
+- No paid human listeners of any kind: crowdsourcing (Prolific, Podonos) and hired raters are dropped.
+- Labels come from the maintainer, plus any unpaid volunteer native-French listeners invited to the same
+  page.
   Option (b) makes inviting easier.
 - Experts and non-experts agree poorly on pronunciation labels (ETS study). Volunteers therefore answer
   "any defect, and where?" and give A/B preferences, while the fine-grained class taxonomy stays with
@@ -625,7 +626,9 @@ started.**
 - Label 300–500 takes, stratified across mode, tier, preset, language and clones.
 - Set up the active-learning queue and the protected panel; optionally invite volunteer native-French
   listeners.
-- Measure: inter-rater agreement (Krippendorff's alpha) and prevalence per class.
+- Measure prevalence per class, plus one of:
+  - inter-rater agreement (Krippendorff's alpha) if volunteers join;
+  - otherwise, the maintainer's own consistency on a blind re-listen of about 10% of the takes.
 
 **Phase 3 — detectors.**
 - Parakeet and aligner runners (once the download is authorized), the phone verifier, phonation,
@@ -659,6 +662,7 @@ RF-14 can be decided after Phase 1, with a measured defect rate. It does not nee
 Already decided on 2026-10-12:
 - No cloud judge; Gemini is dropped.
 - No paid service outside the Claude plan.
+- No paid human listeners.
 
 ## 7. Do not repeat
 

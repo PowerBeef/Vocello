@@ -1555,11 +1555,12 @@
         "docs/audits/2026-10-10-automatic-audio-quality-research.md",
         "docs/audits/2026-10-10-perceptual-evidence-implementation.md",
         "docs/audits/2026-10-10-retained-audio-regression-panel.md",
-        "docs/audits/2026-10-10-local-audio-candidate-implementation.md"
+        "docs/audits/2026-10-10-local-audio-candidate-implementation.md",
+        "docs/audits/2026-10-12-audio-qc-tooling-research.md"
       ],
-      "updated": "2026-10-10",
+      "updated": "2026-10-12",
       "unparkWhen": null,
-      "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone evidence, transcript review, French starter, actual-audio enrollment, private receipts and bounded replay. CTC/DSP evidence now includes phonation, unaligned-fragment and reviewed-boundary producers; review corrected availability/export-loss coverage. Maintainer authorized nonblocking load/pressure reporting for cache-only analysis; measurement guards remain. Clean d52d5ae9 completed thirteen retained development clips in four runs, all strict gate 4. New candidates overlap Dylan whisper (IoU .474) and missed false start (.75), but acceptable clips also nominate. Existing measurements/model bindings are unchanged; thirteen held-out confirmations stay excluded. Routed checks pass 2305 tests/2685 subtests and generic iOS compile. Next: independent class definitions/localized labels, complete negatives, genuine reviewed boundary paths, exact failing Clone pairs, accent and causal qualification. No qualified acceptance, shipping decoder repair or regeneration. QC-08/RF-14 remain separate. Linked audits preserve failed checks and initial pressure refusals."
+      "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone evidence, transcript review, French starter, actual-audio enrollment, private receipts and bounded replay. CTC/DSP evidence now includes phonation, unaligned-fragment and reviewed-boundary producers; review corrected availability/export-loss coverage. Clean d52d5ae9 completed thirteen retained development clips in four runs, all strict gate 4. New candidates overlap Dylan whisper (IoU .474) and missed false start (.75), but acceptable clips also nominate. Existing measurements/model bindings are unchanged; thirteen held-out confirmations stay excluded. Next: independent class definitions/localized labels, complete negatives, genuine reviewed boundary paths, exact failing Clone pairs, accent and causal qualification. No qualified acceptance, shipping decoder repair or regeneration. QC-08/RF-14 remain separate. Linked audits preserve failed checks and initial pressure refusals. The 2026-10-12 tooling research puts class/span labels and generator-divergence A/B tests first; no phase started."
     },
     {
       "id": "QC-08",

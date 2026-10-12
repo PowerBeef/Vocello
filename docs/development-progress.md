@@ -17,6 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 12 — audio QC tooling research
+
+At the maintainer's request, a [tooling research report](audits/2026-10-12-audio-qc-tooling-research.md)
+surveyed tools, models, dependencies, MCP servers, plugins and skills that could catch the defects the
+harness keeps missing. It found no single tool that solves the problem.
+
+The binding constraint is labels with a defect class and a time span. There are 40 label rows. None of
+the 11 takes confirmed unusable carries a class, and no clone has been confirmed. Four generator
+divergences from Qwen's reference were verified in code: streaming text conditioning, EOS
+reinsertion, sampling without a float32 cast, and the English fallback for Custom.
+
+The pinned `mlx-audio` already ships Parakeet and Qwen3-ForcedAligner. The report recommends phases
+from labels to detectors, but none has started. Per the maintainer, the report is saved without
+implementation. Each phase's decisions (cloud, listening-lab hosting, paid raters, Best-of-N,
+downloads) wait for its start. No code, model, download or push.
+
 ### October 12 — Claude Code takeover
 
 Claude Code replaced Codex as the repository agent ([takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)).

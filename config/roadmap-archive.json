@@ -4653,6 +4653,33 @@
         "run:macos-xcui-smoke-20261010-081219-7d9d4c81",
         "doc:docs/audits/2026-10-10-codex-workflow-audit.md#expanded-local-validation-october-10"
       ]
+    },
+    {
+      "id": "DA-15",
+      "plan": "project-audit-2026-10",
+      "title": "Claude Code harness follow-ups",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-12-claude-code-takeover-audit.md",
+        ".claude/settings.json",
+        "scripts/hooks/agent_guard.py",
+        ".mobilebuildmcp/config.yaml"
+      ],
+      "updated": "2026-10-12",
+      "unparkWhen": null,
+      "notes": "Fresh interactive and headless sessions confirmed the SessionStart marker after the system-Python fix, SubagentStart/Stop leases, the guards, rule and skill discovery and every permission rule loading (Claude Code 2.1.296). agent_guard.py enforces the agent rules for subagent calls; the four-agent cap stays an instruction. MobileBuildMCP runs only discovery and coverage. The 25 integrated agent branches were retired with a verified bundle kept outside Git. The over-budget skill listing is a personal plugin setting.",
+      "evidence": [
+        "commit:6389146b",
+        "commit:86d910dd",
+        "commit:244d1e5c",
+        "commit:b83bbf16",
+        "commit:8139af14",
+        "commit:4c4a051d",
+        "file:scripts/hooks/agent_guard.py",
+        "doc:docs/audits/2026-10-12-claude-code-takeover-audit.md#follow-up-decisions-da-15-closed"
+      ]
     }
   ]
 }

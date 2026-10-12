@@ -33,8 +33,10 @@ UI lane, benchmark or push.
 Eleven dead Codex worktree registrations were pruned. All 29 stale agent branches and both stale
 agent worktrees were retired after their work was confirmed on `main`, with a verified Git bundle kept
 outside the repository. A headless fresh session confirmed the SessionStart hooks after the lifecycle
-fix. DA-15 keeps the interactive `/hooks` and `/permissions` views, optional agent-scoped guards, the
-owned-package README drift and the MobileBuildMCP configuration path. The audio remediation below resumes unchanged at step 1; no push
+fix. DA-15 then closed: `agent_guard.py` enforces the agent rules for subagent calls, MobileBuildMCP
+reads `.mobilebuildmcp/config.yaml` with only discovery and coverage enabled, a dead auto-mode allow
+rule and the removed integration-test target were dropped, and a debug session showed every permission
+rule loading. The audio remediation below resumes unchanged at step 1; no push
 was requested.
 
 ### October 10 — ordered quality remediation implementation

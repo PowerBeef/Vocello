@@ -23,7 +23,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `project-audit-2026-09` | active | backend-and-platform | 24/34 (71%) |
-| `project-audit-2026-10` | active | backend-and-platform | 5/15 (33%) |
+| `project-audit-2026-10` | active | backend-and-platform | 6/15 (40%) |
 | `qc-v2-2026-10` | active | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
@@ -492,7 +492,6 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 | `DA-12` | planned | Guard, tooling, docs and website hygiene | — |
 | `DA-13` | planned | Follow-ups from the audit's second fix pass | — |
 | `DA-14` | planned | Preserve historical History ID high-water across legacy upgrades | — |
-| `DA-15` | planned | Claude Code harness follow-ups | — |
 
 ### Open items in detail
 
@@ -522,9 +521,6 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 
 - **`DA-14`** (planned) — Preserve historical History ID high-water across legacy upgrades.
   gate: Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.
-
-- **`DA-15`** (planned) — Claude Code harness follow-ups.
-  gate: A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 

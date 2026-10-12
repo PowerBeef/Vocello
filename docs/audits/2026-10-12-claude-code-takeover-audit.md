@@ -46,7 +46,7 @@ Swift sources were not changed. Fresh-session activation results follow; only th
 | TK-06 | The Xcode MCP server is exposed as `MobileBuildMCP` with only its simulator workflows, which the project forbids; the old deny list named the `XcodeBuildMCP` prefix. | Wildcard deny rules remove the unsupported-destination and UI-driving tools without literal names in the tree. Enabling the macOS, device and debugging workflows described by `.xcodebuildmcp/config.yaml` is a user-level MCP setting (open). |
 | TK-07 | The Axiom simulator-tester, test-runner and test-debugger agents drive simulators or rerun tests outside the repository lanes. | Denied in project permissions; the `xcui` helper stays excluded by instruction. |
 | TK-08 | Comments in `project.yml`, three Swift files, the owned-package README and `benchmarks/OPTIMIZATION.md` pointed at the deleted `.claude/rules/native.md`. | The path exists again as a symlink to `docs/reference/native-engineering.md`, whose `paths:` front matter scopes it. |
-| TK-09 | `Packages/VocelloQwen3Core/README.md` says `macos_test.sh test` runs `VocelloEngineIntegrationTests`, a target `project.yml` does not define. | Open documentation drift; recorded under DA-15. |
+| TK-09 | `Packages/VocelloQwen3Core/README.md` says `macos_test.sh test` runs `VocelloEngineIntegrationTests`, a target `project.yml` does not define. | Fixed in `b83bbf16` (README and the coverage export); `macos_test.sh test` runs `VocelloCoreTests` and `Qwen3RuntimeTests`. |
 | TK-10 | Eleven `~/.codex/worktrees` registrations pointed at removed directories; four agent branches were fully merged. | Pruned and deleted. The 25 unmerged agent branches and the two clean `.claude/worktrees` were retired with the maintainer's approval (see below). |
 
 ### Agent branch retirement
@@ -101,10 +101,12 @@ in place of `AGENTS.md` and listed both agents. Two findings and the rest of the
   Write under `docs/charts/`. An Edit whose old string was absent was rejected by the tool before any
   hook ran, so it proves nothing about the guard. Reading a Swift source loaded `.claude/rules/native.md`
   through its symlink. MobileBuildMCP offered only discovery, coverage and session tools.
-- **TK-12 (open):** MobileBuildMCP now persists defaults to `.mobilebuildmcp/config.yaml`. That suggests
-  the tracked `.xcodebuildmcp/config.yaml`, with its macOS and device profiles, may no longer be read.
-  This is unverified. Renaming or duplicating it would also enable build tools that bypass the native
-  lock, so it waits for a decision.
+- **TK-12 (fixed in `4c4a051d`):** MobileBuildMCP 2.7.1 reads only `.mobilebuildmcp/config.yaml` (its
+  `project-config.js` has no fallback), so the tracked `.xcodebuildmcp/config.yaml` was ignored. The
+  config now lives at the read path and enables only project-discovery and coverage. Its `macos` and
+  `device` workflows are build, install, launch and test tools that bypass the native lock, and its
+  `debugging` workflow attaches only to the Simulator. A fresh headless session then loaded only the
+  discovery, coverage and session tools.
 
 After the fix, a separate headless session (`claude -p` with `--output-format stream-json --verbose`)
 ran the SessionStart hooks successfully:
@@ -116,6 +118,21 @@ ran the SessionStart hooks successfully:
 - No settings or permission error was reported.
 
 Only the interactive `/hooks` and `/permissions` views remain unseen.
+
+## Follow-up decisions (DA-15, closed)
+
+- **TK-13 (fixed in `8139af14`):** a headless probe showed that only a subagent's PreToolUse input carries
+  `agent_id`; the lead's Bash and Agent calls carry none. `agent_guard.py` now refuses a subagent's
+  pushes, commits in the main checkout, native builds and tests, device, model and measured-lane scripts
+  and edits of the roadmap or checkpoint. A live subagent's `xcodebuild -version` was refused while its
+  `git status` ran. The four-agent cap stays an instruction: a subagent that dies without SubagentStop
+  would hold its lease until its session ends.
+- **TK-14 (fixed in `b83bbf16`):** a debug session loaded all 55 allow, 54 ask and 62 deny rules with no
+  invalid-rule warning. Auto mode discarded one allow rule, `Bash(python3 -m pytest *)`, as
+  classifier-bypassing; it was removed.
+- **Observation (personal setting):** the same session warned that the skill listing is over budget (222
+  skills, about 100,000 characters against 30,000), so descriptions are truncated. Disabling plugins this
+  project does not use belongs in the untracked `.claude/settings.local.json`.
 
 ## Carried forward
 

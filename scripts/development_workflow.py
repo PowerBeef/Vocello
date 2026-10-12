@@ -10,6 +10,7 @@ are never scheduled from here.
 from __future__ import annotations
 
 import argparse
+import datetime
 import importlib.util
 import json
 import os
@@ -348,6 +349,50 @@ def run_commands(commands: list[list[str]]) -> None:
     print(f"==> [dev] done in {time.monotonic() - started:.1f}s", flush=True)
 
 
+def primary_plan_lines(data: dict, archived_ids: set[str], today: datetime.date) -> list[str]:
+    """The primary plan at a glance: its live work, the focus lock and what can start next.
+
+    Every session opens on this, so the next unblocked items are listed by due date
+    rather than leaving the next step to be re-derived from the whole roadmap. Blocker
+    and date semantics come from scripts/roadmap.py, the validator that owns them.
+    """
+    roadmap = _load("scripts/roadmap.py")
+    primary = data.get("primaryPlan")
+    items = {item.get("id"): item for item in data.get("items", [])}
+    live = [item for item in items.values()
+            if item.get("plan") == primary and item.get("status") in roadmap.LIVE_STATUSES]
+
+    def unblocked(item: dict) -> bool:
+        for blocker in item.get("blockedBy", []):
+            other = items.get(blocker)
+            if other is None:
+                if blocker not in archived_ids:
+                    return False
+            elif other.get("status") not in roadmap.TERMINAL:
+                return False
+        return True
+
+    def due(item: dict) -> datetime.date | None:
+        return roadmap.parse_date(str(item["due"])) if "due" in item else None
+
+    ready = sorted((item for item in live if unblocked(item)),
+                   key=lambda item: (item.get("status") != "in-flight", due(item) or datetime.date.max, item["id"]))
+    lines = [f"primaryPlan: {primary} — {len(live)} open, {len(ready)} unblocked"]
+    lock = data.get("focusLock")
+    if isinstance(lock, dict) and lock.get("plan") == primary:
+        lines.append(f"focusLock: since {lock.get('decided')}; live work only in {primary}, "
+                     f"at most {lock.get('maxInFlight')} in flight")
+    if ready:
+        shown = [f"{item['id']} ({item['status']}" + (f", due {due(item).isoformat()}" if due(item) else "") + ")"
+                 for item in ready[:5]]
+        lines.append("next: " + ", ".join(shown) + (" …" if len(ready) > 5 else ""))
+    overdue = sorted(item["id"] for item in live if due(item) and due(item) < today)
+    if overdue:
+        lines.append("overdue: " + ", ".join(overdue)
+                     + " (cut scope, move the date with a recorded decision, or close it)")
+    return lines
+
+
 def print_status() -> None:
     branch = _git("symbolic-ref", "--quiet", "--short", "HEAD").decode().strip() or "detached HEAD"
     paths = changed_paths()
@@ -355,14 +400,17 @@ def print_status() -> None:
     print(f"branch: {branch}")
     print(f"dirty: {len(paths)} path(s)")
     print(f"lanes: {', '.join(lanes) or 'none'} (scripts/dev.sh check --dry-run for the commands)")
-    roadmap_path = ROOT / "config/roadmap.json"
-    if roadmap_path.is_file():
-        roadmap = json.loads(roadmap_path.read_text(encoding="utf-8"))
-        primary = roadmap.get("primaryPlan")
-        items = [item for item in roadmap.get("items", []) if item.get("plan") == primary]
-        open_items = [item["id"] for item in items if item.get("status") in ("in-flight", "planned")]
-        print(f"primaryPlan: {primary} — {len(open_items)} open: {', '.join(open_items[:6])}"
-              + (" …" if len(open_items) > 6 else ""))
+    if (ROOT / "config/roadmap.json").is_file():
+        # SessionStart prints this; a half-edited roadmap must not turn it into a traceback.
+        roadmap = _load("scripts/roadmap.py")
+        try:
+            data = roadmap.load(ROOT)
+        except (ValueError, roadmap.RoadmapError) as error:
+            print(f"primaryPlan: unreadable config/roadmap.json ({error}); run python3 scripts/roadmap.py validate")
+            return
+        archived = {item.get("id") for item in roadmap.load_archive(ROOT).get("items", [])}
+        for line in primary_plan_lines(data, archived, datetime.date.today()):
+            print(line)
 
 
 def main(argv: list[str] | None = None) -> int:

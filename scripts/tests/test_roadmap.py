@@ -10,6 +10,7 @@ import datetime
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -303,6 +304,130 @@ class StalenessTests(Harness):
                             for w in report["warnings"]))
 
 
+class FocusTests(Harness):
+    """The focus lock is what stops the primary plan from being handed to the
+    newest problem: live work elsewhere, a silent primary-plan move, too much in
+    flight and an unnamed commit after the freeze each fail validation."""
+
+    LOCK = {"plan": "p1", "decided": "2026-08-02", "decision": "ship p1 first", "maxInFlight": 1}
+    HASH_A, HASH_B = "a" * 40, "b" * 40
+
+    def _focused(self, extra=None):
+        def mutate(data):
+            data["primaryPlan"] = "p1"
+            data["focusLock"] = copy.deepcopy(self.LOCK)
+            data["plans"].append(dict(data["plans"][0], id="p2", title="Plan two"))
+            data["items"].append({"id": "B-1", "plan": "p2", "title": "elsewhere", "status": "parked",
+                                  "unparkWhen": "after p1", "updated": "2026-08-02"})
+            if extra:
+                extra(data)
+        return mutate
+
+    def test_a_focused_roadmap_with_parked_work_elsewhere_passes(self):
+        self.assertTrue(self.check(self._focused())["ok"])
+
+    def test_live_work_outside_the_focus_plan_is_rejected(self):
+        for status in ("planned", "in-flight"):
+            with self.subTest(status=status):
+                errors = self.errors_from(self._focused(lambda d, s=status: d["items"][1].update(status=s)))
+                self.assertIn("B-1 is " + status + " outside the focus plan p1", errors)
+
+    def test_moving_the_primary_plan_requires_rewriting_the_lock(self):
+        errors = self.errors_from(self._focused(lambda d: d.update(primaryPlan="p2")))
+        self.assertIn("focusLock.plan must equal primaryPlan", errors)
+
+    def test_the_lock_records_a_dated_decision_and_a_cap(self):
+        errors = self.errors_from(self._focused(
+            lambda d: d["focusLock"].update(decided="soon", decision=" ", maxInFlight=0)))
+        for text in ("focusLock.decided must be an ISO date", "must record the maintainer's decision",
+                     "maxInFlight must be a positive integer"):
+            self.assertIn(text, errors)
+
+    def test_in_flight_work_in_the_focus_plan_is_capped(self):
+        def two_in_flight(data):
+            data["items"][0].update(status="in-flight")
+            data["items"].append({"id": "A-2", "plan": "p1", "title": "second", "status": "in-flight",
+                                  "updated": "2026-08-02"})
+        self.assertIn("the focus lock allows 1", self.errors_from(self._focused(two_in_flight)))
+
+    def _frozen(self, log, returncode=0, freeze=None, extra_item=None):
+        def extra(data):
+            data["focusLock"]["freeze"] = freeze or {"commit": "abc1234"}
+            if extra_item:
+                data["items"].append(extra_item)
+        data = copy.deepcopy(MINIMAL)
+        self._focused(extra)(data)
+        result = subprocess.CompletedProcess([], returncode, stdout=log, stderr="")
+        with mock.patch.object(roadmap, "load", return_value=data), \
+                mock.patch.object(roadmap, "load_archive", return_value={"items": []}), \
+                mock.patch.object(roadmap, "_git", return_value=result) as git:
+            report = roadmap.validate(REPO_ROOT, today=TODAY)
+        report["git_calls"] = git.call_args_list
+        return report
+
+    def test_after_the_freeze_every_commit_names_a_focus_item(self):
+        log = (f"{self.HASH_A}\x00fix(engine): settle A-1 before submission\x1e\n"
+               f"{self.HASH_B}\x00docs: tidy the README\x1e\n")
+        report = self._frozen(log)
+        self.assertEqual(len(report["errors"]), 1, report["errors"])
+        self.assertIn("commit bbbbbbbbbb after the freeze names no item of the focus plan in its subject: "
+                      "docs: tidy the README", report["errors"][0])
+
+    def test_only_the_subject_is_read(self):
+        """An id mentioned in passing in a body does not make a commit release work."""
+        report = self._frozen("")
+        self.assertIn(mock.call(REPO_ROOT, "log", "--format=%H%x00%s%x1e", "abc1234..HEAD"),
+                      report["git_calls"])
+
+    def test_an_item_id_inside_a_longer_id_does_not_count(self):
+        report = self._frozen(f"{self.HASH_A}\x00fix: settle A-10 instead\x1e\n")
+        self.assertIn("names no item of the focus plan", " | ".join(report["errors"]))
+
+    def test_a_legacy_id_of_a_focus_item_counts(self):
+        renamed = {"id": "A-3", "plan": "p1", "title": "renamed", "status": "planned", "updated": "2026-08-02",
+                   "legacyIds": ["OLD-7"]}
+        report = self._frozen(f"{self.HASH_A}\x00fix: finish OLD-7\x1e\n", extra_item=renamed)
+        self.assertTrue(report["ok"], report["errors"])
+
+    def test_a_recorded_exception_accepts_a_commit_that_slipped_through(self):
+        freeze = {"commit": "abc1234", "exceptions": {"bbbbbbb": "README typo accepted during the freeze"}}
+        report = self._frozen(f"{self.HASH_B}\x00docs: tidy the README\x1e\n", freeze=freeze)
+        self.assertTrue(report["ok"], report["errors"])
+
+    def test_an_exception_needs_a_full_sha_and_a_reason_and_the_scan_still_runs(self):
+        for key, reason in (("bbbbbbb", " "), ("b", "too short to bind one commit"), ("", "empty")):
+            with self.subTest(key=key):
+                freeze = {"commit": "abc1234", "exceptions": {key: reason}}
+                report = self._frozen(f"{self.HASH_B}\x00docs: tidy the README\x1e\n", freeze=freeze)
+                errors = " | ".join(report["errors"])
+                self.assertIn("must map a 7-40 character commit sha to the reason", errors)
+                self.assertIn("commit bbbbbbbbbb after the freeze names no item", errors)
+
+    def test_a_freeze_commit_outside_local_history_is_surfaced_not_failed(self):
+        report = self._frozen("", returncode=128)
+        self.assertTrue(report["ok"], report["errors"])
+        self.assertTrue(any("not in local history" in w for w in report["warnings"]))
+
+    def test_the_freeze_names_a_commit(self):
+        report = self._frozen("", freeze={"commit": "not-a-sha"})
+        self.assertIn("freeze.commit must name the freeze commit's sha", " | ".join(report["errors"]))
+
+
+class DueTests(Harness):
+    def test_a_passed_due_date_on_open_work_is_surfaced(self):
+        report = self.check(lambda d: d["items"][0].update(due="2026-08-01"))
+        self.assertTrue(report["ok"], report["errors"])
+        self.assertTrue(any("due 2026-08-01 has passed" in w for w in report["warnings"]))
+
+    def test_a_future_due_date_is_quiet(self):
+        report = self.check(lambda d: d["items"][0].update(due="2026-08-09"))
+        self.assertFalse([w for w in report["warnings"] if "due" in w])
+
+    def test_a_malformed_due_date_is_rejected(self):
+        self.assertIn("due must be an ISO date",
+                      self.errors_from(lambda d: d["items"][0].update(due="next week")))
+
+
 class ProgressTests(unittest.TestCase):
     def test_primary_plan_is_first_in_status_and_render_without_hiding_other_plans(self):
         data = copy.deepcopy(MINIMAL)
@@ -317,6 +442,18 @@ class ProgressTests(unittest.TestCase):
         self.assertLess(rendered.index("## Primary programme"), rendered.index("## Plan one"))
         self.assertIn("`A-1`", rendered)
         self.assertIn("`RF-01`", rendered)
+
+    def test_the_focus_lock_and_due_dates_render_with_the_primary_plan(self):
+        data = copy.deepcopy(MINIMAL)
+        data["primaryPlan"] = "p1"
+        data["focusLock"] = {"plan": "p1", "decided": "2026-08-02", "decision": "Ship p1 first.",
+                             "maxInFlight": 2}
+        data["items"][0].update(due="2026-08-09", gate="finish it")
+        with mock.patch.object(roadmap, "load", return_value=data):
+            rendered = roadmap.render(REPO_ROOT)
+        self.assertIn("**Focus lock** (decided 2026-08-02): Ship p1 first.", rendered)
+        self.assertIn("at most 2 items in flight", rendered)
+        self.assertIn("- **`A-1`** (planned, due 2026-08-09) — an item.", rendered)
 
     def test_a_parked_item_renders_gate_and_unpark_condition(self):
         data = copy.deepcopy(MINIMAL)

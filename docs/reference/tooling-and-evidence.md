@@ -182,3 +182,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - Bumping a roadmap item's `updated` without a status, gate or evidence change, or superseding without
   `supersededBy` on the loser and `legacyIds` on the winner. Park device-blocked work with a precise
   `unparkWhen`; end roadmap edits with `roadmap.py validate` and `render`.
+- Starting work outside the focus plan while `focusLock` holds, or moving `primaryPlan` without rewriting
+  `focusLock` as a new dated decision. After `focusLock.freeze` names the freeze commit, every later commit
+  names an item of the focus plan in its subject; a slipped commit is accepted only through
+  `freeze.exceptions` (full sha and reason). Treat a
+  passed `due` as a decision (cut, move with a reason, or close), never a silent extension.

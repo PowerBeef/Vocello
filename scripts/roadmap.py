@@ -29,6 +29,13 @@ in-flight item that has not been touched in a long time is surfaced rather than
 left to rot. A plan whose items are all finished but which is still marked
 active is a contradiction and fails.
 
+FOCUS -- is the work going where the maintainer decided it should? An optional
+`focusLock` makes the primary plan the only place for planned or in-flight work,
+caps how much of it is in flight, and makes moving the primary plan a recorded
+decision instead of an edit. Its optional `freeze` requires every commit after
+the freeze commit to name an item of that plan in its subject. An item's optional
+`due` date is surfaced once it passes.
+
 Usage:
     python3 scripts/roadmap.py validate [--strict]
     python3 scripts/roadmap.py render [--check]
@@ -61,6 +68,8 @@ IN_FLIGHT_STALE_DAYS = 14
 # Notes state the current position; history lives in git. Longer notes read as
 # narrative and stop being checked.
 NOTES_MAX_CHARS = 1200
+LIVE_STATUSES = ("planned", "in-flight")
+SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
 class RoadmapError(RuntimeError):
@@ -243,6 +252,100 @@ def staleness_findings(root: pathlib.Path, item: dict, today: _dt.date) -> list[
 
 
 # --------------------------------------------------------------------------
+# focus -- whether the work goes where the maintainer decided
+# --------------------------------------------------------------------------
+
+def freeze_findings(root: pathlib.Path, freeze, item_ids: set[str]) -> tuple[list[str], list[str]]:
+    """Every commit after the freeze commit names an item of the focus plan in its subject.
+
+    Only the subject counts: an id mentioned in passing in a body does not make a
+    commit release work. History is never rewritten, so a commit that slipped
+    through is accepted only by recording its sha in `freeze.exceptions` with a reason.
+    """
+    if not isinstance(freeze, dict) or not SHA.fullmatch(str(freeze.get("commit", ""))):
+        return ["focusLock.freeze.commit must name the freeze commit's sha"], []
+    errors: list[str] = []
+    exceptions = freeze.get("exceptions") or {}
+    if not isinstance(exceptions, dict):
+        errors.append("focusLock.freeze.exceptions must map a commit sha to the reason it was accepted")
+        exceptions = {}
+    accepted = []
+    for key, reason in exceptions.items():
+        # A short or empty key would exempt every commit it prefixes.
+        if SHA.fullmatch(str(key)) and str(reason).strip():
+            accepted.append(str(key))
+        else:
+            errors.append(f"focusLock.freeze.exceptions entry {key!r} must map a 7-40 character commit sha "
+                          "to the reason it was accepted")
+    result = _git(root, "log", "--format=%H%x00%s%x1e", f"{freeze['commit']}..HEAD")
+    if result.returncode != 0:
+        return errors, [f"freeze commit {freeze['commit']} is not in local history; "
+                        "commits after it were not checked"]
+    names = re.compile(r"\b(?:" + "|".join(sorted(map(re.escape, item_ids), key=len, reverse=True)) + r")\b") \
+        if item_ids else None
+    for record in result.stdout.split("\x1e"):
+        sha, _, subject = record.strip().partition("\x00")
+        if not sha or any(sha.startswith(key) for key in accepted):
+            continue
+        if names is None or not names.search(subject):
+            errors.append(f"commit {sha[:10]} after the freeze names no item of the focus plan in its subject: "
+                          f"{subject[:80]}")
+    return errors, []
+
+
+def focus_findings(root: pathlib.Path, data: dict, items: dict,
+                   archived: list[dict]) -> tuple[list[str], list[str]]:
+    """Live work stays in the focus plan, within its in-flight cap, and the lock follows primaryPlan.
+
+    Between September 4 and October 6, 2026 the primary plan was handed to the newest
+    problem four times and the release items were parked each time; the lock makes that
+    move a recorded decision instead of a one-line edit.
+    """
+    lock = data.get("focusLock")
+    if lock is None:
+        return [], []
+    if not isinstance(lock, dict):
+        return ["focusLock must be an object"], []
+    errors: list[str] = []
+    warnings: list[str] = []
+    plan = lock.get("plan")
+    if plan != data.get("primaryPlan"):
+        errors.append("focusLock.plan must equal primaryPlan; moving the primary plan is a maintainer "
+                      "decision, recorded by rewriting focusLock")
+    if not parse_date(str(lock.get("decided", ""))):
+        errors.append("focusLock.decided must be an ISO date")
+    if not str(lock.get("decision") or "").strip():
+        errors.append("focusLock.decision must record the maintainer's decision")
+    cap = lock.get("maxInFlight")
+    if not isinstance(cap, int) or isinstance(cap, bool) or cap < 1:
+        errors.append("focusLock.maxInFlight must be a positive integer")
+        cap = None
+
+    in_flight = []
+    for iid, item in items.items():
+        status = item.get("status")
+        if item.get("plan") != plan and status in LIVE_STATUSES:
+            errors.append(f"item {iid} is {status} outside the focus plan {plan}; park it with "
+                          f"unparkWhen, or re-home it into {plan} as a confirmed release blocker")
+        elif item.get("plan") == plan and status == "in-flight":
+            in_flight.append(iid)
+    if cap is not None and len(in_flight) > cap:
+        errors.append(f"focus plan {plan} has {len(in_flight)} items in flight "
+                      f"({', '.join(sorted(in_flight))}); the focus lock allows {cap}")
+
+    if lock.get("freeze") is not None:
+        plan_ids: set[str] = set()
+        for item in [*items.values(), *archived]:
+            if item.get("plan") == plan and item.get("id"):
+                plan_ids.add(item["id"])
+                plan_ids.update(str(legacy) for legacy in item.get("legacyIds", []))
+        freeze_errors, freeze_warnings = freeze_findings(root, lock["freeze"], plan_ids)
+        errors += freeze_errors
+        warnings += freeze_warnings
+    return errors, warnings
+
+
+# --------------------------------------------------------------------------
 # validation
 # --------------------------------------------------------------------------
 
@@ -303,6 +406,13 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
             errors.append(f"item {iid}: title is required")
         if not item.get("updated") or not parse_date(item["updated"]):
             errors.append(f"item {iid}: updated must be an ISO date")
+        if "due" in item:
+            due = parse_date(str(item["due"]))
+            if not due:
+                errors.append(f"item {iid}: due must be an ISO date")
+            elif status not in TERMINAL and due < today:
+                warnings.append(f"item {iid}: due {item['due']} has passed; cut scope, move the date "
+                                "with a recorded decision, or close it")
 
         for legacy in item.get("legacyIds", []):
             if legacy in legacy_seen:
@@ -347,9 +457,14 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
 
     errors.extend(validate_archive(root))
 
+    archived_items = load_archive(root).get("items", [])
+    focus_errors, focus_warnings = focus_findings(root, data, items, archived_items)
+    errors.extend(focus_errors)
+    warnings.extend(focus_warnings)
+
     # Dependency integrity, resolved after every item is known. A blocker that
     # finished and moved to the archive is satisfied.
-    archived_ids = {i.get("id") for i in load_archive(root).get("items", [])}
+    archived_ids = {i.get("id") for i in archived_items}
     for iid, item in items.items():
         for blocker in item.get("blockedBy", []):
             if blocker in archived_ids and blocker not in items:
@@ -456,6 +571,15 @@ def render(root: pathlib.Path) -> str:
         lines += [f"**Current execution plan: {primary['title']}** (`{primary['id']}`).",
                   "Follow its ordered milestones; the other plans retain the underlying defect records",
                   "and deferred backlog. Milestone progress is not a release-readiness score.", ""]
+        lock = data.get("focusLock")
+        if isinstance(lock, dict) and lock.get("plan") == primary["id"]:
+            lines += [f"**Focus lock** (decided {lock.get('decided')}): {lock.get('decision')}",
+                      f"Only this plan may hold planned or in-flight work, at most {lock.get('maxInFlight')} "
+                      "items in flight.", ""]
+            freeze = lock.get("freeze")
+            if isinstance(freeze, dict) and freeze.get("commit"):
+                lines += [f"**Frozen** at `{freeze['commit']}`: every later commit names an item of this plan "
+                          "in its subject.", ""]
 
     lines += ["## Plans", "",
               "| Plan | Status | Owner | Progress |", "| --- | --- | --- | --- |"]
@@ -501,7 +625,8 @@ def render(root: pathlib.Path) -> str:
             for item in open_items:
                 detail = item.get("gate") or item.get("unparkWhen") or "(no gate text)"
                 label = "unparkWhen" if (not item.get("gate") and item.get("unparkWhen")) else "gate"
-                lines += [f"- **`{item['id']}`** ({item['status']}) — {item['title']}.",
+                state = f"{item['status']}, due {item['due']}" if item.get("due") else item["status"]
+                lines += [f"- **`{item['id']}`** ({state}) — {item['title']}.",
                           f"  {label}: {detail}"]
                 # A parked item shows what would wake it next to what it must do.
                 if item["status"] == "parked" and item.get("gate") and item.get("unparkWhen"):

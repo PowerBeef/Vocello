@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import importlib.util
 import io
 import json
@@ -192,6 +193,55 @@ class PythonSelectionTests(unittest.TestCase):
         selection = MODULE.python_test_selection(["Sources/iOS/A.swift"])
         self.assertEqual(selection["mode"], "none")
         self.assertEqual(MODULE.python_test_commands(selection), [])
+
+
+class PrimaryPlanStatusTests(unittest.TestCase):
+    ROADMAP = {
+        "primaryPlan": "rel",
+        "focusLock": {"plan": "rel", "decided": "2026-10-12", "decision": "release first", "maxInFlight": 2},
+        "items": [
+            {"id": "R-1", "plan": "rel", "status": "planned", "due": "2026-10-20"},
+            {"id": "R-2", "plan": "rel", "status": "planned", "due": "2026-10-16"},
+            {"id": "R-3", "plan": "rel", "status": "planned", "due": "2026-10-10", "blockedBy": ["R-1"]},
+            {"id": "R-4", "plan": "rel", "status": "in-flight"},
+            {"id": "R-5", "plan": "rel", "status": "planned", "blockedBy": ["OLD-1"]},
+            {"id": "X-1", "plan": "other", "status": "parked"},
+        ],
+    }
+
+    TODAY = datetime.date(2026, 10, 12)
+
+    def test_status_lists_unblocked_work_by_due_date_and_flags_overdue_items(self) -> None:
+        lines = MODULE.primary_plan_lines(self.ROADMAP, {"OLD-1"}, self.TODAY)
+        self.assertEqual(lines[0], "primaryPlan: rel — 5 open, 4 unblocked")
+        self.assertEqual(lines[1], "focusLock: since 2026-10-12; live work only in rel, at most 2 in flight")
+        self.assertEqual(lines[2], "next: R-4 (in-flight), R-2 (planned, due 2026-10-16), "
+                                   "R-1 (planned, due 2026-10-20), R-5 (planned)")
+        self.assertTrue(lines[3].startswith("overdue: R-3 "))
+
+    def test_status_without_a_focus_lock_or_due_dates_stays_short(self) -> None:
+        roadmap = {"primaryPlan": "rel", "items": [{"id": "R-1", "plan": "rel", "status": "planned"}]}
+        self.assertEqual(MODULE.primary_plan_lines(roadmap, set(), self.TODAY),
+                         ["primaryPlan: rel — 1 open, 1 unblocked", "next: R-1 (planned)"])
+
+    def test_due_dates_follow_the_validator_parsing_and_never_crash_status(self) -> None:
+        roadmap = {"primaryPlan": "rel", "items": [
+            {"id": "R-1", "plan": "rel", "status": "planned", "due": 20261010},
+            {"id": "R-2", "plan": "rel", "status": "planned", "due": "next week"},
+        ]}
+        lines = MODULE.primary_plan_lines(roadmap, set(), self.TODAY)
+        self.assertEqual(lines[1], "next: R-1 (planned, due 2026-10-10), R-2 (planned)")
+        self.assertTrue(lines[2].startswith("overdue: R-1 "))
+
+    def test_an_unreadable_roadmap_reports_instead_of_raising(self) -> None:
+        roadmap = mock.Mock(RoadmapError=RuntimeError)
+        roadmap.load.side_effect = ValueError("Expecting value: line 1 column 1 (char 0)")
+        output = io.StringIO()
+        with mock.patch.object(MODULE, "_load", return_value=roadmap), \
+                mock.patch.object(MODULE, "changed_paths", return_value=[]), \
+                mock.patch.object(MODULE, "lanes_for", return_value={}), redirect_stdout(output):
+            MODULE.print_status()
+        self.assertIn("primaryPlan: unreadable config/roadmap.json", output.getvalue())
 
 
 class CommandRunnerTests(unittest.TestCase):

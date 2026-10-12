@@ -1595,6 +1595,22 @@
       "updated": "2026-10-10",
       "unparkWhen": null,
       "notes": "CW-05 characterization: retained id 41 and deleted id 900 become sqlite_sequence 41 after the v3 rebuild; the next inserted ID is 42. v5-to-current preserves the high-water. Workflow migration adds an explicitly named characterization test and leaves shipped migrations unchanged. Assess repair and actual outbox reachability separately."
+    },
+    {
+      "id": "DA-15",
+      "plan": "project-audit-2026-10",
+      "title": "Claude Code harness follow-ups",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; the nine unmerged agent branches holding commits not on main are integrated or explicitly discarded by the maintainer; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-12-claude-code-takeover-audit.md",
+        ".claude/settings.json",
+        "scripts/active_workers.py"
+      ],
+      "updated": "2026-10-12",
+      "unparkWhen": null,
+      "notes": "The October 12 takeover (446ea479, c5f8e290, 14ad9393, 7d68a7ad) moved hooks, permissions, skills, agents, rules and instructions to Claude Code and retired .codex/.agents; routed checks passed with 2,312 Python tests, generic iOS compiles and the website check. Settings, wildcard MCP denials, rule symlinks and skills were observed live in the migration session; SessionStart and subagent lifecycle need a fresh session. MobileBuildMCP exposes only simulator workflows here (denied); enabling its macOS/device/debugging workflows is a user-level MCP setting. The four-agent cap is instruction-only. Sixteen further unmerged agent branches are patch-equivalent to main and can be deleted on request."
     }
   ]
 }

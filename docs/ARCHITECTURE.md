@@ -1333,6 +1333,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
 - [`CLAUDE.md`](../CLAUDE.md) — repo operating instructions and links to native/tooling safeguards.
+- [`audits/2026-10-12-claude-code-takeover-audit.md`](audits/2026-10-12-claude-code-takeover-audit.md) — the return to Claude Code: harness changes, live observations and open follow-ups (DA-15).
 - [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — source-traced takeover findings and coverage map; static review is distinguished from fresh runtime evidence.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.

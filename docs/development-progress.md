@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-10
+reviewed: 2026-10-12
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,25 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### October 12 — Claude Code takeover
+
+Claude Code replaced Codex as the repository agent ([takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)).
+`CLAUDE.md` and `website/CLAUDE.md` replace the AGENTS files with the same policy. `.claude/settings.json`
+wires the existing guards and permissions. The six `vocello-*` skills and two read-only agents moved
+under `.claude/`, and the two reference rules load through `.claude/rules` symlinks. Worker leases now
+bind to the `claude` process and the SessionStart hook exports the marker. `.codex/` and `.agents/`
+are retired.
+
+Commits: `446ea479`, `c5f8e290`, `14ad9393`, `7d68a7ad`, plus this checkpoint. Routed checks passed:
+2,312 Python tests (one existing skip), generic iOS compiles and the website check. No model, device,
+UI lane, benchmark or push.
+
+Eleven dead Codex worktree registrations were pruned and four merged agent branches deleted. Nine
+unmerged branches hold commits not on `main` and await a maintainer decision. DA-15 holds the
+fresh-session acceptance, optional agent-scoped guards, that branch decision and the
+MobileBuildMCP workflow setting. The audio remediation below resumes unchanged at step 1; no push
+was requested.
 
 ### October 10 — ordered quality remediation implementation
 

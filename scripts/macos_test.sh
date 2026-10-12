@@ -393,7 +393,7 @@ cmd_debug() {
   [[ -n "$app_pid" ]] || die "$APP_NAME did not launch"
   note "debug: $APP_NAME running (pid $app_pid) — hardened runtime OFF, LLDB-attachable."
   note "  lldb -p $app_pid        # app + in-process engine"
-  note "  (or XcodeBuildMCP debugging, or Xcode → Debug → Attach to Process by PID)"
+  note "  (or Xcode → Debug → Attach to Process by PID)"
   note "  retained os_log: scripts/macos_test.sh logs   (subsystem $BUNDLE_ID)"
 }
 

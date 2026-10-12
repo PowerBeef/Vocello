@@ -1,0 +1,36 @@
+# MobileBuildMCP (formerly XcodeBuildMCP) configuration for the Vocello (QwenVoice) monorepo.
+# The server reads this file from the repository root; .xcodebuildmcp/ is no longer read.
+#
+# Discovery only (CLAUDE.md: Claude Code harness). Repository scripts own every build, test,
+# device and UI route under the host-wide native lock, so the build-capable workflows stay off:
+#   - macos / device: build, install, launch and test tools that bypass the native lock and
+#     the evidence scripts (scripts/dev.sh, scripts/macos_test.sh, scripts/ios_device.sh);
+#   - debugging: its only attach tool targets the Simulator (unsupported here);
+#   - simulator / simulator-management / ui-automation: unsupported destinations.
+# .claude/settings.json still denies the unsupported-destination tools as a backstop.
+# Never call session_set_defaults with persist: true; it writes into this tracked file, and a
+# physical-device ID must never be committed. Restart the session after editing this file.
+schemaVersion: 1
+sentryDisabled: true
+enabledWorkflows:
+  - project-discovery  # discover_projs, list_schemes, show_build_settings, get_*_bundle_id
+  - coverage           # get_coverage_report, get_file_coverage over retained .xcresult bundles
+activeSessionDefaultsProfile: macos
+sessionDefaultsProfiles:
+  macos:
+    projectPath: ./QwenVoice.xcodeproj
+    scheme: QwenVoice
+    configuration: Release
+    platform: macOS
+    bundleId: com.qwenvoice.app
+    arch: arm64
+    # Owned scratch (config/build-output-policy.json) if a build workflow is ever enabled deliberately.
+    derivedDataPath: ./build/scratch/derived-data/xcodebuildmcp/macos
+  ios-device:
+    projectPath: ./QwenVoice.xcodeproj
+    scheme: VocelloiOS
+    configuration: Release
+    platform: iOS
+    bundleId: com.patricedery.vocello
+    arch: arm64
+    derivedDataPath: ./build/scratch/derived-data/xcodebuildmcp/ios-device

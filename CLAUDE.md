@@ -165,7 +165,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 - **Tool routing:** repository scripts own builds, tests and evidence. Apple APIs: Axiom skills, the
   sosumi MCP and Xcode's bundled documentation; libraries: Context7; MLX: swift-mlx/swift-mlx-lm and
   `docs/reference/mlx-guide.md`. Retained crashes and traces: Axiom `xcsym`/`xcprof` (never `xcui` or
-  simulator agents). MobileBuildMCP is for discovery only (its builds bypass the native lock).
+  simulator agents). MobileBuildMCP runs only its discovery and coverage workflows
+  (`.mobilebuildmcp/config.yaml`; never persist session defaults into it).
   Website: Claude in Chrome or chrome-devtools for rendered inspection. CI and GitHub: `gh` and the
   GitHub connector, reads by default. App Store Connect (asc-* skills), Vercel and Hugging Face: reads
   only unless the user requests a write. Use the Workflow tool only on explicit opt-in. Missing optional

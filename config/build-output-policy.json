@@ -800,7 +800,7 @@
       "CLAUDE.md",
       ".claude",
       ".github",
-      ".xcodebuildmcp",
+      ".mobilebuildmcp",
       "README.md",
       "benchmarks",
       "config",

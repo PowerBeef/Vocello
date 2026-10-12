@@ -160,8 +160,9 @@ models or touching devices. Detect MCP tools in the live session. Installed Axio
 Context7, MobileBuildMCP (XcodeBuildMCP), browser and GitHub tools are optional assistance, never CI
 dependencies.
 Use existing plugins when connected; no duplicate servers or automatic global installs.
-`.xcodebuildmcp/config.yaml` provides macOS and physical-device profiles, with scratch caches;
-repository scripts own canonical builds and host serialization. Native UI uses only XCUITest.
+`.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
+with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
+canonical builds and host serialization. Native UI uses only XCUITest.
 
 For a symbol server, `buildServer.json` is ignored because it holds machine paths. When explicitly
 setting up an installed xcode-build-server, its config can target the warm `build/cache/xcode/macos`

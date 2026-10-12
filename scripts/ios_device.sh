@@ -2330,7 +2330,7 @@ cmd_crashes() {
 
 # debug [spec]: build+install the get-task-allow build, then an attached console launch
 # and the exact LLDB attach command. The LLDB session itself is interactive (paste it, or
-# use the XcodeBuildMCP device/debugging workflow, or Xcode → Debug → Attach to Process).
+# use Xcode → Debug → Attach to Process).
 # Burns-in safe (headless/locked works).
 cmd_debug() {
   local spec="${1:-}"
@@ -2342,7 +2342,7 @@ cmd_debug() {
   note "debug: get-task-allow build installed on $dev — LLDB-attachable."
   note "  lldb"
   note "  (lldb) process attach --name Vocello --device $dev"
-  note "  (or XcodeBuildMCP device/debugging workflow, or Xcode → Debug → Attach to Process)"
+  note "  (or Xcode → Debug → Attach to Process)"
   if [[ -n "$spec" ]]; then
     note "attached launch ($spec) — Ctrl-C to detach"
     cmd_console "$spec"

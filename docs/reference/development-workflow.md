@@ -361,11 +361,14 @@ SubagentStart/Stop still need the fresh-session check.
 | App Store/deployment/publication | Explicitly requested release workflow | Available asc-* / Vercel tools; reads do not authorize writes |
 | Model research | Receipts, exact pins and maintenance contracts | Hugging Face read-only metadata; no implied download or repin |
 
-Detect capabilities in the current session rather than assuming installation means connection. On the
-2026-10-12 host MobileBuildMCP exposed only its simulator workflows, which are denied; enabling the
-macOS, device and debugging workflows that `.xcodebuildmcp/config.yaml` describes is a user-level MCP
-setting. Its scratch builds bypass repository serialization: prefer scripts; if diagnosis needs such a
-build, the lead must hold the same native lock for the whole operation. Never run it alongside another
+Detect capabilities in the current session rather than assuming installation means connection.
+MobileBuildMCP (the renamed XcodeBuildMCP) reads only `.mobilebuildmcp/config.yaml`, which enables its
+project-discovery and coverage workflows. Its macOS and device workflows are build, install, launch and
+test tools that bypass repository serialization and the evidence scripts, and its debugging workflow
+attaches only to the Simulator, so all three stay off; the unsupported-destination tools are also
+denied in the permissions. Never persist session defaults (`persist: true` writes the tracked file). If
+a diagnosis ever needs an MCP build, enable it deliberately and hold the native lock for the whole
+operation. Never run it alongside another
 native action/evidence lane. Optional helpers must exist, be executable and pass a non-mutating
 help/version probe from their installed Axiom location
 (`~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/bin`). Keep raw native logs, original exit

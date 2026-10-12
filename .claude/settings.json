@@ -140,7 +140,6 @@
       "Bash(python3 scripts/refresh_derived_artifacts.py *)",
       "Bash(python3 scripts/active_workers.py status)",
       "Bash(python3 scripts/ci/*)",
-      "Bash(python3 -m pytest *)",
       "Bash(npm --prefix website run *)",
       "Bash(scripts/macos_test.sh *)",
       "Bash(./scripts/macos_test.sh *)",

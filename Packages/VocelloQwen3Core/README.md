@@ -99,8 +99,8 @@ From the repository root, run the native test lane:
 scripts/dev.sh test          # or: scripts/dev.sh test --all
 ```
 
-It drives `scripts/macos_test.sh test`, which runs `VocelloCoreTests`, `VocelloEngineIntegrationTests`
-and the owned `Qwen3RuntimeTests` target. `scripts/dev.sh check` is the advisory local loop (lint,
+It drives `scripts/macos_test.sh test`, which runs `VocelloCoreTests` and the owned `Qwen3RuntimeTests`
+target. `scripts/dev.sh check` is the advisory local loop (lint,
 contracts, selected tests, the native lanes the dirty tree touches); the commit lint hook is the only
 local block, and CI on `main` is the gate (`scripts/dev.sh ci` reproduces it serially). Model-dependent
 benchmark and frontend lanes remain explicit QA and are not prerequisites for committing or publishing

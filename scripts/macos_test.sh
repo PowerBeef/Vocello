@@ -272,11 +272,8 @@ write_mac_coverage() {
   fi
   xcrun llvm-profdata merge -sparse "$artifacts"/profraw/*.profraw -o "$profdata" || return 1
   local objects=()
-  local bundle
-  for bundle in VocelloCoreTests VocelloEngineIntegrationTests; do
-    [[ -x "$products/$bundle.xctest/Contents/MacOS/$bundle" ]] \
-      && objects+=(-object "$products/$bundle.xctest/Contents/MacOS/$bundle")
-  done
+  local core_binary="$products/VocelloCoreTests.xctest/Contents/MacOS/VocelloCoreTests"
+  [[ -x "$core_binary" ]] && objects+=(-object "$core_binary")
   (( ${#objects[@]} > 0 )) || { warn "coverage: no instrumented test binaries found"; return 1; }
   xcrun llvm-cov export -format=text -summary-only -instr-profile "$profdata" \
     -ignore-filename-regex='(/Tests/|/\.build/|/SourcePackages/|/DerivedData/|/build/|/Packages/VocelloQwen3Core/Tests/)' \

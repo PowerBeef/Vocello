@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Host-wide Codex worker leases. Never use Git worktree locks as activity evidence.
+"""Host-wide Claude Code worker leases. Never use Git worktree locks as activity evidence.
 
-Leases bind a session/agent id to a live Codex process and its start time. Unknown
+Leases bind a session/agent id to a live Claude Code process and its start time. Unknown
 ownership is inconclusive, not idle. Hooks are supplementary: the lead must also
 join its known workers before measurements. No transcript or prompt is retained.
 """
@@ -16,6 +16,9 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+# The native Claude Code CLI reports this command name. A Node-hosted install
+# reports `node`, which cannot prove ownership; lanes then require lead-only.
+OWNER_NAMES = ("claude",)
 
 
 def directory() -> Path:
@@ -48,12 +51,12 @@ def owner() -> dict:
         info = process(pid)
         if not info:
             break
-        if Path(info["command"]).name.lower() in ("codex", "codexcli", "codex-cli"):
+        if Path(info["command"]).name.lower() in OWNER_NAMES:
             return {key: info[key] for key in ("pid", "started")}
         pid = info["parent"]
         if pid <= 1:
             break
-    raise RuntimeError("no live Codex process owner found")
+    raise RuntimeError("no live Claude Code process owner found")
 
 
 def key(session: str, agent: str = "") -> str:
@@ -132,7 +135,7 @@ def snapshot(*, base: Path | None = None, inspect=process, session: str | None =
             if actual is None or actual["started"] != record["started"]:
                 stale += 1
                 continue
-            if Path(actual["command"]).name.lower() not in ("codex", "codexcli", "codex-cli"):
+            if Path(actual["command"]).name.lower() not in OWNER_NAMES:
                 stale += 1
                 continue
             if record["kind"] == "worker":

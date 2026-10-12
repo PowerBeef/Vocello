@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {"python3": ["--version"], "git": ["--version"], "xcodegen": ["--version"],
          "rg": ["--version"], "shellcheck": ["--version"], "xcbeautify": ["--version"],
          "swiftlint": ["version"], "node": ["--version"], "npm": ["--version"],
-         "gh": ["--version"], "codex": ["--version"]}
+         "gh": ["--version"], "claude": ["--version"]}
 
 
 def _probe(command: list[str]) -> dict:
@@ -90,7 +90,7 @@ def doctor(root: Path = ROOT) -> dict:
     xcode["matchesPin"] = (xcode["version"] == xcode["pinnedVersion"]
                             if xcode["version"] and xcode["pinnedVersion"] else None)
     # Capability presence is not proof that a plugin/server is exposed to this chat.
-    helper_root = Path.home() / ".codex/plugins/cache/axiom-marketplace/axiom"
+    helper_root = Path.home() / ".claude/plugins/cache/axiom-marketplace/axiom"
     helpers = {}
     versions = sorted(helper_root.glob("*/bin"), key=lambda path: tuple(
         int(part) for part in re.findall(r"\d+", path.parent.name))) if helper_root.is_dir() else []
@@ -106,18 +106,28 @@ def doctor(root: Path = ROOT) -> dict:
         helpers[name] = {"path": os.fspath(path) if path else None, "executable": executable,
                          "helpProbePassed": probe["exitCode"] == 0, "helpProbeExitCode": probe["exitCode"],
                          "helpProbeStatus": probe_status}
-    hooks = root / ".codex/hooks.json"
+    settings, settings_error = root / ".claude/settings.json", None
+    hooks_configured = False
+    if settings.is_file():
+        try:
+            configured = json.loads(settings.read_text(encoding="utf-8")).get("hooks")
+            hooks_configured = isinstance(configured, dict) and bool(configured)
+        except (OSError, ValueError, AttributeError) as error:
+            settings_error = type(error).__name__
     return {"schemaVersion": 1, "readOnly": True, "tools": tools, "xcode": xcode,
             "pythonModules": {name: entry["available"] for name, entry in python_module_inventory(manifest).items()},
             "pythonModuleDetails": python_module_inventory(manifest),
             "pythonSelection": {"executable": sys.executable, "override": os.environ.get("VOCELLO_PYTHON"),
                                 "minimumVersion": "3.10", "meetsMinimum": sys.version_info >= (3, 10)},
-            "codex": {"instructionsPresent": (root / "AGENTS.md").is_file(),
-                      "skills": sorted(path.parent.name for path in (root / ".agents/skills").glob("*/SKILL.md")),
-                      "agentDefinitions": sorted(path.name for path in (root / ".codex/agents").glob("*.toml")),
-                      "hooksConfigured": hooks.is_file(), "hookActivation": "unconfirmed",
-                      "hookActivationNote": "A fresh trusted Codex session must confirm hook activation; file presence is insufficient.",
-                      "mcpAvailability": "session-only; inspect exposed tools in the active Codex chat"},
+            "claudeCode": {"instructionsPresent": (root / "CLAUDE.md").is_file(),
+                           "websiteInstructionsPresent": (root / "website/CLAUDE.md").is_file(),
+                           "skills": sorted(path.parent.name for path in (root / ".claude/skills").glob("*/SKILL.md")),
+                           "agentDefinitions": sorted(path.name for path in (root / ".claude/agents").glob("*.md")),
+                           "rules": sorted(path.name for path in (root / ".claude/rules").glob("*.md")),
+                           "settingsPresent": settings.is_file(), "settingsError": settings_error,
+                           "hooksConfigured": hooks_configured, "hookActivation": "unconfirmed",
+                           "hookActivationNote": "A fresh Claude Code session must confirm hook activation (/hooks and the SessionStart output); file presence is insufficient.",
+                           "mcpAvailability": "session-only; inspect exposed tools in the active Claude Code session"},
             "axiomHelpers": helpers,
             "notes": ["No installations, downloads, package resolution, native builds or device probes were performed.",
                       "Optional plugins and helpers never replace repository checks or their native lock."]}
@@ -365,8 +375,8 @@ def print_report(report: dict) -> None:
             detail = entry["version"] or ("present; version unknown" if entry["available"] else "missing")
             pin = f" (pin: {entry['pinnedVersion']})" if entry["pinnedVersion"] else ""
             print(f"Python {name}: {detail}{pin}")
-        print(f"Codex hooks: {'configured' if report['codex']['hooksConfigured'] else 'missing'}; activation unconfirmed")
-        print(report["codex"]["hookActivationNote"])
-        print(f"MCP availability: {report['codex']['mcpAvailability']}")
+        print(f"Claude Code hooks: {'configured' if report['claudeCode']['hooksConfigured'] else 'missing'}; activation unconfirmed")
+        print(report["claudeCode"]["hookActivationNote"])
+        print(f"MCP availability: {report['claudeCode']['mcpAvailability']}")
         for note in report["notes"]:
             print(note)

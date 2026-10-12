@@ -238,8 +238,8 @@ class DoctorTests(unittest.TestCase):
     def test_inventory_uses_only_readonly_probes_and_does_not_claim_active_hooks(self):
         with tempfile.TemporaryDirectory(prefix="vocello doctor ") as directory:
             root = Path(directory)
-            (root / ".codex").mkdir()
-            (root / ".codex/hooks.json").write_text("{}")
+            (root / ".claude").mkdir()
+            (root / ".claude/settings.json").write_text('{"hooks": {"SessionStart": []}}')
             calls = []
             def fake_run(command, **kwargs):
                 calls.append(command)
@@ -251,11 +251,24 @@ class DoctorTests(unittest.TestCase):
                     mock.patch.object(MODULE.Path, "home", return_value=root):
                 report = MODULE.doctor(root)
             self.assertTrue(report["readOnly"])
-            self.assertTrue(report["codex"]["hooksConfigured"])
-            self.assertEqual(report["codex"]["hookActivation"], "unconfirmed")
-            self.assertIn("session-only", report["codex"]["mcpAvailability"])
-            self.assertEqual(sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()), [".codex/hooks.json"])
+            self.assertTrue(report["claudeCode"]["hooksConfigured"])
+            self.assertEqual(report["claudeCode"]["hookActivation"], "unconfirmed")
+            self.assertIn("session-only", report["claudeCode"]["mcpAvailability"])
+            self.assertEqual(sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()), [".claude/settings.json"])
             self.assertTrue(calls)
+
+    def test_malformed_or_hookless_settings_do_not_claim_hooks(self):
+        for content in ("not JSON", "[]", '{"permissions": {}}', '{"hooks": {}}'):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.object(MODULE.shutil, "which", return_value=None), \
+                    mock.patch.object(MODULE.Path, "home", return_value=Path(directory)):
+                root = Path(directory)
+                (root / ".claude").mkdir()
+                (root / ".claude/settings.json").write_text(content)
+                report = MODULE.doctor(root)
+                self.assertTrue(report["claudeCode"]["settingsPresent"])
+                self.assertFalse(report["claudeCode"]["hooksConfigured"])
+                self.assertEqual(report["claudeCode"]["settingsError"] is not None, content in ("not JSON", "[]"))
 
     def test_missing_optional_tools_are_reported_without_installing(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -263,9 +276,10 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(MODULE.Path, "home", return_value=Path(directory)), \
                 mock.patch.object(MODULE.subprocess, "run", side_effect=AssertionError("nothing to probe")):
             report = MODULE.doctor(Path(directory))
-        self.assertFalse(report["tools"]["codex"]["available"])
+        self.assertFalse(report["tools"]["claude"]["available"])
         self.assertFalse(report["xcode"]["available"])
-        self.assertFalse(report["codex"]["hooksConfigured"])
+        self.assertFalse(report["claudeCode"]["hooksConfigured"])
+        self.assertFalse(report["claudeCode"]["settingsPresent"])
 
     def test_running_python_and_package_versions_are_reported(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -291,7 +305,7 @@ class DoctorTests(unittest.TestCase):
             (root / "config").mkdir()
             (root / "config/toolchain.json").write_text(json.dumps({"website": {"node": {"version": "24"}, "npm": {"version": "11"}}}))
             for version in ("9.0.0", "27.3.1"):
-                helper = root / ".codex/plugins/cache/axiom-marketplace/axiom" / version / "bin/xclog"
+                helper = root / ".claude/plugins/cache/axiom-marketplace/axiom" / version / "bin/xclog"
                 helper.parent.mkdir(parents=True)
                 helper.write_text("#!/bin/sh\n")
                 helper.chmod(0o755)

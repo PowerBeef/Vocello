@@ -50,8 +50,8 @@ def run_preflight(
         process_shim.write_text(
             "#!/bin/sh\n"
             'if [ "$1" = "-p" ] && [ "$2" = "43210" ]; then\n'
-            + ({"live": "echo '1 Sat Oct 10 12:00:00 2026 /opt/bin/codex'\n",
-                "reused": "echo '1 Sun Oct 11 12:00:00 2026 /opt/bin/codex'\n",
+            + ({"live": "echo '1 Sat Oct 10 12:00:00 2026 /opt/bin/claude'\n",
+                "reused": "echo '1 Sun Oct 11 12:00:00 2026 /opt/bin/claude'\n",
                 "dead": "exit 1\n", "denied": "echo denied >&2; exit 1\n"}[ownership])
             + "else\nexit 1\nfi\n"
         )
@@ -155,7 +155,7 @@ class HostPreflightTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
             subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "i"], check=True)
             worktree = repo / "managed worktrees" / "agent"
-            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "codex/agent",
+            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "worktree-agent",
                             str(worktree)], check=True)
             idle = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
             self.assertEqual(idle.returncode, 0, idle.stderr)

@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import active_workers as workers
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
+import worker_lifecycle as lifecycle_hook
 
 
 class ActiveWorkerTests(unittest.TestCase):
@@ -30,7 +32,7 @@ class ActiveWorkerTests(unittest.TestCase):
         workers.lifecycle(self.event(event, agent, session), base=self.base, identity=self.identity)
 
     def inspect(self, pid: int) -> dict:
-        return {**self.identity, "pid": pid, "parent": 1, "command": "/Applications/Codex.app/bin/codex"}
+        return {**self.identity, "pid": pid, "parent": 1, "command": "/opt/bin/claude"}
 
     def snapshot(self, session: str = "current", inspect=None) -> dict:
         return workers.snapshot(base=self.base, inspect=inspect or self.inspect, session=workers.key(session))
@@ -133,9 +135,9 @@ class ActiveWorkerTests(unittest.TestCase):
             workers.directory()
 
     def test_process_parser_distinguishes_absence_unavailable_and_valid_owner(self) -> None:
-        valid = subprocess.CompletedProcess([], 0, " 1 Sat Oct 10 12:00:00 2026 /opt/bin/codex\n", "")
+        valid = subprocess.CompletedProcess([], 0, " 1 Sat Oct 10 12:00:00 2026 /opt/bin/claude\n", "")
         with patch.object(workers.subprocess, "run", return_value=valid):
-            self.assertEqual(workers.process(43210), {**self.identity, "parent": 1, "command": "/opt/bin/codex"})
+            self.assertEqual(workers.process(43210), {**self.identity, "parent": 1, "command": "/opt/bin/claude"})
         with patch.object(workers.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "")):
             self.assertIsNone(workers.process(43210))
         for result in (subprocess.CompletedProcess([], 1, "", "denied"),
@@ -143,15 +145,56 @@ class ActiveWorkerTests(unittest.TestCase):
             with patch.object(workers.subprocess, "run", return_value=result), self.assertRaises(RuntimeError):
                 workers.process(43210)
 
-    def test_owner_walks_ancestors_and_rejects_missing_codex_owner(self) -> None:
+    def test_owner_walks_ancestors_and_rejects_missing_claude_owner(self) -> None:
         with patch.object(workers.os, "getppid", return_value=7), patch.object(workers, "process", side_effect=[
             {"pid": 7, "parent": 8, "started": "shell", "command": "/bin/bash"},
-            {**self.identity, "parent": 1, "command": "/opt/bin/codex"},
+            {**self.identity, "parent": 1, "command": "/opt/bin/claude"},
         ]):
             self.assertEqual(workers.owner(), self.identity)
         with patch.object(workers.os, "getppid", return_value=7), patch.object(workers, "process", return_value=None), \
                 self.assertRaises(RuntimeError):
             workers.owner()
+        # A retired Codex host or a Node-hosted client cannot establish ownership.
+        for command in ("/opt/bin/codex", "/opt/bin/node"):
+            with self.subTest(command=command), patch.object(workers.os, "getppid", return_value=7), \
+                    patch.object(workers, "process", side_effect=[{**self.identity, "parent": 1, "command": command}]), \
+                    self.assertRaises(RuntimeError):
+                workers.owner()
+
+    def test_retired_codex_owner_counts_as_stale(self) -> None:
+        self.apply("SessionStart")
+        self.apply("SubagentStart", "review")
+        report = self.snapshot(inspect=lambda pid: {**self.inspect(pid), "command": "/opt/bin/codex"})
+        self.assertEqual(report["activeWorkers"], 0)
+        self.assertEqual(report["staleRecords"], 2)
+        self.assertFalse(report["trackingAvailable"])
+
+
+class LifecycleHookTests(unittest.TestCase):
+    def test_session_start_exports_only_the_opaque_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "env"
+            session_key = workers.key("current")
+            self.assertTrue(lifecycle_hook.session_export(str(env_file), session_key))
+            self.assertEqual(env_file.read_text(), f"export QVOICE_WORKER_SESSION={session_key}\n")
+            self.assertRegex(session_key, r"^[0-9a-f]{64}$")
+            self.assertFalse(lifecycle_hook.session_export(None, session_key))
+            self.assertFalse(lifecycle_hook.session_export(str(Path(directory) / "missing" / "env"), session_key))
+
+    def test_responses_name_the_marker_and_the_agent_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict(os.environ, {"CLAUDE_ENV_FILE": str(Path(directory) / "env")}):
+            start = lifecycle_hook.response({"hook_event_name": "SessionStart", "session_id": "current"})
+        output = start["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "SessionStart")
+        self.assertIn(workers.key("current"), output["additionalContext"])
+        self.assertIn("already exported", output["additionalContext"])
+        self.assertNotIn("current", output["additionalContext"].replace(workers.key("current"), ""))
+        agent = lifecycle_hook.response({"hook_event_name": "SubagentStart", "session_id": "s", "agent_id": "a"})
+        self.assertEqual(agent["hookSpecificOutput"]["hookEventName"], "SubagentStart")
+        for rule in ("worktree-*", "never push", "native builds", "config/roadmap.json"):
+            self.assertIn(rule, agent["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual(lifecycle_hook.response({"hook_event_name": "SessionEnd", "session_id": "s"}), {})
 
 
 class ActiveWorkerCommandTests(unittest.TestCase):

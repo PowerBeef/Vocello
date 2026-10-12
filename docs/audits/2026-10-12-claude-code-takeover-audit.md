@@ -23,7 +23,8 @@ Each commit ran the routed `scripts/dev.sh check`. The final batch passed 2,312 
 existing skip, 2,838 subtests), the contract gate, repository invariants, the build-output policy, two
 phone-free generic iOS compiles and the website check with its Playwright smoke. No model load,
 download, device interaction, native UI lane, listening, benchmark, push or release operation ran.
-Swift sources were not changed. The fresh-session activation check listed below is still outstanding.
+Swift sources were not changed. Fresh-session activation results follow; only the interactive `/hooks` and
+`/permissions` views remain unseen.
 
 ## Project state at takeover
 
@@ -87,9 +88,16 @@ in place of `AGENTS.md` and listed both agents. Two findings and the rest of the
   This is unverified. Renaming or duplicating it would also enable build tools that bypass the native
   lock, so it waits for a decision.
 
-Still outstanding:
-- The exported marker and receipt from a SessionStart that runs the fixed hook.
-- The user-facing `/hooks` and `/permissions` views.
+After the fix, a separate headless session (`claude -p` with `--output-format stream-json --verbose`)
+ran the SessionStart hooks successfully:
+- Its Bash saw the exported `QVOICE_WORKER_SESSION`, and `active_workers.py status` reported tracking
+  available with no active workers. Its SessionEnd then removed its receipt.
+- Its init listed the six skills, both agents and no unsupported-destination MobileBuildMCP tool.
+- It still named the three denied Axiom agents, which the interactive session had dropped from its
+  callable agents once the deny rules loaded.
+- No settings or permission error was reported.
+
+Only the interactive `/hooks` and `/permissions` views remain unseen.
 
 ## Carried forward
 

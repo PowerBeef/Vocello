@@ -334,7 +334,11 @@ entries), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SESSION`
 `activeWorkers` to 1 and back, harmless guard fixtures refused (`git switch -c smoke`, an Edit of a
 generated file), no unsupported-destination MobileBuildMCP tools offered, a rule loading when a matching
 file is read, and the six skills and two agents listed. Record the client version and anything
-unavailable. The 2026-10-12 migration session already observed settings applying live, the wildcard
+unavailable. Without restarting the interactive session (for example when working remotely), a headless
+`claude -p '<prompt>' --model haiku --max-turns 4 --allowedTools 'Bash(echo *)'
+'Bash(python3 scripts/active_workers.py status)' --output-format stream-json --verbose < /dev/null`
+from the repository root exercises the same SessionStart and SessionEnd hooks in a fresh session; its
+init message lists the tools, agents and skills it received. The 2026-10-12 migration session already observed settings applying live, the wildcard
 deny rules removing those MCP tools and the three Axiom simulator/test agents, the tooling rule loading
 through its symlink, and a denied `git add -A` being refused; SessionStart, worker receipts and
 SubagentStart/Stop still need the fresh-session check.

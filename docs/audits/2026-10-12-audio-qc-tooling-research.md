@@ -25,6 +25,14 @@ sourceOfTruth:
 Section 3.10, the model sizes and licenses, and the LACI figures were re-checked through the Hugging
 Face MCP.
 
+**Maintainer decisions, the same day:**
+- **Gemini is dropped.** It performed badly at voice analysis in Vocello's own history.
+- **Every paid option the maintainer's Claude plan does not include is dropped:** Azure Pronunciation
+  Assessment, Speechace, the CrisperWhisper 2.0 commercial license, paid listeners (Prolific, Podonos),
+  and Hugging Face Jobs or PRO quota.
+
+Everything that remains is local, free, openly licensed, or included in the Claude plan.
+
 For months the audio QC harness has missed defects the maintainer hears immediately. It has gone
 through Fast QC v1–v8, the Gemini/`agy` "ear", a DSP prosody gate, NISQA, QC v1 / Stage 0 with
 12 shadow judges, and the QC v2 rebuild. QC v2 has been report-only since October 6, and RF-14, the
@@ -107,7 +115,8 @@ MFA and Learn-then-Test.
      not dependencies.
 7. **Make listening cheap.**
    - A phone-first listening lab: tap to mark a span, pick a class, compare two takes A/B.
-   - Optional paid native-French listeners: about **$290 for 400 takes rated twice** on Prolific.
+   - Unpaid listeners only: the maintainer, plus any volunteer native-French listeners invited to the
+     same page.
    - Active learning to pick what gets labeled, and Learn-then-Test qualification on a protected panel.
 8. **A free in-app second witness.**
    - Apple's on-device `SpeechTranscriber` (iOS and macOS 26+, the deployment target) returns
@@ -176,20 +185,23 @@ defects drew zero to two.
    - Fast QC v8 has no lower or upper bound on take length or pace.
    - Long-form joins have no identity check.
 
-## 2. Strategy: five layers, with the ear last and authoritative
+## 2. Strategy: four layers, with the ear last and authoritative
 
 ```
-L1 prevent → L2 gate gross errors → L3 detect subtle (learned, per class) → L4 triage judges → L5 ear
-                (deterministic)          (report-only until qualified)        (dev-time only)   (labels feed L2–L4)
+L1 prevent → L2 gate gross errors → L3 detect subtle (learned, per class) → L4 ear
+                (deterministic)          (report-only until qualified)        (labels feed L2–L3)
 ```
+
+An earlier draft had a fifth layer of audio-LLM triage judges. It is gone:
+- Gemini is dropped by maintainer decision.
+- Local audio LLMs stay Watch (section 3.7).
 
 | Layer | What it does |
 |---|---|
 | **L1 Prevent** | Fix the generator divergences, qualify clone references, verbalize numbers, offer native-French voices. |
 | **L2 Gross gate** | High precision and cheap: duration and pace bounds, a cross-family ASR round trip, aligner coverage, introspection guards. It can fail a take, and the product's answer is a visible Regenerate. |
 | **L3 Subtle detectors** | Phone verification against the intended text, per-vowel phonation, worst-window speaker similarity and register, then span classifiers trained on Vocello's own labels. Report-only until a class qualifies. |
-| **L4 Triage** | Gemini or Qwen3-Omni, pairwise with anchors, at development time only, never as a gate. |
-| **L5 Ear** | A phone-first listening lab produces class and span labels. Detectors qualify with Learn-then-Test on a protected panel, the method chosen on October 10. |
+| **L4 Ear** | A phone-first listening lab produces class and span labels. Detectors qualify with Learn-then-Test on a protected panel, the method chosen on October 10. |
 
 ## 3. Findings by area
 
@@ -341,7 +353,8 @@ mixed-precision Speed tier.
 - **License:** Apache-2.0.
 - **On the Mac:** fairseq2 installs on macOS. French support is unconfirmed.
 
-**CrisperWhisper 2.0 "Verbatimize": Pilot only with a commercial license.**
+**CrisperWhisper 2.0 "Verbatimize": Reject.** Dropped because its commercial license is a paid
+service outside the Claude plan.
 - **What it adds:** given the intended text, it inserts only the disfluencies actually present, which
   makes it a direct C2 detector. The vendor reports an F1 of 87.8.
 - **License:** non-commercial. A commercial license is sold separately.
@@ -373,12 +386,9 @@ text.**
 - **What it catches:** inserted vowels, over-linking, repeats and false starts, measured against the
   *intended* text. That is exactly where ASR built around a language model fails.
 
-**Cloud phoneme scoring for French.** Only two off-the-shelf French phoneme scorers exist:
-- **Azure Pronunciation Assessment:** fr-FR and fr-CA at the phoneme level; prosody is en-US only.
-- **Speechace:** fr-FR and fr-CA at the word, syllable and phoneme level; zero retention can be agreed
-  by contract.
-
-Neither has been tested on TTS. **Pilot**, at development time only, if cloud use is allowed.
+**Cloud phoneme scoring for French: dropped.** Azure Pronunciation Assessment and Speechace were the
+only off-the-shelf French phoneme scorers (fr-FR and fr-CA). Both are paid services outside the Claude
+plan, so the in-house phone verifier above is the route.
 
 **Rejected:**
 - SSDM 2.0: no code.
@@ -428,17 +438,19 @@ Neither has been tested on TTS. **Pilot**, at development time only, if cloud us
 
 ### 3.7 Delivery and emotion (C6), and audio-LLM judges
 
-**Gemini 3.x (cloud).** Pilot at development time only, for C6 and C4: pairwise comparisons with anchor
-clips. Never a gate for C0–C3.
-- Audio costs 32 tokens per second, about $0.0014–0.0038 per minute. Answers can cite MM:SS
-  timestamps.
-- On English voice-style following it agreed with humans at r = 0.640, against 0.596 between humans
-  ([2506.05984](https://arxiv.org/abs/2506.05984)).
-- Its timestamps are weak: about 31 mIoU on TAG-Bench.
+**Gemini (cloud): dropped by maintainer decision.** It performed badly at voice analysis in
+Vocello's own history:
+- the `agy` "ear" in June;
+- the October 2 finding that the cloud audio LLM was "useless for defect detection".
 
-**Qwen3-Omni-30B-A3B.** Pilot on a Mac with 32 GB or more; otherwise Watch.
-- Apache-2.0, accepts French audio, runs in mlx-vlm.
-- The 4-bit model is 21.8 GB, hence the 32 GB minimum.
+The literature does not change that. Its best published result is r = 0.640 agreement with humans on
+English voice-style following ([2506.05984](https://arxiv.org/abs/2506.05984)), and its timestamps are
+weak (about 31 mIoU on TAG-Bench).
+
+**Qwen3-Omni-30B-A3B: Watch.**
+- Apache-2.0, accepts French audio, runs locally in mlx-vlm.
+- It is the same class of judge that failed here as Qwen2.5-Omni.
+- The 4-bit model is 21.8 GB, so it would need a Mac with 32 GB or more.
 
 **Gemma 4 / 3n, Phi-4-mm and Nemotron 3 Nano Omni.** Watch. They run in mlx-vlm, but their ability to
 judge tone and delivery is undocumented.
@@ -484,11 +496,11 @@ integration therefore takes one of two routes:
 |---|---|---|---|
 | voice-analysis-mcp 0.1.0 | Local faster-whisper plus librosa spectrogram, prosody and quality tools | Unknown | Pattern only. Vocello's runners are stronger |
 | audio-analysis-mcp (zachswift615) | Small local analysis server | Unknown | Pattern only |
-| [Claudio](https://pypi.org/project/claudio/) 0.2.3 | Gemini-backed `listen_to_audio` / `ask_about_audio` | None | Reject as a dependency; a good pattern |
-| [gemini-audio-upload](https://glama.ai/mcp/servers/unscene/gemini-audio-upload) | Uploads audio to Gemini | — | Pattern for L4, if cloud use is allowed |
+| [Claudio](https://pypi.org/project/claudio/) 0.2.3 | Gemini-backed `listen_to_audio` / `ask_about_audio` | None | Reject: unlicensed, and Gemini is dropped |
+| [gemini-audio-upload](https://glama.ai/mcp/servers/unscene/gemini-audio-upload) | Uploads audio to Gemini | — | Reject: Gemini is dropped |
 | mcp_video_recognition, [Whissle](https://mcpservers.org/servers/WhissleAI/whissle-mcp), Deepgram MCP | Cloud ASR and video wrappers | — | Reject: cloud-only, nothing QC-specific |
 | [parakeet-mlx skill](https://mcp.directory/skills/parakeet-mlx) (openclaw/skills) | Local Parakeet v3 transcription | — | Pattern. Integrate Parakeet as a QC runner instead |
-| `hf` CLI and [`hf-mcp-server`](https://huggingface.co/docs/hub/en/hf-mcp-server) | The maintainer's Hugging Face route: hub search, model and dataset cards, file sizes, licenses and papers (CLI and MCP); Spaces as tools and Jobs | — | **Adopt for discovery and verification** before any download; this update's sizes and licenses came from it. Reads are allowed. `hf download`, Space runs (`dynamic_space`) and Jobs ask, because they install weights or send audio off the machine |
+| `hf` CLI and [`hf-mcp-server`](https://huggingface.co/docs/hub/en/hf-mcp-server) | The maintainer's Hugging Face route: hub search, model and dataset cards, file sizes, licenses and papers (CLI and MCP); Spaces as tools within the free quota | Free | **Adopt for discovery and verification** before any download; this update's sizes and licenses came from it. Reads are allowed. `hf download` and Space runs (`dynamic_space`) ask, because they install weights or send audio off the machine. Jobs and PRO quota are paid and dropped |
 | Praat MCP | — | — | None exists. HNR and CPP are easy to write in-house. Parselmouth is GPL; keep it in the venv only, like espeak-ng |
 | Plugins | No marketplace plugin targets TTS QC | — | See the installed toolset below |
 
@@ -515,8 +527,8 @@ integration therefore takes one of two routes:
   3. has Claude read and explain the images;
   4. queues the take for listening.
 - The skill never issues a verdict: Claude's reading of spectrograms is unqualified.
-- An MCP server earns its place only for opt-in Gemini triage, or for exposing labels to a claude.ai
-  page. The mcp-builder skill covers building one.
+- An MCP server earns its place only for exposing labels to a claude.ai page. The mcp-builder skill
+  covers building one.
 - Track new checkpoints with the `hf` CLI and `hf-mcp-server` instead of browsing. Examples: a LACI
   code release, a French CTC model, or Kyutai's MLX timestamps.
 
@@ -536,22 +548,22 @@ severity and start/end times per class and has keyboard shortcuts. Make it phone
 
 **Hosting** (a decision). Two options:
 - **(a) Local, reached over Tailscale (recommended).** Clips and labels never leave the maintainer's
-  machines, consistent with keeping labels under `build/private/qc`. This needs the Tailscale app.
-- **(b) A private claude.ai Artifact.**
+  machines, consistent with keeping labels under `build/private/qc`. This needs the Tailscale app on
+  its free Personal plan.
+- **(b) A private claude.ai Artifact**, included in the Claude plan.
   - Labels live in its `db` under per-user paths. Clips are published files (FLAC). Claude reads the
     labels through ArtifactData.
   - It works from anywhere and can invite other raters.
   - It is an external write. Use it only for built-in and Design voices on CC0 scripts, never for
     clone references of real people.
 
-**Paid listeners** (a decision):
-- Prolific recommends £9 / $12 per hour and adds a 42.8% fee for non-academic studies.
-- Estimate: 400 takes × 2 native-French raters × about 75 s ≈ 17 hours ≈ **$290**. Add about 20% for
-  gold clips.
-- Experts and crowd workers agree poorly on pronunciation labels (ETS study). Use the crowd for "any
-  defect, and where?" and for A/B preference. Keep the fine-grained class taxonomy for the maintainer
-  or one trained native rater.
-- Podonos (at most $0.22 per rating) suits only MOS or preference calibration.
+**Listeners.**
+- Paid crowdsourcing (Prolific, Podonos) is dropped.
+- Labels come from the maintainer, plus any volunteer native-French listeners invited to the same page.
+  Option (b) makes inviting easier.
+- Experts and non-experts agree poorly on pronunciation labels (ETS study). Volunteers therefore answer
+  "any defect, and where?" and give A/B preferences, while the fine-grained class taxonomy stays with
+  the maintainer.
 
 **Fallback tools:**
 - webMUSHRA or the Web Audio Evaluation Toolbox for formal MUSHRA or ABX tests.
@@ -585,8 +597,7 @@ Keep about 25% as a **protected panel** that is never used for tuning.
 | L1 | D1/D2/D3/D6 fixes, PA-16, clone-reference qualification, number verbalization, French voices and diction line | None |
 | L2 | Too-short/too-fast bound (folded into QC-08's Fast QC v9); introspection guards (entropy, codebook-0 cycles, EOS margin); Parakeet v3 round trip plus span re-transcription; aligner coverage; Whisper per-word probability; in-app SpeechTranscriber | Weights only. `mlx-community/parakeet-tdt-0.6b-v3`: 627M parameters, 2.51 GB of float32 weights. `Qwen3-ForcedAligner-0.6B`: 918M parameters despite the name; 1.84 GB at bf16 or 1.27 GB at 8-bit (`mlx-community`). Both licenses (CC-BY-4.0, Apache-2.0) were confirmed on the hub. mlx-audio 0.5.7 is already pinned |
 | L3 | GOP-SF plus WFST phone verifier with a French liaison lattice; phonation with the phrase-final exemption; wSIM and register; ctc-segmentation; LACI pacing; then trained span classifiers | ctc-segmentation (Apache-2.0) and one French CTC model (Apache-2.0) |
-| L4 | Gemini pairwise triage | API key and consent (opt-in) |
-| L5 | Listening lab, protocol v2, `/vocello-qc-review`, optional paid raters, Learn-then-Test | Tailscale or an Artifact (decision) |
+| L4 | Listening lab, protocol v2, `/vocello-qc-review`, volunteer listeners, Learn-then-Test | Tailscale's free Personal plan, or an Artifact under the Claude plan (decision) |
 
 ## 5. Recommended phases
 
@@ -612,7 +623,8 @@ started.**
 
 **Phase 2 — grow the panel.**
 - Label 300–500 takes, stratified across mode, tier, preset, language and clones.
-- Set up the active-learning queue and the protected panel; optionally add paid raters.
+- Set up the active-learning queue and the protected panel; optionally invite volunteer native-French
+  listeners.
 - Measure: inter-rater agreement (Krippendorff's alpha) and prevalence per class.
 
 **Phase 3 — detectors.**
@@ -625,7 +637,6 @@ started.**
 
 **Phase 4 — tooling.**
 - The `/vocello-qc-review` skill.
-- Optional Gemini triage, gated on cloud consent.
 - Recalibrate as labels accumulate.
 
 **Phase 5 — product.**
@@ -641,15 +652,18 @@ RF-14 can be decided after Phase 1, with a measured defect rate. It does not nee
 
 | # | Decision | Recommendation |
 |---|---|---|
-| 1 | Cloud use at development time (Gemini triage; Azure or Speechace for French scoring) | Yes, opt-in, with built-in and Design voices on CC0 scripts only |
-| 2 | Where to host the listening lab | Local plus Tailscale, or a private Artifact if other raters will join |
-| 3 | Paid native-French raters (about $290 for 400 takes rated twice) | Yes, after Phase 0 proves the page |
-| 4 | Best-of-N | Keep "no hidden best-of-N"; allow an explicit, visible mode later |
-| 5 | Downloads: Parakeet v3 (2.51 GB) and Qwen3-ForcedAligner (1.27–1.84 GB), through `hf download` and registered in `config/qc/models.json` | Yes, at Phase 3 |
+| 1 | Where to host the listening lab | Local plus Tailscale (free), or a private Artifact (Claude plan) if volunteers will join |
+| 2 | Best-of-N | Keep "no hidden best-of-N"; allow an explicit, visible mode later |
+| 3 | Downloads: Parakeet v3 (2.51 GB) and Qwen3-ForcedAligner (1.27–1.84 GB), through `hf download` and registered in `config/qc/models.json` | Yes, at Phase 3 |
+
+Already decided on 2026-10-12:
+- No cloud judge; Gemini is dropped.
+- No paid service outside the Claude plan.
 
 ## 7. Do not repeat
 
 - Another MOS predictor or general audio LLM as a gate.
+- A cloud audio-LLM judge. Gemini failed on Vocello's voices.
 - Requiring detectors to agree before flagging. Keep single-witness evidence and qualify each class.
 - Qualifying on injected defects.
 - WER from an ASR built around a language model as a pronunciation check.
@@ -712,8 +726,6 @@ RF-14 can be decided after Phase 1, with a measured defect rate. It does not nee
 - [Hugging Face MCP](https://huggingface.co/docs/hub/en/hf-mcp-server)
 
 **Labeling**
-- Prolific [study cost](https://researcher-help.prolific.com/en/articles/445129-study-cost) and
-  [reward guidance](https://researcher-help.prolific.com/en/articles/445266-deciding-on-a-reward)
 - [Label Studio spectrogram labeling](https://labelstud.io/learning-center/how-to-build-a-labeling-tool-for-sound-event-detection-with-spectrogram)
 
 **Not verified**

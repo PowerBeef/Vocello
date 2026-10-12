@@ -52,8 +52,10 @@ reinsertion, sampling without a float32 cast, and the English fallback for Custo
 
 The pinned `mlx-audio` already ships Parakeet and Qwen3-ForcedAligner. The report recommends phases
 from labels to detectors, but none has started. Per the maintainer, the report is saved without
-implementation. Each phase's decisions (cloud, listening-lab hosting, paid raters, Best-of-N,
-downloads) wait for its start. No code, model, download or push.
+implementation. The maintainer then dropped Gemini, which performed badly at voice analysis, and every
+paid option outside the Claude plan: Azure, Speechace, a commercial license, paid listeners and
+Hugging Face Jobs. The remaining decisions (listening-lab hosting, Best-of-N, downloads) wait for each
+phase's start. No code, model, download or push.
 
 ### October 12 — Claude Code takeover
 

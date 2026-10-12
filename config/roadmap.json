@@ -1602,7 +1602,7 @@
       "title": "Claude Code harness follow-ups",
       "status": "planned",
       "blockedBy": [],
-      "gate": "A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; the nine unmerged agent branches holding commits not on main are integrated or explicitly discarded by the maintainer; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.",
+      "gate": "A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.",
       "sourceOfTruth": [
         "docs/audits/2026-10-12-claude-code-takeover-audit.md",
         ".claude/settings.json",
@@ -1610,7 +1610,7 @@
       ],
       "updated": "2026-10-12",
       "unparkWhen": null,
-      "notes": "Takeover commits 446ea479..b9f69907 passed routed checks (2,312 Python tests, generic iOS compiles, website). A fresh session confirmed the banner, CLAUDE.md discovery, SubagentStart/Stop leases with agent rules, the policy and generated-file guards, rule loading and the MobileBuildMCP denials. SessionStart's lifecycle hook had failed under the host's system Python 3.9; after the fix with a host-interpreter hook test, a fresh headless session exported the marker and reported tracking available. Only the interactive /hooks and /permissions views remain unseen. MobileBuildMCP persists defaults to .mobilebuildmcp/config.yaml, so the tracked .xcodebuildmcp/config.yaml may no longer be read (unverified; enabling its build tools bypasses the native lock). The four-agent cap is instruction-only. Sixteen further unmerged agent branches are patch-equivalent to main and can be deleted on request."
+      "notes": "Takeover commits 446ea479..b9f69907 passed routed checks (2,312 Python tests, generic iOS compiles, website). A fresh session confirmed the banner, CLAUDE.md discovery, SubagentStart/Stop leases with agent rules, the policy and generated-file guards, rule loading and the MobileBuildMCP denials. SessionStart's lifecycle hook had failed under the host's system Python 3.9; after the fix with a host-interpreter hook test, a fresh headless session exported the marker and reported tracking available. Only the interactive /hooks and /permissions views remain unseen. MobileBuildMCP persists defaults to .mobilebuildmcp/config.yaml, so the tracked .xcodebuildmcp/config.yaml may no longer be read (unverified; enabling its build tools bypasses the native lock). The four-agent cap is instruction-only. The 25 stale agent branches and both stale agent worktrees were retired on 2026-10-12 after their work was confirmed on main; a verified Git bundle of their tips sits beside the checkout, outside Git."
     }
   ]
 }

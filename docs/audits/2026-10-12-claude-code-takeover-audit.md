@@ -47,7 +47,25 @@ Swift sources were not changed. Fresh-session activation results follow; only th
 | TK-07 | The Axiom simulator-tester, test-runner and test-debugger agents drive simulators or rerun tests outside the repository lanes. | Denied in project permissions; the `xcui` helper stays excluded by instruction. |
 | TK-08 | Comments in `project.yml`, three Swift files, the owned-package README and `benchmarks/OPTIMIZATION.md` pointed at the deleted `.claude/rules/native.md`. | The path exists again as a symlink to `docs/reference/native-engineering.md`, whose `paths:` front matter scopes it. |
 | TK-09 | `Packages/VocelloQwen3Core/README.md` says `macos_test.sh test` runs `VocelloEngineIntegrationTests`, a target `project.yml` does not define. | Open documentation drift; recorded under DA-15. |
-| TK-10 | Eleven `~/.codex/worktrees` registrations pointed at removed directories; four agent branches were fully merged. | Pruned and deleted. Twenty-five unmerged agent branches remain: sixteen are patch-equivalent to `main`; nine hold commits not on `main` (`codex/clone-asr-review`, `codex/clone-reference-ui`, five `worktree-agent-*` branches including the two live `.claude/worktrees`, and `worktree-wf_cdf39e2b-85c-1`). Nothing unmerged was deleted. |
+| TK-10 | Eleven `~/.codex/worktrees` registrations pointed at removed directories; four agent branches were fully merged. | Pruned and deleted. The 25 unmerged agent branches and the two clean `.claude/worktrees` were retired with the maintainer's approval (see below). |
+
+### Agent branch retirement
+
+Each of the 25 unmerged agent branches was compared with `main` before deletion. None existed on the
+remote.
+
+- Sixteen were patch-equivalent.
+- Twelve commits on the remaining nine branches had different patch identities. Nine of them landed
+  rebased under identical subjects, for example `50c08ebb`, `750a1a50`, `2b1f24d9`, `12182a54` and the
+  BT-05 commits `0c51be1b`, `761b4a8b`, `fbbd9094`, `90eed592` and `711a001d`.
+- `f1d2fc03` and `1c4bfebc` are on `main` through `8c71d64b`: 100% and 99% of their substantive added
+  lines.
+- `32654a87` was deliberately integrated by `8c71d64b` as its "useful residual work", with rewritten tests
+  and `main`'s newer fixes preserved.
+
+A verified Git bundle of all 25 tips, holding only the commits not reachable from `main`, was written
+beside the repository checkout, outside Git. Then the branches and the two clean agent worktrees,
+which held only Python caches, were removed.
 
 ## Observed in the migration session
 

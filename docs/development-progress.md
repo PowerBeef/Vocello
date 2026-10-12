@@ -30,10 +30,11 @@ Commits: `446ea479`, `c5f8e290`, `14ad9393`, `7d68a7ad`, plus this checkpoint. R
 2,312 Python tests (one existing skip), generic iOS compiles and the website check. No model, device,
 UI lane, benchmark or push.
 
-Eleven dead Codex worktree registrations were pruned and four merged agent branches deleted. Nine
-unmerged branches hold commits not on `main` and await a maintainer decision. DA-15 holds the
-fresh-session acceptance, optional agent-scoped guards, that branch decision and the
-MobileBuildMCP workflow setting. The audio remediation below resumes unchanged at step 1; no push
+Eleven dead Codex worktree registrations were pruned. All 29 stale agent branches and both stale
+agent worktrees were retired after their work was confirmed on `main`, with a verified Git bundle kept
+outside the repository. A headless fresh session confirmed the SessionStart hooks after the lifecycle
+fix. DA-15 keeps the interactive `/hooks` and `/permissions` views, optional agent-scoped guards, the
+owned-package README drift and the MobileBuildMCP configuration path. The audio remediation below resumes unchanged at step 1; no push
 was requested.
 
 ### October 10 — ordered quality remediation implementation

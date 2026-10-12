@@ -524,7 +524,7 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
   gate: Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.
 
 - **`DA-15`** (planned) — Claude Code harness follow-ups.
-  gate: A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; the nine unmerged agent branches holding commits not on main are integrated or explicitly discarded by the maintainer; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.
+  gate: A fresh Claude Code session confirms the takeover audit's acceptance list (SessionStart banner and exported worker marker, eight hooks, valid permissions, subagent worker leases, refused guard fixtures, rule and skill discovery) with the client version recorded; agent-scoped guards refuse native lanes, pushes and roadmap/checkpoint edits when the hook input carries an agent_id, or are declined with a reason; and the owned-package README stops naming the undefined VocelloEngineIntegrationTests target.
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)
 

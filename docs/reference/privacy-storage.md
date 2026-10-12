@@ -348,10 +348,10 @@ unowned root or a tracked command that bypasses the contract.
 
 Assistant transcripts, memory, credentials and personal settings are user-scoped developer-tool
 data, not Vocello app data or repository build output. Repository workflows never read, edit,
-track or prune them. Codex keeps personal state outside the tracked project configuration.
-Only shared instructions, reviewed hooks and agent definitions under `.codex/`, and repository
-skills under `.agents/skills/` are tracked. Retired Claude configuration is absent from Git;
-personal `.claude/settings.local.json` and existing untracked worktrees remain ignored and preserved.
+track or prune them. Claude Code keeps personal state outside the tracked project configuration.
+Only shared instructions (`CLAUDE.md`, `website/CLAUDE.md`) and the reviewed `.claude/settings.json`,
+rules, skills and agent definitions are tracked; the retired Codex configuration is absent from Git.
+Personal `.claude/settings.local.json` and agent worktrees under `.claude/worktrees/` stay ignored.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked

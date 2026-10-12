@@ -24,7 +24,7 @@ decode-loop + output-quality work, shared by both platforms — the deep §A–�
 entitlement), [`ios-device-testing.md`](ios-device-testing.md) (how to build/bench on device),
 [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (the telemetry schema).
 
-**Source-of-truth rule (from `AGENTS.md`): if this doc disagrees with the code, the code wins — fix
+**Source-of-truth rule (from `CLAUDE.md`): if this doc disagrees with the code, the code wins — fix
 this doc.** All claims below are cited to a file or commit; re-verify before relying on a number.
 
 ---

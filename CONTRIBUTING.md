@@ -1,8 +1,8 @@
 # Contributing to Vocello
 
-Thank you for helping improve Vocello. This guide is the human contribution path. Codex,
+Thank you for helping improve Vocello. This guide is the human contribution path. Claude Code,
 the repository's coding agent (a lead session on `main`, optionally with parallel agents in
-integrated worktrees), follows [`AGENTS.md`](AGENTS.md) and the
+integrated worktrees), follows [`CLAUDE.md`](CLAUDE.md) and the
 [development workflow](docs/reference/development-workflow.md).
 
 ## Before starting

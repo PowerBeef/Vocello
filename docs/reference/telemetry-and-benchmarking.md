@@ -36,7 +36,7 @@ If anything here disagrees with the code, the code wins — fix this file.
 ## 1. Principles
 
 1. **Runtime‑gated, never compiled out.** There is one shippable config; dev and
-   release run identical code (see root `AGENTS.md`). Telemetry is switched on at
+   release run identical code (see root `CLAUDE.md`). Telemetry is switched on at
    runtime by `TelemetryGate`, not by `#if DEBUG`. When the gate is off, every probe
    is a no‑op and nothing is written.
 2. **Correlated by `generationID`.** The app mints a `UUID` per generation and threads

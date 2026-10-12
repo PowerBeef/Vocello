@@ -47,7 +47,7 @@ build 24 candidate); public facts live in `config/public-product-facts.json`: th
 release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta**.
 
 > For repo conventions,
-> build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
+> build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
 > This document provides the deeper architecture narrative.
 
 ---
@@ -131,8 +131,8 @@ The loop around this table is short. `scripts/dev.sh check` runs lint, contracts
 tests and the native lanes the dirty tree touches, and is advisory. `check --dry-run --json`
 provides the same routing without execution; `doctor` inventories prerequisites and `triage`
 reads retained evidence. Direct repository guards preserve whitespace, privacy, generated-file,
-cache, and Git policy. Trusted Codex hooks add bounded startup context and invoke those guards;
-an inactive hook does not prove a check passed. Scoped local commits and managed worktrees are
+cache, and Git policy. Claude Code hooks add bounded startup context and invoke those guards;
+an inactive hook does not prove a check passed. Scoped local commits and agent worktrees are
 allowed; pushes require an explicit request. Push CI on `main` is the gate —
 `scripts/ci/classify_changes.py` routes each push into the `contracts`, `python`, `macos-tests`,
 `macos-tsan`, `ios-compile`, `website` and `dependency-submission` jobs and `CI required` is the
@@ -1332,7 +1332,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 ## 17. Related documents
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
-- [`AGENTS.md`](../AGENTS.md) — repo operating instructions and links to native/tooling safeguards.
+- [`CLAUDE.md`](../CLAUDE.md) — repo operating instructions and links to native/tooling safeguards.
 - [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — source-traced takeover findings and coverage map; static review is distinguished from fresh runtime evidence.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
@@ -1362,8 +1362,8 @@ Playwright browser smoke. Native compilation cannot validate web rendering or au
 website inputs outside `website/` must still select the web CI lane.
 
 [`scripts/dev.sh`](../scripts/dev.sh) is the local routing interface. Repository instructions,
-`.agents/skills`, read-only review/triage agents, and `.codex/hooks.json` point back to canonical
-scripts. Optional MCP servers and verified Axiom diagnostic helpers supply discovery, research,
+`.claude/skills`, read-only review/triage agents, and the `.claude/settings.json` hooks point back to
+canonical scripts. Optional MCP servers and verified Axiom diagnostic helpers supply discovery, research,
 debugging, and retained-log/trace analysis; they do not define a second source of build provenance,
 native serialization, performance admissibility, or release authority. Scripts remain usable on
 CI and on hosts without personal plugins.

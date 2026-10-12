@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-10
+reviewed: 2026-10-12
 summary: The local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -52,8 +52,9 @@ the whole Python suite.
 
 ## The commit lint
 
-`scripts/hooks/commit_lint.sh` (a Codex `PreToolUse` hook) requires branch `main` in the main
-checkout or a `codex/*` branch in a registered linked worktree, pushes only from `main`, a whitespace-clean
+`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires branch `main` in the main
+checkout or a `worktree-*` branch in a registered linked worktree (a Claude Code agent worktree), pushes
+only from `main`, a whitespace-clean
 staged diff (`git diff --cached --check`) and a clean `scripts/privacy_scan.py --staged` (no developer
 home path, no credential-shaped token, no key file). It never builds or tests. Two more guards block
 Simulator destinations, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made
@@ -197,9 +198,10 @@ inside `release.yml` on the tagged commit.
 
 ## Operating defaults
 
-`AGENTS.md` owns the working agreement. Read `native-engineering.md` for Swift/runtime work and
-`tooling-and-evidence.md` for contracts, CI, debugging, benchmarks and release logic. These are
-explicitly linked references, not automatically loaded path-scoped rules.
+`CLAUDE.md` owns the working agreement. `native-engineering.md` (Swift/runtime) and
+`tooling-and-evidence.md` (contracts, CI, debugging, benchmarks, release) are path-scoped rules: their
+`paths:` front matter loads them through the `.claude/rules` symlinks when matching files are touched.
+Read them directly when planning.
 
 Use targeted deterministic tests, changed-file lint and warm incremental builds while editing.
 Before committing run the routed checks and review the actual diff. Use independent Swift review
@@ -215,32 +217,36 @@ Preserve the original failure. Investigate it before a rerun; record the reason 
 
 ## Parallel agents and worktrees
 
-Use selective parallelism for disjoint editing, research, review or triage. At most four agents may
-be active including the lead, inheriting the selected model; `.codex/config.toml` records this limit.
+Use selective parallelism for disjoint editing, research, review or triage. At most four agents may be
+active including the lead, inheriting the selected model; this limit is an instruction, not a setting.
 One full Python suite and one browser acceptance run at a time on the 16 GB development host.
 Agents doing native work remain code-only; the lead owns native builds and all measured lanes.
 
-Create editing worktrees with Codex's managed-worktree tool, passing the lead's exact committed
-checkpoint as `ref` (the tool otherwise defaults to the remote default branch). Never assume it
-copies dirty files. Inspect Git metadata and commit identity. If creation returns detached HEAD,
-`git switch -c codex/<scope>` inside that registered linked checkout establishes its scoped branch;
-the command guard permits only this non-resetting creation there. A directory name is not proof
-of repository identity. Give each worker a disjoint file set and clear validation limits.
+Create editing agents with the Agent tool and `isolation: "worktree"`. Claude Code creates
+`.claude/worktrees/<name>` on branch `worktree-<name>` from local HEAD (`worktree.baseRef: head` in
+`.claude/settings.json`), so commit the lead checkpoint first: dirty files do not carry over. An unchanged
+agent worktree is removed automatically. Inspect Git metadata and commit identity; a directory name is not
+proof of repository identity. Give each worker a disjoint file set and clear validation limits; the
+SubagentStart hook repeats the agent rules to every subagent. Hand-made branches and worktrees stay denied.
 
-Agents make scoped commits and never push, modify the roadmap/checkpoint or run models, devices,
-native UI or native builds. The lead reviews each commit, integrates with `git cherry-pick` or
-`git merge --ff-only`, and validates the combined result on the warm main cache. Do not edit scripts
-used by a running lane. Archive integrated worktrees with the Codex managed-worktree tool, preserving
-needed ignored evidence first; never discard unintegrated work to tidy the workspace.
+Agents make scoped commits on their `worktree-*` branch and never push, modify the roadmap/checkpoint or
+run models, devices, native UI or native builds. The lead reviews each commit, integrates with
+`git cherry-pick` or `git merge --ff-only`, and validates the combined result on the warm main cache. Do
+not edit scripts used by a running lane. Remove integrated worktrees with
+`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>`, preserving needed
+ignored evidence first; never discard unintegrated work to tidy the workspace (`--force` and
+`git branch -D` ask first).
 
 Before source-bound measurements join or stop all delegated work. `scripts/active_workers.py`
-uses supported SessionStart/SubagentStart/SubagentStop/SessionEnd events, host-wide leases and live
-process start identities. Dead, reused-PID and non-Codex ownership records cannot establish activity.
+uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events, host-wide leases and the live
+start identity of the native `claude` process. Dead, reused-PID and non-Claude ownership records
+(including retired Codex leases and Node-hosted clients) cannot establish activity.
 Unknown ownership blocks measurements. A locked Git worktree may be idle and is never counted.
 Root interruption/teardown does not prove workers stopped, so live worker leases remain conservative.
 
-The startup hook emits the session's opaque `QVOICE_WORKER_SESSION` marker; pass it to measured
-commands to establish *this session's* registration. Another session's receipt cannot establish it.
+The SessionStart hook exports the session's opaque `QVOICE_WORKER_SESSION` marker to later Bash calls
+through `CLAUDE_ENV_FILE` and names it in the session context; it establishes *this session's*
+registration. Another session's receipt cannot establish it.
 If hooks or ownership inventory are unavailable, join all known workers and explicitly use
 `QVOICE_LEAD_ONLY=1` for the lane. Never use that declaration to bypass a known active or unknown
 worker lease. Registration failures invalidate the session receipt and retain a conservative marker;
@@ -256,48 +262,53 @@ recorded without blocking. This deterministic analysis makes no latency or memor
 claim; worker ownership and native-lock checks remain. Do not use it for inference, generation,
 UI, performance or memory measurements.
 
-## Codex setup and tool routing
+## Claude Code setup and tool routing
 
-Repository instructions use supported [AGENTS.md discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
-Skills use [.agents/skills discovery](https://learn.chatgpt.com/docs/build-skills), with six thin
-wrappers: `vocello-ios-validation`, `vocello-macos-ui`, `vocello-device-diagnostics`,
-`vocello-benchmark`, `vocello-debug` and read-only `vocello-release-readiness`.
-They may be selected implicitly for authorized local work; they do not grant external-write authority.
-Read-only [custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents) live in
-`.codex/agents`: `vocello-swift-review` and `vocello-xcresult-triage`. Both inherit the selected model.
+Claude Code reads `CLAUDE.md` at the repository root and `website/CLAUDE.md` once website files are
+touched. `.claude/rules/native.md` and `.claude/rules/tooling.md` are symlinks to the two reference
+rules above. Six thin skills live in `.claude/skills` and run as `/vocello-*`:
+`vocello-ios-validation`, `vocello-macos-ui`, `vocello-device-diagnostics`, `vocello-benchmark`,
+`vocello-debug` and read-only `vocello-release-readiness`. They may also be selected for authorized local
+work; they grant no external-write authority. Read-only agents live in `.claude/agents`:
+`vocello-swift-review` and `vocello-xcresult-triage`, both `model: inherit`.
 
-The sole [hook definition](https://learn.chatgpt.com/docs/hooks) is `.codex/hooks.json`, beside
-`.codex/config.toml`. Opening a session installs nothing and never builds or touches a phone.
+`.claude/settings.json` is the sole hook and permission definition. Opening a session installs nothing
+and never builds or touches a phone.
 
 | Event | Tool/event matcher | Handler | Effect |
 | --- | --- | --- | --- |
-| SessionStart | startup/resume/clear/compact | session_start.sh, worker_lifecycle.py | Bounded local Git/status/checkpoint context and current session receipt |
+| SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; bounded local Git/status/checkpoint context |
 | PreToolUse | Bash | commit_lint.sh, policy_guard.sh | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards |
-| PreToolUse | apply_patch | generated_file_guard.sh | Protects every add/update/delete/move target in a multi-file patch |
-| PreToolUse | MCP names | simulator_tool_guard.py | Refuses unsupported simulator tool routes |
-| PostToolUse | apply_patch | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
-| SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration, completion and conservative teardown |
+| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh | Refuses hand edits of generated and frozen files, naming the generator |
+| PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py | Refuses unsupported-destination tool routes |
+| PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
+| SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration with agent rules, completion and conservative teardown |
 
-Hook commands locate the actual checkout with Git, quote paths with spaces, and use payload `cwd`
-when judging tool actions. Codex's canonical Bash payload is `tool_input.command`; `apply_patch`
-uses the same field containing the complete patch. Edit/Write matcher aliases do not change that
-payload. The adapter retains legacy file-edit payload support for callable regression fixtures.
-File guards fail closed on unreadable paths/patches. Tokenized Git parsing handles global options,
-literal `-C`, chains, subshells and heredocs. Generated guards cover renamed sources and destinations.
-These cooperative guards cannot sandbox interpreter indirection or arbitrary external programs.
-When a tool wrapper does not forward its working directory in the hook payload, use literal
-`git -C <managed-checkout> switch -c codex/<scope>` for the initial branch creation. The registered
-checkout's Git metadata must establish ownership; never bypass the guard or commit detached.
+Hook commands resolve through `$CLAUDE_PROJECT_DIR`, so they never depend on the working directory and
+always run the main checkout's copy, while the guards judge each tool action by the payload `cwd`, which
+follows an agent worktree. Bash payloads carry `tool_input.command`; file tools carry
+`tool_input.file_path` (`notebook_path` for NotebookEdit). Any other tool, including the retired Codex
+patch tool, fails closed in the file guard. Tokenized Git parsing handles global options, literal `-C`,
+chains, subshells and heredocs. These cooperative guards cannot sandbox interpreter indirection or
+arbitrary external programs.
 
-Trust is a separate host decision: trust the project and review the current hook definition in
-Codex's `/hooks` UI. New/changed untrusted definitions are skipped until reviewed. Managed-host policy
-may prohibit repository hooks, and cloud orchestration does not support local command hooks.
-Do not self-approve hooks, bypass hook trust or modify global trust/settings to make a check pass.
-Report inactive/unverified hooks explicitly. `scripts/dev.sh doctor --json` inventories configuration,
-tools and configuration presence; it cannot establish MCP availability or persisted hook trust.
-The October 10 host smoke observed SessionStart and worker start/stop receipts, plus command-guard
-dispatch. Persisted trust and every guard route still require inspection of the current `/hooks`
-definition; those observations alone do not establish full activation.
+The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
+the routine loop: read-only Git, scoped staging and commits, worktree integration, `scripts/dev.sh`,
+contract and privacy scripts, pytest, the website check and the local `macos_test.sh`, `ui_test.sh` and
+`ios_device.sh` lanes. `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup,
+pinned-tool installation, benchmark publication, workflow dispatch, installers, global settings and
+external writes (GitHub, Vercel, App Store Connect, Hugging Face). `deny` covers force and non-main
+pushes, hand-made branches and worktrees, `update-ref`, stashing, broad staging, releases,
+`.xcodeproj` edits, unsupported-destination and UI-driving MCP tools (by wildcard, so no literal tool
+name enters the tree) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
+wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
+overrides and cannot lift a tracked deny.
+
+Claude Code applies edits to the tracked settings to the running session immediately, so change them
+deliberately and in the same commit as their tests. `/hooks` and `/permissions` show what is active. Do
+not self-approve trust prompts or modify global settings to make a check pass; report inactive or
+unverified hooks. `scripts/dev.sh doctor --json` inventories configuration, tools and Axiom helpers; it
+cannot establish MCP availability or hook activation.
 
 Safeguards are also callable without activation:
 
@@ -312,37 +323,49 @@ python3 -m pytest scripts/tests/test_agent_hooks.py scripts/tests/test_active_wo
 
 `policy_guard.sh` and `generated_file_guard.sh` can read a fixture hook JSON on stdin; their tests
 exercise allowed and blocked operations without running destructive commands. CI classification,
-Python consumer selection and reference scanners include `.codex/` and `.agents/`, including deleted
-paths; config-only edits exercise behavioral checks without triggering native builds.
+Python consumer selection and reference scanners include `.claude/`, `CLAUDE.md` and the two rule
+sources, and still route the retired `.codex/` and `.agents/` prefixes so a deletion runs the hook
+tests; config-only edits exercise behavioral checks without triggering native builds.
 
-For a fresh-session smoke check, verify AGENTS root/subdirectory discovery, the six repository skills,
-two read-only agents and their inherited model/concurrency settings. Inspect `/hooks` for source,
-trust and enabled state, then use harmless guard fixtures (never a real destructive command).
-Confirm SessionStart context and worker receipt creation, SubagentStart/Stop behavior, a multi-file
-patch guard and a managed checkout with spaces. Record exact client/host version and any unavailable
-discovery or trust surface. Static parsing and unit tests alone do not prove fresh-session activation.
+For a fresh-session smoke check, start a new `claude` session at the repository root. Confirm the
+SessionStart output ("CLAUDE.md: Start here"), `/memory` (CLAUDE.md and no AGENTS.md), `/hooks` (eight
+entries), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SESSION` and
+`python3 scripts/active_workers.py status` reporting `trackingAvailable: true`, a trivial subagent moving
+`activeWorkers` to 1 and back, harmless guard fixtures refused (`git switch -c smoke`, an Edit of a
+generated file), no unsupported-destination MobileBuildMCP tools offered, a rule loading when a matching
+file is read, and the six skills and two agents listed. Record the client version and anything
+unavailable. The 2026-10-12 migration session already observed settings applying live, the wildcard
+deny rules removing those MCP tools and the three Axiom simulator/test agents, the tooling rule loading
+through its symlink, and a denied `git add -A` being refused; SessionStart, worker receipts and
+SubagentStart/Stop still need the fresh-session check.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
-| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery or compatible debugging under host serialization; no alternative native UI driver |
-| Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Applicable Axiom skills; Sosumi for Apple docs; Context7 for libraries |
+| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; no alternative native UI driver |
+| Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Axiom skills and read-only auditor agents; sosumi; Xcode's bundled documentation |
+| Libraries | Pinned versions in `config/toolchain.json` and package manifests | Context7 |
 | MLX runtime | Owned facade, exact pins and mlx-guide.md | Installed swift-mlx / swift-mlx-lm skills |
+| Code review | The actual diff and the reference rules | vocello-swift-review; `/code-review`; `/security-review` for hooks, security, persistence and release |
 | Finished native run | `scripts/dev.sh triage <run-directory> --json` and testing-runbook.md | Read-only vocello-xcresult-triage agent, xcresulttool, LLDB when indicated |
-| Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | Verified Axiom axbuild, xcsym and xcprof helpers with script-only fallback |
-| Website | `npm --prefix website run check` | Browser tools for local rendered inspection; relevant Impeccable/Vercel guidance |
-| Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; observe CI after an authorized push |
+| Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | Verified Axiom axbuild, xcsym and xcprof helpers and the crash-analyzer agent, with script-only fallback |
+| Website | `npm --prefix website run check` | Claude in Chrome or chrome-devtools for local rendered inspection; relevant Vercel guidance |
+| Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | Available asc-* / Vercel tools; reads do not authorize writes |
 | Model research | Receipts, exact pins and maintenance contracts | Hugging Face read-only metadata; no implied download or repin |
 
-Detect capabilities in the current session rather than assuming installation means connection.
-XcodeBuildMCP's scratch builds bypass repository serialization: prefer scripts; if diagnosis needs
-such a build, the lead must hold the same native lock for the whole operation. Never run it alongside
-another native action/evidence lane. Optional helpers must exist, be executable and pass a non-mutating
-help/version probe via their installed Axiom location. Keep raw native logs, original exit status,
-optimization flags and evidence manifests; compact helper output cannot replace their contracts.
-Use xcsym for retained crash symbolication and xcprof for existing trace inspection. Do not use xcui:
-its simulator UI route conflicts with this project's physical-iPhone/XCUITest rules. Missing optional
-tools never block the script workflow; personal plugins, skills, accounts and credentials are not CI
+Detect capabilities in the current session rather than assuming installation means connection. On the
+2026-10-12 host MobileBuildMCP exposed only its simulator workflows, which are denied; enabling the
+macOS, device and debugging workflows that `.xcodebuildmcp/config.yaml` describes is a user-level MCP
+setting. Its scratch builds bypass repository serialization: prefer scripts; if diagnosis needs such a
+build, the lead must hold the same native lock for the whole operation. Never run it alongside another
+native action/evidence lane. Optional helpers must exist, be executable and pass a non-mutating
+help/version probe from their installed Axiom location
+(`~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/bin`). Keep raw native logs, original exit
+status, optimization flags and evidence manifests; compact helper output cannot replace their
+contracts. Use xcsym for retained crash symbolication and xcprof for existing trace inspection. Do not
+use xcui or the Axiom simulator-tester, test-runner and test-debugger agents (denied): their simulator
+and rerun routes conflict with this project's physical-iPhone/XCUITest rules. Missing optional tools
+never block the script workflow; personal plugins, skills, accounts and credentials are not CI
 dependencies. Never install or change global configuration simply to satisfy a routing table.
 
 ### Host and release prerequisites

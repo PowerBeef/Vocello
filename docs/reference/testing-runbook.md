@@ -38,18 +38,19 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/tooling-and-evidence.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
-## Codex QA shortcuts
+## Claude Code QA shortcuts
 
 Routine edits use `scripts/dev.sh`; no skill is required. Six thin repository skills under
-`.agents/skills` select the existing iOS, macOS UI, device diagnostics, benchmark, debugging and
-read-only release-readiness procedures. See [tool routing](development-workflow.md#codex-setup-and-tool-routing).
+`.claude/skills` (`/vocello-*`) select the existing iOS, macOS UI, device diagnostics, benchmark,
+debugging and read-only release-readiness procedures. See
+[tool routing](development-workflow.md#claude-code-setup-and-tool-routing).
 Local targeted validation is authorized at coherent checkpoints. Full matrices are task/release-specific;
 publication and external writes require specific authorization. Hook guards are supplementary,
-not a permissions system. XcodeBuildMCP and Axiom may assist diagnosis under native serialization.
+not a substitute for review. MobileBuildMCP discovery and Axiom may assist diagnosis under native serialization.
 
 ### Read a finished run
 
-Codex reads the artifacts directly, or hands the run directory to the read-only `vocello-xcresult-triage`
+Claude Code reads the artifacts directly, or hands the run directory to the read-only `vocello-xcresult-triage`
 subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.

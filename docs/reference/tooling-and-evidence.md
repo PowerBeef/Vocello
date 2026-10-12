@@ -169,7 +169,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - Committing raw telemetry, editing `benchmarks/HISTORY.md` or `docs/ROADMAP.md` by hand.
 - Running iOS UI work in the Simulator or making ordinary CI wait for a phone, a model or XCUITest.
 - Clearing caches to evade native-lock contention instead of serializing native commands, or running
-  native builds outside the host-wide lock (XcodeBuildMCP builds bypass it).
+  native builds outside the host-wide lock (MobileBuildMCP/XcodeBuildMCP builds bypass it).
 - Editing, committing or integrating agent work while a UI or benchmark lane runs: publication compares
   the pre- and post-run tree fingerprints, and a mismatch demotes the record to exploratory.
 - Publishing a canonical macOS UI benchmark record without, in the same commit, running

@@ -41,7 +41,7 @@ host after joining workers. `require_quiet_host` rejects excessive load, memory 
 native-lock holder or validated active-worker leases. Unknown ownership blocks measurement; if
 tracking is unavailable declare `QVOICE_LEAD_ONLY=1` only after joining workers.
 `QVOICE_ALLOW_BUSY_HOST=1` preserves explicitly exploratory classification. No new large download,
-release or external write is implied. Codex skills `vocello-ios-validation` and
+release or external write is implied. The Claude Code skills `vocello-ios-validation` and
 `vocello-device-diagnostics` call the scripts; `vocello-xcresult-triage` reads finished artifacts.
 
 ### Host toolchain prerequisite
@@ -368,7 +368,7 @@ Do not repeat completed phases merely for a green aggregate or reuse a token aft
    and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
 4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
    rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, `AGENTS.md`, or any tracked file between shards.
+   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
 5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
    and the current narrative. A changed full-tree identity requires new acceptance identity;
    previous results remain history, never merged current-source PASS.

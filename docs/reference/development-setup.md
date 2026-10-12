@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-09-22
-summary: Set up a new Mac from a fresh clone — Xcode and its components, the pinned CLI tools, Python and website toolchains, Git, signing and permissions, models, and the Codex tooling — then verify with the repository's own checks.
+summary: Set up a new Mac from a fresh clone — Xcode and its components, the pinned CLI tools, Python and website toolchains, Git, signing and permissions, models, and the Claude Code tooling — then verify with the repository's own checks.
 sourceOfTruth:
   - config/toolchain.json
   - scripts/install_pinned_tools.sh
@@ -12,7 +12,7 @@ sourceOfTruth:
 # Development setup on a new Mac
 
 A fresh clone contains the whole project: source, the tracked Xcode project and schemes, contracts,
-scripts, CI, `AGENTS.md` and the Codex configuration. What it cannot contain is the machine:
+scripts, CI, `CLAUDE.md` and the Claude Code configuration. What it cannot contain is the machine:
 Xcode and its downloadable components, command-line tools, Python and Node toolchains, credentials,
 signing identities, privacy grants, downloaded models and caches. This guide sets those up in order.
 Versions are never repeated here; `config/toolchain.json` is the pin authority and the commands below
@@ -106,7 +106,7 @@ integration; `vercel link --repo` is needed only to use the Vercel CLI.
 
 Set a global identity (`git config --global user.name …` and `user.email …`) and do not add a
 repository-local override. HTTPS credentials come from `gh auth login` or the macOS keychain. There
-are no Git hooks, submodules or LFS files; the guards are supplementary Codex hooks. Release tags must be
+are no Git hooks, submodules or LFS files; the guards are supplementary Claude Code hooks. Release tags must be
 signed and GitHub-verified (`git tag -s`), so configure a signing key only if you cut releases
 ([`macos-release-qa.md`](macos-release-qa.md)).
 
@@ -145,18 +145,20 @@ Never copy `build/` from another machine; rebuild it.
   (`scripts/ios_device.sh device-state`). With the Apple ID signed in under Xcode → Settings →
   Accounts, the first `scripts/ios_device.sh build` creates the team development provisioning profile.
 
-## 8. Codex
+## 8. Claude Code
 
-Open the clone in Codex and read `AGENTS.md`. Repository skills live in `.agents/skills`, read-only
-agents in `.codex/agents`, concurrency settings in `.codex/config.toml` and supplementary hooks in
-`.codex/hooks.json`. Review project and hook trust in the client; changed hooks remain inactive until
-reviewed. See the [fresh-session procedure](development-workflow.md#codex-setup-and-tool-routing).
-Do not change global trust/settings automatically. Personal Claude overrides and old worktrees remain
-untracked and untouched by this migration.
+Open the clone with `claude` at the repository root and trust the workspace; Claude Code reads
+`CLAUDE.md`. The tracked `.claude/settings.json` holds the supplementary hooks, permissions and
+`worktree.baseRef`; skills live in `.claude/skills`, read-only agents in `.claude/agents` and the
+path-scoped rules in `.claude/rules`. Check `/hooks` and `/permissions` in the first session and follow
+the [fresh-session procedure](development-workflow.md#claude-code-setup-and-tool-routing).
+Personal overrides go in the untracked `.claude/settings.local.json`; do not change global trust or
+settings automatically. Agent worktrees under `.claude/worktrees` stay untracked.
 
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
 models or touching devices. Detect MCP tools in the live session. Installed Axiom, MLX, Sosumi,
-Context7, XcodeBuildMCP, browser and GitHub tools are optional assistance, never CI dependencies.
+Context7, MobileBuildMCP (XcodeBuildMCP), browser and GitHub tools are optional assistance, never CI
+dependencies.
 Use existing plugins when connected; no duplicate servers or automatic global installs.
 `.xcodebuildmcp/config.yaml` provides macOS and physical-device profiles, with scratch caches;
 repository scripts own canonical builds and host serialization. Native UI uses only XCUITest.

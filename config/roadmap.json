@@ -1610,7 +1610,7 @@
       ],
       "updated": "2026-10-12",
       "unparkWhen": null,
-      "notes": "The October 12 takeover (446ea479, c5f8e290, 14ad9393, 7d68a7ad) moved hooks, permissions, skills, agents, rules and instructions to Claude Code and retired .codex/.agents; routed checks passed with 2,312 Python tests, generic iOS compiles and the website check. Settings, wildcard MCP denials, rule symlinks and skills were observed live in the migration session; SessionStart and subagent lifecycle need a fresh session. MobileBuildMCP exposes only simulator workflows here (denied); enabling its macOS/device/debugging workflows is a user-level MCP setting. The four-agent cap is instruction-only. Sixteen further unmerged agent branches are patch-equivalent to main and can be deleted on request."
+      "notes": "Takeover commits 446ea479..b9f69907 passed routed checks (2,312 Python tests, generic iOS compiles, website). A fresh session confirmed the banner, CLAUDE.md discovery, SubagentStart/Stop leases with agent rules, the policy and generated-file guards, rule loading and the MobileBuildMCP denials. SessionStart's lifecycle hook had failed under the host's system Python 3.9; it is fixed with a host-interpreter hook test, so the marker export after the fix and the /hooks and /permissions views remain to confirm. MobileBuildMCP persists defaults to .mobilebuildmcp/config.yaml, so the tracked .xcodebuildmcp/config.yaml may no longer be read (unverified; enabling its build tools bypasses the native lock). The four-agent cap is instruction-only. Sixteen further unmerged agent branches are patch-equivalent to main and can be deleted on request."
     }
   ]
 }

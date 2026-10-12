@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Claude Code lifecycle adapter for host worker tracking; no raw hook input is saved."""
+"""Claude Code lifecycle adapter for host worker tracking; no raw hook input is saved.
+
+Hooks run the host's bare `python3`, often the macOS system Python 3.9: keep this
+file and what it imports importable there.
+"""
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -241,6 +242,36 @@ class SettingsWiringTests(unittest.TestCase):
         self.assertEqual(matrix, self.EXPECTED)
         wired = set().union(*matrix.values())
         self.assertEqual({p.name for p in HOOKS.glob("*.sh")}, {name for name in wired if name.endswith(".sh")})
+
+    def test_python_hooks_run_under_the_host_default_interpreter(self):
+        # Hook commands run bare `python3`, which on macOS is often the system 3.9: a hook that
+        # needs a newer interpreter fails at import and silently registers nothing.
+        interpreters = {sys.executable}
+        system = shutil.which("python3", path="/usr/bin:/bin")
+        if system:
+            interpreters.add(system)
+        cases = [("worker_lifecycle.py", {"hook_event_name": event, "session_id": "fixture", "agent_id": "a"}, 0)
+                 for event in ("SessionStart", "SubagentStart", "SubagentStop", "SessionEnd")]
+        cases += [("simulator_tool_guard.py", {"tool_name": "mcp__x__list_schemes"}, 0),
+                  ("simulator_tool_guard.py", {"tool_name": "mcp__x__boot" + SIM_SUFFIX}, 2)]
+        for interpreter in sorted(interpreters):
+            for name, payload, expected in cases:
+                with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
+                        tempfile.TemporaryDirectory() as workers:
+                    result = subprocess.run(
+                        [interpreter, str(HOOKS / name)], input=json.dumps(payload), text=True,
+                        capture_output=True, timeout=20,
+                        env=dict(os.environ, QVOICE_WORKER_DIRECTORY=workers,
+                                 CLAUDE_ENV_FILE=str(Path(workers) / "env")))
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    if name == "worker_lifecycle.py":
+                        json.loads(result.stdout)
+            with self.subTest(interpreter=interpreter, hook="agent_hook_input.py"):
+                payload = {"tool_name": "Bash", "tool_input": {"command": "git status"}, "cwd": str(ROOT)}
+                result = subprocess.run([interpreter, str(HOOKS / "agent_hook_input.py"), "git-policy"],
+                                        input=json.dumps(payload), text=True, capture_output=True, timeout=20)
+                self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
 
     def test_matchers_select_only_the_intended_tool_family(self):
         simulator_tool = "mcp__MobileBuildMCP__build" + SIM_SUFFIX

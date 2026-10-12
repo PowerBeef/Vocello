@@ -63,6 +63,34 @@ SessionStart output, worker receipts, the exported marker and SubagentStart/Stop
 session; this one started before the settings existed. `scripts/dev.sh doctor` reports Claude Code
 2.1.296 and finds the Axiom helpers.
 
+## Fresh-session results
+
+A resumed Claude Code 2.1.296 session at `b9f69907` showed the SessionStart banner, loaded `CLAUDE.md`
+in place of `AGENTS.md` and listed both agents. Two findings and the rest of the checks:
+
+- **TK-11 (fixed):** the session had no worker receipt and no `QVOICE_WORKER_SESSION`. Hook commands run
+  bare `python3`, which here is the macOS system Python 3.9. `worker_lifecycle.py` used a `str | None`
+  annotation without postponed evaluation and failed at import, so it registered nothing. The repository
+  already keeps bootstrap code 3.9-compatible (`select_python.py`). The fix adds postponed annotations,
+  and `test_agent_hooks.py` now runs every Python hook entry point under the host's default `python3`.
+  That test fails on the previous file.
+- **Leases:** with the fix, SubagentStart registered the session receipt and a worker lease. Inside a
+  trivial subagent `activeWorkers` was 1, and the agent received the agent rules. After SubagentStop it
+  returned to 0. Checked with the receipt's session key, tracking is available and
+  `active_workers.py check` passes.
+- **Guards and discovery:** the policy guard refused `git switch -c`. The generated-file guard refused a
+  Write under `docs/charts/`. An Edit whose old string was absent was rejected by the tool before any
+  hook ran, so it proves nothing about the guard. Reading a Swift source loaded `.claude/rules/native.md`
+  through its symlink. MobileBuildMCP offered only discovery, coverage and session tools.
+- **TK-12 (open):** MobileBuildMCP now persists defaults to `.mobilebuildmcp/config.yaml`. That suggests
+  the tracked `.xcodebuildmcp/config.yaml`, with its macOS and device profiles, may no longer be read.
+  This is unverified. Renaming or duplicating it would also enable build tools that bypass the native
+  lock, so it waits for a decision.
+
+Still outstanding:
+- The exported marker and receipt from a SessionStart that runs the fixed hook.
+- The user-facing `/hooks` and `/permissions` views.
+
 ## Carried forward
 
 CW-01 (generation signature) and CW-02 (live worker leases) stay fixed; CW-02's ownership check now

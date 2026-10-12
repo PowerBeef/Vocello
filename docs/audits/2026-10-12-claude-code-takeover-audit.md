@@ -53,12 +53,15 @@ Swift sources were not changed. The fresh-session activation check listed below 
 - Edits to the tracked `.claude/settings.json` applied to the running session immediately.
 - The wildcard deny rules removed the session's unsupported-destination MobileBuildMCP tools (including
   list, record and app-path variants, screenshot, UI snapshot and clean) and the three Axiom agents.
-- A denied staging command (`git add -A -n`) was refused before it ran.
+- A denied staging command (`git add -A -n`) was refused before it ran, and a harmless `echo` naming a
+  simulator lifecycle command was blocked by the live `policy_guard.sh` PreToolUse hook, which cited
+  `CLAUDE.md: Physical iPhone only`. The commits after `c5f8e290` passed through the live commit lint.
 - The tooling rule loaded through its `.claude/rules` symlink when `CLAUDE.md` was written, and the six
   skills were listed as soon as they moved.
 
 SessionStart output, worker receipts, the exported marker and SubagentStart/Stop leases need a new
-session; this one started before the settings existed.
+session; this one started before the settings existed. `scripts/dev.sh doctor` reports Claude Code
+2.1.296 and finds the Axiom helpers.
 
 ## Carried forward
 

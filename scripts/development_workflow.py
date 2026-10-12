@@ -93,8 +93,10 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     consumer, or tooling everything depends on changed, the whole suite runs.
     """
     root = root or ROOT
-    agent_inputs = [p for p in paths if p.startswith((".agents/", ".codex/", ".claude/"))
-                    and p.endswith((".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"))]
+    classify_changes = _load("scripts/ci/classify_changes.py")
+    agent_inputs = [p for p in paths if (p.startswith(classify_changes.AGENT_CONFIG_PREFIXES)
+                                         and p.endswith(classify_changes.AGENT_CONFIG_SUFFIXES))
+                    or p in classify_changes.RULE_SOURCES]
     # Top-level benchmark contracts (record schemas, hardware profiles) are read
     # by the registry tests; published records under benchmarks/runs/ are not.
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))

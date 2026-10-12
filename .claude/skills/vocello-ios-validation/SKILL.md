@@ -1,9 +1,12 @@
 ---
 name: vocello-ios-validation
 description: Validate an iOS change with the smallest repository compile or physical-iPhone XCUITest lane; use for iOS acceptance and targeted device UI verification.
+argument-hint: "[lane from scripts/ui_test.sh help] [options]"
 ---
 
 # iOS validation
+
+Arguments: $ARGUMENTS
 
 Read docs/reference/native-engineering.md, docs/reference/ios-device-testing.md and
 the applicable Axiom build/testing guidance. Commands run from the repository root.
@@ -14,5 +17,6 @@ and probe reachability with `python3 scripts/lib/ios_coredevice_probe.py probe`;
 When lifecycle tracking is unavailable, declare `QVOICE_LEAD_ONLY=1` only after joining all workers.
 Explain the lane and expected device interaction, then run `scripts/ui_test.sh ios <lane> <options>`.
 Use installed models; new large downloads need specific authorization. Preserve failed artifacts.
-Read `scripts/dev.sh triage <run-directory> --json`; report the actual verdict and evidence path.
+Read `scripts/dev.sh triage <run-directory> --json` (the read-only `vocello-xcresult-triage` agent can
+take the run directory); report the actual verdict and evidence path.
 Never retry silently; a justified rerun gets a new ID and explanation. No Simulator or MCP UI driving.

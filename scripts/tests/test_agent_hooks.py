@@ -10,7 +10,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -954,56 +953,85 @@ class SessionStartTests(unittest.TestCase):
                                         env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
                                         capture_output=True, text=True, timeout=15)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn("AGENTS.md: Start here", result.stdout)
+                self.assertIn("CLAUDE.md: Start here", result.stdout)
                 self.assertIn("local-status", result.stdout)
                 self.assertIn("Checkpoint", result.stdout)
                 self.assertFalse((root / "unexpected-operation").exists())
 
 
 class ProjectSkillTests(unittest.TestCase):
-    def test_skills_use_codex_discovery_and_supported_metadata(self):
-        skills = sorted((ROOT / ".agents/skills").glob("*/SKILL.md"))
-        self.assertEqual({p.parent.name for p in skills}, {
-            "vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",
-            "vocello-benchmark", "vocello-debug", "vocello-release-readiness",
-        })
+    SKILLS = {"vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",
+              "vocello-benchmark", "vocello-debug", "vocello-release-readiness"}
+
+    def test_skills_use_claude_discovery_and_supported_metadata(self):
+        skills = sorted((ROOT / ".claude/skills").glob("*/SKILL.md"))
+        self.assertEqual({p.parent.name for p in skills}, self.SKILLS)
         for path in skills:
             with self.subTest(skill=path.parent.name):
                 metadata = frontmatter(path)
-                self.assertEqual(set(metadata), {"name", "description"})
+                self.assertTrue({"name", "description", "argument-hint"} <= set(metadata))
+                self.assertTrue(set(metadata) <= {"name", "description", "argument-hint", "disable-model-invocation"})
                 self.assertEqual(metadata["name"], path.parent.name)
                 self.assertTrue(metadata["description"])
-                self.assertIn("scripts/", path.read_text(encoding="utf-8"))
-                policy = path.parent / "agents/openai.yaml"
-                self.assertTrue(policy.is_file())
-                self.assertRegex(policy.read_text(encoding="utf-8"), r"allow_implicit_invocation:\s*true")
+                self.assertTrue(metadata["argument-hint"].strip('"'))
+                # Local validation is authorized, so no skill is hidden from the model.
+                self.assertIn(metadata.get("disable-model-invocation", "false"), ("false",))
+                body = path.read_text(encoding="utf-8")
+                self.assertIn("$ARGUMENTS", body)
+                self.assertIn("scripts/", body)
+                self.assertEqual([p.name for p in path.parent.iterdir()], ["SKILL.md"])
 
 
 class SubagentTests(unittest.TestCase):
+    WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"}
+
     def test_project_subagents_are_read_only_and_inherit_the_selected_model(self):
-        agents = sorted((ROOT / ".codex/agents").glob("*.toml"))
+        agents = sorted((ROOT / ".claude/agents").glob("*.md"))
         self.assertEqual({p.stem for p in agents}, {"vocello-swift-review", "vocello-xcresult-triage"})
         for path in agents:
             with self.subTest(agent=path.stem):
-                metadata = tomllib.loads(path.read_text(encoding="utf-8"))
+                metadata = frontmatter(path)
                 self.assertEqual(metadata["name"], path.stem)
                 self.assertTrue(metadata["description"])
-                self.assertEqual(metadata["sandbox_mode"], "read-only")
-                self.assertNotIn("model", metadata)
-                self.assertNotIn("model_reasoning_effort", metadata)
-                self.assertTrue(metadata["developer_instructions"])
-        configuration = tomllib.loads((ROOT / ".codex/config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(configuration["agents"]["max_concurrent_threads_per_session"], 4)
+                self.assertEqual(metadata["model"], "inherit")
+                tools = {tool.strip() for tool in metadata["tools"].split(",")}
+                self.assertFalse(tools & self.WRITE_TOOLS)
+                self.assertTrue({"Read", "Grep", "Glob"} <= tools)
+                for key in ("isolation", "permissionMode", "memory", "hooks", "mcpServers"):
+                    self.assertNotIn(key, metadata)
+                if path.stem == "vocello-swift-review":
+                    self.assertNotIn("Bash", tools)
 
 
 class RuleTests(unittest.TestCase):
-    def test_domain_guidance_is_explicitly_linked_from_agent_instructions(self):
-        instructions = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        for relative in ("docs/reference/native-engineering.md", "docs/reference/tooling-and-evidence.md"):
-            with self.subTest(path=relative):
+    RULES = {"native.md": "docs/reference/native-engineering.md",
+             "tooling.md": "docs/reference/tooling-and-evidence.md"}
+
+    def test_domain_guidance_is_linked_and_path_scoped(self):
+        instructions = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertTrue(instructions.startswith("# CLAUDE.md\n"))
+        tracked = set(subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True,
+                                     check=True).stdout.splitlines())
+        for rule, relative in self.RULES.items():
+            with self.subTest(rule=rule):
                 self.assertIn(relative, instructions)
-                self.assertTrue((ROOT / relative).is_file())
-        self.assertTrue((ROOT / "website/AGENTS.md").is_file())
+                link = ROOT / ".claude/rules" / rule
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(link.resolve(), (ROOT / relative).resolve())
+                patterns = [line.strip()[2:].strip().strip('"')
+                            for line in frontmatter(ROOT / relative)["paths"].splitlines() if line.strip()]
+                self.assertTrue(patterns)
+                for pattern in patterns:
+                    with self.subTest(pattern=pattern):
+                        self.assertTrue(any(fnmatch.fnmatch(name, pattern) for name in tracked), pattern)
+        self.assertEqual({p.name for p in (ROOT / ".claude/rules").iterdir()}, set(self.RULES))
+        website = (ROOT / "website/CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn("../CLAUDE.md", website)
+
+    def test_retired_codex_harness_is_not_tracked(self):
+        tracked = subprocess.run(["git", "ls-files", "--", ".codex", ".agents", "AGENTS.md", "website/AGENTS.md"],
+                                 cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+        self.assertEqual([name for name in tracked if (ROOT / name).exists()], [])
 
 
 if __name__ == "__main__":

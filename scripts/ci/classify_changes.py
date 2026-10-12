@@ -63,8 +63,12 @@ LANE_COMPANION_JOBS = {
     "swift": ("macOS ThreadSanitizer subset",),
 }
 
-# Tracked Codex configuration, skills and read-only agents.
-CODEX_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml")
+# Tracked Claude Code settings, skills, read-only agents and rules. The retired
+# Codex prefixes stay so a deletion or reintroduction still runs the hook tests.
+AGENT_CONFIG_PREFIXES = (".claude/", ".codex/", ".agents/")
+AGENT_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml")
+# Reference rules whose `paths:` front matter Claude Code loads through .claude/rules.
+RULE_SOURCES = ("docs/reference/native-engineering.md", "docs/reference/tooling-and-evidence.md")
 
 # Owned sources that no iOS target compiles. Anything else under Sources/ or
 # Tests/ can change the device build.
@@ -236,11 +240,13 @@ def _is_macos_ui(path: str) -> bool:
 
 
 def _is_python(path: str) -> bool:
-    # Codex hooks, skills and agents execute or
-    # route repository code; config-only changes must exercise the hook adapter
-    # and wiring tests even when no script changed.
-    if path.startswith((".codex/", ".agents/", ".claude/")):
-        return path.endswith(CODEX_CONFIG_SUFFIXES)
+    # Claude Code hooks, skills, agents and rules execute or route repository
+    # code; config-only changes must exercise the hook adapter and wiring tests
+    # even when no script changed.
+    if path.startswith(AGENT_CONFIG_PREFIXES):
+        return path.endswith(AGENT_CONFIG_SUFFIXES)
+    if path in RULE_SOURCES:
+        return True
     if path.startswith(QC_PATHS):
         return True
     if path.startswith("scripts/"):

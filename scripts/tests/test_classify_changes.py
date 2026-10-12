@@ -26,9 +26,11 @@ def git(cwd: Path, *arguments: str) -> str:
 
 
 class RoutingTests(unittest.TestCase):
-    def test_codex_configuration_routes_to_python_without_native_lanes(self) -> None:
-        for path in (".codex/hooks.json", ".agents/skills/vocello-ios-validation/SKILL.md", ".codex/agents/vocello-xcresult-triage.toml",
-                     ".codex/config.toml", ".agents/skills/vocello-debug/agents/openai.yaml"):
+    def test_agent_configuration_routes_to_python_without_native_lanes(self) -> None:
+        for path in (".claude/settings.json", ".claude/skills/vocello-ios-validation/SKILL.md",
+                     ".claude/agents/vocello-xcresult-triage.md", ".claude/rules/native.md",
+                     "docs/reference/native-engineering.md", "docs/reference/tooling-and-evidence.md",
+                     ".codex/hooks.json", ".agents/skills/vocello-debug/agents/openai.yaml"):
             with self.subTest(path=path):
                 lanes = MODULE.classify([path])
                 self.assertTrue(lanes["python"])

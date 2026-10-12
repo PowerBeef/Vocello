@@ -1,3 +1,15 @@
+---
+status: active
+owner: release-qa
+summary: Tooling, CI, packaging, benchmark and evidence rule; Claude Code loads it through .claude/rules/tooling.md when matching files are touched.
+paths:
+  - "scripts/**"
+  - ".github/**"
+  - "config/**"
+  - "benchmarks/**"
+  - ".claude/**"
+  - "CLAUDE.md"
+---
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 
 References, read only what the change needs: `docs/reference/development-workflow.md` (local loop and
@@ -148,7 +160,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   to make it pass, and never relax the status without a new dated decision.
 - **Assistant state stays external.** Sessions, memory, credentials and personal settings never enter
   Git, CI or evidence. Track only shared instructions, reviewed hooks, rules, skills and subagents.
-  Codex settings, skill and subagent metadata and agent configuration are executable
+  Claude Code settings, skill and subagent metadata and rule front matter are executable
   configuration: their changes route to the existing Python tests (`test_agent_hooks.py`).
 
 ## Common mistakes

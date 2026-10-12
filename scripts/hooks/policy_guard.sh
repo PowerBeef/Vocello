@@ -3,7 +3,7 @@
 #
 # Reads the hook JSON from stdin and inspects `tool_input.command`. It blocks
 # (exit 2, reason on stderr) the handful of shell commands that violate a hard
-# invariant in AGENTS.md regardless of intent:
+# invariant in CLAUDE.md regardless of intent:
 #
 #   * Simulator destinations and simulator lifecycle commands (Physical iPhone only)
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
@@ -58,7 +58,7 @@ if [[ "$lower_command" =~ $re_sim_destination ]] \
   || [[ "$lower_command" =~ $re_sim_app ]] \
   || [[ "$lower_command" =~ $re_simctl_lifecycle ]] \
   || [[ "$lower_command" =~ $re_sim_tools ]]; then
-  block "Simulator destinations are unsupported (AGENTS.md: Physical iPhone only)." \
+  block "Simulator destinations are unsupported (CLAUDE.md: Physical iPhone only)." \
     "Use the paired iPhone through scripts/ui_test.sh ios <lane> or scripts/ios_device.sh, or the macOS lanes."
 fi
 
@@ -67,7 +67,7 @@ fi
 # directory it runs in; it also reports a copy onto the generated project file.
 file_violation="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" file-policy)"
 if [[ "$file_violation" == build ]]; then
-  block "whole build-output deletion bypasses config/build-output-policy.json (AGENTS.md: Owned output)." \
+  block "whole build-output deletion bypasses config/build-output-policy.json (CLAUDE.md: Owned output)." \
     "Use scripts/clean_build_caches.sh with one selective --cache target, or the retention pruning it owns."
 fi
 
@@ -80,21 +80,21 @@ if [[ -n "$git_violation" ]]; then
   reason="${git_violation#*"$tab"}"
   case "$category" in
     force)
-      block "$reason (AGENTS.md: Main is the only published branch, Git/release)." \
+      block "$reason (CLAUDE.md: Main is the only published branch)." \
         "Push fast-forward commits only; CI required protects main." ;;
     push|config)
-      block "$reason; only main is ever pushed (AGENTS.md: Main is the only published branch)." \
+      block "$reason; only main is ever pushed (CLAUDE.md: Main is the only published branch)." \
         "Integrate agent branches into main locally, then push main; release tags are maintainer-run." ;;
     *)
-      block "$reason (AGENTS.md: Main is the only published branch)." \
-        "Work on main, or use a Codex-managed worktree and codex/ branch; the lead integrates it." ;;
+      block "$reason (CLAUDE.md: Main is the only published branch)." \
+        "Work on main, or use a Claude Code agent worktree (Agent isolation or EnterWorktree); the lead integrates it." ;;
   esac
 fi
 
 # 4. Generated project.
 re_pbxproj_write='(sed[[:space:]]+-[A-Za-z]*i|perl[[:space:]]+-[A-Za-z]*i|tee[[:space:]]|>>?[[:space:]]*)[^|;&]*project\.pbxproj'
 if [[ "$command_text" =~ $re_pbxproj_write ]] || [[ "$file_violation" == pbxproj ]]; then
-  block "QwenVoice.xcodeproj/project.pbxproj is generated (AGENTS.md: Generated project)." \
+  block "QwenVoice.xcodeproj/project.pbxproj is generated (CLAUDE.md: Generated project)." \
     "Edit project.yml and run ./scripts/regenerate_project.sh --fast."
 fi
 

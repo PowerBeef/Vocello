@@ -797,9 +797,6 @@
   ],
   "referencePolicy": {
     "scanRoots": [
-      "AGENTS.md",
-      ".agents",
-      ".codex",
       "CLAUDE.md",
       ".claude",
       ".github",

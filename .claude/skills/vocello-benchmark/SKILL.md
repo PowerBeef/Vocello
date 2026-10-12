@@ -1,16 +1,19 @@
 ---
 name: vocello-benchmark
 description: Run or assess a targeted Vocello performance, memory or audio-quality checkpoint using canonical benchmark definitions and compatible evidence.
+argument-hint: "<lane or benchmark id> [options]"
 ---
 
 # Benchmark checkpoint
+
+Arguments: $ARGUMENTS
 
 Read docs/reference/telemetry-and-benchmarking.md, docs/reference/testing-runbook.md,
 docs/reference/qc.md and docs/reference/tooling-and-evidence.md as relevant. Inspect the benchmark registry and
 script help before choosing the smallest applicable `scripts/macos_test.sh` or `scripts/ios_device.sh`
 lane. Source-bound measurements run on committed checkpoints with complete source identity,
 fixed seeds, optimized-build receipts, compatible baselines and required memory qualification.
-Join/stop workers first and keep host-wide native serialization. Performance, memory and model
+Join/stop every agent first (SubagentStop) and keep host-wide native serialization. Performance, memory and model
 inference/generation lanes retain load/memory preflight. Cache-only rescoring of existing audio/results
 uses `check_cache_only_host`: record load/pressure without blocking, retain ownership/native-lock
 checks, and make no latency or memory-qualification claim. If worker

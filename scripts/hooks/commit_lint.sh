@@ -100,13 +100,13 @@ while IFS= read -r line; do
   if (( in_main_checkout )); then
     [[ "$branch" == main ]] || block \
       "commits in the main checkout are made directly on main (current: ${branch:-detached HEAD})." \
-      "Return to main without discarding work; agent work belongs in a Codex-managed linked worktree."
+      "Return to main without discarding work; agent work belongs in a Claude Code agent worktree (.claude/worktrees/<name>)."
   elif (( in_agent_worktree )); then
     [[ "$branch" == worktree-* ]] || block \
       "agent worktrees commit only on their worktree-* branch (current: ${branch:-detached HEAD})." \
       "Create agent worktrees through Agent isolation or EnterWorktree; the lead integrates them."
   else
-    block "commits happen on main or in a registered Codex linked worktree (AGENTS.md)." \
+    block "commits happen on main or in a registered Claude Code agent worktree (CLAUDE.md: Main is the only published branch)." \
       "Use a registered worktree in this repository."
   fi
 

@@ -1,3 +1,19 @@
+---
+status: active
+owner: backend-and-platform
+summary: Native engineering rule for the engine, macOS app and iOS app; Claude Code loads it through .claude/rules/native.md when matching files are touched.
+paths:
+  - "Sources/**"
+  - "Packages/**"
+  - "Tests/**"
+  - "project.yml"
+  - "config/runtime-debug-knobs.json"
+  - "config/concurrency-safety.json"
+  - "config/runtime-refactor-contract.json"
+  - "config/model-artifact-receipts.json"
+  - "config/macos-entitlement-policy.json"
+  - "config/ios-control-audit.json"
+---
 # Native rule — engine, macOS app, iOS app
 
 References, read only what the change needs: `docs/reference/mlx-guide.md`,

@@ -1,9 +1,12 @@
 ---
 name: vocello-device-diagnostics
 description: Inspect or debug the paired physical iPhone through the repository headless device driver and retained diagnostics.
+argument-hint: "<verb from scripts/ios_device.sh help> [options]"
 ---
 
 # Physical-device diagnostics
+
+Arguments: $ARGUMENTS
 
 Read docs/reference/ios-device-testing.md and docs/reference/native-engineering.md. Use
 `scripts/ios_device.sh help` to select its current verb; begin with `doctor` or `device-state` when
@@ -13,5 +16,6 @@ Use a quiet committed checkpoint for measured bench/lang-bench/memory/profile la
 workers. No new models/downloads, distribution-candidate install/launch or external publication
 without specific authorization. Candidate acceptance uses the documented preinstalled-candidate route.
 Print only privacy-safe summaries; retain raw artifacts untracked. Classify the result and crash
-delta accurately. Never retry silently or replace failed evidence. Compatible MCP discovery/debug
-can assist under native serialization; repository scripts own the final evidence.
+delta accurately. Never retry silently or replace failed evidence. MobileBuildMCP discovery/debug, when
+its device workflows are enabled, can assist under native serialization; repository scripts own the
+final evidence.

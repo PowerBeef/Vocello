@@ -25,8 +25,8 @@ def commands(plan: dict) -> list[str]:
 
 class CheckPlanTests(unittest.TestCase):
     def test_prose_only_change_runs_no_native_lane(self) -> None:
-        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "AGENTS.md",
-                                  "docs/reference/native-engineering.md", ".agents/skills/vocello-ios-validation/SKILL.md"])
+        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "CLAUDE.md",
+                                  "docs/reference/native-engineering.md", ".claude/skills/vocello-ios-validation/SKILL.md"])
         joined = commands(plan)
         self.assertFalse(any("macos_test.sh" in c or "build_foundation_targets" in c for c in joined))
         self.assertIn("git diff --check", joined)
@@ -152,9 +152,11 @@ class LintTests(unittest.TestCase):
 
 
 class PythonSelectionTests(unittest.TestCase):
-    def test_codex_configuration_selects_agent_hook_tests_even_when_added_or_deleted(self) -> None:
-        for path in (".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md", ".codex/agents/xcresult-triage.toml",
-                     ".codex/config.toml", ".codex/removed.yaml", ".agents/new.yml", ".claude/settings.json"):
+    def test_agent_configuration_selects_agent_hook_tests_even_when_added_or_deleted(self) -> None:
+        for path in (".claude/settings.json", ".claude/skills/vocello-ios-validation/SKILL.md",
+                     ".claude/agents/vocello-xcresult-triage.md", ".claude/rules/native.md",
+                     "docs/reference/tooling-and-evidence.md", ".claude/removed.yaml",
+                     ".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")
@@ -182,7 +184,7 @@ class PythonSelectionTests(unittest.TestCase):
         self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")
 
     def test_instruction_changes_do_not_select_python(self) -> None:
-        for path in ("AGENTS.md", "website/AGENTS.md", "docs/reference/development-workflow.md"):
+        for path in ("CLAUDE.md", "website/CLAUDE.md", "docs/reference/development-workflow.md"):
             with self.subTest(path=path):
                 self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 

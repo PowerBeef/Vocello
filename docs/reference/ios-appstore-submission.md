@@ -194,7 +194,8 @@ declaration lists are observations, not completed questionnaires.
 App Store Connect readiness is a manual, read-only pass: review the live app identity, platforms,
 category, pricing/availability, metadata, localizations and URLs, screenshots, review contact,
 content rights, age rating and version state in the App Store Connect web portal, or through the
-maintainer's asc-* skills (they drive the tddworks `asc` CLI; reads only, any write needs an explicit
+maintainer's `asc` plugin skills (rorkai's app-store-connect-cli-skills, which drive the Homebrew `asc`
+CLI from Rork; reads only, any write needs an explicit
 request). The repository pins no App Store Connect CLI and keeps no automated inventory. App Privacy
 publication, agreement/tax/banking readiness, DSA trader status and regional-compliance fields are
 owner/web checks; record an unavailable answer as pending, never as PASS. Keep only redacted outcomes

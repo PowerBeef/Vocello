@@ -299,12 +299,21 @@ arbitrary external programs.
 The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
 the routine loop: read-only Git, scoped staging and commits, worktree integration, `scripts/dev.sh`,
 contract and privacy scripts, pytest, the website check and the local `macos_test.sh`, `ui_test.sh` and
-`ios_device.sh` lanes. `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup,
-pinned-tool installation, benchmark publication, workflow dispatch, installers, global settings and
-external writes (GitHub, Vercel, App Store Connect, Hugging Face). `deny` covers force and non-main
-pushes, hand-made branches and worktrees, `update-ref`, stashing, broad staging, releases,
-`.xcodeproj` edits, unsupported-destination and UI-driving MCP tools (by wildcard, so no literal tool
-name enters the tree) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
+`ios_device.sh` lanes. It also covers read-only Hugging Face queries: the `hf` CLI's `version`,
+`auth whoami`, `models` and `datasets` card/info/list, `papers`, and `cache` list/verify, plus the
+`hf-mcp-server` read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`).
+
+`ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
+installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
+External writes include GitHub, the Vercel CLI and App Store Connect. On Hugging Face they include
+`hf download`/`upload`, `repos`, `cp`/`sync`/`buckets`, `jobs`/`sandbox`/`endpoints`, `spaces`,
+`collections`, `discussions`, `webhooks`, CLI `extensions`/`skills`/`update`, `auth login`/`logout`/
+`switch` and cache removal, and the MCP's Space-running tools (`dynamic_space`, `gr*`).
+
+`deny` covers force and non-main pushes, hand-made branches and worktrees, `update-ref`, stashing,
+broad staging, releases, `.xcodeproj` edits and `hf auth token`, which prints the stored credential. It
+also covers unsupported-destination and UI-driving MCP tools (by wildcard, so no literal tool name
+enters the tree) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
 wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
 overrides and cannot lift a tracked deny.
 
@@ -356,10 +365,13 @@ SubagentStart/Stop still need the fresh-session check.
 | Code review | The actual diff and the reference rules | vocello-swift-review; `/code-review`; `/security-review` for hooks, security, persistence and release |
 | Finished native run | `scripts/dev.sh triage <run-directory> --json` and testing-runbook.md | Read-only vocello-xcresult-triage agent, xcresulttool, LLDB when indicated |
 | Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | Verified Axiom axbuild, xcsym and xcprof helpers and the crash-analyzer agent, with script-only fallback |
-| Website | `npm --prefix website run check` | Claude in Chrome or chrome-devtools for local rendered inspection; relevant Vercel guidance |
+| Website | `npm --prefix website run check` | Claude in Chrome or chrome-devtools for local rendered inspection; Vercel deploys from Git (no Vercel plugin; the `vercel` CLI asks) |
 | Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
-| App Store/deployment/publication | Explicitly requested release workflow | Available asc-* / Vercel tools; reads do not authorize writes |
-| Model research | Receipts, exact pins and maintenance contracts | Hugging Face read-only metadata; no implied download or repin |
+| App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
+| Model research | Receipts, exact pins and maintenance contracts | The `hf` CLI and the `hf-mcp-server` MCP for hub search, cards, file sizes, licenses and papers; downloads, Space runs and Jobs need a specific request; no implied repin |
+| Audio quality | `scripts/qc.py`, labels and the maintainer's ear (`docs/reference/qc.md`) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
+| Code navigation | Source, tests and the reference rules | swift-lsp (clangd-lsp for C) through the LSP tool when a symbol server is configured (development-setup.md) |
+| Claude Code configuration | Tracked `.claude/`, `CLAUDE.md` and `scripts/tests/test_agent_hooks.py` | skill-creator for project skills; claude-md-management for `CLAUDE.md` upkeep; `/update-config` for settings |
 
 Detect capabilities in the current session rather than assuming installation means connection.
 MobileBuildMCP (the renamed XcodeBuildMCP) reads only `.mobilebuildmcp/config.yaml`, which enables its

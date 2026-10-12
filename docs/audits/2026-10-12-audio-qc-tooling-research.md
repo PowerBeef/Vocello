@@ -17,6 +17,14 @@ sourceOfTruth:
 **Research date:** October 12, 2026. **Repository baseline:**
 `73ee6c3ea4058534607d883161b82807a8b2e041`.
 
+**Updated** the same day after the maintainer changed the toolset:
+- Hugging Face now goes through the `hf` CLI and the `hf-mcp-server` MCP.
+- The Vercel, Hugging Face skills, Unity and playground plugins were uninstalled.
+- App Store Connect skills now come from the `asc` plugin.
+
+Section 3.10, the model sizes and licenses, and the LACI figures were re-checked through the Hugging
+Face MCP.
+
 For months the audio QC harness has missed defects the maintainer hears immediately. It has gone
 through Fast QC v1–v8, the Gemini/`agy` "ear", a DSP prosody gate, NISQA, QC v1 / Stage 0 with
 12 shadow judges, and the QC v2 rebuild. QC v2 has been report-only since October 6, and RF-14, the
@@ -91,7 +99,7 @@ MFA and Learn-then-Test.
    - The pinned `mlx-audio` 0.5.7 in the QC environment ships Parakeet, Qwen3-ForcedAligner, Canary,
      Voxtral and Granite.
    - FCPE, SwiftF0, ReDimNet2+, ZIPA and wav2vec2-espeak are installed.
-   - Missing are two model downloads, some in-house code, and labels.
+   - Missing are two model downloads (about 3.8–4.3 GB together), some in-house code, and labels.
 6. **Claude cannot hear audio.**
    - The right Claude Code integration is a thin project skill over `scripts/qc.py`. It renders
      spectrogram, F0 and alignment images that Claude reads and explains, without issuing verdicts.
@@ -266,9 +274,17 @@ mixed-precision Speed tier.
   No study covers accent or artifacts.
 
 **P6 — LACI.** Action: **Pilot**, reimplemented in the MLX loop.
-- **Finding:** [LACI](https://arxiv.org/abs/2609.16989) watches Qwen3-TTS's own alignment heads.
-  Detecting pacing problems and rolling back cut catastrophic long-form failures from 26% to under 1%.
-- **Evidence:** The effect is small under 500 words. The code is not released.
+- **Finding:** [LACI](https://arxiv.org/abs/2609.16989) ("Taming Long-form Text-to-Speech", Argmax)
+  watches Qwen3-TTS's own alignment heads, detects errors in near real time, rolls back to the onset and
+  regenerates with temporary guardrails.
+- **Evidence:**
+  - On Qwen3-TTS-0.6B prompts over 1,500 words, worst-of-10-seed WER fell from 35.2% to 3.4%. That
+    is better than the model's 5.4% on prompts under 500 words.
+  - With 120 s clone references, worst-of-N windowed speaker similarity rose from 0.01 to 0.47, and
+    catastrophic generations (WER above 30%) fell from 26% to under 1%.
+  - The gains are reported for long prompts and long references, so Vocello's short takes may benefit
+    less.
+  - Its Hugging Face paper page links no code or model (checked 2026-10-12).
 
 **P7 — Best-of-N.** Action: an explicit, user-visible mode only (a decision).
 - **Finding:** Generate N takes and pick one using ASR plus speaker similarity.
@@ -472,13 +488,27 @@ integration therefore takes one of two routes:
 | [gemini-audio-upload](https://glama.ai/mcp/servers/unscene/gemini-audio-upload) | Uploads audio to Gemini | — | Pattern for L4, if cloud use is allowed |
 | mcp_video_recognition, [Whissle](https://mcpservers.org/servers/WhissleAI/whissle-mcp), Deepgram MCP | Cloud ASR and video wrappers | — | Reject: cloud-only, nothing QC-specific |
 | [parakeet-mlx skill](https://mcp.directory/skills/parakeet-mlx) (openclaw/skills) | Local Parakeet v3 transcription | — | Pattern. Integrate Parakeet as a QC runner instead |
-| [Hugging Face MCP](https://huggingface.co/docs/hub/en/hf-mcp-server) | Hub search, Spaces as tools, Jobs | — | For model discovery only; enable when needed. Spaces and Jobs upload audio, so they need consent |
+| `hf` CLI and [`hf-mcp-server`](https://huggingface.co/docs/hub/en/hf-mcp-server) | The maintainer's Hugging Face route: hub search, model and dataset cards, file sizes, licenses and papers (CLI and MCP); Spaces as tools and Jobs | — | **Adopt for discovery and verification** before any download; this update's sizes and licenses came from it. Reads are allowed. `hf download`, Space runs (`dynamic_space`) and Jobs ask, because they install weights or send audio off the machine |
 | Praat MCP | — | — | None exists. HNR and CPP are easy to write in-house. Parselmouth is GPL; keep it in the venv only, like espeak-ng |
-| Plugins | No marketplace plugin targets TTS QC | — | Already useful: axiom (Apple Speech, Create ML), context7, and Claude in Chrome / chrome-devtools for testing the listening page (never for judging audio) |
+| Plugins | No marketplace plugin targets TTS QC | — | See the installed toolset below |
+
+**The installed toolset, after the maintainer's changes, and what it contributes to QC work:**
+- **axiom** and **sosumi:** `SpeechTranscriber`, Create ML and evaluation design (the axiom-ai skill).
+- **swift-lsp:** navigation for the Swift prevention fixes.
+- **skill-creator:** the `/vocello-qc-review` skill.
+- **context7:** library documentation.
+- **chrome-devtools-mcp** and **Claude in Chrome:** testing the listening page, never judging audio.
+- **pdf-viewer:** reading papers.
+- **Synced skills:**
+  - **deep-research** for literature refreshes;
+  - **mcp-builder** if an MCP ever becomes justified;
+  - **dataviz** and the **artifact** skills for evidence plots and the optional Artifact listening lab.
+- **Removed:** the Vercel, Hugging Face skills, Unity and playground plugins. They carried nothing
+  specific to QC; the `hf` CLI and `hf-mcp-server` cover the Hugging Face needs.
 
 **Recommendation: no new MCP server.**
-- Add a **`/vocello-qc-review` skill**, built with skill-creator in the existing `.claude/skills/vocello-*`
-  pattern. For a take or run, it:
+- Add a **`/vocello-qc-review` skill**, built with the installed skill-creator plugin in the existing
+  `.claude/skills/vocello-*` pattern. For a take or run, it:
   1. runs `qc.py` in report-only mode;
   2. renders evidence PNGs: waveform and spectrogram with word and phone alignment, F0 against the
      reference, per-vowel periodicity, entropy and codebook-cycle traces, and the flagged spans;
@@ -486,7 +516,9 @@ integration therefore takes one of two routes:
   4. queues the take for listening.
 - The skill never issues a verdict: Claude's reading of spectrograms is unqualified.
 - An MCP server earns its place only for opt-in Gemini triage, or for exposing labels to a claude.ai
-  page.
+  page. The mcp-builder skill covers building one.
+- Track new checkpoints with the `hf` CLI and `hf-mcp-server` instead of browsing. Examples: a LACI
+  code release, a French CTC model, or Kyutai's MLX timestamps.
 
 ### 3.11 Listening, labeling and crowdsourcing: fixing the label shortage
 
@@ -551,7 +583,7 @@ Keep about 25% as a **protected panel** that is never used for tuning.
 | Layer | Components | New dependency or download |
 |---|---|---|
 | L1 | D1/D2/D3/D6 fixes, PA-16, clone-reference qualification, number verbalization, French voices and diction line | None |
-| L2 | Too-short/too-fast bound (folded into QC-08's Fast QC v9); introspection guards (entropy, codebook-0 cycles, EOS margin); Parakeet v3 round trip plus span re-transcription; aligner coverage; Whisper per-word probability; in-app SpeechTranscriber | Weights only: `parakeet-tdt-0.6b-v3` and `Qwen3-ForcedAligner-0.6B`, 0.6B parameters each (about 1.2 GB at bf16). mlx-audio 0.5.7 is already pinned |
+| L2 | Too-short/too-fast bound (folded into QC-08's Fast QC v9); introspection guards (entropy, codebook-0 cycles, EOS margin); Parakeet v3 round trip plus span re-transcription; aligner coverage; Whisper per-word probability; in-app SpeechTranscriber | Weights only. `mlx-community/parakeet-tdt-0.6b-v3`: 627M parameters, 2.51 GB of float32 weights. `Qwen3-ForcedAligner-0.6B`: 918M parameters despite the name; 1.84 GB at bf16 or 1.27 GB at 8-bit (`mlx-community`). Both licenses (CC-BY-4.0, Apache-2.0) were confirmed on the hub. mlx-audio 0.5.7 is already pinned |
 | L3 | GOP-SF plus WFST phone verifier with a French liaison lattice; phonation with the phrase-final exemption; wSIM and register; ctc-segmentation; LACI pacing; then trained span classifiers | ctc-segmentation (Apache-2.0) and one French CTC model (Apache-2.0) |
 | L4 | Gemini pairwise triage | API key and consent (opt-in) |
 | L5 | Listening lab, protocol v2, `/vocello-qc-review`, optional paid raters, Learn-then-Test | Tailscale or an Artifact (decision) |
@@ -613,7 +645,7 @@ RF-14 can be decided after Phase 1, with a measured defect rate. It does not nee
 | 2 | Where to host the listening lab | Local plus Tailscale, or a private Artifact if other raters will join |
 | 3 | Paid native-French raters (about $290 for 400 takes rated twice) | Yes, after Phase 0 proves the page |
 | 4 | Best-of-N | Keep "no hidden best-of-N"; allow an explicit, visible mode later |
-| 5 | Downloads: Parakeet v3 and Qwen3-ForcedAligner (about 1.2 GB each), registered in `config/qc/models.json` | Yes, at Phase 3 |
+| 5 | Downloads: Parakeet v3 (2.51 GB) and Qwen3-ForcedAligner (1.27–1.84 GB), through `hf download` and registered in `config/qc/models.json` | Yes, at Phase 3 |
 
 ## 7. Do not repeat
 
@@ -691,5 +723,5 @@ RF-14 can be decided after Phase 1, with a measured defect rate. It does not nee
 - Apple SpeechTranscriber's French accuracy.
 - Omnilingual ASR's French support.
 - The licenses of the ParaSpeechCLAP and YOLO-Stutter weights.
-- A release of the LACI code.
+- Whether LACI code exists anywhere other than its Hugging Face paper page, which links none.
 - Any accuracy figure for an audio LLM detecting single-syllable defects.

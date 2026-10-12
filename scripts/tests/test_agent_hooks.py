@@ -421,6 +421,37 @@ class PermissionTests(unittest.TestCase):
                      "Bash(git reset --hard*)", "Bash(hf download*)"):
             self.assertIn(rule, self.ask)
 
+    def test_hugging_face_cli_and_mcp_reads_are_allowed_while_writes_ask_and_the_token_stays_hidden(self):
+        def matches(command: str, rules: list[str], tool: str = "Bash") -> bool:
+            if tool != "Bash":
+                return any(fnmatch.fnmatchcase(command, rule) for rule in rules)
+            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
+                       for rule in rules)
+
+        reads = ("hf version", "hf auth whoami", "hf models info Qwen/Qwen3-ForcedAligner-0.6B",
+                 "hf models card nvidia/parakeet-tdt-0.6b-v3", "hf datasets info owner/corpus",
+                 "hf papers read 2609.16989", "hf cache ls", "hf cache verify owner/model")
+        writes = ("hf download owner/model", "hf upload owner/model .", "hf repos create owner/model",
+                  "hf repos delete owner/model", "hf cp ./a hf://owner/model/a", "hf sync ./a hf://buckets/o/b",
+                  "hf jobs run python:3.12 python -c 1", "hf endpoints deploy x", "hf spaces restart owner/space",
+                  "hf collections create Vocello", "hf discussions comment owner/model 1", "hf auth login",
+                  "hf cache rm model/owner/model", "hf skills add owner/skill", "hf update")
+        for command in reads:
+            with self.subTest(read=command):
+                self.assertTrue(matches(command, self.allow))
+                self.assertFalse(matches(command, self.ask) or matches(command, self.deny))
+        for command in writes:
+            with self.subTest(write=command):
+                self.assertTrue(matches(command, self.ask))
+                self.assertFalse(matches(command, self.allow))
+        self.assertTrue(matches("hf auth token", self.deny))
+        server = "mcp__hf-mcp-server__"
+        for tool in ("hf_fs", "hub_repo_search", "hub_repo_details", "hf_whoami"):
+            self.assertIn(server + tool, self.allow)
+            self.assertFalse(matches(server + tool, self.ask, tool="mcp"))
+        for tool in ("dynamic_space", "gr1_z_image_turbo_generate"):
+            self.assertTrue(matches(server + tool, self.ask, tool="mcp"), tool)
+
     def test_unsupported_destination_and_ui_driving_tools_are_denied_but_device_tools_are_not(self):
         server = "mcp__MobileBuildMCP__"
         denied = [server + name for name in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",

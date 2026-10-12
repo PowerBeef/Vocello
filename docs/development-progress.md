@@ -17,6 +17,28 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 12 — tool routing follows the maintainer's plugin changes
+
+**Setup changes.**
+- The Vercel, Hugging Face skills, Unity and playground plugins were uninstalled, not merely disabled.
+- The App Store Connect skills moved to the `asc` plugin.
+- The `hf` CLI and `hf-mcp-server` are now the Hugging Face route.
+
+**Permissions** (`.claude/settings.json`, with `test_agent_hooks.py` pinning the split):
+- Allowed: read-only `hf` and Hugging Face MCP queries.
+- Ask: Hugging Face downloads, uploads, and repo, Space, Job, credential and cache-removal actions.
+- Denied: `hf auth token`.
+- The dead Vercel plugin rule was dropped.
+
+**Docs.** `CLAUDE.md`, the workflow and setup references and the App Store submission guide describe
+the new toolset. The [tooling research](audits/2026-10-12-audio-qc-tooling-research.md) was re-checked
+through the Hugging Face MCP:
+- Parakeet v3 is 2.51 GB.
+- Qwen3-ForcedAligner has 918M parameters and is 1.27–1.84 GB.
+- The LACI figures now match its abstract.
+
+No code, model, download or push.
+
 ### October 12 — audio QC tooling research
 
 At the maintainer's request, a [tooling research report](audits/2026-10-12-audio-qc-tooling-research.md)

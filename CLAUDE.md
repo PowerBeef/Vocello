@@ -167,9 +167,12 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   `docs/reference/mlx-guide.md`. Retained crashes and traces: Axiom `xcsym`/`xcprof` (never `xcui` or
   simulator agents). MobileBuildMCP runs only its discovery and coverage workflows
   (`.mobilebuildmcp/config.yaml`; never persist session defaults into it).
-  Website: Claude in Chrome or chrome-devtools for rendered inspection. CI and GitHub: `gh` and the
-  GitHub connector, reads by default. App Store Connect (asc-* skills), Vercel and Hugging Face: reads
-  only unless the user requests a write. Use the Workflow tool only on explicit opt-in. Missing optional
+  Website: Claude in Chrome or chrome-devtools for rendered inspection; Vercel deploys from Git and only
+  its CLI remains (no Vercel plugin). CI and GitHub: `gh` and the GitHub connector, reads by default.
+  Hugging Face: the `hf` CLI and the `hf-mcp-server` MCP (hub reads allowed; downloads, uploads, repo,
+  Space and Job actions ask; `hf auth token` is denied). App Store Connect: the `asc` plugin skills
+  over the Homebrew `asc` CLI. All of them stay read-only unless the user requests a write. Code
+  navigation: the swift-lsp plugin. Use the Workflow tool only on explicit opt-in. Missing optional
   tools never block the script workflow, and CI never depends on personal plugins.
 - **Interactive or maintainer-run commands** (logins, model installs, publication): prepare them and let
   the user run them with the `!` prefix.

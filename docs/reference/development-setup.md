@@ -156,17 +156,27 @@ Personal overrides go in the untracked `.claude/settings.local.json`; do not cha
 settings automatically. Agent worktrees under `.claude/worktrees` stay untracked.
 
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
-models or touching devices. Detect MCP tools in the live session. Installed Axiom, MLX, Sosumi,
-Context7, MobileBuildMCP (XcodeBuildMCP), browser and GitHub tools are optional assistance, never CI
-dependencies.
-Use existing plugins when connected; no duplicate servers or automatic global installs.
+models or touching devices. Detect MCP tools in the live session.
+
+The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-10-12 it is:
+
+- **Plugins:** axiom, context7, swift-lsp, clangd-lsp, chrome-devtools-mcp, skill-creator,
+  claude-md-management and asc.
+- **MCP servers:** MobileBuildMCP, sosumi and `hf-mcp-server`.
+- **Skills:** the swift-mlx skills.
+- **Browser and connectors:** Claude in Chrome and the claude.ai GitHub connector.
+- **CLIs:** `hf`, `asc` and `gh`.
+
+The Vercel, Hugging Face skills, Unity and playground plugins are uninstalled. Hugging Face work goes
+through the `hf` CLI and `hf-mcp-server`. Use existing plugins when connected; no duplicate servers or
+automatic global installs. Uninstall an unwanted plugin rather than disabling it in settings.
 `.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
 with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
 canonical builds and host serialization. Native UI uses only XCUITest.
 
-For a symbol server, `buildServer.json` is ignored because it holds machine paths. When explicitly
-setting up an installed xcode-build-server, its config can target the warm `build/cache/xcode/macos`
-arena. Optional setup never replaces pinned repository tools or authorizes installation/repinning.
+For a symbol server, `buildServer.json` is ignored because it holds machine paths. The swift-lsp
+plugin's sourcekit-lsp reads it for the LSP tool. When explicitly setting up an installed
+xcode-build-server, its config can target the warm `build/cache/xcode/macos` arena. Optional setup never replaces pinned repository tools or authorizes installation/repinning.
 
 ## Troubleshooting
 

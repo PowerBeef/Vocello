@@ -188,7 +188,7 @@
         "docs/reference/content-rights-review.md"
       ],
       "updated": "2026-10-12",
-      "notes": "Synthetic tests execute actual workflow blocks without real credentials or Apple/ASC calls; no account, release or purchase acceptance changed. September 8 authorized account setup: created NON_CONSUMABLE com.patricedery.vocello.design_clone_export (Design & Clone Export), USA base USD 19.99, Apple-managed automatic prices for 174 other territories, no manual regional overrides. Family Sharing was not enabled; API omits its flag, so UI readback remains pending. Product state MISSING_METADATA; localized details, availability, agreements/qualified decisions and physical/processed purchase acceptance remain open. No submission, live purchase, app price or phone change. Apple rejected the prior hyphenated identifier with no product created; corrected identifier is reflected in source and the isolated TEST fixture, with format regression coverage. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08)."
+      "notes": "Synthetic tests execute actual workflow blocks without real credentials or Apple/ASC calls; no account, release or purchase acceptance changed. September 8 authorized account setup: created NON_CONSUMABLE com.patricedery.vocello.design_clone_export (Design & Clone Export), USA base USD 19.99, Apple-managed automatic prices for 174 other territories, no manual regional overrides. Family Sharing was not enabled; API omits its flag, so UI readback remains pending. Product state MISSING_METADATA; localized details, availability, agreements/qualified decisions and physical/processed purchase acceptance remain open. No submission, live purchase, app price or phone change. Apple rejected the prior hyphenated identifier with no product created; corrected identifier is reflected in source and the isolated TEST fixture, with format regression coverage. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08). 2026-10-12: the maintainer is setting up the Paid Apps agreement, tax and banking now; the purchase stays in 3.0."
     },
     {
       "id": "RF-06",
@@ -845,7 +845,7 @@
       "id": "ASR-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Resolve Hugging Face processing and App Privacy disclosure",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-16",
       "gate": "Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.",
       "sourceOfTruth": [
@@ -858,13 +858,13 @@
         "commit:87636935"
       ],
       "updated": "2026-10-12",
-      "notes": "P1, source-proven plus legal review required. Apple requires third-party partner processing in the privacy answers; Hugging Face publicly describes automatic request/session metadata collection, but the repository cannot decide the applicable purpose and retention categories. Nothing has moved since 2026-08-27. (Earlier history: git log -p -- config/roadmap.json.)"
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. Remaining: the maintainer selects Data Not Collected in App Store Connect; ASR-11 reads it back."
     },
     {
       "id": "ASR-04",
       "plan": "release-first-3-0-2026-09",
       "title": "Bundle complete attributions and record content rights",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-16",
       "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
       "sourceOfTruth": [
@@ -884,7 +884,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-10-12",
-      "notes": "September 11 reconciliation: status corrected from planned to in-flight. The deterministic attribution manifest, its bundled in-app screen and the App Store Connect content-rights declaration are shipped (see notes); the open clauses are counsel decisions on previews, marketing audio and artwork, not unstarted work. P1/source-proven plus legal-review-required. Source remediation is complete for software and models: the exact 17-package resolution, owned-runtime license/NOTICE/origins, and six model-card identities generate one deterministic offline manifest; iOS bundles and displays it accessibly, and archive verification requires byte identity. On 2026-08-27 App Store Connect was set to and read back USES_THIRD_PARTY_CONTENT. Exact fork/base revisions, Apache-2.0 declarations, lineage, and modification notices are verified, but qualified review must still confirm license-delivery/NOTICE/trademark obligations and output/personality rights. Owner/counsel evidence remains required for built-in previews/speaker presentation, the voice-clone marketing source, other marketing audio/scripts, and original or licensed artwork."
+      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory prepared that day: built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested."
     },
     {
       "id": "ASR-05",
@@ -981,7 +981,10 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Prove reviewer access to immutable model hosting",
       "status": "planned",
-      "due": "2026-10-16",
+      "due": "2026-10-30",
+      "blockedBy": [
+        "RF-09"
+      ],
       "gate": "The exact anonymous catalog URLs must be probed from each distribution region the maintainer records as in scope for 3.0 (a recorded North-America-only scope, with the residual risk for other regions noted, satisfies this) for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.",
       "sourceOfTruth": [
         "Sources/Resources/qwenvoice_ios_model_catalog.json",
@@ -995,7 +998,7 @@
         "commit:87636935"
       ],
       "updated": "2026-10-12",
-      "notes": "The schema-v2 host contract validates pinned revisions, allowlisted redirects, exact remote totals, bounded-memory full SHA-256 streams, governed region labels, qualified execution provenance, freshness, and immutable no-fallback/no-substitution outage policy. On 2026-09-01 North America passed range and full-digest verification for all three largest 4-bit iOS files (4,024,541,635 bytes total; evidence SHA-256 1a4b00d19ff123dbae4979d5eeb171f27c7f1a796307efad00d6bcced91d1d82) with no retry or rate-limit response header. The local evidence does not claim regional closure: the composer requires fresh full-digest evidence for North America, Europe, and East Asia from qualified external execution identities. Reviewer notes cover exact bytes, Wi-Fi and at least 4 GB free before each model install (corrected September 4 from the full-catalog admission policy), variable timing, cancellation/relaunch adoption, finishing setup, offline use, and support recovery. Europe/East Asia executions and ongoing monitoring remain external blockers. V26-11 source-grounding corrected local reviewer guidance only; it is not renewed host evidence, account verification or an admission-policy change."
+      "notes": "2026-10-12 maintainer decision: 3.0 is sold worldwide with North America as the verified download region (where App Review runs); Europe and East Asia stay unverified as a recorded residual risk (global CDN, support reports as the monitor, no paid hosts). The 2026-09-01 North America proof passed full digests for the three largest iOS files (4,024,541,635 bytes, no retry or rate limit). Reviewer notes already cover exact bytes, Wi-Fi, 4 GB free, cancellation/adoption, offline use and recovery. Remaining: a fresh full-artifact North America proof within 24 hours of submission, after the freeze (about 4 GB; the maintainer's go first). Due moved from 2026-10-16 to 2026-10-30 because the decision is recorded and only that proof remains."
     },
     {
       "id": "ASR-10",

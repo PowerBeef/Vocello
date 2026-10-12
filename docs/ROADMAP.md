@@ -42,13 +42,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | — |
-| `ASR-04` | planned | Bundle complete attributions and record content rights | — |
+| `ASR-02` | in-flight | Resolve Hugging Face processing and App Privacy disclosure | — |
+| `ASR-04` | in-flight | Bundle complete attributions and record content rights | — |
 | `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `RF-12` |
 | `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `RF-12` |
 | `ASR-07` | planned | Complete final release logging, API, symbol, and analyzer hygiene | `ASR-10` |
 | `ASR-08` | planned | Prevent App Store build-number collisions | `RF-02` |
-| `ASR-09` | planned | Prove reviewer access to immutable model hosting | — |
+| `ASR-09` | planned | Prove reviewer access to immutable model hosting | `RF-09` |
 | `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `RF-09` |
 | `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `RF-02` |
 | `AUD-01` | planned | iOS launch and deep-link dead ends | — |
@@ -69,10 +69,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 ### Open items in detail
 
-- **`ASR-02`** (planned, due 2026-10-16) — Resolve Hugging Face processing and App Privacy disclosure.
+- **`ASR-02`** (in-flight, due 2026-10-16) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.
 
-- **`ASR-04`** (planned, due 2026-10-16) — Bundle complete attributions and record content rights.
+- **`ASR-04`** (in-flight, due 2026-10-16) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
 
 - **`ASR-05`** (planned, due 2026-10-30) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
@@ -87,7 +87,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`ASR-08`** (planned, due 2026-10-22) — Prevent App Store build-number collisions.
   gate: Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.
 
-- **`ASR-09`** (planned, due 2026-10-16) — Prove reviewer access to immutable model hosting.
+- **`ASR-09`** (planned, due 2026-10-30) — Prove reviewer access to immutable model hosting.
   gate: The exact anonymous catalog URLs must be probed from each distribution region the maintainer records as in scope for 3.0 (a recorded North-America-only scope, with the residual risk for other regions noted, satisfies this) for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
 
 - **`ASR-10`** (planned, due 2026-10-26) — Produce and verify the signed archive and exported IPA.

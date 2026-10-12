@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-24
-summary: Decision-ready evidence and qualified-review gates for downloadable Qwen model artifacts, built-in voice previews, marketing audio, product artwork, and the App Store Connect third-party-content declaration.
+reviewed: 2026-10-12
+summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.0 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
   - Sources/Resources/qwenvoice_production_model_catalog.json
@@ -22,6 +22,61 @@ September 6: iOS uploads require Xcode 26 or later and the iOS 26 SDK or later. 
 [privacy definition](https://developer.apple.com/app-store/app-privacy-details/) still requires
 consideration of third-party partner collection. No disclosure decision is inferred from local
 inference alone.
+
+## Maintainer decisions of 2026-10-12
+
+On 2026-10-12 the maintainer chose to decide the privacy and content-rights questions personally,
+with no paid counsel (the release plan, `docs/reference/release-first-execution-2026-09.md`). Where
+this document asks for counsel or a "qualified reviewer", read it as the maintainer's recorded
+decision. Each decision records its factual basis; none is a legal opinion.
+
+### ASR-02: App Privacy label is "Data Not Collected"
+
+The facts below were verified in source at `d1c5fb7b`:
+- **No tracking, analytics or advertising code.** `PrivacyInfo.xcprivacy` declares no tracking and no
+  collected data types.
+- **The model download is the app's only own network path.** `HuggingFaceDownloader` makes anonymous
+  HTTPS requests for pinned files to `huggingface.co` and its allowlisted CDN hosts, with no account,
+  token or cookie. It sends only byte-range headers beyond the system defaults, and receives nothing
+  but the model files.
+- **Hugging Face's own libraries make no network calls in the shipped app.** Its open-source Swift
+  libraries (`swift-huggingface`, the `Hub` module of `swift-transformers`) are compiled into the app
+  through the owned engine package, but production uses them only for local cache and configuration
+  types. The facade loads models from the prepared directory (`Runtime.swift` →
+  `TTS.loadModel(fromPreparedDirectory:)`). Their downloading entry points (`fromPretrained`,
+  `ModelUtils.resolveOrDownloadModel`, `resolveModelType`) are not reachable from it.
+- **Transcription stays on the device.** Reference transcription sets
+  `requiresOnDeviceRecognition = true`, so recorded audio, scripts, transcripts and outputs never
+  leave the device.
+- **Purchases go through Apple.** On iPhone, the export purchase uses StoreKit.
+
+Apple defines collection as data accessible to "you and/or your third-party partners" beyond what
+servicing the request needs. It defines third-party partners as vendors "whose code you've added to
+your app". It also states that an IP address sent on a server call and not retained needs no
+disclosure. Hugging Face serves the files as a host and logs requests under its own privacy policy.
+Vocello neither receives nor keeps that data, and no Hugging Face code that sends data runs in the
+app. The label is therefore "Data Not Collected".
+
+The website privacy policy discloses the downloads, Hugging Face's own request logging with a link to
+its policy, and Apple's handling of purchases. Revisit this decision if the app ever adds network
+code, an SDK, an account, analytics, or a non-Apple purchase path.
+
+### ASR-09: model downloads are verified for North America only
+
+3.0 is sold worldwide, but download verification covers North America only, where App Review runs.
+- **Existing evidence:** the North America proof of 2026-09-01 (full digests of the three largest
+  iOS files) is the evidence class.
+- **Before submission:** one fresh full-artifact North America proof runs within its 24-hour
+  freshness window. It downloads about 4 GB and needs the maintainer's go.
+- **Residual risk, accepted:** Europe and East Asia are unverified. Hugging Face serves through a
+  global CDN, and support reports from those regions are the monitor. No paid regional hosts are used.
+
+### ASR-04: per-asset attestations from the maintainer
+
+The maintainer attests each shipped asset's provenance in a private record, using the inventory
+prepared on 2026-10-12. The product artwork is mixed: own work, stock and AI-assisted. The tracked
+record keeps only a decision ID and the evidence digest. Every asset is either attested or replaced
+before submission.
 
 ## Account declaration
 
@@ -129,23 +184,22 @@ an external dependency, not an inferred approval. Publication/submission stays s
 ### September 6 owner checkpoint and timing
 
 Use the six decision rows above as one maintainer checkpoint, not repeated account polling.
-The release maintainer must identify the qualified privacy/IP reviewer and provide their recorded
-decisions; no reviewer is assumed to have been engaged. The account holder supplies pricing,
+Since 2026-10-12 the maintainer records these decisions directly; no paid reviewer is engaged. The account holder supplies pricing,
 territories, review contact and applicable agreement/regional decisions. The signing owner supplies
 the approved profile/private-key match and authorizes candidate operations separately. Record only
 sanitized decision, date, scope and evidence digest in the repository; private correspondence stays
 untracked. Missing responses keep ASR-02/04/08/10/11 blocked, not implicitly approved.
 
-ASR-09 also needs named execution providers in North America, Europe and East Asia. Arrange those
-operators now, but run the existing full-artifact host proofs only near submission: their freshness
-window is **24 hours**. Local probes cannot stand in for the other regions. Do not purchase hosts,
-send vendor/legal inquiries, edit account fields or accept agreements without separate authority.
+ASR-09 verifies North America only for 3.0 (see the 2026-10-12 decisions above). Run its
+full-artifact host proof only near submission: its freshness window is **24 hours**. Do not purchase
+hosts, send vendor or legal inquiries, edit account fields or accept agreements without separate
+authority.
 Repeat the manual read-only build-number check in App Store Connect immediately before archive, not
 continuously while waiting.
 
 ## Fail-closed release choices
 
-If qualified review cannot be obtained before submission:
+If the maintainer cannot attest an asset or decision before submission:
 
 - keep the App Store declaration as `USES_THIRD_PARTY_CONTENT`;
 - do not weaken or omit Apache-2.0 attribution and modification notices;

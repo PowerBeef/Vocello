@@ -17,6 +17,27 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 12 — step 1 decisions recorded
+
+The four decisions are recorded in the roadmap and in the
+[content-rights review](reference/content-rights-review.md#maintainer-decisions-of-2026-10-12):
+- **RF-02:** the maintainer is setting up the Paid Apps agreement, tax and banking, and the export
+  purchase stays in 3.0.
+- **ASR-02 (in flight):** the label is "Data Not Collected". The source facts were verified:
+  - the anonymous model download is the app's only own network path;
+  - Hugging Face's compiled-in libraries have no reachable downloading entry point;
+  - transcription is on-device only;
+  - purchases go through StoreKit.
+
+  The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases.
+  Remaining: select the label in App Store Connect.
+- **ASR-09:** downloads are verified for North America only, with worldwide sales and the residual
+  risk recorded. A fresh proof runs after the freeze (due October 30).
+- **ASR-04 (in flight):** the maintainer attests each asset group; the artwork is mixed.
+
+The maintainer has the step 1 worksheet (account checklist, purchase text drafts, asset groups with
+fingerprints). No code, model, device, account or push.
+
 ### October 12 — roadmap rebaselined onto the iOS 3.0 App Store submission
 
 **Why.** Between September 4 and October 12:

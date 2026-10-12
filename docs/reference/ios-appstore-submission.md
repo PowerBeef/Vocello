@@ -205,11 +205,13 @@ is complete.
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → Privacy & Permissions → Privacy Policy row links to the same URL).
-- [ ] **App Privacy "nutrition label"**: do not select **Data Not Collected** until ASR-02 closes.
-      Mic audio, transcripts, prompts, and generated audio remain local, but Hugging Face receives
-      network request metadata during model downloads. Record the vendor retention and qualified
-      privacy/legal determination, then make the App Store answers, `PrivacyInfo.xcprivacy`, policy,
-      and review notes agree. Apple requires third-party partner processing in the answers.
+- [ ] **App Privacy "nutrition label"**: select **Data Not Collected** (the maintainer's ASR-02
+      decision of 2026-10-12). The rationale and the source facts it rests on are in the
+      [content-rights review](content-rights-review.md#asr-02-app-privacy-label-is-data-not-collected).
+      Mic audio, transcripts, prompts and generated audio stay local; Hugging Face's request logging
+      during model downloads is its own processing as the host and is disclosed in the privacy
+      policy. `PrivacyInfo.xcprivacy`, the policy and the review notes already agree; revisit the
+      decision if the app adds network code, an SDK, an account, analytics or a non-Apple purchase path.
 - [ ] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
       and the 2026-09-04 API read returned no separate encryption-declaration resource. Answer "No"
       to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity), then verify

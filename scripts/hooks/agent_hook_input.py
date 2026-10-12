@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Normalize Codex hook input for the repository shell hooks.
+"""Normalize Claude Code hook input for the repository shell hooks.
 
 Bash calls expose the shell text as tool_input.command. File-edit tools expose
 their target as tool_input.file_path (Edit, Write, MultiEdit) or
-tool_input.notebook_path (NotebookEdit). Print one canonical absolute path per
-line. The git-actions mode prints every `git commit`/`git push` with the
-directory it runs in (the payload cwd, which follows an agent worktree unlike
-the hook installation, then `cd`, subshells and `git -C`); git-policy prints the
-first forbidden git invocation. Both use git_commands.py. Never execute or
-persist tool input. This is a guardrail adapter, not a sandbox.
+tool_input.notebook_path (NotebookEdit); any other tool fails closed. Print one
+canonical absolute path per line. The git-actions mode prints every
+`git commit`/`git push` with the directory it runs in (the payload cwd, which
+follows an agent worktree unlike $CLAUDE_PROJECT_DIR and the hook installation,
+then `cd`, subshells and `git -C`); git-policy prints the first forbidden git
+invocation. Both use git_commands.py. Never execute or persist tool input. This
+is a guardrail adapter, not a sandbox.
 """
 
 from __future__ import annotations
@@ -39,52 +40,14 @@ def edit_paths(payload: dict, root: Path) -> list[str]:
     cwd = Path(payload.get("cwd") or root)
     if not cwd.is_absolute():
         raise ValueError("hook cwd must be absolute")
-    if tool_name == "apply_patch":
-        command = tool_input.get("command")
-        if not isinstance(command, str) or not command.startswith("*** Begin Patch\n"):
-            raise ValueError("apply_patch needs a complete tool_input.command patch")
-        values = []
-        lines = command.rstrip("\n").splitlines()
-        if lines[-1] != "*** End Patch":
-            raise ValueError("apply_patch needs an end marker")
-        operation = None
-        moved = False
-        for line in lines[1:-1]:
-            header = False
-            for prefix in ("*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "):
-                if line.startswith(prefix):
-                    if prefix == "*** Move to: ":
-                        if operation != "update" or moved:
-                            raise ValueError("move target must follow an update")
-                        moved = True
-                    else:
-                        operation = prefix.split()[1].lower()
-                        moved = False
-                    values.append(line[len(prefix):])
-                    header = True
-                    break
-            if header:
-                continue
-            if operation == "add" and line.startswith("+"):
-                continue
-            if operation == "update" and (line.startswith(("@@", "+", "-", " "))
-                                          or line == "*** End of File"):
-                continue
-            raise ValueError("unreadable apply_patch file operation")
-        if not values:
-            raise ValueError("apply_patch needs file headers and an end marker")
-    else:
-        key = EDIT_PATH_KEYS.get(tool_name)
-        if key is None:
-            raise ValueError(f"cannot inspect tool {tool_name!r}")
-        values = [tool_input.get(key)]
-    paths = []
-    for value in values:
-        if not isinstance(value, str) or not value or any(c in value for c in "\n\r\0"):
-            raise ValueError(f"{tool_name} needs representable paths")
-        path = Path(value)
-        paths.append(str((path if path.is_absolute() else cwd / path).resolve()))
-    return paths
+    key = EDIT_PATH_KEYS.get(tool_name)
+    if key is None:
+        raise ValueError(f"cannot inspect tool {tool_name!r}")
+    value = tool_input.get(key)
+    if not isinstance(value, str) or not value or any(c in value for c in "\n\r\0"):
+        raise ValueError(f"{tool_name} needs a representable path")
+    path = Path(value)
+    return [str((path if path.is_absolute() else cwd / path).resolve())]
 
 
 def checkout_root(cwd: Path, fallback: Path) -> Path:
@@ -212,7 +175,8 @@ def file_policy(command: str, cwd: Path, root: Path, depth: int = 0) -> str:
 
     def resolve(base: str | None, word: str) -> str | None:
         for name, value in (("${PWD}", base), ("$PWD", base), ("${VOCELLO_PROJECT_ROOT}", root_path),
-                            ("$VOCELLO_PROJECT_ROOT", root_path)):
+                            ("$VOCELLO_PROJECT_ROOT", root_path), ("${CLAUDE_PROJECT_DIR}", root_path),
+                            ("$CLAUDE_PROJECT_DIR", root_path)):
             if word == name or word.startswith(name + "/"):
                 if value is None:
                     return None
@@ -317,27 +281,6 @@ def git_policy(payload: dict, root: Path) -> str:
         invocations = git_commands.git_invocations(command, cwd if cwd.is_absolute() else root)
         for invocation in invocations:
             category, reason = git_commands.policy_violation(invocation)
-            if category == "branch" and invocation.subcommand == "switch":
-                args = invocation.args
-                # Managed creation currently returns a detached checkout. Permit
-                # one non-resetting branch operation there, not on the lead.
-                if (len(args) in (2, 3) and args[0] in ("-c", "--create")
-                        and args[1].startswith("codex/") and len(args[1]) > 6
-                        and (len(args) == 2 or args[2] == "HEAD")
-                        and invocation.directory and not invocation.unsafe):
-                    import subprocess
-                    def metadata(where, flag):
-                        return subprocess.check_output(["git", "-C", str(where), "rev-parse",
-                                                        flag], text=True, stderr=subprocess.DEVNULL).strip()
-                    try:
-                        target_common = metadata(invocation.directory, "--git-common-dir")
-                        common = (invocation.directory / target_common).resolve()
-                        installed_common = (root / metadata(root, "--git-common-dir")).resolve()
-                        git_dir = Path(metadata(invocation.directory, "--absolute-git-dir")).resolve()
-                        if common == installed_common and git_dir.parent == common / "worktrees":
-                            category, reason = "", ""
-                    except (OSError, ValueError, subprocess.SubprocessError):
-                        pass  # Unverified ownership retains the original branch refusal.
             if category:
                 return f"{category}\t{reason}"
     except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex PostToolUse reminder. Actual freshness is enforced by the shared signature.
+# Claude Code PostToolUse reminder. Actual freshness is enforced by the shared signature.
 #
 # After project.yml changes (in the checkout or an agent worktree), remind the session that the Xcode project is
 # generated and the generation stamp must be refreshed before a checkpoint.

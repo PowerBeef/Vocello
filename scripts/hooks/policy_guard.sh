@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex PreToolUse hook (matcher: Bash): repository policy guard.
+# Claude Code PreToolUse hook (matcher: Bash): repository policy guard.
 #
 # Reads the hook JSON from stdin and inspects `tool_input.command`. It blocks
 # (exit 2, reason on stderr) the handful of shell commands that violate a hard
@@ -9,7 +9,7 @@
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
 #   * force pushes, pushes of any ref but main, hand-made branches and
 #     worktrees, and ref rewrites (Main is the only published branch; agent
-#     worktrees come only from Codex managed-worktree tools)
+#     worktrees come only from Claude Code Agent isolation or EnterWorktree)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
 #
 # Everything else exits 0 immediately. The Simulator, cache and pbxproj checks

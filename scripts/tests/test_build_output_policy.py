@@ -593,7 +593,9 @@ class BuildOutputPolicyTests(unittest.TestCase):
     def test_reference_validation_covers_claude_configuration_skills_and_rules(self) -> None:
         self.initialize_git()
         paths = (".codex/hooks.json", ".agents/skills/vocello-ios-validation/SKILL.md",
-                 ".codex/agents/vocello-xcresult-triage.toml", ".codex/config.toml")
+                 ".codex/agents/vocello-xcresult-triage.toml", ".codex/config.toml",
+                 ".claude/settings.json", ".claude/skills/vocello-ios-validation/SKILL.md",
+                 ".claude/agents/vocello-xcresult-triage.md", "CLAUDE.md")
         for name in paths:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)

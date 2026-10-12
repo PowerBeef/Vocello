@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/worker_lifecycle.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/session_start.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/commit_lint.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/policy_guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^(Edit|Write|MultiEdit|NotebookEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/generated_file_guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^mcp__",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/simulator_tool_guard.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Edit|Write|MultiEdit|NotebookEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/project_yml_reminder.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/worker_lifecycle.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/worker_lifecycle.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/worker_lifecycle.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git grep *)",
+      "Bash(git add *)",
+      "Bash(git mv *)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(git worktree list*)",
+      "Bash(git worktree prune*)",
+      "Bash(git worktree unlock .claude/worktrees/*)",
+      "Bash(git worktree remove .claude/worktrees/*)",
+      "Bash(git merge --ff-only worktree-*)",
+      "Bash(git cherry-pick *)",
+      "Bash(git branch -d worktree-*)",
+      "Bash(scripts/dev.sh *)",
+      "Bash(./scripts/dev.sh *)",
+      "Bash(python3 scripts/roadmap.py *)",
+      "Bash(scripts/regenerate_project.sh *)",
+      "Bash(./scripts/regenerate_project.sh *)",
+      "Bash(./scripts/check_project_inputs.sh *)",
+      "Bash(scripts/repo_invariants.sh)",
+      "Bash(scripts/hooks/commit_lint.sh --staged)",
+      "Bash(python3 scripts/privacy_scan.py *)",
+      "Bash(python3 scripts/build_output_policy.py *)",
+      "Bash(python3 scripts/refresh_derived_artifacts.py *)",
+      "Bash(python3 scripts/active_workers.py status)",
+      "Bash(python3 scripts/ci/*)",
+      "Bash(python3 -m pytest *)",
+      "Bash(npm --prefix website run *)",
+      "Bash(scripts/macos_test.sh *)",
+      "Bash(./scripts/macos_test.sh *)",
+      "Bash(scripts/ui_test.sh *)",
+      "Bash(./scripts/ui_test.sh *)",
+      "Bash(scripts/ios_device.sh *)",
+      "Bash(./scripts/ios_device.sh *)",
+      "Bash(scripts/build_foundation_targets.sh *)",
+      "Bash(./scripts/build_foundation_targets.sh *)",
+      "Bash(scripts/build_ui_test_bundles.sh *)",
+      "Bash(./scripts/build_ui_test_bundles.sh *)",
+      "Bash(xcrun xcresulttool *)",
+      "Bash(xcrun xccov *)",
+      "Bash(xcrun devicectl list *)",
+      "Bash(python3 scripts/lib/ios_coredevice_probe.py probe)",
+      "Bash(gh run view*)",
+      "Bash(gh run list*)",
+      "Bash(gh run watch*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh release view*)",
+      "Bash(gh release list*)"
+    ],
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git reset --hard*)",
+      "Bash(git restore *)",
+      "Bash(git checkout -- *)",
+      "Bash(git clean *)",
+      "Bash(git branch -D*)",
+      "Bash(git worktree remove --force*)",
+      "Bash(scripts/macos_test.sh models install*)",
+      "Bash(./scripts/macos_test.sh models install*)",
+      "Bash(scripts/macos_test.sh models ensure*)",
+      "Bash(./scripts/macos_test.sh models ensure*)",
+      "Bash(scripts/ui_test.sh * model-download*)",
+      "Bash(./scripts/ui_test.sh * model-download*)",
+      "Bash(scripts/clean_build_caches.sh*)",
+      "Bash(./scripts/clean_build_caches.sh*)",
+      "Bash(scripts/install_pinned_tools.sh*)",
+      "Bash(./scripts/install_pinned_tools.sh*)",
+      "Bash(python3 scripts/publish_benchmark_history.py*)",
+      "Bash(gh workflow run*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh issue create*)",
+      "Bash(gh api -X *)",
+      "Bash(gh api --method POST*)",
+      "Bash(gh api --method PATCH*)",
+      "Bash(gh api --method PUT*)",
+      "Bash(gh api --method DELETE*)",
+      "Bash(brew install*)",
+      "Bash(brew upgrade*)",
+      "Bash(pip install*)",
+      "Bash(pip3 install*)",
+      "Bash(python3 -m pip install*)",
+      "Bash(npm install*)",
+      "Bash(npm --prefix website install*)",
+      "Bash(swift package update*)",
+      "Bash(hf download*)",
+      "Bash(hf upload*)",
+      "Bash(huggingface-cli download*)",
+      "Bash(huggingface-cli upload*)",
+      "Bash(git config --global*)",
+      "Bash(defaults write*)",
+      "Bash(sudo *)",
+      "Bash(xcode-select -s*)",
+      "Bash(xcode-select --switch*)",
+      "Bash(vercel *)",
+      "Bash(asc *)",
+      "mcp__plugin_vercel_vercel__*",
+      "mcp__claude_ai_Github__create_*",
+      "mcp__claude_ai_Github__update_*",
+      "mcp__claude_ai_Github__delete_*",
+      "mcp__claude_ai_Github__push_files",
+      "mcp__claude_ai_Github__merge_pull_request",
+      "mcp__claude_ai_Github__fork_repository"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push --all*)",
+      "Bash(git push --mirror*)",
+      "Bash(git push --tags*)",
+      "Bash(git push --delete*)",
+      "Bash(git push -d *)",
+      "Bash(git push -u*)",
+      "Bash(git push --set-upstream*)",
+      "Bash(git push origin :*)",
+      "Bash(git push origin --delete*)",
+      "Bash(git push origin HEAD*)",
+      "Bash(git push origin worktree-*)",
+      "Bash(git checkout -b*)",
+      "Bash(git checkout -B*)",
+      "Bash(git switch -c*)",
+      "Bash(git switch -C*)",
+      "Bash(git switch --create*)",
+      "Bash(git update-ref*)",
+      "Bash(git worktree add*)",
+      "Bash(git stash*)",
+      "Bash(git add -A*)",
+      "Bash(git add --all*)",
+      "Bash(git add .)",
+      "Bash(git add -u*)",
+      "Bash(git add --update*)",
+      "Bash(git commit -a*)",
+      "Bash(git commit --all)",
+      "Bash(git commit --all *)",
+      "Bash(xcrun simctl boot*)",
+      "Bash(xcrun simctl create*)",
+      "Bash(rm -rf build)",
+      "Bash(rm -rf ./build)",
+      "Bash(rm -rf build/cache*)",
+      "Bash(scripts/release.sh*)",
+      "Bash(./scripts/release.sh*)",
+      "Bash(bash scripts/release.sh*)",
+      "Bash(gh release create*)",
+      "Bash(gh release edit*)",
+      "Bash(gh release delete*)",
+      "Bash(gh release upload*)",
+      "Edit(/QwenVoice.xcodeproj/**)",
+      "Edit(**/QwenVoice.xcodeproj/**)",
+      "mcp__*_sim",
+      "mcp__*_sim_*",
+      "mcp__*__sim_*",
+      "mcp__*_sims",
+      "mcp__MobileBuildMCP__screenshot",
+      "mcp__MobileBuildMCP__snapshot_ui",
+      "mcp__MobileBuildMCP__clean",
+      "mcp__MobileBuildMCP__tap",
+      "mcp__MobileBuildMCP__swipe",
+      "mcp__MobileBuildMCP__long_press",
+      "mcp__MobileBuildMCP__touch",
+      "mcp__MobileBuildMCP__type_text",
+      "mcp__MobileBuildMCP__button",
+      "mcp__MobileBuildMCP__gesture",
+      "mcp__MobileBuildMCP__key_press",
+      "mcp__MobileBuildMCP__key_sequence",
+      "Agent(axiom:simulator-tester)",
+      "Agent(axiom:test-runner)",
+      "Agent(axiom:test-debugger)"
+    ]
+  }
+}

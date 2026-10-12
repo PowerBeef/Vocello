@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Codex PreToolUse file guard, also callable with a hook JSON payload on stdin.
+# Claude Code PreToolUse file guard (Edit, Write, MultiEdit, NotebookEdit), also
+# callable with a hook JSON payload on stdin.
 #
 # Reads the normalized edit path and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one

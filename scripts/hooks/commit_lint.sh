@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex PreToolUse hook (Bash): commit and push lint; --staged runs it directly.
+# Claude Code PreToolUse hook (Bash): commit and push lint; --staged runs it directly.
 #
 # Fired for every Bash tool call. git_commands.py lists every `git commit` and
 # `git push` in the command (any global options, quoted `-C` paths, chains,
@@ -11,7 +11,8 @@
 # closed.
 #
 # Commits are allowed in exactly two places: the main checkout on `main`, and a
-# registered linked worktree on a `codex/*` branch, which the lead integrates.
+# registered linked worktree on a `worktree-*` branch (a Claude Code agent
+# worktree under .claude/worktrees), which the lead integrates.
 # Pushes are allowed only from the main checkout on `main`. Commits also need
 # clean whitespace in the staged diff and no private path or credential in the
 # staged blobs; a commit that takes more than the index holds when the hook runs
@@ -101,9 +102,9 @@ while IFS= read -r line; do
       "commits in the main checkout are made directly on main (current: ${branch:-detached HEAD})." \
       "Return to main without discarding work; agent work belongs in a Codex-managed linked worktree."
   elif (( in_agent_worktree )); then
-    [[ "$branch" == codex/* ]] || block \
-      "agent worktrees commit only on their codex/* branch (current: ${branch:-detached HEAD})." \
-      "Use a Codex-managed worktree and a scoped codex/ branch based on the lead checkpoint."
+    [[ "$branch" == worktree-* ]] || block \
+      "agent worktrees commit only on their worktree-* branch (current: ${branch:-detached HEAD})." \
+      "Create agent worktrees through Agent isolation or EnterWorktree; the lead integrates them."
   else
     block "commits happen on main or in a registered Codex linked worktree (AGENTS.md)." \
       "Use a registered worktree in this repository."

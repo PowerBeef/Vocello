@@ -1,7 +1,8 @@
-"""Exercise repository safeguards through Codex payloads and checked-in configuration."""
+"""Exercise repository safeguards through Claude Code payloads and checked-in configuration."""
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 from pathlib import Path
@@ -14,7 +15,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 HOOKS = ROOT / "scripts/hooks"
-SETTINGS = ROOT / ".codex/hooks.json"
+SETTINGS = ROOT / ".claude/settings.json"
+EDIT_TOOLS = {"Edit": "file_path", "Write": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
+EDIT_MATCHER = "^(Edit|Write|MultiEdit|NotebookEdit)$"
 
 
 def fixture_hooks(root):
@@ -26,28 +29,29 @@ def fixture_hooks(root):
     return hooks
 
 
-def invoke(name, tool_input, *, tool_name="apply_patch", cwd=None, root=ROOT, event="PreToolUse"):
+def invoke(name, tool_input, *, tool_name="Edit", cwd=None, root=ROOT, event="PreToolUse"):
     payload = {"hook_event_name": event, "tool_name": tool_name,
                "tool_input": tool_input, "cwd": str(cwd or root)}
     hooks = fixture_hooks(root)
     interpreter = "python3" if name.endswith(".py") else "bash"
     return subprocess.run(
         [interpreter, str(hooks / name)], input=json.dumps(payload), text=True, capture_output=True,
-        cwd=cwd or root, timeout=20, env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(root)),
+        cwd=cwd or root, timeout=20,
+        env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(root), CLAUDE_PROJECT_DIR=str(root)),
     )
 
 
-def edit(path, operation="update", *, move_to=None):
-    header = {"add": "Add", "update": "Update", "delete": "Delete"}[operation]
-    lines = ["*** Begin Patch", f"*** {header} File: {path}"]
-    if move_to is not None:
-        lines.append(f"*** Move to: {move_to}")
-    if operation == "add":
-        lines.append("+fixture")
-    elif operation == "update":
-        lines.extend(["@@", "-before", "+after"])
-    lines.append("*** End Patch")
-    return {"command": "\n".join(lines) + "\n"}
+def edit(path, tool="Edit"):
+    return {EDIT_TOOLS[tool]: path}
+
+
+def matches(matcher: str, tool: str) -> bool:
+    """Claude Code matcher semantics: `*`/empty match all, a plain name list is exact, else a regex."""
+    if matcher in ("", "*"):
+        return True
+    if re.fullmatch(r"[A-Za-z0-9_|, -]+", matcher):
+        return tool in {part.strip() for part in re.split(r"[|,]", matcher)}
+    return re.search(matcher, tool) is not None
 
 
 def initialize_repo(root):
@@ -80,14 +84,15 @@ GENERATED = ("docs/ROADMAP.md", "QwenVoice.xcodeproj/project.pbxproj",
              "docs/charts/architecture-dark.svg", "benchmarks/HISTORY.md",
              "Packages/VocelloQwen3Core/CURRENT_INVENTORY.json",
              "Packages/VocelloQwen3Core/FACADE_API_BASELINE.json")
+SIM_SUFFIX = "_" + "sim"
 
 
 class EditGuardTests(unittest.TestCase):
-    def test_every_patch_operation_is_refused_on_generated_files(self):
-        for operation in ("add", "update", "delete"):
+    def test_every_edit_tool_is_refused_on_generated_files(self):
+        for tool in EDIT_TOOLS:
             for path in GENERATED:
-                with self.subTest(operation=operation, path=path):
-                    result = invoke("generated_file_guard.sh", edit(path, operation))
+                with self.subTest(tool=tool, path=path):
+                    result = invoke("generated_file_guard.sh", edit(path, tool), tool_name=tool)
                     self.assertEqual(result.returncode, 2, result.stderr)
                     self.assertIn("Regenerate", result.stderr)
 
@@ -113,7 +118,8 @@ class EditGuardTests(unittest.TestCase):
             root = Path(tmp).resolve() / "main checkout"
             initialize_repo(root)
             worktree = root.parent / "agent workspace"
-            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "codex/agent", str(worktree)], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "worktree-agent", str(worktree)],
+                           check=True)
             for path, cwd in ((str(worktree / "docs/ROADMAP.md"), root),
                               ("docs/ROADMAP.md", worktree),
                               (str(worktree / "benchmarks/runs/x.json"), root)):
@@ -130,25 +136,13 @@ class EditGuardTests(unittest.TestCase):
                 self.assertEqual(invoke("generated_file_guard.sh", edit(path)).returncode, 2)
 
     def test_ordinary_files_with_spaces_are_allowed(self):
-        for path in ("AGENTS.md", "docs/reference/native-engineering.md", "docs/ordinary file.md",
+        for path in ("CLAUDE.md", "docs/reference/native-engineering.md", "docs/ordinary file.md",
                      "scripts/tool.py", "benchmarks/README.md"):
-            for operation in ("add", "update", "delete"):
-                with self.subTest(operation=operation, path=path):
-                    result = invoke("generated_file_guard.sh", edit(path, operation))
+            for tool in EDIT_TOOLS:
+                with self.subTest(tool=tool, path=path):
+                    result = invoke("generated_file_guard.sh", edit(path, tool), tool_name=tool)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout, "")
-
-    def test_every_file_in_a_multi_file_patch_is_guarded(self):
-        ordinary = edit("docs/ordinary file.md", "add")["command"].splitlines()[1:-1]
-        generated = edit("docs/ROADMAP.md")["command"].splitlines()[1:-1]
-        for body in ([*ordinary, *generated], [*generated, *ordinary]):
-            command = "\n".join(["*** Begin Patch", *body, "*** End Patch", ""])
-            result = invoke("generated_file_guard.sh", {"command": command})
-            self.assertEqual(result.returncode, 2, result.stderr)
-        other = edit("scripts/ordinary.py")["command"].splitlines()[1:-1]
-        command = "\n".join(["*** Begin Patch", *ordinary, *other, "*** End Patch", ""])
-        result = invoke("generated_file_guard.sh", {"command": command})
-        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_project_root_fallback_works_without_an_environment_override(self):
         with tempfile.TemporaryDirectory(prefix="vocello fallback hooks ") as tmp:
@@ -158,36 +152,28 @@ class EditGuardTests(unittest.TestCase):
             hooks = fixture_hooks(root)
             environment = dict(os.environ)
             environment.pop("VOCELLO_PROJECT_ROOT", None)
+            environment.pop("CLAUDE_PROJECT_DIR", None)
             for path, expected in (("../docs/ROADMAP.md", 2), ("../docs/ordinary file.md", 0)):
-                payload = {"hook_event_name": "PreToolUse", "tool_name": "apply_patch",
-                           "tool_input": edit(path), "cwd": str(root / "website")}
+                payload = {"hook_event_name": "PreToolUse", "tool_name": "Write",
+                           "tool_input": edit(path, "Write"), "cwd": str(root / "website")}
                 result = subprocess.run(["bash", str(hooks / "generated_file_guard.sh")],
                                         input=json.dumps(payload), text=True, capture_output=True,
                                         cwd=root / "website", env=environment, timeout=20)
                 self.assertEqual(result.returncode, expected, result.stderr)
 
-    def test_rename_source_and_destination_are_both_guarded(self):
-        for source, destination in (("docs/ordinary file.md", "docs/ROADMAP.md"),
-                                    ("docs/ROADMAP.md", "docs/ordinary file.md")):
-            with self.subTest(source=source, destination=destination):
-                result = invoke("generated_file_guard.sh", edit(source, move_to=destination))
-                self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertEqual(invoke("generated_file_guard.sh", edit("docs/ordinary file.md", move_to="docs/moved file.md")).returncode, 0)
-
     def test_uninspectable_input_fails_closed(self):
-        inputs = [{}, {"command": 5}, {"command": ""}, {"command": "not a patch"},
-                  {"command": "*** Begin Patch\n*** End Patch\n"},
-                  {"command": "*** Begin Patch\n*** Add File: docs/a.md\n+content\n"},
-                  {"command": "*** Begin Patch\n*** Add File: \n+x\n*** End Patch\n"},
-                  {"command": "*** Begin Patch\n*** Add File: docs/a.md\ninvalid body\n*** End Patch\n"},
-                  {"command": "*** Begin Patch\n*** Update File: docs/a.md\n*** Move to: docs/b.md\n*** Move to: docs/c.md\n@@\n-x\n+y\n*** End Patch\n"},
-                  {"command": "*** Begin Patch\n*** Unexpected File: docs/a.md\n*** End Patch\n"}]
-        for tool_input in inputs:
-            with self.subTest(value=tool_input):
-                result = invoke("generated_file_guard.sh", tool_input)
+        for tool_name, tool_input in (("Edit", {}), ("Edit", {"file_path": 5}), ("Edit", {"file_path": ""}),
+                                      ("Write", {"file_path": "docs/a\nb.md"}), ("Edit", {"notebook_path": "a.ipynb"}),
+                                      ("NotebookEdit", {"file_path": "docs/a.ipynb"}), ("Edit", "not an object")):
+            with self.subTest(tool=tool_name, value=tool_input):
+                result = invoke("generated_file_guard.sh", tool_input, tool_name=tool_name)
                 self.assertEqual(result.returncode, 2, result.stderr)
-        result = invoke("generated_file_guard.sh", edit("docs/ordinary.md"), tool_name="UnknownTool")
-        self.assertEqual(result.returncode, 2, result.stderr)
+        # Unknown tools, including the retired Codex patch tool, are not inspectable.
+        patch = {"command": "*** Begin Patch\n*** Update File: docs/ordinary.md\n@@\n-a\n+b\n*** End Patch\n"}
+        for tool_name, tool_input in (("UnknownTool", edit("docs/ordinary.md")), ("apply_patch", patch)):
+            with self.subTest(tool=tool_name):
+                result = invoke("generated_file_guard.sh", tool_input, tool_name=tool_name)
+                self.assertEqual(result.returncode, 2, result.stderr)
         for payload in ("not json", "[]", '"not an object"', "null"):
             with self.subTest(payload=payload):
                 result = subprocess.run(["bash", str(HOOKS / "generated_file_guard.sh")], input=payload, text=True,
@@ -196,15 +182,13 @@ class EditGuardTests(unittest.TestCase):
 
     def test_regeneration_reminder_follows_specification_and_membership_inputs(self):
         for path in ("project.yml", str(ROOT / "project.yml"), "Sources/Fixture.swift", "Tests/New Test.swift"):
-            for operation in ("add", "update", "delete"):
-                with self.subTest(path=path, operation=operation):
-                    result = invoke("project_yml_reminder.sh", edit(path, operation), event="PostToolUse")
+            for tool in EDIT_TOOLS:
+                with self.subTest(path=path, tool=tool):
+                    result = invoke("project_yml_reminder.sh", edit(path, tool), tool_name=tool, event="PostToolUse")
                     self.assertEqual(result.returncode, 0, result.stderr)
                     output = json.loads(result.stdout)["hookSpecificOutput"]
                     self.assertEqual(output["hookEventName"], "PostToolUse")
                     self.assertIn("regenerate_project.sh --fast", output["additionalContext"])
-        result = invoke("project_yml_reminder.sh", edit("docs/old.md", move_to="Sources/New.swift"), event="PostToolUse")
-        self.assertIn("regenerate_project.sh --fast", result.stdout)
         for path in ("fixtures/project.yml", "website/project.yml", "docs/ok.md"):
             with self.subTest(path=path):
                 result = invoke("project_yml_reminder.sh", edit(path), event="PostToolUse")
@@ -214,11 +198,11 @@ class EditGuardTests(unittest.TestCase):
 
 class SettingsWiringTests(unittest.TestCase):
     EXPECTED = {
-        ("SessionStart", "startup|resume|clear|compact"): {"worker_lifecycle.py", "session_start.sh"},
+        ("SessionStart", "startup|resume|clear|compact|fork"): {"worker_lifecycle.py", "session_start.sh"},
         ("PreToolUse", "^Bash$"): {"commit_lint.sh", "policy_guard.sh"},
-        ("PreToolUse", "^apply_patch$"): {"generated_file_guard.sh"},
-        ("PreToolUse", "^mcp__.*$"): {"simulator_tool_guard.py"},
-        ("PostToolUse", "^apply_patch$"): {"project_yml_reminder.sh"},
+        ("PreToolUse", EDIT_MATCHER): {"generated_file_guard.sh"},
+        ("PreToolUse", "^mcp__"): {"simulator_tool_guard.py"},
+        ("PostToolUse", EDIT_MATCHER): {"project_yml_reminder.sh"},
         ("SubagentStart", "*"): {"worker_lifecycle.py"},
         ("SubagentStop", "*"): {"worker_lifecycle.py"},
         ("SessionEnd", "*"): {"worker_lifecycle.py"},
@@ -228,78 +212,159 @@ class SettingsWiringTests(unittest.TestCase):
         self.settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
 
     def resolve(self, command: str, cwd: Path) -> tuple[str, Path]:
-        # Expand the trusted checked-in command as a hook would, without running
-        # the hook itself. Each configured command has exactly interpreter+path.
+        # Expand the trusted checked-in command as Claude Code would, without
+        # running the hook itself. Each configured command is interpreter+path.
         result = subprocess.run(["bash", "-c", 'printf "%s\\n" ' + command], cwd=cwd,
+                                env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)),
                                 capture_output=True, text=True, check=True)
         interpreter, path = result.stdout.splitlines()
         return interpreter, Path(path)
 
-    def test_the_hook_matrix_is_exact_and_commands_resolve_from_nested_directories(self):
+    def test_the_hook_matrix_is_exact_and_commands_do_not_depend_on_the_working_directory(self):
         matrix = {}
-        for event, entries in self.settings["hooks"].items():
-            for entry in entries:
-                matcher = entry.get("matcher", "")
-                if matcher != "*":
-                    re.compile(matcher)
-                for hook in entry["hooks"]:
-                    self.assertEqual(hook["type"], "command")
-                    self.assertLessEqual(hook.get("timeout", 15), 15)
-                    for cwd in (ROOT, ROOT / "website"):
-                        interpreter, path = self.resolve(hook["command"], cwd)
-                        self.assertEqual(hook["command"], f'{interpreter} "$(git rev-parse --show-toplevel)/scripts/hooks/{path.name}"')
-                        self.assertEqual(interpreter, "python3" if path.suffix == ".py" else "bash")
-                        self.assertEqual(path.parent, HOOKS)
-                        self.assertTrue(path.is_file())
-                    matrix.setdefault((event, matcher), set()).add(path.name)
+        with tempfile.TemporaryDirectory() as outside:
+            for event, entries in self.settings["hooks"].items():
+                for entry in entries:
+                    matcher = entry.get("matcher", "")
+                    if matcher != "*":
+                        re.compile(matcher)
+                    for hook in entry["hooks"]:
+                        self.assertEqual(hook["type"], "command")
+                        self.assertLessEqual(hook.get("timeout", 600), 5 if event == "SessionEnd" else 15)
+                        for cwd in (ROOT, ROOT / "website", Path(outside)):
+                            interpreter, path = self.resolve(hook["command"], cwd)
+                            self.assertEqual(hook["command"],
+                                             f'{interpreter} "$CLAUDE_PROJECT_DIR/scripts/hooks/{path.name}"')
+                            self.assertEqual(interpreter, "python3" if path.suffix == ".py" else "bash")
+                            self.assertEqual(path.parent, HOOKS)
+                            self.assertTrue(path.is_file())
+                        matrix.setdefault((event, matcher), set()).add(path.name)
         self.assertEqual(matrix, self.EXPECTED)
+        wired = set().union(*matrix.values())
+        self.assertEqual({p.name for p in HOOKS.glob("*.sh")}, {name for name in wired if name.endswith(".sh")})
 
     def test_matchers_select_only_the_intended_tool_family(self):
+        simulator_tool = "mcp__MobileBuildMCP__build" + SIM_SUFFIX
         for event in ("PreToolUse", "PostToolUse"):
             for entry in self.settings["hooks"][event]:
                 matcher = entry["matcher"]
-                for tool in ("apply_patch", "Bash", "Read", "WebFetch", "mcp__x__Write", "mcp__xcodebuildmcp__build_sim"):
-                    expected = ((matcher == "^apply_patch$" and tool == "apply_patch")
-                                or (matcher == "^Bash$" and tool == "Bash")
-                                or (matcher == "^mcp__.*$" and tool.startswith("mcp__")))
-                    self.assertEqual(bool(re.search(matcher, tool)), expected)
+                for tool in (*EDIT_TOOLS, "Bash", "Read", "NotebookRead", "TodoWrite", "WebFetch",
+                             "mcp__x__Write", simulator_tool):
+                    with self.subTest(matcher=matcher, tool=tool):
+                        expected = ((matcher == EDIT_MATCHER and tool in EDIT_TOOLS)
+                                    or (matcher == "^Bash$" and tool == "Bash")
+                                    or (matcher == "^mcp__" and tool.startswith("mcp__")))
+                        self.assertEqual(matches(matcher, tool), expected)
 
     def test_configured_pretool_hooks_allow_and_block_from_root_and_website(self):
         for cwd in (ROOT, ROOT / "website"):
             prefix = "../" if cwd.name == "website" else ""
             cases = [("Bash", {"command": "git push --force origin main"}, True),
-                     ("Bash", {"command": "git push origin codex/agent-1"}, True),
+                     ("Bash", {"command": "git push origin worktree-agent-1"}, True),
                      ("Bash", {"command": "git status --short"}, False),
-                     ("apply_patch", edit(f"{prefix}docs/ROADMAP.md"), True),
-                     ("apply_patch", edit(f"{prefix}docs/note.md", "add"), False),
-                     ("mcp__xcodebuildmcp__build_sim", {}, True),
-                     ("mcp__xcodebuildmcp__list_devices", {}, False)]
+                     ("Edit", edit(f"{prefix}docs/ROADMAP.md"), True),
+                     ("NotebookEdit", edit(f"{prefix}benchmarks/runs/x.ipynb", "NotebookEdit"), True),
+                     ("Write", edit(f"{prefix}docs/note.md", "Write"), False),
+                     ("mcp__MobileBuildMCP__build" + SIM_SUFFIX, {}, True),
+                     ("mcp__MobileBuildMCP__list_schemes", {}, False)]
             for name, tool_input, blocked in cases:
                 with self.subTest(cwd=cwd, tool=name, blocked=blocked):
                     payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": name,
                                           "tool_input": tool_input, "cwd": str(cwd)})
                     results = []
                     for entry in self.settings["hooks"]["PreToolUse"]:
-                        if re.search(entry["matcher"], name):
+                        if matches(entry["matcher"], name):
                             for hook in entry["hooks"]:
                                 results.append(subprocess.run(
                                     ["bash", "-c", hook["command"]], cwd=cwd, input=payload,
-                                    env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(ROOT)),
+                                    env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)),
                                     capture_output=True, text=True, timeout=20))
                     self.assertTrue(results)
                     self.assertEqual(any(r.returncode == 2 for r in results), blocked)
                     self.assertTrue(all(r.returncode in (0, 2) for r in results))
 
 
+class PermissionTests(unittest.TestCase):
+    def setUp(self):
+        self.settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
+        self.allow, self.ask, self.deny = (self.settings["permissions"][kind] for kind in ("allow", "ask", "deny"))
+
+    def test_pushes_always_ask_and_only_fast_forward_main_can_be_pushed(self):
+        self.assertEqual([rule for rule in self.allow if rule.startswith("Bash(git push")], [])
+        for rule in ("Bash(git push)", "Bash(git push *)"):
+            self.assertIn(rule, self.ask)
+        for rule in ("Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push --tags*)",
+                     "Bash(git push origin HEAD*)", "Bash(git push origin worktree-*)", "Bash(git push -u*)",
+                     "Bash(git checkout -b*)", "Bash(git switch -c*)", "Bash(git worktree add*)",
+                     "Bash(git update-ref*)", "Bash(git stash*)", "Bash(git add -A*)", "Bash(git add .)",
+                     "Bash(git commit -a*)"):
+            self.assertIn(rule, self.deny)
+
+    def test_releases_generated_project_and_authorization_bound_actions(self):
+        for rule in ("Edit(/QwenVoice.xcodeproj/**)", "Bash(scripts/release.sh*)", "Bash(gh release create*)",
+                     "Bash(gh release upload*)", "Bash(rm -rf build/cache*)"):
+            self.assertIn(rule, self.deny)
+        for rule in ("Bash(scripts/macos_test.sh models install*)", "Bash(scripts/macos_test.sh models ensure*)",
+                     "Bash(scripts/ui_test.sh * model-download*)", "Bash(scripts/clean_build_caches.sh*)",
+                     "Bash(scripts/install_pinned_tools.sh*)", "Bash(python3 scripts/publish_benchmark_history.py*)",
+                     "Bash(gh workflow run*)", "Bash(git branch -D*)", "Bash(git worktree remove --force*)",
+                     "Bash(git reset --hard*)", "Bash(hf download*)"):
+            self.assertIn(rule, self.ask)
+
+    def test_unsupported_destination_and_ui_driving_tools_are_denied_but_device_tools_are_not(self):
+        server = "mcp__MobileBuildMCP__"
+        denied = [server + name for name in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",
+                                             f"test{SIM_SUFFIX}", f"list{SIM_SUFFIX}s", f"record{SIM_SUFFIX}_video",
+                                             f"get{SIM_SUFFIX}_app_path", f"install_app{SIM_SUFFIX}",
+                                             f"launch_app{SIM_SUFFIX}", f"open{SIM_SUFFIX}", f"stop_app{SIM_SUFFIX}",
+                                             "screenshot", "snapshot_ui", "clean", "tap")]
+        denied.append(f"mcp__XcodeBuildMCP__debug_attach{SIM_SUFFIX}")
+        retained = [server + name for name in ("list_schemes", "discover_projs", "show_build_settings",
+                                               "get_coverage_report", "session_show_defaults")]
+        retained += ["mcp__XcodeBuildMCP__build_device", "mcp__XcodeBuildMCP__test_macos",
+                     "mcp__claude-in-chrome__computer", "mcp__sosumi__searchAppleDocumentation",
+                     "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot"]
+        patterns = [rule for rule in self.deny if rule.startswith("mcp__")]
+        for name in denied:
+            with self.subTest(denied=name):
+                self.assertTrue(any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns))
+        for name in retained:
+            with self.subTest(retained=name):
+                self.assertFalse(any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns))
+        for rule in (*self.allow, *self.ask):
+            self.assertIsNone(re.search(r"_sims?($|_)", rule), rule)
+        for agent in ("simulator-tester", "test-runner", "test-debugger"):
+            self.assertIn(f"Agent(axiom:{agent})", self.deny)
+
+    def test_worktrees_follow_local_head_and_allowed_scripts_exist(self):
+        self.assertEqual(self.settings["worktree"], {"baseRef": "head"})
+        self.assertNotIn("EnterWorktree", self.deny)
+        self.assertFalse([rule for rule in self.deny if rule.startswith(("Agent(Explore", "Agent(general"))])
+        for rule in ("Bash(git worktree remove .claude/worktrees/*)", "Bash(git merge --ff-only worktree-*)",
+                     "Bash(git branch -d worktree-*)", "Bash(git cherry-pick *)"):
+            self.assertIn(rule, self.allow)
+        for rule in self.allow:
+            words = rule[len("Bash("):-1].split() if rule.startswith("Bash(") else []
+            if words[:1] == ["python3"] and len(words) > 1:
+                words = words[1:]
+            if words and words[0].removeprefix("./").startswith("scripts/"):
+                with self.subTest(rule=rule):
+                    self.assertTrue(list(ROOT.glob(words[0].removeprefix("./"))), rule)
+
+
 class SimulatorToolGuardTests(unittest.TestCase):
     def test_physical_device_only_mcp_routes_preserve_device_discovery(self):
-        for tool in ("mcp__xcodebuildmcp__build_sim", "mcp__XcodeBuildMCP__boot_sim",
-                     "mcp__xcodebuildmcp__debug_attach_sim", "mcp__xcodebuildmcp__simctl"):
+        for tool in ("mcp__xcodebuildmcp__build" + SIM_SUFFIX, "mcp__XcodeBuildMCP__boot" + SIM_SUFFIX,
+                     "mcp__xcodebuildmcp__debug_attach" + SIM_SUFFIX, "mcp__xcodebuildmcp__simctl",
+                     "mcp__MobileBuildMCP__list" + SIM_SUFFIX + "s",
+                     "mcp__MobileBuildMCP__record" + SIM_SUFFIX + "_video",
+                     "mcp__MobileBuildMCP__get" + SIM_SUFFIX + "_app_path"):
             with self.subTest(tool=tool):
                 result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
                 self.assertEqual(result.returncode, 2, result.stderr)
         for tool in ("mcp__xcodebuildmcp__list_devices", "mcp__xcodebuildmcp__build_device",
-                     "mcp__sosumi__search", "mcp__xcodebuildmcp__build_macos"):
+                     "mcp__sosumi__search", "mcp__xcodebuildmcp__build_macos",
+                     "mcp__MobileBuildMCP__list_schemes", "mcp__github__find_similar_issues"):
             with self.subTest(tool=tool):
                 result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -315,7 +380,7 @@ class PolicyGuardTests(unittest.TestCase):
             root = Path(tmp).resolve() / "main checkout"
             initialize_repo(root)
             agent = root.parent / "agent workspace"
-            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "codex/cache", str(agent)], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "worktree-cache", str(agent)], check=True)
             for command in ("rm -rf build/cache", "rm -rf build", f'rm -rf "{agent}/build/cache"'):
                 with self.subTest(command=command):
                     result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root, cwd=agent)
@@ -327,28 +392,20 @@ class PolicyGuardTests(unittest.TestCase):
                             tool_name="Bash", root=root, cwd=agent)
             self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_only_a_scoped_branch_creation_in_a_registered_linked_checkout_is_allowed(self):
+    def test_branch_creation_is_refused_in_every_checkout(self):
+        # Agent worktrees and their branches come from Claude Code itself, never a shell command.
         with tempfile.TemporaryDirectory(prefix="vocello branch hooks ") as tmp:
             root = Path(tmp).resolve() / "main checkout"
             initialize_repo(root)
             agent = root.parent / "detached agent"
             subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "--detach", str(agent), "HEAD"], check=True)
-            allowed = ("git switch -c codex/scoped", "git switch -c codex/scoped HEAD")
-            for command in allowed:
-                with self.subTest(command=command):
-                    result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root, cwd=agent)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root)
-                    self.assertEqual(result.returncode, 2, result.stderr)
-            result = invoke("policy_guard.sh", {"command": 'git -C "missing checkout" switch -c codex/scoped'},
-                            tool_name="Bash", root=root)
-            self.assertEqual(result.returncode, 2, result.stderr)
-            for command in ("git switch -c topic", "git switch -c codex/scoped origin/main",
-                            "git switch -C codex/scoped", "git checkout -b codex/scoped",
-                            "git worktree add ../another", "git branch codex/scoped"):
-                with self.subTest(command=command):
-                    result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root, cwd=agent)
-                    self.assertEqual(result.returncode, 2, result.stderr)
+            for command in ("git switch -c codex/scoped", "git switch -c worktree-x", "git switch -c worktree-x HEAD",
+                            "git switch -c topic", "git switch -C worktree-x", "git checkout -b worktree-x",
+                            "git worktree add ../another", "git branch worktree-x"):
+                for cwd in (agent, root):
+                    with self.subTest(command=command, cwd=cwd.name):
+                        result = invoke("policy_guard.sh", {"command": command}, tool_name="Bash", root=root, cwd=cwd)
+                        self.assertEqual(result.returncode, 2, result.stderr)
 
     def test_ordinary_commands_are_allowed_quickly(self):
         for command in (
@@ -422,7 +479,9 @@ class PolicyGuardTests(unittest.TestCase):
 
     def test_build_output_paths_are_resolved_not_matched_as_text(self):
         root = str(ROOT)
-        for command in (f'rm -rf "{root}/build"', 'rm -rf "$VOCELLO_PROJECT_ROOT/build"', "rm -rf ../Vocello/build"
+        for command in (f'rm -rf "{root}/build"', 'rm -rf "$VOCELLO_PROJECT_ROOT/build"',
+                        'rm -rf "$CLAUDE_PROJECT_DIR/build"', 'rm -rf "${CLAUDE_PROJECT_DIR}/build/cache"',
+                        "rm -rf ../Vocello/build"
                         if ROOT.name == "Vocello" else "rm -rf ./build", "cd build && rm -rf cache",
                         "cd build && rm -rf ./cache/xcode", "rm -rf build/c*", "rm -rf build/{cache,artifacts}",
                         "rm -rf build//cache", "rm -rf build/artifacts/../cache", "bash -c 'rm -rf build'",
@@ -471,7 +530,7 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertIn("only published branch", result.stderr)
 
     def test_only_main_is_pushed(self):
-        for command in ("git push origin codex/agent-1", "git push origin HEAD", "git push origin HEAD:main",
+        for command in ("git push origin worktree-agent-1", "git push origin HEAD", "git push origin HEAD:main",
                         "git push --all", "git push --mirror", "git push --tags", "git push origin --delete main",
                         "git push origin :main", "git push -u origin topic", "git push origin main topic",
                         "git push origin v3.0.0", "git -C wt/a push origin worktree-a",
@@ -529,8 +588,8 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)
 
     def test_lead_integration_commands_are_allowed(self):
-        for command in ("git merge --ff-only codex/agent-1", "git cherry-pick abc1234",
-                        "git branch -d codex/agent-1", "git worktree remove wt/agent-1",
+        for command in ("git merge --ff-only worktree-agent-1", "git cherry-pick abc1234",
+                        "git branch -d worktree-agent-1", "git worktree remove .claude/worktrees/agent-1",
                         "git worktree list --porcelain", "git worktree prune"):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -780,32 +839,39 @@ class WorktreeCommitLintTests(unittest.TestCase):
     commit = "git com" "mit -m x"
 
     def test_agent_worktree_on_its_branch_may_commit(self):
-        agent = self.worktree("wt/agent-1", "codex/agent-1")
+        agent = self.worktree(".claude/worktrees/agent-1", "worktree-agent-1")
         self.stage(agent)
         result = self.lint(self.commit, agent)
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self.lint("git -C wt/agent-1 com" "mit -m x", self.root)
+        result = self.lint("git -C .claude/worktrees/agent-1 com" "mit -m x", self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_retired_codex_branches_cannot_commit_in_a_linked_worktree(self):
+        legacy = self.worktree(".claude/worktrees/legacy", "codex/legacy")
+        self.stage(legacy)
+        result = self.lint(self.commit, legacy)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("worktree-* branch", result.stderr)
 
     def test_wrong_branch_and_unrelated_repository_worktrees_are_blocked(self):
         checkout = self.worktree("wt/wrong-branch", "topic")
         result = self.lint(self.commit, checkout)
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("codex/* branch", result.stderr)
+        self.assertIn("worktree-* branch", result.stderr)
         unrelated = self.root.parent / "unrelated repository"
         initialize_repo(unrelated)
         foreign = unrelated.parent / "foreign agent"
-        subprocess.run(["git", "-C", str(unrelated), "worktree", "add", "-q", "-b", "codex/foreign", str(foreign)], check=True)
+        subprocess.run(["git", "-C", str(unrelated), "worktree", "add", "-q", "-b", "worktree-foreign", str(foreign)], check=True)
         result = self.lint(self.commit, foreign)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("another repository", result.stderr)
-        subprocess.run(["git", "-C", str(self.root), "switch", "-q", "-c", "codex/wrong-main"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "switch", "-q", "-c", "worktree-wrong-main"], check=True)
         result = self.lint(self.commit, self.root)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("directly on main", result.stderr)
 
     def test_the_worktree_index_is_scanned_not_the_main_checkout(self):
-        agent = self.worktree("wt/agent-4", "codex/agent-4")
+        agent = self.worktree(".claude/worktrees/agent-4", "worktree-agent-4")
         self.stage(agent, "logs live in " + "/Users/" + "someone/Library\n")
         result = self.lint(self.commit, agent)
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -813,21 +879,21 @@ class WorktreeCommitLintTests(unittest.TestCase):
 
     def test_quoted_paths_with_spaces_chains_and_unresolvable_targets_are_judged(self):
         spaced = self.root.parent / "agent work"
-        subprocess.run(["git", "-C", str(self.root), "worktree", "add", "-q", "-b", "codex/spaced", str(spaced)],
+        subprocess.run(["git", "-C", str(self.root), "worktree", "add", "-q", "-b", "worktree-spaced", str(spaced)],
                        check=True)
         commit = "com" "mit"
         result = self.lint(f'git -C "{spaced}" {commit} -m x', self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
         # Every commit in a chain is judged in its own checkout: the second one
         # scans the main index, which holds a private path.
-        agent = self.worktree("wt/agent-6", "codex/agent-6")
+        agent = self.worktree(".claude/worktrees/agent-6", "worktree-agent-6")
         self.stage(self.root, "logs live in " + "/Users/" + "someone/Library\n")
-        result = self.lint(f"git -C wt/agent-6 {commit} --dry-run -m z; git {commit} -m x",
+        result = self.lint(f"git -C .claude/worktrees/agent-6 {commit} --dry-run -m z; git {commit} -m x",
                            self.root)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("private path", result.stderr)
         subprocess.run(["git", "-C", str(self.root), "reset", "-q"], check=True)
-        result = self.lint(f"git {commit} -m x && git -C wt/agent-6 pu" "sh", self.root)
+        result = self.lint(f"git {commit} -m x && git -C .claude/worktrees/agent-6 pu" "sh", self.root)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("only main is pushed", result.stderr)
         for command in (f'cd "$SOMEWHERE" && git {commit} -m x', f"GIT_DIR=/tmp/x git {commit} -m x",
@@ -836,7 +902,7 @@ class WorktreeCommitLintTests(unittest.TestCase):
                 result = self.lint(command, agent)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("cannot tell which checkout", result.stderr)
-        result = self.lint(f"git checkout codex/agent-6 && git {commit} -m x", self.root)
+        result = self.lint(f"git checkout worktree-agent-6 && git {commit} -m x", self.root)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("may change the branch", result.stderr)
         result = self.lint(f"git checkout -- notes.md && git {commit} -m x", self.root)
@@ -845,7 +911,7 @@ class WorktreeCommitLintTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_pushes_leave_only_the_main_checkout_on_main(self):
-        agent = self.worktree("wt/agent-5", "codex/agent-5")
+        agent = self.worktree(".claude/worktrees/agent-5", "worktree-agent-5")
         for command in ("git push", "git push origin main"):
             with self.subTest(command=command):
                 result = self.lint(command, agent)
@@ -938,11 +1004,6 @@ class RuleTests(unittest.TestCase):
                 self.assertIn(relative, instructions)
                 self.assertTrue((ROOT / relative).is_file())
         self.assertTrue((ROOT / "website/AGENTS.md").is_file())
-
-    def test_claude_files_are_not_active_tracked_configuration(self):
-        tracked = subprocess.run(["git", "ls-files", "--", ".claude", "CLAUDE.md", "website/CLAUDE.md"],
-                                 cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
-        self.assertEqual([name for name in tracked if (ROOT / name).is_file()], [])
 
 
 if __name__ == "__main__":

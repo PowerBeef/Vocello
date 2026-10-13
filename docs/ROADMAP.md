@@ -51,18 +51,18 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `ASR-09` | planned | Prove reviewer access to immutable model hosting | `RF-09` |
 | `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `RF-09` |
 | `ASR-11` | parked | Audit live App Store Connect and regional compliance read-only | `RF-02` |
-| `AUD-01` | planned | iOS launch and deep-link dead ends | — |
+| `AUD-01` | planned | iOS launch and deep-link dead ends | `RF-15` |
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
-| `AUD-09` | in-flight | Smoke test01 owns the fixture it depends on | — |
-| `DA-04` | planned | Engine edge inputs | — |
+| `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
+| `DA-04` | in-flight | Engine edge inputs | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `RF-13`, `RF-14`, `ASR-08` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-13` | planned | implement the one-time iOS Design and Clone export unlock before freeze | — |
-| `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12`, `AUD-09` |
+| `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 
@@ -107,10 +107,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`AUD-07`** (planned, due 2026-10-30) — Verify recovery from an unverified StoreKit purchase.
   gate: A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`AUD-09`** (in-flight, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
+- **`AUD-09`** (planned, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
-- **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
+- **`DA-04`** (in-flight, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
 - **`F-01`** (planned, due 2026-10-30) — High — make saved-voice review transactional and add iOS deletion.

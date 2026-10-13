@@ -51,13 +51,18 @@ knobs. Subtle defects ship as the known limitation in the 3.0 notes. The rule fo
 nobody listens: RF-15's by-ear takes became the same machine screen, and CLAUDE.md, the evidence
 rule and the QC reference say so.
 
-**In flight:** AUD-09, whose smoke fixture preflights landed (1bc2b95e); closure needs RF-15's device
-smoke.
+**Code landed, closing after RF-15's device run:** AUD-09 (smoke fixture preflights, 1bc2b95e) and
+AUD-01 (startup Retry as an owned pass; opened files queued at the app root until onboarding is gone).
+Both are planned behind RF-15 so they hold no in-flight slot.
 
-**Claude's next work:**
-- Code fixes for the blockers AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04.
-- RF-13's phone session: rerun the purchase exports scenario, and capture the purchase's review
-  screenshot for App Store Connect.
+**In flight:** DA-04 (engine edge inputs).
+
+**Claude's next work:** F-01 and F-16 (the transactional saved-voice and long-form blockers), then
+AUD-02 and AUD-07. All blocker code must land before the October 23 freeze.
+
+**Needs the maintainer or the phone:** RF-13's phone session (rerun the purchase exports scenario and
+capture the purchase's review screenshot) and ASR-08's read-only App Store Connect check of build 24;
+both block the freeze.
 
 ### October 12 — step 1 decisions recorded
 

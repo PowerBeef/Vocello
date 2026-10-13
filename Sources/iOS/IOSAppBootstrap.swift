@@ -18,9 +18,11 @@ final class IOSAppDependenciesContainer: ObservableObject {
     @Published private(set) var modelManager: ModelManagerViewModel?
     @Published private(set) var modelInstaller: IOSModelInstallerViewModel?
     @Published private(set) var startupError: Error?
-    @Published private(set) var isStarting = false
+    /// AUD-01: the owned startup pass (`IOSStartupAttempt`): Retry begins the
+    /// next one only after a failure, never beside a running pass.
+    @Published private(set) var attempt = IOSStartupAttempt()
 
-    private var bootstrapTask: Task<Void, Never>?
+    var isStarting: Bool { attempt.isStarting }
 
     init() {
         start()
@@ -29,15 +31,13 @@ final class IOSAppDependenciesContainer: ObservableObject {
     /// Runs startup again after a failure. Ignored while a pass is running or
     /// once the dependencies exist.
     func retry() {
-        guard startupError != nil else { return }
         start()
     }
 
     private func start() {
-        guard bootstrapTask == nil, engine == nil else { return }
+        guard attempt.begin() else { return }
         startupError = nil
-        isStarting = true
-        bootstrapTask = Task { [weak self] in
+        Task { [weak self] in
             let protection = await Task.detached(priority: .userInitiated) {
                 // MAC-25 on the iPhone: reference clips an earlier launch recorded
                 // (a crash or jetsam kill stranded them) go before any sheet can
@@ -57,10 +57,6 @@ final class IOSAppDependenciesContainer: ObservableObject {
     private func finishStart(
         protection: Result<IOSStorageProtectionPolicy.ApplyReport, any Error>
     ) {
-        defer {
-            bootstrapTask = nil
-            isStarting = false
-        }
         do {
             let report = try protection.get()
             if report.descendantFailureCount > 0, TelemetryGate.resolvedEnabled {
@@ -82,8 +78,10 @@ final class IOSAppDependenciesContainer: ObservableObject {
             self.modelInstaller = installer
             self.engine = selectedBackend.engineStore
             self.startupError = nil
+            attempt.finish(succeeded: true)
         } catch {
             self.startupError = error
+            attempt.finish(succeeded: false)
         }
     }
 }

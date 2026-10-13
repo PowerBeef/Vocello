@@ -495,6 +495,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSStartupRecovery.swift
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
@@ -591,6 +592,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSStartupRecovery.swift
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift

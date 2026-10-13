@@ -337,8 +337,7 @@
       "status": "planned",
       "due": "2026-10-29",
       "blockedBy": [
-        "RF-12",
-        "AUD-09"
+        "RF-12"
       ],
       "gate": "On the processed TestFlight build, through the repository XCUITest stack with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save, replace and delete (F-01); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
       "sourceOfTruth": [
@@ -346,7 +345,7 @@
         "scripts/ui_test.sh"
       ],
       "updated": "2026-10-13",
-      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen)."
+      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen). 2026-10-13: no longer waits on AUD-09, whose smoke preflights landed (1bc2b95e); AUD-09 and AUD-01 now close after this run."
     },
     {
       "id": "RF-17",
@@ -432,7 +431,7 @@
       "id": "DA-04",
       "plan": "release-first-3-0-2026-09",
       "title": "Engine edge inputs",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-30",
       "blockedBy": [],
       "gate": "One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
@@ -440,7 +439,7 @@
         "docs/audits/2026-10-06-deep-audit.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "notes": "E4-01 is a two-line change but cannot be proven without loading a model, which is a consent-bound run."
     },
     {
@@ -1261,11 +1260,15 @@
       "gate": "A dependency-bootstrap failure offers retry and restart rather than a terminal screen; opening a file during first run never presents the import cover over the onboarding cover; both proven on the phone by iOS smoke. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Sources/iOS/QVoiceiOSApp.swift",
-        "Sources/iOS/App/RootView.swift"
+        "Sources/iOS/App/RootView.swift",
+        "Sources/iOSSupport/Services/IOSStartupRecovery.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P1): immutable bootstrap failure has no in-app retry; import and onboarding covers can be requested together. Lost import/presentation behavior is a hypothesis pending the phone, not a reproduced result. See project-review-2026-09-18.md. Test recoverable dependency failure and preserve a pending external import until onboarding finishes.",
+      "notes": "Revalidated 2026-09-18 (P1); see project-review-2026-09-18.md. Startup Retry landed 2026-09-24 (a32a0f7f). 2026-10-13: IOSStartupAttempt owns the pass (Retry only after a failure, never beside a running pass or after success), and opened files are received at the app root and wait in IOSExternalImportQueue until startup finishes and onboarding has dismissed (a cold-launch open was otherwise lost while async startup ran). Tests drive both value types; the container and RootView wiring is device-proven only. Open for RF-15: a processed build cannot force a startup failure (no knob reaches distribution builds), so the Retry path's device proof needs a decision; also open a file while the player sheet or recorder is up.",
       "plan": "release-first-3-0-2026-09",
-      "updated": "2026-10-12"
+      "updated": "2026-10-13",
+      "blockedBy": [
+        "RF-15"
+      ]
     },
     {
       "id": "AUD-02",
@@ -1345,7 +1348,7 @@
     {
       "id": "AUD-09",
       "title": "Smoke test01 owns the fixture it depends on",
-      "status": "in-flight",
+      "status": "planned",
       "due": "2026-10-21",
       "gate": "Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
@@ -1355,7 +1358,10 @@
       ],
       "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See project-review-2026-09-18.md. 2026-10-13: the fixture preflights landed. Full smoke and the macOS localization walk now stop before the build when the debug store lacks the current benchmark clone voice (scripts/ui_test.sh, naming scripts/macos_test.sh models ensure); the iPhone smoke journey probes Saved Voices before it changes any setting or History and fails with the enrollment route. The clean-store outcome is that actionable stop with nothing changed. Closure needs RF-15's device smoke.",
       "plan": "release-first-3-0-2026-09",
-      "updated": "2026-10-13"
+      "updated": "2026-10-13",
+      "blockedBy": [
+        "RF-15"
+      ]
     },
     {
       "id": "AUD-11",

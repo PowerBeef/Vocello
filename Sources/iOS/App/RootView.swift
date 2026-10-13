@@ -24,6 +24,7 @@ struct RootView: View {
     let ttsEngine: TTSEngineStore
 
     @Environment(AppModel.self) private var appModel
+    @Environment(IOSExternalImportInbox.self) private var externalImports
     @StateObject private var performanceGate: IOSGenerationPerformanceGateModel
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
@@ -107,7 +108,12 @@ struct RootView: View {
         .environment(\.presentIOSPlayerSheet) { item in
             appModel.playerSheetItem = item
         }
-        .fullScreenCover(isPresented: $appModel.isOnboardingPresented) {
+        // AUD-01: a file opened during first run waits for the onboarding
+        // cover to finish dismissing, so the import cover never competes with it.
+        .fullScreenCover(
+            isPresented: $appModel.isOnboardingPresented,
+            onDismiss: presentPendingExternalImport
+        ) {
             IOSOnboardingFlow(isPresented: $appModel.isOnboardingPresented)
         }
         .fullScreenCover(isPresented: $appModel.isCloneReferenceRecorderPresented) {
@@ -172,7 +178,11 @@ struct RootView: View {
             .presentationCornerRadius(28)
             .presentationBackground(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.96))
         }
-        .onOpenURL(perform: openExternalAudio)
+        // The app root receives opened files (AUD-01); one waiting from launch
+        // or a later open is presented here once onboarding is gone.
+        .onChange(of: externalImports.queue.pending, initial: true) {
+            presentPendingExternalImport()
+        }
         .alert(
             IOSInterfaceText.importFailed,
             isPresented: Binding(
@@ -319,6 +329,13 @@ struct RootView: View {
         appModel.dismissBottomPanel()
     }
 
+    private func presentPendingExternalImport() {
+        guard let url = externalImports.queue.take(
+            onboardingIsPresented: appModel.isOnboardingPresented
+        ) else { return }
+        openExternalAudio(url)
+    }
+
     private func openExternalAudio(_ sourceURL: URL) {
         // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
         // security-scoped grant before copying audio and any adjacent transcript sidecar.
@@ -391,6 +408,14 @@ struct RootView: View {
 private struct ImportedVoicePresentation: Identifiable {
     let id = UUID()
     let reference: ImportedReferenceAudio
+}
+
+/// AUD-01: files the system opens into Vocello, received at the app root so a
+/// cold-launch open is kept while startup runs (`IOSExternalImportQueue`).
+@MainActor
+@Observable
+final class IOSExternalImportInbox {
+    var queue = IOSExternalImportQueue()
 }
 
 

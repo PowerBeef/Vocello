@@ -817,8 +817,9 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   (custom/design/clone), input area, generate button, and live-preview rail.
   Sheets under `Sources/iOS/Sheets/` (e.g. `IOSVoicePreviewPlayer`).
 - Reference import: `IOSVoicesView` presents a native `fileImporter` for WAV, MP3, AIFF, and M4A;
-  `RootView.onOpenURL` routes supported documents opened from Files through the same production
-  flow. `TTSEngineStore.importReferenceAudio` / `LocalDocumentIO` materializes the security-scoped
+  a supported document opened from Files is received by the app root's `onOpenURL`
+  (`QVoiceiOSApp`), waits in `IOSExternalImportQueue` while startup runs or onboarding shows, and
+  `RootView` then routes it through the same production flow (AUD-01). `TTSEngineStore.importReferenceAudio` / `LocalDocumentIO` materializes the security-scoped
   audio and adjacent `.txt` transcript sidecar into app-owned storage. `IOSRecordVoiceSheet` then
   collects the visible name/transcript, prepares a private review candidate, and commits it only
   after the user accepts any quality warning; Cancel, Discard, and outside dismissal discard it.

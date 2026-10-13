@@ -20,6 +20,8 @@ struct QVoiceiOSApp: App {
     @StateObject private var audioPlayer = AudioPlayerViewModel()
     @StateObject private var savedVoicesViewModel = SavedVoicesViewModel()
     @StateObject private var runtimeReleaseCoordinator = RuntimeReleaseCoordinator()
+    /// AUD-01: opened files wait here until the root view can present them.
+    @State private var externalImports = IOSExternalImportInbox()
     /// PA-15: background time, Studio cancellation/notice and the screen-awake hold.
     @State private var backgroundGeneration = IOSBackgroundGenerationController()
     @State private var didInitializeEngine = false
@@ -70,6 +72,7 @@ struct QVoiceiOSApp: App {
                             .environmentObject(manager)
                             .environmentObject(savedVoicesViewModel)
                             .environmentObject(installer)
+                            .environment(externalImports)
                             .onAppear {
                                 setupAppSupport()
                                 reconcilePendingHistory()
@@ -136,6 +139,9 @@ struct QVoiceiOSApp: App {
             }
             .preferredColorScheme(.dark)
             .environment(\.locale, appLanguage.interfaceLocale)
+            // AUD-01: received here, above the startup and failure screens, so a
+            // file that launches the app is not lost while startup runs.
+            .onOpenURL { externalImports.queue.enqueue($0) }
             .task { await IOSExportCommerce.shared.refresh() }
         }
         .onChange(of: scenePhase) { _, newValue in

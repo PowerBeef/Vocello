@@ -72,7 +72,7 @@ Documents directory (`UIFileSharingEnabled`); generated output lives in the App 
 | History failed-storage recovery files | `HistoryScreen` | `.recoveryRecord` (free by policy) | `IOSExportGate.share` |
 | Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
 | Saved-outputs folder copy after generation (single take and long-form joined output) | `IOSSavedOutputsDestination.exportIfConfigured` | generation mode of the saved row | `IOSExportCommerce.permits` before any copy; never starts a purchase |
-| Inbound `onOpenURL` audio, Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
+| Inbound `onOpenURL` audio (received in `QVoiceiOSApp`), Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
 | Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` | reads a staged reference from Documents, deletes it after enrollment | not an export |
 
 No App Intent, Shortcut, URL scheme, drag, pasteboard, Quick Look or document-browser route exists on
@@ -139,8 +139,14 @@ archive/IPA verification rejects any capability drift.
 
 The launch mark shows while the storage-protection pass runs off the main actor and the
 dependencies are built. If startup fails, `startup_errorState` shows the reason with
-`startup_retryButton`, which runs startup again without a relaunch. A failed engine
+`startup_retryButton`, which runs startup again without a relaunch; `IOSStartupAttempt` owns the
+pass, so Retry never starts one beside a running pass or after success (AUD-01). A failed engine
 initialization after startup is retried the next time the app becomes active.
+
+An audio file opened into Vocello (Files, Share, Open in) is received at the app root, above the
+startup and failure screens, and waits in `IOSExternalImportQueue` until the root view is up and
+first-run onboarding has finished dismissing; then its import cover opens. A later open replaces
+one still waiting, and each file opens once (AUD-01).
 
 ### Onboarding (first run) — `Sources/iOS/Overlays/IOSOnboardingFlow.swift`
 

@@ -45,11 +45,18 @@ the next items by due date.
 5. The push that deploys the updated website privacy page (ASR-02). `main` is ahead of `origin`, and
    nothing has been pushed since October 12.
 
-**Claude's work now:**
-- RF-14 (due October 19): the four engine fixes as registered knobs (D1 streaming text conditioning,
-  D2 EOS reinsertion, D3 the float32 cast, D6 the Custom English fallback), fixed-seed pairs, then the
-  maintainer's blind A/B.
-- AUD-09: the smoke-test fixture preflight.
+**In flight:**
+- **RF-14** (due October 19): the four engine fixes are registered knobs, defaults unchanged
+  (c82ab684). The streamed fixed-seed pairs are generated (untracked run
+  `build/private/qc/rf14-ab-20261013`):
+  - D2 and D6 left the audio identical in every pair, so they stay off;
+  - D1 and D3 changed every pair, and their 32 blind pairs wait for the maintainer at
+    `page/index.html` in that run (Export writes the choices file);
+  - after listening: `python3 <run>/rf14_ab.py --repo . --run <run> tally --choices <file>`, then apply
+    the pre-registered rule in RF-14's notes.
+- **AUD-09**: the smoke fixture preflights landed (1bc2b95e); closure needs RF-15's device smoke.
+
+**Claude's next work:**
 - Code fixes for the blockers AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04.
 - RF-13's phone session: rerun the purchase exports scenario, and capture the purchase's review
   screenshot for App Store Connect.

@@ -41,6 +41,13 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             var restoration = VocelloUIPurchaseRestoration()
             var transactionsDeleted = true
             // Only transactions created after the verified empty baseline are owned here.
+            // Refund before deleting: an active purchase deleted unrefunded stayed entitled
+            // in the app's StoreKit cache with an empty environment (October 13).
+            for transaction in store.allTransactions()
+            where transaction.state == .purchased && transaction.cancelDate == nil {
+                do { try store.refundTransaction(identifier: transaction.identifier) }
+                catch { transactionsDeleted = false }
+            }
             for transaction in store.allTransactions() {
                 do { try store.deleteTransaction(identifier: transaction.identifier) }
                 catch { transactionsDeleted = false }
@@ -123,6 +130,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         add(languageBaseline)
         try selectInterfaceLanguage("en")
         try openPurchase()
+        try clearStaleEntitlementIfNeeded()
         try locked()
         record("initial_locked")
 
@@ -376,6 +384,22 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         try require("purchase sheet loaded") {
             self.element("exportPurchase_unlocked").exists || self.element("exportPurchase_buy").exists
         }
+    }
+    /// The environment is verified empty before launch, so an unlocked sheet here is the
+    /// app's StoreKit cache still holding a deleted purchase (October 13, after a run ended
+    /// while owned). Restore re-syncs it; the repair is attached, and initial_locked is
+    /// still observed on a fresh launch.
+    private func clearStaleEntitlementIfNeeded() throws {
+        guard element("exportPurchase_unlocked").exists else { return }
+        try tap("exportPurchase_restore")
+        try notice("No export purchase was found")
+        let evidence = XCTAttachment(string: "Unlocked before any purchase with no local transactions; Restore re-synced it")
+        evidence.name = "purchase-stale-entitlement-cleared"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        app.terminate()
+        app.launch()
+        try openPurchase()
     }
     private func locked() throws {
         try require("locked, local fixture price, idle") {

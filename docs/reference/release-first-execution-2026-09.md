@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-12
+reviewed: 2026-10-13
 summary: The iOS 3.0 App Store submission path rebaselined on October 12, the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
 sourceOfTruth:
   - config/roadmap.json
@@ -55,7 +55,7 @@ Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scr
 
 | Step | Items | Exit | Who | Target |
 | --- | --- | --- | --- | --- |
-| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | Oct 16 |
+| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | On hold since Oct 13 |
 | 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04 | A/B winners become defaults; the blockers' code fixes with deterministic tests | Claude; the maintainer listens | Oct 19 (A/B), Oct 21–23 (code) |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Oct 21 |
 | 4 — freeze | ASR-08, RF-09 | Build 24 unused; exact-SHA CI green; `focusLock.freeze` recorded; the v3.0.0 tag | Maintainer pushes the tag | Oct 23 |
@@ -63,6 +63,11 @@ Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scr
 | 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build; exact-tag promotion evidence | Claude and the phone; the maintainer listens | Oct 29 |
 | 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | Oct 30 |
 | 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | Nov 2 |
+
+**Step 1 is on hold** (maintainer decision, October 13). The decisions are recorded, but the
+maintainer's own account steps, the ASR-04 attestations and the privacy-page push wait, so RF-02,
+ASR-02, ASR-04, ASR-11 and RF-16 are parked without dates. Steps 2–6 continue. The Paid Apps
+agreement can take days to activate, so the submission date is set again when step 1 resumes.
 
 The blockers' device proof comes from RF-15, so they close after it and before RF-16. Group the phone
 work into as few windows as possible: RF-13 first, then RF-15 with ASR-06 and the ASR-05 screenshots.

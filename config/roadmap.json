@@ -177,8 +177,7 @@
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
-      "status": "planned",
-      "due": "2026-10-16",
+      "status": "parked",
       "blockedBy": [
         "RF-01"
       ],
@@ -187,8 +186,9 @@
         "docs/reference/ios-appstore-submission.md",
         "docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "2026-10-12, in App Store Connect with the maintainer's approval (driven in the browser): version 3.0.0 replaces the unreleased 1.0 draft with its copyright line; category Productivity (secondary Music); the app is free in all 175 territories, with Apple-silicon Mac and Vision Pro availability turned off (iPhone only); age rating 4+; App Privacy published as Data Not Collected with the privacy policy URL; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR names and descriptions. Accepting the Paid Apps agreement stopped at Apple's two-factor prompt. Remaining for the maintainer: accept it, then banking, tax and EU trader (DSA) status; the purchase's review screenshot comes from RF-13's phone session."
+      "updated": "2026-10-13",
+      "notes": "2026-10-12, in App Store Connect with the maintainer's approval (driven in the browser): version 3.0.0 replaces the unreleased 1.0 draft with its copyright line; category Productivity (secondary Music); the app is free in all 175 territories, with Apple-silicon Mac and Vision Pro availability turned off (iPhone only); age rating 4+; App Privacy published as Data Not Collected with the privacy policy URL; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR names and descriptions. Accepting the Paid Apps agreement stopped at Apple's two-factor prompt. Remaining for the maintainer: accept it, then banking, tax and EU trader (DSA) status; the purchase's review screenshot comes from RF-13's phone session. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "unparkWhen": "The maintainer resumes the App Store Connect account steps: the Paid Apps agreement (Apple's two-factor prompt), banking, tax and EU trader (DSA) status."
     },
     {
       "id": "RF-06",
@@ -334,7 +334,7 @@
       "id": "RF-14",
       "plan": "release-first-3-0-2026-09",
       "title": "Ship the 3.0 take-quality decision: a timeboxed blind A/B of the four engine fixes",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-19",
       "blockedBy": [],
       "gate": "Maintainer decision 2026-10-12: within one week, put the four verified divergences from Qwen's reference (D1 streaming text conditioning, D2 EOS reinsertion, D3 sampling without a float32 cast, D6 the English fallback for Custom) behind knobs registered in config/runtime-debug-knobs.json with defaults unchanged; generate fixed-seed pairs on the French and English CC0 scripts with built-in and Design voices at Speed and Quality; the maintainer blind-A/Bs them; only fixes that win become defaults before RF-09, each with its listening result recorded. The remaining defect rate ships as a documented known limitation, with RF-06's long-form failure, in the 3.0 release notes. QC detectors, PA-16 and the QC programme follow the submission. Models, seeds, prompts and QC stay unchanged without this evidence.",
@@ -345,7 +345,7 @@
         "docs/audits/2026-10-12-audio-qc-tooling-research.md",
         "config/runtime-debug-knobs.json"
       ],
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "notes": "2026-10-05/06 confirmations: 11 of 34 decisive judgments among 39 reviewed French/English Built-in and Design takes were unusable. This enriched sample excludes clones and does not estimate population failure prevalence; only five decisive unflagged controls were heard. The October 10 generation-quality investigation reproduces missing clone-coverage PASS and documents accent/local-defect gaps. QC-06 owns proposed automatic detection qualification; no qualified substitute for the existing release gate is established. Preserve the recorded listening evidence and release decision requirement until an explicit acceptance-policy decision changes it. 2026-10-12: decided as a one-week timebox (gate); the divergences and their evidence are in the tooling research report."
     },
     {
@@ -387,8 +387,7 @@
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
-      "status": "planned",
-      "due": "2026-11-02",
+      "status": "parked",
       "blockedBy": [
         "RF-15",
         "RF-17",
@@ -411,8 +410,9 @@
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it."
+      "updated": "2026-10-13",
+      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "unparkWhen": "RF-02, ASR-02 and ASR-04 unpark and every blocker is closed."
     },
     {
       "id": "DA-02",
@@ -845,8 +845,7 @@
       "id": "ASR-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Resolve Hugging Face processing and App Privacy disclosure",
-      "status": "in-flight",
-      "due": "2026-10-16",
+      "status": "parked",
       "gate": "Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.",
       "sourceOfTruth": [
         "Sources/PrivacyInfo.xcprivacy",
@@ -857,15 +856,15 @@
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-10-12",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. Remaining: deploy the updated privacy page with the next authorized push; ASR-11 reads the label back."
+      "updated": "2026-10-13",
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. Remaining: deploy the updated privacy page with the next authorized push; ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "unparkWhen": "The maintainer authorizes the push that deploys the updated privacy page; ASR-11 then reads the label back."
     },
     {
       "id": "ASR-04",
       "plan": "release-first-3-0-2026-09",
       "title": "Bundle complete attributions and record content rights",
-      "status": "in-flight",
-      "due": "2026-10-16",
+      "status": "parked",
       "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
       "sourceOfTruth": [
         "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
@@ -883,8 +882,9 @@
         "commit:87636935",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested."
+      "updated": "2026-10-13",
+      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "unparkWhen": "The maintainer gives the per-asset attestations (groups 1-11 and confirmations 12-13 in docs/reference/content-rights-review.md), or approves replacing an asset that cannot be attested."
     },
     {
       "id": "ASR-05",
@@ -961,9 +961,6 @@
       "title": "Prevent App Store build-number collisions",
       "status": "planned",
       "due": "2026-10-22",
-      "blockedBy": [
-        "RF-02"
-      ],
       "gate": "Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.",
       "sourceOfTruth": [
         "project.yml",
@@ -973,8 +970,8 @@
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-10-12",
-      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure needs a fresh manual read-only check before archiving. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload."
+      "updated": "2026-10-13",
+      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure needs a fresh manual read-only check before archiving. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload. 2026-10-12: App Store Connect now has version 3.0.0 (RF-02), so the dependency on RF-02 is satisfied; the fresh check still runs before archiving."
     },
     {
       "id": "ASR-09",
@@ -1026,8 +1023,7 @@
       "id": "ASR-11",
       "plan": "release-first-3-0-2026-09",
       "title": "Audit live App Store Connect and regional compliance read-only",
-      "status": "planned",
-      "due": "2026-10-30",
+      "status": "parked",
       "blockedBy": [
         "RF-02"
       ],
@@ -1040,8 +1036,9 @@
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "September 5 authenticated inventory was INCOMPLETE: content-rights/no-submitted-review and the matching Support URL confirmed; pricing/availability and 3.0 readiness unavailable; no 3.0 version. The September 4 inventory confirmed USES_THIRD_PARTY_CONTENT. Owner/web/privacy/financial/DSA/regional dependencies remain; RF-02/RF-12 schedule this dependency. 2026-09-22: the automated read-only inventory (app_store_connect_readiness.py, asc_readonly.py, the rorkai asc CLI) was removed by maintainer decision; the audit is now a manual read-only pass in the App Store Connect web portal or through the asc-* skills, recorded without payload values. No metadata or build mutation is authorized."
+      "updated": "2026-10-13",
+      "notes": "September 5 authenticated inventory was INCOMPLETE: content-rights/no-submitted-review and the matching Support URL confirmed; pricing/availability and 3.0 readiness unavailable; no 3.0 version. The September 4 inventory confirmed USES_THIRD_PARTY_CONTENT. Owner/web/privacy/financial/DSA/regional dependencies remain; RF-02/RF-12 schedule this dependency. 2026-09-22: the automated read-only inventory (app_store_connect_readiness.py, asc_readonly.py, the rorkai asc CLI) was removed by maintainer decision; the audit is now a manual read-only pass in the App Store Connect web portal or through the asc-* skills, recorded without payload values. No metadata or build mutation is authorized. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "unparkWhen": "RF-02 unparks and the account steps are complete."
     },
     {
       "id": "ASR-12",

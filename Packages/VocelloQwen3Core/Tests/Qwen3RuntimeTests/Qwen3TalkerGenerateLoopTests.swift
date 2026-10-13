@@ -631,11 +631,11 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let armed = try await streamed(
             model,
             seed: seed,
-            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: false)
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true)
         )
         XCTAssertEqual(armed, qualityFirst.frames)
         XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "full_text_non_streaming")
-        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "full_text_conditioning")
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "full_text_conditioning,float32_sampling")
 
         model.resetPreparationDiagnostics()
         _ = try await streamed(model, seed: seed)
@@ -663,30 +663,49 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         }
         let production = try await widths(.production)
         let filtered = try await widths(
-            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)
         )
         XCTAssertTrue(production.contains(3), "production re-inserts EOS outside the top-k: \(production)")
         XCTAssertFalse(filtered.isEmpty)
         XCTAssertTrue(filtered.allSatisfy { $0 <= 2 }, "the reference arm keeps only the top-k: \(filtered)")
     }
 
-    /// D2 and D3: each armed take names its arms on the engine row, and
-    /// production names none. The tiny talker's logits are already float32, so
-    /// float32 sampling leaves its codes unchanged.
-    func testSamplerArmsRecordThemselvesAndFloat32IsTheIdentityOnFloat32Logits() async throws {
+    /// D3 is production (maintainer decision 2026-10-13): every request without
+    /// an override samples from float32 logits. A request that departs from
+    /// production names all its arms on the engine row, and production names
+    /// none. The tiny talker's logits are already float32, so model-precision
+    /// sampling leaves its codes unchanged.
+    func testFloat32SamplingIsProductionAndDeparturesRecordTheirArms() async throws {
+        XCTAssertEqual(
+            Qwen3ReferenceParity.production,
+            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)
+        )
         let model = try Self.makeModel()
+        let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
+        // Both ways a policy is built without naming the arms take production.
+        XCTAssertEqual(
+            Qwen3RequestSamplingPolicy(
+                effectiveSeed: 1, talker: stage, subtalker: stage, repetitionPenalty: 1.05, maximumCodecTokens: 16
+            ).referenceParity,
+            .production
+        )
+        XCTAssertEqual(
+            Qwen3RequestSamplingPolicy.official(model.defaultGenerationParameters, effectiveSeed: 1).referenceParity,
+            .production
+        )
+
         let seed: UInt64 = 0x5EED_0D03
         let production = try await generate(model, seed: seed)
         XCTAssertNil(model.latestPreparationStringFlags["reference_parity"])
 
         model.resetPreparationDiagnostics()
-        let float32 = try await generate(
+        let modelPrecision = try await generate(
             model,
             seed: seed,
-            referenceParity: Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: false)
         )
-        XCTAssertEqual(float32.frames, production.frames)
-        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "float32_sampling")
+        XCTAssertEqual(modelPrecision.frames, production.frames)
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "model_precision_sampling")
 
         model.resetPreparationDiagnostics()
         _ = try await generate(
@@ -698,5 +717,47 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             model.latestPreparationStringFlags["reference_parity"],
             "full_text_conditioning,filters_eos,float32_sampling"
         )
+    }
+
+    /// D3 on a lower-precision talker: with bf16 weights the raw logits are
+    /// bf16, every production draw (talker and code predictor, and the
+    /// GEN-NOEOS redraw when it fires) samples from float32 logits, and only the
+    /// model-precision arm keeps bf16. A call site that dropped the production
+    /// flag would fail here, which the float32 tiny talker cannot show.
+    func testProductionSamplesFloat32LogitsFromABFloat16Talker() async throws {
+        final class DTypes {
+            var raw: Set<String> = []
+            var talker: Set<String> = []
+            var codePredictor: Set<String> = []
+        }
+        let model = try Self.makeModel()
+        model.talker.update(parameters: model.talker.parameters().mapValues { $0.asType(.bfloat16) })
+        eval(model.talker)
+        let talkerVocabulary = try XCTUnwrap(model.config.talkerConfig).vocabSize
+        func dtypes(_ parity: Qwen3ReferenceParity) async throws -> DTypes {
+            let seen = DTypes()
+            model.samplerObserver = { raw, filtered, _, _ in
+                if filtered.dim(-1) == talkerVocabulary {
+                    seen.raw.insert(String(describing: raw.dtype))
+                    seen.talker.insert(String(describing: filtered.dtype))
+                } else {
+                    seen.codePredictor.insert(String(describing: filtered.dtype))
+                }
+            }
+            defer { model.samplerObserver = nil }
+            _ = try await generate(model, seed: 0x5EED_0D04, eosSuppressionFrames: 2, referenceParity: parity)
+            return seen
+        }
+        let bf16 = String(describing: DType.bfloat16)
+        let f32 = String(describing: DType.float32)
+        let production = try await dtypes(.production)
+        XCTAssertEqual(production.raw, [bf16], "the talker must really produce bf16 logits")
+        XCTAssertEqual(production.talker, [f32])
+        XCTAssertEqual(production.codePredictor, [f32])
+        let modelPrecision = try await dtypes(
+            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: false)
+        )
+        XCTAssertEqual(modelPrecision.talker, [bf16])
+        XCTAssertEqual(modelPrecision.codePredictor, [bf16])
     }
 }

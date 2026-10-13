@@ -3285,7 +3285,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let subtalkerSampling = samplingPolicy.subtalker
         // Audio QC GEN-NOEOS (diagnostics only): nil on every production request.
         var eosSuppression = samplingPolicy.eosSuppressionFrames.map(Qwen3EOSSuppressionWindow.init(frames:))
-        // RF-14 A/B arms (diagnostics only): `.production` on every production request.
+        // RF-14 reference parity: `.production` (D3 float32 sampling) on every
+        // production request; the other arms are diagnostics only.
         let referenceParity = samplingPolicy.referenceParity
         // D1: streamed Custom and Design takes use the reference's full-text
         // layout; clones ignore the requested mode (see `recordedLabel`).
@@ -5156,13 +5157,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         minP: Float = 0.0,
         scratch: Qwen3SamplerScratch? = nil,
         allowsEOS: Bool = true,
-        castsLogitsToFloat32: Bool = false,
+        castsLogitsToFloat32: Bool = true,
         reinsertsEOSAfterFiltering: Bool = true,
         observe: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)? = nil
     ) -> MLXArray {
         var logitsSlice = logits[0..., (-1)..., 0...].squeezed(axis: 1) // [batch, vocab_size]
-        // RF-14 D3 (diagnostics only): the reference samples from float32
-        // logits; production samples in the model's own precision.
+        // RF-14 D3: the reference samples from float32 logits, and so does
+        // production since 2026-10-13 (the generate loop passes true).
         if castsLogitsToFloat32, logitsSlice.dtype != .float32 {
             logitsSlice = logitsSlice.asType(.float32)
         }

@@ -355,6 +355,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         let memory = VocelloQwen3MemoryConfiguration(clearCacheOnStreamChunk: true, tokenMemoryClearCadence: 50)
         let cases: [(VocelloQwen3ReferenceParity?, Qwen3ReferenceParity)] = [
             (nil, .production),
+            // The facade's production constant is the runtime's.
+            (VocelloQwen3ReferenceParity.production, .production),
             (
                 VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true),
                 Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true)

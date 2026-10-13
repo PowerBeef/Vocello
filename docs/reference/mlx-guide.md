@@ -196,8 +196,10 @@ Sampling algorithm v2 resolves one immutable `VocelloQwen3SamplingConfiguration`
 Every request has a recorded effective seed and owns a fresh `MLXRandom.RandomState`; all talker and
 Code Predictor categorical draws run under that state and do not advance MLX's process-global RNG.
 Talker and subtalker stages have independent temperature, top-k, top-p, and min-p values. The
-subtalker never inherits repetition penalty. The order matters: Vocello applies temperature scaling
-before top-p/min-p truncation. Talker defaults are:
+subtalker never inherits repetition penalty. Both stages sample from float32 logits whatever the
+model's precision, as Qwen's reference does (RF-14 D3, the default since 2026-10-13;
+`QWENVOICE_SAMPLER_FLOAT32=off` restores model-precision sampling for comparison). The order matters:
+Vocello applies temperature scaling before top-p/min-p truncation. Talker defaults are:
 
 - temperature `0.9`
 - topK `50`
@@ -208,8 +210,9 @@ before top-p/min-p truncation. Talker defaults are:
 Debug-gated environment values may be used for A/B experiments
 (`QWENVOICE_TALKER_TEMP`, `QWENVOICE_TALKER_TOPP`, etc.), but they are resolved into the request
 before model invocation and are never mutable runtime authority. Sampling v2 can differ from
-historical v1 byte output; promotion requires reproducibility within v2 plus the normal fixed-seed
-QC and applicable ASR/prosody evidence.
+historical v1 byte output, and v2 takes before and after the float32 change differ for one seed, so
+reproducibility within v2 holds on one source identity. Promotion requires that reproducibility plus
+the normal fixed-seed QC and applicable ASR/prosody evidence.
 
 ### 4.5 The single per-frame `eval()`
 

@@ -168,6 +168,31 @@
       "removalCriteria": "Remove only after an upstream API carries versioned talker/subtalker policy and request-local reproducible random state without process-global mutation."
     },
     {
+      "id": "SAMPLER-003",
+      "title": "Float32 sampling logits and request-local reference-parity arms (RF-14)",
+      "category": "sampling",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Generation.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/VocelloQwen3Core/Contracts.swift",
+        "Sources/VocelloQwen3Core/LoadedModel.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3SamplerBoundaryTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
+        "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "upstreamable",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove the float32 cast only if upstream samples from float32 logits itself; remove a diagnostic arm (full-text conditioning for streamed takes, EOS filtered like any token) once a recorded decision adopts or retires it."
+    },
+    {
       "id": "STREAM-001",
       "title": "Bounded production streaming and final-audio barrier",
       "category": "streaming",

@@ -88,9 +88,9 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
         XCTAssertEqual(processed([4, 2, -4, 1], topK: 2, reinsertsEOS: false), processed([4, 2, -4, 1], topK: 2))
     }
 
-    /// RF-14 D3: the reference arm samples from float32 logits whatever the
-    /// model's precision; production keeps the model's dtype, and float32
-    /// logits are untouched either way.
+    /// RF-14 D3: production and the reference cast logits to float32 whatever
+    /// the model's precision; the model-precision arm keeps the model's dtype,
+    /// and float32 logits are untouched either way.
     func testFloat32SamplingCastsOnlyLowerPrecisionLogits() {
         func filteredDType(_ logits: MLXArray, casts: Bool) -> DType {
             var observed: MLXArray?

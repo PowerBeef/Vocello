@@ -45,7 +45,9 @@ Sampling algorithm v2 resolves one immutable policy at the product boundary. Eve
 effective seed and owns a fresh `MLXRandom.RandomState`; categorical draws run under that
 task-local state and never advance the process-global RNG. The talker uses the official effective
 generation parameters. The subtalker/Code Predictor inherits temperature, top-k, top-p, and min-p
-by default, but remains independently configurable and never inherits repetition penalty.
+by default, but remains independently configurable and never inherits repetition penalty. Both
+stages sample from float32 logits, as Qwen's reference does (SAMPLER-003, the default since
+2026-10-13); the cast is lazy inside the per-frame graph and adds no synchronization.
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Temperature is applied before probability filtering,
 EOS remains eligible, repetition state is maintained incrementally (constant-time membership over

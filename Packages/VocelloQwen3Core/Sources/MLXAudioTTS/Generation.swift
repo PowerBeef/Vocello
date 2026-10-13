@@ -24,10 +24,11 @@ public struct Qwen3SamplingStage: Hashable, Sendable {
     }
 }
 
-/// RF-14 blind A/B arms: each flag moves one verified divergence from Qwen's
-/// reference implementation onto the reference behavior for one request. The
-/// host sets them only through its registered internal-diagnostics knobs;
-/// `.production` (every flag off) is the shipped engine.
+/// RF-14 reference-parity arms: each flag puts one verified divergence from
+/// Qwen's reference implementation on the reference behavior for one request.
+/// `.production` is the shipped engine: D3 (float32 sampling) by the
+/// maintainer's 2026-10-13 decision, the others off. The host departs from it
+/// only through its registered internal-diagnostics knobs.
 public struct Qwen3ReferenceParity: Hashable, Sendable {
     /// D1: a streamed Custom or Design take lays its whole target text over
     /// the prefix up front (the reference's `non_streaming_mode=True`, which
@@ -37,13 +38,14 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
     /// other token instead of being re-inserted after them.
     public let filtersEOS: Bool
     /// D3: talker and code-predictor logits are cast to float32 before
-    /// sampling, as the reference does.
+    /// sampling, as the reference does. On in production since 2026-10-13;
+    /// off samples in the model's own precision, as before.
     public let float32Sampling: Bool
 
     public static let production = Self(
         fullTextConditioning: false,
         filtersEOS: false,
-        float32Sampling: false
+        float32Sampling: true
     )
 
     public init(fullTextConditioning: Bool, filtersEOS: Bool, float32Sampling: Bool) {
@@ -52,17 +54,18 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
         self.float32Sampling = float32Sampling
     }
 
-    /// The engine row's record of the arms this request asked for; empty on the
-    /// production path. An arm can be a no-op for one take (D1 on a clone or a
-    /// quality-first take, D3 on float32 logits), so a pair's audio, not this
-    /// label, shows whether it changed anything.
+    /// The engine's record of a request that departs from production: every
+    /// arm it asked for; empty on the production path. An arm can be a no-op for
+    /// one take (D1 on a clone or a quality-first take, D3 on float32 logits),
+    /// so a pair's audio, not this label, shows whether it changed anything.
     var evidence: [String: String] {
+        guard self != .production else { return [:] }
         let arms = [
             fullTextConditioning ? "full_text_conditioning" : nil,
             filtersEOS ? "filters_eos" : nil,
-            float32Sampling ? "float32_sampling" : nil,
+            float32Sampling ? "float32_sampling" : "model_precision_sampling",
         ].compactMap { $0 }
-        return arms.isEmpty ? [:] : ["reference_parity": arms.joined(separator: ",")]
+        return ["reference_parity": arms.joined(separator: ",")]
     }
 }
 
@@ -70,7 +73,9 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 ///
 /// Version 2 is the first policy that owns an explicit MLX random state. The
 /// effective seed is always present, including for requests where the product
-/// selected a random seed, so generation evidence can reproduce the take.
+/// selected a random seed, so generation evidence can reproduce the take on the
+/// same source: version 2 samples from float32 logits since 2026-10-13 (RF-14
+/// D3), so one seed's takes differ before and after that change.
 public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     public static let currentAlgorithmVersion = 2
 
@@ -83,7 +88,7 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     /// Audio QC GEN-NOEOS: the codec frames the talker's first sampled EOS is
     /// held back for (`Qwen3EOSSuppressionWindow`); nil is the production path.
     public let eosSuppressionFrames: Int?
-    /// RF-14 A/B arms; `.production` on every production request.
+    /// RF-14 reference-parity arms; `.production` on every production request.
     public let referenceParity: Qwen3ReferenceParity
 
     public init(

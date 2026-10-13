@@ -247,11 +247,12 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         maximumCodecTokens: Int = 16,
         eosSuppressionFrames: Int? = nil,
         referenceParity: Qwen3ReferenceParity = .production,
-        topK: Int = 50
+        topK: Int = 50,
+        text: String = "Hello there, tiny talker."
     ) async throws -> Take {
         let frames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
         let completion = try await model.generateVoiceDesignQualityFirst(
-            text: "Hello there, tiny talker.",
+            text: text,
             language: "auto",
             voiceDescription: "A calm narrator.",
             generationParameters: model.defaultGenerationParameters,
@@ -281,11 +282,12 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
     private func streamed(
         _ model: Qwen3TTSModel,
         seed: UInt64,
-        referenceParity: Qwen3ReferenceParity = .production
+        referenceParity: Qwen3ReferenceParity = .production,
+        text: String = "Hello there, tiny talker."
     ) async throws -> [[Int32]] {
         let frames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
         _ = try await model.produceVoiceDesign(
-            text: "Hello there, tiny talker.",
+            text: text,
             language: "auto",
             voiceDescription: "A calm narrator.",
             generationParameters: model.defaultGenerationParameters,
@@ -294,7 +296,6 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             streamingInterval: 0.32,
             streamStepEvalPolicy: nil,
             generationSpeedProfile: nil,
-            memoryClearCadence: nil,
             enableChunkTimings: false,
             enableCodecTrace: true,
             sink: { event in
@@ -340,6 +341,63 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertTrue(steppedValues.allSatisfy(\.isFinite))
         let maxDifference = zip(steppedValues, referenceValues).map { abs($0 - $1) }.max() ?? .infinity
         XCTAssertLessThanOrEqual(maxDifference, 1e-4, "KV-cached steps diverged from the full pass")
+    }
+
+    /// DA-04 E4-04: a multi-token step on a non-empty cache matches decoding the
+    /// same positions one at a time. On a plain cache that is the full causal
+    /// pass; on a rotating cache whose window has already slid, the chunk must
+    /// still keep the pinned prefix and drop only the oldest generated keys,
+    /// exactly as the single steps do.
+    func testAMultiTokenStepOnANonEmptyCacheMatchesStepByStepDecoding() throws {
+        MLXRandom.seed(0x7A1C_E8)
+        let talkerConfig = try XCTUnwrap(try Self.tinyModelConfig().talkerConfig)
+        let talker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        eval(talker)
+        func assertClose(_ actual: MLXArray, _ expected: MLXArray, _ name: String) {
+            eval(actual, expected)
+            XCTAssertEqual(actual.shape, expected.shape, name)
+            let actualValues = actual.asArray(Float.self)
+            XCTAssertTrue(actualValues.allSatisfy(\.isFinite), name)
+            let maxDifference = zip(actualValues, expected.asArray(Float.self)).map { abs($0 - $1) }.max() ?? .infinity
+            XCTAssertLessThanOrEqual(maxDifference, 1e-4, "\(name): the chunk diverged from step-by-step decoding")
+        }
+
+        // Plain cache: a prefill plus a 4-token chunk is the full causal pass.
+        let total = 9
+        let prefill = 5
+        let embeds = MLXRandom.normal([1, total, 16], key: MLXRandom.key(0x7A1C_E9)) * 0.5
+        let (fullLogits, _) = talker(embeds)
+        let plain = talker.makeCache()
+        _ = talker(embeds[0..., 0 ..< prefill, 0...], cache: plain)
+        let (plainChunk, _) = talker(embeds[0..., prefill ..< total, 0...], cache: plain)
+        XCTAssertEqual(plain.first?.offset, total)
+        assertClose(plainChunk, fullLogits[0..., prefill..., 0...], "plain")
+
+        // Rotating cache (keep 3, window 4) that has already slid: a 4-token chunk
+        // against a twin cache that decodes the same positions one at a time.
+        let keep = 3
+        let singleSteps = 6
+        let chunk = 4
+        let length = keep + singleSteps + chunk
+        let sequence = MLXRandom.normal([1, length, 16], key: MLXRandom.key(0x7A1C_EA)) * 0.5
+        let chunked = talker.makeRotatingCache(keep: keep, window: 4)
+        let stepped = talker.makeRotatingCache(keep: keep, window: 4)
+        for cache in [chunked, stepped] {
+            _ = talker(sequence[0..., 0 ..< keep, 0...], cache: cache)
+            for position in keep ..< (keep + singleSteps) {
+                _ = talker(sequence[0..., position ..< (position + 1), 0...], cache: cache)
+            }
+        }
+        let chunkStart = keep + singleSteps
+        let (rotatingChunk, _) = talker(sequence[0..., chunkStart ..< length, 0...], cache: chunked)
+        var expected: [MLXArray] = []
+        for position in chunkStart ..< length {
+            let (stepLogits, _) = talker(sequence[0..., position ..< (position + 1), 0...], cache: stepped)
+            expected.append(stepLogits)
+        }
+        XCTAssertEqual(chunked.first?.offset, length)
+        XCTAssertEqual(stepped.first?.offset, length)
+        assertClose(rotatingChunk, concatenated(expected, axis: 1), "rotating")
     }
 
     // MARK: - Generate loop
@@ -759,5 +817,60 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         )
         XCTAssertEqual(modelPrecision.talker, [bf16])
         XCTAssertEqual(modelPrecision.codePredictor, [bf16])
+    }
+
+    // MARK: - DA-04 engine edge inputs
+
+    /// E4-01: a script of one text token (the tiny tokenizer's "A", as the
+    /// shipping tokenizer's "Hi") makes nine chat tokens, which every slice of
+    /// the text embedding accepts, so it generates through both the streamed
+    /// and the full-text layouts. A script with no text token is refused with
+    /// a message that names only the count.
+    func testAOneTokenScriptGeneratesAndAnEmptyOneIsRefusedWithoutItsText() async throws {
+        XCTAssertEqual(Qwen3TTSModel.minimumChatTemplateTokenCount, 9)
+        XCTAssertNoThrow(try Qwen3TTSModel.validateChatTemplateTokenCount(9))
+        XCTAssertThrowsError(try Qwen3TTSModel.validateChatTemplateTokenCount(8)) { error in
+            let message = String(describing: error)
+            XCTAssertTrue(message.contains("8 chat tokens"), message)
+            XCTAssertFalse(message.contains("'"), "the message never quotes the script: \(message)")
+        }
+
+        let model = try Self.makeModel()
+        let qualityFirst = try await generate(model, seed: 0x5EED_0E41, text: "A")
+        XCTAssertFalse(qualityFirst.samples.isEmpty)
+        model.resetPreparationDiagnostics()
+        let streamedFrames = try await streamed(model, seed: 0x5EED_0E41, text: "A")
+        XCTAssertFalse(streamedFrames.isEmpty)
+        XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "streaming_trailing_text")
+
+        do {
+            _ = try await generate(model, seed: 0x5EED_0E41, text: "")
+            XCTFail("a script with no text token must be refused")
+        } catch AudioGenerationError.invalidInput(let message) {
+            XCTAssertTrue(message.contains("8 chat tokens"), message)
+        }
+    }
+
+    /// E4-02: a model whose config has no `talker_config` fails its first take
+    /// with a typed error instead of trapping on a force-unwrap.
+    func testAModelWithoutATalkerConfigFailsTypedInsteadOfTrapping() async throws {
+        let tiny = try Self.tinyModelConfig()
+        var withoutTalkerConfig = tiny
+        withoutTalkerConfig.talkerConfig = nil
+        MLXRandom.seed(0x7A1C_E5)
+        let model = Qwen3TTSModel(
+            config: withoutTalkerConfig,
+            talker: Qwen3TTSTalkerForConditionalGeneration(config: try XCTUnwrap(tiny.talkerConfig)),
+            speakerEncoder: nil
+        )
+        model.speechTokenizer = try Self.tinySpeechTokenizer()
+        model.tokenizer = TinyTextTokenizer()
+        eval(model)
+        do {
+            _ = try await generate(model, seed: 0x5EED_0E42)
+            XCTFail("a take without a talker config must fail")
+        } catch AudioGenerationError.modelNotInitialized(let message) {
+            XCTAssertEqual(message, "Talker config not loaded")
+        }
     }
 }

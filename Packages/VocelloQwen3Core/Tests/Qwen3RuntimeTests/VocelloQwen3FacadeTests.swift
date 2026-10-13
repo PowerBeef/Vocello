@@ -2650,7 +2650,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         customVoiceProfile _: String?,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         capture(
@@ -2717,7 +2716,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         customVoiceProfile _: String?,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
         enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -2772,7 +2770,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         capture(
@@ -2832,7 +2829,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
         enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -2885,7 +2881,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         capture(
@@ -2945,7 +2940,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        memoryClearCadence _: Int?,
         enableChunkTimings _: Bool,
         enableCodecTrace _: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,

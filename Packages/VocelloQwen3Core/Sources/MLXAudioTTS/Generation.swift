@@ -423,7 +423,6 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         customVoiceProfile: String?,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -440,7 +439,6 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -457,7 +455,6 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -488,7 +485,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         customVoiceProfile: String?,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error>
 
@@ -521,7 +517,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error>
 
@@ -559,7 +554,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool
     ) -> AsyncThrowingStream<AudioGeneration, Error>
 

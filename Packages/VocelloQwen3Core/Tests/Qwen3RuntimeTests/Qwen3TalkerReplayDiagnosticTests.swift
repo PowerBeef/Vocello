@@ -238,7 +238,7 @@ final class Qwen3TalkerReplayDiagnosticTests: XCTestCase {
                     clearCacheOnStreamChunkEmit: policy.clearCacheOnStreamChunkEmit,
                     tokenMemoryClearCadence: policy.tokenMemoryClearCadence, talkerKVGeneratedWindow: nil),
                 streamingInterval: capture.streamingInterval, customVoiceProfile: nil, streamStepEvalPolicy: nil,
-                generationSpeedProfile: nil, memoryClearCadence: nil, enableChunkTimings: false,
+                generationSpeedProfile: nil, enableChunkTimings: false,
                 enableCodecTrace: true, sink: { event in try await buffer.receive(event) })
             terminal = String(describing: finish)
         } catch SamplingCaptureBuffer.Stop.frameBound {

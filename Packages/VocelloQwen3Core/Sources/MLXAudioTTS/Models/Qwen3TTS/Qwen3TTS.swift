@@ -302,16 +302,6 @@ private enum Qwen3GenerationSpeedProfile: String, Sendable {
         return .current
     }
 
-    func memoryClearCadence(explicitCadence: Int?) -> Int {
-        if let explicitCadence {
-            return max(0, explicitCadence)
-        }
-        switch self {
-        case .current, .legacy123Memory, .adaptiveFailureOnly, .balancedAllModes:
-            return 50
-        }
-    }
-
     func tokenBudgetPolicy(
         mode: Qwen3StreamingGenerationMode,
         customVoiceProfile: Qwen3CustomVoiceGenerationProfile
@@ -1405,7 +1395,6 @@ struct Qwen3StreamChunkSchedule: Sendable {
 
 public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedSpeechGenerationModel, Qwen3PreparedQualityGenerationModel, Qwen3SuspendingSpeechGenerationModel, Qwen3CodecTraceReplayModel, Qwen3CodecRoundTripModel, Qwen3CustomVoicePrewarmDepthControlling, SpeechGenerationModelDiagnosticsProvider, @unchecked Sendable {
     private static let productionMinimumGeneratedCodeTokensBeforeEOS = 2
-    private static let productionFullResultMemoryClearCadence = 0
 
     let config: Qwen3TTSModelConfig
     let talker: Qwen3TTSTalkerForConditionalGeneration
@@ -1690,10 +1679,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
         let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
-        try validateOptimizedCustomVoiceTextEmbeddingLength(
-            textTokenCount: textEmbed.dim(1),
-            originalText: text
-        )
+        try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         let firstTextEmbed = textEmbed[0..., 3 ..< 4, 0...] + prefix.codecLastEmbed
         let trailingTextHidden = concatenated(
@@ -1730,10 +1716,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
         let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
-        try validateOptimizedCustomVoiceTextEmbeddingLength(
-            textTokenCount: textEmbed.dim(1),
-            originalText: text
-        )
+        try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         let targetTextEmbed = concatenated(
             [textEmbed[0..., 3 ..< (textEmbed.dim(1) - 5), 0...], prefix.ttsEosEmbed],
@@ -1890,6 +1873,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         guard let speechTokenizer else {
             throw AudioGenerationError.modelNotInitialized("Speech tokenizer not loaded")
         }
+        // DA-04 E4-02 backstop: every caller's input preparation already needs
+        // the talker config, so this only guards a future caller that does not.
+        guard let talkerConfig = config.talkerConfig else {
+            throw AudioGenerationError.modelNotInitialized("Talker config not loaded")
+        }
         defer {
             Memory.clearCache()
         }
@@ -1912,7 +1900,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             axis: -1,
             keepDims: true
         )
-        let talkerConfig = config.talkerConfig!
         let eosTokenArray = MLXArray([Int32(talkerConfig.codecEosTokenId)]).reshaped(1, 1)
         let isEOS = nextToken .== eosTokenArray
 
@@ -2362,8 +2349,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 refAudio: refAudio,
                 refText: refText,
                 samplingPolicy: samplingPolicy,
-                memoryPolicy: .compatibilityDefault,
-                memoryClearCadence: Self.productionFullResultMemoryClearCadence
+                memoryPolicy: .compatibilityDefault
             )
         }
         return audio
@@ -2431,7 +2417,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         streamingInterval: streamingInterval,
                         streamStepEvalPolicy: nil,
                         generationSpeedProfile: nil,
-                        memoryClearCadence: nil,
                         onToken: { tokenId in
                             guard !Task.isCancelled else { return }
                             continuation.yield(.token(tokenId))
@@ -2513,7 +2498,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 customVoiceProfile: nil,
                 streamStepEvalPolicy: nil,
                 generationSpeedProfile: nil,
-                memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
@@ -2575,7 +2559,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 customVoiceProfile: nil,
                 streamStepEvalPolicy: nil,
                 generationSpeedProfile: nil,
-                memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
@@ -2639,7 +2622,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 customVoiceProfile: nil,
                 streamStepEvalPolicy: nil,
                 generationSpeedProfile: nil,
-                memoryClearCadence: Self.productionFullResultMemoryClearCadence,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
                 onPrepared: onPrepared,
@@ -2679,7 +2661,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         customVoiceProfile: String?,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool = false
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         let (stream, continuation) = AsyncThrowingStream<AudioGeneration, Error>.makeStream()
@@ -2702,7 +2683,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         customVoiceProfile: customVoiceProfile,
                         streamStepEvalPolicy: streamStepEvalPolicy,
                         generationSpeedProfile: generationSpeedProfile,
-                        memoryClearCadence: memoryClearCadence,
                         onToken: {
                             guard !Task.isCancelled else { return }
                             continuation.yield(.token($0))
@@ -2743,7 +2723,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool = false
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         let (stream, continuation) = AsyncThrowingStream<AudioGeneration, Error>.makeStream()
@@ -2764,7 +2743,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         streamingInterval: streamingInterval,
                         streamStepEvalPolicy: streamStepEvalPolicy,
                         generationSpeedProfile: generationSpeedProfile,
-                        memoryClearCadence: memoryClearCadence,
                         onToken: {
                             guard !Task.isCancelled else { return }
                             continuation.yield(.token($0))
@@ -2805,7 +2783,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool = false
     ) -> AsyncThrowingStream<AudioGeneration, Error> {
         let (stream, continuation) = AsyncThrowingStream<AudioGeneration, Error>.makeStream()
@@ -2828,7 +2805,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         streamingInterval: streamingInterval,
                         streamStepEvalPolicy: streamStepEvalPolicy,
                         generationSpeedProfile: generationSpeedProfile,
-                        memoryClearCadence: memoryClearCadence,
                         onToken: {
                             guard !Task.isCancelled else { return }
                             continuation.yield(.token($0))
@@ -2877,7 +2853,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         customVoiceProfile: String?,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -2899,7 +2874,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     customVoiceProfile: customVoiceProfile,
                     streamStepEvalPolicy: streamStepEvalPolicy,
                     generationSpeedProfile: generationSpeedProfile,
-                    memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
@@ -2922,7 +2896,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -2942,7 +2915,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     streamingInterval: streamingInterval,
                     streamStepEvalPolicy: streamStepEvalPolicy,
                     generationSpeedProfile: generationSpeedProfile,
-                    memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
@@ -2965,7 +2937,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         streamingInterval: Double,
         streamStepEvalPolicy: String?,
         generationSpeedProfile: String?,
-        memoryClearCadence: Int?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
@@ -2987,7 +2958,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     streamingInterval: streamingInterval,
                     streamStepEvalPolicy: streamStepEvalPolicy,
                     generationSpeedProfile: generationSpeedProfile,
-                    memoryClearCadence: memoryClearCadence,
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
@@ -3259,7 +3229,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         customVoiceProfile explicitCustomVoiceProfile: String? = nil,
         streamStepEvalPolicy explicitStreamStepEvalPolicy: String? = nil,
         generationSpeedProfile explicitGenerationSpeedProfile: String? = nil,
-        memoryClearCadence _: Int? = nil,
         onToken: ((Int) -> Void)? = nil,
         onInfo: ((AudioGenerationInfo) -> Void)? = nil,
         onAudioChunk: ((MLXArray) -> Void)? = nil,
@@ -3293,7 +3262,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let effectiveTextConditioningMode: Qwen3TextConditioningMode =
             referenceParity.fullTextConditioning ? .fullTextNonStreaming : textConditioningMode
 
-        let talkerConfig = config.talkerConfig!
+        // DA-04 E4-02: a checkpoint loaded without `talker_config` builds its
+        // talker from defaults, so fail here, typed, rather than trap.
+        guard let talkerConfig = config.talkerConfig else {
+            throw AudioGenerationError.modelNotInitialized("Talker config not loaded")
+        }
         let isPureVoiceDesign = speaker == nil && refAudio == nil && voiceClonePrompt == nil
         let isDedicatedCustomVoice = speaker != nil && refAudio == nil && voiceClonePrompt == nil
         let isVoiceCloneGeneration = voiceClonePrompt != nil || refAudio != nil
@@ -4890,10 +4863,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         // Get text embeddings
         let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
-        try validateOptimizedCustomVoiceTextEmbeddingLength(
-            textTokenCount: textEmbed.dim(1),
-            originalText: text
-        )
+        try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         // TTS special tokens
         let ttsTokens = MLXArray(
@@ -4969,14 +4939,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         return (inputEmbeds, trailingTextHidden, ttsPadEmbed)
     }
 
-    private func validateOptimizedCustomVoiceTextEmbeddingLength(
-        textTokenCount: Int,
-        originalText: String
-    ) throws {
-        guard textTokenCount >= 10 else {
+    /// The fewest chat-template tokens a script can produce: the
+    /// `<|im_start|>assistant\n` role (3), one text token, and the
+    /// `<|im_end|>\n<|im_start|>assistant\n` tail (5). Every slice of the text
+    /// embedding is valid from here, so a one-token script such as "Hi"
+    /// generates (DA-04 E4-01).
+    static let minimumChatTemplateTokenCount = 3 + 1 + 5
+
+    /// Refuses a script with no text token. The message names only the count,
+    /// never the script, and no mode.
+    static func validateChatTemplateTokenCount(_ tokenCount: Int) throws {
+        guard tokenCount >= minimumChatTemplateTokenCount else {
             throw AudioGenerationError.invalidInput(
-                "Optimized Qwen3 custom voice requires a longer tokenized prompt. " +
-                "The current text produced only \(textTokenCount) chat tokens for '\(originalText)'."
+                "The script has no text to speak: it produced \(tokenCount) chat tokens, " +
+                "and at least \(minimumChatTemplateTokenCount) are needed."
             )
         }
     }

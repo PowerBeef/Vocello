@@ -26,7 +26,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 0/4 (0%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 0/5 (0%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 6/14 (43%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -55,7 +55,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
-| `DA-04` | in-flight | Engine edge inputs | — |
+| `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
@@ -110,7 +110,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`AUD-09`** (planned, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
-- **`DA-04`** (in-flight, due 2026-10-30) — Engine edge inputs.
+- **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
 - **`F-01`** (planned, due 2026-10-30) — High — make saved-voice review transactional and add iOS deletion.
@@ -442,12 +442,17 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
+| `BKL-01` | parked | Refuse a script that is only whitespace once control tokens are neutralized | — |
 | `CONV-21` | parked | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
 
 ### Open items in detail
+
+- **`BKL-01`** (parked) — Refuse a script that is only whitespace once control tokens are neutralized.
+  gate: A script made only of chat-template control-token literals (for example <|im_end|>) is refused with the typed short-script error instead of synthesizing a whitespace token, with a deterministic test.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`CONV-21`** (parked) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline) and a clean unit lane; scripts/dev.sh ci is green on the new pin.

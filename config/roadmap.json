@@ -431,16 +431,18 @@
       "id": "DA-04",
       "plan": "release-first-3-0-2026-09",
       "title": "Engine edge inputs",
-      "status": "in-flight",
+      "status": "planned",
       "due": "2026-10-30",
-      "blockedBy": [],
+      "blockedBy": [
+        "RF-15"
+      ],
       "gate": "One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "docs/audits/2026-10-06-deep-audit.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
       "updated": "2026-10-13",
-      "notes": "E4-01 is a two-line change but cannot be proven without loading a model, which is a consent-bound run."
+      "notes": "2026-10-13: E4-01 fixed: the chat-template guard accepts 9 tokens (3 role + 1 text + 5 tail) and its message names only the count, never the script. E4-02 fixed: a model without talker_config fails typed at generate and prewarm instead of trapping. E4-03 fixed by removing the ignored memoryClearCadence parameter, the constant and the unused speed-profile function; the request's tokenMemoryClearCadence was and stays the cadence. E4-04 fixed: a multi-token step on a non-empty talker cache runs as single-token steps, exact for plain, quantized and rotating caches; the production prefill mask is unchanged. Real-model proof: \"Hi\" at Speed generated through the streamed Custom and full-text Design layouts, ending by EOS with Fast QC pass, and both engine rows record a target token count of 1. Closes after RF-15's device run."
     },
     {
       "id": "DA-05",
@@ -1697,6 +1699,20 @@
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "CW-05 characterization: retained id 41 and deleted id 900 become sqlite_sequence 41 after the v3 rebuild; the next inserted ID is 42. v5-to-current preserves the high-water. Workflow migration adds an explicitly named characterization test and leaves shipped migrations unchanged. Assess repair and actual outbox reachability separately."
+    },
+    {
+      "id": "BKL-01",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Refuse a script that is only whitespace once control tokens are neutralized",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A script made only of chat-template control-token literals (for example <|im_end|>) is refused with the typed short-script error instead of synthesizing a whitespace token, with a deterministic test.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the DA-04 review (2026-10-13): such a script passes the apps' speakable-text check, neutralizes to one space and now generates as nine chat tokens; it ends in the existing no-audio failure or Fast QC, with no crash or leak. Parked without investigation under the focus lock."
     }
   ]
 }

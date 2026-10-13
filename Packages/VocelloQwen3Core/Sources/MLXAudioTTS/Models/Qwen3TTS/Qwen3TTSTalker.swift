@@ -286,6 +286,23 @@ final class Qwen3TTSTalkerModel: Module {
 
         let offset: Int = cache?.first?.offset ?? 0
 
+        // DA-04 E4-04: a multi-token step on a non-empty cache runs as single-token
+        // steps. That is the shape every cache attends exactly (a plain or
+        // quantized cache, and a rotating cache that keeps its pinned prefix
+        // while its window slides), so the chunk matches step-by-step decoding.
+        // No production path sends one: the prefill runs on an empty cache and
+        // every later step is a single position.
+        if offset > 0, seqLen > 1, mask == nil {
+            let steps = (0 ..< seqLen).map { index in
+                self(
+                    inputsEmbeds[0..., index ..< (index + 1), 0...],
+                    positionIds: positionIds.map { $0[0..., 0..., index ..< (index + 1)] },
+                    cache: cache
+                )
+            }
+            return concatenated(steps, axis: 1)
+        }
+
         let posIds: MLXArray
         if let positionIds {
             posIds = positionIds
@@ -299,6 +316,8 @@ final class Qwen3TTSTalkerModel: Module {
 
         var causalMask = mask
         if causalMask == nil, seqLen > 1 {
+            // Only the prefill on an empty cache gets here (see above), where
+            // queries and keys are the same positions, so the square mask is exact.
             causalMask = MultiHeadAttention.createAdditiveCausalMask(seqLen).asType(inputsEmbeds.dtype)
         }
 

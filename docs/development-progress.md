@@ -17,6 +17,48 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### October 12 — paused at release step 1 (resume here)
+
+The maintainer paused all work. The release plan is under the focus lock, with step 1 partly done.
+Read [the path](reference/release-first-execution-2026-09.md) first; `scripts/dev.sh status` lists
+the next items by due date.
+
+**Done in App Store Connect**, with the maintainer's approval (RF-02 notes):
+- version 3.0.0 replaces the unreleased 1.0 draft, with its copyright line;
+- category Productivity (secondary Music);
+- free in all 175 territories, iPhone only (Apple-silicon Mac and Vision Pro off);
+- age rating 4+;
+- App Privacy "Data Not Collected" published with the privacy policy URL;
+- the export purchase's en-US, fr-CA and fr-FR names and descriptions.
+
+**Waiting on the maintainer** (step 1, due October 16):
+1. Accept the Paid Apps agreement. The browser attempt stopped at Apple's two-factor prompt; Claude
+   never enters verification codes. The terms: 30% commission, 15% under the Small Business Program
+   (worth applying).
+2. Banking and tax in App Store Connect. Claude never enters account numbers or tax IDs.
+3. The EU trader (DSA) declaration, or EU storefronts stay closed.
+4. ASR-04 attestations for the 11 asset groups and confirmations 12 and 13, using the inventory in
+   [the content-rights review](reference/content-rights-review.md#asr-04-per-asset-attestations-from-the-maintainer).
+   Each asset is attested or replaced.
+
+**In flight:** ASR-02, whose only remaining step is to deploy the updated privacy page with the next
+authorized push, and ASR-04 (the attestations). RF-02 stays planned until items 1 to 3 are done.
+
+**Next for Claude** after step 1:
+- RF-14 (due October 19): the four engine fixes as registered knobs (D1 streaming text conditioning,
+  D2 EOS reinsertion, D3 the float32 cast, D6 the Custom English fallback), fixed-seed pairs, then the
+  maintainer's blind A/B.
+- AUD-09: the smoke-test fixture preflight.
+- Code fixes for the blockers AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04.
+- RF-13's phone session: rerun the purchase exports scenario, and capture the purchase's review
+  screenshot for App Store Connect.
+
+If a step 1 date has passed when work resumes, move it with a recorded reason rather than leaving it
+overdue.
+
+`main` is 14 commits ahead of `origin` and nothing has been pushed; the website privacy update goes
+live only after a push.
+
 ### October 12 — step 1 decisions recorded
 
 The four decisions are recorded in the roadmap and in the

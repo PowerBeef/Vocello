@@ -884,7 +884,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-10-12",
-      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory prepared that day: built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested."
+      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested."
     },
     {
       "id": "ASR-05",

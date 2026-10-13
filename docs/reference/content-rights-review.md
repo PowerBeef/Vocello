@@ -74,9 +74,32 @@ code, an SDK, an account, analytics, or a non-Apple purchase path.
 ### ASR-04: per-asset attestations from the maintainer
 
 The maintainer attests each shipped asset's provenance in a private record, using the inventory
-prepared on 2026-10-12. The product artwork is mixed: own work, stock and AI-assisted. The tracked
-record keeps only a decision ID and the evidence digest. Every asset is either attested or replaced
-before submission.
+below. The product artwork is mixed: own work, stock and AI-assisted. The tracked record keeps only
+a decision ID and the evidence digest. Every asset is either attested or replaced before submission.
+
+For each group the maintainer answers who made it (self, another person, an AI tool and which one,
+or stock with its site and license) and roughly when. Each fingerprint is the first 12 hex characters
+of SHA-256 over the group's sorted `sha256  path` lines at `36236682`. A changed asset changes its
+fingerprint and needs a fresh answer.
+
+| # | Asset group | Files | Fingerprint | What the repository knows |
+|---|---|---|---|---|
+| 1 | macOS app icon (`AppIcon.appiconset`) | 10 sizes | `1a43162c7cde` | Nothing |
+| 2 | iPhone app icon (`VocelloIOSIcon.appiconset`) | 9 sizes | `28f60184c798` | Nothing |
+| 3 | Website favicon and touch icon | 2 | `78b0860bb22e` | Brand art |
+| 4 | Header mark (app and website) | 4 | `386564067946` | Brand art |
+| 5 | Launch logo | 3 sizes | `b11af58e5a56` | Nothing |
+| 6 | Launch background | 3 sizes | `fcb8bc9835ee` | Nothing |
+| 7 | Website social preview | 1 | `125eba9aa004` | Brand art |
+| 8 | README banner | 1 | `9f202800a5fd` | Nothing |
+| 9 | Website app screenshots (PNG and AVIF) | 14 | `7c5615a0c52c` | Captures of Vocello's own UI; some are historical 2.x iPhone captures |
+| 10 | Website voice samples | 4 | `141776ca135c` | Vocello outputs (`website/src/data/samples.js`) |
+| 11 | In-app voice previews | 9 | `51dd17e72695` | Vocello outputs from documented neutral scripts (`Sources/Resources/voice-previews/README.md`) |
+
+Two confirmations complete the record:
+- **12.** Qwen and Hugging Face names appear only descriptively, never as Vocello's own brand.
+- **13.** The maintainer wrote the scripts behind groups 10 and 11 and accepts presenting Qwen's
+  built-in speaker names in the app.
 
 ## Account declaration
 

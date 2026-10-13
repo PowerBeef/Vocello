@@ -43,6 +43,20 @@ class CoreDeviceProbeTests(unittest.TestCase):
         devices.pop()
         self.assertEqual(probe.pick_device(data, None)["identifier"], devices[0]["identifier"])
 
+    def test_simulated_devices_never_count_or_get_selected(self) -> None:
+        data = json.loads((FIXTURES / "devicectl-list-connected.json").read_text())
+        devices = data["result"]["devices"]
+        physical = devices[0]["identifier"]
+        simulated = json.loads(json.dumps(devices[0]))
+        simulated["identifier"] = "00000000-0000-0000-0000-00000000000A"
+        simulated["hardwareProperties"] = dict(simulated.get("hardwareProperties") or {}, reality="simulated")
+        simulated["connectionProperties"] = {"pairingState": "paired", "tunnelState": "disconnected",
+                                             "transportType": "sameMachine"}
+        devices.append(simulated)
+        # The paired simulator neither makes the physical phone ambiguous nor is selectable.
+        self.assertEqual(probe.pick_device(data, None)["identifier"], physical)
+        self.assertIsNone(probe.pick_device(data, simulated["identifier"]))
+
     def test_unavailable_device(self) -> None:
         data = json.loads((FIXTURES / "devicectl-list-unavailable.json").read_text())
         dev = probe.pick_device(data, "00000000-0000-0000-0000-000000000001")

@@ -56,7 +56,11 @@ def list_devices_json() -> dict[str, Any]:
 
 
 def _devices(data: dict[str, Any]) -> list[dict[str, Any]]:
-    return (data.get("result") or {}).get("devices") or []
+    # Xcode 27's CoreDevice lists the Simulator runtimes as paired devices too;
+    # the lanes drive the physical iPhone only, so a simulated entry never
+    # counts, never makes the choice ambiguous and is never selected.
+    devices = (data.get("result") or {}).get("devices") or []
+    return [d for d in devices if (d.get("hardwareProperties") or {}).get("reality") != "simulated"]
 
 
 def _connected(d: dict[str, Any]) -> bool:

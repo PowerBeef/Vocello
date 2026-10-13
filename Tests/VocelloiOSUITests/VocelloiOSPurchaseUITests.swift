@@ -232,7 +232,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                 row = try longestHistoryRow()
             }
             try require("existing \(mode) History row with visible provenance") {
-                row.exists && row.isHittable && row.label.contains(label)
+                self.clearsDock(row) && row.label.contains(label)
             }
             let id = row.identifier
             historyRows[mode] = id
@@ -269,7 +269,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         var best: (element: XCUIElement, seconds: Double)?
         for index in 0..<min(rows.count, 8) {
             let candidate = rows.element(boundBy: index)
-            guard candidate.isHittable else { continue }
+            guard clearsDock(candidate) else { continue }
             let seconds = candidate.label.split(separator: ",").last
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .flatMap { $0.hasSuffix("s") ? Double($0.dropLast()) : nil } ?? 0
@@ -277,6 +277,13 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         }
         guard let best else { throw Failure.observation }
         return best.element
+    }
+
+    /// A row half under the tab dock reports hittable, yet its menu button misses the tap
+    /// (2026-10-13 physical run: the row at y 845 of 874 pt never opened its menu).
+    private func clearsDock(_ row: XCUIElement) -> Bool {
+        guard row.exists, row.isHittable, let viewport = VocelloUISettingsReveal.viewport(in: app) else { return false }
+        return viewport.contains(row.frame)
     }
 
     private func selectHistoryFilter(_ label: String) throws {

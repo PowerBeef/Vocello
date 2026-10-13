@@ -40,6 +40,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario foreground-exit
   scripts/ui_test.sh ios smoke --scenario update-models
   scripts/ui_test.sh ios smoke --scenario startup-retry
+  scripts/ui_test.sh ios smoke --scenario background-warmup
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -69,6 +70,10 @@ create it: an absent voice stops the run before it changes anything, naming the 
 `smoke --scenario startup-retry` (AUD-01) launches with the registered internal-diagnostics knob
 QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE, so the first startup pass fails; Retry must then reach the
 Studio without a relaunch. Distribution builds compile the knob out, so this runs on the device build.
+`smoke --scenario background-warmup` chooses the benchmark clone voice, which starts the proactive
+Clone model load and reference priming, then leaves the foreground 0.3, 1.5 and 3.0 s later, each in
+a fresh process. The app must still be running after each dwell and the crash delta must stay empty.
+It generates nothing.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
@@ -214,9 +219,10 @@ elif [[ "$lane" == "screen-protection" ]]; then
     || die "screen-protection --scenario must be inspect or enable"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
-        || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" ) \
+        || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \
+        || "$scenario_argument" == "background-warmup" ) \
       && -z "$candidate_evidence" ]] \
-    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models or startup-retry"
+    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models, startup-retry or background-warmup"
   [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
@@ -399,6 +405,7 @@ step_workflow="ui-$platform-$lane"
 [[ "$scenario_argument" != "history-transcript" ]] || step_workflow="ui-ios-history-transcript"
 [[ "$scenario_argument" != "update-models" ]] || step_workflow="ui-ios-update-models"
 [[ "$scenario_argument" != "startup-retry" ]] || step_workflow="ui-ios-startup-retry"
+[[ "$scenario_argument" != "background-warmup" ]] || step_workflow="ui-ios-background-warmup"
 [[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
   step_workflow="ui-ios-control-audit-generation"
@@ -444,6 +451,12 @@ if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] 
     payload["scenario"] = "startup-retry"
     payload["evidenceClass"] = "focused-smoke"
     payload["modes"] = []
+    payload["lengths"] = []
+    payload["warm"] = 0
+if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "background-warmup":
+    payload["scenario"] = "background-warmup"
+    payload["evidenceClass"] = "focused-smoke"
+    payload["modes"] = ["clone"]
     payload["lengths"] = []
     payload["warm"] = 0
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "update-models":
@@ -1807,6 +1820,9 @@ else
     elif [[ "$scenario_argument" == "startup-retry" ]]; then
       # AUD-01: the registered knob fails the first startup pass; Retry must reach the Studio.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testStartupFailureOffersRetry"
+    elif [[ "$scenario_argument" == "background-warmup" ]]; then
+      # Engine review 2026-10-13: leaving during the proactive Clone warm-up must not end the app.
+      only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testLeavingDuringCloneWarmupKeepsTheAppRunning"
     fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
@@ -2103,10 +2119,10 @@ PY
   # Collect failed smoke evidence before the aggregate exit. A passing diagnostic
   # subset never converts a failed XCTest into a successful run.
   smoke_diagnostics_status=0
-  # Model maintenance and the startup Retry proof generate nothing, so they have
-  # no smoke diagnostics to gate.
+  # Model maintenance, the startup Retry proof and the background warm-up check
+  # generate nothing, so they have no smoke diagnostics to gate.
   if [[ "$lane" == "smoke" && "$scenario_argument" != "update-models" \
-      && "$scenario_argument" != "startup-retry" ]]; then
+      && "$scenario_argument" != "startup-retry" && "$scenario_argument" != "background-warmup" ]]; then
     if ! required_step_run "$step_ledger" smoke-diagnostics validate_ios_smoke; then
       smoke_diagnostics_status=1
       warn "iOS smoke memory-pressure diagnostics gate failed"

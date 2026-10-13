@@ -502,6 +502,53 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         select(tab: .studio)
     }
 
+    /// Device check of the October 13 engine review's background warm-up candidate
+    /// (`smoke --scenario background-warmup`): choosing a saved voice starts the
+    /// proactive Clone model load and reference priming, and iOS rejects GPU work
+    /// from the background. Each pass launches a fresh process, leaves the
+    /// foreground at a fixed offset after the Clone handoff and returns after a
+    /// dwell. The process must still be running; the lane's crash delta must stay
+    /// empty. Nothing is generated.
+    func testLeavingDuringCloneWarmupKeepsTheAppRunning() {
+        for offset in [0.3, 1.5, 3.0] {
+            beginSession()
+            let savedVoice = assertRequiredCloneVoice()
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: savedVoice, timeout: 20))
+            let clone = element("generateSection_clone")
+            XCTAssertTrue(
+                VocelloUIWait.condition("saved voice handoff to select Clone mode", timeout: 30) {
+                    clone.exists && clone.isSelected
+                }
+            )
+            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "warm-up offset")], timeout: offset)
+            XCUIDevice.shared.press(.home)
+            XCTAssertTrue(
+                VocelloUIWait.condition("app to leave the foreground", timeout: 20) {
+                    self.app.state != .runningForeground
+                }
+            )
+            // Long enough for a rejected command buffer to end the process.
+            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "background dwell")], timeout: 15)
+            XCTAssertNotEqual(
+                app.state, .notRunning,
+                "Leaving \(offset) s after the Clone handoff ended the process"
+            )
+            app.activate()
+            XCTAssertTrue(
+                VocelloUIWait.condition("app to return to the foreground", timeout: 30) {
+                    self.app.state == .runningForeground
+                }
+            )
+            XCTAssertTrue(
+                VocelloUIWait.condition("Clone mode kept after the return", timeout: 30) {
+                    clone.exists && clone.isSelected
+                }
+            )
+            VocelloUIScreenshot.attach(app, named: "ios-background-warmup-\(offset)s")
+            endSession()
+        }
+    }
+
     /// Maintenance on the paired iPhone, on explicit request only
     /// (`smoke --scenario update-models`): taps each installed model's genuine
     /// Update control and waits until every model reads Ready. No generation.

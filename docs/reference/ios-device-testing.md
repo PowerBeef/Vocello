@@ -103,6 +103,17 @@ reason `shutdown`, no `*_cancel_failed` event, exactly one cancelled app generat
 one, and a successful generation after the barrier (`check_ios_smoke_acceptance.py --scenario
 foreground-exit`).
 
+The background warm-up check is a third focused scenario:
+
+```sh
+scripts/ui_test.sh ios smoke --scenario background-warmup
+```
+
+Choosing the benchmark clone voice starts the proactive Clone model load and reference priming, and
+iOS rejects GPU work from the background. In three fresh processes the journey presses Home 0.3, 1.5
+and 3.0 s after the Clone handoff, waits 15 s and returns. The process must still be running and the
+crash delta must stay empty. It generates nothing, so no smoke diagnostics are gated.
+
 The long-form acceptance fixture removes its final separator space before entry so exact joined
 History comparisons use canonical input. Do not normalize the observed player value or ignore
 missing words/punctuation. On mismatch, the shared verifier retains the actual value before dismissal;

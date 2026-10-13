@@ -366,8 +366,9 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         startGenerationAndWaitForAutomaticMemoryPressureTerminal()
         VocelloUIScreenshot.attach(app, named: "ios-smoke-memory-pressure-terminal")
 
+        // The memory notice holds the action slot; its Retry starts the next take.
         replaceScript(with: completionPrompt)
-        _ = generateAndWaitForCompletedPlayer(timeout: 240)
+        _ = generateAndWaitForCompletedPlayer(timeout: 240, startingFromNotice: true)
         VocelloUIScreenshot.attach(app, named: "ios-smoke-custom-complete")
 
         replaceHistorySearch(with: completionToken)

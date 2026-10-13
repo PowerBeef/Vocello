@@ -606,7 +606,9 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     /// Starts a real production generation and waits for the runtime memory
-    /// policy to cancel it. Typed cause and cancel-before-unload ordering are
+    /// policy to cancel it. Since U23 (e9286e8f) such a take says why: the
+    /// localized "stopped to free memory" notice holds the action slot until the
+    /// next take starts. Typed cause and cancel-before-unload ordering are
     /// validated from pulled device diagnostics by `scripts/ui_test.sh`.
     func startGenerationAndWaitForAutomaticMemoryPressureTerminal() {
         let generate = element("textInput_generateButton")
@@ -627,19 +629,15 @@ class VocelloiOSUITestCase: XCTestCase {
         // typed cancellation, and full unload; the checks below prove the UI
         // returned cleanly and that the runtime can generate again afterward.
         XCTAssertTrue(
-            VocelloUIWait.condition("memory-pressure generation to reach a terminal state", timeout: 120) {
-                generationError.exists || (
-                    !cancel.exists
-                        && !livePlayer.exists
-                        && !completedPlayer.exists
-                        && generate.exists
-                        && generate.isEnabled
-                )
+            VocelloUIWait.condition("memory-pressure stop notice", timeout: 120) {
+                generationError.exists && !cancel.exists && !livePlayer.exists && !completedPlayer.exists
             }
         )
-        XCTAssertFalse(generationError.exists, "Memory-pressure cancellation must be a clean terminal outcome")
+        XCTAssertTrue(
+            VocelloUIWait.label(generationError, contains: "free memory", timeout: 10),
+            "A take the engine stops for memory must say so (U23)"
+        )
         XCTAssertFalse(completedPlayer.exists, "Memory-pressure cancellation must not surface an output")
-        XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 10))
     }
 
     func replaceHistorySearch(with query: String) {
@@ -758,8 +756,11 @@ class VocelloiOSUITestCase: XCTestCase {
 
     /// Uses only visible production state: enabled Generate before the action,
     /// the completed inline player after it, and no visible generation error.
+    /// `startingFromNotice`: the previous take ended in a notice that holds the
+    /// action slot (U23's memory stop); tapping it is Retry with the current script.
     func generateAndWaitForCompletedPlayer(
         timeout: TimeInterval,
+        startingFromNotice: Bool = false,
         failTestOnVisibleError: Bool = true,
         onVisibleError: ((String) -> Void)? = nil
     ) -> String {
@@ -770,9 +771,17 @@ class VocelloiOSUITestCase: XCTestCase {
         let generationError = element("textInput_generationError")
         let replacesCompletedPlayer = completedPlayer.exists
 
-        XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
-        XCTAssertFalse(generationError.exists, "Generate must not begin from an error state")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 20))
+        if startingFromNotice {
+            XCTAssertTrue(VocelloUIWait.enabled(generationError, timeout: 60))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generationError, timeout: 20))
+            // The new attempt clears the notice; until it does, a stale notice
+            // must not read as this take's terminal error.
+            XCTAssertTrue(VocelloUIWait.disappears(generationError, timeout: 30))
+        } else {
+            XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
+            XCTAssertFalse(generationError.exists, "Generate must not begin from an error state")
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 20))
+        }
         XCTAssertTrue(
             VocelloUIWait.condition("generation to visibly start", timeout: 30) {
                 cancel.exists || livePlayer.exists || !generate.exists || !generate.isEnabled

@@ -425,14 +425,24 @@ class VocelloiOSUITestCase: XCTestCase {
         VocelloUISettingsReveal.perform(target, in: app, swipingUp: swipingUp)
     }
 
+    /// AUD-09: smoke and the clone benchmark use the benchmark clone voice but
+    /// never create it. An absent voice is a missing fixture, reported with its
+    /// enrollment route rather than as a generic timeout.
+    static let absentCloneFixtureMessage = """
+        Absent fixture: Saved Voices has no "\(VocelloUIBenchMatrix.cloneVoiceID)", and this lane never \
+        creates it. Enroll it first (scripts/ui_test.sh ios enroll-clone-fixture after staging the \
+        reference WAV and .txt sidecar in the app's Documents, or headless scripts/ios_device.sh \
+        enroll-clone-fixture), then rerun.
+        """
+
     @discardableResult
     func assertRequiredCloneVoice() -> XCUIElement {
         select(tab: .voices)
         let savedVoice = element("voicesRow_saved_\(VocelloUIBenchMatrix.cloneVoiceID)")
-        XCTAssertTrue(
-            VocelloUIWait.exists(savedVoice, timeout: 60),
-            "The exact benchmark clone voice must be present in Saved Voices"
-        )
+        // The raw wait: the shared waits record their own generic failure on timeout.
+        if !savedVoice.waitForExistence(timeout: 60) {
+            XCTFail(Self.absentCloneFixtureMessage)
+        }
         XCTAssertTrue(
             VocelloUIWait.condition("benchmark clone voice to be visible", timeout: 20) {
                 savedVoice.exists && savedVoice.isHittable

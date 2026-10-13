@@ -306,6 +306,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
 
         XCTAssertTrue(VocelloUIWait.exists(element("generateSection_custom"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("textInput_textEditor"), timeout: 20))
+        // AUD-09: the journey needs the benchmark clone voice and never creates
+        // it. On a store without it, smoke stops here, before it changes any
+        // setting or History, with the enrollment route.
+        _ = assertRequiredCloneVoice()
 
         for mode in VocelloUIBenchMatrix.Mode.allCases {
             select(mode: mode)

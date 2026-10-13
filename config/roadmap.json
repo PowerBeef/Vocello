@@ -1363,15 +1363,17 @@
     {
       "id": "AUD-09",
       "title": "Smoke test01 owns the fixture it depends on",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-21",
       "gate": "Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
-        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift"
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
+        "scripts/ui_test.sh"
       ],
-      "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See project-review-2026-09-18.md.",
+      "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See project-review-2026-09-18.md. 2026-10-13: the fixture preflights landed. Full smoke and the macOS localization walk now stop before the build when the debug store lacks the current benchmark clone voice (scripts/ui_test.sh, naming scripts/macos_test.sh models ensure); the iPhone smoke journey probes Saved Voices before it changes any setting or History and fails with the enrollment route. The clean-store outcome is that actionable stop with nothing changed. Closure needs RF-15's device smoke.",
       "plan": "release-first-3-0-2026-09",
-      "updated": "2026-10-12"
+      "updated": "2026-10-13"
     },
     {
       "id": "AUD-11",

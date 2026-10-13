@@ -63,6 +63,8 @@ screenshots, xcresult, diagnostics, and restoration proof are retained under the
 the production UI); it never publishes benchmark history and never runs in smoke, benchmark, CI, or release.
 `startup-parity` enters the supplied script through the real composer, visibly selects Vivian / Calm Strong /
 English, then correlates the completed generation UUID with the engine request receipt. It never publishes.
+Full smoke (both platforms) and the macOS localization walk need the benchmark clone voice and never
+create it: an absent voice stops the run before it changes anything, naming the enrollment route.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
@@ -344,6 +346,13 @@ fi
 if [[ "$platform" == "macos" && "$lane" == "benchmark" && ",${modes}," == *",clone,"* ]]; then
   mac_test_clone_fixture_current \
     || die "benchmark clone reference is stale; run: scripts/macos_test.sh models ensure"
+fi
+# AUD-09: full smoke and the localization walk read the benchmark clone voice
+# (test01, test02) but never create it, so a store without it stops here, before
+# the build and before the app changes anything.
+if [[ "$platform" == "macos" && ( "$lane" == "localization" || ( "$lane" == "smoke" && -z "$scenario_argument" ) ) ]]; then
+  mac_test_clone_fixture_current \
+    || die "absent fixture: macOS $lane needs the benchmark clone voice $MAC_TEST_CLONE_VOICE_NAME in the debug store and never creates it; run: scripts/macos_test.sh models ensure"
 fi
 
 command -v xcodebuild >/dev/null 2>&1 || die "xcodebuild not found"

@@ -54,7 +54,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-01` | planned | iOS launch and deep-link dead ends | — |
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
-| `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
+| `AUD-09` | in-flight | Smoke test01 owns the fixture it depends on | — |
 | `DA-04` | planned | Engine edge inputs | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
@@ -108,7 +108,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`AUD-07`** (planned, due 2026-10-30) — Verify recovery from an unverified StoreKit purchase.
   gate: A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`AUD-09`** (planned, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
+- **`AUD-09`** (in-flight, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.

@@ -367,7 +367,8 @@ class VocelloMacUITestCase: XCTestCase {
                 element("voicesRow_\(VocelloUIBenchMatrix.cloneVoiceID)"),
                 timeout: 20
             ),
-            "The benchmark clone voice must be visibly present in Saved Voices"
+            "Absent fixture: Saved Voices has no \"\(VocelloUIBenchMatrix.cloneVoiceID)\", and this lane "
+                + "never creates it; run scripts/macos_test.sh models ensure, then rerun"
         )
         XCTAssertTrue(
             VocelloUIWait.exists(

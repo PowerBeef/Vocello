@@ -110,6 +110,38 @@ class VocelloiOSUITestCase: XCTestCase {
         additionalEnvironment: [String: String] = [:],
         additionalArguments: [String] = []
     ) {
+        launchProcess(additionalEnvironment: additionalEnvironment, additionalArguments: additionalArguments)
+        completeVisibleOnboardingIfNeeded()
+        XCTAssertTrue(VocelloUIWait.exists(element(VocelloiOSTab.studio.identifier), timeout: 30))
+        // Fail fast, with a full-screen screenshot, when a system alert or
+        // overlay is covering the app instead of surfacing later as cryptic
+        // "not hittable" timeouts.
+        VocelloUIWait.assertForegroundUnobstructed(
+            app,
+            probe: element(VocelloiOSTab.studio.identifier)
+        )
+        select(tab: .studio)
+        XCTAssertTrue(VocelloUIWait.exists(element("generateSection_custom"), timeout: 30))
+        XCTAssertTrue(VocelloUIWait.exists(element("textInput_textEditor"), timeout: 30))
+    }
+
+    /// AUD-01: begins a session whose first startup pass fails on purpose
+    /// (`QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE`, a registered internal-diagnostics
+    /// knob), so the journey starts on the startup failure screen, not the Studio.
+    func beginSessionAtForcedStartupFailure() {
+        continueAfterFailure = false
+        assertToggleNormalizerContract()
+        pendingAutoplayPreferenceRestore = nil
+        session = VocelloUIApplicationSession()
+        launchProcess(additionalEnvironment: ["QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE": "1"])
+    }
+
+    /// Launches the app process and waits for the foreground, without waiting for
+    /// the Studio (a forced startup failure stops before it).
+    private func launchProcess(
+        additionalEnvironment: [String: String] = [:],
+        additionalArguments: [String] = []
+    ) {
         var environment = [
             "QWENVOICE_DEBUG": "1",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
@@ -130,18 +162,6 @@ class VocelloiOSUITestCase: XCTestCase {
                 self.app.state == .runningForeground
             }
         )
-        completeVisibleOnboardingIfNeeded()
-        XCTAssertTrue(VocelloUIWait.exists(element(VocelloiOSTab.studio.identifier), timeout: 30))
-        // Fail fast, with a full-screen screenshot, when a system alert or
-        // overlay is covering the app instead of surfacing later as cryptic
-        // "not hittable" timeouts.
-        VocelloUIWait.assertForegroundUnobstructed(
-            app,
-            probe: element(VocelloiOSTab.studio.identifier)
-        )
-        select(tab: .studio)
-        XCTAssertTrue(VocelloUIWait.exists(element("generateSection_custom"), timeout: 30))
-        XCTAssertTrue(VocelloUIWait.exists(element("textInput_textEditor"), timeout: 30))
     }
 
     func element(_ identifier: String) -> XCUIElement {

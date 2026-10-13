@@ -32,6 +32,11 @@ struct RootView: View {
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
     @State private var importedVoicePresentation: ImportedVoicePresentation?
     @State private var importErrorMessage: String?
+    /// AUD-01: imports one opened file at a time, from its copy to its cover.
+    @State private var externalImportWaiter: Task<Void, Never>?
+    /// AUD-01: only an on-screen root takes an opened file, so a file put back
+    /// while this root goes away waits for the next one.
+    @State private var isRootOnScreen = false
     @State private var dockHeight = IOSStudioShellMetrics.dockFadeHeight
 
     init(ttsEngine: TTSEngineStore) {
@@ -180,8 +185,16 @@ struct RootView: View {
         }
         // The app root receives opened files (AUD-01); one waiting from launch
         // or a later open is presented here once onboarding is gone.
+        .onAppear {
+            isRootOnScreen = true
+            presentPendingExternalImport()
+        }
         .onChange(of: externalImports.queue.pending, initial: true) {
             presentPendingExternalImport()
+        }
+        .onDisappear {
+            isRootOnScreen = false
+            externalImportWaiter?.cancel()
         }
         .alert(
             IOSInterfaceText.importFailed,
@@ -329,34 +342,79 @@ struct RootView: View {
         appModel.dismissBottomPanel()
     }
 
+    /// AUD-01: takes the next opened file once onboarding is gone and no other
+    /// opened file is in progress.
     private func presentPendingExternalImport() {
-        guard let url = externalImports.queue.take(
-            onboardingIsPresented: appModel.isOnboardingPresented
-        ) else { return }
-        openExternalAudio(url)
+        guard isRootOnScreen,
+              externalImportWaiter == nil,
+              let url = externalImports.queue.take(
+                  onboardingIsPresented: appModel.isOnboardingPresented
+              ) else { return }
+        externalImportWaiter = Task { await importExternalAudio(url) }
     }
 
-    private func openExternalAudio(_ sourceURL: URL) {
+    /// AUD-01: one opened file, start to finish. The copy comes first, so a file
+    /// that fails closes nothing the user has open. On success RootView closes
+    /// what the import replaces (the player sheet, the recorder, the picker and
+    /// an earlier import review) and presents only once nothing is presented
+    /// over the root, so the cover is never dropped; a child screen's sheet or
+    /// an alert keeps it waiting. A file opened meanwhile goes next.
+    private func importExternalAudio(_ sourceURL: URL) async {
+        var finished = true
+        defer {
+            externalImportWaiter = nil
+            if finished { presentPendingExternalImport() }
+        }
         // Keep the URL supplied by the system intact so LocalDocumentIO can consume the
         // security-scoped grant before copying audio and any adjacent transcript sidecar.
         // The copy runs off the main actor and refuses an oversized file (CORE-16).
-        Task {
-            do {
-                let imported = try await IOSReferenceAudioImportPolicy.importReference(
-                    from: sourceURL,
-                    into: AppPaths.importedReferenceAudioDir
-                )
-                importErrorMessage = nil
-                appModel.playerSheetItem = nil
-                appModel.cancelCloneReferenceRecording()
-                appModel.cancelCloneReferenceImport()
-                appModel.dismissBottomPanel()
-                appModel.dismissDeleteModelSheet()
-                appModel.tab = .voices
-                importedVoicePresentation = ImportedVoicePresentation(reference: imported)
-            } catch {
-                importErrorMessage = importFailureMessage(error)
+        let imported: ImportedReferenceAudio
+        do {
+            imported = try await IOSReferenceAudioImportPolicy.importReference(
+                from: sourceURL,
+                into: AppPaths.importedReferenceAudioDir
+            )
+        } catch {
+            guard !Task.isCancelled else {
+                finished = false
+                requeueExternalImport(sourceURL)
+                return
             }
+            importErrorMessage = importFailureMessage(error)
+            return
+        }
+        appModel.playerSheetItem = nil
+        appModel.cancelCloneReferenceRecording()
+        appModel.cancelCloneReferenceImport()
+        appModel.dismissBottomPanel()
+        appModel.dismissDeleteModelSheet()
+        importedVoicePresentation = nil
+        appModel.tab = .voices
+        while !IOSRootPresentation.isIdle {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else {
+                // The root went away: the next one imports the file again.
+                finished = false
+                Self.discardImportCopy(imported)
+                requeueExternalImport(sourceURL)
+                return
+            }
+        }
+        importErrorMessage = nil
+        importedVoicePresentation = ImportedVoicePresentation(reference: imported)
+    }
+
+    /// Puts an interrupted file back unless a newer one is already waiting.
+    private func requeueExternalImport(_ sourceURL: URL) {
+        if externalImports.queue.pending == nil {
+            externalImports.queue.enqueue(sourceURL)
+        }
+    }
+
+    private static func discardImportCopy(_ imported: ImportedReferenceAudio) {
+        try? FileManager.default.removeItem(atPath: imported.materializedPath)
+        if let sidecar = imported.transcriptSidecarPath {
+            try? FileManager.default.removeItem(atPath: sidecar)
         }
     }
 
@@ -416,6 +474,22 @@ private struct ImportedVoicePresentation: Identifiable {
 @Observable
 final class IOSExternalImportInbox {
     var queue = IOSExternalImportQueue()
+}
+
+/// AUD-01: whether nothing (a sheet, cover, picker or alert, from RootView or a
+/// child screen) is presented over the app's root. The app's windows sit at the
+/// normal level; the app-switcher privacy covers sit above it. With no root to
+/// present from, nothing can be presented, so that is not idle.
+@MainActor
+enum IOSRootPresentation {
+    static var isIdle: Bool {
+        let roots = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .filter { $0.windowLevel == .normal }
+            .compactMap(\.rootViewController)
+        return !roots.isEmpty && roots.allSatisfy { $0.presentedViewController == nil }
+    }
 }
 
 

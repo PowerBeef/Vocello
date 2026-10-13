@@ -345,7 +345,7 @@
         "scripts/ui_test.sh"
       ],
       "updated": "2026-10-13",
-      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen). 2026-10-13: no longer waits on AUD-09, whose smoke preflights landed (1bc2b95e); AUD-09 and AUD-01 now close after this run."
+      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen). 2026-10-13: no longer waits on AUD-09, whose smoke preflights landed (1bc2b95e); AUD-09 and AUD-01 now close after this run. Proposed 2026-10-13, awaiting the maintainer: a processed build cannot force a startup failure, so the dependency-failure row runs scripts/ui_test.sh ios smoke --scenario startup-retry on the device build; the journey also opens a file while the player sheet or the recorder is up (AUD-01)."
     },
     {
       "id": "RF-17",
@@ -1265,7 +1265,7 @@
         "Sources/iOS/App/RootView.swift",
         "Sources/iOSSupport/Services/IOSStartupRecovery.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P1); see project-review-2026-09-18.md. Startup Retry landed 2026-09-24 (a32a0f7f). 2026-10-13: IOSStartupAttempt owns the pass (Retry only after a failure, never beside a running pass or after success), and opened files are received at the app root and wait in IOSExternalImportQueue until startup finishes and onboarding has dismissed (a cold-launch open was otherwise lost while async startup ran). Tests drive both value types; the container and RootView wiring is device-proven only. Open for RF-15: a processed build cannot force a startup failure (no knob reaches distribution builds), so the Retry path's device proof needs a decision; also open a file while the player sheet or recorder is up.",
+      "notes": "Revalidated 2026-09-18 (P1); see project-review-2026-09-18.md. Startup Retry landed 2026-09-24 (a32a0f7f); 7bf815d6 queued opened files at the app root until onboarding is gone (a cold-launch open was otherwise lost while async startup ran). 2026-10-13 remediation: IOSStartupRunner owns each pass (fail, Retry, succeed is tested over fakes; the container only adapts iOS); the registered knob QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE with scripts/ui_test.sh ios smoke --scenario startup-retry proves Retry on the device build (distribution builds compile the knob out); RootView imports one opened file at a time: the copy comes first (a failure closes nothing), then it closes its own sheet, recorder, picker and earlier import and presents only once nothing is presented over the root, so the cover is never dropped. Closure needs RF-15's device run.",
       "plan": "release-first-3-0-2026-09",
       "updated": "2026-10-13",
       "blockedBy": [

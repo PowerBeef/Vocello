@@ -392,6 +392,26 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-smoke-history")
     }
 
+    /// AUD-01 device proof of the startup Retry (`smoke --scenario startup-retry`):
+    /// the registered knob fails the first startup pass, the failure screen shows
+    /// its reason with Retry, and Retry reaches the Studio without a relaunch.
+    /// Only a build with the internal-diagnostics capability honors the knob.
+    func testStartupFailureOffersRetry() {
+        beginSessionAtForcedStartupFailure()
+        defer { endSession() }
+
+        XCTAssertTrue(VocelloUIWait.exists(element("startup_errorState"), timeout: 60))
+        VocelloUIScreenshot.attach(app, named: "ios-startup-failure")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("startup_retryButton"), timeout: 20))
+        completeVisibleOnboardingIfNeeded()
+        XCTAssertTrue(VocelloUIWait.exists(element(VocelloiOSTab.studio.identifier), timeout: 60))
+        XCTAssertFalse(element("startup_errorState").exists)
+        // The app restores the last tab, which an earlier journey may have left.
+        select(tab: .studio)
+        XCTAssertTrue(VocelloUIWait.exists(element("generateSection_custom"), timeout: 30))
+        VocelloUIScreenshot.attach(app, named: "ios-startup-retry-studio")
+    }
+
     /// PA-15 foreground-exit proof: leaving the app mid-take cancels the
     /// attempt through the typed barrier with the `shutdown` reason before iOS
     /// suspends GPU work, the take never reaches History, the return notice

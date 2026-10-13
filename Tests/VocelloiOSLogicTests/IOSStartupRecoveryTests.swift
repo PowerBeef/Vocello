@@ -44,4 +44,79 @@ final class IOSStartupRecoveryTests: XCTestCase {
         XCTAssertNil(queue.pending)
         XCTAssertNil(queue.take(onboardingIsPresented: false), "each file is handed out once")
     }
+
+    /// The runner a container drives: the first pass fails and keeps its error
+    /// with Retry available, the retried pass succeeds and keeps the
+    /// dependencies, and nothing starts after success. Every change is announced
+    /// before it happens.
+    @MainActor
+    func testTheRunnerShowsAFailureThenSucceedsOnRetry() async {
+        var passes = 0
+        let runner = IOSStartupRunner<String> {
+            passes += 1
+            if passes == 1 { throw StartupProbeError.unavailable }
+            return "dependencies"
+        }
+        var announcements = 0
+        runner.willChange = { announcements += 1 }
+
+        await runner.start()?.value
+        XCTAssertEqual(runner.attempt.phase, .failed)
+        XCTAssertEqual(runner.error as? StartupProbeError, .unavailable)
+        XCTAssertNil(runner.dependencies)
+        XCTAssertFalse(runner.attempt.isStarting, "Retry is available after a failure")
+
+        await runner.start()?.value
+        XCTAssertEqual(runner.attempt.phase, .ready)
+        XCTAssertNil(runner.error, "Retry clears the failure")
+        XCTAssertEqual(runner.dependencies, "dependencies")
+        XCTAssertNil(runner.start(), "a started app never runs startup again")
+        XCTAssertEqual(passes, 2)
+        XCTAssertEqual(announcements, 4, "two passes, each announced at its start and its end")
+    }
+
+    /// Retry while a pass runs starts nothing; the running pass still ends it.
+    @MainActor
+    func testTheRunnerRefusesASecondPassWhileOneRuns() async {
+        let gate = StartupProbeGate()
+        var passes = 0
+        let runner = IOSStartupRunner<Int> {
+            passes += 1
+            await gate.wait()
+            return 7
+        }
+        let running = runner.start()
+        XCTAssertNotNil(running)
+        // Let the pass begin and suspend inside its operation.
+        while passes == 0 { await Task.yield() }
+        XCTAssertTrue(runner.attempt.isStarting)
+        XCTAssertNil(runner.start(), "Retry during a pass starts nothing")
+        gate.open()
+        await running?.value
+        XCTAssertEqual(runner.dependencies, 7)
+        XCTAssertEqual(passes, 1)
+    }
+}
+
+private enum StartupProbeError: Error, Equatable {
+    case unavailable
+}
+
+/// Holds a startup pass until the test opens it.
+@MainActor
+private final class StartupProbeGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        let pending = waiters
+        waiters.removeAll()
+        pending.forEach { $0.resume() }
+    }
 }

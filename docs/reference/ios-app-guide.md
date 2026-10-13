@@ -139,14 +139,20 @@ archive/IPA verification rejects any capability drift.
 
 The launch mark shows while the storage-protection pass runs off the main actor and the
 dependencies are built. If startup fails, `startup_errorState` shows the reason with
-`startup_retryButton`, which runs startup again without a relaunch; `IOSStartupAttempt` owns the
-pass, so Retry never starts one beside a running pass or after success (AUD-01). A failed engine
+`startup_retryButton`, which runs startup again without a relaunch; `IOSStartupRunner` owns the
+pass, so Retry never starts one beside a running pass or after success (AUD-01). On a device build the
+registered knob `QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE` fails the first pass, which
+`scripts/ui_test.sh ios smoke --scenario startup-retry` uses to prove Retry. A failed engine
 initialization after startup is retried the next time the app becomes active.
 
 An audio file opened into Vocello (Files, Share, Open in) is received at the app root, above the
 startup and failure screens, and waits in `IOSExternalImportQueue` until the root view is up and
-first-run onboarding has finished dismissing; then its import cover opens. A later open replaces
-one still waiting, and each file opens once (AUD-01).
+first-run onboarding has finished dismissing. RootView imports one file at a time: it copies the file
+first, so a file that fails closes nothing the user has open; then it closes its own player sheet,
+recorder, picker or earlier import review and presents the import cover only once nothing is
+presented over the root (a child screen's sheet or an alert keeps it waiting), so the cover is never
+dropped. A later open waits for the current one, a newer waiting open replaces an older one, and each
+file opens once (AUD-01).
 
 ### Onboarding (first run) — `Sources/iOS/Overlays/IOSOnboardingFlow.swift`
 

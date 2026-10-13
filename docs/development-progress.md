@@ -51,11 +51,19 @@ knobs. Subtle defects ship as the known limitation in the 3.0 notes. The rule fo
 nobody listens: RF-15's by-ear takes became the same machine screen, and CLAUDE.md, the evidence
 rule and the QC reference say so.
 
-**Code landed, closing after RF-15's device run:** AUD-09 (smoke fixture preflights, 1bc2b95e) and
-AUD-01 (startup Retry as an owned pass; opened files queued at the app root until onboarding is gone).
-Both are planned behind RF-15 so they hold no in-flight slot.
+**Code landed, closing after RF-15's device run** (each planned behind RF-15, holding no in-flight
+slot):
+- AUD-09: smoke fixture preflights (1bc2b95e).
+- AUD-01: startup is an `IOSStartupRunner` pass tested through fail, Retry, success; opened files wait
+  at the app root and open only once nothing is presented over the root. The registered knob
+  `QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE` with `scripts/ui_test.sh ios smoke --scenario startup-retry`
+  proves Retry on the device build.
+- DA-04: one-token scripts generate ("Hi" proven on real models), no talker-config trap, the dead
+  cadence parameter removed, and multi-token chunks exact on every cache (7841227f).
 
-**In flight:** DA-04 (engine edge inputs).
+**Waiting on the maintainer:** RF-15's notes propose running the dependency-failure row as the
+`startup-retry` scenario on the device build, because a processed build compiles the failure knob
+out; that needs a yes.
 
 **Claude's next work:** F-01 and F-16 (the transactional saved-voice and long-form blockers), then
 AUD-02 and AUD-07. All blocker code must land before the October 23 freeze.

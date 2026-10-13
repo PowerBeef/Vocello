@@ -9,80 +9,94 @@ import QwenVoiceCore
 /// The storage-protection pass walks the whole App Group tree, so it runs off the main
 /// actor; the registry, engine store and installer are created on the main actor only
 /// after it has finished, as the immutable model-file metadata window requires. A
-/// failure is shown with Retry instead of ending the session.
+/// failure is shown with Retry instead of ending the session: `IOSStartupRunner` owns
+/// the pass, so Retry starts one only after a failure.
 @MainActor
 final class IOSAppDependenciesContainer: ObservableObject {
-    @Published private(set) var registry: ContractBackedModelRegistry?
-    @Published private(set) var documentIO: LocalDocumentIO?
-    @Published private(set) var engine: TTSEngineStore?
-    @Published private(set) var modelManager: ModelManagerViewModel?
-    @Published private(set) var modelInstaller: IOSModelInstallerViewModel?
-    @Published private(set) var startupError: Error?
-    /// AUD-01: the owned startup pass (`IOSStartupAttempt`): Retry begins the
-    /// next one only after a failure, never beside a running pass.
-    @Published private(set) var attempt = IOSStartupAttempt()
+    struct Dependencies {
+        let registry: ContractBackedModelRegistry
+        let engine: TTSEngineStore
+        let modelManager: ModelManagerViewModel
+        let modelInstaller: IOSModelInstallerViewModel
+    }
 
-    var isStarting: Bool { attempt.isStarting }
+    private let startup: IOSStartupRunner<Dependencies>
+    /// Bumped before every startup change. Combine keeps the synthesized
+    /// `objectWillChange` in a `@Published` property, so without one the
+    /// container's computed state would never reach SwiftUI (AUD-01).
+    @Published private var revision = 0
+
+    var registry: ContractBackedModelRegistry? { startup.dependencies?.registry }
+    var engine: TTSEngineStore? { startup.dependencies?.engine }
+    var modelManager: ModelManagerViewModel? { startup.dependencies?.modelManager }
+    var modelInstaller: IOSModelInstallerViewModel? { startup.dependencies?.modelInstaller }
+    var startupError: Error? { startup.error }
+    var isStarting: Bool { startup.attempt.isStarting }
 
     init() {
-        start()
+        startup = IOSStartupRunner(operation: Self.makeDependencies)
+        startup.willChange = { [weak self] in self?.revision &+= 1 }
+        startup.start()
     }
 
     /// Runs startup again after a failure. Ignored while a pass is running or
     /// once the dependencies exist.
     func retry() {
-        start()
+        startup.start()
     }
 
-    private func start() {
-        guard attempt.begin() else { return }
-        startupError = nil
-        Task { [weak self] in
-            let protection = await Task.detached(priority: .userInitiated) {
-                // MAC-25 on the iPhone: reference clips an earlier launch recorded
-                // (a crash or jetsam kill stranded them) go before any sheet can
-                // record again. One app process owns this temporary directory.
-                ReferenceClipRecordingStash.removeLeftoverRecordings(
-                    anotherCopyIsRunning: false,
-                    ownerHasEnded: { _ in true }
-                )
-                return Result<IOSStorageProtectionPolicy.ApplyReport, any Error> {
-                    try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)
-                }
-            }.value
-            self?.finishStart(protection: protection)
+    /// AUD-01 device proof: the registered internal-diagnostics knob
+    /// `QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE` fails the first pass of the process
+    /// before it touches anything, so a phone run can prove Retry. Distribution
+    /// builds compile the knob out (`RuntimeDebugGate`).
+    private static var forcedStartupFailurePending: Bool = {
+        let raw = RuntimeDebugGate.value(for: "QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return ["1", "true", "yes", "on"].contains(raw ?? "")
+    }()
+
+    private struct ForcedStartupFailure: LocalizedError {
+        var errorDescription: String? { "Startup failed on purpose (internal diagnostics)." }
+    }
+
+    private static func makeDependencies() async throws -> Dependencies {
+        if forcedStartupFailurePending {
+            forcedStartupFailurePending = false
+            throw ForcedStartupFailure()
         }
-    }
-
-    private func finishStart(
-        protection: Result<IOSStorageProtectionPolicy.ApplyReport, any Error>
-    ) {
-        do {
-            let report = try protection.get()
-            if report.descendantFailureCount > 0, TelemetryGate.resolvedEnabled {
-                print("[bootstrap] storage protection left \(report.descendantFailureCount) file(s) for the next launch")
-            }
-            let registry = try TTSContract.loadRegistry()
-            let documentIO = LocalDocumentIO(importedReferenceDirectory: AppPaths.importedReferenceAudioDir)
-            let selectedBackend = try QVoiceiOSApp.makeBackend(
-                registry: registry,
-                documentIO: documentIO
+        let protection = await Task.detached(priority: .userInitiated) {
+            // MAC-25 on the iPhone: reference clips an earlier launch recorded
+            // (a crash or jetsam kill stranded them) go before any sheet can
+            // record again. One app process owns this temporary directory.
+            ReferenceClipRecordingStash.removeLeftoverRecordings(
+                anotherCopyIsRunning: false,
+                ownerHasEnded: { _ in true }
             )
-            let installer = selectedBackend.modelInstaller
-            IOSModelDeliveryBackgroundEventRelay.handler = { identifier, completionHandler in
-                _ = installer.handleBackgroundEventsCompletion(identifier, completionHandler)
+            return Result<IOSStorageProtectionPolicy.ApplyReport, any Error> {
+                try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)
             }
-            self.registry = registry
-            self.documentIO = documentIO
-            self.modelManager = selectedBackend.modelManager
-            self.modelInstaller = installer
-            self.engine = selectedBackend.engineStore
-            self.startupError = nil
-            attempt.finish(succeeded: true)
-        } catch {
-            self.startupError = error
-            attempt.finish(succeeded: false)
+        }.value
+        let report = try protection.get()
+        if report.descendantFailureCount > 0, TelemetryGate.resolvedEnabled {
+            print("[bootstrap] storage protection left \(report.descendantFailureCount) file(s) for the next launch")
         }
+        let registry = try TTSContract.loadRegistry()
+        let documentIO = LocalDocumentIO(importedReferenceDirectory: AppPaths.importedReferenceAudioDir)
+        let selectedBackend = try QVoiceiOSApp.makeBackend(
+            registry: registry,
+            documentIO: documentIO
+        )
+        let installer = selectedBackend.modelInstaller
+        IOSModelDeliveryBackgroundEventRelay.handler = { identifier, completionHandler in
+            _ = installer.handleBackgroundEventsCompletion(identifier, completionHandler)
+        }
+        return Dependencies(
+            registry: registry,
+            engine: selectedBackend.engineStore,
+            modelManager: selectedBackend.modelManager,
+            modelInstaller: installer
+        )
     }
 }
 

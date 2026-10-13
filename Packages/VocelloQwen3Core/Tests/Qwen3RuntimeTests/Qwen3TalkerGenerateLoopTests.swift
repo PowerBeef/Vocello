@@ -218,16 +218,19 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
     private static func samplingPolicy(
         seed: UInt64,
         maximumCodecTokens: Int = 16,
-        eosSuppressionFrames: Int? = nil
+        eosSuppressionFrames: Int? = nil,
+        referenceParity: Qwen3ReferenceParity = .production,
+        topK: Int = 50
     ) -> Qwen3RequestSamplingPolicy {
-        let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
+        let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: topK, minP: 0)
         return Qwen3RequestSamplingPolicy(
             effectiveSeed: seed,
             talker: stage,
             subtalker: stage,
             repetitionPenalty: 1.05,
             maximumCodecTokens: maximumCodecTokens,
-            eosSuppressionFrames: eosSuppressionFrames
+            eosSuppressionFrames: eosSuppressionFrames,
+            referenceParity: referenceParity
         )
     }
 
@@ -242,7 +245,9 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         _ model: Qwen3TTSModel,
         seed: UInt64,
         maximumCodecTokens: Int = 16,
-        eosSuppressionFrames: Int? = nil
+        eosSuppressionFrames: Int? = nil,
+        referenceParity: Qwen3ReferenceParity = .production,
+        topK: Int = 50
     ) async throws -> Take {
         let frames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
         let completion = try await model.generateVoiceDesignQualityFirst(
@@ -253,7 +258,9 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             samplingPolicy: Self.samplingPolicy(
                 seed: seed,
                 maximumCodecTokens: maximumCodecTokens,
-                eosSuppressionFrames: eosSuppressionFrames
+                eosSuppressionFrames: eosSuppressionFrames,
+                referenceParity: referenceParity,
+                topK: topK
             ),
             memoryPolicy: .compatibilityDefault,
             onPrepared: {},
@@ -267,6 +274,37 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             finishReason: completion.finishReason,
             info: completion.info
         )
+    }
+
+    /// The same Design request through the shipping streamed producer; returns
+    /// its codec frames.
+    private func streamed(
+        _ model: Qwen3TTSModel,
+        seed: UInt64,
+        referenceParity: Qwen3ReferenceParity = .production
+    ) async throws -> [[Int32]] {
+        let frames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
+        _ = try await model.produceVoiceDesign(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: model.defaultGenerationParameters,
+            samplingPolicy: Self.samplingPolicy(seed: seed, referenceParity: referenceParity),
+            memoryPolicy: .compatibilityDefault,
+            streamingInterval: 0.32,
+            streamStepEvalPolicy: nil,
+            generationSpeedProfile: nil,
+            memoryClearCadence: nil,
+            enableChunkTimings: false,
+            enableCodecTrace: true,
+            sink: { event in
+                if case .codecFrame(let codes) = event {
+                    frames.withLock { $0.append(codes) }
+                }
+            },
+            isolation: nil
+        )
+        return frames.withLock { $0 }
     }
 
     // MARK: - Talker
@@ -575,5 +613,90 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertEqual(sham.finishReason, .eos)
         XCTAssertEqual(model.latestPreparationTimingsMS["talker_eos_suppression_frames"], 0)
         XCTAssertNil(model.latestPreparationTimingsMS["talker_eos_suppression_start_frame"])
+    }
+
+    // MARK: - RF-14 reference-parity arms
+
+    /// D1: a streamed Design take armed with full-text conditioning lays its
+    /// text out as quality-first does, so one seed samples the quality-first
+    /// take's codes frame for frame; the engine row records the layout and the
+    /// arm. Unarmed, the streamed take keeps trailing text and records no arm.
+    func testFullTextConditioningGivesAStreamedTakeTheQualityFirstCodes() async throws {
+        let model = try Self.makeModel()
+        let seed: UInt64 = 0x5EED_0D01
+        let qualityFirst = try await generate(model, seed: seed)
+        XCTAssertFalse(qualityFirst.frames.isEmpty)
+
+        model.resetPreparationDiagnostics()
+        let armed = try await streamed(
+            model,
+            seed: seed,
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: false)
+        )
+        XCTAssertEqual(armed, qualityFirst.frames)
+        XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "full_text_non_streaming")
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "full_text_conditioning")
+
+        model.resetPreparationDiagnostics()
+        _ = try await streamed(model, seed: seed)
+        XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "streaming_trailing_text")
+        XCTAssertNil(model.latestPreparationStringFlags["reference_parity"])
+    }
+
+    /// D2 in the loop: at top-k 2 the talker's sampled distribution keeps two
+    /// codes, and production re-inserts an eligible EOS beside them as a third
+    /// candidate on some step; filtering EOS like any token never keeps more
+    /// than two.
+    func testFilteringEOSStopsTheLoopFromReinsertingIt() async throws {
+        final class Widths { var talker: [Int] = [] }
+        let model = try Self.makeModel()
+        let talkerVocabulary = try XCTUnwrap(model.config.talkerConfig).vocabSize
+        func widths(_ parity: Qwen3ReferenceParity) async throws -> [Int] {
+            let widths = Widths()
+            model.samplerObserver = { _, filtered, _, _ in
+                guard filtered.dim(-1) == talkerVocabulary else { return }
+                widths.talker.append(filtered.asArray(Float.self).filter(\.isFinite).count)
+            }
+            defer { model.samplerObserver = nil }
+            _ = try await generate(model, seed: 0x5EED_0D02, referenceParity: parity, topK: 2)
+            return widths.talker
+        }
+        let production = try await widths(.production)
+        let filtered = try await widths(
+            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+        )
+        XCTAssertTrue(production.contains(3), "production re-inserts EOS outside the top-k: \(production)")
+        XCTAssertFalse(filtered.isEmpty)
+        XCTAssertTrue(filtered.allSatisfy { $0 <= 2 }, "the reference arm keeps only the top-k: \(filtered)")
+    }
+
+    /// D2 and D3: each armed take names its arms on the engine row, and
+    /// production names none. The tiny talker's logits are already float32, so
+    /// float32 sampling leaves its codes unchanged.
+    func testSamplerArmsRecordThemselvesAndFloat32IsTheIdentityOnFloat32Logits() async throws {
+        let model = try Self.makeModel()
+        let seed: UInt64 = 0x5EED_0D03
+        let production = try await generate(model, seed: seed)
+        XCTAssertNil(model.latestPreparationStringFlags["reference_parity"])
+
+        model.resetPreparationDiagnostics()
+        let float32 = try await generate(
+            model,
+            seed: seed,
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)
+        )
+        XCTAssertEqual(float32.frames, production.frames)
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "float32_sampling")
+
+        model.resetPreparationDiagnostics()
+        _ = try await generate(
+            model,
+            seed: seed,
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
+        )
+        XCTAssertEqual(
+            model.latestPreparationStringFlags["reference_parity"],
+            "full_text_conditioning,filters_eos,float32_sampling"
+        )
     }
 }

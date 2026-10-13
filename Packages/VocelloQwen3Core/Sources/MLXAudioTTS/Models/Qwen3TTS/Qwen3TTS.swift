@@ -3285,6 +3285,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let subtalkerSampling = samplingPolicy.subtalker
         // Audio QC GEN-NOEOS (diagnostics only): nil on every production request.
         var eosSuppression = samplingPolicy.eosSuppressionFrames.map(Qwen3EOSSuppressionWindow.init(frames:))
+        // RF-14 A/B arms (diagnostics only): `.production` on every production request.
+        let referenceParity = samplingPolicy.referenceParity
+        // D1: streamed Custom and Design takes use the reference's full-text
+        // layout; clones ignore the requested mode (see `recordedLabel`).
+        let effectiveTextConditioningMode: Qwen3TextConditioningMode =
+            referenceParity.fullTextConditioning ? .fullTextNonStreaming : textConditioningMode
 
         let talkerConfig = config.talkerConfig!
         let isPureVoiceDesign = speaker == nil && refAudio == nil && voiceClonePrompt == nil
@@ -3350,7 +3356,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 language: language,
                 speaker: speaker,
                 instruct: instruct,
-                textConditioningMode: textConditioningMode
+                textConditioningMode: effectiveTextConditioningMode
             )
             inputEmbedsInit = prepared.inputEmbeds
             trailingTextHidden = prepared.trailingTextHidden
@@ -3369,7 +3375,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 text: text,
                 language: language,
                 voiceDescription: instruct ?? "",
-                textConditioningMode: textConditioningMode
+                textConditioningMode: effectiveTextConditioningMode
             )
             inputEmbedsInit = prepared.inputEmbeds
             trailingTextHidden = prepared.trailingTextHidden
@@ -3394,10 +3400,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
         storePreparationStringFlags([
             "text_conditioning_mode": Qwen3TextConditioningMode.recordedLabel(
-                requested: textConditioningMode,
+                requested: effectiveTextConditioningMode,
                 cloneInContextLearning: cloneInContextLearning
             ),
         ])
+        mergePreparationStringFlags(referenceParity.evidence)
 
         // Cap max tokens based on text length
         let customVoiceProfile = isDedicatedCustomVoice
@@ -3833,6 +3840,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 minP: minP,
                 scratch: samplerScratch,
                 allowsEOS: allowsEOS,
+                castsLogitsToFloat32: referenceParity.float32Sampling,
+                reinsertsEOSAfterFiltering: !referenceParity.filtersEOS,
                 observe: samplerObserver
             )
             // GEN-NOEOS (internal diagnostics only; `eosSuppression` is nil on
@@ -3852,6 +3861,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     minP: minP,
                     scratch: samplerScratch,
                     allowsEOS: false,
+                    castsLogitsToFloat32: referenceParity.float32Sampling,
                     observe: samplerObserver
                 )
             }
@@ -3927,6 +3937,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     topK: subtalkerSampling.topK,
                     minP: subtalkerSampling.minP,
                     scratch: codePredictorScratch,
+                    castsLogitsToFloat32: referenceParity.float32Sampling,
                     observe: samplerObserver
                 )
                 os_signpost(.end, log: stepSignpostLog, name: "Sample Predicted Codebook")
@@ -5145,9 +5156,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         minP: Float = 0.0,
         scratch: Qwen3SamplerScratch? = nil,
         allowsEOS: Bool = true,
+        castsLogitsToFloat32: Bool = false,
+        reinsertsEOSAfterFiltering: Bool = true,
         observe: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)? = nil
     ) -> MLXArray {
         var logitsSlice = logits[0..., (-1)..., 0...].squeezed(axis: 1) // [batch, vocab_size]
+        // RF-14 D3 (diagnostics only): the reference samples from float32
+        // logits; production samples in the model's own precision.
+        if castsLogitsToFloat32, logitsSlice.dtype != .float32 {
+            logitsSlice = logitsSlice.asType(.float32)
+        }
 
         // Suppress tokens by setting to -inf
         if let scratch {
@@ -5208,7 +5226,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Preserve EOS logit so top-k/top-p/min-p do not permanently suppress it.
-        let eosLogit: MLXArray? = if let eosTokenId, eosTokenId >= 0, eosTokenId < logitsSlice.dim(-1) {
+        // RF-14 D2 (diagnostics only): the reference filters EOS like any token.
+        let eosLogit: MLXArray? = if reinsertsEOSAfterFiltering,
+            let eosTokenId, eosTokenId >= 0, eosTokenId < logitsSlice.dim(-1) {
             logitsSlice[0..., eosTokenId ..< (eosTokenId + 1)]
         } else {
             nil

@@ -24,6 +24,48 @@ public struct Qwen3SamplingStage: Hashable, Sendable {
     }
 }
 
+/// RF-14 blind A/B arms: each flag moves one verified divergence from Qwen's
+/// reference implementation onto the reference behavior for one request. The
+/// host sets them only through its registered internal-diagnostics knobs;
+/// `.production` (every flag off) is the shipped engine.
+public struct Qwen3ReferenceParity: Hashable, Sendable {
+    /// D1: a streamed Custom or Design take lays its whole target text over
+    /// the prefix up front (the reference's `non_streaming_mode=True`, which
+    /// quality-first takes already use) instead of feeding it as trailing text.
+    public let fullTextConditioning: Bool
+    /// D2: the talker's EOS goes through top-k, top-p and min-p like every
+    /// other token instead of being re-inserted after them.
+    public let filtersEOS: Bool
+    /// D3: talker and code-predictor logits are cast to float32 before
+    /// sampling, as the reference does.
+    public let float32Sampling: Bool
+
+    public static let production = Self(
+        fullTextConditioning: false,
+        filtersEOS: false,
+        float32Sampling: false
+    )
+
+    public init(fullTextConditioning: Bool, filtersEOS: Bool, float32Sampling: Bool) {
+        self.fullTextConditioning = fullTextConditioning
+        self.filtersEOS = filtersEOS
+        self.float32Sampling = float32Sampling
+    }
+
+    /// The engine row's record of the arms this request asked for; empty on the
+    /// production path. An arm can be a no-op for one take (D1 on a clone or a
+    /// quality-first take, D3 on float32 logits), so a pair's audio, not this
+    /// label, shows whether it changed anything.
+    var evidence: [String: String] {
+        let arms = [
+            fullTextConditioning ? "full_text_conditioning" : nil,
+            filtersEOS ? "filters_eos" : nil,
+            float32Sampling ? "float32_sampling" : nil,
+        ].compactMap { $0 }
+        return arms.isEmpty ? [:] : ["reference_parity": arms.joined(separator: ",")]
+    }
+}
+
 /// Fully resolved request-local Qwen3 sampling policy.
 ///
 /// Version 2 is the first policy that owns an explicit MLX random state. The
@@ -41,6 +83,8 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     /// Audio QC GEN-NOEOS: the codec frames the talker's first sampled EOS is
     /// held back for (`Qwen3EOSSuppressionWindow`); nil is the production path.
     public let eosSuppressionFrames: Int?
+    /// RF-14 A/B arms; `.production` on every production request.
+    public let referenceParity: Qwen3ReferenceParity
 
     public init(
         algorithmVersion: Int = Self.currentAlgorithmVersion,
@@ -49,7 +93,8 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
         subtalker: Qwen3SamplingStage,
         repetitionPenalty: Float,
         maximumCodecTokens: Int,
-        eosSuppressionFrames: Int? = nil
+        eosSuppressionFrames: Int? = nil,
+        referenceParity: Qwen3ReferenceParity = .production
     ) {
         self.algorithmVersion = algorithmVersion
         self.effectiveSeed = effectiveSeed
@@ -58,6 +103,7 @@ public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
         self.repetitionPenalty = repetitionPenalty
         self.maximumCodecTokens = maximumCodecTokens
         self.eosSuppressionFrames = eosSuppressionFrames
+        self.referenceParity = referenceParity
     }
 
     /// Run every random operation in `body` against a fresh request-local MLX

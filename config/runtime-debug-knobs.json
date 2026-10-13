@@ -147,6 +147,20 @@
       ]
     },
     {
+      "id": "reference-parity-ab",
+      "classification": "behavior-or-policy-mutation",
+      "gateRequired": true,
+      "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
+      "releaseBehavior": "unavailable-without-internal-capability",
+      "purpose": "RF-14 blind A/B of four verified divergences from Qwen's reference implementation (docs/audits/2026-10-12-audio-qc-tooling-research.md section 3.1). Each key set to on takes the reference behavior: QWENVOICE_FULL_TEXT_CONDITIONING (D1) gives streamed Custom and Design takes the full-text layout quality-first takes already use; QWENVOICE_TALKER_FILTER_EOS (D2) filters the talker's EOS through top-k, top-p and min-p instead of re-inserting it; QWENVOICE_SAMPLER_FLOAT32 (D3) casts talker and code-predictor logits to float32 before sampling; QWENVOICE_CUSTOM_AUTO_LANGUAGE (D6) lets a Custom take with ambiguous language detection fall back to Auto instead of English. Production safety: read only through RuntimeDebugGate (an internal-diagnostics build plus QWENVOICE_DEBUG=1); D1-D3 resolve at the host into each request's immutable sampling configuration (referenceParity, encoded only when set) and D6 into the request's language hint, so no process-global state enters the runtime. Unset, every request takes the shipped path. Each armed take records reference_parity (D1-D3) and text_conditioning_mode in its engine row and its language hint (D6), and runtime debug provenance names the keys. Only a fix that wins the maintainer's blind listening becomes a default.",
+      "keys": [
+        "QWENVOICE_CUSTOM_AUTO_LANGUAGE",
+        "QWENVOICE_FULL_TEXT_CONDITIONING",
+        "QWENVOICE_SAMPLER_FLOAT32",
+        "QWENVOICE_TALKER_FILTER_EOS"
+      ]
+    },
+    {
       "id": "master-gate",
       "classification": "capability-gate",
       "gateRequired": false,

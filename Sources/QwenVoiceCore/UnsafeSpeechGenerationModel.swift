@@ -25,6 +25,37 @@ enum Qwen3TalkerSamplingOverride {
         RuntimeDebugGate.value(for: "QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES")
     )
 
+    /// RF-14 blind A/B arms (`VocelloQwen3ReferenceParity`): D1
+    /// `QWENVOICE_FULL_TEXT_CONDITIONING`, D2 `QWENVOICE_TALKER_FILTER_EOS` and D3
+    /// `QWENVOICE_SAMPLER_FLOAT32`, each `on` to take Qwen's reference behavior.
+    static let envReferenceParity: VocelloQwen3ReferenceParity? = referenceParity(
+        fullTextConditioning: RuntimeDebugGate.value(for: "QWENVOICE_FULL_TEXT_CONDITIONING"),
+        filtersEOS: RuntimeDebugGate.value(for: "QWENVOICE_TALKER_FILTER_EOS"),
+        float32Sampling: RuntimeDebugGate.value(for: "QWENVOICE_SAMPLER_FLOAT32")
+    )
+
+    /// The arms the knobs turn on, or nil (the production path) when none is.
+    static func referenceParity(
+        fullTextConditioning: String?,
+        filtersEOS: String?,
+        float32Sampling: String?
+    ) -> VocelloQwen3ReferenceParity? {
+        let parity = VocelloQwen3ReferenceParity(
+            fullTextConditioning: isOn(fullTextConditioning),
+            filtersEOS: isOn(filtersEOS),
+            float32Sampling: isOn(float32Sampling)
+        )
+        guard parity.fullTextConditioning || parity.filtersEOS || parity.float32Sampling else {
+            return nil
+        }
+        return parity
+    }
+
+    private static func isOn(_ raw: String?) -> Bool {
+        guard let raw else { return false }
+        return ["1", "true", "on", "yes"].contains(raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
     /// A whole number of codec frames within the facade's bound; anything else
     /// leaves the hold unset (the production path), so a take whose engine row
     /// does not record the hold was not held.
@@ -95,7 +126,8 @@ enum Qwen3TalkerSamplingOverride {
             repetitionPenalty: envRepetitionPenalty ?? official.repetitionPenalty,
             maxNewTokens: official.maxNewTokens,
             requestedSeed: requestedSeed,
-            eosSuppressionFrames: envEOSSuppressionFrames
+            eosSuppressionFrames: envEOSSuppressionFrames,
+            referenceParity: envReferenceParity
         )
     }
 }

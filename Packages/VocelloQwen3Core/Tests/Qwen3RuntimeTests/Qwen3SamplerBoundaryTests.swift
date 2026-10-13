@@ -8,12 +8,13 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
     private func processed(_ values: [Float], temperature: Float = 1, topP: Float = 1,
         topK: Int = 0, penalty: Float = 1, history: Set<Int> = [], suppress: [Int] = [],
         eos: Int? = nil, minP: Float = 0, scratch: Qwen3TTSModel.Qwen3SamplerScratch? = nil,
-        allowsEOS: Bool = true) -> [Float] {
+        allowsEOS: Bool = true, castsToFloat32: Bool = false, reinsertsEOS: Bool = true) -> [Float] {
         var observed: MLXArray?
         _ = Qwen3TTSModel.sampleToken(MLXArray(values).reshaped(1, 1, -1), temperature: temperature,
             topP: topP, topK: topK, repetitionPenalty: penalty, generatedTokenIDs: history,
             suppressTokens: suppress, eosTokenId: eos, minP: minP, scratch: scratch,
-            allowsEOS: allowsEOS, observe: { _, filtered, _, _ in observed = filtered })
+            allowsEOS: allowsEOS, castsLogitsToFloat32: castsToFloat32,
+            reinsertsEOSAfterFiltering: reinsertsEOS, observe: { _, filtered, _, _ in observed = filtered })
         return observed!.asArray(Float.self)
     }
 
@@ -74,6 +75,54 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
         XCTAssertEqual(processed([4, 2, -4], topP: 0.1, topK: 1, eos: 2, minP: 0.9), [4, -.infinity, -4])
         XCTAssertEqual(processed([4, 2, -4], topK: 1, suppress: [2], eos: 2), [4, -.infinity, -.infinity])
         XCTAssertEqual(processed([4, 2, -4], temperature: 0, topK: 1, suppress: [0]), [-.infinity, 2, -4])
+    }
+
+    /// RF-14 D2: production re-inserts an eligible EOS after top-k, top-p and
+    /// min-p; the reference arm filters it like any token. Without an EOS id
+    /// the two paths are the same filter.
+    func testReferenceEOSFilteringDropsTheReinsertion() {
+        XCTAssertEqual(processed([4, 2, -4], topK: 1, eos: 2), [4, -.infinity, -4])
+        XCTAssertEqual(processed([4, 2, -4], topK: 1, eos: 2, reinsertsEOS: false), [4, -.infinity, -.infinity])
+        // An EOS inside the top-k survives either way.
+        XCTAssertEqual(processed([4, 2, -4], topK: 2, eos: 1, reinsertsEOS: false), [4, 2, -.infinity])
+        XCTAssertEqual(processed([4, 2, -4, 1], topK: 2, reinsertsEOS: false), processed([4, 2, -4, 1], topK: 2))
+    }
+
+    /// RF-14 D3: the reference arm samples from float32 logits whatever the
+    /// model's precision; production keeps the model's dtype, and float32
+    /// logits are untouched either way.
+    func testFloat32SamplingCastsOnlyLowerPrecisionLogits() {
+        func filteredDType(_ logits: MLXArray, casts: Bool) -> DType {
+            var observed: MLXArray?
+            _ = Qwen3TTSModel.sampleToken(logits, temperature: 0.9, topP: 0.9, topK: 2, eosTokenId: 1,
+                castsLogitsToFloat32: casts, observe: { _, filtered, _, _ in observed = filtered })
+            return observed!.dtype
+        }
+        let bf16 = MLXArray([Float](arrayLiteral: 0.5, 1.25, -2, 3)).reshaped(1, 1, 4).asType(.bfloat16)
+        XCTAssertEqual(filteredDType(bf16, casts: false), .bfloat16)
+        XCTAssertEqual(filteredDType(bf16, casts: true), .float32)
+        XCTAssertEqual(
+            processed([0.5, 1.25, -2, 3], temperature: 0.9, topP: 0.9, topK: 2, castsToFloat32: true),
+            processed([0.5, 1.25, -2, 3], temperature: 0.9, topP: 0.9, topK: 2)
+        )
+
+        // Through a scratch prepared as the generate loop prepares it (float32
+        // suppress rows), cast bf16 logits stay float32 and match the float32 path.
+        func throughScratch(_ logits: MLXArray, casts: Bool) -> MLXArray {
+            let scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: 4)
+            scratch.prepareSuppressPairs(base: [3], withEOS: [2, 3], dtype: .float32)
+            var observed: MLXArray?
+            _ = Qwen3TTSModel.sampleToken(logits, temperature: 0.9, topP: 0.9, topK: 2, eosTokenId: 2,
+                scratch: scratch, castsLogitsToFloat32: casts, observe: { _, filtered, _, _ in observed = filtered })
+            return observed!
+        }
+        let cast = throughScratch(bf16, casts: true)
+        XCTAssertEqual(cast.dtype, .float32)
+        XCTAssertEqual(
+            cast.asArray(Float.self),
+            throughScratch(bf16.asType(.float32), casts: false).asArray(Float.self)
+        )
+        XCTAssertEqual(cast.asArray(Float.self)[3], -.infinity)
     }
 
     func testScratchAndObservationDoNotChangeSeededSequenceOrNextKey() {

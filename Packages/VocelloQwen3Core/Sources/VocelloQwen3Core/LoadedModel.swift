@@ -572,7 +572,14 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             ),
             repetitionPenalty: policy.repetitionPenalty,
             maximumCodecTokens: policy.maxNewTokens,
-            eosSuppressionFrames: policy.eosSuppressionFrames
+            eosSuppressionFrames: policy.eosSuppressionFrames,
+            referenceParity: policy.referenceParity.map {
+                Qwen3ReferenceParity(
+                    fullTextConditioning: $0.fullTextConditioning,
+                    filtersEOS: $0.filtersEOS,
+                    float32Sampling: $0.float32Sampling
+                )
+            } ?? .production
         )
     }
 

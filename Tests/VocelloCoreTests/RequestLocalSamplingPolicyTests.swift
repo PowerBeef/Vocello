@@ -1,5 +1,6 @@
 import XCTest
 @testable import QwenVoiceCore
+import VocelloQwen3Core
 
 final class RequestLocalSamplingPolicyTests: XCTestCase {
     func testRequestedSeedAndVariationResolveIntoOneImmutablePolicy() throws {
@@ -20,7 +21,31 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         XCTAssertEqual(policy.repetitionPenalty, 1.05, accuracy: 0.0001)
         // Production requests carry no EOS hold (the audio QC GEN-NOEOS knob is unset).
         XCTAssertNil(policy.eosSuppressionFrames)
+        // Nor any RF-14 reference-parity arm (its knobs are unset).
+        XCTAssertNil(policy.referenceParity)
         XCTAssertNoThrow(try policy.validated())
+    }
+
+    /// The RF-14 D1-D3 knobs: each turns its arm on only for an explicit on
+    /// value, and no arm at all is the production configuration (nil).
+    func testReferenceParityKnobsTurnOnOnlyTheirOwnArms() {
+        let parse = Qwen3TalkerSamplingOverride.referenceParity
+        XCTAssertNil(parse(nil, nil, nil))
+        for off in ["", "off", "0", "false", "no", "full"] {
+            XCTAssertNil(parse(off, off, off), off)
+        }
+        XCTAssertEqual(
+            parse("on", nil, nil),
+            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: false)
+        )
+        XCTAssertEqual(
+            parse(nil, " TRUE\n", nil),
+            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+        )
+        XCTAssertEqual(
+            parse("1", "yes", "on"),
+            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
+        )
     }
 
     /// The registered GEN-NOEOS knob's value: a whole number of codec frames

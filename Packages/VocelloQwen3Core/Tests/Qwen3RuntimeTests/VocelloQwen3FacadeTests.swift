@@ -337,6 +337,59 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         )
     }
 
+    /// RF-14: the reference-parity arms travel request-locally from the
+    /// sampling configuration to the runtime policy; a configuration without
+    /// them reaches the runtime as `.production` and encodes exactly as before.
+    func testSamplingConfigurationCarriesTheReferenceParityArms() async throws {
+        func sampling(_ parity: VocelloQwen3ReferenceParity?) -> VocelloQwen3SamplingConfiguration {
+            VocelloQwen3SamplingConfiguration(
+                effectiveSeed: 11,
+                talker: .init(temperature: 0.9, topP: 1, topK: 50, minP: 0),
+                subtalker: .init(temperature: 0.9, topP: 1, topK: 50, minP: 0),
+                repetitionPenalty: 1.05,
+                maxNewTokens: 64,
+                requestedSeed: 11,
+                referenceParity: parity
+            )
+        }
+        let memory = VocelloQwen3MemoryConfiguration(clearCacheOnStreamChunk: true, tokenMemoryClearCadence: 50)
+        let cases: [(VocelloQwen3ReferenceParity?, Qwen3ReferenceParity)] = [
+            (nil, .production),
+            (
+                VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true),
+                Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true)
+            ),
+            (
+                VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false),
+                Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+            ),
+        ]
+        for (parity, expected) in cases {
+            let compatibilityModel = FacadeCompatibilityModel()
+            let loaded = try makeLoadedFixture(compatibilityModel: compatibilityModel)
+            _ = try await loaded.generateCustomVoice(
+                text: "Sample like the reference.",
+                language: "en-US",
+                speaker: "fixture-speaker",
+                instruction: nil,
+                sampling: sampling(parity),
+                memory: memory
+            )
+            let captured = try XCTUnwrap(compatibilityModel.capturedSamplingPolicy)
+            XCTAssertEqual(captured.referenceParity, expected)
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let production = try XCTUnwrap(String(data: try encoder.encode(sampling(nil)), encoding: .utf8))
+        XCTAssertFalse(production.contains("referenceParity"))
+        let armed = sampling(VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true))
+        XCTAssertEqual(
+            try JSONDecoder().decode(VocelloQwen3SamplingConfiguration.self, from: try encoder.encode(armed)),
+            armed
+        )
+    }
+
     /// Audio QC GEN-NOEOS: the EOS hold travels request-locally from the
     /// sampling configuration to the runtime policy, only inside its bound, and
     /// a configuration without it encodes exactly as before.

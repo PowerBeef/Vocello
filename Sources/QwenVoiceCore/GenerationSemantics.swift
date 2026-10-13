@@ -842,6 +842,25 @@ public enum GenerationSemantics {
         return "\(trimmedBase.closingItsSentence) \(reinforcement)"
     }
 
+    /// RF-14 D6 A/B arm: `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` lets a Custom take
+    /// whose language detection is ambiguous fall back to Auto, as Design, Clone
+    /// and Qwen's reference do, instead of English (which also appends the
+    /// English diction reinforcement). Under Auto a dialect speaker (Dylan,
+    /// Eric) takes its dialect token, as in the reference. Registered in
+    /// `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
+    /// master gate, so production always falls back to English.
+    static let customUndetectedLanguage = resolvedCustomUndetectedLanguage(
+        RuntimeDebugGate.value(for: "QWENVOICE_CUSTOM_AUTO_LANGUAGE")
+    )
+
+    static func resolvedCustomUndetectedLanguage(_ raw: String?) -> String {
+        let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let value, ["1", "true", "on", "yes"].contains(value) else {
+            return canonicalCustomWarmLanguage
+        }
+        return Qwen3SupportedLanguage.auto.rawValue
+    }
+
     public static func qwenLanguageHint(
         for request: GenerationRequest,
         resolvedCloneTranscript: String? = nil,
@@ -856,7 +875,7 @@ public enum GenerationSemantics {
         }
         switch request.payload {
         case .custom:
-            return detectedQwenLanguage(in: effectiveText)?.rawValue ?? canonicalCustomWarmLanguage
+            return detectedQwenLanguage(in: effectiveText)?.rawValue ?? customUndetectedLanguage
         case .design:
             return detectedQwenLanguage(in: effectiveText)?.rawValue ?? Qwen3SupportedLanguage.auto.rawValue
         case .clone:

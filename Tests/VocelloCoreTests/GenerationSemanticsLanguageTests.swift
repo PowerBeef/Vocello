@@ -153,6 +153,18 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
         )
     }
 
+    /// RF-14 D6: only an explicit on value moves the Custom fallback to Auto;
+    /// production (the knob unset) keeps English.
+    func testCustomAutoLanguageKnobMovesOnlyTheUndetectedFallback() {
+        let resolve = GenerationSemantics.resolvedCustomUndetectedLanguage
+        XCTAssertEqual(resolve("on"), Qwen3SupportedLanguage.auto.rawValue)
+        XCTAssertEqual(resolve(" Yes\n"), Qwen3SupportedLanguage.auto.rawValue)
+        for raw in [nil, "", "off", "0", "auto", "french"] as [String?] {
+            XCTAssertEqual(resolve(raw), GenerationSemantics.canonicalCustomWarmLanguage, String(describing: raw))
+        }
+        XCTAssertEqual(GenerationSemantics.customUndetectedLanguage, GenerationSemantics.canonicalCustomWarmLanguage)
+    }
+
     func testDesignAutoFallsBackToAutoWhenUndetected() {
         let request = LanguageTestSupport.makeRequest(
             mode: .design,

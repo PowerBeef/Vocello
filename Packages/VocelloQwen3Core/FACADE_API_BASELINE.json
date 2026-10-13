@@ -77,6 +77,11 @@
     "Sources/VocelloQwen3Core/Contracts.swift::public let topK: Int",
     "Sources/VocelloQwen3Core/Contracts.swift::public let minP: Float",
     "Sources/VocelloQwen3Core/Contracts.swift::public init(temperature: Float, topP: Float, topK: Int, minP: Float = 0)",
+    "Sources/VocelloQwen3Core/Contracts.swift::public struct VocelloQwen3ReferenceParity: Codable, Hashable, Sendable",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let fullTextConditioning: Bool",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let filtersEOS: Bool",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let float32Sampling: Bool",
+    "Sources/VocelloQwen3Core/Contracts.swift::public init(fullTextConditioning: Bool, filtersEOS: Bool, float32Sampling: Bool)",
     "Sources/VocelloQwen3Core/Contracts.swift::public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/Contracts.swift::public static let currentAlgorithmVersion = 2",
     "Sources/VocelloQwen3Core/Contracts.swift::public static let compatibilityDefaultTopK = 50",
@@ -92,8 +97,9 @@
     "Sources/VocelloQwen3Core/Contracts.swift::public let repetitionPenalty: Float",
     "Sources/VocelloQwen3Core/Contracts.swift::public let seed: UInt64?",
     "Sources/VocelloQwen3Core/Contracts.swift::public let eosSuppressionFrames: Int?",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let referenceParity: VocelloQwen3ReferenceParity?",
     "Sources/VocelloQwen3Core/Contracts.swift::public init( maxNewTokens: Int, temperature: Float, topP: Float, topK: Int, repetitionPenalty: Float, seed: UInt64? = nil )",
-    "Sources/VocelloQwen3Core/Contracts.swift::public init( algorithmVersion: Int = Self.currentAlgorithmVersion, effectiveSeed: UInt64, talker: VocelloQwen3SamplingStage, subtalker: VocelloQwen3SamplingStage, repetitionPenalty: Float, maxNewTokens: Int, requestedSeed: UInt64? = nil, eosSuppressionFrames: Int? = nil )",
+    "Sources/VocelloQwen3Core/Contracts.swift::public init( algorithmVersion: Int = Self.currentAlgorithmVersion, effectiveSeed: UInt64, talker: VocelloQwen3SamplingStage, subtalker: VocelloQwen3SamplingStage, repetitionPenalty: Float, maxNewTokens: Int, requestedSeed: UInt64? = nil, eosSuppressionFrames: Int? = nil, referenceParity: VocelloQwen3ReferenceParity? = nil )",
     "Sources/VocelloQwen3Core/Contracts.swift::public func validated() throws -> Self",
     "Sources/VocelloQwen3Core/Contracts.swift::public struct VocelloQwen3MemoryConfiguration: Codable, Hashable, Sendable",
     "Sources/VocelloQwen3Core/Contracts.swift::public static let compatibilityDefault = Self( clearCacheOnStreamChunk: true, tokenMemoryClearCadence: 50, talkerKVGeneratedWindow: nil )",
@@ -448,7 +454,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "b226feb7b427c068a801245a70193c1dc93ddd4408edce7752088a43e216a21e"
+      "sha256": "5ed10a2d190e057f520844074f1aacd1a65f81fcc28388c6b76b795b3e464b95"
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
@@ -460,7 +466,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "ca33f83d772ff8bdd64cb14691195d1e826dff1cdca551049de49bec80c59164"
+      "sha256": "d37510c38fa141c69c56d8482ceecddae15683c01451ad503944b211c826aa86"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

@@ -112,6 +112,22 @@ public struct VocelloQwen3SamplingStage: Codable, Hashable, Sendable {
     }
 }
 
+/// RF-14 blind A/B arms (internal diagnostics only). Each flag moves one
+/// verified divergence from Qwen's reference implementation onto the reference
+/// behavior for one request: D1 full-text conditioning for streamed Custom and
+/// Design takes, D2 EOS filtered like any token, D3 float32 sampling logits.
+public struct VocelloQwen3ReferenceParity: Codable, Hashable, Sendable {
+    public let fullTextConditioning: Bool
+    public let filtersEOS: Bool
+    public let float32Sampling: Bool
+
+    public init(fullTextConditioning: Bool, filtersEOS: Bool, float32Sampling: Bool) {
+        self.fullTextConditioning = fullTextConditioning
+        self.filtersEOS = filtersEOS
+        self.float32Sampling = float32Sampling
+    }
+}
+
 /// Typed, request-local Qwen3 sampling policy.
 ///
 /// The legacy scalar fields remain source-compatible aliases for the talker
@@ -140,6 +156,9 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
     /// sets it; nil is the production path and 0 is the construction's sham
     /// (the same request with the hold armed at zero frames).
     public let eosSuppressionFrames: Int?
+    /// RF-14 A/B arms. Only the host's registered internal-diagnostics knobs
+    /// set it; nil is the production path and is never encoded.
+    public let referenceParity: VocelloQwen3ReferenceParity?
 
     public init(
         maxNewTokens: Int,
@@ -165,6 +184,7 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         self.repetitionPenalty = repetitionPenalty
         self.seed = seed
         self.eosSuppressionFrames = nil
+        self.referenceParity = nil
     }
 
     public init(
@@ -175,7 +195,8 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         repetitionPenalty: Float,
         maxNewTokens: Int,
         requestedSeed: UInt64? = nil,
-        eosSuppressionFrames: Int? = nil
+        eosSuppressionFrames: Int? = nil,
+        referenceParity: VocelloQwen3ReferenceParity? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.effectiveSeed = effectiveSeed
@@ -188,6 +209,7 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
         self.repetitionPenalty = repetitionPenalty
         self.seed = requestedSeed
         self.eosSuppressionFrames = eosSuppressionFrames
+        self.referenceParity = referenceParity
     }
 
     public func validated() throws -> Self {

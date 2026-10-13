@@ -75,7 +75,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                 } catch { /* Independent tab restoration must still be attempted. */ }
                 do {
                     try tap(originalTab)
-                    try require("original tab restored") { self.element(originalTab).isSelected }
+                    try require("original tab restored") { self.selected(self.element(originalTab)) }
                     if presentationRestored { restoration.tab = .restored }
                 } catch { restoration.tab = .failed }
             }
@@ -247,11 +247,11 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             // Autoplay may already have finished a clip of about a second (observed
             // 2026-09-24), so playing or played-to-the-end both prove playback.
             try require("internal playback stays available") {
-                player.isEnabled && (player.label == "Pause" || player.label == "Play")
+                player.exists && player.isEnabled && (player.label == "Pause" || player.label == "Play")
             }
             if player.label == "Pause" {
                 try tap("iosPlayer_playPause")
-                try require("playback paused") { player.label == "Play" }
+                try require("playback paused") { player.exists && player.label == "Play" }
             }
             try tap("iosPlayer_download")
             try checkExportPresentation(allowed: unlocked || mode == "custom")
@@ -293,7 +293,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             format: "identifier == %@ AND label == %@", "historyModeFilter", label))
         try require("unique History filter") { matches.count == 1 && matches.firstMatch.isHittable }
         matches.firstMatch.tap()
-        try require("selected History filter") { matches.firstMatch.isSelected }
+        try require("selected History filter") { self.selected(matches.firstMatch) }
     }
 
     private func checkExportPresentation(allowed: Bool) throws {
@@ -318,6 +318,10 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     }
 
     private func element(_ id: String) -> XCUIElement { VocelloUIWait.element(app, id: id) }
+    /// Waits read `label`, `isEnabled` and `isSelected` only once the element exists: on a
+    /// missing element XCTest fails the query itself, which ended the runner before this
+    /// test's cleanup (2026-10-13 physical run).
+    private func selected(_ element: XCUIElement) -> Bool { element.exists && element.isSelected }
     private func require(_ name: String, _ condition: @escaping () -> Bool) throws {
         guard VocelloUIWait.condition(name, timeout: 30, evaluate: condition) else { throw Failure.observation }
     }
@@ -361,7 +365,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             try tap("iosSettings_appLanguageOption_\(language)")
         }
         try require("interface language selected") {
-            self.element("iosSettings_appLanguageOption_\(language)").isSelected
+            self.selected(self.element("iosSettings_appLanguageOption_\(language)"))
         }
     }
     private func openPurchase() throws {
@@ -376,10 +380,9 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     private func locked() throws {
         try require("locked, local fixture price, idle") {
             let buy = self.element("exportPurchase_buy")
+            guard buy.exists, buy.isEnabled else { return false }
             // The live product is $19.99. Fail closed before Buy if app routing is not local.
-            let digits = buy.label.filter(\.isNumber)
-            return buy.exists && buy.isEnabled && digits == "099"
-                && !self.element("exportPurchase_unlocked").exists
+            return buy.label.filter(\.isNumber) == "099" && !self.element("exportPurchase_unlocked").exists
         }
     }
     private func unlocked() throws {
@@ -389,7 +392,8 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     }
     private func notice(_ text: String) throws {
         try require("purchase outcome: \(text)") {
-            self.element("exportPurchase_status").label.contains(text)
+            let status = self.element("exportPurchase_status")
+            return status.exists && status.label.contains(text)
                 && !self.element("exportPurchase_progress").exists
         }
     }

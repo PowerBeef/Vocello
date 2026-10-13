@@ -41,6 +41,9 @@ Between September 4 and October 12 the release did not move:
   [tooling research](../audits/2026-10-12-audio-qc-tooling-research.md). Only fixes that win become
   defaults. The remaining defect rate, with RF-06's long-form failure, ships as a documented known
   limitation.
+- **No listening (2026-10-13).** The maintainer chose not to listen. RF-14 closed without the A/B:
+  D3 (float32 sampling) became the default on reference grounds after a machine screen found no gross
+  failures; D1, D2 and D6 stay off as knobs. RF-15's by-ear takes became the same machine screen.
 - **Device gate (RF-15).** Risk-based acceptance of the processed TestFlight candidate. The 201-take
   campaign (ICA-04/ICA-05) and the full matrix (ASR-12) follow the submission.
 - **Privacy and content rights (ASR-02, ASR-04).** The maintainer's own recorded answers, with the
@@ -56,11 +59,11 @@ Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scr
 | Step | Items | Exit | Who | Target |
 | --- | --- | --- | --- | --- |
 | 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | On hold since Oct 13 |
-| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04 | A/B winners become defaults; the blockers' code fixes with deterministic tests | Claude; the maintainer listens | Oct 19 (A/B), Oct 21–23 (code) |
+| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04 | D3 the default (done); the blockers' code fixes with deterministic tests | Claude | Oct 21–23 (code) |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Oct 21 |
 | 4 — freeze | ASR-08, RF-09 | Build 24 unused; exact-SHA CI green; `focusLock.freeze` recorded; the v3.0.0 tag | Maintainer pushes the tag | Oct 23 |
 | 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | Release workflow `archive-ios` dispatch, verifier, internal TestFlight | Maintainer dispatches and approves | Oct 26–27 |
-| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build; exact-tag promotion evidence | Claude and the phone; the maintainer listens | Oct 29 |
+| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | Oct 29 |
 | 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | Oct 30 |
 | 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | Nov 2 |
 

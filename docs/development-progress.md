@@ -45,16 +45,14 @@ the next items by due date.
 5. The push that deploys the updated website privacy page (ASR-02). `main` is ahead of `origin`, and
    nothing has been pushed since October 12.
 
-**In flight:**
-- **RF-14** (due October 19): the four engine fixes are registered knobs, defaults unchanged
-  (c82ab684). The streamed fixed-seed pairs are generated (untracked run
-  `build/private/qc/rf14-ab-20261013`):
-  - D2 and D6 left the audio identical in every pair, so they stay off;
-  - D1 and D3 changed every pair, and their 32 blind pairs wait for the maintainer at
-    `page/index.html` in that run (Export writes the choices file);
-  - after listening: `python3 <run>/rf14_ab.py --repo . --run <run> tally --choices <file>`, then apply
-    the pre-registered rule in RF-14's notes.
-- **AUD-09**: the smoke fixture preflights landed (1bc2b95e); closure needs RF-15's device smoke.
+**RF-14 closed without listening** (maintainer decision): float32 sampling (D3) is the default
+(c62390d6) after a pre-registered machine screen found no gross failure. D1, D2 and D6 stay off as
+knobs. Subtle defects ship as the known limitation in the 3.0 notes. The rule for 3.0 is now that
+nobody listens: RF-15's by-ear takes became the same machine screen, and CLAUDE.md, the evidence
+rule and the QC reference say so.
+
+**In flight:** AUD-09, whose smoke fixture preflights landed (1bc2b95e); closure needs RF-15's device
+smoke.
 
 **Claude's next work:**
 - Code fixes for the blockers AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04.

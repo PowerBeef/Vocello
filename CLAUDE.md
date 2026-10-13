@@ -67,7 +67,8 @@ work and `config/roadmap-archive.json` completed work; `docs/ROADMAP.md` is gene
 - **Audio quality:** three separate systems. In-app Fast QC ships with every take; QC v2
   (`scripts/qc.py`, `scripts/qc/`, `config/qc/`) is an offline, report-only harness whose `gate`
   exits 0 pass, 1 fail, 2 error, 3 warn, 4 NOT_ASSESSED; older prosody/delivery/clone gates remain.
-  Automated scores never stand in for human listening.
+  No automated score is a quality verdict. For 3.0 nobody listens (maintainer decision 2026-10-13):
+  machine screens catch gross failures only, and subtle defects ship as a documented known limitation.
 - **Website** (`website/`): React 19 + Vite SSR/prerender, Playwright acceptance, deployed by Vercel
   from Git. Its rules are in `website/CLAUDE.md`.
 

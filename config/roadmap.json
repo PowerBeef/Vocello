@@ -331,24 +331,6 @@
       "notes": "2026-09-24 (paired iPhone, local StoreKit only, no live purchase): the September 21 cancellation blocker is resolved. An internal-build diagnostic (IOSCommerceErrorDiagnostics) showed a runner-injected purchase error reaches the app as StoreKitError.unknown whatever case is injected, so the app's generic failure notice was correct; the lane's arm now proves the failure path (phase purchase_failed) and the StoreKit adapter also maps thrown user cancellations to cancelled (unit-tested). Lifecycle PASS: ios-xcui-purchase-20260924-073512-c7d44217 (all ten phases, cleanup verified). Exports scenario ios-xcui-purchase-20260924-073819-32d98675 passed 14 phases through owned_design_history, then timed out on 'internal playback stays available': the failure screenshot shows the player had autoplayed a one-second Design clip to the end (Play, 0:01 of 0:01), a test assumption fixed in bbd8434f (longest row; playing or finished both count); cleanup verified. Next: rerun --scenario exports on the phone, then true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json."
     },
     {
-      "id": "RF-14",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Ship the 3.0 take-quality decision: a timeboxed blind A/B of the four engine fixes",
-      "status": "in-flight",
-      "due": "2026-10-19",
-      "blockedBy": [],
-      "gate": "Maintainer decision 2026-10-12: within one week, put the four verified divergences from Qwen's reference (D1 streaming text conditioning, D2 EOS reinsertion, D3 sampling without a float32 cast, D6 the English fallback for Custom) behind knobs registered in config/runtime-debug-knobs.json with defaults unchanged; generate fixed-seed pairs on the French and English CC0 scripts with built-in and Design voices at Speed and Quality; the maintainer blind-A/Bs them; only fixes that win become defaults before RF-09, each with its listening result recorded. The remaining defect rate ships as a documented known limitation, with RF-06's long-form failure, in the 3.0 release notes. QC detectors, PA-16 and the QC programme follow the submission. Models, seeds, prompts and QC stay unchanged without this evidence.",
-      "sourceOfTruth": [
-        "benchmarks/qc/eval-v1.json",
-        "docs/reference/qc.md",
-        "docs/audits/2026-10-10-generation-quality-investigation.md",
-        "docs/audits/2026-10-12-audio-qc-tooling-research.md",
-        "config/runtime-debug-knobs.json"
-      ],
-      "updated": "2026-10-13",
-      "notes": "2026-10-05/06: 11 of 34 decisive judgments on 39 Built-in and Design takes were unusable (enriched, no clones). Those were 2026-09-30 qc-takes from vocello batch, which runs quality-first with full-text conditioning, so D1 cannot explain them and the apps' streamed path was never heard. 2026-10-13: knobs at c82ab684, defaults unchanged. Run rf14-ab-20261013 (untracked): 80 streamed takes, 16 fixed-seed pairs per fix (English, French; ryan, calm-narrator brief; Speed, Quality; two three-sentence CC0 scripts per cell), all ended by EOS. D2 and D6 left the audio identical in 16 of 16 pairs each (EOS always inside the top-50 at the end; confident detection on every script), so they stay off. D1 and D3 changed every pair: 32 blind pairs wait for the maintainer. Pre-registered: a fix becomes a default only if preferred in more decisive pairs than the baseline with a two-sided sign test p <= 0.10."
-    },
-    {
       "id": "RF-15",
       "plan": "release-first-3-0-2026-09",
       "title": "Risk-based acceptance of the processed 3.0.0 candidate on the iPhone",
@@ -358,13 +340,13 @@
         "RF-12",
         "AUD-09"
       ],
-      "gate": "On the processed TestFlight build, through the repository XCUITest stack with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save, replace and delete (F-01); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and about 30 targeted takes across modes, languages and presets judged by ear against RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
+      "gate": "On the processed TestFlight build, through the repository XCUITest stack with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save, replace and delete (F-01); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
       "sourceOfTruth": [
         "docs/reference/release-first-execution-2026-09.md",
         "scripts/ui_test.sh"
       ],
-      "updated": "2026-10-12",
-      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04."
+      "updated": "2026-10-13",
+      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen)."
     },
     {
       "id": "RF-17",

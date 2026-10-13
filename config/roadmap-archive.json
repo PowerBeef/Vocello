@@ -4695,6 +4695,29 @@
       "updated": "2026-10-12",
       "notes": "Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. September 21 device window: stateful control audit ios-xcui-control-audit-20260921-063335-d71bad24 completed with limitations (9 PASS, 4 blocked prerequisites, 2 preservation blocks; restoration and crash checks passed). Accessibility audit ios-xcui-control-audit-20260921-064147-ef16ae49 passed with the variation control visible at all four sizes. Smoke ios-xcui-smoke-20260921-060820-9ba0262c failed model readiness: all three installed production models showed Update Available; generation and long-form were not qualified. The subsequently selected redundant localization test was interrupted; smoke now selects only its two documented journeys. No prior pass is promoted to current-source full smoke.",
       "supersededBy": "RF-15"
+    },
+    {
+      "id": "RF-14",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Ship the 3.0 take-quality decision: a timeboxed blind A/B of the four engine fixes",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Maintainer decision 2026-10-12: within one week, put the four verified divergences from Qwen's reference (D1 streaming text conditioning, D2 EOS reinsertion, D3 sampling without a float32 cast, D6 the English fallback for Custom) behind knobs registered in config/runtime-debug-knobs.json with defaults unchanged; generate fixed-seed pairs on the French and English CC0 scripts with built-in and Design voices at Speed and Quality; the maintainer blind-A/Bs them; only fixes that win become defaults before RF-09, each with its listening result recorded. The remaining defect rate ships as a documented known limitation, with RF-06's long-form failure, in the 3.0 release notes. QC detectors, PA-16 and the QC programme follow the submission. Models, seeds, prompts and QC stay unchanged without this evidence.",
+      "sourceOfTruth": [
+        "benchmarks/qc/eval-v1.json",
+        "docs/reference/qc.md",
+        "docs/audits/2026-10-10-generation-quality-investigation.md",
+        "docs/audits/2026-10-12-audio-qc-tooling-research.md",
+        "config/runtime-debug-knobs.json"
+      ],
+      "updated": "2026-10-13",
+      "notes": "Closed 2026-10-13 without the blind A/B: the maintainer chose not to listen. D3 (float32 sampling) became the default on reference grounds at c62390d6 after a pre-registered machine screen (Fast QC, end of take, the better ASR family's edit rate above 0.30, the language check) found no gross failure in 24 D3 takes or their 24 baselines across Custom, Design and Clone, English and French, Speed and Quality (edit rate max 0.057); the new default reproduces the screened D3 takes sample for sample. D2 and D6 left every one of their 16 pairs identical. D1 changed every pair but stays off: unheard, and the October takes judged 11 of 34 unusable already conditioned on the full text. D1, D2 and D6 remain registered knobs. Subtle defects ship as the 3.0 known limitation (docs/releases/v3.0.0.md).",
+      "evidence": [
+        "commit:c82ab684",
+        "commit:c62390d6",
+        "run:rf14-ab-20261013",
+        "run:language-bench-20261013-174130-5502"
+      ]
     }
   ]
 }

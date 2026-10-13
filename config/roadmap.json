@@ -346,7 +346,7 @@
         "config/runtime-debug-knobs.json"
       ],
       "updated": "2026-10-13",
-      "notes": "2026-10-05/06 confirmations: 11 of 34 decisive judgments among 39 reviewed French/English Built-in and Design takes were unusable. This enriched sample excludes clones and does not estimate population failure prevalence; only five decisive unflagged controls were heard. The October 10 generation-quality investigation reproduces missing clone-coverage PASS and documents accent/local-defect gaps. QC-06 owns proposed automatic detection qualification; no qualified substitute for the existing release gate is established. Preserve the recorded listening evidence and release decision requirement until an explicit acceptance-policy decision changes it. 2026-10-12: decided as a one-week timebox (gate); the divergences and their evidence are in the tooling research report."
+      "notes": "2026-10-05/06: 11 of 34 decisive judgments on 39 French/English Built-in and Design takes were unusable (an enriched sample without clones, not prevalence). Those takes came from the 2026-09-30 qc-takes runs, whose vocello batch takes run quality-first and so already condition on the full text: D1 cannot explain them, and the apps' streamed path was never heard. 2026-10-13: the four knobs landed at c82ab684 with defaults unchanged. The A/B uses 16 fixed-seed streamed pairs per fix against the unchanged engine (English, French; ryan and the calm-narrator brief; Speed, Quality; two three-sentence CC0 scripts per cell); a pair whose audio is identical is dropped. Pre-registered rule: a fix becomes a default only if the maintainer prefers it in more decisive pairs than the baseline, with a two-sided sign test p <= 0.10."
     },
     {
       "id": "RF-15",

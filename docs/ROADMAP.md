@@ -70,7 +70,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`ASR-02`** (parked) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.
-  unparkWhen: The maintainer authorizes the push that deploys the updated privacy page; ASR-11 then reads the label back.
+  unparkWhen: ASR-11 unparks (RF-02's account steps are complete) and reads the published label back.
 
 - **`ASR-04`** (parked) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.

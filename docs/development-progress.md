@@ -17,7 +17,28 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 13 — step 1 on hold, development resumes (resume here)
+### October 13, evening — purchase and Retry proven on the iPhone (resume here)
+
+- **RF-13:** the purchase exports scenario passes all 23 phases on the paired iPhone, with restoration
+  verified (`ios-xcui-purchase-20261013-201729-998547b6`), after three test fixes (ec49f4ee, 699be26f,
+  de770c2b). Its locked-sheet screenshot shows the local $0.99 fixture price, so the App Store review
+  screenshot needs a maintainer choice: use it, or capture the live $19.99 price.
+- **AUD-01:** `scripts/ui_test.sh ios smoke --scenario startup-retry` passes on the device build
+  (`ios-xcui-smoke-20261013-202516-b175375f`). A file opened while a sheet or the recorder is up is
+  still unproven on a device (RF-15 proposal).
+- **Pushed** at the maintainer's request (`86d910dd..c08a1360`). Vercel deployed it and the live privacy
+  page matches the repository, so ASR-02 waits only on ASR-11's read-back.
+- **Waiting on the phone:** `scripts/ui_test.sh ios smoke --scenario background-warmup` (c08a1360)
+  confirms or refutes the engine review's crash candidate: a proactive Clone load or priming still
+  running after the app leaves the foreground, where iOS rejects GPU work and MLX aborts. Then full
+  iOS smoke. An aborted purchase run left Vocello's App Language on English; the maintainer sets it
+  back to System.
+- **Engine review in progress:** seven Axiom audits are in (storage, concurrency, memory, performance,
+  networking, database, energy); security and privacy, Codable and test quality are running. The
+  report goes to `docs/audits/2026-10-13-core-engine-review.md`; non-blockers become parked lines and
+  blocker candidates go to the maintainer.
+
+### October 13 — step 1 on hold, development resumes
 
 The maintainer put their own step 1 actions on hold and resumed development. RF-02, ASR-02, ASR-04,
 ASR-11 and RF-16 are parked without dates; each `unparkWhen` names what brings it back. ASR-08 no
@@ -42,8 +63,7 @@ the next items by due date.
 4. ASR-04 attestations for the 11 asset groups and confirmations 12 and 13, using the inventory in
    [the content-rights review](reference/content-rights-review.md#asr-04-per-asset-attestations-from-the-maintainer).
    Each asset is attested or replaced.
-5. The push that deploys the updated website privacy page (ASR-02). `main` is ahead of `origin`, and
-   nothing has been pushed since October 12.
+5. Done that evening: the push deployed the updated website privacy page (ASR-02).
 
 **RF-14 closed without listening** (maintainer decision): float32 sampling (D3) is the default
 (c62390d6) after a pre-registered machine screen found no gross failure. D1, D2 and D6 stay off as
@@ -68,9 +88,8 @@ out; that needs a yes.
 **Claude's next work:** F-01 and F-16 (the transactional saved-voice and long-form blockers), then
 AUD-02 and AUD-07. All blocker code must land before the October 23 freeze.
 
-**Needs the maintainer or the phone:** RF-13's phone session (rerun the purchase exports scenario and
-capture the purchase's review screenshot) and ASR-08's read-only App Store Connect check of build 24;
-both block the freeze.
+**Needs the maintainer:** ASR-08's read-only App Store Connect check of build 24, which blocks the
+freeze. RF-13's phone session ran that evening (above).
 
 ### October 12 — step 1 decisions recorded
 

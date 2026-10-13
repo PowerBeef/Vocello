@@ -43,7 +43,7 @@ class CoreDeviceProbeTests(unittest.TestCase):
         devices.pop()
         self.assertEqual(probe.pick_device(data, None)["identifier"], devices[0]["identifier"])
 
-    def test_simulated_devices_never_count_or_get_selected(self) -> None:
+    def test_physical_phone_wins_over_paired_simulator_entries(self) -> None:
         data = json.loads((FIXTURES / "devicectl-list-connected.json").read_text())
         devices = data["result"]["devices"]
         physical = devices[0]["identifier"]

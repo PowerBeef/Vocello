@@ -45,10 +45,11 @@ last full copy at commit 25a895ed).
   items are noted there: SER-1 on F-16, SER-2 on RF-13 (a saved voice's unreadable metadata exports
   without the unlock), SEC-4 and SEC-6 on ASR-06, SEC-2 on ASR-02.
 - **Decided (maintainer, October 13):** the IAP review screenshot comes from the TestFlight build with
-  the live price (RF-13); the privacy page's backup sentence (SEC-2) is committed (2a57dc80) and deploys
-  with the next authorized push.
-- **Waiting on the maintainer:** classifying BG-1 on the BG-01 evidence, and RF-15's startup-retry
-  proposal.
+  the live price (RF-13); the privacy page's backup sentence (SEC-2, 2a57dc80) is pushed and live.
+- **BG-01 next (paused by the maintainer):** cover the two uncovered paths with internal-diagnostics-only
+  events (leaving the foreground, marking, the prompt prebuild after Save voice), run device passes,
+  then the maintainer classifies BG-1. Nothing was changed for it yet.
+- **Waiting on the maintainer:** RF-15's startup-retry proposal.
 
 ### October 13 — step 1 on hold, development resumes
 

@@ -847,7 +847,7 @@
         "commit:87636935"
       ],
       "updated": "2026-10-13",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; it deploys with the next authorized push.",
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; pushed and deployed the same day; the live page carries it.",
       "unparkWhen": "ASR-11 unparks (RF-02's account steps are complete) and reads the published label back."
     },
     {
@@ -1905,7 +1905,7 @@
       "id": "BG-01",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
-      "status": "in-flight",
+      "status": "planned",
       "due": "2026-10-22",
       "blockedBy": [],
       "gate": "On the paired iPhone, scripts/ui_test.sh ios smoke --scenario background-warmup leaves the foreground with model work visibly in flight: the proactive Clone prime (the composer shows Preparing reference) and a cold take's load and warm (Stop shown, no live preview), each pass in a fresh process, recording survival or a crash in the lane's crash delta. The paths the report lists without a visible signal (the prompt prebuild after Save voice, marking at a take's end) are recorded as uncovered. The maintainer then classifies BG-1: a reproduced crash becomes a release blocker with the report's fix shape, otherwise a parked line.",
@@ -1915,7 +1915,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ],
       "updated": "2026-10-13",
-      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed. 2026-10-13: the strengthened check PASSES (ios-xcui-smoke-20261014-013015-ab48517b): all six passes left with the work in flight (three during Preparing reference, three during a cold take's load and warm) and the app survived each, with a clean crash delta. The prompt prebuild after Save voice and marking at a take's end have no visible signal and stay uncovered. Awaiting the maintainer's classification."
+      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed. 2026-10-13: the strengthened check PASSES (ios-xcui-smoke-20261014-013015-ab48517b): all six passes left with the work in flight (three during Preparing reference, three during a cold take's load and warm) and the app survived each, with a clean crash delta. The prompt prebuild after Save voice and marking at a take's end have no visible signal and stay uncovered. The maintainer chose to cover those two paths before classifying: internal-diagnostics-only events for leaving the foreground, marking and the prompt prebuild, then device passes. Paused by the maintainer on 2026-10-13 before any code changed."
     }
   ]
 }

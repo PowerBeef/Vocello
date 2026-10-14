@@ -71,8 +71,9 @@ download it automatically.
       2027-07-25 expiry. Keep this row open until its payload or the exported IPA proves both required
       entitlements and the exact signing identity; an active account record alone is insufficient.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
-      2026-09-04 found configured 2.4.0/build 23 state and one `en-US` localization. The next candidate
-      is 3.0.0, but its unused build number and account version are not selected until RF-09.
+      2026-09-04 found configured 2.4.0/build 23 state and one `en-US` localization. The 3.0.0 account
+      version exists (Prepare for Submission), and a read-only check on 2026-10-14 found build 24
+      unused, with no build in the 3.0.0 train (ASR-08); the check repeats right before archiving.
       Category and the rest of the live account remain part of ASR-11.
 - [x] App Store installation eligibility matches the app's runtime hardware floor before the first
       public version. The built bundle requires exactly `arm64` and Apple's

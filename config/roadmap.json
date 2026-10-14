@@ -947,24 +947,6 @@
       "notes": "Path-bearing owned-runtime prints are replaced by privacy-safe Logger messages. Archive/IPA verification now rejects script payloads, unexpected/test/debug executables, enabled diagnostic strings, absolute developer paths, dynamic loading symbols, escaping symlinks, missing third-party privacy manifests, and missing or UUID-mismatched dSYMs; 26 focused verifier fixtures pass. A generic-device Release Analyze succeeded on 2026-09-01 after resolving every application-source warning. Its 19 residual diagnostics are fail-closed and count-bounded in six reviewed classes: 14 MLXArray single-owner isolation warnings, four empty cross-platform shim objects, and one intentional no-App-Intents notice. ASR-07 remains open only for the exact signed archive/export scan and confirmation that its analysis produces no unregistered warning."
     },
     {
-      "id": "ASR-08",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Prevent App Store build-number collisions",
-      "status": "planned",
-      "due": "2026-10-22",
-      "gate": "Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.",
-      "sourceOfTruth": [
-        "project.yml",
-        ".github/workflows/release.yml",
-        "docs/reference/ios-appstore-submission.md"
-      ],
-      "evidence": [
-        "commit:87636935"
-      ],
-      "updated": "2026-10-13",
-      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure needs a fresh manual read-only check before archiving. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload. 2026-10-12: App Store Connect now has version 3.0.0 (RF-02), so the dependency on RF-02 is satisfied; the fresh check still runs before archiving."
-    },
-    {
       "id": "ASR-09",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove reviewer access to immutable model hosting",

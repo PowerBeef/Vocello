@@ -39,6 +39,9 @@ so. The commits since are local and unpushed.
   removes the review candidates of an app session that has ended, never a running copy's. iOS Delete
   waits while a long-form project runs and ends a retained project's use of the deleted voice; the Mac
   sheet holds Cancel while Keep runs. BKL-13 parks the Mac's long-form delete gap.
+- **ASR-08 (October 14):** a read-only App Store Connect check found build 24 unused (builds 21–23
+  only, nothing in the 3.0.0 train, no build on the 3.0.0 version); `project.yml` selects 3.0.0/24.
+  Closed; the same check repeats right before archiving. RF-09's freeze now waits only on RF-13.
 - **Decided (maintainer, October 14):** F-01's G2 — saved-voice replacement stays macOS-only with
   repository tests; RF-15's iPhone row is save and delete.
 - **Waiting on the maintainer:** RF-15's startup-retry proposal, setting Vocello's App Language back to

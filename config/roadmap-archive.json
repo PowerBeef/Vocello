@@ -4718,6 +4718,25 @@
         "run:rf14-ab-20261013",
         "run:language-bench-20261013-174130-5502"
       ]
+    },
+    {
+      "id": "ASR-08",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Prevent App Store build-number collisions",
+      "status": "done",
+      "gate": "Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.",
+      "sourceOfTruth": [
+        "project.yml",
+        ".github/workflows/release.yml",
+        "docs/reference/ios-appstore-submission.md"
+      ],
+      "evidence": [
+        "commit:87636935",
+        "file:project.yml",
+        "doc:docs/reference/ios-appstore-submission.md"
+      ],
+      "updated": "2026-10-14",
+      "notes": "Closed 2026-10-14 on the maintainer's go, with a read-only App Store Connect check through the asc CLI (app 6794692745, com.patricedery.vocello; every processing state, complete pagination): the account holds builds 21 (2.2.2), 22 (2.3.0) and 23 (2.4.0) only; build 24 and the 3.0.0 train have no builds; the 3.0.0 App Store version is Prepare for Submission with no build attached. project.yml and the regenerated project select 3.0.0/build 24 for the app (the static frameworks carry their own 1), and scripts/release.sh only reads the build number. Nothing in the account changed. This is not a reservation: the submission guide repeats the same read-only check right before archiving (ASR-10), and Apple rejects a reused build number at upload. Earlier history: git log -p -- config/roadmap.json."
     }
   ]
 }

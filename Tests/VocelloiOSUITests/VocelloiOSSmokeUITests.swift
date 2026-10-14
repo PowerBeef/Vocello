@@ -391,6 +391,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             "A memory-pressure-cancelled take must never be committed to History"
         )
         VocelloUIScreenshot.attach(app, named: "ios-smoke-history")
+        // The search keyboard covers the tab dock that session teardown uses.
+        replaceHistorySearch(with: "")
+        dismissHistorySearchKeyboardIfNeeded()
+        select(tab: .studio)
     }
 
     /// AUD-01 device proof of the startup Retry (`smoke --scenario startup-retry`):

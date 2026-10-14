@@ -474,6 +474,59 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: XCTUnwrap(kept.first)), damaged, "Set aside, never deleted")
     }
 
+    /// F-16: Discard completes an acceptance a suspended History interrupted
+    /// instead of setting it aside; its journal retires on the next pass.
+    func testDiscardCompletesAResumableAcceptanceInsteadOfSettingItAside() throws {
+        let root = try makeRoot().resolvingSymlinksInPath()
+        let f = try interruptedAcceptance(in: root)
+        let service = DatabaseService(rootDirectory: root)
+
+        XCTAssertEqual(try service.setAsideUnresolvableLongFormRecovery(), 0)
+        XCTAssertEqual(try f.queue.read { db in try Generation.fetchCount(db) }, 4, "Its rows commit in Discard's write")
+        XCTAssertTrue(f.store.hasPendingRecovery, "The journal stays until a later pass sees them committed")
+
+        try service.reconcileLongFormRecovery()
+        XCTAssertFalse(f.store.hasPendingRecovery)
+        XCTAssertEqual(try f.queue.read { db in try Generation.fetchCount(db) }, 4)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+    }
+
+    /// F-16 ownership: while a long-form journal Retry cannot resolve is
+    /// pending, a single delete and clear-all fail closed and delete nothing.
+    /// Once Discard sets it aside they run, clear-all never hands back the
+    /// audio the set-aside journal names (no row holds it), and a relaunched
+    /// History writes normally.
+    func testAnUnresolvableJournalHoldsDeleteAndClearUntilDiscardThenKeepsItsAudio() throws {
+        let root = try makeRoot().resolvingSymlinksInPath()
+        let f = try LongFormHistoryAcceptanceTests.makeFixture(
+            in: root,
+            journalRoot: root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        )
+        try f.queue.write { db in try f.store.prepare(f.input, in: db) }
+        // Readable, but recovery may not overwrite an unrelated manifest edit.
+        try Data("another accepted identity".utf8).write(to: f.input.manifestURL)
+        let service = DatabaseService(rootDirectory: root)
+        // History withholds project rows while the journal is pending; read the file directly.
+        let storedPaths = { try f.queue.read { db in try Generation.fetchAll(db).map(\.audioPath) } }
+        let priorID = try XCTUnwrap(try f.queue.read { db in try Generation.fetchOne(db)?.id })
+
+        XCTAssertThrowsError(try service.deleteGeneration(id: priorID))
+        XCTAssertThrowsError(try service.deleteGenerations(throughID: priorID))
+        XCTAssertEqual(try storedPaths(), [f.oldJoined.path], "Nothing was deleted")
+
+        XCTAssertEqual(try service.setAsideUnresolvableLongFormRecovery(), 1)
+        XCTAssertEqual(try service.deleteGenerations(throughID: priorID), [f.oldJoined.path],
+                       "Clear-all hands back only its rows' audio")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        XCTAssertEqual(f.store.setAsideAudioPaths()?.contains(f.input.joined.audioPath), true,
+                       "The leftover review keeps the set-aside joined take")
+
+        let relaunched = DatabaseService(rootDirectory: root)
+        var take = row("/nonexistent/after-discard.wav", at: 2)
+        try relaunched.saveGeneration(&take)
+        XCTAssertEqual(try relaunched.fetchAllGenerations().map(\.audioPath), ["/nonexistent/after-discard.wav"])
+    }
+
     /// A2-01: a restore or device migration moves the container, and the rows
     /// still name the old one.
     func testRowsUnderARootThatMovedAreRebasedWhenHistoryOpens() throws {

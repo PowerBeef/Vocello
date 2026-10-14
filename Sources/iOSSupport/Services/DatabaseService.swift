@@ -34,7 +34,10 @@ final class DatabaseService: @unchecked Sendable {
     init(rootDirectory: URL) {
         let dbPath = rootDirectory.appendingPathComponent("history.sqlite").path
         self.longFormAcceptance = LongFormHistoryAcceptanceStore(
-            rootURL: rootDirectory.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+            rootURL: rootDirectory.appendingPathComponent("history-outbox/long-form", isDirectory: true),
+            // A journal written under a container that has since moved is told
+            // apart by its recorded root (F-16).
+            audioRootURL: rootDirectory
         )
         self.store = RecoverableStoreCoordinator(
             openStore: { try Self.openQueue(at: dbPath, rootDirectory: rootDirectory) },

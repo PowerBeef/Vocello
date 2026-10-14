@@ -564,7 +564,7 @@
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "updated": "2026-10-13",
-      "notes": "Reviewed 2026-10-10 at 38d295c4: journaled acceptance, rollback and reconcile, QC refusal, compatibility, cancellation and suspension tests pass (mac-test-20261010-040414). Reads of a damaged project withhold its rows but keep standalone History and a bounded private recovery export. Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 proves initial long-form generation and grouped History only. Open: Mac replacement and regeneration acceptance, recovery and export journeys, and the ownership matrix (abandon, new project, relaunch, replacement, delete, clear all). RF-10 and RF-12 qualification remain open; earlier history is in git. 2026-10-13 (engine review SER-1): reconcile now resolves every journal it can, and History's confirmed Discard sets aside one that fails on its own data (renamed, kept, nothing touched) so writes resume, on iOS and macOS. A device failure sets nothing aside, and the iPhone's leftover-audio review keeps the audio a set-aside journal names (nothing is offered while one is unreadable). Decision recorded: a journal from a newer build is set aside like a damaged one; revisit with the first journal version change. Store, classification and service tests pass.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4: journaled acceptance, rollback, reconcile, QC refusal, compatibility, cancellation and suspension tests pass (mac-test-20261010-040414). 2026-10-13 (engine review SER-1, 8ef203e7 and follow-up): reconcile resolves every journal it can; History's confirmed Discard sets aside one that fails on its own data (renamed .unreadable, kept with the audio it names) on iOS and macOS. A device failure sets nothing aside and is reported; a moved container counts as the journal's own fault. The leftover-audio review keeps set-aside audio. Decisions: a newer build's journal is set aside like a damaged one (revisit with the first journal version change); set-aside records have no count or age limit, since each is a confirmed Discard. Ownership tests cover delete and clear-all with a pending or set-aside journal. Mac regeneration acceptance PASS (macos-xcui-smoke-20261014-032256-711c4dc4, smoke --scenario long-form): a regenerated segment lands as a new revision and the replaced take and joined output stay in History. Open: recovery and export journeys. BKL-14 parks never-started candidates. iOS device proof via RF-15.",
       "evidence": [
         "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "commit:df79aa96"
@@ -1915,6 +1915,22 @@
       "updated": "2026-10-13",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-13 while closing F-01's iOS gap (G4): the engine refuses a delete only during an active take, and a long-form Clone project reads its voice again for every segment. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission."
+    },
+    {
+      "id": "BKL-14",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A long-form candidate whose acceptance never started is later offered as leftover audio",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "When a long-form acceptance fails before writing its journal (History blocked by a pending journal), the runner either removes its never-started joined and replacement candidates or records them, so the iPhone's leftover-audio review never offers them as audio from earlier clears; a deterministic test covers it.",
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Sources/iOS/Settings/IOSLeftoverAudioCleanup.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "From the 2026-10-13 re-review of F-16's Discard: while a journal is stuck, each acceptance fails in reconcile before prepare and the runner keeps its candidate, which no row, journal or outbox entry names. Before F-16 the stuck journal kept the leftover review closed; after Discard those files can be offered under the earlier-clears label. Parked without investigation under the focus lock: the files are unreachable from the app, and removal still needs a confirmation."
     },
     {
       "id": "BG-01",

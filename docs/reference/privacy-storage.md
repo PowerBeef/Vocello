@@ -93,10 +93,11 @@ Maintained macOS subtrees and preferences:
   History's confirmed Discard sets aside a journal Retry cannot resolve because of its own data,
   renaming it `<name>.<UUID>.unreadable` in the same folder (F-16), as it renames outbox records
   that cannot be verified with the `unverifiable` extension (A2-02). Set-aside files are never
-  reconciled or exported again and are not removed by Clear History; they keep their script text,
-  local paths and the audio they name until the app's data is deleted, in this backed-up
-  `history-outbox/` tree. Each comes from a recovery failure the user confirmed discarding, so
-  there is no count or age limit. A device failure sets nothing aside.
+  reconciled or exported again and are not removed by Clear History; they keep their script text
+  and local paths until the app's data is deleted, in this backed-up `history-outbox/` tree. Audio
+  they name that no History row holds stays with them; audio a row also holds goes with that row
+  as usual. Each comes from a recovery failure the user confirmed discarding, so there is no count
+  or age limit. A device failure sets nothing aside and is reported, and the notice stays for Retry.
   Unrelated standalone History remains readable; project reads and all mutations remain gated.
   Explicit Export Recovery Files includes bounded regular-file journals without interpreting their
   embedded paths. The UI warns that exports may contain private script text and paths; export

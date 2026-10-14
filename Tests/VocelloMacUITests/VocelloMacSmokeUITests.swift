@@ -591,7 +591,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     /// Live long-form v4 acceptance: a >900-character script routes to the
     /// long-form sheet, plans multiple segments, streams them sequentially,
     /// joins the output, and lands in History as a project row with an
-    /// expandable segment map. Real generation: expect several minutes.
+    /// expandable segment map. Regenerating the first segment is then accepted
+    /// as a new revision (F-16). Real generation: expect several minutes.
     func test06_LongFormProjectJourney() {
         beginSession()
         defer { endSession() }
@@ -679,12 +680,33 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         attachLongFormProjectSummary(wallSeconds: projectWallSeconds)
         VocelloUIScreenshot.attach(app, named: "mac-smoke-longform-complete")
 
+        // F-16: regenerating a segment is accepted as a new revision of the
+        // project. The regenerate controls leave while it runs and return once
+        // the replacement is accepted, with no resume affordance.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: firstRegenerate, timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.condition("segment regeneration to start", timeout: 60) { !firstRegenerate.exists },
+            "the regenerate controls must leave while the replacement runs"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("segment regeneration to settle", timeout: outcomeTimeout) {
+                firstRegenerate.exists || resume.exists
+            },
+            "segment regeneration must reach a terminal project outcome"
+        )
+        XCTAssertTrue(
+            firstRegenerate.exists && !resume.exists,
+            "an accepted replacement keeps every segment saved"
+        )
+        VocelloUIScreenshot.attach(app, named: "mac-smoke-longform-regenerated")
+
         let done = button("batch_doneButton")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: done, timeout: 20))
 
-        // Search renders flat: the nonce appears in the joined row and the
-        // first segment row.
-        assertHistoryRows(matching: nonce, expected: 2)
+        // Search renders flat: the nonce appears in the new joined row and the
+        // new first segment row, and in the joined output and take the
+        // replacement superseded, which stay in History.
+        assertHistoryRows(matching: nonce, expected: 4)
 
         // Cleared search groups the project: the joined row exposes the
         // segment-map toggle.
@@ -702,9 +724,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
         VocelloUIScreenshot.attach(app, named: "mac-smoke-longform-history-project")
 
-        // Expanded map shows the nonce twice even without search (joined row
-        // plus the first segment row).
-        assertHistoryRows(matching: nonce, expected: 2)
+        // Searching again lists the same four rows flat.
+        assertHistoryRows(matching: nonce, expected: 4)
     }
 
     /// Distinct continuation prose for scaled long-form runs

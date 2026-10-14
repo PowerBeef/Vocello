@@ -12769,6 +12769,72 @@
         }
       }
     },
+    "vocello.history.discard_failed_title": {
+      "comment": "History: alert title when a confirmed Discard of recovery data set nothing aside (for example, storage is full). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Discarded"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non écarté"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No descartado"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht verworfen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non scartato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não descartado"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未丢弃"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "破棄されませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폐기되지 않음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не отброшено"
+          }
+        }
+      }
+    },
     "vocello.history.discard_unverifiable_records_confirm": {
       "comment": "Destructive confirmation button that sets aside damaged History recovery records; no audio is deleted.",
       "extractionState": "manual",

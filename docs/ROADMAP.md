@@ -26,7 +26,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 0/17 (0%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 0/18 (0%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 6/14 (43%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -459,6 +459,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-11` | parked | Test the lifecycle glue | — |
 | `BKL-12` | parked | Release rehearsal's macOS DMG step runs out of runner disk | — |
 | `BKL-13` | parked | Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project | — |
+| `BKL-14` | parked | A long-form candidate whose acceptance never started is later offered as leftover audio | — |
 | `CONV-21` | parked | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
@@ -516,6 +517,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-13`** (parked) — Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project.
   gate: On macOS, a saved voice cannot be deleted while a long-form project or line batch that may read it is running, and a retained long-form project that reads a deleted voice can no longer resume or regenerate, as on the iPhone; deterministic tests cover both.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-14`** (parked) — A long-form candidate whose acceptance never started is later offered as leftover audio.
+  gate: When a long-form acceptance fails before writing its journal (History blocked by a pending journal), the runner either removes its never-started joined and replacement candidates or records them, so the iPhone's leftover-audio review never offers them as audio from earlier clears; a deterministic test covers it.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`CONV-21`** (parked) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.

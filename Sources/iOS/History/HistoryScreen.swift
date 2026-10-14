@@ -203,6 +203,10 @@ private struct IOSHistoryLibrarySection: View {
     @State private var isDiscardConfirmationPresented = false
     /// What the open Discard confirmation sets aside, fixed when it was asked.
     @State private var discardsLongFormRecovery = false
+    /// A Discard that set nothing aside is never silent; the message is the
+    /// typed storage failure, which says what to do (F-16).
+    @State private var isDiscardFailurePresented = false
+    @State private var discardFailureMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -416,6 +420,12 @@ private struct IOSHistoryLibrarySection: View {
                 ? IOSAppLanguage.shared.presentation.discardLongFormRecoveryDetail
                 : IOSAppLanguage.shared.presentation.discardUnverifiableRecordsDetail)
         }
+        .alert(IOSAppLanguage.shared.presentation.historyDiscardFailedTitle, isPresented: $isDiscardFailurePresented) {
+            Button(IOSInterfaceText.ok, role: .cancel) {}
+                .accessibilityIdentifier("historyRecovery_discardFailedDismiss")
+        } message: {
+            Text(discardFailureMessage)
+        }
     }
 
     /// A2-02: offered on the notice about records that cannot be verified, while
@@ -494,9 +504,13 @@ private struct IOSHistoryLibrarySection: View {
     /// and History works again.
     private func discardLongFormRecovery() {
         Task {
-            await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
+            let failure = await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reload(reopenFailedStore: true)
+            if let failure {
+                discardFailureMessage = failure.interfaceMessage(IOSAppLanguage.shared.presentation.localization)
+                isDiscardFailurePresented = true
+            }
         }
     }
 

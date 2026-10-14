@@ -241,6 +241,22 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         }
     }
 
+    /// A journal from before a restore or device migration names a container
+    /// root that is gone: that is its own fault, whatever error the sandbox
+    /// would give a lookup there, so Discard can set it aside.
+    func testAJournalUnderAContainerThatMovedIsItsOwnFault() throws {
+        let current = FileManager.default.temporaryDirectory
+        let gone = "/vocello-moved-container-\(UUID().uuidString)"
+        func moved(_ path: String, root: URL? = current) -> Bool {
+            LongFormHistoryAcceptanceStore.namesAContainerThatMoved(journalAudioPath: path, audioRootURL: root)
+        }
+        XCTAssertTrue(moved(gone + "/outputs/custom/joined.wav"))
+        XCTAssertFalse(moved(current.path + "/outputs/custom/joined.wav"), "this container")
+        XCTAssertFalse(moved("/private/tmp/outputs/custom/joined.wav"), "another root that still exists")
+        XCTAssertFalse(moved("/Volumes/Elsewhere/joined.wav"), "no recorded outputs root")
+        XCTAssertFalse(moved(gone + "/outputs/custom/joined.wav", root: nil), "no current root to compare")
+    }
+
     /// The audio a set-aside journal names is no History row's, yet the user's:
     /// the iPhone's leftover review keeps it, and offers nothing while a
     /// set-aside journal cannot be read.

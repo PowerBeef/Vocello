@@ -73,8 +73,8 @@
       "path": "Sources/iOS/History/HistoryScreen.swift",
       "screen": "History",
       "scenario": "stateful",
-      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified (A2-02), or long-form recovery data Retry cannot resolve (F-16), is confirmed first; only naturally damaged records may be inspected on user devices. A single delete that could not record its audio removal reports that nothing was deleted.",
-      "interactiveOccurrenceCount": 21
+      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified (A2-02), or long-form recovery data Retry cannot resolve (F-16), is confirmed first, and a Discard that set nothing aside says why; only naturally damaged records may be inspected on user devices. A single delete that could not record its audio removal reports that nothing was deleted.",
+      "interactiveOccurrenceCount": 23
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",

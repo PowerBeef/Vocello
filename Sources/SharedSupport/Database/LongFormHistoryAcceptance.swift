@@ -426,6 +426,15 @@ struct LongFormHistoryAcceptanceStore: Sendable {
         return nsError.domain == HistoryPersistenceError.sqliteErrorDomain && nsError.code & 0xFF == 19
     }
 
+    /// Whether a journal's audio was recorded under a container root that is
+    /// no longer this one and no longer exists (a restore, a device migration).
+    static func namesAContainerThatMoved(journalAudioPath: String, audioRootURL: URL?) -> Bool {
+        guard let audioRootURL,
+              let root = GenerationAudioPathRebase.storedRoot(of: journalAudioPath),
+              root != audioRootURL.path else { return false }
+        return !FileManager.default.fileExists(atPath: root)
+    }
+
     /// The audio set-aside journals name, or nil when the folder or one of them
     /// cannot be read. A set-aside acceptance's joined take and the takes it
     /// owned are named by no row, yet they are the user's: the iPhone's
@@ -460,6 +469,12 @@ struct LongFormHistoryAcceptanceStore: Sendable {
 
     private func reconcileJournal(at url: URL, in db: Database) throws {
         let journal = try readJournal(at: url)
+        // A journal from before a restore or device migration names a container
+        // that is gone. How a lookup there fails depends on the sandbox, so it
+        // is the journal's own fault whatever error a file check would give.
+        if Self.namesAContainerThatMoved(journalAudioPath: journal.joined.audioPath, audioRootURL: audioRootURL) {
+            throw LongFormAcceptanceError.recoveryRequired
+        }
         try requireLocalManifest(journal.manifestURL)
         let current = try readManifestIfPresent(journal.manifestURL)
         // Never overwrite an unrelated edit or silently accept corrupt state.

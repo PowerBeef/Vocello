@@ -388,6 +388,12 @@ struct VocelloPresentationText: Sendable {
                comment: "Confirmation message before unusable long-form recovery data is set aside: History works again, and the data and any audio it names stay on the device.")
     }
 
+    var historyDiscardFailedTitle: String {
+        localization.string(localized: "vocello.history.discard_failed_title",
+               defaultValue: "Not Discarded",
+               comment: "History: alert title when a confirmed Discard of recovery data set nothing aside (for example, storage is full). Presentation only.")
+    }
+
     var discardUnverifiableRecordsConfirm: String {
         localization.string(localized: "vocello.history.discard_unverifiable_records_confirm",
                defaultValue: "Discard",

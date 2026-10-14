@@ -17,7 +17,33 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 13, evening — purchase, Retry and full smoke pass on the iPhone (resume here)
+### October 13, night — F-01, F-16 and RF-13 without the iPhone (resume here)
+
+The maintainer paused iPhone work after the last push (`49d94178`); no device lane runs until they say
+so. The commits since are local and unpushed.
+
+- **RF-13 (engine review SER-2), 8ef203e7:** a saved voice whose `.voice.json` is damaged or newer no
+  longer exports free; the voice's own Vocello WAV provenance decides. Product call recorded: a
+  Vocello-made WAV imported as a reference is free while its sidecar reads and locked once it is
+  damaged.
+- **F-16 (engine review SER-1), 8ef203e7 and its follow-up:** reconcile resolves every journal it can, and
+  History's confirmed Discard sets aside one that fails on its own data (renamed `.unreadable`, kept
+  with the audio it names), on iOS and macOS. A device failure sets nothing aside and is shown ("Not
+  Discarded"); a moved container counts as the journal's own fault; the iPhone's leftover-audio review
+  keeps set-aside audio. New ownership tests cover delete and clear-all with a pending or set-aside
+  journal. The Mac regeneration acceptance passes (`macos-xcui-smoke-20261014-032256-711c4dc4`, new
+  `smoke --scenario long-form`): a regenerated segment lands as a new revision, and the replaced take
+  and joined output stay in History. BKL-14 parks never-started candidates.
+- **F-01, 79113a02:** every review surface discards its candidate however it closes, a save still
+  staging included; a closed surface's discard finishes on the store's next operation; a review save
+  removes the review candidates of an app session that has ended, never a running copy's. iOS Delete
+  waits while a long-form project runs and ends a retained project's use of the deleted voice; the Mac
+  sheet holds Cancel while Keep runs. BKL-13 parks the Mac's long-form delete gap.
+- **Waiting on the maintainer:** F-01's G2 (iOS has no replace flow, so RF-15's iPhone "save, replace
+  and delete" row needs a scope decision), RF-15's startup-retry proposal, and setting Vocello's App
+  Language back to System on the phone.
+
+### October 13, evening — purchase, Retry and full smoke pass on the iPhone
 
 - **RF-13:** the purchase exports scenario passes all 23 phases on the paired iPhone, with restoration
   verified (`ios-xcui-purchase-20261013-201729-998547b6`), after three test fixes (ec49f4ee, 699be26f,

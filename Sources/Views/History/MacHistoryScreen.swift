@@ -923,9 +923,16 @@ private extension MacHistoryScreen {
     /// device with the audio it names (F-16), and History works again.
     func discardLongFormRecovery() {
         Task {
-            await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
+            let failure = await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reloadHistory(reopenFailedStore: true)
+            // Never silent: the typed storage failure says what to do.
+            if let failure {
+                presentActionAlert(
+                    title: MacInterfaceText.presentation.historyDiscardFailedTitle,
+                    message: failure.interfaceMessage(MacInterfaceText.presentation.localization)
+                )
+            }
         }
     }
 

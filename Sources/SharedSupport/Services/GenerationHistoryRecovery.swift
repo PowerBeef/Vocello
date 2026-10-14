@@ -138,10 +138,16 @@ enum GenerationHistoryRecovery {
 
     /// The user confirmed discarding the long-form recovery data Retry cannot
     /// resolve (F-16): it is set aside, never deleted, nothing it names is
-    /// touched, and queued takes then reach History again. A failure leaves
-    /// the notice and its Discard action in place.
-    static func setAsideLongFormRecoveryRecords() async {
-        _ = try? DatabaseService.shared.setAsideUnresolvableLongFormRecovery()
+    /// touched, and queued takes then reach History again. A device failure
+    /// (full storage, a missing permission) leaves the notice and its Discard
+    /// action in place and is returned, classified, for the screen to show.
+    static func setAsideLongFormRecoveryRecords() async -> HistoryPersistenceError? {
+        do {
+            _ = try DatabaseService.shared.setAsideUnresolvableLongFormRecovery()
+            return nil
+        } catch {
+            return HistoryPersistenceError.classify(error, operation: .write)
+        }
     }
 
     static func pendingAudioURLs() async -> [URL] {

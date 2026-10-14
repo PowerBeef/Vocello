@@ -329,7 +329,7 @@
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "updated": "2026-10-13",
-      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-13: the exports scenario PASSES all 23 phases with restoration verified (ios-xcui-purchase-20261013-201729-998547b6) after three test fixes: rows under the tab dock (ec49f4ee), waits that read absent elements and ended the runner before cleanup (699be26f), and cleanup that deleted an owned purchase unrefunded so the app's StoreKit cache stayed entitled (de770c2b refunds first and re-syncs a stale entitlement through Restore). Its locked-sheet screenshot shows the local $0.99 fixture price, not the live $19.99. Next: true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json. 2026-10-13 core engine review (SER-2): the full player maps a saved voice without readable .voice.json metadata to originalReference, so a Design-made voice whose sidecar is truncated or newer exports without the unlock; unreadable metadata must map to unknown."
+      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-13: the exports scenario PASSES all 23 phases with restoration verified (ios-xcui-purchase-20261013-201729-998547b6) after three test fixes: rows under the tab dock (ec49f4ee), waits that read absent elements and ended the runner before cleanup (699be26f), and cleanup that deleted an owned purchase unrefunded so the app's StoreKit cache stayed entitled (de770c2b refunds first and re-syncs a stale entitlement through Restore). Its locked-sheet screenshot shows the local $0.99 fixture price, so the App Review screenshot comes from the TestFlight build (RF-12) with the live $19.99 (maintainer decision 2026-10-13). Next: true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json. 2026-10-13 core engine review (SER-2): the full player maps a saved voice without readable .voice.json metadata to originalReference, so a Design-made voice whose sidecar is truncated or newer exports without the unlock; unreadable metadata must map to unknown."
     },
     {
       "id": "RF-15",
@@ -847,7 +847,7 @@
         "commit:87636935"
       ],
       "updated": "2026-10-13",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 core engine review (SEC-2): the page says none of this is uploaded, while the microphone purpose string says saved voices are in iPhone backups; one sentence on backups would align them.",
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; it deploys with the next authorized push.",
       "unparkWhen": "ASR-11 unparks (RF-02's account steps are complete) and reads the published label back."
     },
     {
@@ -1900,6 +1900,22 @@
       "updated": "2026-10-13",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Failing since 2026-10-10 (8c71d64b). On 2026-10-12 (86d910dd) and 2026-10-13 (c08a1360) hdiutil reported 'No space left on device' while building the DMG, after the macOS build, bundle verification and CLI smoke had passed; the iOS archive prerequisites job passes. Parked without investigation under the focus lock: macOS packaging is not part of the 3.0 iOS submission."
+    },
+    {
+      "id": "BG-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
+      "status": "in-flight",
+      "due": "2026-10-22",
+      "blockedBy": [],
+      "gate": "On the paired iPhone, scripts/ui_test.sh ios smoke --scenario background-warmup leaves the foreground with model work visibly in flight: the proactive Clone prime (the composer shows Preparing reference) and a cold take's load and warm (Stop shown, no live preview), each pass in a fresh process, recording survival or a crash in the lane's crash delta. The paths the report lists without a visible signal (the prompt prebuild after Save voice, marking at a take's end) are recorded as uncovered. The maintainer then classifies BG-1: a reproduced crash becomes a release blocker with the report's fix shape, otherwise a parked line.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "scripts/ui_test.sh",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
+      ],
+      "updated": "2026-10-13",
+      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed."
     }
   ]
 }

@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 8/31 (26%) |
+| `release-first-3-0-2026-09` | active | release-qa | 8/32 (25%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -55,6 +55,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
+| `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
@@ -109,6 +110,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`AUD-09`** (planned, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
+
+- **`BG-01`** (in-flight, due 2026-10-22) — Prove or rule out GPU work outliving the foreground (engine review BG-1).
+  gate: On the paired iPhone, scripts/ui_test.sh ios smoke --scenario background-warmup leaves the foreground with model work visibly in flight: the proactive Clone prime (the composer shows Preparing reference) and a cold take's load and warm (Stop shown, no live preview), each pass in a fresh process, recording survival or a crash in the lane's crash delta. The paths the report lists without a visible signal (the prompt prebuild after Save voice, marking at a take's end) are recorded as uncovered. The maintainer then classifies BG-1: a reproduced crash becomes a release blocker with the report's fix shape, otherwise a parked line.
 
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).

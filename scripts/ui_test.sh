@@ -70,10 +70,11 @@ create it: an absent voice stops the run before it changes anything, naming the 
 `smoke --scenario startup-retry` (AUD-01) launches with the registered internal-diagnostics knob
 QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE, so the first startup pass fails; Retry must then reach the
 Studio without a relaunch. Distribution builds compile the knob out, so this runs on the device build.
-`smoke --scenario background-warmup` chooses the benchmark clone voice, which starts the proactive
-Clone model load and reference priming, then leaves the foreground 0.3, 1.5 and 3.0 s later, each in
-a fresh process. The app must still be running after each dwell and the crash delta must stay empty.
-It generates nothing.
+`smoke --scenario background-warmup` (BG-01) leaves the foreground while model work runs, each pass in
+a fresh process: after choosing the benchmark clone voice, as soon as the composer shows "Preparing
+reference"; and after Generate on a cold Built-in model, while the take loads (Stop shown, no live
+preview). The app must still be running after each dwell and the crash delta must stay empty; the
+interrupted takes are discarded, never saved.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
@@ -456,7 +457,7 @@ if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] 
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "background-warmup":
     payload["scenario"] = "background-warmup"
     payload["evidenceClass"] = "focused-smoke"
-    payload["modes"] = ["clone"]
+    payload["modes"] = ["clone", "custom"]
     payload["lengths"] = []
     payload["warm"] = 0
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "update-models":
@@ -1821,7 +1822,7 @@ else
       # AUD-01: the registered knob fails the first startup pass; Retry must reach the Studio.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testStartupFailureOffersRetry"
     elif [[ "$scenario_argument" == "background-warmup" ]]; then
-      # Engine review 2026-10-13: leaving during the proactive Clone warm-up must not end the app.
+      # BG-01: leaving during model work (Clone warm-up, a cold take's load) must not end the app.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testLeavingDuringCloneWarmupKeepsTheAppRunning"
     fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
@@ -1903,6 +1904,9 @@ else
   test_selection_args=("-only-testing:$only_test")
   if [[ "$lane" == "smoke" && -z "$scenario_argument" ]]; then
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney")
+  fi
+  if [[ "$lane" == "smoke" && "$scenario_argument" == "background-warmup" ]]; then
+    test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testLeavingDuringColdTakeWarmupKeepsTheAppRunning")
   fi
   note "physical-iPhone XCUITest $lane on $device → $out"
   xcuitest_status=0

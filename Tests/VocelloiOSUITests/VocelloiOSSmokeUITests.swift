@@ -507,15 +507,17 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         select(tab: .studio)
     }
 
-    /// Device check of the October 13 engine review's background warm-up candidate
-    /// (`smoke --scenario background-warmup`): choosing a saved voice starts the
-    /// proactive Clone model load and reference priming, and iOS rejects GPU work
-    /// from the background. Each pass launches a fresh process, leaves the
-    /// foreground at a fixed offset after the Clone handoff and returns after a
-    /// dwell. The process must still be running; the lane's crash delta must stay
-    /// empty. Nothing is generated.
+    /// BG-01 device check (engine review BG-1, `smoke --scenario background-warmup`):
+    /// iOS refuses GPU work from the background and MLX turns the refusal into an
+    /// abort. Path a: choosing a saved voice starts the proactive Clone load and
+    /// reference prime, and the composer's readiness row shows the prime as
+    /// "Preparing reference". Each pass launches a fresh process, leaves the
+    /// foreground as soon as the row shows the prime (or once it is ready), returns
+    /// after a dwell and requires the process to still be running; the lane's crash
+    /// delta must stay empty. At least one pass must leave with the prime in flight.
     func testLeavingDuringCloneWarmupKeepsTheAppRunning() {
-        for offset in [0.3, 1.5, 3.0] {
+        var observations: [String] = []
+        for pass in 1...3 {
             beginSession()
             let savedVoice = assertRequiredCloneVoice()
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: savedVoice, timeout: 20))
@@ -525,33 +527,105 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
                     clone.exists && clone.isSelected
                 }
             )
-            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "warm-up offset")], timeout: offset)
-            XCUIDevice.shared.press(.home)
-            XCTAssertTrue(
-                VocelloUIWait.condition("app to leave the foreground", timeout: 20) {
-                    self.app.state != .runningForeground
-                }
-            )
-            // Long enough for a rejected command buffer to end the process.
-            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "background dwell")], timeout: 15)
-            XCTAssertNotEqual(
-                app.state, .notRunning,
-                "Leaving \(offset) s after the Clone handoff ended the process"
-            )
-            app.activate()
-            XCTAssertTrue(
-                VocelloUIWait.condition("app to return to the foreground", timeout: 30) {
-                    self.app.state == .runningForeground
-                }
-            )
+            let meta = element("textInput_modeMetaLabel")
+            let observed = leaveWhenFirst(timeout: 30, [
+                ("preparing", { meta.exists && meta.label.contains("Preparing reference") }),
+                ("ready", { meta.exists && meta.label.contains("Reference ready") }),
+            ])
+            observations.append("pass \(pass): \(observed)")
+            assertSurvivesBackgroundDwell(during: "the Clone warm-up, pass \(pass) (\(observed))")
             XCTAssertTrue(
                 VocelloUIWait.condition("Clone mode kept after the return", timeout: 30) {
                     clone.exists && clone.isSelected
                 }
             )
-            VocelloUIScreenshot.attach(app, named: "ios-background-warmup-\(offset)s")
+            VocelloUIScreenshot.attach(app, named: "ios-background-warmup-pass\(pass)")
             endSession()
         }
+        attachObservations(observations, named: "background-warmup-observations")
+        XCTAssertTrue(
+            observations.contains { $0.hasSuffix("preparing") },
+            "No pass left with the proactive prime in flight: \(observations)"
+        )
+    }
+
+    /// BG-01 path c (`smoke --scenario background-warmup`): Generate on a cold
+    /// Built-in model, then leave while the take loads and warms (Stop shown, no
+    /// live preview yet). The foreground exit cancels the take (PA-15), but model
+    /// load and warm have no cancellation checkpoint, so they can keep running in
+    /// the background. Each pass launches a fresh process so the model is cold;
+    /// the process must survive the dwell, and at least one pass must leave before
+    /// the live preview starts.
+    func testLeavingDuringColdTakeWarmupKeepsTheAppRunning() {
+        var observations: [String] = []
+        for pass in 1...3 {
+            beginSession()
+            prepare(mode: .custom)
+            replaceScript(with: "Background check \(pass). The train left the station at dawn.")
+            let generate = element("textInput_generateButton")
+            let cancel = element("textInput_cancelButton")
+            let livePlayer = element("studio_livePreview_playPause")
+            XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 20))
+            let observed = leaveWhenFirst(timeout: 30, [
+                ("streaming", { livePlayer.exists }),
+                ("preparing", { cancel.exists }),
+            ])
+            observations.append("pass \(pass): \(observed)")
+            assertSurvivesBackgroundDwell(during: "a cold take's warm-up, pass \(pass) (\(observed))")
+            // PA-15: the interrupted take is discarded and its notice holds the action slot.
+            let notice = element("textInput_backgroundNotice")
+            if VocelloUIWait.exists(notice, timeout: 30) {
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: notice, timeout: 20))
+            }
+            XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
+            VocelloUIScreenshot.attach(app, named: "ios-background-cold-take-pass\(pass)")
+            endSession()
+        }
+        attachObservations(observations, named: "background-cold-take-observations")
+        XCTAssertTrue(
+            observations.contains { $0.hasSuffix("preparing") },
+            "No pass left before the live preview started: \(observations)"
+        )
+    }
+
+    /// Polls the given visible states in order and presses Home at the first that
+    /// holds; returns its name, or "timeout" when none showed in time.
+    private func leaveWhenFirst(timeout: TimeInterval, _ states: [(String, () -> Bool)]) -> String {
+        let deadline = Date().addingTimeInterval(timeout)
+        var observed = "timeout"
+        polling: while Date() < deadline {
+            for (name, holds) in states where holds() {
+                observed = name
+                break polling
+            }
+        }
+        XCUIDevice.shared.press(.home)
+        return observed
+    }
+
+    private func assertSurvivesBackgroundDwell(during context: String) {
+        XCTAssertTrue(
+            VocelloUIWait.condition("app to leave the foreground", timeout: 20) {
+                self.app.state != .runningForeground
+            }
+        )
+        // Long enough for a rejected command buffer to end the process.
+        _ = XCTWaiter.wait(for: [XCTestExpectation(description: "background dwell")], timeout: 15)
+        XCTAssertNotEqual(app.state, .notRunning, "Leaving the foreground during \(context) ended the process")
+        app.activate()
+        XCTAssertTrue(
+            VocelloUIWait.condition("app to return to the foreground", timeout: 30) {
+                self.app.state == .runningForeground
+            }
+        )
+    }
+
+    private func attachObservations(_ observations: [String], named name: String) {
+        let attachment = XCTAttachment(string: observations.joined(separator: "\n"))
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     /// Maintenance on the paired iPhone, on explicit request only

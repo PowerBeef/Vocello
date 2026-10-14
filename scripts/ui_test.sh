@@ -76,7 +76,7 @@ a fresh process: after choosing the benchmark clone voice, as soon as the compos
 reference"; and after Generate on a cold Built-in model, while the take loads (Stop shown, no live
 preview). The app must still be running after each dwell and the crash delta must stay empty; the
 interrupted takes are discarded, never saved.
-`smoke --scenario record-then-play` (AUD-02) records a clip in Voices and plays it to its end in the
+`smoke --scenario record-then-play` (AUD-02) records a clip from Clone's reference and plays it to its end in the
 save sheet's review, then closes without saving; full smoke runs it too. A first run waits for the
 human-answered microphone and speech prompts.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine

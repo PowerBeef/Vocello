@@ -698,7 +698,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX)
     }
 
-    /// AUD-02: record a clip, then play it in the review the save sheet shows,
+    /// AUD-02: record a clip from Clone's reference, then play it in the review the save sheet shows,
     /// in one journey. The session moves from recording to playback through its
     /// one owner; the review's play control changes while the clip plays and
     /// changes back only when the player reaches the clip's end, so a player
@@ -710,11 +710,11 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         beginSession()
         defer { endSession() }
 
-        select(tab: .voices)
-        // The card follows every saved voice; taps never scroll.
-        let saveNewVoice = element("voices_saveNewVoice")
-        XCTAssertTrue(revealSettingsElement(saveNewVoice, swipingUp: true))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: saveNewVoice, timeout: 20))
+        // Clone's reference chip opens the recorder whatever Saved Voices holds;
+        // the Voices card can sit below a long list.
+        select(mode: .clone)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_reference"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("referenceClip_recordNewClip"), timeout: 20))
         XCTAssertTrue(
             VocelloUIPrimaryAction.perform(on: element("iosRecord_start"), timeout: 90),
             "the recorder must offer Record (a first run waits for the microphone prompt)"
@@ -754,8 +754,8 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
         XCTAssertTrue(
-            VocelloUIWait.exists(element("voices_saveNewVoice"), timeout: 20),
-            "closing the review returns to Voices without saving"
+            VocelloUIWait.exists(element("studioChip_reference"), timeout: 20),
+            "closing the review returns to the Studio without saving"
         )
     }
 

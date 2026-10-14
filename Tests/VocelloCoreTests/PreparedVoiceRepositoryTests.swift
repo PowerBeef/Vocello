@@ -12,6 +12,20 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         let source = shared.appendingPathComponent("source.wav")
         try Data([1, 2, 3]).write(to: source)
         let normal = PreparedVoiceRepository(appSupportDirectory: shared, supportedAudioExtensions: ["wav"])
+        if phase == "review" {
+            // F-01: an open review in a running copy, held until released.
+            _ = try await normal.prepare(
+                name: "Held", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+                replacingVoiceID: nil, heldForReview: true
+            )
+            try Data("locked".utf8).write(to: shared.appendingPathComponent("locked"), options: .atomic)
+            let deadline = Date().addingTimeInterval(15)
+            while !FileManager.default.fileExists(atPath: shared.appendingPathComponent("release").path) {
+                guard Date() < deadline else { throw Injected.filesystem }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            return
+        }
         if phase != "prepare" {
             let old = try await normal.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
             _ = try await normal.commit(id: old.id)
@@ -322,7 +336,166 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             process.waitUntilExit()
         }
     }
+
+    /// F-01: the discard of a closed surface's candidate that cannot take the
+    /// store (another process holds it) is remembered, and the next operation
+    /// that can take it finishes the discard, so the candidate does not keep
+    /// its name until it expires. An explicit Discard that fails leaves its
+    /// candidate under review: Keep after it still publishes.
+    func testAnAbandonedDiscardThatCannotTakeTheStoreIsFinishedByTheNextOperation() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "source.wav")
+        let abandoned = try await repository.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let reviewed = try await repository.prepare(
+            name: "Bea", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let holder = try StoreLockHolder(lockURL: root.appendingPathComponent(".voice-store.lock"))
+        for (candidate, isAbandoned) in [(abandoned, true), (reviewed, false)] {
+            do {
+                try await repository.discard(id: candidate.id, abandoned: isAbandoned)
+                XCTFail("A discard cannot take a store another process holds")
+            } catch {
+                XCTAssertEqual(error as? PreparedVoiceRepositoryError, .storeBusy)
+            }
+        }
+        holder.release()
+        XCTAssertTrue(exists(candidateDirectory(abandoned.id)))
+
+        let listed = try await repository.list()
+        XCTAssertEqual(listed.map(\.id), [])
+        XCTAssertFalse(exists(candidateDirectory(abandoned.id)), "the next operation finishes the abandoned discard")
+        XCTAssertTrue(exists(candidateDirectory(reviewed.id)), "an explicit Discard that failed stays under review")
+        _ = try await repository.commit(id: reviewed.id)
+        _ = try await repository.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+    }
+
+    /// F-01: a review save never removes the open review of another copy of the
+    /// app that is still running (the Mac runs several on one store); once
+    /// that copy has ended, the next review save does.
+    func testAReviewSaveKeepsAnotherRunningCopysReviewUntilItEnds() async throws {
+        try NativeHelperProcess.skipUnderThreadSanitizer()
+        let shared = root.appendingPathComponent("review")
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        let child = NativeHelperProcess.xctest(
+            running: "VocelloCoreTests.PreparedVoiceRepositoryTests/testNativeStoreWorker", in: Bundle(for: Self.self))
+        var environment = ProcessInfo.processInfo.environment
+        environment["VOCELLO_TEST_STORE_ROOT"] = shared.path
+        environment["VOCELLO_TEST_STORE_PHASE"] = "review"
+        child.environment = environment
+        child.standardOutput = FileHandle.nullDevice
+        child.standardError = FileHandle.nullDevice
+        try child.run()
+        defer { if child.isRunning { kill(child.processIdentifier, SIGKILL); child.waitUntilExit() } }
+        let deadline = ContinuousClock.now + .seconds(15)
+        while !FileManager.default.fileExists(atPath: shared.appendingPathComponent("locked").path),
+              child.isRunning, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: shared.appendingPathComponent("locked").path))
+
+        let source = shared.appendingPathComponent("parent.wav")
+        try Data([1, 2, 3]).write(to: source)
+        let app = PreparedVoiceRepository(appSupportDirectory: shared, supportedAudioExtensions: ["wav"])
+        _ = try await app.prepare(
+            name: "Other", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        do {
+            _ = try await app.prepare(
+                name: "Held", audioURL: source, transcript: nil, qualityWarnings: [],
+                replacingVoiceID: nil, heldForReview: true
+            )
+            XCTFail("A running copy's open review keeps its name")
+        } catch {
+            XCTAssertEqual(error as? PreparedVoiceRepositoryError, .duplicateName("Held"))
+        }
+
+        try Data().write(to: shared.appendingPathComponent("release"), options: .atomic)
+        while child.isRunning, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertFalse(child.isRunning)
+        guard !child.isRunning else { return }
+        child.waitUntilExit()
+        XCTAssertEqual(child.terminationStatus, 0)
+        _ = try await app.prepare(
+            name: "Held", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+    }
     #endif
+
+    /// F-01: a review candidate lives only as long as the process whose review
+    /// holds it. A review save removes one an ended session left, so its name
+    /// is free again at once, and keeps this session's open reviews and every
+    /// one-shot candidate.
+    func testAReviewSaveRemovesCandidatesAnEndedSessionLeftBehind() async throws {
+        let source = try writeSource(named: "source.wav")
+        let ended = makeRepository(reviewSession: UUID())
+        let abandoned = try await ended.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let oneShot = try await ended.prepare(
+            name: "Bea", audioURL: source, transcript: nil, qualityWarnings: [], replacingVoiceID: nil
+        )
+
+        let current = makeRepository(reviewSession: UUID())
+        let open = try await current.prepare(
+            name: "Cy", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let again = try await current.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+
+        XCTAssertFalse(exists(candidateDirectory(abandoned.id)))
+        XCTAssertTrue(exists(candidateDirectory(oneShot.id)), "a one-shot candidate is not a review")
+        XCTAssertTrue(exists(candidateDirectory(open.id)), "this session's open review stays")
+        _ = try await current.commit(id: again.id)
+        _ = try await current.commit(id: open.id)
+        let listed = try await current.list()
+        XCTAssertEqual(listed.map(\.id), ["Ava", "Cy"])
+    }
+
+    /// F-01: a one-shot enrollment (the CLI's) never removes another process's
+    /// open review, whose name stays taken; nor does a review while a journal a
+    /// newer build left may still own a candidate.
+    func testOnlyAReviewSweepsAndNeverPastANewerJournal() async throws {
+        let source = try writeSource(named: "source.wav")
+        let app = makeRepository(reviewSession: UUID())
+        let review = try await app.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: ["warning"],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let cli = makeRepository(reviewSession: UUID())
+        do {
+            _ = try await cli.prepare(name: "Ava", audioURL: source, transcript: nil, qualityWarnings: [], replacingVoiceID: nil)
+            XCTFail("A one-shot enrollment must not take a name another review holds")
+        } catch {
+            XCTAssertEqual(error as? PreparedVoiceRepositoryError, .duplicateName("Ava"))
+        }
+        XCTAssertTrue(exists(candidateDirectory(review.id)))
+
+        let journal = root.appendingPathComponent("voice-transactions/commit-future", isDirectory: true)
+        try FileManager.default.createDirectory(at: journal, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 99, "candidateID": review.id.uuidString, "newVoiceName": "Ava",
+            "newAudioFileName": "Ava.wav",
+        ]).write(to: journal.appendingPathComponent("transaction.json"))
+        let later = makeRepository(reviewSession: UUID())
+        _ = try await later.prepare(
+            name: "Bea", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        XCTAssertTrue(exists(candidateDirectory(review.id)), "a newer journal may own it")
+    }
 
     func testReconcileSkipsHiddenAndNonDirectoryRootEntries() async throws {
         let repository = makeRepository()
@@ -1079,6 +1252,24 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             appSupportDirectory: root,
             supportedAudioExtensions: extensions
         )
+    }
+
+    /// A repository whose review session is its own but whose process is this
+    /// one: to another such session it reads as a process that has ended.
+    private func makeRepository(reviewSession: UUID) -> PreparedVoiceRepository {
+        PreparedVoiceRepository(
+            appSupportDirectory: root,
+            supportedAudioExtensions: extensions,
+            reviewOwner: .init(
+                session: reviewSession,
+                processIdentifier: PreparedVoiceRepository.processReviewOwner.processIdentifier,
+                startTime: PreparedVoiceRepository.processReviewOwner.startTime
+            )
+        )
+    }
+
+    private func candidateDirectory(_ id: UUID) -> URL {
+        root.appendingPathComponent("voice-candidates/\(id.uuidString.lowercased())", isDirectory: true)
     }
 
     private func exists(_ url: URL) -> Bool {

@@ -491,6 +491,14 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         syncFromBackend()
     }
 
+    /// F-01: discards the candidate of a saved-voice surface that has closed.
+    /// Nothing is left to show a failure to, and the store finishes a discard
+    /// it could not do now on its next operation.
+    func discardAbandonedPreparedVoiceCandidate(id: UUID) async {
+        await backend.discardAbandonedPreparedVoiceCandidate(id: id)
+        syncFromBackend()
+    }
+
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         let voice = try await backend.enrollPreparedVoice(name: name, audioPath: audioPath, transcript: transcript)
         syncFromBackend()

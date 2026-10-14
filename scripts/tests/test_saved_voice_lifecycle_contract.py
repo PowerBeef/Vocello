@@ -33,6 +33,7 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
             "Sources/Views/Voices/MacSavedVoiceSheet.swift",
             "Sources/iOS/IOSVoicesView.swift",
+            "Sources/iOS/TTSEngineStore.swift",
             "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
             "scripts/ui_test.sh",
         ):
@@ -60,6 +61,43 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
         )
         path.write_text(text, encoding="utf-8")
         with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "missing"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_closed_surface_without_candidate_discard_fails(self) -> None:
+        path = self.root / "Sources/iOS/IOSGenerationModeViews.swift"
+        text = path.read_text(encoding="utf-8").replace(
+            "discardAbandonedPreparedVoiceCandidate(id:",
+            "candidateLeftBehind(id:",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "leaves its candidate behind"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_swallowed_interactive_discard_fails(self) -> None:
+        path = self.root / "Sources/Views/Voices/MacSavedVoiceSheet.swift"
+        path.write_text(
+            path.read_text(encoding="utf-8")
+            + "\ntry? await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "swallows a discard failure"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_one_shot_enrollment_held_for_review_fails(self) -> None:
+        path = self.root / "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+        text = path.read_text(encoding="utf-8").replace("heldForReview: false", "heldForReview: true")
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "one-shot enrollment"):
+            saved_voice_lifecycle_contract.validate(self.root)
+
+    def test_delete_during_long_form_project_fails(self) -> None:
+        path = self.root / "Sources/iOS/IOSVoicesView.swift"
+        text = path.read_text(encoding="utf-8").replace(
+            "appModel.longForm.isProcessing",
+            "appModel.longForm.isIgnored",
+        )
+        path.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "iOS saved-voice deletion"):
             saved_voice_lifecycle_contract.validate(self.root)
 
     def test_private_candidate_path_exposure_fails(self) -> None:

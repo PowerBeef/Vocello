@@ -26,7 +26,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 0/16 (0%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 0/17 (0%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 6/14 (43%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -458,6 +458,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-10` | parked | Version-skew exits for persisted JSON | — |
 | `BKL-11` | parked | Test the lifecycle glue | — |
 | `BKL-12` | parked | Release rehearsal's macOS DMG step runs out of runner disk | — |
+| `BKL-13` | parked | Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project | — |
 | `CONV-21` | parked | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
@@ -511,6 +512,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-12`** (parked) — Release rehearsal's macOS DMG step runs out of runner disk.
   gate: The release rehearsal's macOS package job passes on GitHub's runner: the DMG step gets the disk it needs, by freeing runner space before packaging or staging the DMG on a larger volume, and the rehearsal is green on three consecutive pushes.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-13`** (parked) — Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project.
+  gate: On macOS, a saved voice cannot be deleted while a long-form project or line batch that may read it is running, and a retained long-form project that reads a deleted voice can no longer resume or regenerate, as on the iPhone; deterministic tests cover both.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`CONV-21`** (parked) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.

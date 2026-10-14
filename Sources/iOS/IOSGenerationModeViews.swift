@@ -591,6 +591,9 @@ struct IOSVoiceDesignView: View {
     @State private var isVoiceReviewDecisionInFlight = false
     /// IOS-21: one save at a time; a second Save tap is ignored.
     @State private var isSavingVoice = false
+    /// F-01: this view going away reaches the save in flight. One per save, so
+    /// a view that disappears and returns starts its next save open.
+    @State private var saveCancellation = SavedVoiceSaveCancellation()
     /// A designed voice that was just saved → drives the "Saved ✓ · Use in Clone" confirmation banner.
     @State private var savedDesignedResult: IOSDesignedVoiceSaveResult?
 
@@ -801,6 +804,8 @@ struct IOSVoiceDesignView: View {
                             // Claimed synchronously at the tap, before the task runs.
                             guard !isSavingVoice, saveSheetReview.allowsSave(transcript: saveSheetTranscript) else { return }
                             isSavingVoice = true
+                            let cancellation = SavedVoiceSaveCancellation()
+                            saveCancellation = cancellation
                             Task {
                                 defer { isSavingVoice = false }
                                 saveError = nil
@@ -822,12 +827,24 @@ struct IOSVoiceDesignView: View {
                                             generatedSourceMode: GenerationMode.design.rawValue
                                         )
                                     )
+                                    // F-01: the view went away while the
+                                    // candidate was being staged.
+                                    if cancellation.isCancelled {
+                                        await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                                        return
+                                    }
                                     if candidate.qualityWarnings.isEmpty {
                                         do {
                                             let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
                                             completeDesignedVoiceSave(voice)
                                             await savedVoicesViewModel.refresh(using: ttsEngine)
                                         } catch {
+                                            // A view that went away during the
+                                            // commit cannot review it.
+                                            if cancellation.isCancelled {
+                                                await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                                                return
+                                            }
                                             pendingVoiceForReview = candidate
                                             saveError = error.localizedDescription
                                         }
@@ -896,6 +913,15 @@ struct IOSVoiceDesignView: View {
                     savedDesignedResult = nil
                 }
             }
+            // F-01: a save in flight or a candidate awaiting Keep or Discard
+            // goes with the view (a mode switch or a host change tears it down).
+            .onDisappear {
+                saveCancellation.isCancelled = true
+                if let candidate = pendingVoiceForReview, !isVoiceReviewDecisionInFlight {
+                    pendingVoiceForReview = nil
+                    Task { await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id) }
+                }
+            }
     }
 
     // MARK: - Save designed voice → reuse in Clone
@@ -903,6 +929,7 @@ struct IOSVoiceDesignView: View {
     private func commitDesignedVoiceCandidate(_ candidate: PreparedVoiceCandidate) {
         guard !isVoiceReviewDecisionInFlight else { return }
         isVoiceReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
@@ -911,6 +938,13 @@ struct IOSVoiceDesignView: View {
                 completeDesignedVoiceSave(voice)
                 await savedVoicesViewModel.refresh(using: ttsEngine)
             } catch {
+                // F-01: the view went away while Keep was committing.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isVoiceReviewDecisionInFlight = false
+                    await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 saveError = error.localizedDescription
                 isVoiceReviewDecisionInFlight = false
             }
@@ -920,11 +954,19 @@ struct IOSVoiceDesignView: View {
     private func discardDesignedVoiceCandidate(_ candidate: PreparedVoiceCandidate) {
         guard !isVoiceReviewDecisionInFlight else { return }
         isVoiceReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 try await ttsEngine.discardPreparedVoiceCandidate(id: candidate.id)
                 pendingVoiceForReview = nil
             } catch {
+                // F-01: a view that went away while Discard ran cannot review it again.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isVoiceReviewDecisionInFlight = false
+                    await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 saveError = error.localizedDescription
             }
             isVoiceReviewDecisionInFlight = false

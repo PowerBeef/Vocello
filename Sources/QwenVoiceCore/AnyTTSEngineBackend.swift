@@ -56,6 +56,7 @@ public final class AnyTTSEngineBackend {
     ) async throws -> PreparedVoiceCandidate
     private let commitPreparedVoiceCandidateBlock: (UUID) async throws -> PreparedVoice
     private let discardPreparedVoiceCandidateBlock: (UUID) async throws -> Void
+    private let discardAbandonedPreparedVoiceCandidateBlock: (UUID) async -> Void
     private let enrollPreparedVoiceBlock: (String, String, String?) async throws -> PreparedVoice
     private let deletePreparedVoiceBlock: (String) async throws -> Void
     private let exportGeneratedAudioBlock: (URL, URL) throws -> ExportedDocument
@@ -179,6 +180,7 @@ public final class AnyTTSEngineBackend {
         }
         self.commitPreparedVoiceCandidateBlock = { try await engine.commitPreparedVoiceCandidate(id: $0) }
         self.discardPreparedVoiceCandidateBlock = { try await engine.discardPreparedVoiceCandidate(id: $0) }
+        self.discardAbandonedPreparedVoiceCandidateBlock = { await engine.discardAbandonedPreparedVoiceCandidate(id: $0) }
         self.enrollPreparedVoiceBlock = { try await engine.enrollPreparedVoice(name: $0, audioPath: $1, transcript: $2) }
         self.deletePreparedVoiceBlock = { try await engine.deletePreparedVoice(id: $0) }
         self.exportGeneratedAudioBlock = { try engine.exportGeneratedAudio(from: $0, to: $1) }
@@ -333,6 +335,9 @@ public final class AnyTTSEngineBackend {
     }
     public func discardPreparedVoiceCandidate(id: UUID) async throws {
         try await discardPreparedVoiceCandidateBlock(id)
+    }
+    public func discardAbandonedPreparedVoiceCandidate(id: UUID) async {
+        await discardAbandonedPreparedVoiceCandidateBlock(id)
     }
     public func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         try admitVoiceEnrollment()

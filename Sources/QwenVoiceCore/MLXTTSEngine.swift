@@ -2088,6 +2088,26 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         replacingVoiceID: String?,
         enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
     ) async throws -> PreparedVoiceCandidate {
+        try await preparePreparedVoiceCandidate(
+            name: name,
+            audioPath: audioPath,
+            transcript: transcript,
+            replacingVoiceID: replacingVoiceID,
+            enrollmentMetadata: enrollmentMetadata,
+            heldForReview: true
+        )
+    }
+
+    /// Interactive surfaces hold their candidate for review; a one-shot
+    /// enrollment commits it in the same call (F-01).
+    private func preparePreparedVoiceCandidate(
+        name: String,
+        audioPath: String,
+        transcript: String?,
+        replacingVoiceID: String?,
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata?,
+        heldForReview: Bool
+    ) async throws -> PreparedVoiceCandidate {
         try ensureInitialized()
         let requestedURL = URL(fileURLWithPath: audioPath)
         let repository = try requirePreparedVoiceRepository()
@@ -2123,7 +2143,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 transcript: transcript,
                 qualityWarnings: warnings,
                 enrollmentMetadata: enrollmentMetadata,
-                replacingVoiceID: replacingVoiceID
+                replacingVoiceID: replacingVoiceID,
+                heldForReview: heldForReview
             )
             clearSavedVoiceStoreStartupIssue(after: repository)
             return candidate
@@ -2158,6 +2179,21 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    /// F-01: the candidate of a review surface that has closed. Nothing is left
+    /// to show a failure to, so the repository remembers a discard it cannot
+    /// do now and finishes it on its next operation.
+    public func discardAbandonedPreparedVoiceCandidate(id: UUID) async {
+        do {
+            try ensureInitialized()
+            let repository = try requirePreparedVoiceRepository()
+            try await repository.discard(id: id, abandoned: true)
+            clearSavedVoiceStoreStartupIssue(after: repository)
+        } catch {
+            // Remembered by the repository when it got that far; otherwise the
+            // candidate expires on its own.
+        }
+    }
+
     /// Compatibility route for non-interactive callers such as the CLI and
     /// device diagnostics. Interactive UI must prepare, review, then commit.
     public func enrollPreparedVoice(
@@ -2169,7 +2205,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             name: name,
             audioPath: audioPath,
             transcript: transcript,
-            replacingVoiceID: nil
+            replacingVoiceID: nil,
+            enrollmentMetadata: nil,
+            heldForReview: false
         )
         do {
             return try await commitPreparedVoiceCandidate(id: candidate.id)

@@ -477,6 +477,15 @@ final class IOSLongFormCoordinator {
         }
     }
 
+    /// F-01: the saved voice a retained Clone project reads was deleted, so the
+    /// project can no longer resume or regenerate a segment. Its History stays;
+    /// only those session affordances end. A project in flight is left alone:
+    /// Delete waits for it.
+    func releaseRetainedProject(usingSavedVoiceID voiceID: String) {
+        guard !isProcessing, lastRequest?.preparedVoiceID == voiceID else { return }
+        lastRequest = nil
+    }
+
     /// `baseSeed` is the pinned Studio seed, if any (U11): the same script and
     /// seed plan the same segments on the same sub-seeds, as the CLI's
     /// `--seed` does. Without one, every project draws its own.

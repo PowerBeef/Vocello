@@ -171,7 +171,8 @@ without native pinned-header material or section rules. Search still renders a f
 | Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton`; `voicesEnroll_inlineConsent` (one-time, same key as the Settings toggle) shows while consent is off and Confirm stays disabled until it is recorded |
 
 Confirm prepares a private candidate first. A clean candidate commits immediately; a warned
-candidate commits only on Keep, while Discard, Cancel, and outside dismissal discard it. Editing a
+candidate commits only on Keep, while Discard, Cancel, and outside dismissal discard it, including a
+candidate a save was still staging when the sheet closed (F-01). Editing a
 voice supplies replacement intent to the same transaction, so the old assets remain recoverable
 until the new audio crosses the publication boundary. Row deletion stops a matching preview before
 the engine atomically removes that voice's audio, transcript, and prepared prompt artifacts.

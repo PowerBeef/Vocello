@@ -224,6 +224,42 @@ final class ReferenceImportStorageTests: XCTestCase {
         XCTAssertEqual(voice.audioProvenanceMode, "design", "A saved WAV keeps its provenance byte for byte")
     }
 
+    /// F-01: an interactive save holds its candidate for review and removes the
+    /// review an ended session left; the one-shot enrollment (the CLI's) does
+    /// neither.
+    @MainActor
+    func testOnlyAnInteractiveSaveHoldsItsCandidateForReviewAndSweeps() async throws {
+        let engine = try makeEngine()
+        defer { engine.stop() }
+        try await engine.initialize(appSupportDirectory: root)
+        let source = root.appendingPathComponent("Reference.wav")
+        try Self.writeTone(to: source, sampleRate: 24_000, seconds: 11)
+        let current = PreparedVoiceRepository.processReviewOwner
+        let ended = PreparedVoiceRepository(
+            appSupportDirectory: root,
+            supportedAudioExtensions: MLXTTSEngine.supportedSavedVoiceAudioExtensions,
+            reviewOwner: .init(session: UUID(), processIdentifier: current.processIdentifier, startTime: current.startTime)
+        )
+        let abandoned = try await ended.prepare(
+            name: "Ava", audioURL: source, transcript: nil, qualityWarnings: [],
+            replacingVoiceID: nil, heldForReview: true
+        )
+        let candidates = root.appendingPathComponent("voice-candidates", isDirectory: true)
+        let abandonedDirectory = candidates.appendingPathComponent(abandoned.id.uuidString.lowercased())
+
+        _ = try await engine.enrollPreparedVoice(name: "Bea", audioPath: source.path, transcript: nil)
+        XCTAssertTrue(exists(abandonedDirectory), "A one-shot enrollment never sweeps")
+
+        let review = try await engine.preparePreparedVoiceCandidate(
+            name: "Cy", audioPath: source.path, transcript: nil, replacingVoiceID: nil
+        )
+        XCTAssertFalse(exists(abandonedDirectory), "An interactive save removes an ended session's review")
+        let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: candidates
+            .appendingPathComponent(review.id.uuidString.lowercased())
+            .appendingPathComponent("manifest.json"))) as? [String: Any]
+        XCTAssertNotNil(manifest?["reviewOwner"], "An interactive save holds its candidate for review")
+    }
+
     // MARK: - Fixtures
 
     @MainActor

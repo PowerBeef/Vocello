@@ -663,8 +663,8 @@
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],
-      "updated": "2026-10-12",
-      "notes": "Initial transactional review and iOS deletion passed source/device acceptance August 20 (ios-xcui-saved-voice-lifecycle-20260820-061924-73065027). Reopened September 4 for V26-02 at 75ecb740: replacement/delete handlers can suppress backup-restore failure then remove the transaction directory; post-publication cleanup also shares rollback. This source-proven P1 preservation defect has no reproduced personal-data loss; prior pass does not cover secondary failures. See docs/reference/engineering-audit-grounding-2026-09-04.md. September 21: the simple device lane was not run against personal state because it lacks complete Studio selection/draft/consent restoration (ios-device-testing.md); current models also show Update Available. No user voice was imported, replaced or deleted. V26-02 secondary-failure schedules remain unqualified. Earlier history: git log -p -- config/roadmap.json."
+      "updated": "2026-10-13",
+      "notes": "The repository's V26-02 preservation fix and its failure-schedule tests landed in 78142e07 (2026-09-04); PreparedVoiceRepositoryTests and saved_voice_lifecycle_contract pass. 2026-10-13 (UI audit G1, G3, G4): every review surface (iOS recorder and import, iOS Design save, Mac sheet) discards its candidate however it closes, a save still staging included. The store finishes a discard it could not take the lock for on its next operation, and a review save removes the review candidates an ended app session left, never the CLI's one-shot ones. iOS Delete also waits while a long-form project runs; the Mac's same gap is parked as BKL-13. Open: G2, iOS has no replace flow, so RF-15's iPhone 'save, replace and delete' row needs a maintainer scope decision. Device proof comes from RF-15. Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "F-05",
@@ -1900,6 +1900,21 @@
       "updated": "2026-10-13",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Failing since 2026-10-10 (8c71d64b). On 2026-10-12 (86d910dd) and 2026-10-13 (c08a1360) hdiutil reported 'No space left on device' while building the DMG, after the macOS build, bundle verification and CLI smoke had passed; the iOS archive prerequisites job passes. Parked without investigation under the focus lock: macOS packaging is not part of the 3.0 iOS submission."
+    },
+    {
+      "id": "BKL-13",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "On macOS, a saved voice cannot be deleted while a long-form project or line batch that may read it is running, and a retained long-form project that reads a deleted voice can no longer resume or regenerate, as on the iPhone; deterministic tests cover both.",
+      "sourceOfTruth": [
+        "Sources/Views/Voices/MacVoicesScreen.swift",
+        "Sources/iOS/IOSVoicesView.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-13 while closing F-01's iOS gap (G4): the engine refuses a delete only during an active take, and a long-form Clone project reads its voice again for every segment. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission."
     },
     {
       "id": "BG-01",

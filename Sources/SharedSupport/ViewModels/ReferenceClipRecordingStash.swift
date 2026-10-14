@@ -291,3 +291,12 @@ final class ReferenceClipStashTracker {
         finished.forEach(discard)
     }
 }
+
+/// The enrollment surface that started a save has closed: Cancel (MAC-12), a
+/// host dismissal or a teardown (F-01). A reference type, so the running save
+/// sees it after the view's state is gone and discards the private candidate
+/// it stages instead of publishing it or leaving it to hold its name.
+@MainActor
+final class SavedVoiceSaveCancellation {
+    var isCancelled = false
+}

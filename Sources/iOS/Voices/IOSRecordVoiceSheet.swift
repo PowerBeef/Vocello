@@ -37,6 +37,8 @@ struct IOSRecordVoiceSheet: View {
     @State private var isReviewDecisionInFlight = false
     /// IOS-21: one enrollment at a time; a second Save tap is ignored.
     @State private var isSaving = false
+    /// F-01: the flow closing reaches a save still staging its candidate.
+    @State private var saveCancellation = SavedVoiceSaveCancellation()
     @State private var transcriptionReview: ReferenceTranscriptionReviewState
     @State private var transcriptionEvidence: VoiceClipTranscriber.EnrollmentEvidence?
     @State private var transcriptionTask: Task<Void, Never>?
@@ -202,8 +204,15 @@ struct IOSRecordVoiceSheet: View {
         }
         .onDisappear {
             cancelTranscription()
-            // However the flow closes (a host dismissal included), its clips go
-            // once no save still reads them.
+            // F-01: however the flow closes (a host dismissal included), its
+            // private candidate goes: a save still staging one discards it when
+            // it lands, and one still awaiting Keep or Discard goes now.
+            saveCancellation.isCancelled = true
+            if let candidate = pendingVoiceForReview, !isReviewDecisionInFlight {
+                pendingVoiceForReview = nil
+                Task { await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id) }
+            }
+            // However the flow closes, its clips go once no save still reads them.
             recordedClips.close()
         }
     }
@@ -318,6 +327,7 @@ struct IOSRecordVoiceSheet: View {
         // The candidate copies the clip; until then the clip must outlive a close.
         recordedClips.beginUse()
         defer { recordedClips.endUse() }
+        let cancellation = saveCancellation
         do {
             let candidate = try await ttsEngine.preparePreparedVoiceCandidate(
                 name: name,
@@ -330,11 +340,21 @@ struct IOSRecordVoiceSheet: View {
                     evidence: transcriptionEvidence
                 )
             )
+            // F-01: the flow closed while the candidate was being staged.
+            if cancellation.isCancelled {
+                await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                return
+            }
             if candidate.qualityWarnings.isEmpty {
                 do {
                     let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
                     completeEnrollment(voice)
                 } catch {
+                    // A flow that closed during the commit cannot review it.
+                    if cancellation.isCancelled {
+                        await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                        return
+                    }
                     pendingVoiceForReview = candidate
                     enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 }
@@ -350,6 +370,7 @@ struct IOSRecordVoiceSheet: View {
     private func commitPendingCandidate(_ candidate: PreparedVoiceCandidate) {
         guard !isReviewDecisionInFlight else { return }
         isReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 let voice = try await ttsEngine.commitPreparedVoiceCandidate(id: candidate.id)
@@ -357,6 +378,13 @@ struct IOSRecordVoiceSheet: View {
                 isReviewDecisionInFlight = false
                 completeEnrollment(voice)
             } catch {
+                // F-01: the flow closed while Keep was committing.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isReviewDecisionInFlight = false
+                    await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
@@ -369,12 +397,14 @@ struct IOSRecordVoiceSheet: View {
     ) {
         guard !isReviewDecisionInFlight else { return }
         isReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 try await ttsEngine.discardPreparedVoiceCandidate(id: candidate.id)
                 pendingVoiceForReview = nil
                 isReviewDecisionInFlight = false
-                guard closesFlow else { return }
+                // A host that closed this flow meanwhile may have opened a newer one.
+                guard closesFlow, !cancellation.isCancelled else { return }
                 cleanupCapturedFile()
                 isNamingPresented = false
                 if importedReference == nil {
@@ -383,6 +413,13 @@ struct IOSRecordVoiceSheet: View {
                     onDismiss()
                 }
             } catch {
+                // F-01: a flow that closed while Discard ran cannot review it again.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isReviewDecisionInFlight = false
+                    await ttsEngine.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 enrollError = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
@@ -392,12 +429,17 @@ struct IOSRecordVoiceSheet: View {
     private func completeEnrollment(_ voice: PreparedVoice) {
         let confirmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let language = detectedLanguage
+        let cancellation = saveCancellation
         savedVoicesViewModel.insertOrReplace(voice)
         cleanupCapturedFile()
         recordedClips.close()
         isNamingPresented = false
         Task {
             await savedVoicesViewModel.refresh(using: ttsEngine)
+            // A voice that landed after the flow closed stays saved, but the
+            // host that closed the flow, and may since have opened another, is
+            // not handed it.
+            guard !cancellation.isCancelled else { return }
             onEnrolled(voice, confirmed, language)
         }
     }

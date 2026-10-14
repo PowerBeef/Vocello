@@ -646,11 +646,16 @@ bridge with `onReceive` instead of observing the whole object (W1-D/W2-A).
 Saved-voice mutation is serialized by `PreparedVoiceRepository`. Interactive enrollment first
 copies audio, transcript, warnings, and replacement intent into an opaque, private candidate; the
 candidate is absent from `listPreparedVoices` until an explicit commit moves audio across the
-publication boundary. Discard is idempotent. Commit/replacement and delete use journaled
+publication boundary. Discard is idempotent; a closed surface's discard that cannot take the store at
+once is finished by the store's next operation, while an explicit Discard that fails stays under
+review. An interactive candidate records its review owner (a process session, identifier and start
+time), and the next interactive review removes the review candidates of an owner that has ended,
+never a running copy's, so a name is normally free at once (F-01). Commit/replacement and delete use journaled
 transaction directories so startup reconciliation can roll an interrupted pre-publication commit
 back, complete a post-publication commit, or finish a user-confirmed delete without reviving it.
 The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
-for noninteractive CLI and diagnostics.
+for noninteractive CLI and diagnostics; it never holds a candidate for review or sweeps another
+process's review.
 
 Saved-voice clone prompts serialize to a private staging directory without holding the store
 lock. `PreparedVoiceRepository.publishClonePromptArtifact` then takes the same cross-process lock

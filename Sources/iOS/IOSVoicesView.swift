@@ -506,6 +506,13 @@ struct IOSVoicesView: View {
         .accessibilityLabel(isPlaying ? IOSInterfaceText.stopPreview : IOSInterfaceText.previewVoice)
     }
 
+    /// A take or a long-form project may still read a saved voice: a long-form
+    /// Clone project reads it again for every segment, between which no take
+    /// is active (F-01).
+    private var isGenerationUsingVoices: Bool {
+        ttsEngine.hasActiveGeneration || appModel.longForm.isProcessing
+    }
+
     @ViewBuilder
     private func savedVoiceActionsMenu(_ voice: Voice) -> some View {
         if deletingVoiceID == voice.id {
@@ -520,7 +527,7 @@ struct IOSVoicesView: View {
                 } label: {
                     Label(IOSInterfaceText.deleteVoice, systemImage: "trash")
                 }
-                .disabled(ttsEngine.hasActiveGeneration)
+                .disabled(isGenerationUsingVoices)
                 .accessibilityIdentifier("voicesDelete_\(voice.id)")
             } label: {
                 IOSPlayerIconButtonChrome(
@@ -535,7 +542,7 @@ struct IOSVoicesView: View {
             .accessibilityIdentifier("voicesRowMenu_\(voice.id)")
             .accessibilityLabel(IOSInterfaceText.actionsForVoice(voice.name))
             .accessibilityHint(
-                ttsEngine.hasActiveGeneration
+                isGenerationUsingVoices
                     ? IOSInterfaceText.waitDelete
                     : IOSInterfaceText.voiceActionsHint
             )
@@ -554,7 +561,7 @@ struct IOSVoicesView: View {
 
     private func deleteSavedVoice(_ voice: Voice) {
         guard deletingVoiceID == nil else { return }
-        guard !ttsEngine.hasActiveGeneration else {
+        guard !isGenerationUsingVoices else {
             voiceToDelete = nil
             deleteErrorMessage = IOSInterfaceText.waitCurrentDelete
             return
@@ -576,6 +583,7 @@ struct IOSVoicesView: View {
                 if appModel.pendingVoiceCloningHandoff?.savedVoiceID == voice.id {
                     appModel.pendingVoiceCloningHandoff = nil
                 }
+                appModel.longForm.releaseRetainedProject(usingSavedVoiceID: voice.id)
                 savedVoicesViewModel.removeVoiceFromVisibleState(id: voice.id)
                 await savedVoicesViewModel.refresh(using: ttsEngine)
                 IOSHaptics.success()

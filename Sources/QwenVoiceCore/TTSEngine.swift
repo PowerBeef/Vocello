@@ -132,6 +132,9 @@ public protocol TTSEngine: ObservableObject {
     ) async throws -> PreparedVoiceCandidate
     func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice
     func discardPreparedVoiceCandidate(id: UUID) async throws
+    /// The candidate of a review surface that has closed (F-01): nothing is left
+    /// to show a failure to, so the store finishes a discard it cannot do now.
+    func discardAbandonedPreparedVoiceCandidate(id: UUID) async
     func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice
     func deletePreparedVoice(id: String) async throws
     func importReferenceAudio(from sourceURL: URL) throws -> ImportedReferenceAudio
@@ -151,6 +154,11 @@ public protocol TTSEngineEventStreaming: AnyObject {
 }
 
 public extension TTSEngine {
+    /// Engines without a store that remembers discards drop the failure.
+    func discardAbandonedPreparedVoiceCandidate(id: UUID) async {
+        try? await discardPreparedVoiceCandidate(id: id)
+    }
+
     func preparePreparedVoiceCandidate(
         name: String,
         audioPath: String,

@@ -102,6 +102,7 @@ struct MacSavedVoiceSheet: View {
             && !audioPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && validationMessage == nil
             && !isSaving
+            && !isReviewDecisionInFlight
             && transcriptionReview.allowsSave(transcript: transcript)
             && !requiresReferenceLanguageConfirmation
     }
@@ -296,7 +297,8 @@ struct MacSavedVoiceSheet: View {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
-                .disabled(isCommitting)
+                // A Keep or Discard in flight finishes first, as on the iPhone (F-01).
+                .disabled(isCommitting || isReviewDecisionInFlight)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("voicesEnroll_cancelButton")
 
@@ -354,6 +356,14 @@ struct MacSavedVoiceSheet: View {
         .onDisappear {
             transcriptionTask?.cancel()
             transcriptionReview.invalidate()
+            // F-01: however the sheet closes (an outside dismissal included),
+            // its private candidate goes: a save still staging one discards it
+            // when it lands, and one still awaiting Keep or Discard goes now.
+            saveCancellation.isCancelled = true
+            if let candidate = pendingVoiceForReview, !isReviewDecisionInFlight {
+                pendingVoiceForReview = nil
+                Task { await ttsEngineStore.discardAbandonedPreparedVoiceCandidate(id: candidate.id) }
+            }
             recordedClips.close()
         }
         .sheet(isPresented: $isRecordSheetPresented) {
@@ -654,10 +664,10 @@ struct MacSavedVoiceSheet: View {
                             && audioPath == configuration.initialAudioPath ? GenerationMode.design.rawValue : nil
                     )
                 )
-                // MAC-12: Cancel arrived while the candidate was being staged.
-                // It is private and expires on its own, but it is discarded now.
+                // MAC-12, F-01: the sheet was cancelled or closed while the
+                // candidate was being staged, so it is discarded now.
                 if cancellation.isCancelled {
-                    try? await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)
+                    await ttsEngineStore.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
                     return
                 }
                 pendingVoiceForReview = candidate.qualityWarnings.isEmpty ? nil : candidate
@@ -668,6 +678,11 @@ struct MacSavedVoiceSheet: View {
                     onComplete(savedVoice)
                     dismiss()
                 } catch {
+                    // A sheet that closed during the commit cannot review it.
+                    if cancellation.isCancelled {
+                        await ttsEngineStore.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                        return
+                    }
                     pendingVoiceForReview = candidate
                     errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                 }
@@ -680,6 +695,7 @@ struct MacSavedVoiceSheet: View {
     private func acceptPendingVoice(_ candidate: PreparedVoiceCandidate) {
         guard !isReviewDecisionInFlight else { return }
         isReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
@@ -688,6 +704,13 @@ struct MacSavedVoiceSheet: View {
                 onComplete(savedVoice)
                 dismiss()
             } catch {
+                // F-01: the sheet closed while Keep was committing.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isReviewDecisionInFlight = false
+                    await ttsEngineStore.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
@@ -697,11 +720,19 @@ struct MacSavedVoiceSheet: View {
     private func discardPendingVoice(_ candidate: PreparedVoiceCandidate) {
         guard !isReviewDecisionInFlight else { return }
         isReviewDecisionInFlight = true
+        let cancellation = saveCancellation
         Task {
             do {
                 try await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)
                 pendingVoiceForReview = nil
             } catch {
+                // F-01: a sheet that closed while Discard ran cannot review it again.
+                if cancellation.isCancelled {
+                    pendingVoiceForReview = nil
+                    isReviewDecisionInFlight = false
+                    await ttsEngineStore.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                    return
+                }
                 errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
             }
             isReviewDecisionInFlight = false
@@ -715,13 +746,6 @@ struct MacSavedVoiceSheet: View {
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
         errorMessage ?? MacInterfaceText.qualityWarningSummary(tokens: candidate.qualityWarnings)
     }
-}
-
-/// Cancel's request to a save that is still staging its candidate (MAC-12);
-/// a reference type so the running save sees it after the sheet has closed.
-@MainActor
-private final class SavedVoiceSaveCancellation {
-    var isCancelled = false
 }
 
 /// Field chrome of the iOS sheets (`iosSelectionFieldChrome`): a muted glass

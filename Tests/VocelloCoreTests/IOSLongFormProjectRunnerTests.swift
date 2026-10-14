@@ -774,6 +774,31 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertTrue(coordinator.canRegenerateSegments)
     }
 
+    /// F-01: deleting the saved voice a retained project reads ends its Resume
+    /// and Regenerate; its History stays, and another voice's deletion leaves it.
+    func testDeletingTheProjectsSavedVoiceReleasesItsRetainedProject() async throws {
+        let f = try makeFixture()
+        let base = f.request
+        let request = IOSLongFormProjectRequest(
+            mode: base.mode, model: base.model, plan: base.plan, voice: base.voice, emotion: base.emotion,
+            deliveryInstructionCellID: base.deliveryInstructionCellID, languageHint: base.languageHint,
+            voiceDescription: base.voiceDescription, refAudio: "/saved/voice-1.wav", refText: nil,
+            preparedVoiceID: "voice-1"
+        )
+        let coordinator = f.makeCoordinator()
+        coordinator.start(request: request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to finish") { !coordinator.isProcessing }
+        XCTAssertTrue(coordinator.canRegenerateSegments)
+
+        coordinator.releaseRetainedProject(usingSavedVoiceID: "voice-2")
+        XCTAssertTrue(coordinator.canRegenerateSegments, "Another voice's deletion leaves the project")
+
+        coordinator.releaseRetainedProject(usingSavedVoiceID: "voice-1")
+        XCTAssertFalse(coordinator.canRegenerateSegments)
+        XCTAssertFalse(coordinator.canResume)
+        XCTAssertEqual(try rows(f, role: "joined").count, 1, "Its History stays")
+    }
+
     /// U09: a regenerated take that fails its QC stops its own live preview,
     /// and the completed project stays as it was.
     func testARegeneratedTakeThatFailsQCStopsItsLivePreview() async throws {

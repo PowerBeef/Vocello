@@ -40,6 +40,7 @@ def validate(root: Path) -> None:
     engine = _read(root, "Sources/QwenVoiceCore/MLXTTSEngine.swift")
     ios_ui_test = _read(root, "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift")
     ui_runner = _read(root, "scripts/ui_test.sh")
+    engine_store = _read(root, "Sources/iOS/TTSEngineStore.swift")
 
     required_protocol_tokens = (
         "preparePreparedVoiceCandidate(",
@@ -69,6 +70,15 @@ def validate(root: Path) -> None:
                 raise ContractError(f"interactive review is missing {token!r}: {relative}")
         if re.search(r"try\?\s+await\s+\w+\.deletePreparedVoice", text):
             raise ContractError(f"interactive deletion silently swallows failure: {relative}")
+        # F-01: a surface that closes however it closes discards its candidate
+        # through the store, which retries a discard it could not finish.
+        if "discardAbandonedPreparedVoiceCandidate(id:" not in text:
+            raise ContractError(f"a closed review surface leaves its candidate behind: {relative}")
+        if re.search(r"try\?\s+await\s+\w+\.discardPreparedVoiceCandidate", text):
+            raise ContractError(f"interactive review swallows a discard failure: {relative}")
+
+    if "func discardAbandonedPreparedVoiceCandidate(id:" not in engine_store:
+        raise ContractError("TTSEngineStore is missing the closed-surface candidate discard")
 
     for token in (
         'appendingPathComponent("voice-candidates"',
@@ -80,9 +90,19 @@ def validate(root: Path) -> None:
         "reconcileCommitTransaction(at:",
         "reconcileDeleteTransaction(at:",
         "Audio is the publication boundary",
+        # F-01: a closed surface's discard that cannot take the store is
+        # finished later, and a review removes the review candidates of an app
+        # session that has ended, never a running copy's.
+        "if abandoned { releasedCandidateIDs.insert(id) }",
+        "discardEndedReviewsCandidatesLocked()",
+        "reviewOwnerHasEnded(",
     ):
         if token not in repository:
             raise ContractError(f"prepared-voice repository is missing {token!r}")
+
+    # Only interactive review sweeps; the CLI's one-shot enrollment never does.
+    if "heldForReview: true" not in engine or "heldForReview: false" not in engine:
+        raise ContractError("engine must hold interactive candidates for review and keep one-shot enrollment out of the sweep")
 
     for token in (
         "guard !(await activeGenerationCoordinator.hasActiveGeneration)",
@@ -100,6 +120,10 @@ def validate(root: Path) -> None:
         "appModel.playerSheetItem = nil",
         "appModel.voiceCloningDraft.clearReference()",
         "appModel.pendingVoiceCloningHandoff = nil",
+        # A long-form Clone project reads the voice again for every segment,
+        # and a retained one may not resume or regenerate against a deleted voice.
+        "appModel.longForm.isProcessing",
+        "appModel.longForm.releaseRetainedProject(usingSavedVoiceID: voice.id)",
     ):
         if token not in ios_voices:
             raise ContractError(f"iOS saved-voice deletion is missing {token!r}")

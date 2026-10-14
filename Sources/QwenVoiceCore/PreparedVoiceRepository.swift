@@ -74,6 +74,25 @@ actor PreparedVoiceRepository {
     static let candidateSchemaVersion = 2
     static let supportedCandidateSchemaVersions: Set<Int> = [1, 2]
     static let candidateLifetime: TimeInterval = 24 * 60 * 60
+    /// The process whose interactive review holds a candidate (F-01): a session
+    /// every repository of that process shares, so an engine that restarts
+    /// keeps its reviews, and the identifier and start time that tell whether
+    /// the process has ended.
+    struct ReviewOwner: Codable, Equatable, Sendable {
+        let session: UUID
+        let processIdentifier: Int32
+        /// Microseconds since 1970; zero when the kernel did not report it.
+        let startTime: UInt64
+    }
+
+    static let processReviewOwner: ReviewOwner = {
+        let processIdentifier = getpid()
+        return ReviewOwner(
+            session: UUID(),
+            processIdentifier: processIdentifier,
+            startTime: startTime(ofProcess: processIdentifier) ?? 0
+        )
+    }()
     private static let transactionSchemaVersion = 2
     private static let transactionManifestFileName = "transaction.json"
 
@@ -87,6 +106,10 @@ actor PreparedVoiceRepository {
         let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
         let replacingVoiceID: String?
         let createdAt: Date
+        /// The process whose interactive review holds this candidate (F-01);
+        /// nil for a one-shot enrollment such as the CLI's, and for earlier
+        /// builds, which never wrote it.
+        var reviewOwner: ReviewOwner? = nil
     }
 
     private enum CommitPhase: String, Codable { case prepared, backedUp, rolledBack }
@@ -114,6 +137,12 @@ actor PreparedVoiceRepository {
     private let supportedAudioExtensions: Set<String>
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
+    private let reviewOwner: ReviewOwner
+    /// Candidates of closed review surfaces whose discard could not finish yet,
+    /// usually because another process held the store. The next operation that
+    /// holds it removes them with the expired ones, so such a candidate does
+    /// not keep its name until it expires (F-01).
+    private var releasedCandidateIDs: Set<UUID> = []
     enum FaultPoint: Sendable { case beforeCandidatePublication, beforeAudioPublication, beforeRestoreAsset, beforeCandidateCleanup, beforeTransactionCleanup, beforeClonePromptPublication }
     private let fault: @Sendable (FaultPoint) throws -> Void
 
@@ -122,6 +151,7 @@ actor PreparedVoiceRepository {
         supportedAudioExtensions: Set<String>,
         fileManager: FileManager = .default,
         now: @escaping @Sendable () -> Date = Date.init,
+        reviewOwner: ReviewOwner = PreparedVoiceRepository.processReviewOwner,
         fault: @escaping @Sendable (FaultPoint) throws -> Void = { _ in }
     ) {
         voicesDirectory = appSupportDirectory.appendingPathComponent("voices", isDirectory: true)
@@ -132,6 +162,7 @@ actor PreparedVoiceRepository {
         self.supportedAudioExtensions = supportedAudioExtensions
         self.fileManager = fileManager
         self.now = now
+        self.reviewOwner = reviewOwner
         self.fault = fault
     }
 
@@ -187,10 +218,13 @@ actor PreparedVoiceRepository {
                 try fileManager.removeItem(at: url)
                 continue
             }
-            if now().timeIntervalSince(manifest.createdAt) >= Self.candidateLifetime {
+            if releasedCandidateIDs.contains(manifest.id)
+                || now().timeIntervalSince(manifest.createdAt) >= Self.candidateLifetime {
                 try fileManager.removeItem(at: url)
             }
         }
+        // Every released candidate still present is gone now.
+        releasedCandidateIDs.removeAll()
         return summary
     }
 
@@ -227,11 +261,15 @@ actor PreparedVoiceRepository {
         transcript: String?,
         qualityWarnings: [String],
         enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil,
-        replacingVoiceID: String?
+        replacingVoiceID: String?,
+        heldForReview: Bool = false
     ) throws -> PreparedVoiceCandidate {
         let lock = try acquireStoreLock()
         defer { releaseStoreLock(lock) }
-        try reconcileLocked()
+        let summary = try reconcileLocked()
+        if heldForReview, summary.skippedNewerJournals == 0 {
+            try discardEndedReviewsCandidatesLocked()
+        }
         guard fileManager.fileExists(atPath: sourceURL.path) else {
             throw PreparedVoiceRepositoryError.sourceMissing
         }
@@ -277,7 +315,8 @@ actor PreparedVoiceRepository {
                 qualityWarnings: qualityWarnings,
                 enrollmentMetadata: enrollmentMetadata,
                 replacingVoiceID: replacingVoiceID,
-                createdAt: now()
+                createdAt: now(),
+                reviewOwner: heldForReview ? reviewOwner : nil
             )
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -410,7 +449,13 @@ actor PreparedVoiceRepository {
         )
     }
 
-    func discard(id: UUID) throws {
+    /// `abandoned`: the surface that held the candidate has closed, so nothing
+    /// is left to show a failure to. Such a discard is remembered before the
+    /// store is taken, and one that cannot take it now is finished by the next
+    /// operation that can (F-01). An explicit Discard that fails leaves its
+    /// candidate under review, so Keep still publishes it.
+    func discard(id: UUID, abandoned: Bool = false) throws {
+        if abandoned { releasedCandidateIDs.insert(id) }
         let lock = try acquireStoreLock()
         defer { releaseStoreLock(lock) }
         try reconcileLocked()
@@ -662,6 +707,56 @@ actor PreparedVoiceRepository {
                 try? fileManager.removeItem(at: url)
             }
         }
+    }
+
+    /// F-01: a review candidate lives only as long as the process whose review
+    /// holds it. Once that process has ended (the app was quit, or the system
+    /// ended it, mid-review), its candidate would keep its name until it
+    /// expires, so an interactive review save removes it. Another copy of the
+    /// app still running keeps its reviews (the Mac runs several copies on one
+    /// store), as does every one-shot candidate: the CLI stages and commits in
+    /// one call and never sweeps. A journal a newer build left may own a
+    /// candidate, so the caller skips the sweep while one remains.
+    private func discardEndedReviewsCandidatesLocked() throws {
+        var ended: [UUID: Bool] = [:]
+        for url in try reconcilableEntries(at: candidatesDirectory) {
+            guard let manifest = try? loadManifest(from: url),
+                  let owner = manifest.reviewOwner,
+                  owner.session != reviewOwner.session else { continue }
+            let hasEnded = ended[owner.session] ?? Self.reviewOwnerHasEnded(owner, current: reviewOwner)
+            ended[owner.session] = hasEnded
+            if hasEnded { try fileManager.removeItem(at: url) }
+        }
+    }
+
+    /// Whether the process behind another review session has ended: this
+    /// process now holds its identifier, no process does, or a later one
+    /// reuses it (a different start time). A process this one may not signal
+    /// is no copy of this app on its store: on the iPhone any other app, on the
+    /// Mac another user's process. When nothing can be told, the review stays.
+    static func reviewOwnerHasEnded(_ owner: ReviewOwner, current: ReviewOwner) -> Bool {
+        guard owner.processIdentifier > 0 else { return false }
+        if owner.processIdentifier == current.processIdentifier { return true }
+        guard kill(owner.processIdentifier, 0) == 0 else { return errno == ESRCH || errno == EPERM }
+        guard owner.startTime != 0, let running = startTime(ofProcess: owner.processIdentifier) else { return false }
+        return running != owner.startTime
+    }
+
+    /// `sysctl(KERN_PROC_PID)`, as MAC-25's recording owner reads it: the start
+    /// time of the process holding `processIdentifier` in microseconds since
+    /// 1970, or nil when none does or the kernel cannot say.
+    private static func startTime(ofProcess processIdentifier: Int32) -> UInt64? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        let status = mib.withUnsafeMutableBufferPointer { mib in
+            sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
+        }
+        guard status == 0, size >= MemoryLayout<kinfo_proc>.stride,
+              info.kp_proc.p_pid == processIdentifier else { return nil }
+        let started = info.kp_proc.p_un.__p_starttime
+        let microseconds = UInt64(clamping: started.tv_sec) * 1_000_000 + UInt64(clamping: started.tv_usec)
+        return microseconds == 0 ? nil : microseconds
     }
 
     private func createRoots() throws {

@@ -296,10 +296,15 @@ it stores no diagnostic transcript copy or raw Speech error. The reviewed transc
 language survive relaunch, while delayed recognition can never overwrite a sidecar or manual edit.
 Save prepares an opaque
 candidate that does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
-outside dismissal discard the candidate. A successful commit creates `voicesRow_saved_<id>` and
+outside dismissal discard the candidate, however the flow closes (a host dismissal or a Studio mode
+switch included) and even while a save is still staging it; a candidate an app session that ended
+mid-review left behind goes at the next review save (F-01). A successful commit creates `voicesRow_saved_<id>` and
 hands the reference to Studio Clone. Each saved row exposes `voicesRowMenu_<id>` with
 `voicesDelete_<id>`; confirmation `voicesDeleteConfirm_<id>` names the exact voice and explains
-that deleting one voice-bank member leaves the others. Delete stops a matching preview, removes
+that deleting one voice-bank member leaves the others. Delete waits while a take or a long-form
+project runs, since a long-form Clone project reads the voice again for every segment, and a retained
+project that reads the deleted voice can no longer resume or regenerate a segment (F-01).
+Delete stops a matching preview, removes
 the engine assets and prepared prompt caches, and clears a matching Studio draft/handoff; failures
 remain visible and retryable. Search is `voicesSearchField`.
 

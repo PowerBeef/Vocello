@@ -152,6 +152,7 @@ scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos smoke --scenario design-enrollment
 scripts/ui_test.sh macos smoke --scenario clone-reference
 scripts/ui_test.sh macos smoke --scenario long-form
+scripts/ui_test.sh macos smoke --scenario long-form-recovery
 scripts/ui_test.sh macos localization
 scripts/ui_test.sh macos benchmark
 # Filtered benchmark example:
@@ -167,8 +168,12 @@ scripts/ui_test.sh macos marketing [--scenario all|models]
 `design-enrollment` runs the existing Design brief/player and actual-audio enrollment journey;
 `clone-reference` runs saved-reference hydration, editing and completed Clone playback; `long-form`
 runs the long-form project journey alone, including a regenerated segment accepted as a new revision
-with the replaced take and joined output kept in History (F-16). Each is recorded as
-`focused-smoke`, with its selected mode and no benchmark matrix. None constitutes
+with the replaced take and joined output kept in History (F-16); `long-form-recovery` plants an
+unreadable long-form journal in an isolated empty profile and drives History's notice: Export is
+offered, Retry is offered and the notice stays, and a confirmed Discard ends the notice and sets the
+journal aside on disk, unchanged (F-16). Each is recorded as
+`focused-smoke`, with its selected mode (none for `long-form-recovery`, which generates nothing) and
+no benchmark matrix. None constitutes
 full smoke, localization, automatic-ASR accuracy or acoustic-quality acceptance. Pure draft and
 recognition-operation tests cover pending/stale one-off references; the Design and Clone journeys do
 not replace that coverage.

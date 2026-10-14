@@ -745,7 +745,14 @@ private extension MacHistoryScreen {
             content()
         }
         .padding(VocelloTheme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Bounds the card's fixed-height text in the window's minimum-size pass,
+        // as the recovery banner does (F-16).
+        .frame(
+            minWidth: MacShellMetrics.historyMessageMinWidth,
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .top
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }

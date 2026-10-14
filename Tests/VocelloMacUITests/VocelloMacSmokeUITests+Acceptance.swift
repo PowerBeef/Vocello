@@ -51,6 +51,50 @@ extension VocelloMacSmokeUITests {
         }
     }
 
+    /// F-16: History's recovery path for a long-form journal Retry cannot
+    /// resolve. It runs on an isolated empty profile, the registered storage
+    /// isolation test10 uses, so the user's History is never touched. The banner
+    /// offers Retry, Export and Discard; after Retry the notice stays and the
+    /// journal is still in place (best effort: Retry's pass is not observable);
+    /// a confirmed Discard ends the notice and sets the journal aside on disk,
+    /// renamed and unchanged, never deleted.
+    func test13_LongFormRecoveryDiscard() throws {
+        beginSession()
+        defer { endSession() }
+        let artifacts = try XCTUnwrap(ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"])
+        let profile = URL(fileURLWithPath: artifacts).appendingPathComponent("long-form-recovery-profile")
+        let journals = profile.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        try FileManager.default.createDirectory(at: journals, withIntermediateDirectories: true)
+        let damaged = Data("damaged long-form recovery fixture".utf8)
+        try damaged.write(to: journals.appendingPathComponent(String(repeating: "0", count: 64) + ".json"))
+        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": profile.path])
+
+        navigate(to: .history)
+        // The banner's container identifier is not exposed on macOS; its Retry is the notice.
+        let retry = button("historyRecovery_retry")
+        XCTAssertTrue(VocelloUIWait.exists(retry, timeout: 30), "An unreadable long-form journal must surface the recovery notice")
+        XCTAssertTrue(VocelloUIWait.condition("the journal to be offered for export", timeout: 20) {
+            self.button("historyRecovery_export").isEnabled
+        })
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: retry, timeout: 20))
+        let discard = button("historyRecovery_discard")
+        XCTAssertTrue(VocelloUIWait.exists(discard, timeout: 20), "Retry cannot resolve it, so the notice and Discard stay")
+        let pending = journals.appendingPathComponent(String(repeating: "0", count: 64) + ".json")
+        XCTAssertEqual(try Data(contentsOf: pending), damaged, "Retry leaves the journal in place")
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-long-form-recovery-notice")
+
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: discard, timeout: 20))
+        // The confirmation is a destructive alert, shown as a sheet; the interface is English.
+        let confirm = app.sheets.firstMatch.buttons["Discard"]
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.disappears(retry, timeout: 30), "A confirmed Discard ends the notice")
+
+        let kept = try FileManager.default.contentsOfDirectory(at: journals, includingPropertiesForKeys: nil)
+        XCTAssertEqual(kept.map(\.pathExtension), ["unreadable"], "The journal is set aside, never deleted")
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(kept.first)), damaged, "The set-aside journal is unchanged")
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-long-form-recovery-discarded")
+    }
+
     /// Presentation follows speech language; user-authored instructions survive
     /// both speech-language and interface-language changes without translation.
     func test12_CrossLanguageStudioContent() {

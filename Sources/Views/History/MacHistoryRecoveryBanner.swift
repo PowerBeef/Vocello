@@ -44,7 +44,10 @@ struct MacHistoryRecoveryBanner: View {
             .tint(MacTheme.historyTint)
         }
         .padding(VocelloTheme.Spacing.lg)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // A minimum width bounds the message's fixed height: the window's
+        // minimum-size pass otherwise wraps it a word per line, and the whole
+        // window laid out thousands of points tall, off screen (F-16).
+        .frame(minWidth: MacShellMetrics.historyMessageMinWidth, maxWidth: .infinity, alignment: .leading)
         .background(
             MacTheme.Surface.panel,
             in: VocelloShape.card()

@@ -23,6 +23,11 @@ enum MacShellMetrics {
     /// strictly needs, which is the point -- the minimum is the constraint, the
     /// default is a judgement about a comfortable size to start at.
     static let windowDefaultSize = CGSize(width: 1040, height: 680)
+    /// History's recovery banner and state cards keep at least this width, so
+    /// the window's minimum-size pass, which proposes almost no width, never
+    /// wraps their fixed-height text a word per line (F-16). It fits the detail
+    /// column at the window's minimum width.
+    static let historyMessageMinWidth: CGFloat = 320
     static let diagnosticsMinSize = CGSize(width: 520, height: 420)
     static let settingsWindowMinSize = CGSize(width: 600, height: 520)
     /// 680 tall, not 720. A window's default size is its *content* size, and

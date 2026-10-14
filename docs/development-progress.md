@@ -17,7 +17,34 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 13, night — F-01, F-16 and RF-13 without the iPhone (resume here)
+### October 14 — ASR-08, AUD-02 and F-16's Mac recovery; paused by the maintainer (resume here)
+
+Everything is paused at the maintainer's request after this checkpoint: no device or Mac lane runs
+until they say so.
+
+- **ASR-08 closed:** a read-only App Store Connect check found build 24 unused (builds 21–23 only,
+  nothing in the 3.0.0 train). RF-09's freeze now waits only on RF-13.
+- **AUD-02:** every `AVAudioPlayer` owner pauses for a call, Siri, an alarm or a lost output through
+  one central observer, with deterministic tests; the shared player keeps its own resume after a call.
+  The new record-then-play smoke journey (`--scenario record-then-play`) passes on the iPhone
+  (`ios-xcui-smoke-20261014-182117-a8bd7902`): a clip recorded from Clone's reference plays to its end.
+- **Full iOS smoke** (`ios-xcui-smoke-20261014-182350-b16be88b`): the main journey and
+  record-then-play pass, with a clean crash delta; the long-form journey failed because Fast QC refused
+  a segment for an unusually long silent gap (a generation outcome the screen is meant to catch, not a
+  change from today). Not rerun, at the maintainer's request to pause.
+- **F-16 on the Mac:** the new `smoke --scenario long-form-recovery` journey passes
+  (`macos-xcui-smoke-20261014-165645-239d5942`): Export is offered, Retry keeps the notice, and a
+  confirmed Discard sets the journal aside on disk. It found History's window blank whenever the
+  recovery notice sat over an empty History (the window's minimum-size pass wrapped the notice's text a
+  word per line); History now bounds that width, and the layout matrix still passes
+  (`macos-xcui-smoke-20261014-165900-78a79989`). The same structure in Saved Voices is parked as BKL-15.
+  The journey's last edit (an on-disk check after Retry) compiles but has not run yet.
+- **F-01 test fix:** `testAReviewSaveKeepsAnotherRunningCopysReviewUntilItEnds` could block the full
+  macOS suite in `Process.waitUntilExit()`; it no longer waits on the child.
+- **Next without the iPhone:** BG-01's diagnostics code if the maintainer lifts its pause; otherwise the
+  release path waits on RF-13's remaining export surfaces, which need the phone.
+
+### October 13, night — F-01, F-16 and RF-13 without the iPhone
 
 The maintainer paused iPhone work after the last push (`49d94178`); no device lane runs until they say
 so. The commits since are local and unpushed.

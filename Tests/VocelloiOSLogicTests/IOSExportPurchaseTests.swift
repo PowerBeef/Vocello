@@ -286,6 +286,25 @@ final class IOSExportPurchaseTests: XCTestCase {
         XCTAssertEqual(store.access, .unlocked)
     }
 
+    func testSavedVoiceProvenanceAsksTheAudioWhenItsSidecarIsUnreadable() {
+        func provenance(_ mode: String?, unreadable: Bool = false, audio: String? = nil) -> IOSExportProvenance {
+            IOSExportProvenance(savedVoiceGeneratedSourceMode: mode, sidecarUnreadable: unreadable,
+                                audioProvenanceMode: audio)
+        }
+        XCTAssertEqual(provenance(nil), .originalReference)
+        XCTAssertEqual(provenance("design"), .generatedPremium)
+        XCTAssertEqual(provenance("custom"), .builtIn)
+        XCTAssertEqual(provenance(nil, audio: "design"), .originalReference, "The audio is asked only without a sidecar answer")
+        // A damaged or newer sidecar: a generated voice's own provenance keeps it locked.
+        XCTAssertEqual(provenance(nil, unreadable: true, audio: "design"), .generatedPremium)
+        XCTAssertEqual(provenance(nil, unreadable: true, audio: "clone"), .generatedPremium)
+        XCTAssertFalse(IOSExportAccessPolicy.permits([provenance(nil, unreadable: true, audio: "design")], unlocked: false))
+        // A recording carries no provenance and stays a free original.
+        XCTAssertEqual(provenance(nil, unreadable: true), .originalReference)
+        XCTAssertEqual(provenance(nil, unreadable: true, audio: "custom"), .builtIn)
+        XCTAssertEqual(provenance(nil, unreadable: true, audio: "unexpected"), .unknown)
+    }
+
     func testEnrollmentProvenanceRoundTripsAndOldMetadataStillDecodes() throws {
         let original = PreparedVoiceEnrollmentMetadata(referenceLanguage: .french, transcriptSource: .manual)
         let encodedOld = try JSONEncoder().encode(original)

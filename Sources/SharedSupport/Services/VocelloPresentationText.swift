@@ -376,6 +376,18 @@ struct VocelloPresentationText: Sendable {
                comment: "Confirmation message before damaged History recovery records are set aside: their takes stay out of History, clearing works again, and no audio file is deleted.")
     }
 
+    var discardLongFormRecoveryTitle: String {
+        localization.string(localized: "vocello.history.discard_long_form_recovery_title",
+               defaultValue: "Discard long-form recovery data?",
+               comment: "Confirmation title before long-form recovery data that Retry cannot use is set aside.")
+    }
+
+    var discardLongFormRecoveryDetail: String {
+        localization.string(localized: "vocello.history.discard_long_form_recovery_detail",
+               defaultValue: "Vocello can't use this recovery data, so changes to History stay blocked. Discarding sets it aside on this device, with any audio it names, so History works again. Export it first if you may need it.",
+               comment: "Confirmation message before unusable long-form recovery data is set aside: History works again, and the data and any audio it names stay on the device.")
+    }
+
     var discardUnverifiableRecordsConfirm: String {
         localization.string(localized: "vocello.history.discard_unverifiable_records_confirm",
                defaultValue: "Discard",

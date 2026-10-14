@@ -565,6 +565,54 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         ))
     }
 
+    func testUnreadableOrNewerSidecarIsReportedRatherThanTreatedAsAbsent() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let source = try writeSource(named: "sidecar-source.wav")
+        let metadata = PreparedVoiceEnrollmentMetadata(
+            referenceLanguage: .french,
+            transcriptSource: .manual,
+            generatedSourceMode: "design"
+        )
+        let candidate = try await repository.prepare(
+            name: "Designed",
+            audioURL: source,
+            transcript: "Texte.",
+            qualityWarnings: [],
+            enrollmentMetadata: metadata,
+            replacingVoiceID: nil
+        )
+        _ = try await repository.commit(id: candidate.id)
+        let sidecar = root.appendingPathComponent("voices/Designed.voice.json")
+
+        func relisted() async throws -> PreparedVoiceStorageRecord {
+            let relaunched = makeRepository()
+            try await relaunched.reconcile()
+            let listed = try await relaunched.list()
+            return try XCTUnwrap(listed.first)
+        }
+
+        var voice = try await relisted()
+        XCTAssertEqual(voice.enrollmentMetadata, metadata)
+        XCTAssertFalse(voice.enrollmentMetadataUnreadable)
+
+        try Data("{".utf8).write(to: sidecar)
+        voice = try await relisted()
+        XCTAssertNil(voice.enrollmentMetadata)
+        XCTAssertTrue(voice.enrollmentMetadataUnreadable, "a truncated sidecar is unreadable, not absent")
+        XCTAssertNil(voice.audioProvenanceMode, "audio without Vocello provenance is a recording")
+
+        try Data(#"{"schemaVersion":2,"transcriptSource":"manual","generatedSourceMode":"design"}"#.utf8)
+            .write(to: sidecar)
+        voice = try await relisted()
+        XCTAssertTrue(voice.enrollmentMetadataUnreadable, "a newer sidecar is unreadable to this build")
+
+        try FileManager.default.removeItem(at: sidecar)
+        voice = try await relisted()
+        XCTAssertNil(voice.enrollmentMetadata)
+        XCTAssertFalse(voice.enrollmentMetadataUnreadable, "no sidecar is an older or recorded voice")
+    }
+
     func testDiscardIsIdempotentAndAllowsSameNameRetry() async throws {
         let repository = makeRepository()
         try await repository.reconcile()

@@ -9,8 +9,9 @@ import QwenVoiceCore
 /// History guarded removal, never through a link or into a folder.
 ///
 /// It fails closed: while a long-form acceptance awaits recovery, a clear has
-/// not finished, or History, its outbox or its removal list cannot be read
-/// fully, nothing is offered and nothing is removed.
+/// not finished, or History, its outbox, its removal list or a set-aside
+/// long-form journal cannot be read fully, nothing is offered and nothing is
+/// removed.
 enum IOSLeftoverAudioCleanup {
     /// When this app session started; `QVoiceiOSApp.init` reads it first.
     /// Audio written since is never offered, so a take still in flight, not
@@ -94,9 +95,12 @@ enum IOSLeftoverAudioCleanup {
         let cutoff = Self.sessionStart
         let result = await GenerationHistoryRecovery.coordinator.withReferencedAudioPaths { referenced -> T? in
             guard !GenerationHistoryRecovery.longFormStore.hasPendingRecovery,
+                  // A long-form journal History's Discard set aside keeps the
+                  // audio it names, which no row holds (F-16).
+                  let setAside = GenerationHistoryRecovery.longFormStore.setAsideAudioPaths(),
                   let leftovers = IOSLeftoverAudioAnalysis.leftovers(
                       in: IOSLeftoverAudioAnalysis.listing(ofDirectories: directories),
-                      referencedAudioPaths: referenced.union(unqueued),
+                      referencedAudioPaths: referenced.union(unqueued).union(setAside),
                       writtenBefore: cutoff
                   ) else { return nil }
             return body(leftovers)

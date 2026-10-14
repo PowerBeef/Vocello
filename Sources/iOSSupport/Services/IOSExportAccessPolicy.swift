@@ -19,6 +19,21 @@ enum IOSExportProvenance: Equatable, Sendable {
         }
     }
 
+    /// A saved voice's provenance comes from its enrollment sidecar: no generated
+    /// source is the user's own reference. When the sidecar cannot be read, the
+    /// voice's audio decides (RF-13): Design and Clone publications embed their
+    /// mode as Vocello provenance and stay locked; a recording carries none and
+    /// stays free, as original references always are.
+    init(savedVoiceGeneratedSourceMode mode: String?, sidecarUnreadable: Bool, audioProvenanceMode: String?) {
+        if sidecarUnreadable {
+            self = audioProvenanceMode.map { IOSExportProvenance(generationMode: $0) } ?? .originalReference
+        } else if let mode {
+            self.init(generationMode: mode)
+        } else {
+            self = .originalReference
+        }
+    }
+
     var requiresUnlock: Bool {
         switch self {
         case .builtIn, .originalReference, .recoveryRecord: false

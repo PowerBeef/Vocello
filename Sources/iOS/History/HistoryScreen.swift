@@ -201,6 +201,8 @@ private struct IOSHistoryLibrarySection: View {
     /// Queued records that cannot be verified are set aside only after this
     /// confirmation (A2-02); nothing is discarded by default.
     @State private var isDiscardConfirmationPresented = false
+    /// What the open Discard confirmation sets aside, fixed when it was asked.
+    @State private var discardsLongFormRecovery = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -381,6 +383,7 @@ private struct IOSHistoryLibrarySection: View {
             // On its own line, so the row never crowds past the phone's width.
             if showsDiscardUnverifiableRecords {
                 Button(IOSAppLanguage.shared.presentation.discardUnverifiableRecords, role: .destructive) {
+                    discardsLongFormRecovery = recoverySnapshot.notice == .longFormRecovery
                     isDiscardConfirmationPresented = true
                 }
                 .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
@@ -393,24 +396,34 @@ private struct IOSHistoryLibrarySection: View {
         .accessibilityIdentifier("historyRecovery_banner")
         .iosExportPresentation(recoveryExportGate)
         .alert(
-            IOSAppLanguage.shared.presentation.discardUnverifiableRecordsTitle(recoverySnapshot.unverifiableRecordCount),
+            discardsLongFormRecovery
+                ? IOSAppLanguage.shared.presentation.discardLongFormRecoveryTitle
+                : IOSAppLanguage.shared.presentation.discardUnverifiableRecordsTitle(recoverySnapshot.unverifiableRecordCount),
             isPresented: $isDiscardConfirmationPresented
         ) {
             Button(IOSAppLanguage.shared.presentation.discardUnverifiableRecordsConfirm, role: .destructive) {
-                discardUnverifiableRecords()
+                if discardsLongFormRecovery {
+                    discardLongFormRecovery()
+                } else {
+                    discardUnverifiableRecords()
+                }
             }
             .accessibilityIdentifier("historyRecovery_discardConfirm")
             Button(IOSInterfaceText.cancel, role: .cancel) {}
                 .accessibilityIdentifier("historyRecovery_discardCancel")
         } message: {
-            Text(IOSAppLanguage.shared.presentation.discardUnverifiableRecordsDetail)
+            Text(discardsLongFormRecovery
+                ? IOSAppLanguage.shared.presentation.discardLongFormRecoveryDetail
+                : IOSAppLanguage.shared.presentation.discardUnverifiableRecordsDetail)
         }
     }
 
-    /// A2-02: offered only on the notice about records that cannot be verified,
-    /// and only while such a record exists to set aside.
+    /// A2-02: offered on the notice about records that cannot be verified, while
+    /// such a record exists to set aside; F-16: and on long-form recovery that
+    /// Retry cannot finish.
     private var showsDiscardUnverifiableRecords: Bool {
-        recoverySnapshot.notice == .unverifiedRecord && recoverySnapshot.unverifiableRecordCount > 0
+        (recoverySnapshot.notice == .unverifiedRecord && recoverySnapshot.unverifiableRecordCount > 0)
+            || recoverySnapshot.notice == .longFormRecovery
     }
 
     private var recoveryTitle: String {
@@ -471,6 +484,17 @@ private struct IOSHistoryLibrarySection: View {
     private func discardUnverifiableRecords() {
         Task {
             await GenerationHistoryRecovery.setAsideUnverifiableRecords()
+            NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+            reload(reopenFailedStore: true)
+        }
+    }
+
+    /// The user confirmed discarding the long-form recovery data Retry cannot
+    /// resolve (F-16): it is set aside on the device with the audio it names,
+    /// and History works again.
+    private func discardLongFormRecovery() {
+        Task {
+            await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reload(reopenFailedStore: true)
         }

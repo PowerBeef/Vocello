@@ -137,7 +137,7 @@ setup chips wrap when the actual available width cannot fit them.
 | Pin seed | `history_pinSeedButton` in the row context menu (only for rows with a recorded seed, DP-15): pins the take's seed into its mode's draft and switches to that mode; the composer then shows the pinned-seed chip |
 | Long-form project | joined row plus `history_longFormSegmentsToggle_<digest8>` disclosure over the per-segment map; segments collapse under the project, flatten during search, and orphans stay visible |
 | Degraded database state | `history_errorState`; destructive actions stay disabled until a later reload/read succeeds |
-| Pending-history recovery | `historyRecovery_banner` with `historyRecovery_retry`, `historyRecovery_reveal`, and `historyRecovery_export` |
+| Pending-history recovery | `historyRecovery_banner` with `historyRecovery_retry`, `historyRecovery_reveal`, and `historyRecovery_export`; a confirmed `historyRecovery_discard` sets aside records that cannot be verified (A2-02) or long-form recovery data Retry cannot resolve (F-16) |
 | Paging | `history_showMoreButton` below the list loads the next 500 entries (AUD-05); sort, filter and search reach the whole archive through `GenerationHistoryPageQuery` with the list's own predicate, and run in memory while the whole archive is loaded |
 
 Database failures are typed and fail closed: an unavailable store is not shown as empty History.

@@ -42,6 +42,12 @@ struct PreparedVoiceStorageRecord: Sendable, Equatable {
     let audioURL: URL
     let hasTranscript: Bool
     let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    /// The voice's sidecar exists but could not be read (damaged, or newer than
+    /// this build), so it cannot say whether the voice was generated.
+    var enrollmentMetadataUnreadable = false
+    /// Read only for an unreadable sidecar: the generation mode the voice's
+    /// audio embeds as Vocello provenance, nil for a recording or import.
+    var audioProvenanceMode: String?
     var cleanupPending = false
 }
 
@@ -196,6 +202,7 @@ actor PreparedVoiceRepository {
             .filter { supportedAudioExtensions.contains($0.pathExtension.lowercased()) }
             .map { audioURL in
                 let id = audioURL.deletingPathExtension().lastPathComponent
+                let sidecar = loadEnrollmentMetadata(for: id)
                 return PreparedVoiceStorageRecord(
                     id: id,
                     name: id,
@@ -203,7 +210,10 @@ actor PreparedVoiceRepository {
                     hasTranscript: fileManager.fileExists(
                         atPath: voicesDirectory.appendingPathComponent("\(id).txt").path
                     ),
-                    enrollmentMetadata: loadEnrollmentMetadata(for: id)
+                    enrollmentMetadata: sidecar.metadata,
+                    enrollmentMetadataUnreadable: sidecar.unreadable,
+                    audioProvenanceMode: sidecar.unreadable
+                        ? WAVProvenanceChunk.generationMode(fromWAVAt: audioURL) : nil
                 )
             }
             .sorted {
@@ -897,17 +907,23 @@ actor PreparedVoiceRepository {
         return manifest
     }
 
-    private func loadEnrollmentMetadata(for id: String) -> PreparedVoiceEnrollmentMetadata? {
+    /// No sidecar is an older or recorded voice. A sidecar that exists but cannot
+    /// be read (damaged, or written by a newer schema) is reported as unreadable,
+    /// never as absent, so outward export can ask the audio instead (RF-13).
+    private func loadEnrollmentMetadata(
+        for id: String
+    ) -> (metadata: PreparedVoiceEnrollmentMetadata?, unreadable: Bool) {
         let url = voicesDirectory.appendingPathComponent("\(id).voice.json")
+        guard fileManager.fileExists(atPath: url.path) else { return (nil, false) }
         guard let data = try? Data(contentsOf: url),
               let metadata = try? JSONDecoder().decode(
                   PreparedVoiceEnrollmentMetadata.self,
                   from: data
               ),
-              metadata.schemaVersion == PreparedVoiceEnrollmentMetadata.currentSchemaVersion else {
-            return nil
+              (1...PreparedVoiceEnrollmentMetadata.currentSchemaVersion).contains(metadata.schemaVersion) else {
+            return (nil, true)
         }
-        return metadata
+        return (metadata, false)
     }
 
     private func validateIdentifier(_ id: String) throws {

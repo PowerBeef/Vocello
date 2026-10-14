@@ -71,12 +71,17 @@ struct LongFormHistoryAcceptance: Sendable {
 /// Called exclusively on the existing serial GRDB writer, including recovery.
 /// The SQLite row at the unique joined audio path is the commit witness. The
 /// journal is written before the manifest; it survives until a subsequent queue
-/// operation observes the committed row or restores the previous manifest.
+/// operation observes the committed row or restores the previous manifest, or
+/// until the user confirms setting aside one that cannot be resolved (F-16).
 /// No actor reentrancy, second database, or schema migration occurs inside the
 /// filesystem/SQLite commit boundary. A suspended History (IOS-11) can
 /// interrupt it; that acceptance is completed after resume, never rolled back.
 struct LongFormHistoryAcceptanceStore: Sendable {
     let rootURL: URL
+    /// The root whose `outputs/` holds the projects' audio (the app-support
+    /// root). Set, the audio a set-aside journal recorded before the container
+    /// moved is also kept at its rebased path (P10-06); nil keeps paths as stored.
+    var audioRootURL: URL? = nil
     /// How often an acceptance a suspended History interrupted retries.
     var suspensionRetryInterval: Duration = .milliseconds(500)
     static let maximumJournalBytes = 8 * 1_024 * 1_024
@@ -351,47 +356,138 @@ struct LongFormHistoryAcceptanceStore: Sendable {
     /// commit cannot be exposed as an accepted project or bypassed by clear-all.
     /// A read with no journal pending needs no writer: SQLite shows it only
     /// committed rows, and a committed row is the acceptance witness (AUD-05).
+    /// Resolves every pending journal it can. One it cannot resolve stays for
+    /// Retry, export or discarding, but no longer stops the journals after it
+    /// (engine review SER-1); the pass then reports that recovery is required.
+    /// Only `resume` writes rows, and its journal stays until a later pass sees
+    /// them committed, so a rolled-back pass never strands a finished journal.
     func reconcile(in db: Database) throws {
+        var unresolved = false
         for url in try journalURLs() {
             do {
-                let journal = try readJournal(at: url)
-                try requireLocalManifest(journal.manifestURL)
-                let current = try readManifestIfPresent(journal.manifestURL)
-                // Never overwrite an unrelated edit or silently accept corrupt state.
-                guard current == journal.candidate || current == journal.previous else {
-                    throw LongFormAcceptanceError.recoveryRequired
-                }
-                if let committed = try Generation.filter(Generation.Columns.audioPath == journal.joined.audioPath).fetchOne(db) {
-                    guard Self.matchesCommit(committed, journal.joined) else { throw LongFormAcceptanceError.recoveryRequired }
-                    try requireRegularFile(URL(fileURLWithPath: committed.audioPath))
-                    if current != journal.candidate { try journal.candidate.write(to: journal.manifestURL, options: .atomic) }
-                } else if let segments = journal.resumableSegments {
-                    // A suspended History interrupted this acceptance; nothing
-                    // failed (PA-30). Its rows are saved in this write, which may
-                    // itself roll back later, so the journal stays until a later
-                    // reconcile sees them committed and finishes it above.
-                    do {
-                        try resume(journal, segments: segments, in: db)
-                        continue
-                    } catch LongFormAcceptanceError.invalidCandidate {
-                        // The acceptance's own verdict: it would have refused
-                        // this candidate without the suspension, so it rolls
-                        // back as it would have then.
-                        try rollBack(journal, current: current, in: db)
-                    }
-                } else {
-                    try rollBack(journal, current: current, in: db)
-                }
-                try FileManager.default.removeItem(at: url)
+                try reconcileJournal(at: url, in: db)
             } catch {
                 // A suspended History is not damage: the caller sees the
                 // transient failure and retries after resume (IOS-11).
                 if HistoryPersistenceError.isSuspensionInterruption(error) { throw error }
-                // Corrupt/unrecoverable journals remain bounded and visible via
-                // History's existing degraded-state/Retry flow. No raw path leaks.
-                throw LongFormAcceptanceError.recoveryRequired
+                unresolved = true
             }
         }
+        // Corrupt/unrecoverable journals remain bounded and visible via
+        // History's existing degraded-state/Retry flow. No raw path leaks.
+        if unresolved { throw LongFormAcceptanceError.recoveryRequired }
+    }
+
+    /// The user confirmed discarding the long-form recovery data Retry cannot
+    /// resolve (F-16): a journal that resolves now is resolved instead; every
+    /// other one whose own data is at fault is renamed with the `unreadable`
+    /// extension, so no reconcile or export reads it again, and stays on the
+    /// device. Nothing it names is touched. A device failure (a full disk, a
+    /// missing permission, a History database fault) sets nothing aside for
+    /// that journal: the first one is rethrown once the others are done, so the
+    /// notice stays for Retry. Returns how many were set aside.
+    func setAsideUnresolvableJournals(in db: Database) throws -> Int {
+        guard FileManager.default.fileExists(atPath: rootURL.path) else { return 0 }
+        let urls = try FileManager.default.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        var setAside = 0
+        var deviceFailure: Error?
+        for url in urls {
+            do {
+                try reconcileJournal(at: url, in: db)
+            } catch where Self.isJournalFault(error) {
+                let aside = url.deletingPathExtension()
+                    .appendingPathExtension(UUID().uuidString.lowercased())
+                    .appendingPathExtension(Self.setAsideExtension)
+                try FileManager.default.moveItem(at: url, to: aside)
+                setAside += 1
+            } catch {
+                if HistoryPersistenceError.isSuspensionInterruption(error) { throw error }
+                deviceFailure = deviceFailure ?? error
+            }
+        }
+        if let deviceFailure { throw deviceFailure }
+        return setAside
+    }
+
+    static let setAsideExtension = "unreadable"
+
+    /// Whether a journal failed on its own data, which a later Retry cannot
+    /// change: it is damaged, from a newer build, or no longer matches the
+    /// manifest, files and rows it names. Anything else comes from the device.
+    static func isJournalFault(_ error: Error) -> Bool {
+        if error is LongFormAcceptanceError || error is DecodingError { return true }
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain {
+            return [CocoaError.Code.fileReadCorruptFile, .fileReadNoSuchFile, .fileNoSuchFile]
+                .map(\.rawValue).contains(nsError.code)
+        }
+        // SQLITE_CONSTRAINT: the rows it would save conflict with History.
+        return nsError.domain == HistoryPersistenceError.sqliteErrorDomain && nsError.code & 0xFF == 19
+    }
+
+    /// The audio set-aside journals name, or nil when the folder or one of them
+    /// cannot be read. A set-aside acceptance's joined take and the takes it
+    /// owned are named by no row, yet they are the user's: the iPhone's
+    /// leftover review must keep them, and cannot tell them apart while a
+    /// journal is unreadable (as for set-aside outbox records, A2-02).
+    func setAsideAudioPaths() -> Set<String>? {
+        guard FileManager.default.fileExists(atPath: rootURL.path) else { return [] }
+        guard let urls = try? FileManager.default.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil)
+        else { return nil }
+        var paths = Set<String>()
+        for url in urls where url.pathExtension == Self.setAsideExtension {
+            guard let journal = try? decodeJournal(at: url) else { return nil }
+            let named = [journal.joined.audioPath]
+                + journal.ownedAudioURLs.map(\.path)
+                + (journal.resumableSegments ?? []).map(\.audioPath)
+            for path in named {
+                paths.insert(path)
+                // Its audio may have moved with the container (P10-06); keep that file too.
+                if let audioRootURL,
+                   let rebased = GenerationAudioPathRebase.rebased(
+                       path,
+                       onto: audioRootURL.path,
+                       rootIsGone: { !FileManager.default.fileExists(atPath: $0) },
+                       fileExists: { FileManager.default.fileExists(atPath: $0) }
+                   ) {
+                    paths.insert(rebased)
+                }
+            }
+        }
+        return paths
+    }
+
+    private func reconcileJournal(at url: URL, in db: Database) throws {
+        let journal = try readJournal(at: url)
+        try requireLocalManifest(journal.manifestURL)
+        let current = try readManifestIfPresent(journal.manifestURL)
+        // Never overwrite an unrelated edit or silently accept corrupt state.
+        guard current == journal.candidate || current == journal.previous else {
+            throw LongFormAcceptanceError.recoveryRequired
+        }
+        if let committed = try Generation.filter(Generation.Columns.audioPath == journal.joined.audioPath).fetchOne(db) {
+            guard Self.matchesCommit(committed, journal.joined) else { throw LongFormAcceptanceError.recoveryRequired }
+            try requireRegularFile(URL(fileURLWithPath: committed.audioPath))
+            if current != journal.candidate { try journal.candidate.write(to: journal.manifestURL, options: .atomic) }
+        } else if let segments = journal.resumableSegments {
+            // A suspended History interrupted this acceptance; nothing
+            // failed (PA-30). Its rows are saved in this write, which may
+            // itself roll back later, so the journal stays until a later
+            // reconcile sees them committed and finishes it above.
+            do {
+                try resume(journal, segments: segments, in: db)
+                return
+            } catch LongFormAcceptanceError.invalidCandidate {
+                // The acceptance's own verdict: it would have refused
+                // this candidate without the suspension, so it rolls
+                // back as it would have then.
+                try rollBack(journal, current: current, in: db)
+            }
+        } else {
+            try rollBack(journal, current: current, in: db)
+        }
+        try FileManager.default.removeItem(at: url)
     }
 
     /// Restores the previous manifest and removes the audio only this failed
@@ -444,15 +540,22 @@ struct LongFormHistoryAcceptanceStore: Sendable {
     }
 
     private func readJournal(at url: URL) throws -> Journal {
+        let journal = try decodeJournal(at: url)
+        guard url.lastPathComponent == journalURL(forJoinedAudioPath: journal.joined.audioPath).lastPathComponent
+        else { throw LongFormAcceptanceError.recoveryRequired }
+        return journal
+    }
+
+    /// A bounded, digest-checked journal this build can read, wherever it is
+    /// named (a set-aside one carries its own suffix).
+    private func decodeJournal(at url: URL) throws -> Journal {
         try requireRegularFile(url)
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size <= Self.maximumJournalBytes else { throw LongFormAcceptanceError.recoveryRequired }
         let envelope = try JSONDecoder().decode(Envelope.self, from: Data(contentsOf: url))
         guard envelope.digest == Self.digest(envelope.payload) else { throw LongFormAcceptanceError.recoveryRequired }
         let journal = try JSONDecoder().decode(Journal.self, from: envelope.payload)
-        guard journal.version == 1,
-              url.lastPathComponent == journalURL(forJoinedAudioPath: journal.joined.audioPath).lastPathComponent
-        else { throw LongFormAcceptanceError.recoveryRequired }
+        guard journal.version == 1 else { throw LongFormAcceptanceError.recoveryRequired }
         return journal
     }
 

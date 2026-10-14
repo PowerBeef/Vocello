@@ -421,9 +421,11 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             avatarSeed: voice.id,
             avatarInitials: voice.name,
             waveformSeed: IOSStableVisualHash.int(voice.wavPath),
-            exportProvenance: voice.enrollmentMetadata?.generatedSourceMode.map {
-                IOSExportProvenance(generationMode: $0)
-            } ?? .originalReference
+            exportProvenance: IOSExportProvenance(
+                savedVoiceGeneratedSourceMode: voice.enrollmentMetadata?.generatedSourceMode,
+                sidecarUnreadable: voice.enrollmentMetadataUnreadable,
+                audioProvenanceMode: voice.audioProvenanceMode
+            )
         )
     }
 

@@ -86,7 +86,15 @@ Evidence stays privacy-safe: manifests and assembly evidence carry digests, vers
 counts, frame maps, and typed risks — never original text, spoken text, transcripts, paths, or
 audio bytes. The separate app-local transaction journal is private recovery data and can contain
 History text and paths. Its bounded Export Recovery Files action is user-directed, not telemetry
-or publication, and does not delete or automatically repair a corrupt journal.
+or publication, and does not delete or automatically repair a corrupt journal. Reconcile resolves
+every journal it can and keeps the rest for Retry. When Retry cannot resolve one because of its own
+data (damaged, written by a newer build, or no longer matching the manifest, files and rows it
+names), History's confirmed Discard sets it aside: it is renamed with the `unreadable` extension and
+kept on the device, and nothing it names is touched. History writes then resume, and the project
+rows a pending journal withheld show again. A device failure (full storage, a missing permission, a
+History database fault) sets nothing aside; Discard reports it and the notice stays for Retry. A
+journal from a newer build is set aside like a damaged one, so that build cannot resume it later;
+revisit with the first journal version change (F-16).
 
 ## QC calibration
 

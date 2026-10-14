@@ -90,6 +90,13 @@ Maintained macOS subtrees and preferences:
   by the iPhone's History suspension, IOS-11) is completed instead, with the acceptance's own checks,
   and keeps its audio (PA-30). Corrupt/unrecoverable journals remain for visible recovery;
   their private paths and generation records never enter telemetry or tracked evidence.
+  History's confirmed Discard sets aside a journal Retry cannot resolve because of its own data,
+  renaming it `<name>.<UUID>.unreadable` in the same folder (F-16), as it renames outbox records
+  that cannot be verified with the `unverifiable` extension (A2-02). Set-aside files are never
+  reconciled or exported again and are not removed by Clear History; they keep their script text,
+  local paths and the audio they name until the app's data is deleted, in this backed-up
+  `history-outbox/` tree. Each comes from a recovery failure the user confirmed discarding, so
+  there is no count or age limit. A device failure sets nothing aside.
   Unrelated standalone History remains readable; project reads and all mutations remain gated.
   Explicit Export Recovery Files includes bounded regular-file journals without interpreting their
   embedded paths. The UI warns that exports may contain private script text and paths; export
@@ -159,9 +166,12 @@ Maintained iPhone subtrees:
   server, receipt logging or preference unlock. Apple's billing/privacy disclosures remain RF-02
   account-review work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
+  When that metadata cannot be read, the voice's own Vocello provenance decides, so a generated
+  voice stays locked and a recording stays free.
   Audio that earlier History clears kept here, which nothing can reach once its rows are gone, is
   offered once for a confirmed removal in Settings → Models & Files (PA-30); audio any History row,
-  queued take or pending removal uses is never offered. The finished review is an empty
+  queued take, pending removal or set-aside recovery record uses is never offered, and nothing is
+  offered while a set-aside record cannot be read. The finished review is an empty
   `leftover-audio-reviewed` file in the same App Support root, so a run on an isolated root never
   ends the offer for the user's own.
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation, together with the normalized clone copy and transcript derived from its audio under `cache/normalized_clone_refs/` (A8-01); other voice-bank members remain intact.
@@ -196,8 +206,9 @@ Maintained iPhone subtrees:
   the clear survives it; a marker written before that bound existed is abandoned rather than resumed
   unbounded. The marker is retired once its rows and pending entries are gone; audio that could not
   be removed moves to a durable removal list that a later reconcile retries.
-  The same app-session-only enqueue-failure warning and bounded `long-form/` acceptance journal
-  apply on iOS. Long-form generation continuation remains session-scoped: retained segments are
+  The same app-session-only enqueue-failure warning, bounded `long-form/` acceptance journal and
+  confirmed Discard of recovery records Retry cannot use apply on iOS. Long-form generation
+  continuation remains session-scoped: retained segments are
   individually durable History takes, but not an accepted project until joined QC and the entire
   acceptance commit succeed. Saved Voice locking/recovery and private recovery-file export use the
   same shared implementations on both platforms.

@@ -2240,7 +2240,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             audioPath: record.audioURL.path,
             hasTranscript: record.hasTranscript,
             qualityWarnings: savedReferenceQualityWarnings(forAudioAt: record.audioURL.path),
-            enrollmentMetadata: record.enrollmentMetadata
+            enrollmentMetadata: record.enrollmentMetadata,
+            enrollmentMetadataUnreadable: record.enrollmentMetadataUnreadable,
+            audioProvenanceMode: record.audioProvenanceMode
         )
     }
 

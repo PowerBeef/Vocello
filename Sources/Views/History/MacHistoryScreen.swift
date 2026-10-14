@@ -290,8 +290,9 @@ struct MacHistoryScreen: View {
                             || recoverySnapshot.pendingAudioRemovalCount > 0
                             || recoverySnapshot.unreadableAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
-                        canDiscard: recoverySnapshot.notice == .unverifiedRecord
-                            && recoverySnapshot.unverifiableRecordCount > 0,
+                        canDiscard: (recoverySnapshot.notice == .unverifiedRecord
+                            && recoverySnapshot.unverifiableRecordCount > 0)
+                            || recoverySnapshot.notice == .longFormRecovery,
                         onRetry: { retryRecovery() },
                         onReveal: { MacHistoryFileActions.revealRecoveryAudio(recoveryAudioURLs) },
                         onExport: exportPendingAudio,
@@ -888,9 +889,18 @@ private extension MacHistoryScreen {
         }
     }
 
-    /// A2-02: nothing is set aside without this confirmation.
+    /// A2-02 and F-16: nothing is set aside without this confirmation.
     func confirmDiscardUnverifiableRecords() {
         let presentation = MacInterfaceText.presentation
+        if recoverySnapshot.notice == .longFormRecovery {
+            actionAlert = MacHistoryActionAlert(
+                title: presentation.discardLongFormRecoveryTitle,
+                message: presentation.discardLongFormRecoveryDetail,
+                confirmTitle: presentation.discardUnverifiableRecordsConfirm,
+                onConfirm: { discardLongFormRecovery() }
+            )
+            return
+        }
         actionAlert = MacHistoryActionAlert(
             title: presentation.discardUnverifiableRecordsTitle(recoverySnapshot.unverifiableRecordCount),
             message: presentation.discardUnverifiableRecordsDetail,
@@ -904,6 +914,16 @@ private extension MacHistoryScreen {
     func discardUnverifiableRecords() {
         Task {
             await GenerationHistoryRecovery.setAsideUnverifiableRecords()
+            NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+            reloadHistory(reopenFailedStore: true)
+        }
+    }
+
+    /// The long-form recovery data Retry cannot resolve is set aside on the
+    /// device with the audio it names (F-16), and History works again.
+    func discardLongFormRecovery() {
+        Task {
+            await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reloadHistory(reopenFailedStore: true)
         }

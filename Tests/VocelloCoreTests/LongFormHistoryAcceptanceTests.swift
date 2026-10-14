@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import GRDB
 @testable import QwenVoiceCore
@@ -122,6 +123,142 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
         XCTAssertTrue(FileManager.default.fileExists(atPath: journal.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+    }
+
+    func testReconcileResolvesJournalsPastOneItCannotRead() throws {
+        let f = try fixture()
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            _ = try f.store.saveRows(f.input, in: db)
+            throw InjectedFailure()
+        })
+        let readable = try XCTUnwrap(journalURLs(f.store).first)
+        // Sorts before every digest-named journal: the old loop stopped here.
+        let unreadable = f.store.rootURL.appendingPathComponent("0.json")
+        try Data().write(to: unreadable)
+
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) }) { error in
+            XCTAssertEqual(error as? LongFormAcceptanceError, .recoveryRequired)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: readable.path), "The readable journal still resolves")
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+        XCTAssertEqual(try rowCount(f.queue), 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unreadable.path), "The unreadable one stays for Retry")
+    }
+
+    func testUnresolvableJournalsAreSetAsideKeptAndUnblockHistory() throws {
+        let f = try fixture()
+        try f.queue.write { db in try f.store.prepare(f.input, in: db) }
+        let journal = try XCTUnwrap(journalURLs(f.store).first)
+        // A newer schema: a valid envelope whose journal version this build does not know.
+        let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: journal)) as? [String: Any])
+        let payloadData = try XCTUnwrap(Data(base64Encoded: XCTUnwrap(envelope["payload"] as? String)))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: payloadData) as? [String: Any])
+        payload["version"] = 2
+        let newerPayload = try JSONSerialization.data(withJSONObject: payload)
+        let newer = try JSONSerialization.data(withJSONObject: [
+            "payload": newerPayload.base64EncodedString(),
+            "digest": SHA256.hash(data: newerPayload).map { String(format: "%02x", $0) }.joined(),
+        ])
+        try newer.write(to: journal)
+        try Data().write(to: f.store.rootURL.appendingPathComponent("0.json"))
+        try Data("corrupt".utf8).write(to: f.store.rootURL.appendingPathComponent("1.json"))
+        let manifest = try Data(contentsOf: f.input.manifestURL)
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
+
+        let setAside = try f.queue.write { db in try f.store.setAsideUnresolvableJournals(in: db) }
+
+        XCTAssertEqual(setAside, 3)
+        XCTAssertFalse(f.store.hasPendingRecovery)
+        XCTAssertNoThrow(try f.queue.write { db in try f.store.reconcile(in: db) })
+        XCTAssertTrue(try f.store.recoveryExportURLs().isEmpty)
+        let kept = try journalURLs(f.store)
+        XCTAssertEqual(kept.map(\.pathExtension), Array(repeating: LongFormHistoryAcceptanceStore.setAsideExtension, count: 3))
+        XCTAssertEqual(Set(try kept.map { try Data(contentsOf: $0) }), [newer, Data(), Data("corrupt".utf8)],
+                       "Set aside, never deleted")
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), manifest, "Nothing a set-aside journal names is touched")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+    }
+
+    func testDiscardResolvesAJournalThatCanStillResolveInsteadOfSettingItAside() throws {
+        let f = try fixture()
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            _ = try f.store.saveRows(f.input, in: db)
+            throw InjectedFailure()
+        })
+
+        let setAside = try f.queue.write { db in try f.store.setAsideUnresolvableJournals(in: db) }
+
+        XCTAssertEqual(setAside, 0)
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+    }
+
+    /// A device failure is not the journal's fault: Discard sets nothing aside
+    /// for it, reports it once the other journals are done, and the journal
+    /// resolves on a later pass.
+    func testDiscardLeavesAJournalADeviceFailureStoppedForRetry() throws {
+        let f = try fixture()
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            _ = try f.store.saveRows(f.input, in: db)
+            throw InjectedFailure()
+        })
+        try Data("corrupt".utf8).write(to: f.store.rootURL.appendingPathComponent("0.json"))
+        // The project folder turns read-only, so restoring its prior manifest fails.
+        let projectFolder = f.input.manifestURL.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: projectFolder.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: projectFolder.path) }
+
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.setAsideUnresolvableJournals(in: db) }) { error in
+            XCTAssertFalse(LongFormHistoryAcceptanceStore.isJournalFault(error))
+        }
+        let names = try journalURLs(f.store).map(\.lastPathComponent)
+        XCTAssertEqual(names.filter { $0.hasSuffix(".json") }.count, 1, "the journal the device stopped stays for Retry")
+        XCTAssertEqual(names.filter { $0.hasSuffix("." + LongFormHistoryAcceptanceStore.setAsideExtension) }.count, 1,
+                       "the damaged one is still set aside")
+        XCTAssertTrue(f.store.hasPendingRecovery)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: projectFolder.path)
+        XCTAssertEqual(try f.queue.write { db in try f.store.setAsideUnresolvableJournals(in: db) }, 0)
+        XCTAssertFalse(f.store.hasPendingRecovery)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+    }
+
+    func testOnlyAJournalsOwnDataMakesItAFault() {
+        let constraint = NSError(domain: HistoryPersistenceError.sqliteErrorDomain, code: 2_067) // SQLITE_CONSTRAINT_UNIQUE
+        let full = NSError(domain: HistoryPersistenceError.sqliteErrorDomain, code: 13)
+        let decoding = DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "damaged"))
+        for fault: Error in [LongFormAcceptanceError.recoveryRequired, decoding, CocoaError(.fileReadCorruptFile),
+                             CocoaError(.fileReadNoSuchFile), constraint] {
+            XCTAssertTrue(LongFormHistoryAcceptanceStore.isJournalFault(fault), "\(fault)")
+        }
+        for device: Error in [CocoaError(.fileWriteOutOfSpace), CocoaError(.fileWriteNoPermission),
+                              CocoaError(.fileReadNoPermission), POSIXError(.ENOSPC), full,
+                              NSError(domain: HistoryPersistenceError.sqliteErrorDomain, code: 4)] {
+            XCTAssertFalse(LongFormHistoryAcceptanceStore.isJournalFault(device), "\(device)")
+        }
+    }
+
+    /// The audio a set-aside journal names is no History row's, yet the user's:
+    /// the iPhone's leftover review keeps it, and offers nothing while a
+    /// set-aside journal cannot be read.
+    func testSetAsideJournalsKeepTheAudioTheyNameFromTheLeftoverReview() throws {
+        let f = try fixture()
+        XCTAssertEqual(f.store.setAsideAudioPaths(), [])
+        try f.queue.write { db in try f.store.prepare(f.input, in: db) }
+        // Readable, but recovery may not overwrite an unrelated edit.
+        try Data("another accepted identity".utf8).write(to: f.input.manifestURL)
+        XCTAssertEqual(try f.queue.write { db in try f.store.setAsideUnresolvableJournals(in: db) }, 1)
+
+        let kept = try XCTUnwrap(f.store.setAsideAudioPaths())
+        XCTAssertTrue(kept.contains(f.input.joined.audioPath))
+        XCTAssertTrue(Set(f.input.ownedAudioURLs.map(\.path)).isSubset(of: kept))
+
+        try Data("corrupt".utf8).write(to: f.store.rootURL.appendingPathComponent(
+            "damaged.\(UUID().uuidString.lowercased()).\(LongFormHistoryAcceptanceStore.setAsideExtension)"))
+        XCTAssertNil(f.store.setAsideAudioPaths())
     }
 
     func testMissingAudioAndEncodingFailureCannotChangeAcceptedProject() async throws {

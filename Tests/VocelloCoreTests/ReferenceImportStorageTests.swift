@@ -197,6 +197,33 @@ final class ReferenceImportStorageTests: XCTestCase {
         XCTAssertEqual(listed.first?.qualityWarnings, [])
     }
 
+    @MainActor
+    func testAnUnreadableSidecarReachesTheVoiceWithItsAudiosProvenance() async throws {
+        let engine = try makeEngine()
+        defer { engine.stop() }
+        try await engine.initialize(appSupportDirectory: root)
+        let source = root.appendingPathComponent("Designed.wav")
+        try Self.writeTone(to: source, sampleRate: 24_000, seconds: 11)
+        try WAVProvenanceChunk.append(toWAVAt: source, software: "Vocello", comment: WAVProvenanceChunk.comment(
+            modelID: "pro_design_speed", mode: "design", createdAt: Date(timeIntervalSince1970: 1_786_000_000),
+            watermarkPayload: nil, generatorVersion: nil))
+        let candidate = try await engine.preparePreparedVoiceCandidate(
+            name: "Designed",
+            audioPath: source.path,
+            transcript: nil,
+            replacingVoiceID: nil
+        )
+        let committed = try await engine.commitPreparedVoiceCandidate(id: candidate.id)
+        XCTAssertFalse(committed.enrollmentMetadataUnreadable)
+        XCTAssertNil(committed.audioProvenanceMode, "The audio is read only for an unreadable sidecar")
+
+        try Data("{".utf8).write(to: committed.audioURL.deletingPathExtension().appendingPathExtension("voice.json"))
+        let listed = try await engine.listPreparedVoices()
+        let voice = try XCTUnwrap(listed.first)
+        XCTAssertTrue(voice.enrollmentMetadataUnreadable)
+        XCTAssertEqual(voice.audioProvenanceMode, "design", "A saved WAV keeps its provenance byte for byte")
+    }
+
     // MARK: - Fixtures
 
     @MainActor

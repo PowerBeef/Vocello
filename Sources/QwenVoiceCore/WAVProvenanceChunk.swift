@@ -106,9 +106,21 @@ public enum WAVProvenanceChunk {
         try handle.synchronize()
     }
 
-    /// Reads back the `INFO` fields of a WAV file (validation and tests).
+    /// The generation mode a Vocello publication embedded in `ICMT` (`mode=`),
+    /// or nil when the file carries no Vocello provenance or cannot be read.
+    /// Only a WAV can carry it, and the file is mapped rather than copied.
+    public static func generationMode(fromWAVAt url: URL) -> String? {
+        guard url.pathExtension.lowercased() == "wav",
+              let comment = try? readInfoFields(fromWAVAt: url)["ICMT"] else { return nil }
+        let fields = comment.components(separatedBy: "; ")
+        guard fields.contains("generator=Vocello") else { return nil }
+        return fields.first { $0.hasPrefix("mode=") }.map { String($0.dropFirst("mode=".count)) }
+    }
+
+    /// Reads back the `INFO` fields of a WAV file (validation, tests, and the
+    /// provenance of a saved voice whose metadata cannot be read).
     public static func readInfoFields(fromWAVAt url: URL) throws -> [String: String] {
-        let data = try Data(contentsOf: url)
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
         var fields = [String: String]()
         var offset = 12
         while offset + 8 <= data.count {

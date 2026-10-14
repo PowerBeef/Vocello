@@ -7,8 +7,9 @@ struct MacHistoryRecoveryBanner: View {
     let message: String
     let canReveal: Bool
     let canExport: Bool
-    /// Records that cannot be verified may be set aside, after a confirmation
-    /// (A2-02); the action shows only then.
+    /// Records that cannot be verified (A2-02), and long-form recovery data
+    /// Retry cannot resolve (F-16), may be set aside after a confirmation; the
+    /// action shows only then.
     let canDiscard: Bool
     let onRetry: () -> Void
     let onReveal: () -> Void

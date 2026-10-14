@@ -147,6 +147,21 @@ final class DatabaseService: @unchecked Sendable {
         try await longFormAcceptance.commit(input, using: requireQueue(for: .write))
     }
 
+    /// The user confirmed discarding long-form recovery data Retry cannot
+    /// resolve (F-16): it is set aside on the device, never deleted, and the
+    /// History writes it blocked can run again.
+    @discardableResult
+    func setAsideUnresolvableLongFormRecovery() throws -> Int {
+        let dbQueue = try requireQueue(for: .write)
+        do {
+            return try dbQueue.write { db in
+                try longFormAcceptance.setAsideUnresolvableJournals(in: db)
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .write)
+        }
+    }
+
     /// Settles pending long-form recovery on the writer (PA-30): an acceptance a
     /// suspended History interrupted completes, a committed one is finished, a
     /// failed one rolls back. Completing takes two writes, one that commits the

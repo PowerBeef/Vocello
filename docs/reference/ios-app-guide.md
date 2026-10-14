@@ -47,7 +47,10 @@ through the governed test route, never a shipping unlock or production credentia
 - New Design-generated Saved Voices retain `generatedSourceMode` in existing enrollment metadata
   through candidate commit and reference playback. Imported/recorded originals remain recoverable
   for free. Legacy Saved Voices lack origin metadata and stay exportable without retrospective
-  inference, rewriting or deletion. Existing History entries already record their generation mode.
+  inference, rewriting or deletion. When a voice's metadata exists but cannot be read (damaged, or
+  written by a newer build), the voice's audio decides: Design and Clone publications embed their
+  mode as Vocello provenance and stay locked, while a recording carries none and stays free.
+  Existing History entries already record their generation mode.
 - Actual failed-storage recovery audio/journals remain freely exportable. Only the existing enqueue/
   outbox recovery surfaces provide this exception; ordinary History/player/folder exports do not.
   This preserves the rule against making data recovery a payment demand.
@@ -67,7 +70,7 @@ Documents directory (`UIFileSharingEnabled`); generated output lives in the App 
 | Surface | Source | Provenance | Boundary |
 | --- | --- | --- | --- |
 | Studio inline player Save / Download | `IOSStudioInlinePlayerCard` | finished output's mode | `IOSExportGate.perform` / `.share` |
-| Expanded player Save / Share (Studio, History, Saved Voices, previews) | `IOSPlayerSheet` | item's recorded mode; saved voice `generatedSourceMode` or `.originalReference`; bundled previews `.builtIn` | `IOSExportGate` |
+| Expanded player Save / Share (Studio, History, Saved Voices, previews) | `IOSPlayerSheet` | item's recorded mode; saved voice `generatedSourceMode`, or with unreadable metadata the audio's own Vocello provenance, else `.originalReference`; bundled previews `.builtIn` | `IOSExportGate` |
 | History row export | `HistoryScreen` | row's recorded mode | `IOSExportGate.share` |
 | History failed-storage recovery files | `HistoryScreen` | `.recoveryRecord` (free by policy) | `IOSExportGate.share` |
 | Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
@@ -336,7 +339,9 @@ Database failures are typed and fail closed. The error state does not masquerade
 destructive actions remain disabled until `historyRetryButton` completes a successful read.
 Published single takes are written to the local `history-outbox/`, when storage permits, before their
 idempotent SQLite commit. Startup and History entry reconcile pending rows. If attention remains,
-`historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`; clear-all
+`historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`, and a
+confirmed `historyRecovery_discard` sets aside records that cannot be verified (A2-02) or long-form
+recovery data Retry cannot resolve (F-16), keeping them on the device; clear-all
 uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
 The banner states one notice chosen by `GenerationHistoryRecoverySnapshot.notice`: a clear that did
 not finish has its own copy (Retry resumes it) and no count is ever zero. A clear that is refused or

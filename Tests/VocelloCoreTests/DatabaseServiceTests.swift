@@ -451,6 +451,29 @@ final class DatabaseServiceTests: XCTestCase {
         )
     }
 
+    func testDiscardingUnreadableLongFormRecoveryUnblocksHistoryWrites() async throws {
+        let root = try makeRoot()
+        let service = DatabaseService(rootDirectory: root)
+        let journals = root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        try FileManager.default.createDirectory(at: journals, withIntermediateDirectories: true)
+        let journal = journals.appendingPathComponent(String(repeating: "0", count: 64) + ".json")
+        let damaged = Data("damaged fixture journal".utf8)
+        try damaged.write(to: journal)
+        let take = row("/nonexistent/queued.wav", at: 1)
+        do {
+            _ = try await service.saveGenerationIfMissingAsync(take)
+            XCTFail("A write reconciles first, so the damaged journal blocks it")
+        } catch {}
+
+        XCTAssertEqual(try service.setAsideUnresolvableLongFormRecovery(), 1)
+
+        _ = try await service.saveGenerationIfMissingAsync(take)
+        XCTAssertEqual(try service.fetchAllGenerations().map(\.audioPath), ["/nonexistent/queued.wav"])
+        let kept = try FileManager.default.contentsOfDirectory(at: journals, includingPropertiesForKeys: nil)
+        XCTAssertEqual(kept.map(\.pathExtension), ["unreadable"])
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(kept.first)), damaged, "Set aside, never deleted")
+    }
+
     /// A2-01: a restore or device migration moves the container, and the rows
     /// still name the old one.
     func testRowsUnderARootThatMovedAreRebasedWhenHistoryOpens() throws {

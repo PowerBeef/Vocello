@@ -12637,6 +12637,138 @@
         }
       }
     },
+    "vocello.history.discard_long_form_recovery_title": {
+      "comment": "Confirmation title before long-form recovery data that Retry cannot use is set aside.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard long-form recovery data?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écarter les données de récupération du projet long ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Descartar los datos de recuperación del audio largo?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daten der Langtextwiederherstellung verwerfen?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scartare i dati di recupero del progetto lungo?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar os dados de recuperação do projeto longo?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "丢弃长文本恢复数据？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長文プロジェクトの復旧データを破棄しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "긴 원고 복구 데이터를 폐기할까요?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отбросить данные восстановления длинного проекта?"
+          }
+        }
+      }
+    },
+    "vocello.history.discard_long_form_recovery_detail": {
+      "comment": "Confirmation message before unusable long-form recovery data is set aside: History works again, and the data and any audio it names stay on the device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello can't use this recovery data, so changes to History stay blocked. Discarding sets it aside on this device, with any audio it names, so History works again. Export it first if you may need it."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ne peut pas utiliser ces données de récupération : les modifications de l’historique restent bloquées. Les écarter les met de côté sur cet appareil, avec l’audio qu’elles désignent, pour que l’historique fonctionne de nouveau. Exportez-les d’abord si vous pourriez en avoir besoin."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no puede usar estos datos de recuperación, así que los cambios del historial siguen bloqueados. Al descartarlos se apartan en este dispositivo, junto con el audio que indican, para que el historial vuelva a funcionar. Expórtalos antes si podrías necesitarlos."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello kann diese Wiederherstellungsdaten nicht verwenden, daher bleiben Änderungen am Verlauf gesperrt. Beim Verwerfen werden sie samt dem Audio, auf das sie verweisen, auf diesem Gerät beiseitegelegt, damit der Verlauf wieder funktioniert. Exportiere sie vorher, falls du sie noch brauchst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non può usare questi dati di recupero, quindi le modifiche alla cronologia restano bloccate. Scartandoli vengono messi da parte su questo dispositivo, insieme all’audio a cui fanno riferimento, e la cronologia torna a funzionare. Esportali prima se potrebbero servirti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não consegue usar estes dados de recuperação, então as alterações no histórico continuam bloqueadas. Descartá-los os coloca de lado neste dispositivo, junto com o áudio a que se referem, para que o histórico volte a funcionar. Exporte-os antes se puder precisar deles."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法使用这些恢复数据，因此历史记录的更改仍被阻止。丢弃后，这些数据及其所指的音频会在此设备上被移到一旁，历史记录即可恢复正常。如果可能还需要，请先导出。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はこの復旧データを使用できないため、履歴の変更は停止したままです。破棄すると、データとそれが示す音声はこのデバイス上で別に保管され、履歴が再び使えるようになります。必要になりそうなら先に書き出してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 이 복구 데이터를 사용할 수 없어 기록 변경이 계속 차단됩니다. 폐기하면 데이터와 데이터가 가리키는 오디오를 이 기기에 따로 보관하므로 기록을 다시 사용할 수 있습니다. 필요할 수 있다면 먼저 내보내세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не может использовать эти данные восстановления, поэтому изменения истории остаются заблокированными. При отбрасывании данные вместе с аудио, на которое они ссылаются, откладываются в сторону на этом устройстве, и история снова работает. Сначала экспортируйте их, если они могут понадобиться."
+          }
+        }
+      }
+    },
     "vocello.history.discard_unverifiable_records_confirm": {
       "comment": "Destructive confirmation button that sets aside damaged History recovery records; no audio is deleted.",
       "extractionState": "manual",

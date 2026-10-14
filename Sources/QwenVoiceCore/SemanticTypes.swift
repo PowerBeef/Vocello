@@ -761,6 +761,12 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
     /// badges in the saved-voices list.
     public let qualityWarnings: [String]
     public let enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
+    /// The enrollment sidecar exists but could not be read, so `enrollmentMetadata`
+    /// is nil without meaning "a recorded reference" (RF-13).
+    public let enrollmentMetadataUnreadable: Bool
+    /// Read only when the sidecar is unreadable: the generation mode the voice's
+    /// audio embeds as Vocello provenance; nil for a recording or import.
+    public let audioProvenanceMode: String?
 
     public init(
         id: String,
@@ -768,7 +774,9 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
         audioPath: String,
         hasTranscript: Bool,
         qualityWarnings: [String] = [],
-        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil
+        enrollmentMetadata: PreparedVoiceEnrollmentMetadata? = nil,
+        enrollmentMetadataUnreadable: Bool = false,
+        audioProvenanceMode: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -776,6 +784,8 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
         self.hasTranscript = hasTranscript
         self.qualityWarnings = qualityWarnings
         self.enrollmentMetadata = enrollmentMetadata
+        self.enrollmentMetadataUnreadable = enrollmentMetadataUnreadable
+        self.audioProvenanceMode = audioProvenanceMode
     }
 
     public init(from decoder: Decoder) throws {
@@ -792,6 +802,9 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
             PreparedVoiceEnrollmentMetadata.self,
             forKey: .enrollmentMetadata
         )
+        self.enrollmentMetadataUnreadable = try container
+            .decodeIfPresent(Bool.self, forKey: .enrollmentMetadataUnreadable) ?? false
+        self.audioProvenanceMode = try container.decodeIfPresent(String.self, forKey: .audioProvenanceMode)
     }
 
     public var audioURL: URL {

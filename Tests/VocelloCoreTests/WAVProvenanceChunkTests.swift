@@ -52,6 +52,30 @@ final class WAVProvenanceChunkTests: XCTestCase {
         XCTAssertEqual(Int(riffSize), bytes.count - 8)
     }
 
+    func testGenerationModeReadsOnlyVocellosOwnProvenance() throws {
+        let generated = try makeBareWAV()
+        defer { try? FileManager.default.removeItem(at: generated) }
+        try WAVProvenanceChunk.append(toWAVAt: generated, software: "Vocello", comment: WAVProvenanceChunk.comment(
+            modelID: "pro_design_speed", mode: "design", createdAt: Date(timeIntervalSince1970: 1_786_000_000),
+            watermarkPayload: nil, generatorVersion: nil))
+        XCTAssertEqual(WAVProvenanceChunk.generationMode(fromWAVAt: generated), "design")
+        let renamed = generated.deletingPathExtension().appendingPathExtension("m4a")
+        try FileManager.default.copyItem(at: generated, to: renamed)
+        defer { try? FileManager.default.removeItem(at: renamed) }
+        XCTAssertNil(WAVProvenanceChunk.generationMode(fromWAVAt: renamed), "Only a WAV can carry it")
+
+        let foreign = try makeBareWAV()
+        defer { try? FileManager.default.removeItem(at: foreign) }
+        try WAVProvenanceChunk.append(toWAVAt: foreign, software: "Other",
+                                      comment: "AI-generated audio; generator=Other; mode=design")
+        XCTAssertNil(WAVProvenanceChunk.generationMode(fromWAVAt: foreign), "Only Vocello's own statement counts")
+
+        let recording = try makeBareWAV()
+        defer { try? FileManager.default.removeItem(at: recording) }
+        XCTAssertNil(WAVProvenanceChunk.generationMode(fromWAVAt: recording))
+        XCTAssertNil(WAVProvenanceChunk.generationMode(fromWAVAt: recording.appendingPathExtension("missing")))
+    }
+
     func testPCMBytesAreUntouchedByTheAppend() throws {
         let samples: [Int16] = (0 ..< 4_800).map { Int16(truncatingIfNeeded: $0 &* 13) }
         let url = try makeBareWAV(samples: samples)

@@ -12,7 +12,9 @@ enum GenerationHistoryRecovery {
         audioRootURL: AppPaths.appSupportDir
     )
     static let longFormStore = LongFormHistoryAcceptanceStore(
-        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true),
+        // The audio a set-aside journal names is kept on the current container too (P10-06).
+        audioRootURL: AppPaths.appSupportDir
     )
 
     static let coordinator = GenerationHistoryRecoveryCoordinator(
@@ -132,6 +134,14 @@ enum GenerationHistoryRecovery {
     /// touched. A failure leaves the notice and its Discard action in place.
     static func setAsideUnverifiableRecords() async {
         _ = try? await coordinator.setAsideUnverifiableRecords()
+    }
+
+    /// The user confirmed discarding the long-form recovery data Retry cannot
+    /// resolve (F-16): it is set aside, never deleted, nothing it names is
+    /// touched, and queued takes then reach History again. A failure leaves
+    /// the notice and its Discard action in place.
+    static func setAsideLongFormRecoveryRecords() async {
+        _ = try? DatabaseService.shared.setAsideUnresolvableLongFormRecovery()
     }
 
     static func pendingAudioURLs() async -> [URL] {

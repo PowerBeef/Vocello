@@ -1915,7 +1915,7 @@
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ],
       "updated": "2026-10-13",
-      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed."
+      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed. 2026-10-13: the strengthened check PASSES (ios-xcui-smoke-20261014-013015-ab48517b): all six passes left with the work in flight (three during Preparing reference, three during a cold take's load and warm) and the app survived each, with a clean crash delta. The prompt prebuild after Save voice and marking at a take's end have no visible signal and stay uncovered. Awaiting the maintainer's classification."
     }
   ]
 }

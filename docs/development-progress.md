@@ -28,9 +28,10 @@ last full copy at commit 25a895ed).
   still unproven on a device (RF-15 proposal).
 - **Pushed** at the maintainer's request (`86d910dd..c08a1360`). Vercel deployed it and the live privacy
   page matches the repository, so ASR-02 waits only on ASR-11's read-back.
-- **Background warm-up check:** `scripts/ui_test.sh ios smoke --scenario background-warmup` passed
-  (`ios-xcui-smoke-20261013-232424-a8c32853`): the app survived leaving 0.3, 1.5 and 3.0 s after the
-  Clone handoff. It proves survival only, so the crash candidate is not reproduced rather than refuted.
+- **BG-01 (engine review BG-1):** `scripts/ui_test.sh ios smoke --scenario background-warmup` now
+  leaves with model work visibly in flight and passes (`ios-xcui-smoke-20261014-013015-ab48517b`): three
+  passes during "Preparing reference" and three during a cold take's load and warm, all survived with a
+  clean crash delta. The prompt prebuild after Save voice and marking at a take's end stay uncovered.
 - **Full iOS smoke:** PASS (`ios-xcui-smoke-20261014-002614-3f711b56`), the first full pass since
   September, after two stale test steps were fixed: the memory-pressure step still forbade U23's
   deliberate notice (9fa670ba), and the journey ended with the search keyboard over the tab dock
@@ -43,9 +44,11 @@ last full copy at commit 25a895ed).
   classifies ten Axiom audits. Non-blockers are parked as BKL-02 to BKL-11. Findings inside release
   items are noted there: SER-1 on F-16, SER-2 on RF-13 (a saved voice's unreadable metadata exports
   without the unlock), SEC-4 and SEC-6 on ASR-06, SEC-2 on ASR-02.
-- **Waiting on the maintainer:** whether BG-1 (GPU work outliving the foreground) becomes a release
-  blocker, whether the IAP review screenshot may show the local $0.99 price, the privacy page's
-  sentence on backups (SEC-2), and RF-15's startup-retry proposal.
+- **Decided (maintainer, October 13):** the IAP review screenshot comes from the TestFlight build with
+  the live price (RF-13); the privacy page's backup sentence (SEC-2) is committed (2a57dc80) and deploys
+  with the next authorized push.
+- **Waiting on the maintainer:** classifying BG-1 on the BG-01 evidence, and RF-15's startup-retry
+  proposal.
 
 ### October 13 — step 1 on hold, development resumes
 

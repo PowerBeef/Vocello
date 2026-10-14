@@ -193,8 +193,8 @@ macOS uses `~/Library/Application Support/QwenVoice/`; iPhone uses `<App Group>/
 
 ## BG-1: GPU work can outlive the foreground
 
-**Class: crash. Status: candidate. Path a was not reproduced on the iPhone; the maintainer classifies
-it.**
+**Class: crash. Status: candidate. Paths a and c were not reproduced on the iPhone with the work in
+flight; b and d are uncovered. The maintainer classifies it (BG-01).**
 
 ### What is verified
 
@@ -247,15 +247,20 @@ A grant keeps the process running, so on paths c and d it widens the window inst
 processes it presses Home 0.3, 1.5 and 3.0 s after the Clone handoff, waits 15 s and returns. The
 process must still be running and the lane's crash delta must stay empty.
 
-- **Result, October 13:** PASS (`ios-xcui-smoke-20261013-232424-a8c32853`). Home came 1.8, 3.0 and 4.5
-  s after the tap on the saved voice, and the app was running at every return.
-- **Limit:** the test proves survival only. Nothing in it shows that a load or prime was in flight when
-  Home was pressed (TEST P1.1). A stronger check would wait for a visible preparing state, or read
-  run-scoped diagnostics, before pressing Home.
-- **Not covered:** paths b to d. Each needs a similar scenario: Home after Save voice; about +0.5 s and
-  +2 s after Generate on a cold model; and in a take's final second. Path c is the one a reviewer can
-  reach on a fresh install (tap Generate, then leave while the model loads). The PA-15 proof presses
-  Home only after the live preview streams.
+- **First run, October 13:** PASS (`ios-xcui-smoke-20261013-232424-a8c32853`). Home came 1.8, 3.0 and
+  4.5 s after the tap on the saved voice, and the app was running at every return. That test proved
+  survival only (TEST P1.1).
+- **Second run, October 13 (BG-01):** PASS (`ios-xcui-smoke-20261014-013015-ab48517b`). The scenario now
+  waits for visible in-flight states and attaches what each pass observed:
+  - path a: three passes left while the composer's readiness row read "Preparing reference";
+  - path c: three passes tapped Generate on a cold Built-in model and left while Stop showed with no
+    live preview yet.
+  All six left with the work in flight, and the app survived each 15 s dwell with a clean crash delta.
+- **Not covered:** path b (the prompt prebuild after Save voice) and path d (marking at a take's end)
+  show no visible state a test can wait for; covering them needs an app-side diagnostic event.
+- **Reading:** paths a and c are not reproduced with the work proven in flight. Apple's article allows
+  "some time before the system restricts your app from using Metal" after deactivation, which may
+  cover these short phases.
 
 ### Fix shape, for planning only
 

@@ -481,7 +481,10 @@ hold a mixable claim, and the recorder holds `.record` (which outranks playback 
 session deactivates with `.notifyOthersOnDeactivation` only when the last claim is released, and
 the default category is restored afterwards. `IOSPlaybackExclusivity` keeps one player audible:
 a starting player or recording pauses the others, and a paused live preview does not resume on
-its next chunk. A Pause, an interruption, unplugged headphones or another player (even while the
+its next chunk. It also holds the one observer of the session's interruptions and route changes
+(AUD-02): a call, Siri, an alarm or a lost output (headphones unplugged, Bluetooth gone) pauses the
+player sheet, the inline card, voice samples and clip review, none of which resumes on its own; the
+shared Studio player keeps its own observers, which resume a file after a call. A Pause, an interruption, unplugged headphones or another player (even while the
 preview is still buffering or the take has no chunk yet) holds the take: no chunk, underrun
 recovery or final-file handoff plays it again, only Play; an underrun alone resumes on its own. Leaving the foreground drops every claim and hands the session back; until the app
 is active again a claim changes nothing, so a late live chunk or an interruption ending in the

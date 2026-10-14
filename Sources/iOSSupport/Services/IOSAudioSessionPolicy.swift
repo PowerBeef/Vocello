@@ -207,3 +207,61 @@ struct IOSAudioSessionLedger: Equatable, Sendable {
         return steps
     }
 }
+
+/// What the session asks of every player (AUD-02).
+enum IOSAudioSessionEvent: Equatable, Sendable {
+    /// A call, Siri, an alarm or another app took the session.
+    case interruptionBegan
+    /// The output in use went away: headphones unplugged, Bluetooth disconnected.
+    case outputDeviceLost
+}
+
+/// One audible player at a time (PA-21, IOS-04): a player that starts
+/// announces itself and every other registered player pauses, so a preview
+/// never plays over the shared Studio player or another preview.
+@MainActor
+enum IOSPlaybackExclusivity {
+    private struct Participant {
+        weak var owner: AnyObject?
+        let handlesSessionEvents: Bool
+        let pause: @MainActor () -> Void
+    }
+
+    private static var participants: [ObjectIdentifier: Participant] = [:]
+
+    /// Registers `owner`; `pause` runs when another player starts, and for a
+    /// session event unless `owner` handles those itself (the shared player
+    /// resumes a file after a call). `owner` is held weakly, so a player needs
+    /// no explicit unregistration.
+    static func register(
+        _ owner: AnyObject,
+        handlesSessionEvents: Bool = false,
+        pause: @escaping @MainActor () -> Void
+    ) {
+        participants[ObjectIdentifier(owner)] = Participant(
+            owner: owner, handlesSessionEvents: handlesSessionEvents, pause: pause
+        )
+    }
+
+    /// `owner` is starting playback: pause every other live participant.
+    static func didStartPlayback(_ owner: AnyObject) {
+        let source = ObjectIdentifier(owner)
+        participants = participants.filter { $0.value.owner != nil }
+        for (identifier, participant) in participants where identifier != source {
+            participant.pause()
+        }
+    }
+
+    /// AUD-02: every player that does not handle `event` itself pauses, so none
+    /// keeps playing from the speaker or shows a stale Playing state. Nothing
+    /// resumes on its own; the person presses Play again.
+    static func handle(_ event: IOSAudioSessionEvent) {
+        switch event {
+        case .interruptionBegan, .outputDeviceLost:
+            participants = participants.filter { $0.value.owner != nil }
+            for participant in participants.values where !participant.handlesSessionEvents {
+                participant.pause()
+            }
+        }
+    }
+}

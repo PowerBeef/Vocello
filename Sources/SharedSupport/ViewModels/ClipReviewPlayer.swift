@@ -15,12 +15,12 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
     private var url: URL?
     private var timer: Timer?
     #if os(iOS)
-    private var interruptionObserver: NSObjectProtocol?
     /// Hold on the audio session while reviewing (PA-21).
     private var sessionClaim: IOSAudioSessionClaim?
 
     override init() {
         super.init()
+        // Another player starting, a call or a lost output pauses the review (AUD-02).
         IOSPlaybackExclusivity.register(self) { [weak self] in
             guard let self, self.isPlaying else { return }
             self.pause()
@@ -33,9 +33,6 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
         // timer so a late callback / repeating tick can't touch a freed object.
         MainActor.assumeIsolated {
             #if os(iOS)
-            if let interruptionObserver {
-                NotificationCenter.default.removeObserver(interruptionObserver)
-            }
             IOSAudioSessionOwner.shared.release(sessionClaim)
             #endif
             player?.delegate = nil
@@ -71,12 +68,11 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
         sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.playback, renewing: sessionClaim)
         IOSPlaybackExclusivity.didStartPlayback(self)
         #endif
-        player.play()
+        // A refused play leaves the review idle rather than showing Pause for
+        // audio that never starts (AUD-02).
+        guard player.play() else { return }
         isPlaying = true
         startTimer()
-        #if os(iOS)
-        registerInterruptionObserver()
-        #endif
     }
 
     func pause() {
@@ -97,36 +93,10 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
         duration = 0
         stopTimer()
         #if os(iOS)
-        removeInterruptionObserver()
         IOSAudioSessionOwner.shared.release(sessionClaim)
         sessionClaim = nil
         #endif
     }
-
-    #if os(iOS)
-    private func registerInterruptionObserver() {
-        guard interruptionObserver == nil else { return }
-        interruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] notification in
-            let typeRaw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-            MainActor.assumeIsolated {
-                guard let self, let typeRaw,
-                      AVAudioSession.InterruptionType(rawValue: typeRaw) == .began else { return }
-                self.pause()
-            }
-        }
-    }
-
-    private func removeInterruptionObserver() {
-        if let interruptionObserver {
-            NotificationCenter.default.removeObserver(interruptionObserver)
-            self.interruptionObserver = nil
-        }
-    }
-    #endif
 
     private func startTimer() {
         stopTimer()

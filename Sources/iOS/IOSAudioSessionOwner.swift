@@ -146,30 +146,31 @@ final class IOSAudioSessionOwner: Sendable {
     }
 }
 
-/// One audible player at a time (PA-21, IOS-04): a player that starts
-/// announces itself and every other registered player pauses, so a preview
-/// never plays over the shared Studio player or another preview.
-@MainActor
-enum IOSPlaybackExclusivity {
-    private struct Participant {
-        weak var owner: AnyObject?
-        let pause: @MainActor () -> Void
-    }
+/// AUD-02: the session's interruptions and route changes reach every player
+/// through one observer, installed at launch. `IOSPlaybackExclusivity.handle`
+/// decides who pauses.
+extension IOSPlaybackExclusivity {
+    private static var sessionObservers: [NSObjectProtocol] = []
 
-    private static var participants: [ObjectIdentifier: Participant] = [:]
-
-    /// Registers `owner`; `pause` runs when another player starts. `owner` is
-    /// held weakly, so a player needs no explicit unregistration.
-    static func register(_ owner: AnyObject, pause: @escaping @MainActor () -> Void) {
-        participants[ObjectIdentifier(owner)] = Participant(owner: owner, pause: pause)
-    }
-
-    /// `owner` is starting playback: pause every other live participant.
-    static func didStartPlayback(_ owner: AnyObject) {
-        let source = ObjectIdentifier(owner)
-        participants = participants.filter { $0.value.owner != nil }
-        for (identifier, participant) in participants where identifier != source {
-            participant.pause()
-        }
+    static func observeSessionEvents() {
+        guard sessionObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+        sessionObservers.append(center.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: session, queue: .main
+        ) { notification in
+            // Raw values cross the hop: a Notification is not Sendable.
+            let typeRaw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard typeRaw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began else { return }
+            MainActor.assumeIsolated { handle(.interruptionBegan) }
+        })
+        sessionObservers.append(center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: session, queue: .main
+        ) { notification in
+            let reasonRaw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            guard reasonRaw.flatMap(AVAudioSession.RouteChangeReason.init(rawValue:)) == .oldDeviceUnavailable
+            else { return }
+            MainActor.assumeIsolated { handle(.outputDeviceLost) }
+        })
     }
 }

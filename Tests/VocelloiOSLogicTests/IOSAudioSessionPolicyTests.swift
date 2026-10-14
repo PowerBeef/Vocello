@@ -176,4 +176,52 @@ final class IOSAudioSessionPolicyTests: XCTestCase {
         XCTAssertEqual(ledger.claim(claim(3), for: .playback), [], "clip review plays at once")
         XCTAssertEqual(ledger.appliedConfiguration, .playback)
     }
+
+    // MARK: - AUD-02: interruptions and route changes
+
+    private final class Player {
+        let name: String
+        init(_ name: String) { self.name = name }
+    }
+
+    @MainActor
+    private final class PauseLog {
+        var names: [String] = []
+    }
+
+    /// A call, Siri, an alarm or a lost output pauses every player that does
+    /// not handle it itself; the shared player keeps its own handling, which
+    /// resumes a file after a call.
+    @MainActor
+    func testASessionEventPausesEveryPlayerThatDoesNotHandleItItself() {
+        let log = PauseLog()
+        let sheet = Player("sheet"), preview = Player("preview"), shared = Player("shared")
+        for player in [sheet, preview] {
+            IOSPlaybackExclusivity.register(player) { [name = player.name] in log.names.append(name) }
+        }
+        IOSPlaybackExclusivity.register(shared, handlesSessionEvents: true) { log.names.append("shared") }
+
+        for event: IOSAudioSessionEvent in [.interruptionBegan, .outputDeviceLost] {
+            log.names.removeAll()
+            IOSPlaybackExclusivity.handle(event)
+            XCTAssertEqual(Set(log.names), ["sheet", "preview"], "\(event)")
+        }
+
+        // Exclusivity is unchanged: another player starting still pauses the shared one.
+        log.names.removeAll()
+        IOSPlaybackExclusivity.didStartPlayback(sheet)
+        XCTAssertEqual(Set(log.names), ["preview", "shared"])
+    }
+
+    /// Players are held weakly: one that is gone is never called.
+    @MainActor
+    func testASessionEventSkipsAPlayerThatIsGone() {
+        let log = PauseLog()
+        var gone: Player? = Player("gone")
+        IOSPlaybackExclusivity.register(gone!) { log.names.append("gone") }
+        gone = nil
+
+        IOSPlaybackExclusivity.handle(.outputDeviceLost)
+        XCTAssertFalse(log.names.contains("gone"))
+    }
 }

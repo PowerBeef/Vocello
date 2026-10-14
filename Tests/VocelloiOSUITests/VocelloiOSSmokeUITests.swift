@@ -698,6 +698,70 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX)
     }
 
+    /// AUD-02: record a clip, then play it in the review the save sheet shows,
+    /// in one journey. The session moves from recording to playback through its
+    /// one owner; the review's play control changes while the clip plays and
+    /// changes back only when the player reaches the clip's end, so a player
+    /// that could not play never passes. It proves playback to the end, not
+    /// that anyone heard it. Microphone and speech prompts stay human-answered:
+    /// the recorder asks as it opens and the review as it appears, so those two
+    /// taps wait long enough for a first run's answer. Nothing is saved.
+    func testRecordThenPlayReviewsTheClip() {
+        beginSession()
+        defer { endSession() }
+
+        select(tab: .voices)
+        // The card follows every saved voice; taps never scroll.
+        let saveNewVoice = element("voices_saveNewVoice")
+        XCTAssertTrue(revealSettingsElement(saveNewVoice, swipingUp: true))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: saveNewVoice, timeout: 20))
+        XCTAssertTrue(
+            VocelloUIPrimaryAction.perform(on: element("iosRecord_start"), timeout: 90),
+            "the recorder must offer Record (a first run waits for the microphone prompt)"
+        )
+        // Typed: the level meter redraws while recording, and an untyped query can
+        // time out on its snapshots.
+        let stop = VocelloUIWait.element(app, id: "iosRecord_stop", type: .button)
+        XCTAssertTrue(VocelloUIWait.exists(stop, timeout: 20), "recording must start")
+        let recordingStarted = Date()
+        XCTAssertTrue(
+            VocelloUIWait.condition("the clip to pass the recorder's minimum", timeout: 30) {
+                Date().timeIntervalSince(recordingStarted) >= Self.recorderMinimumSeconds + 1
+            }
+        )
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: stop, timeout: 20))
+        VocelloUIScreenshot.attach(app, named: "ios-smoke-record-review")
+
+        let play = element("saveVoice_playClip")
+        XCTAssertTrue(VocelloUIWait.exists(play, timeout: 30), "the save sheet reviews the recorded clip")
+        let idleLabel = play.label
+        XCTAssertTrue(
+            VocelloUIPrimaryAction.perform(on: play, timeout: 90),
+            "the review must offer Play (a first run waits for the speech prompt)"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("the recorded clip to start playing", timeout: 15) {
+                play.exists && play.label != idleLabel
+            },
+            "playback after a recording must start"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("the recorded clip to play to its end", timeout: 45) {
+                play.exists && play.label == idleLabel
+            },
+            "playback after a recording must reach the clip's end"
+        )
+
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.exists(element("voices_saveNewVoice"), timeout: 20),
+            "closing the review returns to Voices without saving"
+        )
+    }
+
+    /// `ReferenceClipRecorder.minDuration`, which the app target owns.
+    private static let recorderMinimumSeconds: TimeInterval = 10
+
     /// Long-form project journey: a script above the 900-character single-take
     /// limit routes to the sequential-streaming project path — planner
     /// segments, per-segment takes, joined output, and a grouped History

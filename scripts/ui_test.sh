@@ -41,6 +41,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario update-models
   scripts/ui_test.sh ios smoke --scenario startup-retry
   scripts/ui_test.sh ios smoke --scenario background-warmup
+  scripts/ui_test.sh ios smoke --scenario record-then-play
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -75,6 +76,9 @@ a fresh process: after choosing the benchmark clone voice, as soon as the compos
 reference"; and after Generate on a cold Built-in model, while the take loads (Stop shown, no live
 preview). The app must still be running after each dwell and the crash delta must stay empty; the
 interrupted takes are discarded, never saved.
+`smoke --scenario record-then-play` (AUD-02) records a clip in Voices and plays it to its end in the
+save sheet's review, then closes without saving; full smoke runs it too. A first run waits for the
+human-answered microphone and speech prompts.
 `enroll-clone-fixture` is an opt-in helper that enrolls the benchmark clone voice through the genuine
 visible Files-import flow; stage the reference WAV and .txt sidecar in the app's Documents first
 (devicectl appDataContainer copy). It never runs in smoke, benchmark, CI, or release. The headless
@@ -221,9 +225,9 @@ elif [[ "$lane" == "screen-protection" ]]; then
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
         || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \
-        || "$scenario_argument" == "background-warmup" ) \
+        || "$scenario_argument" == "background-warmup" || "$scenario_argument" == "record-then-play" ) \
       && -z "$candidate_evidence" ]] \
-    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models, startup-retry or background-warmup"
+    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models, startup-retry, background-warmup or record-then-play"
   [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
@@ -407,6 +411,7 @@ step_workflow="ui-$platform-$lane"
 [[ "$scenario_argument" != "update-models" ]] || step_workflow="ui-ios-update-models"
 [[ "$scenario_argument" != "startup-retry" ]] || step_workflow="ui-ios-startup-retry"
 [[ "$scenario_argument" != "background-warmup" ]] || step_workflow="ui-ios-background-warmup"
+[[ "$scenario_argument" != "record-then-play" ]] || step_workflow="ui-ios-record-then-play"
 [[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
   step_workflow="ui-ios-control-audit-generation"
@@ -458,6 +463,12 @@ if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] 
     payload["scenario"] = "background-warmup"
     payload["evidenceClass"] = "focused-smoke"
     payload["modes"] = ["clone", "custom"]
+    payload["lengths"] = []
+    payload["warm"] = 0
+if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "record-then-play":
+    payload["scenario"] = "record-then-play"
+    payload["evidenceClass"] = "focused-smoke"
+    payload["modes"] = []
     payload["lengths"] = []
     payload["warm"] = 0
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "update-models":
@@ -1825,6 +1836,9 @@ else
     elif [[ "$scenario_argument" == "background-warmup" ]]; then
       # BG-01: leaving during model work (Clone warm-up, a cold take's load) must not end the app.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testLeavingDuringCloneWarmupKeepsTheAppRunning"
+    elif [[ "$scenario_argument" == "record-then-play" ]]; then
+      # AUD-02: a recorded clip plays to its end in the save sheet's review.
+      only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testRecordThenPlayReviewsTheClip"
     fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
@@ -1904,6 +1918,7 @@ else
 
   test_selection_args=("-only-testing:$only_test")
   if [[ "$lane" == "smoke" && -z "$scenario_argument" ]]; then
+    test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testRecordThenPlayReviewsTheClip")
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney")
   fi
   if [[ "$lane" == "smoke" && "$scenario_argument" == "background-warmup" ]]; then
@@ -2124,10 +2139,11 @@ PY
   # Collect failed smoke evidence before the aggregate exit. A passing diagnostic
   # subset never converts a failed XCTest into a successful run.
   smoke_diagnostics_status=0
-  # Model maintenance, the startup Retry proof and the background warm-up check
-  # generate nothing, so they have no smoke diagnostics to gate.
+  # Model maintenance, the startup Retry proof, the background warm-up check and
+  # record-then-play generate nothing, so they have no smoke diagnostics to gate.
   if [[ "$lane" == "smoke" && "$scenario_argument" != "update-models" \
-      && "$scenario_argument" != "startup-retry" && "$scenario_argument" != "background-warmup" ]]; then
+      && "$scenario_argument" != "startup-retry" && "$scenario_argument" != "background-warmup" \
+      && "$scenario_argument" != "record-then-play" ]]; then
     if ! required_step_run "$step_ledger" smoke-diagnostics validate_ios_smoke; then
       smoke_diagnostics_status=1
       warn "iOS smoke memory-pressure diagnostics gate failed"

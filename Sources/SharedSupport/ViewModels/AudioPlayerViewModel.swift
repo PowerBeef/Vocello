@@ -292,7 +292,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         #endif
         #if os(iOS)
         registerAudioSessionObservers()
-        IOSPlaybackExclusivity.register(self) { [weak self] in
+        // Its own observers pause it for a call or a lost output and resume a
+        // file after the call (AUD-02), so the central handling leaves it alone.
+        IOSPlaybackExclusivity.register(self, handlesSessionEvents: true) { [weak self] in
             self?.pauseForOtherPlayback()
         }
         #endif

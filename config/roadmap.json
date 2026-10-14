@@ -1275,9 +1275,13 @@
         "Sources/iOS/Sheets/IOSPlayerSheet.swift",
         "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P1): the recorder selects .record and later deactivates; the shared player does not restore its category. ClipReviewPlayer does. The shared player already observes interruptions/routes; the other two AVAudioPlayer owners do not. Record-then-play silence and recovery after calls/headset changes require phone evidence. See project-review-2026-09-18.md. 2026-09-24: PA-21 now gives the session one owner (IOSAudioSessionOwner). Device checks left here: music continues through launch and return until Vocello plays; first playback is audible with the Silent switch; sheet expand/close pauses and resumes; voice samples mix, Studio does not; a capped (20.5 s) recording then clip review and Studio playback are audible; Control Center mid-recording keeps the category; background lets Music resume; call/Siri interruptions; startup Retry after a real failure.",
+      "notes": "2026-09-24: PA-21 gives the session one owner (IOSAudioSessionOwner), and the shared player claims playback before playing. 2026-10-14: every AVAudioPlayer owner pauses for a call, Siri, an alarm or a lost output through one central observer (IOSPlaybackExclusivity.handle), with deterministic tests; the shared player keeps its own observers, which resume a file after a call. iOS smoke gains record-then-play (testRecordThenPlayReviewsTheClip, alone with --scenario record-then-play): the recorded clip must play to its end in the save sheet's review. Device checks left for RF-15: Music keeps playing through launch and return until Vocello plays; first playback audible with the Silent switch on; sheet expand and close pause and resume; voice samples mix, Studio does not; record-then-play reaches the clip's end (audibility stays unverified, since nobody listens for 3.0); Control Center mid-recording keeps the category; the background lets Music resume; call and Siri interruptions; startup Retry after a real failure. Earlier history: git log -p -- config/roadmap.json.",
       "plan": "release-first-3-0-2026-09",
-      "updated": "2026-10-12"
+      "updated": "2026-10-14",
+      "evidence": [
+        "file:Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift",
+        "file:Tests/VocelloiOSLogicTests/IOSAudioSessionPolicyTests.swift"
+      ]
     },
     {
       "id": "AUD-03",

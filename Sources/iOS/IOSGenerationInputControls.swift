@@ -612,6 +612,7 @@ struct IOSSaveVoiceSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(clipPlayer.isPlaying ? IOSInterfaceText.pause : IOSInterfaceText.playRecording)
+            .accessibilityIdentifier("saveVoice_playClip")
 
             VStack(alignment: .leading, spacing: 8) {
                 IOSWaveformBars(

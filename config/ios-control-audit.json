@@ -481,7 +481,7 @@
     },
     {
       "id": "voice-enrollment",
-      "identifierPattern": "saveVoice_(nameField|saveButton|transcriptionStatus|referenceLanguagePicker|useAudioOnlyButton|consentRequired)",
+      "identifierPattern": "saveVoice_(nameField|saveButton|transcriptionStatus|referenceLanguagePicker|useAudioOnlyButton|consentRequired|playClip)",
       "sourceToken": "saveVoice_",
       "screen": "Saved voice review",
       "prerequisite": "Test-owned recording or import",

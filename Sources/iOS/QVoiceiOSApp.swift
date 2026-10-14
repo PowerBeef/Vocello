@@ -38,6 +38,8 @@ struct QVoiceiOSApp: App {
         // PA-21: the playback category is set without activating the session;
         // players activate it through the owner when playback actually starts.
         IOSAudioSessionOwner.shared.prepareForLaunch()
+        // AUD-02: a call, Siri or a lost output pauses every player.
+        IOSPlaybackExclusivity.observeSessionEvents()
         configureNativeRuntimeMemoryCacheIfNeeded()
         IOSCrashObserver.shared.start()
         IOSMetricKitMemoryReporter.shared.start()

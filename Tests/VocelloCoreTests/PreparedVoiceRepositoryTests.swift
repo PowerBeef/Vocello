@@ -392,7 +392,8 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         child.standardOutput = FileHandle.nullDevice
         child.standardError = FileHandle.nullDevice
         try child.run()
-        defer { if child.isRunning { kill(child.processIdentifier, SIGKILL); child.waitUntilExit() } }
+        // Killed, never waited for: `waitUntilExit()` can block an async test for good.
+        defer { if child.isRunning { kill(child.processIdentifier, SIGKILL) } }
         let deadline = ContinuousClock.now + .seconds(15)
         while !FileManager.default.fileExists(atPath: shared.appendingPathComponent("locked").path),
               child.isRunning, ContinuousClock.now < deadline {
@@ -420,8 +421,9 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         try Data().write(to: shared.appendingPathComponent("release"), options: .atomic)
         while child.isRunning, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         XCTAssertFalse(child.isRunning)
+        // Not `waitUntilExit()`: on a test's cooperative thread it can block for
+        // good once the child has gone, which hung the full suite.
         guard !child.isRunning else { return }
-        child.waitUntilExit()
         XCTAssertEqual(child.terminationStatus, 0)
         _ = try await app.prepare(
             name: "Held", audioURL: source, transcript: nil, qualityWarnings: [],

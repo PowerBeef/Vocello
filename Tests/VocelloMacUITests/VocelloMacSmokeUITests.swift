@@ -698,6 +698,11 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             firstRegenerate.exists && !resume.exists,
             "an accepted replacement keeps every segment saved"
         )
+        // A rejected replacement also keeps the project complete, but shows why.
+        XCTAssertFalse(
+            element("batch_errorLine").exists,
+            "the replacement must be accepted (a QC or engine rejection shows an error line)"
+        )
         VocelloUIScreenshot.attach(app, named: "mac-smoke-longform-regenerated")
 
         let done = button("batch_doneButton")

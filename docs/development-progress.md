@@ -31,8 +31,8 @@ so. The commits since are local and unpushed.
   with the audio it names), on iOS and macOS. A device failure sets nothing aside and is shown ("Not
   Discarded"); a moved container counts as the journal's own fault; the iPhone's leftover-audio review
   keeps set-aside audio. New ownership tests cover delete and clear-all with a pending or set-aside
-  journal. The Mac regeneration acceptance passes (`macos-xcui-smoke-20261014-032256-711c4dc4`, new
-  `smoke --scenario long-form`): a regenerated segment lands as a new revision, and the replaced take
+  journal. The Mac regeneration acceptance passes twice (`macos-xcui-smoke-20261014-032256-711c4dc4`, then
+  `-040507-0f70cdfc` with the replacement's acceptance asserted; new `smoke --scenario long-form`): a regenerated segment lands as a new revision, and the replaced take
   and joined output stay in History. BKL-14 parks never-started candidates.
 - **F-01, 79113a02:** every review surface discards its candidate however it closes, a save still
   staging included; a closed surface's discard finishes on the store's next operation; a review save

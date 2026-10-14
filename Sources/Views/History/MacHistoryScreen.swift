@@ -248,6 +248,9 @@ struct MacHistoryScreen: View {
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: MacHistoryListItem?
     @State private var actionAlert: MacHistoryActionAlert?
+    /// One long-form Discard at a time, so a second cannot race the first's
+    /// failure alert (F-16).
+    @State private var isDiscardingLongFormRecovery = false
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
     /// One page read at a time; a reload or an in-place row change during a
     /// read is followed by one more read (P10-07).
@@ -290,9 +293,10 @@ struct MacHistoryScreen: View {
                             || recoverySnapshot.pendingAudioRemovalCount > 0
                             || recoverySnapshot.unreadableAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
-                        canDiscard: (recoverySnapshot.notice == .unverifiedRecord
+                        canDiscard: ((recoverySnapshot.notice == .unverifiedRecord
                             && recoverySnapshot.unverifiableRecordCount > 0)
-                            || recoverySnapshot.notice == .longFormRecovery,
+                            || recoverySnapshot.notice == .longFormRecovery)
+                            && !isDiscardingLongFormRecovery,
                         onRetry: { retryRecovery() },
                         onReveal: { MacHistoryFileActions.revealRecoveryAudio(recoveryAudioURLs) },
                         onExport: exportPendingAudio,
@@ -922,8 +926,11 @@ private extension MacHistoryScreen {
     /// The long-form recovery data Retry cannot resolve is set aside on the
     /// device with the audio it names (F-16), and History works again.
     func discardLongFormRecovery() {
+        guard !isDiscardingLongFormRecovery else { return }
+        isDiscardingLongFormRecovery = true
         Task {
             let failure = await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
+            isDiscardingLongFormRecovery = false
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reloadHistory(reopenFailedStore: true)
             // Never silent: the typed storage failure says what to do.

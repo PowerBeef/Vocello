@@ -346,7 +346,9 @@ Published single takes are written to the local `history-outbox/`, when storage 
 idempotent SQLite commit. Startup and History entry reconcile pending rows. If attention remains,
 `historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`, and a
 confirmed `historyRecovery_discard` sets aside records that cannot be verified (A2-02) or long-form
-recovery data Retry cannot resolve (F-16), keeping them on the device; clear-all
+recovery data Retry cannot resolve (F-16), keeping them on the device. A Discard that a device
+failure (full storage, a missing permission) stopped says so in an alert
+(`historyRecovery_discardFailedDismiss`) and the notice stays for Retry; clear-all
 uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
 The banner states one notice chosen by `GenerationHistoryRecoverySnapshot.notice`: a clear that did
 not finish has its own copy (Retry resumes it) and no count is ever zero. A clear that is refused or

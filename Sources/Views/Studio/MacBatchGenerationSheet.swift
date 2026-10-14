@@ -263,6 +263,7 @@ struct MacBatchGenerationSheet: View {
             Text(errorLine)
                 .foregroundStyle(MacTheme.Status.critical)
                 .macType(.rowMeta)
+                .accessibilityIdentifier("batch_errorLine")
         }
 
         HStack {
@@ -320,6 +321,7 @@ struct MacBatchGenerationSheet: View {
             Text(errorLine)
                 .foregroundStyle(MacTheme.Status.critical)
                 .macType(.rowMeta)
+                .accessibilityIdentifier("batch_errorLine")
         }
 
         Spacer()

@@ -526,7 +526,7 @@
     },
     {
       "id": "history-surface",
-      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|DeleteRefusedDismiss|RetryButton|Recovery_retry|Recovery_export|Recovery_discard|Recovery_discardConfirm|Recovery_discardCancel|ShowMoreButton)",
+      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|DeleteRefusedDismiss|RetryButton|Recovery_retry|Recovery_export|Recovery_discard|Recovery_discardConfirm|Recovery_discardCancel|Recovery_discardFailedDismiss|ShowMoreButton)",
       "sourceToken": "historySearchField",
       "screen": "History",
       "prerequisite": "History tab",

@@ -250,7 +250,7 @@ selected segmentation, with its existing review, Generate all, cancel and recove
 | Segmentation | `batch_segmentationMode` (read-only mode selected in Studio) |
 | Editor | `batch_textEditor` |
 | Generate all | `batch_generateAllButton` / `batch_cancelButton` / `batch_doneButton` |
-| Item status | `batch_itemStatusList` / `batch_regenerateSegment_<index>` (long-form, per accepted segment) |
+| Item status | `batch_itemStatusList` / `batch_regenerateSegment_<index>` (long-form, per accepted segment) / `batch_errorLine` (the attempt's failure, a rejected replacement included) |
 | Long-form resume | `batch_resumeLongFormButton` (shown when a stopped project has reusable takes) |
 | Delivery summary | `batch_deliverySummary` |
 
@@ -369,8 +369,8 @@ The shell harness owns deterministic proof and evidence:
 macOS controls not currently targeted by the minimal smoke/benchmark lanes:
 - Individual delivery/language menu items.
 - Model "Manage" popover menu items.
-- Per-segment long-form controls beyond the batch journeys (`batch_regenerateSegment_<index>` and
-  `batch_resumeLongFormButton` exist but are not yet exercised by the minimal lanes).
+- `batch_resumeLongFormButton` exists but is not yet exercised by the minimal lanes; the long-form
+  journey regenerates segment 0 through `batch_regenerateSegment_0` (F-16).
 - The History "Reveal in Finder" context menu item (the pin-seed item carries
   `history_pinSeedButton`).
 

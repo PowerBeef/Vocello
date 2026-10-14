@@ -206,6 +206,8 @@ private struct IOSHistoryLibrarySection: View {
     /// A Discard that set nothing aside is never silent; the message is the
     /// typed storage failure, which says what to do (F-16).
     @State private var isDiscardFailurePresented = false
+    /// One Discard at a time, so a second cannot race the first's failure alert.
+    @State private var isDiscardingLongFormRecovery = false
     @State private var discardFailureMessage = ""
 
     var body: some View {
@@ -390,6 +392,7 @@ private struct IOSHistoryLibrarySection: View {
                     discardsLongFormRecovery = recoverySnapshot.notice == .longFormRecovery
                     isDiscardConfirmationPresented = true
                 }
+                .disabled(isDiscardingLongFormRecovery)
                 .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                 .accessibilityIdentifier("historyRecovery_discard")
             }
@@ -503,8 +506,11 @@ private struct IOSHistoryLibrarySection: View {
     /// resolve (F-16): it is set aside on the device with the audio it names,
     /// and History works again.
     private func discardLongFormRecovery() {
+        guard !isDiscardingLongFormRecovery else { return }
+        isDiscardingLongFormRecovery = true
         Task {
             let failure = await GenerationHistoryRecovery.setAsideLongFormRecoveryRecords()
+            isDiscardingLongFormRecovery = false
             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
             reload(reopenFailedStore: true)
             if let failure {

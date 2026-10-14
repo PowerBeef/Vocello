@@ -39,9 +39,10 @@ so. The commits since are local and unpushed.
   removes the review candidates of an app session that has ended, never a running copy's. iOS Delete
   waits while a long-form project runs and ends a retained project's use of the deleted voice; the Mac
   sheet holds Cancel while Keep runs. BKL-13 parks the Mac's long-form delete gap.
-- **Waiting on the maintainer:** F-01's G2 (iOS has no replace flow, so RF-15's iPhone "save, replace
-  and delete" row needs a scope decision), RF-15's startup-retry proposal, and setting Vocello's App
-  Language back to System on the phone.
+- **Decided (maintainer, October 14):** F-01's G2 — saved-voice replacement stays macOS-only with
+  repository tests; RF-15's iPhone row is save and delete.
+- **Waiting on the maintainer:** RF-15's startup-retry proposal, setting Vocello's App Language back to
+  System on the phone, and a push of the local commits.
 
 ### October 13, evening — purchase, Retry and full smoke pass on the iPhone
 

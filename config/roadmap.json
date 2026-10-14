@@ -325,10 +325,11 @@
         "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift",
         "Sources/iOS/Commerce/IOSSavedOutputsDestination+Commerce.swift",
         "Tests/VocelloiOSLogicTests/IOSSavedOutputsDestinationTests.swift",
-        "scripts/repo_invariants.sh"
+        "scripts/repo_invariants.sh",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "updated": "2026-10-13",
-      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-13: the exports scenario PASSES all 23 phases with restoration verified (ios-xcui-purchase-20261013-201729-998547b6) after three test fixes: rows under the tab dock (ec49f4ee), waits that read absent elements and ended the runner before cleanup (699be26f), and cleanup that deleted an owned purchase unrefunded so the app's StoreKit cache stayed entitled (de770c2b refunds first and re-syncs a stale entitlement through Restore, with attached evidence; it fired once on the passing run). Its locked-sheet screenshot shows the local $0.99 fixture price, not the live $19.99. Next: true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json."
+      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-13: the exports scenario PASSES all 23 phases with restoration verified (ios-xcui-purchase-20261013-201729-998547b6) after three test fixes: rows under the tab dock (ec49f4ee), waits that read absent elements and ended the runner before cleanup (699be26f), and cleanup that deleted an owned purchase unrefunded so the app's StoreKit cache stayed entitled (de770c2b refunds first and re-syncs a stale entitlement through Restore). Its locked-sheet screenshot shows the local $0.99 fixture price, not the live $19.99. Next: true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Earlier history: git log -p -- config/roadmap.json. 2026-10-13 core engine review (SER-2): the full player maps a saved voice without readable .voice.json metadata to originalReference, so a Design-made voice whose sidecar is truncated or newer exports without the unlock; unreadable metadata must map to unknown."
     },
     {
       "id": "RF-15",
@@ -342,10 +343,11 @@
       "gate": "On the processed TestFlight build, through the repository XCUITest stack with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save, replace and delete (F-01); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
       "sourceOfTruth": [
         "docs/reference/release-first-execution-2026-09.md",
-        "scripts/ui_test.sh"
+        "scripts/ui_test.sh",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "updated": "2026-10-13",
-      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen). 2026-10-13: no longer waits on AUD-09, whose smoke preflights landed (1bc2b95e); AUD-09 and AUD-01 now close after this run. Proposed 2026-10-13, awaiting the maintainer: a processed build cannot force a startup failure, so the dependency-failure row runs scripts/ui_test.sh ios smoke --scenario startup-retry on the device build; the journey also opens a file while the player sheet or the recorder is up (AUD-01). 2026-10-13: the startup-retry scenario already passed on the device build (ios-xcui-smoke-20261013-202516-b175375f)."
+      "notes": "Opened 2026-10-12 by the maintainer's risk-based gate decision; supersedes CONV-20's device re-verification. Covers the device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04. 2026-10-13: the by-ear takes became a machine screen for gross failures (maintainer decision; RF-14 ran the same screen). 2026-10-13: no longer waits on AUD-09, whose smoke preflights landed (1bc2b95e); AUD-09 and AUD-01 now close after this run. Proposed 2026-10-13, awaiting the maintainer: a processed build cannot force a startup failure, so the dependency-failure row runs scripts/ui_test.sh ios smoke --scenario startup-retry on the device build; the journey also opens a file while the player sheet or the recorder is up (AUD-01). 2026-10-13: the startup-retry scenario already passed on the device build (ios-xcui-smoke-20261013-202516-b175375f). 2026-10-13 development-build full smoke: the memory-pressure step still forbade U23's deliberate stopped-to-free-memory notice (e9286e8f), and the journey ended with the search keyboard over the tab dock; 9fa670ba and 29aa0e37 fix both, and the full smoke passes (ios-xcui-smoke-20261014-002614-3f711b56)."
     },
     {
       "id": "RF-17",
@@ -454,11 +456,12 @@
       "sourceOfTruth": [
         "docs/audits/2026-10-06-deep-audit.md",
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
-        "docs/reference/native-engineering.md"
+        "docs/reference/native-engineering.md",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
-      "notes": "Four contract texts say a full unload frees the model; on macOS a few hundred MB stay resident by design. Recommendation: clear at the critical band only."
+      "notes": "Four contract texts say a full unload frees the model; on macOS a few hundred MB stay resident by design. Recommendation: clear at the critical band only. 2026-10-13 core engine review: the macOS survivors also include the Clone encoder and its KV (MEM-1) and up to three text tokenizers, so the fix clears every slot; on iPhone the model switch clears the caches first, so Phase 9 residency never engages; 16 direct Memory.clearCache() calls bypass NativeMLXAllocatorControl."
     },
     {
       "id": "DA-06",
@@ -470,11 +473,12 @@
       "sourceOfTruth": [
         "docs/audits/2026-10-06-deep-audit.md",
         "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift",
-        "Sources/QwenVoiceCore/ModelAssets.swift"
+        "Sources/QwenVoiceCore/ModelAssets.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
-      "notes": "E1-02 is P2: a Stop during warm-up unloads the model while the UI shows it loaded, and the next take pays a cold load. The rest is not reachable on a shipped path today."
+      "notes": "E1-02 is P2: a Stop during warm-up unloads the model while the UI shows it loaded, and the next take pays a cold load. The rest is not reachable on a shipped path today. 2026-10-13 core engine review: E1-02 is worse than titled; every warm cancel lands at the trailing check after the full warm, and Stop during Preparing discards the model and its primed state."
     },
     {
       "id": "DA-07",
@@ -556,10 +560,11 @@
         "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
         "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
-        "Sources/QwenVoiceCore/HistoryDeletionEngine.swift"
+        "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "Reviewed 2026-10-10 at 38d295c4. Shared journaled acceptance, rollback/reconcile, QC refusal, compatibility, cancellation and suspension tests pass (mac-test-20261010-040414). Corrupt-journal handling now permits unrelated standalone History and bounded private recovery export; the earlier blanket-block finding is obsolete. Clean-source Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 proves initial long-form generation and grouped History only: test06 checks the regeneration control but never performs replacement. Open local work: actual Mac replacement/regeneration acceptance, targeted recovery/export journeys and the full abandon/new-project/relaunch/replacement/delete/clear-all ownership matrix, including bounded replaced/abandoned outputs. RF-10 corrected-candidate qualification remains open. September 7 iOS acceptance is historical; current-candidate physical acceptance (RF-12) is deferred until phone work resumes. See docs/reference/long-form-generation.md; earlier history remains in git.",
+      "updated": "2026-10-13",
+      "notes": "Reviewed 2026-10-10 at 38d295c4: journaled acceptance, rollback and reconcile, QC refusal, compatibility, cancellation and suspension tests pass (mac-test-20261010-040414). Reads of a damaged project withhold its rows but keep standalone History and a bounded private recovery export. Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 proves initial long-form generation and grouped History only. Open: Mac replacement and regeneration acceptance, recovery and export journeys, and the ownership matrix (abandon, new project, relaunch, replacement, delete, clear all). RF-10 and RF-12 qualification remain open; earlier history is in git. 2026-10-13 core engine review (SER-1): every History write reconciles first, so an unreadable journal (truncation, a newer version, a moved container) keeps each new take queued and Clear All failing, and Export is the only offer; the loop also stops at the first bad journal. Qualifying recoveryRequired needs an exit after Export and a loop that continues past a bad file.",
       "evidence": [
         "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "commit:df79aa96"
@@ -694,15 +699,16 @@
         "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
-        "Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift"
+        "Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "evidence": [
         "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
         "file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift",
         "file:docs/reference/privacy-storage.md"
       ],
-      "updated": "2026-09-13",
-      "notes": "VRA-008 source correction now returns typed saved/queued/unable-to-queue outcomes through the shared single-take pipeline. Failed enqueue exposes app-wide Retry/Export on macOS/iOS and retains exact identity in app-session memory without claiming durability or failed synthesis. Existing outbox and database-first deletion remain. Focused/current-tree verification and corrected-candidate acceptance remain separate from implementation and release authorization. The coherent-tree source checkpoint subsequently passed. V26-08's corrupt long-form journal recovery UX is owned by F-16 and cross-referenced here; a generic reopen/retry must not be presented as repair of an unchanged corrupt journal. Keep single-take retry/export and playable audio intact. September 4 long-form integration now awaits individual segment persistence through the shared saved/queued/unable-to-queue policy before continuation. Storage failures retain the existing outbox or explicit app-session export owner, not a false accepted project. Superseded joined files remain enumerable by History deletion. F-16 owns non-destructive corrupt-journal export and unrelated read access; candidate acceptance remains open.",
+      "updated": "2026-10-13",
+      "notes": "Source: typed saved/queued/unable-to-queue outcomes run through the shared single-take pipeline (VRA-008). A failed enqueue exposes app-wide Retry and Export on macOS and iOS and keeps exact identity in app-session memory without claiming durability. The outbox and database-first deletion remain. Long-form segments persist through the same policy before continuation; storage failures keep the outbox or an explicit export owner. F-16 owns corrupt long-form journal export. Candidate acceptance remains open; earlier history is in git. 2026-10-13 core engine review: PA-30's leftover review treats any unreferenced WAV older than the session as deletable, so after a kill the only copy of a take whose enqueue failed in an earlier session can be deleted on the user's confirmation.",
       "unparkWhen": "A corrected candidate (RF-10 macOS, RF-12 iOS) exercises enqueue-failure retry and export."
     },
     {
@@ -834,13 +840,14 @@
         "Sources/PrivacyInfo.xcprivacy",
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "website/public/privacy/index.html",
-        "docs/reference/ios-appstore-submission.md"
+        "docs/reference/ios-appstore-submission.md",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "evidence": [
         "commit:87636935"
       ],
       "updated": "2026-10-13",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 core engine review (SEC-2): the page says none of this is uploaded, while the microphone purpose string says saved voices are in iPhone backups; one sentence on backups would align them.",
       "unparkWhen": "ASR-11 unparks (RF-02's account steps are complete) and reads the published label back."
     },
     {
@@ -906,13 +913,14 @@
         "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
         "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift",
         "config/ios-storage-protection-policy.json",
-        "docs/reference/privacy-storage.md"
+        "docs/reference/privacy-storage.md",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-10-12",
-      "notes": "The schema-v1 path contract classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models/downloads/caches/diagnostics from backup, and preserves backup for user outputs/voices/History. The first September 2 signed-device VLR export exposed a source-proven bootstrap defect before any generation row launched: recursive metadata application could not save attributes on the intentionally read-only speech_tokenizer/model.safetensors hard link. The bounded correction temporarily adds owner write permission only around metadata updates and restores the exact immutable mode on success or failure; focused policy and Swift tests cover a hard-linked replica and a thrown operation. Signed-device effective-attribute, backup-exclusion, locked-background, deletion, and relaunch proof remains required before ASR-06 closes."
+      "updated": "2026-10-13",
+      "notes": "The schema-v1 path contract classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models, downloads, caches and diagnostics from backup, and keeps outputs, voices and History in backup. Metadata updates briefly add owner write permission to read-only hard links and restore the exact mode (tested). Signed-device proof of effective attributes, backup exclusion, locked-background behavior, deletion and relaunch remains required; earlier history is in git. 2026-10-13 core engine review: the launch protection pass resets the iPhone reclamation clock, so startup reclamation frees nothing (STOR-1, BKL-04); crash-stranded clone-prompt staging sits in backed-up voices/ (STOR-6); Studio drafts of up to 30,000 characters per mode live in UserDefaults outside the contract (SEC-4); voices and History could take .complete, since only models and downloads need access while locked (SEC-6)."
     },
     {
       "id": "ASR-07",
@@ -1371,11 +1379,12 @@
       "status": "parked",
       "gate": "The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.",
       "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "notes": "Reviewed 2026-10-10 at 38d295c4. Commit 814b664b implements set membership with ordered token storage/cache invalidation preserved; focused sampler and seeded production generate-loop tests pass in the full native suite. Qualified M6 gate benches already exist, so the old claim that none ran is obsolete. However mac-gate-bench-20260925-200552-0c056a16 compares sources that both contain the dedup change; pre-change retained evidence uses different M2 hardware/lineage. Open: a compatible pre/post-change gate comparison establishing no regression, with clean source identities and normal benchmark safeguards. October 10 telemetry parity compares telemetry modes on the same sampler and cannot close this clause. No measured optimization benefit is claimed.",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. Commit 814b664b implements set membership with ordered token storage/cache invalidation preserved; focused sampler and seeded production generate-loop tests pass in the full native suite. Qualified M6 gate benches already exist, so the old claim that none ran is obsolete. However mac-gate-bench-20260925-200552-0c056a16 compares sources that both contain the dedup change; pre-change retained evidence uses different M2 hardware/lineage. Open: a compatible pre/post-change gate comparison establishing no regression, with clean source identities and normal benchmark safeguards. October 10 telemetry parity compares telemetry modes on the same sampler and cannot close this clause. No measured optimization benefit is claimed. 2026-10-13 core engine review: the sampler is already Set-backed; only the gate evidence is open.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
     },
     {
@@ -1446,11 +1455,12 @@
       "gate": "The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.",
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
-        "docs/reference/mimi-codec-guide.md"
+        "docs/reference/mimi-codec-guide.md",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output.",
+      "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output. 2026-10-13 core engine review: the gate should add that no encoder KV stays resident after an encode; a window alone does not fix MEM-1 (BKL-03).",
       "plan": "project-audit-2026-09",
-      "updated": "2026-10-12",
+      "updated": "2026-10-13",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
     },
     {
@@ -1553,10 +1563,11 @@
         "scripts/benchmark_memory.py",
         "scripts/check_macos_ui_bench.py",
         "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
-        "config/memory-qualification-policy.json"
+        "config/memory-qualification-policy.json",
+        "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "notes": "Reviewed 2026-10-10 at 38d295c4. One-process unsummed memory and routine policy-clear behavior have deterministic tests; 357 registry records validate and the peak-miss report preserves historical undersampling. M6 mac-memory-qualification-20260926-011258-82f5f55c passed 11 takes with kernel peak >= MLX peak; 235a205d calibrated general gap and Mac retained-memory-v2 bounds, closing the old AV-17 step-4 note. Open local evidence: the original exact-eight-record offline UI replay was not found retained; reproduce/document it or reconcile that historical clause with equivalent explicit evidence before closure. Phone budget/retained-v2 qualification is deferred. Physical iPhone/8GB gap bounds stay provisional until unforced hardware evidence exists; floor-emulated exploratory results do not calibrate them. October 10 telemetry parity is not memory qualification.",
-      "updated": "2026-10-12",
+      "notes": "Reviewed 2026-10-10 at 38d295c4. One-process unsummed memory and routine policy-clear behavior have deterministic tests; 357 registry records validate and the peak-miss report preserves historical undersampling. M6 mac-memory-qualification-20260926-011258-82f5f55c passed 11 takes with kernel peak >= MLX peak; 235a205d calibrated general gap and Mac retained-memory-v2 bounds, closing the old AV-17 step-4 note. Open local evidence: the original exact-eight-record offline UI replay was not found retained; reproduce/document it or reconcile that historical clause with equivalent explicit evidence before closure. Phone budget/retained-v2 qualification is deferred. Physical iPhone/8GB gap bounds stay provisional until unforced hardware evidence exists; floor-emulated exploratory results do not calibrate them. October 10 telemetry parity is not memory qualification. 2026-10-13 core engine review: the v1 bound cannot see constant retention such as MEM-1, and the quiescence evaluator has no post-unload baseline (BKL-03).",
+      "updated": "2026-10-13",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
     },
     {
@@ -1713,6 +1724,182 @@
       "updated": "2026-10-13",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Raised by the DA-04 review (2026-10-13): such a script passes the apps' speakable-text check, neutralizes to one space and now generates as nine chat tokens; it ends in the existing no-audio failure or Fast QC, with no crash or leak. Parked without investigation under the focus lock."
+    },
+    {
+      "id": "BKL-02",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Engine cancellation and task-lifecycle hygiene",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix CONC-2 to CONC-7, MEM-2 and MEM-4 from the 2026-10-13 core engine review: relief a cancelled caller cannot skip, one owner for the resident speech tokenizer, tracked prebuild and drain Tasks, blocking IO off the MainActor and actors, a cancellable audio-normalization queue, a registry that matches the code, and an engine relief API that is wired or removed, each with a deterministic test. CONC-1 joins this item unless BG-1 becomes a release blocker.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        "config/concurrency-safety.json"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-03",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Release Clone-encoder and late-failure MLX memory",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix MEM-1, MEM-3, MEM-5 and MEM-6 from the 2026-10-13 core engine review: a per-encode Mimi encoder cache, an allocator clear on late take failures, bounded per-session bookkeeping and an owned telemetry sampler, with package leak canaries (active memory after encode and drop, generate and drop, load and unload) and a post-unload quiescence baseline.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-04",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "One storage janitor for stranded families and the iPhone reclamation clock",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix STOR-1 to STOR-6 from the 2026-10-13 core engine review: reclamation ages entries by birth time so the iPhone protection pass cannot reset it, crash-stranded install and migration replicas, imported and normalized reference copies, delegate temp files, clone-prompt staging and export temporaries are swept, and stored audio paths survive a container move. A contract test lists every hidden-name pattern against its sweeper.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-05",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "History persistence exits and per-row decode isolation",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix DB-1 to DB-6 from the 2026-10-13 core engine review: a damaged or newer clear marker and a queued entry without audio get a confirmed exit, one undecodable row cannot take History offline or trap, suspension holds for a queue opened while backgrounded and a failed open reopens on return, and Mac deletes on an unmounted folder report honestly; with real-GRDB tests.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-06",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Model delivery robustness on iPhone and Mac",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix NET-1 to NET-10 from the 2026-10-13 core engine review: a failed iPhone install stays failed until Retry, Wi-Fi only also excludes expensive and constrained networks, transient TLS and session errors retry, Retry gates on remaining bytes, the background completion handler is released promptly, sessions refuse cookies, sidecars carry artifact identity, and Mac transfers wait for connectivity; with a URLProtocol-stubbed downloader suite. IOSModelDownloadCoordinator has no test target today (DA-13).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/iOS/IOSModelDownloadCoordinator.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-07",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Cut decode-loop kernel launches and end-of-take latency",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Pursue PERF-1 to PERF-11 from the 2026-10-13 core engine review, each confirmed first by a Metal System Trace dispatch count: identity-safe changes (introspection off with telemetry, one embedding sum, a held compiled plan, fused projections, compiled samplers, growing K/V lists) before RoPE, which needs fixed-seed QC evidence; measure the per-chunk cache clear, the Mimi fixed cost and AudioSeal latency before changing them.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "benchmarks/OPTIMIZATION.md"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-08",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "iOS energy hygiene",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix EN-1 to EN-8 from the 2026-10-13 core engine review: the inline player card's display link stops when playback is not live, the download heartbeat is gated in production, timers carry tolerance, the opened-file wait is event-driven, marking docs match the GPU path, and cold-reload churn and Low Power Mode are profiled with Power Profiler.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift",
+        "Sources/iOS/IOSModelDownloadCoordinator.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-09",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Privacy and security hygiene",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix SEC-1, SEC-3, SEC-5, SEC-7 and SEC-8 from the 2026-10-13 core engine review: neutral names for shared and saved audio copies, no latent Hugging Face download client or Documents write in the package (with the invariant extended to Packages/), secure delete for History, telemetry gated on internal diagnostics with package errors routed through DiagnosticPrivacy, and no developer README or debug entitlements as defaults in the app bundle.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/SharedSupport/Services/GenerationOutputFileName.swift",
+        "Sources/PrivacyInfo.xcprivacy"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-10",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Version-skew exits for persisted JSON",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Fix SER-3 to SER-9 from the 2026-10-13 core engine review: outbox entries and removal lists written by a newer build stay in place and are reported instead of discarded, receipt enums decode an unknown case, unreadable drafts are kept aside, a bad legacy ledger is quarantined, JSON is synced before its rename, one date encoding per type, and one fail-closed policy for unreadable manifests, with newer-version and zero-length fixtures.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-11",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Test the lifecycle glue",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Close TEST P1.3 to P1.5, P2 and P3 from the 2026-10-13 core engine review: History recovery wiring over a real database with injectable roots, the 0xDEAD10CC suspension guard on DatabaseService, the model-download restore table, XCUITest waits that never read an absent element, dock-aware row reveals, out-of-process lane restoration, an injectable thermal provider, and positive twins for marking failures. TEST P1.1 and P1.2 travel with BG-1 if it becomes a release blocker.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report."
+    },
+    {
+      "id": "BKL-12",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Release rehearsal's macOS DMG step runs out of runner disk",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The release rehearsal's macOS package job passes on GitHub's runner: the DMG step gets the disk it needs, by freeing runner space before packaging or staging the DMG on a larger volume, and the rehearsal is green on three consecutive pushes.",
+      "sourceOfTruth": [
+        ".github/workflows/release-rehearsal.yml",
+        "scripts/release.sh"
+      ],
+      "updated": "2026-10-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Failing since 2026-10-10 (8c71d64b). On 2026-10-12 (86d910dd) and 2026-10-13 (c08a1360) hdiutil reported 'No space left on device' while building the DMG, after the macOS build, bundle verification and CLI smoke had passed; the iOS archive prerequisites job passes. Parked without investigation under the focus lock: macOS packaging is not part of the 3.0 iOS submission."
     }
   ]
 }

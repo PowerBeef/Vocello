@@ -26,7 +26,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 0/5 (0%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 0/16 (0%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 6/14 (43%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -443,6 +443,17 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `BKL-01` | parked | Refuse a script that is only whitespace once control tokens are neutralized | — |
+| `BKL-02` | parked | Engine cancellation and task-lifecycle hygiene | — |
+| `BKL-03` | parked | Release Clone-encoder and late-failure MLX memory | — |
+| `BKL-04` | parked | One storage janitor for stranded families and the iPhone reclamation clock | — |
+| `BKL-05` | parked | History persistence exits and per-row decode isolation | — |
+| `BKL-06` | parked | Model delivery robustness on iPhone and Mac | — |
+| `BKL-07` | parked | Cut decode-loop kernel launches and end-of-take latency | — |
+| `BKL-08` | parked | iOS energy hygiene | — |
+| `BKL-09` | parked | Privacy and security hygiene | — |
+| `BKL-10` | parked | Version-skew exits for persisted JSON | — |
+| `BKL-11` | parked | Test the lifecycle glue | — |
+| `BKL-12` | parked | Release rehearsal's macOS DMG step runs out of runner disk | — |
 | `CONV-21` | parked | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
@@ -452,6 +463,50 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-01`** (parked) — Refuse a script that is only whitespace once control tokens are neutralized.
   gate: A script made only of chat-template control-token literals (for example <|im_end|>) is refused with the typed short-script error instead of synthesizing a whitespace token, with a deterministic test.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-02`** (parked) — Engine cancellation and task-lifecycle hygiene.
+  gate: Fix CONC-2 to CONC-7, MEM-2 and MEM-4 from the 2026-10-13 core engine review: relief a cancelled caller cannot skip, one owner for the resident speech tokenizer, tracked prebuild and drain Tasks, blocking IO off the MainActor and actors, a cancellable audio-normalization queue, a registry that matches the code, and an engine relief API that is wired or removed, each with a deterministic test. CONC-1 joins this item unless BG-1 becomes a release blocker.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-03`** (parked) — Release Clone-encoder and late-failure MLX memory.
+  gate: Fix MEM-1, MEM-3, MEM-5 and MEM-6 from the 2026-10-13 core engine review: a per-encode Mimi encoder cache, an allocator clear on late take failures, bounded per-session bookkeeping and an owned telemetry sampler, with package leak canaries (active memory after encode and drop, generate and drop, load and unload) and a post-unload quiescence baseline.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-04`** (parked) — One storage janitor for stranded families and the iPhone reclamation clock.
+  gate: Fix STOR-1 to STOR-6 from the 2026-10-13 core engine review: reclamation ages entries by birth time so the iPhone protection pass cannot reset it, crash-stranded install and migration replicas, imported and normalized reference copies, delegate temp files, clone-prompt staging and export temporaries are swept, and stored audio paths survive a container move. A contract test lists every hidden-name pattern against its sweeper.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-05`** (parked) — History persistence exits and per-row decode isolation.
+  gate: Fix DB-1 to DB-6 from the 2026-10-13 core engine review: a damaged or newer clear marker and a queued entry without audio get a confirmed exit, one undecodable row cannot take History offline or trap, suspension holds for a queue opened while backgrounded and a failed open reopens on return, and Mac deletes on an unmounted folder report honestly; with real-GRDB tests.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-06`** (parked) — Model delivery robustness on iPhone and Mac.
+  gate: Fix NET-1 to NET-10 from the 2026-10-13 core engine review: a failed iPhone install stays failed until Retry, Wi-Fi only also excludes expensive and constrained networks, transient TLS and session errors retry, Retry gates on remaining bytes, the background completion handler is released promptly, sessions refuse cookies, sidecars carry artifact identity, and Mac transfers wait for connectivity; with a URLProtocol-stubbed downloader suite. IOSModelDownloadCoordinator has no test target today (DA-13).
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-07`** (parked) — Cut decode-loop kernel launches and end-of-take latency.
+  gate: Pursue PERF-1 to PERF-11 from the 2026-10-13 core engine review, each confirmed first by a Metal System Trace dispatch count: identity-safe changes (introspection off with telemetry, one embedding sum, a held compiled plan, fused projections, compiled samplers, growing K/V lists) before RoPE, which needs fixed-seed QC evidence; measure the per-chunk cache clear, the Mimi fixed cost and AudioSeal latency before changing them.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-08`** (parked) — iOS energy hygiene.
+  gate: Fix EN-1 to EN-8 from the 2026-10-13 core engine review: the inline player card's display link stops when playback is not live, the download heartbeat is gated in production, timers carry tolerance, the opened-file wait is event-driven, marking docs match the GPU path, and cold-reload churn and Low Power Mode are profiled with Power Profiler.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-09`** (parked) — Privacy and security hygiene.
+  gate: Fix SEC-1, SEC-3, SEC-5, SEC-7 and SEC-8 from the 2026-10-13 core engine review: neutral names for shared and saved audio copies, no latent Hugging Face download client or Documents write in the package (with the invariant extended to Packages/), secure delete for History, telemetry gated on internal diagnostics with package errors routed through DiagnosticPrivacy, and no developer README or debug entitlements as defaults in the app bundle.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-10`** (parked) — Version-skew exits for persisted JSON.
+  gate: Fix SER-3 to SER-9 from the 2026-10-13 core engine review: outbox entries and removal lists written by a newer build stay in place and are reported instead of discarded, receipt enums decode an unknown case, unreadable drafts are kept aside, a bad legacy ledger is quarantined, JSON is synced before its rename, one date encoding per type, and one fail-closed policy for unreadable manifests, with newer-version and zero-length fixtures.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-11`** (parked) — Test the lifecycle glue.
+  gate: Close TEST P1.3 to P1.5, P2 and P3 from the 2026-10-13 core engine review: History recovery wiring over a real database with injectable roots, the 0xDEAD10CC suspension guard on DatabaseService, the model-download restore table, XCUITest waits that never read an absent element, dock-aware row reveals, out-of-process lane restoration, an injectable thermal provider, and positive twins for marking failures. TEST P1.1 and P1.2 travel with BG-1 if it becomes a release blocker.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-12`** (parked) — Release rehearsal's macOS DMG step runs out of runner disk.
+  gate: The release rehearsal's macOS package job passes on GitHub's runner: the DMG step gets the disk it needs, by freeing runner space before packaging or staging the DMG on a larger volume, and the rehearsal is green on three consecutive pushes.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`CONV-21`** (parked) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.

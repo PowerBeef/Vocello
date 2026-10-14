@@ -17,7 +17,7 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 13, evening — purchase and Retry proven on the iPhone (resume here)
+### October 13, evening — purchase, Retry and full smoke pass on the iPhone (resume here)
 
 - **RF-13:** the purchase exports scenario passes all 23 phases on the paired iPhone, with restoration
   verified (`ios-xcui-purchase-20261013-201729-998547b6`), after three test fixes (ec49f4ee, 699be26f,
@@ -28,15 +28,24 @@ last full copy at commit 25a895ed).
   still unproven on a device (RF-15 proposal).
 - **Pushed** at the maintainer's request (`86d910dd..c08a1360`). Vercel deployed it and the live privacy
   page matches the repository, so ASR-02 waits only on ASR-11's read-back.
-- **Waiting on the phone:** `scripts/ui_test.sh ios smoke --scenario background-warmup` (c08a1360)
-  confirms or refutes the engine review's crash candidate: a proactive Clone load or priming still
-  running after the app leaves the foreground, where iOS rejects GPU work and MLX aborts. Then full
-  iOS smoke. An aborted purchase run left Vocello's App Language on English; the maintainer sets it
-  back to System.
-- **Engine review in progress:** seven Axiom audits are in (storage, concurrency, memory, performance,
-  networking, database, energy); security and privacy, Codable and test quality are running. The
-  report goes to `docs/audits/2026-10-13-core-engine-review.md`; non-blockers become parked lines and
-  blocker candidates go to the maintainer.
+- **Background warm-up check:** `scripts/ui_test.sh ios smoke --scenario background-warmup` passed
+  (`ios-xcui-smoke-20261013-232424-a8c32853`): the app survived leaving 0.3, 1.5 and 3.0 s after the
+  Clone handoff. It proves survival only, so the crash candidate is not reproduced rather than refuted.
+- **Full iOS smoke:** PASS (`ios-xcui-smoke-20261014-002614-3f711b56`), the first full pass since
+  September, after two stale test steps were fixed: the memory-pressure step still forbade U23's
+  deliberate notice (9fa670ba), and the journey ended with the search keyboard over the tab dock
+  (29aa0e37).
+- **Release rehearsal:** the macOS DMG step has run out of runner disk since October 10 (BKL-12); the
+  iOS archive prerequisites pass.
+- An aborted purchase run left Vocello's App Language on English; the maintainer sets it back to
+  System.
+- **Engine review:** [the report](audits/2026-10-13-core-engine-review.md) maps the backend and
+  classifies ten Axiom audits. Non-blockers are parked as BKL-02 to BKL-11. Findings inside release
+  items are noted there: SER-1 on F-16, SER-2 on RF-13 (a saved voice's unreadable metadata exports
+  without the unlock), SEC-4 and SEC-6 on ASR-06, SEC-2 on ASR-02.
+- **Waiting on the maintainer:** whether BG-1 (GPU work outliving the foreground) becomes a release
+  blocker, whether the IAP review screenshot may show the local $0.99 price, the privacy page's
+  sentence on backups (SEC-2), and RF-15's startup-retry proposal.
 
 ### October 13 — step 1 on hold, development resumes
 

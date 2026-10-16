@@ -1348,40 +1348,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         return observed
     }
 
-    private func selectVariation(_ id: String) {
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        XCTAssertTrue(revealSettingsElement(picker, swipingUp: false))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
-        let option = element("iosSettings_variationOption_\(id)")
-        XCTAssertTrue(VocelloUIWait.exists(option, timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
-        select(tab: .studio)
-    }
-
-    private func selectedVariationID() -> String {
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        let value = ((picker.value as? String) ?? picker.label).lowercased()
-        select(tab: .studio)
-        if value.contains("balanced") { return "balanced" }
-        if value.contains("consistent") { return "consistent" }
-        if value.contains("expressive") { return "expressive" }
-        XCTFail("Variation control did not expose a known selection")
-        return "unknown"
-    }
-
-    private func restoreVariation(_ id: String) {
-        guard app.state == .runningForeground else { return }
-        if selectedVariationID() != id {
-            selectVariation(id)
-        }
-    }
-
     private func mutateAndRestoreToggle(_ identifier: String) {
         openSettingsPage(for: identifier)
         let toggle = element(identifier)

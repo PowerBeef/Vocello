@@ -115,6 +115,15 @@ microphone and speech prompts:
 scripts/ui_test.sh ios smoke --scenario record-then-play
 ```
 
+The long-form project journey (RF-18) also runs alone, in about 15 minutes. It pins Take
+variation to Expressive through Settings and restores the original afterwards, so a persisted
+Consistent setting no longer decides the outcome (Consistent's long-form stalls are a 3.0 known
+limitation). It has no memory-pressure gate, because only the full smoke forces that event:
+
+```sh
+scripts/ui_test.sh ios smoke --scenario long-form
+```
+
 The background warm-up check (BG-01) is another focused scenario:
 
 ```sh

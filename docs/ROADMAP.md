@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 4 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 10/35 (29%) |
+| `release-first-3-0-2026-09` | active | release-qa | 11/35 (31%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/15 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -67,7 +67,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-18` | in-flight | Long-form segments keep their pacing (RF-15's long-form row) | — |
-| `RF-19` | planned | iPhone model installs never wedge or silently discard a download | — |
 
 ### Open items in detail
 
@@ -148,9 +147,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-18`** (in-flight, due 2026-10-22) — Long-form segments keep their pacing (RF-15's long-form row).
   gate: A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.
 
-- **`RF-19`** (planned, due 2026-10-21) — iPhone model installs never wedge or silently discard a download.
-  gate: A file failure is never recorded as a user cancel: only the coordinator's own durable cancel intent writes .cancelRequested, so a failed install shows Failed with Retry and the next queued model starts (E-02). A failed install stays failed with its staging until Retry instead of restarting on every launch (NET-1). -1200 and the other transient session errors retry within the existing bound while certificate errors stay permanent (NET-3). One model starts at a time because the start slot is claimed before any await (E-01). The decision logic lives in value types under Sources/iOSSupport/Services with table tests in both logic bundles; device proof is RF-15's onboarding and download row, since failure paths cannot be injected on a device.
-
 ## Engine remediation programme (2026-10-16 audit)
 
 `engine-remediation-2026-10` · **active** · backend-and-platform · adopted 2026-10-16
@@ -216,7 +212,7 @@ Narrative authority: [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2
   unparkWhen: Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.
 
 - **`ER-10`** (parked) — Delivery, storage and persistence.
-  gate: The downloader never reports a failure as cancelling; NET-2 and NET-4 to NET-10, E-03 (staging keyed by artifact version, before any layout change), E-04, E-05, E-06 and E-09 to E-14 are fixed; STOR-1 to STOR-6 run through one janitor with a contract test listing every hidden-name family against its sweeper; DB-1 to DB-6 and SER-3 to SER-9 have real-GRDB and newer-version fixtures; BKL-14, DA-14 and F-06's durable unqueued marker are closed.
+  gate: NET-2 and NET-4 to NET-10, E-03 (staging keyed by artifact version, before any layout change), E-04, E-05, E-06 and E-09 to E-14 are fixed; STOR-1 to STOR-6 run through one janitor with a contract test listing every hidden-name family against its sweeper; DB-1 to DB-6 and SER-3 to SER-9 have real-GRDB and newer-version fixtures; BKL-14, DA-14 and F-06's durable unqueued marker are closed.
   unparkWhen: Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.
 
 - **`ER-11`** (parked) — Fast QC and output-path hygiene.

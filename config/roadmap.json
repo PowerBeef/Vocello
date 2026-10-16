@@ -1743,23 +1743,6 @@
       "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed. 2026-10-13: the strengthened check PASSES (ios-xcui-smoke-20261014-013015-ab48517b): all six passes left with the work in flight (three during Preparing reference, three during a cold take's load and warm) and the app survived each, with a clean crash delta. The prompt prebuild after Save voice and marking at a take's end have no visible signal and stay uncovered. The maintainer chose to cover those two paths before classifying: internal-diagnostics-only events for leaving the foreground, marking and the prompt prebuild, then device passes. Paused by the maintainer on 2026-10-13 before any code changed. 2026-10-16: the maintainer chose the engine audit's hardening as BG-01's fix shape before the freeze, together with the MLX refresh (CONV-21)."
     },
     {
-      "id": "RF-19",
-      "plan": "release-first-3-0-2026-09",
-      "title": "iPhone model installs never wedge or silently discard a download",
-      "status": "planned",
-      "due": "2026-10-21",
-      "gate": "A file failure is never recorded as a user cancel: only the coordinator's own durable cancel intent writes .cancelRequested, so a failed install shows Failed with Retry and the next queued model starts (E-02). A failed install stays failed with its staging until Retry instead of restarting on every launch (NET-1). -1200 and the other transient session errors retry within the existing bound while certificate errors stay permanent (NET-3). One model starts at a time because the start slot is claimed before any await (E-01). The decision logic lives in value types under Sources/iOSSupport/Services with table tests in both logic bundles; device proof is RF-15's onboarding and download row, since failure paths cannot be injected on a device.",
-      "sourceOfTruth": [
-        "Sources/iOS/IOSModelDownloadCoordinator.swift",
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Sources/QwenVoiceCore/ModelDownloadContracts.swift",
-        "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
-        "docs/audits/2026-10-16-engine-runtime-audit.md"
-      ],
-      "updated": "2026-10-16",
-      "notes": "Classified a release blocker by the maintainer on 2026-10-16 (engine audit E-02, E-01, NET-1, NET-3): a failed download leaves the row at Cancelling with no action, queued models never start, and the next launch silently deletes the staged gigabytes; two quick Install taps wedge both models. An App Review risk on the reviewer's first path. E-02 and NET-1 ship together, or failed installs restart on every launch."
-    },
-    {
       "id": "RF-18",
       "plan": "release-first-3-0-2026-09",
       "title": "Long-form segments keep their pacing (RF-15's long-form row)",
@@ -1950,7 +1933,7 @@
       "plan": "engine-remediation-2026-10",
       "title": "Delivery, storage and persistence",
       "status": "parked",
-      "gate": "The downloader never reports a failure as cancelling; NET-2 and NET-4 to NET-10, E-03 (staging keyed by artifact version, before any layout change), E-04, E-05, E-06 and E-09 to E-14 are fixed; STOR-1 to STOR-6 run through one janitor with a contract test listing every hidden-name family against its sweeper; DB-1 to DB-6 and SER-3 to SER-9 have real-GRDB and newer-version fixtures; BKL-14, DA-14 and F-06's durable unqueued marker are closed.",
+      "gate": "NET-2 and NET-4 to NET-10, E-03 (staging keyed by artifact version, before any layout change), E-04, E-05, E-06 and E-09 to E-14 are fixed; STOR-1 to STOR-6 run through one janitor with a contract test listing every hidden-name family against its sweeper; DB-1 to DB-6 and SER-3 to SER-9 have real-GRDB and newer-version fixtures; BKL-14, DA-14 and F-06's durable unqueued marker are closed.",
       "sourceOfTruth": [
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
@@ -1959,7 +1942,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "Absorbs BKL-04, BKL-05, BKL-06, BKL-10 and BKL-14. Also covers DA-13's download and clone-cache follow-ups and schedules DA-14.",
+      "notes": "Absorbs BKL-04, BKL-05, BKL-06, BKL-10 and BKL-14. Also covers DA-13's download and clone-cache follow-ups and schedules DA-14. RF-19 (2026-10-16) met the old first clause: the downloader reports a run's root failure, never a sibling's cancellation. Left here by its review: Cancel during the start window shows Failed briefly, then Downloading (cancel() could see the start claim); a failure teardown drops parked completions a Retry could reuse; kept failed staging lengthens E-03's exposure until staging is keyed by artifact.",
       "legacyIds": [
         "BKL-04",
         "BKL-05",

@@ -331,30 +331,35 @@ final class IOSModelDownloadCoordinator {
 
             for index in ledger.requests.indices {
                 let request = ledger.requests[index]
-                guard let descriptor = modelAssetStore.descriptor(id: request.modelID)?.model,
-                      descriptor.artifactVersion == request.artifactVersion else {
-                    ledger.requests[index].status = .failed
-                    continue
-                }
-                if request.status == .cancelRequested || request.status == .deleted {
+                let descriptor = modelAssetStore.descriptor(id: request.modelID)?.model
+                let currentDescriptor = descriptor?.artifactVersion == request.artifactVersion
+                    ? descriptor
+                    : nil
+                // NET-1: a failed request stays failed, with its staging, until an explicit
+                // Retry; only interrupted live work restarts on its own.
+                switch request.restoreAction(
+                    artifactIsCurrent: currentDescriptor != nil,
+                    targetIsInstalled: currentDescriptor?.isAvailable(
+                        in: AppPaths.modelsDir,
+                        fileManager: fileManager
+                    ) ?? false
+                ) {
+                case .discard:
                     discardStaging(modelID: request.modelID)
                     ledger.requests[index].status = .deleted
-                    continue
-                }
-                let installed = descriptor.isAvailable(
-                    in: AppPaths.modelsDir,
-                    fileManager: fileManager
-                )
-                if installed {
+                case .markFailed:
+                    ledger.requests[index].status = .failed
+                case .markInstalled:
                     ledger.requests[index].status = .installed
-                    continue
-                }
-                if request.status != .installed {
+                case .keepFailed, .keepInstalled:
+                    break
+                case .requeue:
+                    guard let currentDescriptor else { continue }
                     if request.retryCount > 0 {
                         retryProgressResetModels.insert(request.modelID)
                     }
                     ledger.requests[index].status = .queued
-                    restored.append(descriptor)
+                    restored.append(currentDescriptor)
                 }
             }
             try ledgerStore.save(ledger)

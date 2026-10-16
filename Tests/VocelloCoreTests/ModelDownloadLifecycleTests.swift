@@ -291,6 +291,71 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(failed.queuedForExplicitInstall(replacing: replacement), replacement)
     }
 
+    /// NET-1: what a launch does with each durable request. A failed request stays failed,
+    /// keeping its staging for an explicit Retry, instead of re-downloading at every launch; a
+    /// cancel intent or tombstone is discarded; interrupted live work is requeued.
+    func testRestoreActionTable() {
+        typealias Status = IOSModelDownloadLedger.Status
+        func action(
+            _ status: Status,
+            artifactIsCurrent: Bool = true,
+            targetIsInstalled: Bool = false
+        ) -> IOSModelDownloadLedger.RestoreAction {
+            ledgerRequest(
+                logicalRequestID: "request",
+                status: status,
+                receivedBytes: 21,
+                verifiedFiles: [ledgerVerifiedFile]
+            ).restoreAction(artifactIsCurrent: artifactIsCurrent, targetIsInstalled: targetIsInstalled)
+        }
+
+        XCTAssertEqual(action(.failed), .keepFailed, "a failure never restarts on its own")
+        XCTAssertEqual(action(.cancelRequested), .discard)
+        XCTAssertEqual(action(.deleted), .discard)
+        let live: [Status] = [.queued, .waitingForConnectivity, .downloading, .retrying, .verifying, .installing]
+        for status in live {
+            XCTAssertEqual(action(status), .requeue, "\(status)")
+        }
+
+        let nonTombstones: [Status] = live + [Status.failed, Status.installed]
+        // Installed files win over every non-tombstone status.
+        for status in nonTombstones {
+            XCTAssertEqual(action(status, targetIsInstalled: true), .markInstalled, "\(status)")
+        }
+        XCTAssertEqual(action(.installed), .keepInstalled, "Install starts afresh")
+        // An artifact this build no longer delivers is recorded failed, never resumed...
+        for status in nonTombstones {
+            XCTAssertEqual(action(status, artifactIsCurrent: false), .markFailed, "\(status)")
+        }
+        // ...while a durable cancel or tombstone always discards its staging.
+        let tombstones: [Status] = [.cancelRequested, .deleted]
+        for status in tombstones {
+            XCTAssertEqual(action(status, artifactIsCurrent: false), .discard, "\(status)")
+            XCTAssertEqual(action(status, targetIsInstalled: true), .discard, "\(status)")
+        }
+
+        // The kept failure still resumes from its verified work on an explicit Retry.
+        let keptFailure = ledgerRequest(
+            logicalRequestID: "kept-request",
+            status: .failed,
+            receivedBytes: 21,
+            verifiedFiles: [ledgerVerifiedFile]
+        )
+        XCTAssertEqual(
+            keptFailure.restoreAction(artifactIsCurrent: true, targetIsInstalled: false),
+            .keepFailed
+        )
+        let retried = keptFailure.queuedForExplicitInstall(replacing: ledgerRequest(
+            logicalRequestID: "new-request",
+            status: .queued,
+            receivedBytes: 0,
+            verifiedFiles: []
+        ))
+        XCTAssertEqual(retried.logicalRequestID, "kept-request")
+        XCTAssertEqual(retried.status, .queued)
+        XCTAssertEqual(retried.verifiedFiles, [ledgerVerifiedFile])
+    }
+
     func testDelegateProgressGateBoundsIngressAndAlwaysForwardsTerminalBytes() {
         var gate = ModelDownloadDelegateProgressGate()
 

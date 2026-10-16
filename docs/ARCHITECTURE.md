@@ -1106,8 +1106,10 @@ contract: [`reference/model-delivery.md`](reference/model-delivery.md).
 and [`scripts/lib/test_models.sh`](../scripts/lib/test_models.sh).
 
 The app-lifetime coordinator's background orchestration remains a coverage boundary.
-`restoreInFlightDownloadsIfNeeded` migrates/reconciles the ledger, discards durable cancelled
-requests, recognizes installed files, and requeues valid unfinished requests. Its concrete
+`restoreInFlightDownloadsIfNeeded` migrates/reconciles the ledger and applies each request's pure
+`restoreAction` (tested in `ModelDownloadLifecycleTests`): it discards durable cancelled requests,
+recognizes installed files, requeues interrupted live requests, and keeps failed ones failed, with
+their staging, for an explicit Retry (NET-1). Its concrete
 background URLSession, `IOSModelDeliveryBackgroundEventRelay`, and AppPaths wiring are not
 compiled into app-host-free deterministic tests. Pure cancellation, ledger, downloader, and
 integrity tests cover their own owners; they do not jointly prove coordinator restoration,

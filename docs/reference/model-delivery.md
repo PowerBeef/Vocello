@@ -190,8 +190,14 @@ transfer actually starts.
 
 ## iPhone restoration and ownership
 
-At launch, the coordinator asks the single background session for all tasks. Valid tasks whose
-encoded model/artifact/file identity exactly matches the ledger and current catalog are adopted.
+At launch, each ledger request gets one restore action
+(`IOSModelDownloadLedger.Request.restoreAction`, RF-19 NET-1): a `cancelRequested` or `deleted`
+request discards its staging; installed files mark it installed; interrupted live work (queued
+through installing) is queued again; a `failed` request stays failed and keeps its staged files and
+verified work for an explicit Retry, so a persistent failure is never re-downloaded at every
+launch; a request for an artifact the build no longer delivers is recorded failed. The coordinator
+then asks the single background session for all tasks. Valid tasks whose encoded
+model/artifact/file identity exactly matches the ledger and current catalog are adopted.
 Unknown, stale, or duplicate tasks are cancelled, and only missing files receive new tasks.
 Delegate temporary files are synchronously moved into durable app-group staging before the callback
 returns. UIKit's background-session completion handler is released only after all delegate events

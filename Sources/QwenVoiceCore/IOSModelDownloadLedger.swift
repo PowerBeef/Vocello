@@ -16,6 +16,28 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
         case deleted
     }
 
+    /// What a launch does with one durable request (RF-19, NET-1). A launch never restarts a
+    /// failed request on its own: requeueing it made a persistent failure re-download
+    /// gigabytes at every launch.
+    public enum RestoreAction: Equatable, Sendable {
+        /// A durable cancel intent or tombstone: the staged files are discarded and the request
+        /// stays tombstoned (`deleted`). Only the user's Cancel writes `cancelRequested` (E-02).
+        case discard
+        /// The request names an artifact this build no longer delivers: it is recorded as
+        /// failed, and only an explicit Install replaces it.
+        case markFailed
+        /// The target is on disk: the request is recorded as installed.
+        case markInstalled
+        /// A failed request stays failed and keeps its staged files and verified work for an
+        /// explicit Retry, which resumes from them.
+        case keepFailed
+        /// An installed request whose target has gone stays as it is; Install starts afresh.
+        case keepInstalled
+        /// Interrupted live work (queued, waiting, downloading, retrying, verifying or
+        /// installing) is queued again and resumes.
+        case requeue
+    }
+
     public struct VerifiedFile: Codable, Equatable, Sendable {
         public let relativePath: String
         public let expectedSize: Int64
@@ -72,6 +94,32 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
             resumed.status = .queued
             resumed.totalBytes = replacement.totalBytes
             return resumed
+        }
+
+        /// What a launch does with this request (NET-1).
+        /// - Parameters:
+        ///   - artifactIsCurrent: this build's descriptor still names the request's model at
+        ///     the request's artifact version.
+        ///   - targetIsInstalled: the model's files are installed; read only for a current
+        ///     artifact.
+        public func restoreAction(
+            artifactIsCurrent: Bool,
+            targetIsInstalled: Bool
+        ) -> IOSModelDownloadLedger.RestoreAction {
+            // A durable cancel intent or tombstone always discards, whatever the artifact.
+            if status == .cancelRequested || status == .deleted { return .discard }
+            guard artifactIsCurrent else { return .markFailed }
+            if targetIsInstalled { return .markInstalled }
+            switch status {
+            case .failed:
+                return .keepFailed
+            case .installed:
+                return .keepInstalled
+            case .queued, .waitingForConnectivity, .downloading, .retrying, .verifying, .installing:
+                return .requeue
+            case .cancelRequested, .deleted:
+                return .discard
+            }
         }
 
         public init(

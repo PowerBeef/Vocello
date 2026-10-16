@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-01
+reviewed: 2026-10-16
 summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -62,6 +62,11 @@ Xcode → Settings → Components. Apple also exposes the attended command
 operation, so repository scripts never invoke it automatically. Installing the component is a host
 toolchain repair; it does not authorize Simulator builds, launches, tests, or UI automation. See
 [Apple's additional Xcode components guide](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components).
+
+After an Xcode update the paired iPhone may also need UI automation allowed again: a lane that ends
+with "Timed out while enabling automation mode" before any test starts is fixed on the phone (accept
+its prompt, or turn on Settings → Developer → Enable UI Automation), not by a retry of the same
+build (observed after the Xcode 27.1 update, October 16).
 
 Those shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
 cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode

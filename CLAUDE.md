@@ -127,6 +127,9 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 - **Native execution:** every Xcode/SwiftPM build and test goes through the repository scripts and the
   host-wide native lock and owned caches. Join or stop agents before measurements.
 - **Physical iPhone only:** generic iOS compilation is phone-free; Simulator routes are unsupported.
+  After an Xcode update, every iPhone build waits on the matching iOS platform component (a
+  multi-GB download: ask first; `scripts/lib/ios_platform_preflight.py check` reports it), and the
+  phone may need UI automation allowed again ("Timed out while enabling automation mode").
 - **One native UI driver:** repository XCUITest via `scripts/ui_test.sh`. No computer-use, coordinate,
   browser or MCP native UI driving; genuine shipped controls only, no hidden test UI.
 - **Runtime:** MLX only, in-process, actor-owned lifecycle, typed cancellation barrier, serialized

@@ -17,10 +17,15 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 16 — RF-13 closes on the iPhone (resume here)
+### October 16 — RF-13 closes on the iPhone; paused by the maintainer (resume here)
 
-The maintainer opened a two-hour iPhone window and asked that no macOS XCUITest run for a few hours
-after the recovery rerun below.
+The maintainer opened a two-hour iPhone window, asked that no macOS XCUITest run for a few hours
+after the recovery rerun below, and paused everything at the end of the day. Nothing is in flight.
+
+**Resume with:** the maintainer's decision on RF-15's long-form finding (reproduce it with the
+`vocello` CLI first, or accept it as a known limitation), then RF-09's freeze, whose listed blockers
+are all closed. RF-15's startup-retry proposal (October 13) still awaits the maintainer, and BG-01
+stays paused.
 
 - **Toolchain:** the Mac now has Xcode 27.1, whose iOS 27.1 platform component had to be downloaded
   (with the maintainer's approval) before any iPhone build, and the phone had to re-enable UI

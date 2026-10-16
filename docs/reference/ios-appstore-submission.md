@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-10-16
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -115,7 +115,7 @@ For explicitly authorized **local** physical-device transaction testing, run:
 ```sh
 scripts/ios_device.sh preflight
 scripts/ui_test.sh ios purchase --retain-result
-# Extend the same local session with read-only existing History/player export checks:
+# Extend the same local session with offline owned access and every export surface:
 scripts/ui_test.sh ios purchase --scenario exports --retain-result
 ```
 
@@ -136,30 +136,37 @@ prevent teardown; retain evidence and resolve the local session before another a
 `local-purchase-summary.json` requires every ordered phase, exact run/fixture identity and cleanup;
 the `.xcresult`, screenshots, source receipt and crash delta remain untracked. Zero-test bootstrap
 failures remain failed infrastructure runs, never retries or purchase passes.
-The optional `exports` scenario requires an existing accessible History clip in each mode. It
-selects one visible-provenance row per mode and reuses its exact identity for the revoked comparison;
-no row is created, edited, pinned or deleted. History-menu and full-player sharing are tested while
-owned and revoked, with free Built-in controls and internal playback/pause. System sharing is
-cancelled, never sent or saved. Apple's product-loading network-error injection tests relaunch with
-owned access but unavailable product metadata; it does not disconnect the device. The test restores
-the History filter and verifies the original tab after dismissing any modal, then stops the app.
-Current schema 3 records the scenario and separate transaction, tab, History-filter and app-stop
-restoration observations. The exports scenario still requires all 23 phases; lifecycle requires ten.
+The optional `exports` scenario requires an existing accessible History clip in each mode and the
+installed Design model. It selects one visible-provenance row per mode and reuses its exact identity
+for the revoked comparison; no existing row is edited, pinned or deleted. It generates one short
+Design take, which stays in History, so the Studio inline card's export is tested too. History-menu,
+full-player and Studio inline sharing are tested while owned and revoked, with free Built-in controls
+and internal playback/pause. System sharing is cancelled, never sent or saved. The owned half runs
+with StoreKit offline as the app sees it: Apple's fault injection fails product loading, purchase
+and App Store sync (the device stays connected), and the unlock must survive a relaunch and a failed
+Restore. The test restores the History filter, the Studio mode, Design brief and Design script, and
+verifies the original tab after dismissing any modal, then stops the app. Current schema 4 records
+the scenario and separate transaction, tab, History-filter, Studio and app-stop restoration
+observations. The exports scenario requires all 26 phases; lifecycle requires ten.
 The test snapshots the selected History filter before changing it and restores that filter, not an
 assumed All selection. Background interruption never triggers foreground takeover during cleanup:
 skipped or unobserved restoration fails qualification even if transactions were cleared and the app
 stopped. `--require-restoration` is mandatory in the current runner. Historical schemas 1/2 remain
-readable without that option but cannot establish current restoration proof. Cross-scenario
+readable without that option but cannot establish current restoration proof (schema 3 is readable
+with its own restoration fields, but cannot qualify the current runner either). Cross-scenario
 qualification is rejected. The French system share sheet is queried by its stable
 `header.closeButton`, not the English app locale's Close label.
 
-Neither scenario qualifies actual offline behavior, every export surface, App Store sandbox,
-or the processed TestFlight candidate. Remaining physical surfaces are Studio Save/Download,
-automatic folder copies, individual long-form segments, generated Saved Voice/original reference
-recovery and genuine failed-storage exports, using test-owned fixtures with restoration. A local
-PASS cannot close those remaining RF-13/RF-12 gates. Sandbox needs a confirmed test account and
-available configured product; processed proof additionally needs the separately authorized
-command-bound archive/IPA and TestFlight upload, not a development build substituted in place.
+RF-13 closed on the exports scenario's 26-phase pass (`ios-xcui-purchase-20261016-175234-5cbdbead`).
+The other export routes have no paid device path to drive: failed-storage recovery exports are
+always free, long-form segments have no export of their own (a project leaves as its History row or
+through the automatic folder copy, whose purchase gating `IOSSavedOutputsDestinationTests` cover),
+and saved-voice provenance is covered by `IOSExportPurchaseTests`. Neither scenario qualifies the
+live App Store's own offline cache, App Store sandbox, or the processed TestFlight candidate: RF-12
+checks owned exports in Airplane Mode on the processed TestFlight build. Sandbox needs a confirmed
+test account and available configured product; processed proof additionally needs the separately
+authorized command-bound archive/IPA and TestFlight upload, not a development build substituted in
+place.
 
 The existing stateful control audit inspects/dismisses purchase options but blocks transaction actions.
 A separately authorized physical StoreKit/sandbox session must qualify purchase/restore/pending/

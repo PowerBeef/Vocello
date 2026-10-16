@@ -199,7 +199,12 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   `.accessibilityElement(children: .contain)` container.
 - In UI tests: probing an optional element with `VocelloUIWait` (it records `XCTFail` on timeout; use
   `XCTWaiter.wait(for: [XCTNSPredicateExpectation])`); matching visible labels instead of identifiers
-  (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build.
+  (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build;
+  replacing existing text in an iOS `UITextView` with `VocelloUITextEntry.replace` and trusting it
+  (the tap can leave the caret at the start, where its backspaces delete nothing: select the text
+  first and assert the resulting value, as the purchase lane's brief restore does; BKL-16);
+  querying a tab while a bottom panel or keyboard covers the dock (the hittability query can end the
+  runner before cleanup; close the panel first).
 - Testing pure order or state logic owned by an app-only `@MainActor` iOS type in place: extract it
   into a value type under `Sources/iOSSupport/Services`, list the file under both `VocelloCoreTests`
   and `VocelloiOSLogicTests` in `project.yml`, and add it to the matching `promotionRouting` class in

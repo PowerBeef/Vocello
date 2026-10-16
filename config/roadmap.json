@@ -256,8 +256,8 @@
         "scripts/release_evidence.py",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-10-12",
-      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. Planned behind RF-13 because the export purchase must be source-complete before the freeze. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
+      "updated": "2026-10-16",
+      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. Its listed blockers are closed: RF-14 and ASR-08 on 2026-10-13/14, RF-13 on 2026-10-16. RF-15's long-form finding (Fast QC refuses a segment) may bring a code change, so the maintainer's decision on it best comes before the freeze. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
       "blockedBy": [
         "RF-13",
         "RF-14",

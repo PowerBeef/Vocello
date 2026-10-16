@@ -296,7 +296,12 @@ new task registration, awaits all resume-data cancellation callbacks and termina
 the final deleted tombstone, and only then removes staging or reports deletion. If either critical
 ledger write fails, cancellation fails closed: tasks or staging are preserved as applicable, the UI
 shows a privacy-safe storage error, and relaunch cannot silently reinterpret the request as queued.
-**Retry** preserves already verified files and reconstructs progress from the ledger, staged
+Only that explicit Cancel records `cancelRequested` (RF-19, E-02). A file that fails for good stops
+its sibling transfers, and the downloader reports `cancelling` while it does; that is not a
+cancellation and changes neither the row nor the ledger. The run reports the failure that started
+the teardown, never a sibling's `cancelled`; the iPhone request records `failed`, its row shows
+Failed with Retry, and the next queued model starts. A run that ends `cancelled` without a Cancel
+is reported the same way. **Retry** preserves already verified files and reconstructs progress from the ledger, staged
 partials, and adopted task byte counts. An explicit install after a terminal `deleted`,
 `cancelRequested`, or target-missing `installed` ledger starts a new logical request at zero bytes;
 terminal counters remain available for diagnosis but can never seed the next progress bar.

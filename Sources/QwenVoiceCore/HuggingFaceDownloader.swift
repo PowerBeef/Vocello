@@ -481,6 +481,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var adoptedTasksByKey: [String: URLSessionDownloadTask] = [:]
         private var backgroundCompletionGate = ModelDownloadBackgroundCompletionGate()
         private var verifiedReceiptsByPath: [String: VerifiedArtifactReceipt] = [:]
+        /// The run's first file failure seen while nothing had asked for cancellation: what
+        /// the run reports, so the `.cancelled` its stopped siblings end with cannot hide it
+        /// (E-02). A user's cancel sets `isCancelled` first, so it never records one.
+        private var rootFailure: (any Error)?
 
         /// Bytes counted so far: completed files (at their exact size) plus unique logical
         /// transfer slots. Retried URLSession tasks share a slot and therefore cannot
@@ -501,6 +505,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         func resetForNewRepositoryDownload(preserveUnclaimedCompletions: Bool) {
             isCancelled = false
+            rootFailure = nil
             activeCancellations.removeAll()
             continuations.removeAll()
             destinations.removeAll()
@@ -698,6 +703,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 task.cancel()
             }
             adoptedTasksByKey.removeAll()
+        }
+
+        /// One file failed for good: it becomes the run's root failure unless a
+        /// cancellation or an earlier failure came first, then every sibling transfer stops.
+        func recordFailureAndCancelPeers(_ error: any Error) async {
+            if rootFailure == nil, !isCancelled, !ModelDownloadRetryPolicy.isCancellation(error) {
+                rootFailure = error
+            }
+            await requestCancellation()
+        }
+
+        /// What a failed run reports: its root failure when it has one, else `error`.
+        func failureToReport(for error: any Error) -> any Error {
+            rootFailure ?? error
         }
 
         func cancellationRequested() -> Bool {
@@ -1619,7 +1638,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // keep this downloader alive for the life of the process (CORE-14).
             await finishRun(succeeded: false)
             stagingLock?.release()
-            throw error
+            // A sibling stopped by a failed file ends with `.cancelled`, which can reach
+            // this point first; report the failure that started the teardown (E-02).
+            let reported = await state.failureToReport(for: error)
+            throw reported
         }
     }
 
@@ -2121,7 +2143,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 resumeRoot: resumeRoot
             )
         } catch {
-            await state.requestCancellation()
+            await state.recordFailureAndCancelPeers(error)
             throw error
         }
     }

@@ -512,6 +512,72 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(disposition(wrapped(NSURLErrorCancelled), 1), .cancelled)
     }
 
+    /// E-02: the cancellation classifier the downloader and the iPhone coordinator share.
+    func testCancellationClassifierSeparatesCancellationsFromFailures() {
+        typealias DownloadError = HuggingFaceDownloader.DownloadError
+        let cancellations: [Error] = [
+            CancellationError(),
+            DownloadError.cancelled,
+            DownloadError.fileDownloadFailed(path: "config.json", underlying: URLError(.cancelled)),
+            URLError(.cancelled),
+        ]
+        for error in cancellations {
+            XCTAssertTrue(ModelDownloadRetryPolicy.isCancellation(error), "\(error)")
+        }
+        let failures: [Error] = [
+            DownloadError.httpError(statusCode: 404, path: "config.json"),
+            DownloadError.fileDownloadFailed(path: "config.json", underlying: URLError(.secureConnectionFailed)),
+            DownloadError.integrityCheckFailed(path: "config.json", reason: "fixture"),
+            URLError(.timedOut),
+            CocoaError(.fileWriteOutOfSpace),
+        ]
+        for error in failures {
+            XCTAssertFalse(ModelDownloadRetryPolicy.isCancellation(error), "\(error)")
+        }
+    }
+
+    /// E-02: a failed file's error is what the run reports, never the `.cancelled` its
+    /// stopped siblings end with (on the Mac that `.cancelled` hid the failure reason, on the
+    /// iPhone it left the row at Cancelling); a run cancelled first reports its cancellation.
+    func testARunReportsItsRootFailureRatherThanASiblingsCancellation() async {
+        typealias DownloadError = HuggingFaceDownloader.DownloadError
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+
+        await registry.recordFailureAndCancelPeers(
+            DownloadError.httpError(statusCode: 404, path: "weights/model.safetensors")
+        )
+        let siblingsStopped = await registry.cancellationRequested()
+        XCTAssertTrue(siblingsStopped, "a failed file stops its siblings")
+        // The stopped siblings end with `.cancelled`, or fail on their own afterwards.
+        await registry.recordFailureAndCancelPeers(DownloadError.cancelled)
+        await registry.recordFailureAndCancelPeers(
+            DownloadError.httpError(statusCode: 503, path: "config.json")
+        )
+        let reported = await registry.failureToReport(for: DownloadError.cancelled)
+        guard case .httpError(let statusCode, _, _)? = reported as? DownloadError else {
+            return XCTFail("the root failure must be reported, not \(reported)")
+        }
+        XCTAssertEqual(statusCode, 404)
+
+        // A new run starts clean; a run cancelled first, as by a user's cancel, reports its
+        // cancellation even when a file fails afterwards.
+        await registry.resetForNewRepositoryDownload(preserveUnclaimedCompletions: false)
+        await registry.requestCancellation()
+        await registry.recordFailureAndCancelPeers(
+            DownloadError.httpError(statusCode: 503, path: "config.json")
+        )
+        let afterUserCancel = await registry.failureToReport(for: DownloadError.cancelled)
+        XCTAssertTrue(ModelDownloadRetryPolicy.isCancellation(afterUserCancel), "\(afterUserCancel)")
+
+        // A cancellation is never recorded as the root failure.
+        await registry.resetForNewRepositoryDownload(preserveUnclaimedCompletions: false)
+        await registry.recordFailureAndCancelPeers(
+            DownloadError.fileDownloadFailed(path: "config.json", underlying: URLError(.cancelled))
+        )
+        let afterTaskCancel = await registry.failureToReport(for: DownloadError.cancelled)
+        XCTAssertTrue(ModelDownloadRetryPolicy.isCancellation(afterTaskCancel), "\(afterTaskCancel)")
+    }
+
     func testHTTPRetryAfterIsCappedAndPermanent4xxFails() {
         let throttled = HuggingFaceDownloader.DownloadError.httpError(
             statusCode: 429,

@@ -1,56 +1,8 @@
 import Foundation
 import QwenVoiceCore
 
-struct IOSModelDeliverySnapshot: Equatable, Sendable {
-    enum Phase: String, Codable, Sendable {
-        case queued
-        case waitingForConnectivity
-        case downloading
-        case retrying
-        case verifying
-        case installing
-        case cancelling
-        case installed
-        case failed
-        case deleting
-        case deleted
-    }
-
-    let modelID: String
-    let phase: Phase
-    let downloadedBytes: Int64
-    let totalBytes: Int64?
-    let estimatedBytes: Int64?
-    let bytesPerSecond: Int64?
-    let estimatedSecondsRemaining: Double?
-    let retryCount: Int
-    let message: String?
-    let operationGeneration: UInt64
-
-    init(
-        modelID: String,
-        phase: Phase,
-        downloadedBytes: Int64,
-        totalBytes: Int64?,
-        estimatedBytes: Int64?,
-        bytesPerSecond: Int64? = nil,
-        estimatedSecondsRemaining: Double? = nil,
-        retryCount: Int = 0,
-        message: String?,
-        operationGeneration: UInt64
-    ) {
-        self.modelID = modelID
-        self.phase = phase
-        self.downloadedBytes = downloadedBytes
-        self.totalBytes = totalBytes
-        self.estimatedBytes = estimatedBytes
-        self.bytesPerSecond = bytesPerSecond
-        self.estimatedSecondsRemaining = estimatedSecondsRemaining
-        self.retryCount = retryCount
-        self.message = message
-        self.operationGeneration = operationGeneration
-    }
-}
+// `IOSModelDeliverySnapshot` lives beside the pure progress mapping in
+// `Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift` (RF-19).
 
 /// Schema-v1 compatibility record. It is decoded only by the one-time migration and is never
 /// written again. The absolute target path is reduced to its final folder name before v2 storage.
@@ -85,6 +37,10 @@ final class IOSModelDownloadCoordinator {
 
         var errorDescription: String? { Self.privacySafeMessage }
     }
+
+    /// A transfer the downloader ended as cancelled although no Cancel asked for it (E-02):
+    /// a failure, offered for Retry with its verified files kept, never a silent cancellation.
+    private static let unexpectedStopMessage = "The download stopped before it finished. Retry to continue it."
 
     struct InFlightDownload {
         let modelID: String
@@ -223,7 +179,12 @@ final class IOSModelDownloadCoordinator {
         if let pendingIndex = pending.firstIndex(where: { $0.id == modelID }) {
             cancellationBarriers.insert(modelID)
             let outcome = IOSModelDownloadCancellationSequence.cancelPending(
-                persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+                persistIntent: {
+                    persistCancellationStatus(
+                        modelID: modelID,
+                        status: IOSModelDownloadProgressMapping.userCancelIntentStatus
+                    )
+                },
                 // A5-03: still queued, so still cancellable; the row keeps its Cancel control.
                 keepCancellable: {
                     publishSnapshot(
@@ -261,7 +222,12 @@ final class IOSModelDownloadCoordinator {
 
         cancellationBarriers.insert(modelID)
         let outcome = await IOSModelDownloadCancellationSequence.cancelActive(
-            persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+            persistIntent: {
+                persistCancellationStatus(
+                    modelID: modelID,
+                    status: IOSModelDownloadProgressMapping.userCancelIntentStatus
+                )
+            },
             // A5-03: the transfer keeps running under its own generation, so the row keeps its
             // Cancel control and says why; a failure row would offer only Retry, a no-op here.
             keepCancellable: {
@@ -569,46 +535,46 @@ final class IOSModelDownloadCoordinator {
                 generation: generation
             )
             stopDiagnosticsHeartbeat(for: model.id)
-        } catch is CancellationError {
-            traceCurrentState(layer: "coordinator", event: "request-cancelled", modelID: model.id, generation: generation)
-            stopDiagnosticsHeartbeat(for: model.id)
-            return
-        } catch let error as HuggingFaceDownloader.DownloadError {
-            if case .cancelled = error { return }
-            guard inflight[model.id]?.operationGeneration == generation,
-                  !cancellationBarriers.contains(model.id) else { return }
-            inflight.removeValue(forKey: model.id)
-            markLedgerTerminal(modelID: model.id, status: .failed)
-            diagnosticsStore.recordFailure(classification: "transfer", error: error)
-            diagnosticsStore.recordEvent(
-                layer: "downloader",
-                event: "request-failed",
-                modelID: model.id,
-                logicalRequestID: request.logicalRequestID,
-                operationGeneration: generation,
-                artifactVersion: request.artifactVersion,
-                errorClassification: "transfer",
-                error: error
-            )
-            publishFailed(modelID: model.id, message: error.localizedDescription)
-            stopDiagnosticsHeartbeat(for: model.id)
         } catch {
-            guard inflight[model.id]?.operationGeneration == generation,
-                  !cancellationBarriers.contains(model.id) else { return }
+            // E-02: the model's Cancel owns its outcome and a superseded run owns nothing.
+            // Any other end is a failure the row shows with Retry, a `.cancelled` this
+            // coordinator never asked for included, and the next queued model then starts.
+            let isCancellation = ModelDownloadRetryPolicy.isCancellation(error)
+            let runEnd = IOSModelDownloadProgressMapping.runEnd(
+                runIsCurrent: inflight[model.id]?.operationGeneration == generation,
+                userCancelIntent: cancellationBarriers.contains(model.id)
+            )
+            guard runEnd == .reportFailure else {
+                if isCancellation {
+                    traceCurrentState(
+                        layer: "coordinator",
+                        event: "request-cancelled",
+                        modelID: model.id,
+                        generation: generation
+                    )
+                    stopDiagnosticsHeartbeat(for: model.id)
+                }
+                return
+            }
+            let isTransferFailure = isCancellation || error is HuggingFaceDownloader.DownloadError
+            let classification = isTransferFailure ? "transfer" : "filesystem"
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .failed)
-            diagnosticsStore.recordFailure(classification: "filesystem", error: error)
+            diagnosticsStore.recordFailure(classification: classification, error: error)
             diagnosticsStore.recordEvent(
-                layer: "filesystem",
+                layer: isTransferFailure ? "downloader" : "filesystem",
                 event: "request-failed",
                 modelID: model.id,
                 logicalRequestID: request.logicalRequestID,
                 operationGeneration: generation,
                 artifactVersion: request.artifactVersion,
-                errorClassification: "filesystem",
+                errorClassification: classification,
                 error: error
             )
-            publishFailed(modelID: model.id, message: error.localizedDescription)
+            publishFailed(
+                modelID: model.id,
+                message: isCancellation ? Self.unexpectedStopMessage : error.localizedDescription
+            )
             stopDiagnosticsHeartbeat(for: model.id)
         }
         await startPendingDownloads()
@@ -710,27 +676,18 @@ final class IOSModelDownloadCoordinator {
 
     private func handleProgress(_ progress: HuggingFaceDownloader.RepositoryProgress) {
         diagnosticsStore.record(progress: progress)
+        // E-02: a `.cancelling` the downloader reports while a failed file stops its
+        // siblings maps to no update, so it can neither freeze the row at Cancelling nor
+        // record `cancelRequested`; while the user's Cancel runs, nothing here does.
         guard let active = inflight.values.first,
               let descriptor = modelAssetStore.descriptor(id: active.modelID)?.model,
-              !cancellationBarriers.contains(active.modelID) else { return }
-        let phase: IOSModelDeliverySnapshot.Phase
-        let ledgerStatus: IOSModelDownloadLedger.Status
-        switch progress.phase {
-        case .queued:
-            phase = .queued; ledgerStatus = .queued
-        case .waitingForConnectivity:
-            phase = .waitingForConnectivity; ledgerStatus = .waitingForConnectivity
-        case .downloading:
-            phase = .downloading; ledgerStatus = .downloading
-        case .retrying:
-            phase = .retrying; ledgerStatus = .retrying
+              let update = IOSModelDownloadProgressMapping.update(
+                  for: progress.phase,
+                  userCancelIntent: cancellationBarriers.contains(active.modelID)
+              ) else { return }
+        let phase = update.displayPhase
+        if phase == .retrying {
             retryProgressResetModels.insert(active.modelID)
-        case .verifying:
-            phase = .verifying; ledgerStatus = .verifying
-        case .installing:
-            phase = .installing; ledgerStatus = .installing
-        case .cancelling:
-            phase = .cancelling; ledgerStatus = .cancelRequested
         }
         let visibleBytes = ModelDownloadProgressReconciler.visibleBytes(
             current: progress.downloadedBytes,
@@ -773,7 +730,7 @@ final class IOSModelDownloadCoordinator {
         }
         guard persistProgressIfNeeded(
             modelID: active.modelID,
-            status: ledgerStatus,
+            status: update.ledgerStatus,
             bytes: visibleBytes,
             retryCount: progress.retryCount,
             allowByteRegression: retryProgressResetModels.contains(active.modelID)

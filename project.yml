@@ -507,6 +507,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
       - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
+      # RF-19 (E-02): downloader progress to the iPhone model row and ledger.
+      - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
@@ -601,6 +603,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
       - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
+      # RF-19 (E-02): downloader progress to the iPhone model row and ledger.
+      - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift

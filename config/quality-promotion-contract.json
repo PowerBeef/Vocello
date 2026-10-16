@@ -378,6 +378,7 @@
           "Sources/Resources/qwenvoice_production_model_catalog.json",
           "Sources/iOS/IOSModelDownloadCoordinator.swift",
           "Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift",
+          "Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift",
           "Sources/iOS/IOSModelInstallerViewModel.swift",
           "Sources/iOS/IOSSettingsViews.swift",
           "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",

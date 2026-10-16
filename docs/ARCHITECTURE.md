@@ -1086,7 +1086,8 @@ hash in the same process; a relaunch rehashes staged data once before reuse. mac
 terminal foreground-session teardown. iPhone owns one bundle-aware background session for the app
 lifetime, an atomic schema-v2 ledger, exact task adoption, durable delegate staging, and UIKit
 completion deferral until postprocessing is durable. Explicit Cancel discards staging; Retry keeps
-verified files. Typed transient retries cover connection loss and HTTP 408/429/5xx, while permanent
+verified files. Only an explicit Cancel records a cancellation: a failed file stops its siblings and
+the run reports that failure, shown with Retry (E-02). Typed transient retries cover connection loss and HTTP 408/429/5xx, while permanent
 failures remain terminal. Shared URLSession callbacks use a serial delegate queue; durable file
 staging is sequenced before terminal continuation, and cumulative progress is bounded per task while
 the exact final byte count is always delivered.

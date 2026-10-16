@@ -536,6 +536,13 @@ public enum ModelDownloadRetryPolicy {
         return dispositionForFoundationError(error, retryNumber: retryNumber)
     }
 
+    /// Whether `error` ends a transfer as a cancellation rather than a failure:
+    /// `CancellationError`, `DownloadError.cancelled`, or a URL task cancelled under a
+    /// file transfer (E-02).
+    public static func isCancellation(_ error: Error) -> Bool {
+        disposition(error: error, retryNumber: 1, integrityRetryAlreadyUsed: true) == .cancelled
+    }
+
     /// Certificate and trust failures, local file errors and size violations never retry. A
     /// connection-level failure retries within `maxRetryNumber` (NET-3): that includes
     /// `NSURLErrorSecureConnectionFailed` (-1200), the catch-all a TLS session reports for a

@@ -185,17 +185,20 @@ layout, and removes the old document only when those sessions are empty. Install
 touched. A ledger this build cannot use (undecodable, invalid, or from a newer schema) is moved
 aside to `*.unusable.json` at the next install, launch restore or background event, with a typed
 diagnostic, so it cannot block every later install; a read failure is never treated that way. Free
-space is checked when an install is requested and again, for the bytes still to fetch, when its
-transfer actually starts.
+space is checked for the bytes still to fetch, both when an install is requested and again when its
+transfer actually starts, so a Retry that resumes kept staging is not refused for the bytes it
+already holds.
 
 ## iPhone restoration and ownership
 
 At launch, each ledger request gets one restore action
-(`IOSModelDownloadLedger.Request.restoreAction`, RF-19 NET-1): a `cancelRequested` or `deleted`
-request discards its staging; installed files mark it installed; interrupted live work (queued
-through installing) is queued again; a `failed` request stays failed and keeps its staged files and
-verified work for an explicit Retry, so a persistent failure is never re-downloaded at every
-launch; a request for an artifact the build no longer delivers is recorded failed. The coordinator
+(`IOSModelDownloadLedger.Request.restoreAction`, RF-19 NET-1), checked in this order: a
+`cancelRequested` or `deleted` request discards its staging, whatever its artifact and even when its
+target is installed (a tombstone wins); a request for an artifact the build no longer delivers is
+recorded failed and its staging is discarded, since it can never resume; installed files mark it
+installed; interrupted live work (queued through installing) is queued again; a `failed` request
+stays failed and keeps its staged files and verified work for an explicit Retry, so a persistent
+failure is never re-downloaded at every launch. The coordinator
 then asks the single background session for all tasks. Valid tasks whose encoded
 model/artifact/file identity exactly matches the ledger and current catalog are adopted.
 Unknown, stale, or duplicate tasks are cancelled, and only missing files receive new tasks.

@@ -298,6 +298,13 @@ enum IOSModelDeliverySupport {
         return url
     }
 
+    /// IOS-20: an install, its Retry and its transfer need space only for the bytes still to
+    /// fetch: the plan's files to download (shared components already in the store excluded),
+    /// less what the request already holds when it resumes kept staging (RF-19).
+    static func bytesStillToFetch(planBytes: Int64, totalBytes: Int64, receivedBytes: Int64) -> Int64 {
+        min(planBytes, max(0, totalBytes - receivedBytes))
+    }
+
     static func ensureSufficientDiskSpace(
         requiredBytes: Int64,
         at rootURL: URL,

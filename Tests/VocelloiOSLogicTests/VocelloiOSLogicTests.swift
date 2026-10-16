@@ -133,6 +133,30 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
     }
 
+    /// RF-19 review: a Retry resumes the staging NET-1 kept, so its free-space check counts
+    /// only the bytes still to fetch, as the transfer's own start check does (IOS-20).
+    func testFreeSpaceIsCheckedForTheBytesStillToFetch() {
+        let gib: Int64 = 1_073_741_824
+        let cases: [(plan: Int64, total: Int64, received: Int64, expected: Int64)] = [
+            (plan: 3 * gib, total: 3 * gib, received: 0, expected: 3 * gib), // first install
+            (plan: 3 * gib, total: 3 * gib, received: 2 * gib, expected: gib), // Retry of a failure
+            (plan: 2 * gib, total: 3 * gib, received: 0, expected: 2 * gib), // shared component reused
+            (plan: 2 * gib, total: 3 * gib, received: 2 * gib, expected: gib),
+            (plan: 3 * gib, total: 3 * gib, received: 4 * gib, expected: 0), // never negative
+        ]
+        for item in cases {
+            XCTAssertEqual(
+                IOSModelDeliverySupport.bytesStillToFetch(
+                    planBytes: item.plan,
+                    totalBytes: item.total,
+                    receivedBytes: item.received
+                ),
+                item.expected,
+                "\(item)"
+            )
+        }
+    }
+
     func testCatalogValidationRejectsMutableOrUnsafeArtifactRoute() throws {
         let configuration = IOSModelDeliveryConfiguration(
             catalogURL: try XCTUnwrap(URL(string: "bundle://vocello/ios/catalog/v1/models.json")),

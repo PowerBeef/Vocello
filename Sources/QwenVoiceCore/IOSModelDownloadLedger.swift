@@ -24,7 +24,8 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
         /// stays tombstoned (`deleted`). Only the user's Cancel writes `cancelRequested` (E-02).
         case discard
         /// The request names an artifact this build no longer delivers: it is recorded as
-        /// failed, and only an explicit Install replaces it.
+        /// failed and its staged files are discarded, since they can never resume; only an
+        /// explicit Install replaces it.
         case markFailed
         /// The target is on disk: the request is recorded as installed.
         case markInstalled

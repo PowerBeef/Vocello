@@ -38,10 +38,6 @@ final class IOSModelDownloadCoordinator {
         var errorDescription: String? { Self.privacySafeMessage }
     }
 
-    /// A transfer the downloader ended as cancelled although no Cancel asked for it (E-02):
-    /// a failure, offered for Retry with its verified files kept, never a silent cancellation.
-    private static let unexpectedStopMessage = "The download stopped before it finished. Retry to continue it."
-
     struct InFlightDownload {
         let modelID: String
         let logicalRequestID: String
@@ -167,25 +163,35 @@ final class IOSModelDownloadCoordinator {
             in: try await fetchCatalog(),
             configuration: configuration
         )
-        _ = try await productionDeliveryPlan(for: model, matching: entry)
+        let delivery = try await productionDeliveryPlan(for: model, matching: entry)
+        let downloadPaths = Set(delivery.filesToDownload.map(\.path))
+        let bytesToFetch = resolveFiles(entry: entry)
+            .filter { downloadPaths.contains($0.path) }
+            .reduce(Int64(0)) { $0 + $1.size }
         let totalBytes = entry.totalBytes > 0
             ? entry.totalBytes
             : entry.files.reduce(Int64(0)) { $0 + $1.sizeBytes }
-        try IOSModelDeliverySupport.ensureSufficientDiskSpace(
-            requiredBytes: totalBytes,
-            at: AppPaths.appSupportDir,
-            fileManager: fileManager
-        )
 
         var ledger = try loadLedgerRecoveringUnusableDocument()
         let replacement = makeLedgerRequest(model: model, entry: entry, totalBytes: totalBytes)
-        let queuedRequest: IOSModelDownloadLedger.Request
-        if let index = ledger.requests.firstIndex(where: { $0.modelID == model.id }) {
-            let existing = ledger.requests[index]
-            queuedRequest = existing.queuedForExplicitInstall(replacing: replacement)
+        let index = ledger.requests.firstIndex(where: { $0.modelID == model.id })
+        let queuedRequest = index.map { ledger.requests[$0].queuedForExplicitInstall(replacing: replacement) }
+            ?? replacement
+        // IOS-20, as at the transfer's start: only the bytes still to fetch. A Retry resumes
+        // the staging NET-1 kept, so checking the whole artifact could refuse it on a phone
+        // that holds most of the bytes already.
+        try IOSModelDeliverySupport.ensureSufficientDiskSpace(
+            requiredBytes: IOSModelDeliverySupport.bytesStillToFetch(
+                planBytes: bytesToFetch,
+                totalBytes: totalBytes,
+                receivedBytes: queuedRequest.receivedBytes
+            ),
+            at: AppPaths.appSupportDir,
+            fileManager: fileManager
+        )
+        if let index {
             ledger.requests[index] = queuedRequest
         } else {
-            queuedRequest = replacement
             ledger.requests.append(queuedRequest)
         }
         try ledgerStore.save(ledger)
@@ -370,6 +376,9 @@ final class IOSModelDownloadCoordinator {
                     discardStaging(modelID: request.modelID)
                     ledger.requests[index].status = .deleted
                 case .markFailed:
+                    // A Retry starts this artifact over, so its stale staging could only
+                    // leak into the new install (E-03).
+                    discardStaging(modelID: request.modelID)
                     ledger.requests[index].status = .failed
                 case .markInstalled:
                     ledger.requests[index].status = .installed
@@ -465,7 +474,11 @@ final class IOSModelDownloadCoordinator {
             let bytesToFetch = files.reduce(Int64(0)) { $0 + $1.size }
             do {
                 try IOSModelDeliverySupport.ensureSufficientDiskSpace(
-                    requiredBytes: min(bytesToFetch, max(0, totalBytes - request.receivedBytes)),
+                    requiredBytes: IOSModelDeliverySupport.bytesStillToFetch(
+                        planBytes: bytesToFetch,
+                        totalBytes: totalBytes,
+                        receivedBytes: request.receivedBytes
+                    ),
                     at: AppPaths.appSupportDir,
                     fileManager: fileManager
                 )
@@ -605,9 +618,12 @@ final class IOSModelDownloadCoordinator {
                 errorClassification: classification,
                 error: error
             )
+            // A transfer the downloader ended as cancelled although no Cancel asked for it
+            // (E-02) is a failure offered for Retry, never a silent cancellation. It carries
+            // no message, so the row shows the localized delivery failure.
             publishFailed(
                 modelID: model.id,
-                message: isCancellation ? Self.unexpectedStopMessage : error.localizedDescription
+                message: isCancellation ? nil : error.localizedDescription
             )
             stopDiagnosticsHeartbeat(for: model.id)
         }
@@ -1331,7 +1347,7 @@ final class IOSModelDownloadCoordinator {
         )
     }
 
-    private func publishFailed(modelID: String, message: String) {
+    private func publishFailed(modelID: String, message: String?) {
         publishSnapshot(
             modelID: modelID,
             phase: .failed,

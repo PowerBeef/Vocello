@@ -17,7 +17,7 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 16 — RF-13's Studio inline export passes on the iPhone (resume here)
+### October 16 — RF-13 closes on the iPhone (resume here)
 
 The maintainer opened a two-hour iPhone window and asked that no macOS XCUITest run for a few hours
 after the recovery rerun below.
@@ -34,8 +34,8 @@ after the recovery rerun below.
   before it (`ios-xcui-purchase-20261016-173803-de7338ff`). The first attempt
   (`ios-xcui-purchase-20261016-172823-49bad283`) passed every export check but could not restore the
   brief: the shared text helper's backspaces delete nothing when the tap leaves the caret at the start
-  (parked for the control audit as BKL-16). Open question for the maintainer: close RF-13 and give
-  Airplane Mode on the TestFlight build to RF-12.
+  (parked for the control audit as BKL-16). RF-13 is closed on the maintainer's go; owned exports in
+  Airplane Mode on the TestFlight build move to RF-12. RF-09's listed blockers are all closed.
 - **F-16:** the Mac recovery journey passes again on Xcode 27.1, now including the on-disk Retry check
   (`macos-xcui-smoke-20261016-170320-da10149d`).
 

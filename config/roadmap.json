@@ -292,44 +292,13 @@
       "blockedBy": [
         "ASR-07"
       ],
-      "gate": "After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate.",
+      "gate": "After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate. On that build, an owned export unlock still saves and shares Design and Clone audio with the phone in Airplane Mode (moved from RF-13, 2026-10-16: only the live App Store's offline cache was left untested).",
       "sourceOfTruth": [
         "scripts/verify_ios_release_artifacts.py",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-10-12",
-      "notes": "RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08)."
-    },
-    {
-      "id": "RF-13",
-      "plan": "release-first-3-0-2026-09",
-      "title": "implement the one-time iOS Design and Clone export unlock before freeze",
-      "status": "planned",
-      "due": "2026-10-21",
-      "gate": "Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.",
-      "sourceOfTruth": [
-        "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift",
-        "Sources/iOS/History/HistoryScreen.swift",
-        "Sources/iOS/Info.plist",
-        "docs/reference/ios-appstore-submission.md",
-        "docs/reference/release-first-execution-2026-09.md",
-        "Sources/iOSSupport/Services/IOSExportAccessPolicy.swift",
-        "Sources/iOSSupport/Services/IOSExportPurchaseState.swift",
-        "Sources/iOS/Commerce/IOSStoreKitClient.swift",
-        "Sources/iOS/Commerce/IOSExportGate.swift",
-        "Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift",
-        "Tests/Fixtures/VocelloExports.storekit",
-        "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift",
-        "scripts/ios_purchase_acceptance.py",
-        "scripts/tests/test_ios_purchase_acceptance.py",
-        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift",
-        "Sources/iOS/Commerce/IOSSavedOutputsDestination+Commerce.swift",
-        "Tests/VocelloiOSLogicTests/IOSSavedOutputsDestinationTests.swift",
-        "scripts/repo_invariants.sh",
-        "docs/audits/2026-10-13-core-engine-review.md"
-      ],
       "updated": "2026-10-16",
-      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-16: the exports scenario passes all 26 phases with every restoration observed (ios-xcui-purchase-20261016-175234-5cbdbead, result schema 4): with StoreKit offline as the app sees it (product loading, purchase and sync fail), the unlock survives a relaunch and a failed Restore, and every owned export goes through; History rows, the full player and, new, the Studio inline card on a fresh Design take are checked owned and revoked. The App Review screenshot comes from the TestFlight build (RF-12) at the live $19.99 (decision 2026-10-13). No other surface has a paid device path: recovery exports are always free, and long-form takes leave as History rows or by the folder copy (IOSSavedOutputsDestinationTests). Left: whether owned access in Airplane Mode on the TestFlight build joins RF-12. RF-02/RF-12 own live setup and submission. SER-2: a saved voice whose .voice.json cannot be read exports by its audio's Vocello provenance (generated voices locked, recordings free)."
+      "notes": "RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08)."
     },
     {
       "id": "RF-15",

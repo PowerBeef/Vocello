@@ -4737,6 +4737,42 @@
       ],
       "updated": "2026-10-14",
       "notes": "Closed 2026-10-14 on the maintainer's go, with a read-only App Store Connect check through the asc CLI (app 6794692745, com.patricedery.vocello; every processing state, complete pagination): the account holds builds 21 (2.2.2), 22 (2.3.0) and 23 (2.4.0) only; build 24 and the 3.0.0 train have no builds; the 3.0.0 App Store version is Prepare for Submission with no build attached. project.yml and the regenerated project select 3.0.0/build 24 for the app (the static frameworks carry their own 1), and scripts/release.sh only reads the build number. Nothing in the account changed. This is not a reservation: the submission guide repeats the same read-only check right before archiving (ASR-10), and Apple rejects a reused build number at upload. Earlier history: git log -p -- config/roadmap.json."
+    },
+    {
+      "id": "RF-13",
+      "plan": "release-first-3-0-2026-09",
+      "title": "implement the one-time iOS Design and Clone export unlock before freeze",
+      "status": "done",
+      "gate": "Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.",
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift",
+        "Sources/iOS/History/HistoryScreen.swift",
+        "Sources/iOS/Info.plist",
+        "docs/reference/ios-appstore-submission.md",
+        "docs/reference/release-first-execution-2026-09.md",
+        "Sources/iOSSupport/Services/IOSExportAccessPolicy.swift",
+        "Sources/iOSSupport/Services/IOSExportPurchaseState.swift",
+        "Sources/iOS/Commerce/IOSStoreKitClient.swift",
+        "Sources/iOS/Commerce/IOSExportGate.swift",
+        "Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift",
+        "Tests/Fixtures/VocelloExports.storekit",
+        "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift",
+        "scripts/ios_purchase_acceptance.py",
+        "scripts/tests/test_ios_purchase_acceptance.py",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift",
+        "Sources/iOS/Commerce/IOSSavedOutputsDestination+Commerce.swift",
+        "Tests/VocelloiOSLogicTests/IOSSavedOutputsDestinationTests.swift",
+        "scripts/repo_invariants.sh",
+        "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Closed 2026-10-16 on the maintainer's go. Local StoreKit only, no live purchase. The exports scenario passes all 26 phases with every restoration observed (ios-xcui-purchase-20261016-175234-5cbdbead): with StoreKit offline as the app sees it, the unlock survives a relaunch and a failed Restore and every owned export goes through; History rows, the full player and the Studio inline card are checked owned and revoked for every mode. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). Recovery exports are always free; long-form takes leave as History rows or by the folder copy (IOSSavedOutputsDestinationTests). SER-2: a saved voice whose .voice.json cannot be read exports by its audio's Vocello provenance. Moved to RF-12: owned exports in Airplane Mode on the TestFlight build. The App Review screenshot comes from that build at the live $19.99 (decision 2026-10-13); RF-02/RF-12 own live setup and submission.",
+      "evidence": [
+        "commit:bbd33a7d",
+        "run:ios-xcui-purchase-20261016-175234-5cbdbead",
+        "file:Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift",
+        "doc:docs/reference/ios-device-testing.md"
+      ]
     }
   ]
 }

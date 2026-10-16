@@ -4773,6 +4773,213 @@
         "file:Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift",
         "doc:docs/reference/ios-device-testing.md"
       ]
+    },
+    {
+      "id": "DA-05",
+      "plan": "project-audit-2026-10",
+      "title": "macOS memory relief and the process-global Qwen3 caches",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "The maintainer decides whether macOS clears the resident speech tokenizer and prefix caches at the critical band or keeps them for speed after idle (E2-01); code, comments and native.md then say the same thing, and the allocator seam is complete or documented as partial (E2-02).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        "docs/reference/native-engineering.md",
+        "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-06 in engine-remediation-2026-10 (engine audit). Four contract texts say a full unload frees the model; on macOS a few hundred MB stay resident by design. Recommendation: clear at the critical band only. 2026-10-13 core engine review: the macOS survivors also include the Clone encoder and its KV (MEM-1) and up to three text tokenizers, so the fix clears every slot; on iPhone the model switch clears the caches first, so Phase 9 residency never engages; 16 direct Memory.clearCache() calls bypass NativeMLXAllocatorControl.",
+      "supersededBy": "ER-06"
+    },
+    {
+      "id": "DA-06",
+      "plan": "project-audit-2026-10",
+      "title": "Engine, delivery and telemetry hygiene",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "A cancelled prewarm keeps the resident model and the published load state stays true (E1-02, verified by one model run on request), and the P3 findings E1-03, E3-01 to E3-04, E5-02, E5-04, E5-05, E6-02, A16-01 and A16-02 are fixed or declined with a reason.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift",
+        "Sources/QwenVoiceCore/ModelAssets.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-06 in engine-remediation-2026-10 (engine audit). E1-02 is P2: a Stop during warm-up unloads the model while the UI shows it loaded, and the next take pays a cold load. The rest is not reachable on a shipped path today. 2026-10-13 core engine review: E1-02 is worse than titled; every warm cancel lands at the trailing check after the full warm, and Stop during Preparing discards the model and its primed state.",
+      "supersededBy": "ER-06"
+    },
+    {
+      "id": "PA-19",
+      "title": "Orchestrators and the generate loop have unit coverage",
+      "status": "superseded",
+      "gate": "TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.",
+      "sourceOfTruth": [
+        "Tests/VocelloCoreTests",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"
+      ],
+      "notes": "Superseded 2026-10-16 by ER-01 in engine-remediation-2026-10 (engine audit). Reviewed 2026-10-10 at 38d295c4. TTSEngineStore, StudioGenerationCoordinator, real SQLite persistence, IOSExportGate, iPhone model inventory and long-form coordinator/runner tests exist and pass (mac-test-20261010-040414). Seeded tiny talker/production generate-loop and synthetic AudioSeal call-site fixtures also pass. Open deterministic coverage: the Mac ModelManagerViewModel downloader seam and separate target (name collisions), and concrete IOSModelDownloadCoordinator orchestration. Shared downloader helper tests do not establish those boundaries; this local implementation/testing work does not need a phone. DA-13 also retains concrete production-generation adapter/background-delivery integration boundaries; avoid duplicating that scope. Physical download acceptance stays deferred.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-10-16",
+      "supersededBy": "ER-01"
+    },
+    {
+      "id": "BKL-01",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Refuse a script that is only whitespace once control tokens are neutralized",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "A script made only of chat-template control-token literals (for example <|im_end|>) is refused with the typed short-script error instead of synthesizing a whitespace token, with a deterministic test.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-05 in engine-remediation-2026-10 (engine audit). Raised by the DA-04 review (2026-10-13): such a script passes the apps' speakable-text check, neutralizes to one space and now generates as nine chat tokens; it ends in the existing no-audio failure or Fast QC, with no crash or leak. Parked without investigation under the focus lock.",
+      "supersededBy": "ER-05"
+    },
+    {
+      "id": "BKL-02",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Engine cancellation and task-lifecycle hygiene",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix CONC-2 to CONC-7, MEM-2 and MEM-4 from the 2026-10-13 core engine review: relief a cancelled caller cannot skip, one owner for the resident speech tokenizer, tracked prebuild and drain Tasks, blocking IO off the MainActor and actors, a cancellable audio-normalization queue, a registry that matches the code, and an engine relief API that is wired or removed, each with a deterministic test. CONC-1 joins this item unless BG-1 becomes a release blocker.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        "config/concurrency-safety.json"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-06 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-06"
+    },
+    {
+      "id": "BKL-03",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Release Clone-encoder and late-failure MLX memory",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix MEM-1, MEM-3, MEM-5 and MEM-6 from the 2026-10-13 core engine review: a per-encode Mimi encoder cache, an allocator clear on late take failures, bounded per-session bookkeeping and an owned telemetry sampler, with package leak canaries (active memory after encode and drop, generate and drop, load and unload) and a post-unload quiescence baseline.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-06 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-06"
+    },
+    {
+      "id": "BKL-04",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "One storage janitor for stranded families and the iPhone reclamation clock",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix STOR-1 to STOR-6 from the 2026-10-13 core engine review: reclamation ages entries by birth time so the iPhone protection pass cannot reset it, crash-stranded install and migration replicas, imported and normalized reference copies, delegate temp files, clone-prompt staging and export temporaries are swept, and stored audio paths survive a container move. A contract test lists every hidden-name pattern against its sweeper.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-10 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-10"
+    },
+    {
+      "id": "BKL-05",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "History persistence exits and per-row decode isolation",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix DB-1 to DB-6 from the 2026-10-13 core engine review: a damaged or newer clear marker and a queued entry without audio get a confirmed exit, one undecodable row cannot take History offline or trap, suspension holds for a queue opened while backgrounded and a failed open reopens on return, and Mac deletes on an unmounted folder report honestly; with real-GRDB tests.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-10 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-10"
+    },
+    {
+      "id": "BKL-06",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Model delivery robustness on iPhone and Mac",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix NET-1 to NET-10 from the 2026-10-13 core engine review: a failed iPhone install stays failed until Retry, Wi-Fi only also excludes expensive and constrained networks, transient TLS and session errors retry, Retry gates on remaining bytes, the background completion handler is released promptly, sessions refuse cookies, sidecars carry artifact identity, and Mac transfers wait for connectivity; with a URLProtocol-stubbed downloader suite. IOSModelDownloadCoordinator has no test target today (DA-13).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/iOS/IOSModelDownloadCoordinator.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-10 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-10"
+    },
+    {
+      "id": "BKL-07",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Cut decode-loop kernel launches and end-of-take latency",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Pursue PERF-1 to PERF-11 from the 2026-10-13 core engine review, each confirmed first by a Metal System Trace dispatch count: identity-safe changes (introspection off with telemetry, one embedding sum, a held compiled plan, fused projections, compiled samplers, growing K/V lists) before RoPE, which needs fixed-seed QC evidence; measure the per-chunk cache clear, the Mimi fixed cost and AudioSeal latency before changing them.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "benchmarks/OPTIMIZATION.md"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-08 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-08"
+    },
+    {
+      "id": "BKL-10",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Version-skew exits for persisted JSON",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Fix SER-3 to SER-9 from the 2026-10-13 core engine review: outbox entries and removal lists written by a newer build stay in place and are reported instead of discarded, receipt enums decode an unknown case, unreadable drafts are kept aside, a bad legacy ledger is quarantined, JSON is synced before its rename, one date encoding per type, and one fail-closed policy for unreadable manifests, with newer-version and zero-length fixtures.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-10 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-10"
+    },
+    {
+      "id": "BKL-11",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Test the lifecycle glue",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "Close TEST P1.3 to P1.5, P2 and P3 from the 2026-10-13 core engine review: History recovery wiring over a real database with injectable roots, the 0xDEAD10CC suspension guard on DatabaseService, the model-download restore table, XCUITest waits that never read an absent element, dock-aware row reveals, out-of-process lane restoration, an injectable thermal provider, and positive twins for marking failures. TEST P1.1 and P1.2 travel with BG-1 if it becomes a release blocker.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-01 in engine-remediation-2026-10 (engine audit). Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report.",
+      "supersededBy": "ER-01"
+    },
+    {
+      "id": "BKL-14",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A long-form candidate whose acceptance never started is later offered as leftover audio",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "When a long-form acceptance fails before writing its journal (History blocked by a pending journal), the runner either removes its never-started joined and replacement candidates or records them, so the iPhone's leftover-audio review never offers them as audio from earlier clears; a deterministic test covers it.",
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Sources/iOS/Settings/IOSLeftoverAudioCleanup.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Superseded 2026-10-16 by ER-10 in engine-remediation-2026-10 (engine audit). From the 2026-10-13 re-review of F-16's Discard: while a journal is stuck, each acceptance fails in reconcile before prepare and the runner keeps its candidate, which no row, journal or outbox entry names. Before F-16 the stuck journal kept the leftover review closed; after Discard those files can be offered under the earlier-clears label. Parked without investigation under the focus lock: the files are unreachable from the app, and removal still needs a confirmation.",
+      "supersededBy": "ER-10"
     }
   ]
 }

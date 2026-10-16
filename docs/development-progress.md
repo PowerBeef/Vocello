@@ -17,7 +17,25 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 16 — RF-13 closes on the iPhone; paused by the maintainer (resume here)
+### October 16, evening — engine audit approved; the remediation starts on the Mac (resume here)
+
+The maintainer asked for an exhaustive audit of the engine runtime and a step-by-step remediation
+plan; it is [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2026-10-16-engine-runtime-audit.md)
+(eight read-only auditors, a blind refuter, lead verification; about 200 findings). The iPhone is
+unavailable: work stays on the Mac, and device checks wait for a window the maintainer announces.
+
+- **Before the RF-09 freeze (still Oct 23):** RF-19 (iPhone install dead ends, a new blocker), RF-18
+  (long-form pacing: a Mac machine screen of full-text conditioning, D1), BG-01 hardened per the
+  audit, and the MLX refresh (CONV-21, authorized: mlx-swift 0.32.3 with its prerequisites).
+- **The engine-remediation-2026-10 programme starts now** (ER-01…ER-13): identity-safe, test-only or
+  doc-only items join the release plan while worked; unfinished items pause at the freeze until the
+  submission. It supersedes BKL-01/02/03/04/05/06/07/10/11/14, DA-05, DA-06 and PA-19, and re-homes
+  PA-16 and PA-33. ER-13 is the Qwen3-TTS model research and reference-doc overhaul.
+- **Focus lock** rewritten 2026-10-16: maxInFlight 4 until the freeze, 2 after.
+- **Queued for the next iPhone window:** smoke with the new `--scenario long-form`,
+  `background-warmup`, an iPhone memory benchmark after the repin.
+
+### October 16 — RF-13 closes on the iPhone; paused by the maintainer
 
 The maintainer opened a two-hour iPhone window, asked that no macOS XCUITest run for a few hours
 after the recovery rerun below, and paused everything at the end of the day. Nothing is in flight.

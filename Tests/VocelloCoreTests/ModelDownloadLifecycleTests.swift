@@ -427,6 +427,91 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         )
     }
 
+    /// NET-3: a TLS handshake reset (-1200, the catch-all for connection resets and Wi-Fi
+    /// handoffs), a bad, empty or unparseable response and a disconnected background
+    /// session retry within the unchanged bound, at every attempt and wrapped as the
+    /// downloader reports them; certificate and trust failures never retry.
+    func testFoundationErrorDispositionTablePerCodeAndRetryNumber() {
+        func disposition(_ error: Error, _ retryNumber: Int) -> ModelDownloadRetryDisposition {
+            ModelDownloadRetryPolicy.disposition(
+                error: error,
+                retryNumber: retryNumber,
+                integrityRetryAlreadyUsed: false
+            )
+        }
+        func wrapped(_ code: Int) -> Error {
+            HuggingFaceDownloader.DownloadError.fileDownloadFailed(
+                path: "weights/model.safetensors",
+                underlying: NSError(domain: NSURLErrorDomain, code: code)
+            )
+        }
+        let backoffByRetryNumber: [(retryNumber: Int, delay: Double)] = [(1, 1), (2, 2), (3, 4)]
+        let transient: [(code: Int, name: String)] = [
+            (NSURLErrorSecureConnectionFailed, "-1200 secure connection failed"),
+            (NSURLErrorBadServerResponse, "-1011 bad server response"),
+            (NSURLErrorZeroByteResource, "-1014 zero-byte resource"),
+            (NSURLErrorCannotParseResponse, "-1017 cannot parse response"),
+            (NSURLErrorBackgroundSessionInUseByAnotherProcess, "-996 background session in use"),
+            (NSURLErrorBackgroundSessionWasDisconnected, "-997 background session disconnected"),
+            (NSURLErrorNetworkConnectionLost, "-1005 connection lost"),
+            (NSURLErrorTimedOut, "-1001 timed out"),
+        ]
+        XCTAssertEqual(ModelDownloadRetryPolicy.maxRetryNumber, 3, "the retry bound is unchanged")
+        for (code, name) in transient {
+            for (retryNumber, delay) in backoffByRetryNumber {
+                XCTAssertEqual(
+                    disposition(NSError(domain: NSURLErrorDomain, code: code), retryNumber),
+                    .retry(afterSeconds: delay),
+                    "\(name), retry \(retryNumber)"
+                )
+                XCTAssertEqual(
+                    disposition(wrapped(code), retryNumber),
+                    .retry(afterSeconds: delay),
+                    "\(name) as a file failure, retry \(retryNumber)"
+                )
+            }
+            XCTAssertEqual(
+                disposition(wrapped(code), ModelDownloadRetryPolicy.maxRetryNumber + 1),
+                .fail,
+                "\(name) stops at the bound"
+            )
+            XCTAssertEqual(
+                HuggingFaceDownloader.rangeRetryDelay(for: wrapped(code), retryNumber: 1),
+                1,
+                "\(name) retries the one range it hit"
+            )
+        }
+
+        let permanent: [(code: Int, name: String)] = [
+            (NSURLErrorServerCertificateHasBadDate, "-1201 certificate has bad date"),
+            (NSURLErrorServerCertificateUntrusted, "-1202 certificate untrusted"),
+            (NSURLErrorServerCertificateHasUnknownRoot, "-1203 certificate has unknown root"),
+            (NSURLErrorServerCertificateNotYetValid, "-1204 certificate not yet valid"),
+            (NSURLErrorClientCertificateRejected, "-1205 client certificate rejected"),
+            (NSURLErrorClientCertificateRequired, "-1206 client certificate required"),
+            (NSURLErrorCannotWriteToFile, "-3003 cannot write to file"),
+        ]
+        for (code, name) in permanent {
+            for retryNumber in 1...(ModelDownloadRetryPolicy.maxRetryNumber + 1) {
+                XCTAssertEqual(
+                    disposition(NSError(domain: NSURLErrorDomain, code: code), retryNumber),
+                    .fail,
+                    "\(name), retry \(retryNumber)"
+                )
+                XCTAssertEqual(
+                    disposition(wrapped(code), retryNumber),
+                    .fail,
+                    "\(name) as a file failure, retry \(retryNumber)"
+                )
+            }
+            XCTAssertNil(
+                HuggingFaceDownloader.rangeRetryDelay(for: wrapped(code), retryNumber: 1),
+                "\(name) never retries a range"
+            )
+        }
+        XCTAssertEqual(disposition(wrapped(NSURLErrorCancelled), 1), .cancelled)
+    }
+
     func testHTTPRetryAfterIsCappedAndPermanent4xxFails() {
         let throttled = HuggingFaceDownloader.DownloadError.httpError(
             statusCode: 429,

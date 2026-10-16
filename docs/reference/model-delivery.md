@@ -301,10 +301,13 @@ partials, and adopted task byte counts. An explicit install after a terminal `de
 `cancelRequested`, or target-missing `installed` ledger starts a new logical request at zero bytes;
 terminal counters remain available for diagnosis but can never seed the next progress bar.
 
-Transient connection failures and HTTP 408, 429, and 5xx responses retry up to three times. A
-`Retry-After` value is honored up to five minutes. One integrity mismatch receives one clean retry.
-Cancellation, disk exhaustion, local filesystem errors, TLS trust failures, configuration errors,
-and permanent 4xx responses do not retry. Chunked files first retry the failing range alone (see
+Transient connection failures and HTTP 408, 429, and 5xx responses retry up to three times. Since
+RF-19 (NET-3) that includes a failed TLS handshake (`-1200`, what a connection reset or a Wi-Fi
+handoff reports), a bad, empty or unparseable server response (`-1011`, `-1014`, `-1017`) and a
+background session that lost its process (`-996`, `-997`). A `Retry-After` value is honored up to
+five minutes. One integrity mismatch receives one clean retry. Cancellation, disk exhaustion, local
+filesystem errors, TLS certificate and trust failures, configuration errors, and permanent 4xx
+responses do not retry. Chunked files first retry the failing range alone (see
 above). Every backoff wakes within a quarter second of a cancel, so a cancelled delivery never
 waits out a `Retry-After` and never retries.
 

@@ -536,6 +536,12 @@ public enum ModelDownloadRetryPolicy {
         return dispositionForFoundationError(error, retryNumber: retryNumber)
     }
 
+    /// Certificate and trust failures, local file errors and size violations never retry. A
+    /// connection-level failure retries within `maxRetryNumber` (NET-3): that includes
+    /// `NSURLErrorSecureConnectionFailed` (-1200), the catch-all a TLS session reports for a
+    /// connection reset or a Wi-Fi handoff mid-handshake; a bad, empty or unparseable server
+    /// response (-1011, -1014, -1017); and a background session that lost its process
+    /// (-996, -997).
     private static func dispositionForFoundationError(
         _ error: Error,
         retryNumber: Int
@@ -549,7 +555,6 @@ public enum ModelDownloadRetryPolicy {
             NSURLErrorServerCertificateHasBadDate,
             NSURLErrorServerCertificateHasUnknownRoot,
             NSURLErrorServerCertificateNotYetValid,
-            NSURLErrorSecureConnectionFailed,
             NSURLErrorClientCertificateRejected,
             NSURLErrorClientCertificateRequired,
             NSURLErrorCannotWriteToFile,
@@ -570,6 +575,12 @@ public enum ModelDownloadRetryPolicy {
             NSURLErrorInternationalRoamingOff,
             NSURLErrorCallIsActive,
             NSURLErrorDataNotAllowed,
+            NSURLErrorSecureConnectionFailed,
+            NSURLErrorBadServerResponse,
+            NSURLErrorZeroByteResource,
+            NSURLErrorCannotParseResponse,
+            NSURLErrorBackgroundSessionInUseByAnotherProcess,
+            NSURLErrorBackgroundSessionWasDisconnected,
         ]
         return transientCodes.contains(nsError.code)
             ? .retry(afterSeconds: boundedDelay(backoff(retryNumber)))

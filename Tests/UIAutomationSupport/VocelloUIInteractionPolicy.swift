@@ -165,9 +165,11 @@ struct VocelloUIPurchaseRestoration: Codable {
     var transactionsCleared = false
     var tab: Outcome = .notRequired
     var historyFilter: Outcome = .notRequired
+    /// Studio mode, Design brief and script the exports scenario changed for its own take.
+    var studio: Outcome = .notRequired
     var appStopped = false
 
     var complete: Bool {
-        transactionsCleared && tab.satisfied && historyFilter.satisfied && appStopped
+        transactionsCleared && tab.satisfied && historyFilter.satisfied && studio.satisfied && appStopped
     }
 }

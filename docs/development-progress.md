@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-13
+reviewed: 2026-10-16
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,10 +17,31 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 14 — ASR-08, AUD-02 and F-16's Mac recovery; paused by the maintainer (resume here)
+### October 16 — RF-13's Studio inline export passes on the iPhone (resume here)
 
-Everything is paused at the maintainer's request after this checkpoint: no device or Mac lane runs
-until they say so.
+The maintainer opened a two-hour iPhone window and asked that no macOS XCUITest run for a few hours
+after the recovery rerun below.
+
+- **Toolchain:** the Mac now has Xcode 27.1, whose iOS 27.1 platform component had to be downloaded
+  (with the maintainer's approval) before any iPhone build, and the phone had to re-enable UI
+  automation (`ios-xcui-purchase-20261016-172358-7922dfbf` never started).
+- **RF-13:** the purchase lane's exports scenario now generates one short Design take and checks the
+  Studio inline card's export owned and revoked, putting back the Studio mode, brief and script (result
+  schema 4), and runs its owned half with StoreKit offline as the app sees it (Apple's fault injection
+  fails product loading, purchase and sync while the phone stays connected): the unlock survives a
+  relaunch and a failed Restore, and every owned export goes through. All 26 phases pass with every
+  restoration observed (`ios-xcui-purchase-20261016-175234-5cbdbead`); the online version passed
+  before it (`ios-xcui-purchase-20261016-173803-de7338ff`). The first attempt
+  (`ios-xcui-purchase-20261016-172823-49bad283`) passed every export check but could not restore the
+  brief: the shared text helper's backspaces delete nothing when the tap leaves the caret at the start
+  (parked for the control audit as BKL-16). Open question for the maintainer: close RF-13 and give
+  Airplane Mode on the TestFlight build to RF-12.
+- **F-16:** the Mac recovery journey passes again on Xcode 27.1, now including the on-disk Retry check
+  (`macos-xcui-smoke-20261016-170320-da10149d`).
+
+### October 14 — ASR-08, AUD-02 and F-16's Mac recovery; paused by the maintainer
+
+Everything was paused at the maintainer's request after this checkpoint, until October 16.
 
 - **ASR-08 closed:** a read-only App Store Connect check found build 24 unused (builds 21–23 only,
   nothing in the 3.0.0 train). RF-09's freeze now waits only on RF-13.

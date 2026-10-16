@@ -100,6 +100,9 @@ final class UIInteractionPolicyTests: XCTestCase {
             state.historyFilter = outcome
             XCTAssertFalse(state.complete)
             state.historyFilter = .restored
+            state.studio = outcome
+            XCTAssertFalse(state.complete)
+            state.studio = .restored
         }
         let decoded = try JSONDecoder().decode(VocelloUIPurchaseRestoration.self,
                                                from: JSONEncoder().encode(state))

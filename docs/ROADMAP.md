@@ -26,7 +26,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 0/19 (0%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 0/20 (0%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 24/34 (71%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 6/14 (43%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -457,6 +457,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-13` | parked | Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project | — |
 | `BKL-14` | parked | A long-form candidate whose acceptance never started is later offered as leftover audio | — |
 | `BKL-15` | parked | Mac Saved Voices empty and error states may lay the window out off screen | — |
+| `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
 | `CONV-21` | parked | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
@@ -522,6 +523,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-15`** (parked) — Mac Saved Voices empty and error states may lay the window out off screen.
   gate: On macOS, the Saved Voices empty and error states render inside the window at its minimum size, as History's do since F-16's fix (a minimum width on the state container), and a UI lane covers them.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-16`** (parked) — iOS UI text replacement cannot clear an editor whose caret lands at the start.
+  gate: VocelloUITextEntry.replace on iOS clears existing text wherever the tap leaves the caret and verifies the result, and the control audit's Design brief restore observes the restored value.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`CONV-21`** (parked) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.

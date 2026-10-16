@@ -12,6 +12,9 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     private var phases: [String] = []
     private var historyRows: [String: String] = [:]
     private var originalHistoryFilter: String?
+    /// What the exports scenario's own Studio take changed; nil once put back.
+    private var studioBaseline: StudioBaseline?
+    private var studioTouched = false
 
     func testLocalPurchaseLifecycle() async throws {
         continueAfterFailure = true // Throw on failure so cleanup always runs.
@@ -58,6 +61,8 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                 restoration.tab = originalTab == nil ? .baselineMissing : .skippedBackground
             }
             if originalHistoryFilter != nil { restoration.historyFilter = .skippedBackground }
+            if studioBaseline != nil { restoration.studio = .skippedBackground }
+            else if studioTouched { restoration.studio = .restored }
             // Do not bring Vocello over another app after an interruption. Preserve
             // the failed attempt and report exactly which restoration was skipped.
             if app.state == .runningForeground, let originalTab {
@@ -68,6 +73,9 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                     if app.otherElements["ActivityListView"].exists { try dismissShareSheet() }
                     if element("exportPurchase_close").exists { try tap("exportPurchase_close") }
                     if element("iosPlayer_close").exists { try tap("iosPlayer_close") }
+                    // The brief panel and its keyboard cover the tab dock; restoreStudio
+                    // rewrites whatever this commits.
+                    if element("voiceBrief_editor").exists { try closeBriefPanel() }
                     presentationRestored = true
                     if let languageToRestore {
                         try selectInterfaceLanguage(languageToRestore)
@@ -80,11 +88,29 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                         restoration.historyFilter = .restored
                     }
                 } catch { /* Independent tab restoration must still be attempted. */ }
+                if let studioBaseline {
+                    restoration.studio = .failed
+                    do {
+                        try restoreStudio(studioBaseline)
+                        restoration.studio = .restored
+                    } catch { /* Reported as failed; the tab is still restored. */ }
+                }
                 do {
+                    // A failed restore can leave the brief panel over the tab dock, where a
+                    // dock query ends the runner before the result is emitted.
+                    if element("voiceBrief_editor").exists { try closeBriefPanel() }
                     try tap(originalTab)
                     try require("original tab restored") { self.selected(self.element(originalTab)) }
                     if presentationRestored { restoration.tab = .restored }
                 } catch { restoration.tab = .failed }
+            }
+            // Studio drafts save only when the scene leaves the foreground, so restored
+            // ones are saved before the app stops; unrestored edits are dropped unsaved.
+            if studioTouched, restoration.studio == .restored, app.state == .runningForeground {
+                XCUIDevice.shared.press(.home)
+                if !VocelloUIWait.condition("Vocello saves drafts in the background", timeout: 30, evaluate: {
+                    self.app.state == .runningBackground || self.app.state == .runningBackgroundSuspended
+                }) { restoration.studio = .failed }
             }
             app.terminate()
             XCUIDevice.shared.press(.home)
@@ -95,12 +121,13 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             languageEvidence.lifetime = .keepAlways
             add(languageEvidence)
             XCTAssertTrue(cleaned, "Local transaction/app cleanup must succeed")
-            emit(["schemaVersion": 3, "scenario": exportChecks ? "exports" : "lifecycle",
+            emit(["schemaVersion": 4, "scenario": exportChecks ? "exports" : "lifecycle",
                   "runID": runID, "fixtureSHA256": digest,
                   "environment": "Xcode", "phases": phases,
                   "restoration": ["transactionsCleared": restoration.transactionsCleared,
                                   "tab": restoration.tab.rawValue,
                                   "historyFilter": restoration.historyFilter.rawValue,
+                                  "studio": restoration.studio.rawValue,
                                   "appStopped": restoration.appStopped],
                   "cleanup": cleaned, "complete": complete && cleaned])
         }
@@ -191,29 +218,48 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         try unlocked()
         record("approved")
         if exportChecks {
-            // Exercise Apple's fault injection, not a product override or global radio change.
-            try await store.setSimulatedError(.generic(.networkError(URLError(.notConnectedToInternet))),
-                                              forAPI: .loadProducts)
-            app.terminate()
-            app.launch()
-            try openPurchase()
-            try unlocked()
-            try notice("Your export unlock is still active")
-            XCTAssertFalse(element("exportPurchase_status").label.contains("Your audio stays in Vocello"))
-            XCTAssertFalse(element("exportPurchase_reload").exists)
-            record("owned_product_unavailable")
-            try await store.setSimulatedError(nil, forAPI: .loadProducts)
+            // Offline as the app sees it, with the phone still connected to the Mac: every
+            // network-backed StoreKit call it makes fails, and the verified entitlement comes
+            // from the on-device cache. Apple's fault injection, not a product override or a
+            // global radio change. The owned exports below all run offline.
+            do {
+                try await setStoreKitOffline(true, in: store)
+                app.terminate()
+                app.launch()
+                try openPurchase()
+                try unlocked()
+                try notice("Your export unlock is still active")
+                XCTAssertFalse(element("exportPurchase_status").label.contains("Your audio stays in Vocello"))
+                XCTAssertFalse(element("exportPurchase_reload").exists)
+                record("owned_offline_relaunch")
+                try tap("exportPurchase_restore")
+                try notice("could not complete")
+                try unlocked()
+                record("owned_offline_restore")
+                try tap("exportPurchase_close")
+                // The take comes first, so the History rows chosen below stay put for the
+                // revoked comparison.
+                try generateStudioDesignTake()
+                try checkStudioInlineExport(allowed: true)
+                record("owned_design_studio")
+                try checkHistoryExports(unlocked: true)
+                try await setStoreKitOffline(false, in: store)
+            } catch {
+                try? await setStoreKitOffline(false, in: store)
+                throw error
+            }
             store.resetToDefaultState()
             store.disableDialogs = true
             store.storefront = "USA"
             store.locale = Locale(identifier: "en_US")
-            try tap("exportPurchase_close")
-            try checkHistoryExports(unlocked: true)
 
             try openPurchase()
             try store.refundTransaction(identifier: pending.identifier)
             try locked()
             try tap("exportPurchase_close")
+            try checkStudioInlineExport(allowed: false)
+            record("revoked_design_studio")
+            if let studioBaseline { try restoreStudio(studioBaseline) }
             try checkHistoryExports(unlocked: false)
         }
         complete = true
@@ -267,6 +313,154 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             record("\(unlocked ? "owned" : "revoked")_\(mode)_player")
         }
         if let originalHistoryFilter { try selectHistoryFilter(originalHistoryFilter) }
+    }
+
+    /// Fails, or clears and reads back, every network-backed StoreKit call the app makes:
+    /// product loading, purchase and App Store sync.
+    private func setStoreKitOffline(_ offline: Bool, in store: SKTestSession) async throws {
+        let error = StoreKitError.networkError(URLError(.notConnectedToInternet))
+        try await store.setSimulatedError(offline ? .generic(error) : nil, forAPI: .loadProducts)
+        try await store.setSimulatedError(offline ? .generic(error) : nil, forAPI: .purchase)
+        try await store.setSimulatedError(offline ? .generic(error) : nil, forAPI: .appStoreSync)
+        guard !offline else { return }
+        let products = await store.simulatedError(forAPI: .loadProducts)
+        let purchase = await store.simulatedError(forAPI: .purchase)
+        let sync = await store.simulatedError(forAPI: .appStoreSync)
+        guard products == nil, purchase == nil, sync == nil else { throw Failure.observation }
+    }
+
+    private struct StudioBaseline {
+        let mode: String
+        var brief: String?
+        var script: String?
+    }
+
+    /// One short Design take for the Studio inline card, the only export surface with no
+    /// History row to reuse. The take stays in History like any smoke take; Studio's
+    /// mode, Design brief and Design script are put back by `restoreStudio`.
+    private func generateStudioDesignTake() throws {
+        try tap("rootTab_studio")
+        let modes = ["custom", "design", "clone"]
+        try require("Studio mode selector") { modes.contains { self.selected(self.element("generateSection_\($0)")) } }
+        guard let mode = modes.first(where: { selected(element("generateSection_\($0)")) }) else {
+            throw Failure.observation
+        }
+        studioBaseline = StudioBaseline(mode: mode)
+        studioTouched = true
+        if mode != "design" { try tap("generateSection_design") }
+        try require("Design mode") {
+            self.selected(self.element("generateSection_design")) && self.element("studioChip_voiceBrief").exists
+        }
+        try require("Design model installed") {
+            self.element("textInput_textEditor").exists && !self.element("textInput_installModelButton").exists
+        }
+        studioBaseline?.script = (element("textInput_textEditor").value as? String) ?? ""
+        try tap("studioChip_voiceBrief")
+        try require("voice brief editor") { self.element("voiceBrief_editor").exists }
+        studioBaseline?.brief = (element("voiceBrief_editor").value as? String) ?? ""
+        try setBrief(VocelloUIBenchMatrix.voiceDesignBrief)
+        try setScript("Vocello checks this export.")
+
+        let generate = element("textInput_generateButton")
+        let player = element("studio_inlinePlayer_playPause")
+        let live = element("studio_livePreview_playPause")
+        let error = element("textInput_generationError")
+        // The app was relaunched, so no earlier take's card can satisfy the wait below.
+        try require("Generate enabled, no card") {
+            generate.exists && generate.isEnabled && !error.exists && !player.exists
+        }
+        try tap("textInput_generateButton")
+        // The CTA is replaced, not disabled, when the take starts.
+        try require("take started") { self.element("textInput_cancelButton").exists || live.exists || !generate.exists }
+        guard VocelloUIWait.condition("Design take completes", timeout: 300, evaluate: {
+            (player.exists && !live.exists) || error.exists
+        }), !error.exists else { throw Failure.observation }
+        if player.exists && player.label == "Pause" {
+            try tap("studio_inlinePlayer_playPause")
+            try require("take paused") { player.exists && player.label == "Play" }
+        }
+    }
+
+    private func checkStudioInlineExport(allowed: Bool) throws {
+        try tap("rootTab_studio")
+        try require("completed Design take on the inline card") {
+            self.selected(self.element("generateSection_design")) && self.element("studio_inlinePlayer_download").exists
+        }
+        try tap("studio_inlinePlayer_download")
+        try checkExportPresentation(allowed: allowed)
+    }
+
+    /// Dismisses this test's take from the card (it stays in History), then puts back the
+    /// Design script, the brief and the original mode, in that order.
+    private func restoreStudio(_ baseline: StudioBaseline) throws {
+        // A failure can leave the brief panel open over the tab dock.
+        if element("voiceBrief_editor").exists { try closeBriefPanel() }
+        try tap("rootTab_studio")
+        if !selected(element("generateSection_design")) { try tap("generateSection_design") }
+        // A take still running disables the setup chips.
+        let cancel = element("textInput_cancelButton")
+        if cancel.exists {
+            try tap("textInput_cancelButton")
+            try require("take cancelled") { !cancel.exists }
+        }
+        if element("studio_inlinePlayer_dismiss").exists {
+            try tap("studio_inlinePlayer_dismiss")
+            try tap("studio_inlinePlayer_dismissConfirm")
+            try require("take dismissed") { !self.element("studio_inlinePlayer_playPause").exists }
+        }
+        if let script = baseline.script { try setScript(script) }
+        if let brief = baseline.brief { try setBrief(brief) }
+        try tap("generateSection_\(baseline.mode)")
+        try require("original Studio mode") { self.selected(self.element("generateSection_\(baseline.mode)")) }
+        studioBaseline = nil
+    }
+
+    /// The brief binding updates while editing, so it is observed before the panel closes;
+    /// text the editor cannot reproduce (smart punctuation) fails rather than reads as restored.
+    private func setBrief(_ text: String) throws {
+        let editor = element("voiceBrief_editor")
+        if !editor.exists { try tap("studioChip_voiceBrief") }
+        try require("voice brief editor") { editor.exists }
+        if ((editor.value as? String) ?? "") != text {
+            guard VocelloUIPrimaryAction.perform(on: editor, timeout: 20) else { throw Failure.observation }
+            // The tap leaves the caret at the start of an existing brief, where deletes remove
+            // nothing (2026-10-16 physical run); a triple tap selects its paragraph instead.
+            if !((editor.value as? String) ?? "").isEmpty {
+                editor.tap(withNumberOfTaps: 3, numberOfTouches: 1)
+                editor.typeText(XCUIKeyboardKey.delete.rawValue)
+                try require("voice brief cleared") { editor.exists && ((editor.value as? String) ?? "").isEmpty }
+            }
+            if !text.isEmpty { editor.typeText(text) }
+        }
+        try require("voice brief entered") { editor.exists && ((editor.value as? String) ?? "") == text }
+        try closeBriefPanel()
+    }
+
+    /// An empty brief disables Confirm, so the panel then closes with its drag-to-dismiss.
+    private func closeBriefPanel() throws {
+        let confirm = element("voiceBrief_confirm")
+        guard confirm.exists else { throw Failure.observation }
+        if confirm.isEnabled { try tap("voiceBrief_confirm") } else { confirm.swipeDown() }
+        try require("voice brief closed") { !self.element("voiceBrief_editor").exists }
+    }
+
+    private func setScript(_ text: String) throws {
+        let editor = element("textInput_textEditor")
+        try require("script editor") { editor.exists }
+        if ((editor.value as? String) ?? "") != text {
+            let clear = element("textInput_clearButton")
+            if clear.exists {
+                try tap("textInput_clearButton")
+                try require("script cleared") { !clear.exists }
+            }
+            if !text.isEmpty {
+                guard VocelloUITextEntry.replace(in: editor, with: text, timeout: 20) else { throw Failure.observation }
+            }
+        }
+        if app.keyboards.firstMatch.exists { editor.typeText("\n") }
+        try require("script entered, keyboard closed") {
+            ((editor.value as? String) ?? "") == text && !self.app.keyboards.firstMatch.exists
+        }
     }
 
     /// The filtered list's longest visible row, so the player check sees real playback;

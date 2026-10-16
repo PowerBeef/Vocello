@@ -305,6 +305,14 @@ diagnostic and never publishes benchmark history; `purchase` is the focused loca
 (`VocelloiOSPurchaseUITests` over an `SKTestSession` on the bundled test fixture, never a live
 account; `--scenario exports` additionally exercises the export surfaces) and its documented
 invocation always passes `--retain-result` (the script does not refuse a run without it).
+`--scenario exports` takes StoreKit offline as the app sees it (Apple's fault injection fails
+product loading, purchase and App Store sync while the phone stays connected to the Mac), then
+checks that the unlock survives a relaunch and a failed Restore and that every owned export goes
+through; it checks existing History rows and the full player for every mode, owned and revoked, and
+generates one short Design take (the Design model must be installed; the take stays in History like
+any smoke take) so the Studio inline card is checked on each side of the refund; it puts back the
+Studio mode, Design brief and Design script it changed, and reports that restoration (result schema
+4).
 The purchase fixture observes the in-app interface language, selects English through Settings for
 its English notice assertions, and restores the observed choice during cleanup, including after
 failure. Process launch language alone does not override a saved in-app language preference.

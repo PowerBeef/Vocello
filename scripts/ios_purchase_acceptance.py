@@ -10,9 +10,22 @@ import re
 PHASES = ["local_environment", "initial_locked", "restore_not_owned", "purchase_failed",
           "purchased", "relaunch_entitlement", "restored", "revoked", "pending", "approved"]
 PREFIX = "VOCELLO_LOCAL_PURCHASE_RESULT="
-EXPORT_PHASES = PHASES + ["owned_product_unavailable"] + [
-    f"{state}_{mode}_{surface}" for state in ("owned", "revoked")
-    for mode in ("custom", "design", "clone") for surface in ("history", "player")]
+
+
+def _surfaces(state: str) -> list[str]:
+    return [f"{state}_{mode}_{surface}" for mode in ("custom", "design", "clone")
+            for surface in ("history", "player")]
+
+
+# Schema 3 and earlier exercised History rows and the full player only.
+LEGACY_EXPORT_PHASES = PHASES + ["owned_product_unavailable"] + _surfaces("owned") + _surfaces("revoked")
+# Schema 4 takes StoreKit offline for relaunch, Restore and every owned export, and adds the
+# Studio inline card's own Design take on each side of the refund.
+EXPORT_PHASES = (PHASES + ["owned_offline_relaunch", "owned_offline_restore", "owned_design_studio"]
+                 + _surfaces("owned") + ["revoked_design_studio"] + _surfaces("revoked"))
+CURRENT_SCHEMA = 4
+RESTORATION_FIELDS = {3: {"transactionsCleared", "tab", "historyFilter", "appStopped"}}
+RESTORATION_FIELDS[4] = RESTORATION_FIELDS[3] | {"studio"}
 
 
 def collect(log: str, run_id: str, fixture_digest: str, scenario: str = "lifecycle",
@@ -25,37 +38,39 @@ def collect(log: str, run_id: str, fixture_digest: str, scenario: str = "lifecyc
     result = json.loads(base64.b64decode(markers[0], validate=True))
     if not isinstance(result, dict):
         raise ValueError("Unexpected purchase result fields")
-    current = result.get("schemaVersion") == 3
+    schema = result.get("schemaVersion")
+    restored = type(schema) is int and schema in RESTORATION_FIELDS
     fields = {
         "schemaVersion", "runID", "fixtureSHA256", "environment", "phases", "cleanup", "complete"
-    } | ({"scenario", "restoration"} if current else set())
+    } | ({"scenario", "restoration"} if restored else set())
     if set(result) != fields:
         raise ValueError("Unexpected purchase result fields")
-    if (type(result["schemaVersion"]) is not int
-            or result["schemaVersion"] != (3 if current else (2 if scenario == "exports" else 1))
+    if (type(schema) is not int
+            or schema != (schema if restored else (2 if scenario == "exports" else 1))
             or result["runID"] != run_id
             or not re.fullmatch(r"[0-9a-f]{64}", fixture_digest)
             or result["fixtureSHA256"] != fixture_digest or result["environment"] != "Xcode"):
         raise ValueError("Purchase identity/environment mismatch")
-    if require_restoration and not current:
+    if require_restoration and schema != CURRENT_SCHEMA:
         raise ValueError("Current acceptance requires explicit restoration evidence")
-    if current:
+    exported = "restored" if scenario == "exports" else "notRequired"
+    if restored:
         restoration = result["restoration"]
         if result["scenario"] != scenario:
             raise ValueError("Purchase scenario mismatch")
-        if (not isinstance(restoration, dict) or set(restoration) != {
-                "transactionsCleared", "tab", "historyFilter", "appStopped"}):
+        if not isinstance(restoration, dict) or set(restoration) != RESTORATION_FIELDS[schema]:
             raise ValueError("Unexpected restoration fields")
         if (restoration["transactionsCleared"] is not True or restoration["appStopped"] is not True
-                or restoration["tab"] != "restored"
-                or restoration["historyFilter"] != ("restored" if scenario == "exports" else "notRequired")):
+                or restoration["tab"] != "restored" or restoration["historyFilter"] != exported
+                or restoration.get("studio", exported) != exported):
             raise ValueError("Purchase restoration not fully observed")
+    export_phases = EXPORT_PHASES if schema == CURRENT_SCHEMA else LEGACY_EXPORT_PHASES
     if (result["complete"] is not True or result["cleanup"] is not True
-            or result["phases"] != (EXPORT_PHASES if scenario == "exports" else PHASES)):
+            or result["phases"] != (export_phases if scenario == "exports" else PHASES)):
         raise ValueError("Purchase lifecycle or restoration incomplete")
     return {**result, "scope": "physical-device-local-storekit-only",
             "scenario": scenario, "offlineAcceptance": False,
-            "restorationVerified": current,
+            "restorationVerified": restored,
             "liveAcceptance": False, "logSHA256": hashlib.sha256(log.encode()).hexdigest()}
 
 

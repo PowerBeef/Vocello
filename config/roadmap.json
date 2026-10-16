@@ -328,8 +328,8 @@
         "scripts/repo_invariants.sh",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "updated": "2026-10-13",
-      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-13: the exports scenario passes all 23 phases with restoration verified (ios-xcui-purchase-20261013-201729-998547b6) after test fixes ec49f4ee, 699be26f and de770c2b. Its locked-sheet screenshot shows the local $0.99 fixture price, so the App Review screenshot comes from the TestFlight build (RF-12) with the live $19.99 (maintainer decision 2026-10-13). Next: true offline, Studio inline, folder-copy, long-form and recovery export surfaces. RF-02/RF-12 own live setup and submission. Engine review SER-2: a saved voice whose .voice.json cannot be read no longer exports free; its audio's own Vocello provenance decides, so generated voices stay locked and recordings free. Product call: a Vocello-made WAV imported as a reference is free while its .voice.json reads and locked once that sidecar is damaged. Earlier history: git log -p -- config/roadmap.json."
+      "updated": "2026-10-16",
+      "notes": "Paired iPhone, local StoreKit only, no live purchase. Lifecycle PASS stands (ios-xcui-purchase-20260924-073512-c7d44217). 2026-10-16: the exports scenario passes all 26 phases with every restoration observed (ios-xcui-purchase-20261016-175234-5cbdbead, result schema 4): with StoreKit offline as the app sees it (product loading, purchase and sync fail), the unlock survives a relaunch and a failed Restore, and every owned export goes through; History rows, the full player and, new, the Studio inline card on a fresh Design take are checked owned and revoked. The App Review screenshot comes from the TestFlight build (RF-12) at the live $19.99 (decision 2026-10-13). No other surface has a paid device path: recovery exports are always free, and long-form takes leave as History rows or by the folder copy (IOSSavedOutputsDestinationTests). Left: whether owned access in Airplane Mode on the TestFlight build joins RF-12. RF-02/RF-12 own live setup and submission. SER-2: a saved voice whose .voice.json cannot be read exports by its audio's Vocello provenance (generated voices locked, recordings free)."
     },
     {
       "id": "RF-15",
@@ -563,8 +563,8 @@
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "updated": "2026-10-14",
-      "notes": "Reviewed 2026-10-10 at 38d295c4 (mac-test-20261010-040414). 2026-10-13 (engine review SER-1): reconcile resolves every journal it can; History's confirmed Discard sets aside one that fails on its own data (renamed .unreadable, kept with the audio it names) on iOS and macOS; a device failure sets nothing aside and is reported; a moved container is the journal's own fault; the leftover-audio review keeps set-aside audio. Decisions: a newer build's journal is set aside like a damaged one (revisit at the first journal version change); set-aside records have no count or age limit. Ownership tests cover delete and clear-all. Mac acceptance: regeneration PASS (macos-xcui-smoke-20261014-040507-0f70cdfc) and, 2026-10-14, the recovery journey PASS (macos-xcui-smoke-20261014-165645-239d5942, --scenario long-form-recovery: Export offered, Retry keeps, Discard sets aside). It found the Mac History window blank with the notice on an empty History, a minimum-size layout bug, now fixed. BKL-14 parks never-started candidates. iOS device proof via RF-15.",
+      "updated": "2026-10-16",
+      "notes": "Reviewed 2026-10-10 at 38d295c4 (mac-test-20261010-040414). 2026-10-13 (engine review SER-1): reconcile resolves every journal it can; History's confirmed Discard sets aside one that fails on its own data (renamed .unreadable, kept with the audio it names) on iOS and macOS; a device failure sets nothing aside and is reported; a moved container is the journal's own fault; the leftover-audio review keeps set-aside audio. Decisions: a newer build's journal is set aside like a damaged one (revisit at the first journal version change); set-aside records have no count or age limit. Ownership tests cover delete and clear-all. Mac acceptance: regeneration PASS (macos-xcui-smoke-20261014-040507-0f70cdfc) the recovery journey (--scenario long-form-recovery) PASS 2026-10-14 (macos-xcui-smoke-20261014-165645-239d5942: Export offered, Retry keeps, Discard sets aside) and 2026-10-16 on Xcode 27.1 with the on-disk Retry check (macos-xcui-smoke-20261016-170320-da10149d). It found the Mac History window blank with the notice on an empty History, a minimum-size layout bug, now fixed. BKL-14 parks never-started candidates. iOS device proof via RF-15.",
       "evidence": [
         "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "commit:df79aa96"
@@ -1932,6 +1932,21 @@
       "updated": "2026-10-14",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-14 by the review of F-16's Mac recovery journey: History with its recovery notice on an empty History laid the whole window out about 3,900 pt tall and off screen, because the window's minimum-size pass wraps fixed-height text a word per line; History now bounds the width. The Saved Voices state container has the same structure and no lane opens it empty. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission."
+    },
+    {
+      "id": "BKL-16",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "iOS UI text replacement cannot clear an editor whose caret lands at the start",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "VocelloUITextEntry.replace on iOS clears existing text wherever the tap leaves the caret and verifies the result, and the control audit's Design brief restore observes the restored value.",
+      "sourceOfTruth": [
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "updated": "2026-10-16",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-16 by RF-13's purchase exports run (ios-xcui-purchase-20261016-172823-49bad283): tapping the Design brief editor left the caret before the existing text, so the helper's backspaces deleted nothing. The purchase lane now selects the brief with a triple tap and checks the value; the control audit's brief restore still uses the helper without checking, so it may leave the original brief prefixed to the test's. Parked without investigation under the focus lock: test tooling, not a release blocker."
     },
     {
       "id": "BG-01",

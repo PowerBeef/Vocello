@@ -55,7 +55,8 @@ final class IOSModelDownloadCoordinator {
 
     typealias SnapshotSink = @MainActor (IOSModelDeliverySnapshot) -> Void
 
-    private static let maxConcurrentModels = 1
+    /// One model transfers at a time; installs and starts claim their slot before any await (E-01).
+    private var admission = IOSModelDownloadAdmission(maxConcurrentModels: 1)
     private let modelAssetStore: LocalModelAssetStore
     private let configuration: IOSModelDeliveryConfiguration
     private let fileManager: FileManager
@@ -116,8 +117,50 @@ final class IOSModelDownloadCoordinator {
         guard model.iosDownloadEligible else {
             throw IOSModelDeliveryError.notEligibleForIOS(modelID: model.id)
         }
-        if inflight[model.id] != nil || pending.contains(where: { $0.id == model.id }) { return }
+        // E-01: claimed before the first await (the catalog, then the delivery plan, which
+        // hashes the shared component), so a second tap while this one prepares is ignored
+        // like a tap on a queued, starting or running model.
+        guard admission.claimPreparation(of: model.id, hasDownload: hasDownload(for: model.id)) else {
+            return
+        }
+        let queuedRequest: IOSModelDownloadLedger.Request
+        do {
+            queuedRequest = try await persistQueuedRequest(for: model)
+        } catch {
+            admission.releasePreparation(of: model.id)
+            throw error
+        }
+        // The model joins the queue in this same turn; from then on the queue refuses a duplicate.
+        admission.releasePreparation(of: model.id)
+        if queuedRequest.retryCount > 0 {
+            retryProgressResetModels.insert(model.id)
+        } else {
+            retryProgressResetModels.remove(model.id)
+        }
+        diagnosticsStore.recordEvent(
+            layer: "coordinator",
+            event: "request-queued",
+            modelID: model.id,
+            logicalRequestID: queuedRequest.logicalRequestID,
+            artifactVersion: queuedRequest.artifactVersion,
+            phase: IOSModelDeliverySnapshot.Phase.queued.rawValue,
+            durableBytes: queuedRequest.receivedBytes,
+            totalBytes: queuedRequest.totalBytes,
+            expectedFileCount: queuedRequest.expectedFiles.count,
+            verifiedFileCount: queuedRequest.verifiedFiles.count,
+            ledgerStatus: queuedRequest.status.rawValue
+        )
+        cancellationBarriers.remove(model.id)
+        pending.append(model)
+        publishSnapshot(for: model, phase: .queued, downloadedBytes: queuedRequest.receivedBytes)
+        await startPendingDownloads()
+    }
 
+    /// Install's preparation: checks the model against the catalog and the authenticated
+    /// delivery plan and the free space, then records its request as queued in the ledger.
+    private func persistQueuedRequest(
+        for model: ModelDescriptor
+    ) async throws -> IOSModelDownloadLedger.Request {
         try prepareDirectories()
         let entry = try IOSModelDeliverySupport.matchingCatalogEntry(
             for: model,
@@ -146,28 +189,7 @@ final class IOSModelDownloadCoordinator {
             ledger.requests.append(queuedRequest)
         }
         try ledgerStore.save(ledger)
-        if queuedRequest.retryCount > 0 {
-            retryProgressResetModels.insert(model.id)
-        } else {
-            retryProgressResetModels.remove(model.id)
-        }
-        diagnosticsStore.recordEvent(
-            layer: "coordinator",
-            event: "request-queued",
-            modelID: model.id,
-            logicalRequestID: queuedRequest.logicalRequestID,
-            artifactVersion: queuedRequest.artifactVersion,
-            phase: IOSModelDeliverySnapshot.Phase.queued.rawValue,
-            durableBytes: queuedRequest.receivedBytes,
-            totalBytes: queuedRequest.totalBytes,
-            expectedFileCount: queuedRequest.expectedFiles.count,
-            verifiedFileCount: queuedRequest.verifiedFiles.count,
-            ledgerStatus: queuedRequest.status.rawValue
-        )
-        cancellationBarriers.remove(model.id)
-        pending.append(model)
-        publishSnapshot(for: model, phase: .queued, downloadedBytes: queuedRequest.receivedBytes)
-        await startPendingDownloads()
+        return queuedRequest
     }
 
     /// Cancels only after the intent is durable. Returning `false` means the
@@ -401,13 +423,20 @@ final class IOSModelDownloadCoordinator {
     }
 
     private func startPendingDownloads() async {
-        while inflight.count < Self.maxConcurrentModels, let model = pending.first {
+        // E-01: the start slot is claimed before `beginDownload` awaits the catalog and the
+        // delivery plan, so a start still preparing counts against the limit and a second
+        // model stays queued instead of running beside it on the shared downloader.
+        while let model = pending.first,
+              admission.claimStart(of: model.id, runningCount: inflight.count) {
             pending.removeFirst()
             await beginDownload(model)
         }
     }
 
+    /// Starts `model`, whose start slot `startPendingDownloads` claimed. The claim ends when
+    /// this returns: the transfer is in `inflight` by then, or its start failed.
     private func beginDownload(_ model: ModelDescriptor) async {
+        defer { admission.releaseStart(of: model.id) }
         do {
             let catalog = try await fetchCatalog()
             let entry = try IOSModelDeliverySupport.matchingCatalogEntry(

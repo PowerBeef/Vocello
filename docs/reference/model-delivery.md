@@ -206,7 +206,11 @@ the canonical and debug-isolated coordinators retain and acknowledge only their 
 handler. A foreign handler is neither stored nor completed, while an owned session with no durable
 work is completed after reconciliation.
 
-iPhone runs one model request at a time. macOS keeps its existing foreground concurrency.
+iPhone runs one model request at a time. macOS keeps its existing foreground concurrency. The
+iPhone start slot is claimed before the start awaits the catalog and the delivery plan, and an
+Install is claimed while it prepares (`IOSModelDownloadAdmission`, RF-19 E-01), so two quick taps
+queue the second model, or ignore a second tap on the same one, instead of running two transfers
+on the one background downloader.
 **macOS/CLI run per-file range chunking by default since 2026-08-08** (evidence under the
 tuning policy below). **iPhone runs chunked transfers by default since 2026-08-11.** The
 background mechanism: task identities are schema v2 with optional range qualification, so

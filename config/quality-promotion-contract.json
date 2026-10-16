@@ -379,6 +379,7 @@
           "Sources/iOS/IOSModelDownloadCoordinator.swift",
           "Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift",
           "Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift",
+          "Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift",
           "Sources/iOS/IOSModelInstallerViewModel.swift",
           "Sources/iOS/IOSSettingsViews.swift",
           "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",

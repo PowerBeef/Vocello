@@ -38,6 +38,11 @@ after the recovery rerun below.
   Airplane Mode on the TestFlight build move to RF-12. RF-09's listed blockers are all closed.
 - **F-16:** the Mac recovery journey passes again on Xcode 27.1, now including the on-disk Retry check
   (`macos-xcui-smoke-20261016-170320-da10149d`).
+- **Full iOS smoke on Xcode 27.1** (`ios-xcui-smoke-20261016-181355-c7c92864`, a justified rerun of
+  October 14's): the main journey and record-then-play pass with a clean crash delta; the long-form
+  journey fails again because Fast QC refuses a 56-62 s Built-in segment for a 2.1 s interior silence,
+  now under a second, different seed. Recorded on RF-15, whose long-form row needs a fix or an accepted
+  known limitation from the maintainer.
 
 ### October 14 — ASR-08, AUD-02 and F-16's Mac recovery; paused by the maintainer
 

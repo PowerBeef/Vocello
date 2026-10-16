@@ -66,7 +66,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-18` | planned | Long-form segments keep their pacing (RF-15's long-form row) | — |
+| `RF-18` | in-flight | Long-form segments keep their pacing (RF-15's long-form row) | — |
 | `RF-19` | planned | iPhone model installs never wedge or silently discard a download | — |
 
 ### Open items in detail
@@ -145,7 +145,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
 
-- **`RF-18`** (planned, due 2026-10-22) — Long-form segments keep their pacing (RF-15's long-form row).
+- **`RF-18`** (in-flight, due 2026-10-22) — Long-form segments keep their pacing (RF-15's long-form row).
   gate: A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.
 
 - **`RF-19`** (planned, due 2026-10-21) — iPhone model installs never wedge or silently discard a download.

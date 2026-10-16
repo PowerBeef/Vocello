@@ -1763,7 +1763,7 @@
       "id": "RF-18",
       "plan": "release-first-3-0-2026-09",
       "title": "Long-form segments keep their pacing (RF-15's long-form row)",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-22",
       "gate": "A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.",
       "sourceOfTruth": [
@@ -1774,7 +1774,7 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md"
       ],
       "updated": "2026-10-16",
-      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23). Both failing smokes refused a ~60 s Built-in segment fed as streaming text: one text token per codec frame uses the script up about 16 s in, then the talker sees only tts_pad, and the same boundaries pause 0.7 s early and 1.6-2.4 s late. Both runs used the phone's persisted Consistent variation, and the fixture repeats one paragraph five times."
+      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23). Both failing smokes refused a ~60 s Built-in segment fed as streaming text: one text token per codec frame uses the script up about 16 s in, then the talker sees only tts_pad, and the same boundaries pause 0.7 s early and 1.6-2.4 s late. Both runs used the phone's persisted Consistent variation, and the fixture repeats one paragraph five times. 2026-10-16 screen (audit A2 result): D1 is not adopted. Pooled, D1-on failed 3 of 23 long segments and D1-off 2 of 27; every failure ran under Consistent (dropouts, and one runaway take per arm), Expressive had none, and Fast QC refused them all. Recorded as a known limitation in the release notes; C-03 remains; C-02 goes back to the maintainer."
     },
     {
       "id": "ER-01",

@@ -184,6 +184,39 @@ a device. An optional download-race scenario needs a separate go for multi-GB do
    - **Decision rule:** adopt D1 if D1-on fails ≤1 of ≥24 segments of 45 s or more, against ≥3 for
      D1-off, with no new gross-failure class. Otherwise record the known limitation, naming
      Consistent.
+   - **Result (2026-10-16): D1 is not adopted.** The Mac M6 ran the release CLI built at 18:47
+     (lanes `mac-qc-takes-20261016-224715-51137966` and `-225256-3ccd01fa`). Outputs are untracked
+     under `build/private/qc/rf18-screen/`.
+
+     | Stratum (variation) | D1 off: failed / long (all segments) | D1 on |
+     |---|---|---|
+     | qc-takes long-form cells, English and French (Expressive) | 0 / 3 (32) | 0 / 3 (32) |
+     | The same cells replayed through the CLI (Consistent) | 2 / 8 (31) | 2 / 6 (29) |
+     | RF-15 fixture, seeds 1–8 (Consistent) | 0 / 16 (24) | 1 / 14 (21) |
+     | **Pooled** | **2 / 27** | **3 / 23** |
+
+     - **The rule fails on both sides.** D1-on failed 3 long segments (the rule allows 1), and
+       D1-off failed only 2 (the rule needs 3). D1-on also had more dropouts overall, 4 against 1.
+       No take hit the token cap, and no new failure class appeared.
+     - **Every failure ran under Consistent.**
+       - Two were mid-take dropouts: 11.4 s with D1 off and 2.3 s with D1 on.
+       - One take per arm never reached end of speech and ended in 98 s and 59 s of trailing
+         silence (repeat runs of 1,064 and 649 frames).
+       - Fast QC refused all of them.
+     - **The knob applied.**
+       - No D1-off/D1-on pair produced identical PCM.
+       - A rerun of fixture seed 1 with D1 off reproduced its PCM byte for byte. Seeded takes are
+         therefore deterministic, and the differences come from D1.
+     - **The Mac did not reproduce the phone's failure rate** on the RF-15 fixture: 0 of 16 long
+       segments failed with D1 off.
+     - **Not run:** the ASR edit rate and the language check were not computed, because the Fast QC
+       criterion already decided the rule; time to first chunk was not measured either.
+     - **Decision.**
+       - The defect is recorded as a 3.0 known limitation naming Consistent.
+       - C-03 lands.
+       - C-02 goes back to the maintainer. Every D1-off failure was in a segment of 45 s or more,
+         which argues for shorter segments, but C-02 changes every long-form plan and needs its
+         own screen.
 3. **D1 adoption (if the rule passes).**
    - Flip both `.production` constants together: `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`
      45-49 and `Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift` 122.

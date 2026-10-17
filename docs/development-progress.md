@@ -35,9 +35,18 @@ On local `main`, not pushed (pushes wait for the maintainer's request).
   closes after the rehearsal passes on three consecutive pushes). New parked line: BKL-18.
 - **ER-13:** the v0.1.5 upstream review point, a banner on the historical iPhone memory figures and
   the artifact provenance in `model-delivery.md`. Pass 2 follows the RF-18 follow-up screen.
-- **RF-18 follow-up screen** (pre-registered in the engine audit, A2): seven arms of 56 long-form
-  projects through the CLI, untracked under `build/private/qc/rf18-followup/`; its rules decide C-02,
-  the subtalker defaults (ER-05) and D2.
+- **RF-18 follow-up screen** (pre-registered in the engine audit, A2), paused at the E2/E4 boundary
+  with six of seven arms done (failed long-form projects of 56): C0 9, C1 2, C2 15, C4 7, E0 0, E2 0.
+  The control reproduced; C1 (subtalker at the reference 0.9/50/1.0) passes its rule, C2 (budget 200)
+  fails it, and D2 waits on E4. Resume: `ARMS=E4
+  build/private/qc/rf18-followup/tools/rf18_followup_resume.sh` (about 27 minutes; it skips finished
+  projects and reuses the screen's CLI binary when its digest still matches), then `python3
+  build/private/qc/rf18-followup/tools/rf18_followup_analyze.py`. Then adopt per the rules: C1 changes
+  the subtalker defaults for Balanced and Consistent (`UnsafeSpeechGenerationModel`), D2 flips
+  `filtersEOS`; if both pass, a combined Consistent arm must fail at most one project more than C1
+  before the combination ships; record the result in the audit (A2), RF-18, ER-05 and the release notes.
+- **Owed after the screen:** CONV-21's Mac smoke lanes (`scripts/ui_test.sh macos smoke`,
+  `--scenario long-form`, `--scenario long-form-recovery`).
 - **Next iPhone window, in order:**
   1. `scripts/ios_device.sh preflight`
   2. `scripts/ui_test.sh ios smoke`: CONV-21's iPhone smoke on the new MLX, and the long-form

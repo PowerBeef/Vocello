@@ -1741,8 +1741,8 @@
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
         "docs/audits/2026-10-16-engine-runtime-audit.md"
       ],
-      "updated": "2026-10-16",
-      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23). Both failing smokes refused a ~60 s Built-in segment fed as streaming text: one text token per codec frame uses the script up about 16 s in, then the talker sees only tts_pad, and the same boundaries pause 0.7 s early and 1.6-2.4 s late. Both runs used the phone's persisted Consistent variation, and the fixture repeats one paragraph five times. 2026-10-16 screen (audit A2 result): D1 is not adopted. Pooled, D1-on failed 3 of 23 long segments and D1-off 2 of 27; every failure ran under Consistent (dropouts, and one runaway take per arm), Expressive had none, and Fast QC refused them all. Recorded as a known limitation in the release notes; C-03 remains; C-02 goes back to the maintainer."
+      "updated": "2026-10-17",
+      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23). Both failing smokes refused a ~60 s Built-in segment fed as streaming text: one text token per codec frame uses the script up about 16 s in, then the talker sees only tts_pad, and the same boundaries pause 0.7 s early and 1.6-2.4 s late. Both runs used the phone's persisted Consistent variation, and the fixture repeats one paragraph five times. 2026-10-16 screen (audit A2 result): D1 is not adopted. Pooled, D1-on failed 3 of 23 long segments and D1-off 2 of 27; every failure ran under Consistent (dropouts, and one runaway take per arm), Expressive had none, and Fast QC refused them all. Recorded as a known limitation in the release notes; C-03 remains; C-02 goes back to the maintainer. 2026-10-17 follow-up screen (pre-registered, A2), paused before E4 with 6 of 7 arms done: failed projects C0 9, C1 (subtalker at 0.9/50/1.0) 2, C2 (budget 200) 15, C4 (EOS filtered) 7, E0 0, E2 0; the control reproduced, C1 passes its rule, C2 fails it, D2 waits on E4. Resume: ARMS=E4 with build/private/qc/rf18-followup/tools/rf18_followup_resume.sh, then its analyze script."
     },
     {
       "id": "ER-01",
@@ -1826,7 +1826,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls.",
+      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls. 2026-10-17: RF-18's follow-up screen supports it: C1 (Consistent with the subtalker on reference values) failed 2 of 56 long-form projects against 9 for C0; adoption goes with RF-18 once E4 finishes.",
       "legacyIds": [
         "BKL-01"
       ]

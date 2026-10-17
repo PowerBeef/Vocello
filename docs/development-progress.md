@@ -17,7 +17,39 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 16, evening — engine audit approved; the remediation starts on the Mac (resume here)
+### October 16, night — RF-19 closes; BG-01, the MLX refresh and the model research land on the Mac (resume here)
+
+All on local `main`, not pushed (pushes wait for the maintainer's request). The iPhone stayed
+unavailable and no Mac XCUITest ran.
+
+- **RF-19 closed on the Mac:** the four install fixes (NET-3, E-02, NET-1, E-01) plus a review
+  follow-up (a Retry checks space only for the bytes it still needs; a stale artifact's staging is
+  discarded; the unexpected-stop row is localized). Device proof: RF-15's onboarding and download
+  row. The integrated agent branch `worktree-agent-a3e1e1ebe4bc3aef0` remains; deleting it needs
+  `git branch -D`, the maintainer's call.
+- **RF-18 decided:** the pre-registered Mac screen does not adopt full-text conditioning (D1): D1-on
+  failed 3 of 23 long segments, D1-off 2 of 27, all under Consistent, Expressive clean, Fast QC
+  refused them all. The Consistent stall is a 3.0 known limitation in the release notes; the
+  long-form smoke now pins Expressive and runs alone (`ui_test.sh ios smoke --scenario long-form`).
+  For the maintainer: C-02 (shorter segments) and the subtalker hypothesis on ER-05.
+- **BG-01's hardening landed** with tests: the foreground permit (also when the engine starts in
+  the background), cancellation of the clone prime and the chained prompt prebuilds, a check before
+  marking, MLX error scopes on clone adoption, persistence and replay, the CPU finite check and the
+  evaluated ICL encode. Left: `background-warmup` on the iPhone.
+- **CONV-21 landed:** mlx-swift 0.32.3, mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and
+  swift-huggingface 1.0.0 with their prerequisites. A same-host A/B kept RTF, memory and audio QC
+  unchanged; the warm first chunk rose 146 → 155 ms, and the first cold run paid a one-time Metal
+  compile, so prewarm now also runs the production sampler. Gate baseline re-pooled, memory
+  qualification and a 336-take qc-takes screen pass; seeds changed (release note). Left: TSan and
+  `dev.sh ci`, the Mac smoke lanes, the iPhone checks.
+- **ER-13:** the sourced research report
+  ([`2026-10-17-qwen3-tts-model-research.md`](audits/2026-10-17-qwen3-tts-model-research.md)) and
+  docs pass 1, which corrected the wrong model facts in the guides. Pass 2 follows the freeze
+  decisions.
+- **Queued for the next iPhone window:** the full smoke, `--scenario long-form`, `background-warmup`,
+  an iPhone memory benchmark on the new MLX, and the first take after the update (one-time compile).
+
+### October 16, evening — engine audit approved; the remediation starts on the Mac
 
 The maintainer asked for an exhaustive audit of the engine runtime and a step-by-step remediation
 plan; it is [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2026-10-16-engine-runtime-audit.md)

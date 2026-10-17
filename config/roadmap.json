@@ -179,7 +179,7 @@
         "project.yml",
         "scripts/macos_test.sh"
       ],
-      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started. Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. 2026-10-16: re-homed into the release plan by the maintainer (engine audit DEP-1, DEP-2, F-01 to F-19). 2026-10-16: prerequisites landed: F-03 readback probes, F-06 the MLX build in the clone feature version (checked against the pin), F-11 the Hub and Tokenizers products only, F-20 the golden sampler canary on 0.31.6. Next: the repin.",
+      "notes": "Opened 2026-09-15 when the Mac moved to macOS 27 / Xcode 27 and the iPhone to iOS 27; deployment targets stay 26 and CI stays on the pinned Xcode 26.6 until the runners offer 27. Re-homed into the release plan on 2026-10-16 by the maintainer (engine audit DEP-1, DEP-2, F-01 to F-20). Landed on the Mac on 2026-10-16: the prerequisites (F-03, F-06, F-11, F-20) and the repin (57196483). A same-host A/B of three seeded gate runs per side (20496dc4): RTF, MLX peak and audio QC unchanged; warm first chunk 146 → 155 ms (F-04); the first cold run paid a one-time Metal compile (prewarm 6.5 s, +1.6 s in the first take, F-05), so prewarm now also runs the production sampler (bf19e2c6). The gate baseline is re-pooled; memory qualification passes (mac-memory-qualification-20261017-011445-7c69c6e2); a qc-takes screen of 336 en/fr takes had no Fast QC rejection. Left: TSan and dev.sh ci, the Mac smoke lanes once Mac XCUITest resumes, and the iPhone smoke, background-warmup, memory benchmark and first-take compile check in the next announced window.",
       "updated": "2026-10-16",
       "due": "2026-10-22"
     },
@@ -2000,6 +2000,21 @@
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
       "notes": "Requested by the maintainer on 2026-10-16; doc-only, so it may run before the freeze. Re-homed into the release plan on 2026-10-16 while worked (doc-only). The research report is in (two read-only research agents plus the lead's verification against code); its §9 gap analysis is pass 1's work list, and pass 2 follows RF-18 and CONV-21 as shipped.",
       "due": "2026-10-22"
+    },
+    {
+      "id": "BKL-17",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The qc-takes lane runs QC v2 under a Python without its dependencies",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/macos_test.sh qc-takes scores its take pool with QC v2 through the interpreter scripts/select_python.py picks, and a missing dependency fails the lane instead of reporting qc_v2=ERROR.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/select_python.py"
+      ],
+      "updated": "2026-10-16",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-16: every qc-takes run that day (RF-18's screen and CONV-21's) generated its takes but printed qc_v2=ERROR run=none, because the lane calls scripts/qc.py with the plain python3 (Homebrew 3.15, no numpy). Fast QC still judged every take; only the report-only QC v2 scoring was missing."
     }
   ]
 }

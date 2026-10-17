@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 4 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 10/19 (53%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 10/20 (50%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -540,6 +540,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-13` | parked | Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project | — |
 | `BKL-15` | parked | Mac Saved Voices empty and error states may lay the window out off screen | — |
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
+| `BKL-17` | parked | The qc-takes lane runs QC v2 under a Python without its dependencies | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -568,6 +569,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-16`** (parked) — iOS UI text replacement cannot clear an editor whose caret lands at the start.
   gate: VocelloUITextEntry.replace on iOS clears existing text wherever the tap leaves the caret and verifies the result, and the control audit's Design brief restore observes the restored value.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-17`** (parked) — The qc-takes lane runs QC v2 under a Python without its dependencies.
+  gate: scripts/macos_test.sh qc-takes scores its take pool with QC v2 through the interpreter scripts/select_python.py picks, and a missing dependency fails the lane instead of reporting qc_v2=ERROR.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

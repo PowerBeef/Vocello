@@ -1,6 +1,7 @@
 import XCTest
 
-/// MAC-16 / IOS-16: take file names and the iPhone's output-folder override.
+/// MAC-16 / IOS-16 / SEC-1: take file names, the names of their exported
+/// copies and the iPhone's output-folder override.
 final class GenerationOutputFileNameTests: XCTestCase {
     private let utc = TimeZone(identifier: "UTC")!
     /// 2026-09-26 14:03:07.250 UTC. A quarter second is exact in binary, so the
@@ -13,59 +14,69 @@ final class GenerationOutputFileNameTests: XCTestCase {
         XCTAssertTrue(stamp.allSatisfy { $0.isASCII })
     }
 
-    func testTheNameJoinsTheTimestampAndTheSnippet() {
+    /// SEC-1: a take's name is the timestamp and the app's name, never the
+    /// script, because the share sheet, AirDrop, Files and the Mac's output
+    /// folder all show it.
+    func testTheNameJoinsTheTimestampAndTheAppName() {
+        let name = GenerationOutputFileName.make(date: date, timeZone: utc)
+        XCTAssertEqual(name, "20260926_14-03-07-250_Vocello.wav")
+        XCTAssertTrue(name.allSatisfy { $0.isASCII })
+    }
+
+    /// SEC-1: takes an earlier build named after their script keep that name
+    /// on disk; their saved and exported copies take the neutral name of the
+    /// same moment, whatever the script's language or length.
+    func testAnEarlierBuildsTakeExportsUnderTheNeutralName() {
+        let neutral = GenerationOutputFileName.make(date: date, timeZone: utc)
+        for legacy in [
+            "20260926_14-03-07-250_Hello_world.wav",
+            "20260926_14-03-07-250_こんにちは_世界.wav",
+            "20260926_14-03-07-250_नमस्ते_दुनिया.wav",
+            "20260926_14-03-07-250_audio.wav",
+            // A long-form segment: `segment_<n>_<line>`, then a UUID.
+            "20260926_14-03-07-250_segment_0001_Tell_Ma_0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D.wav",
+        ] {
+            XCTAssertEqual(GenerationOutputFileName.exportName(forTakeNamed: legacy), neutral, legacy)
+        }
+    }
+
+    func testACurrentTakeAndItsLongFormSegmentsExportUnderTheTakeName() {
+        let name = GenerationOutputFileName.make(date: date, timeZone: utc)
+        XCTAssertEqual(GenerationOutputFileName.exportName(forTakeNamed: name), name)
+        let segment = LongFormHistoryAcceptance.uniqueAudioURL(
+            basedOn: URL(fileURLWithPath: "/outputs/CustomVoice").appendingPathComponent(name)
+        )
+        XCTAssertNotEqual(segment.lastPathComponent, name, "a segment adds its UUID")
+        XCTAssertEqual(GenerationOutputFileName.exportName(forTakeNamed: segment.lastPathComponent), name)
+    }
+
+    func testTheExportNameKeepsTheExtension() {
         XCTAssertEqual(
-            GenerationOutputFileName.make(text: "Hello, world!", date: date, timeZone: utc),
-            "20260926_14-03-07-250_Hello_world.wav"
+            GenerationOutputFileName.exportName(forTakeNamed: "20260926_14-03-07-250_Hello.WAV"),
+            "20260926_14-03-07-250_Vocello.WAV"
+        )
+        XCTAssertEqual(
+            GenerationOutputFileName.exportName(forTakeNamed: "20260926_14-03-07-250_Hello"),
+            "20260926_14-03-07-250_Vocello"
         )
     }
 
-    func testWhitespaceRunsIncludingNewlinesAndTabsBecomeOneUnderscore() {
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "Line one\n\tline two"), "Line_one_line_two")
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "  padded   words  "), "padded_words")
-        XCTAssertFalse(GenerationOutputFileName.snippet(from: "a\r\nb\u{2028}c").contains { $0.isWhitespace })
-    }
-
-    func testTheSnippetIsBoundedAndNeverEndsWithAnUnderscore() {
-        let snippet = GenerationOutputFileName.snippet(from: "The quick brown fox jumps over the lazy dog")
-        XCTAssertLessThanOrEqual(snippet.count, GenerationOutputFileName.snippetLength)
-        XCTAssertFalse(snippet.hasSuffix("_"))
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "abcdefghijklmnopqrs tuvw"), "abcdefghijklmnopqrs")
-    }
-
-    func testPunctuationOnlyTextFallsBack() {
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "?!…\n\t"), GenerationOutputFileName.fallbackSnippet)
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: ""), GenerationOutputFileName.fallbackSnippet)
-    }
-
-    func testNonLatinLettersAreKept() {
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "こんにちは 世界"), "こんにちは_世界")
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: "नमस्ते दुनिया"), "नमस्ते_दुनिया", "a letter keeps its marks")
-    }
-
-    /// P09-03: the emoji the snippet strips leave their variation selectors and
-    /// joiners behind, and stacked marks make one letter of any size; neither
-    /// may push the staging or long-form segment name past the 255-character
-    /// file-name limit, which would fail every take of that script.
-    func testNoScriptPushesTheTakeNamePastTheFileNameLimit() {
-        let hearts = String(repeating: "\u{2764}\u{FE0F}", count: 200) + " hi"
-        let flags = String(repeating: "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}", count: 100)
-        let zalgo = String(repeating: "a" + String(repeating: "\u{0301}", count: 12), count: 20)
-        let stagingAndSegmentSuffixes = 42 + 37
-        for text in [hearts, flags, zalgo] {
-            let name = GenerationOutputFileName.make(text: text, date: date, timeZone: utc)
-            XCTAssertLessThanOrEqual(name.utf8.count + stagingAndSegmentSuffixes, 255)
-            let snippet = GenerationOutputFileName.snippet(from: text)
-            XCTAssertLessThanOrEqual(snippet.utf8.count, GenerationOutputFileName.snippetUTF8Budget)
-            for character in snippet {
-                XCTAssertLessThanOrEqual(character.unicodeScalars.count, GenerationOutputFileName.maximumScalarsPerCharacter)
-                let first = character.unicodeScalars.first!
-                XCTAssertFalse(first.properties.isGraphemeExtend || first.value == 0x200D, "no lone extender")
-            }
+    /// Names that do not begin with a take timestamp carry no script and are
+    /// exported as they are: a joined long-form project, a recovery journal,
+    /// a near miss of the timestamp.
+    func testANameWithoutATakeTimestampIsExportedUnchanged() {
+        for name in [
+            "long_form_joined_0123abcd_0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D.wav",
+            "0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D.json",
+            "custom_take.wav",
+            "20260926_14-03-07-250.wav",
+            "2026092_14-03-07-250_Hello.wav",
+            "x20260926_14-03-07-250_Hello.wav",
+            "\u{0662}\u{0660}\u{0662}\u{0666}\u{0660}\u{0669}\u{0662}\u{0666}_14-03-07-250_Hello.wav",
+            "",
+        ] {
+            XCTAssertEqual(GenerationOutputFileName.exportName(forTakeNamed: name), name, name)
         }
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: hearts), "hi")
-        XCTAssertEqual(GenerationOutputFileName.snippet(from: flags), GenerationOutputFileName.fallbackSnippet)
-        XCTAssertTrue(GenerationOutputFileName.snippet(from: zalgo).hasPrefix("a\u{0301}\u{0301}\u{0301}"))
     }
 
     // MARK: - IOS-16 output root

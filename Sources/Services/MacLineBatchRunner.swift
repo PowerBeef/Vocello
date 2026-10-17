@@ -195,7 +195,7 @@ final class MacLineBatchRunner {
             ), attempt: attempt)
 
             do {
-                let outputPath = makeOutputPath(subfolder: request.outputSubfolder, text: line)
+                let outputPath = makeOutputPath(subfolder: request.outputSubfolder)
                 guard let generationRequest = request.generationRequest(
                     line: line,
                     outputPath: outputPath,

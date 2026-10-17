@@ -1016,7 +1016,7 @@ struct MacVoiceCloningScreen: View {
         guard let request = MacStudioGenerationRequestFactory.voiceClone(
             modelID: model.id,
             text: text,
-            outputPath: makeOutputPath(subfolder: model.outputSubfolder, text: text),
+            outputPath: makeOutputPath(subfolder: model.outputSubfolder),
             language: currentDraft.selectedLanguage,
             referenceAudioPath: refPath,
             referenceTranscript: currentDraft.trimmedReferenceTranscript,

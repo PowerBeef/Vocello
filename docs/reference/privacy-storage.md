@@ -56,7 +56,7 @@ Maintained macOS subtrees and preferences:
   interrupted once untouched for an hour (CORE-15).
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and completed-range sidecars while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB. A failure is its typed error summary, so error text, raw URLs and absolute paths are excluded (see [Diagnostics](#diagnostics)).
-- `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder. A take is written to a hidden staging file beside its final name (`.<name>.<UUID>.tmp.wav`) and renamed into place; each engine start removes the staging files a crash left under `outputs/` once untouched for an hour (CORE-15). A user-chosen output folder is not walked.
+- `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder. A take is named after its time and the app (`20261016_14-03-07-512_Vocello.wav`; a long-form segment adds a UUID), never after its script, because the file keeps that name in Finder, Spotlight, the share sheet, AirDrop and Files (SEC-1). Takes from earlier builds keep their `<time>_<script opening>.wav` names on disk, and Save As and Export Recovery Files give their copies the neutral name. A take is written to a hidden staging file beside its final name (`.<name>.<UUID>.tmp.wav`) and renamed into place; each engine start removes the staging files a crash left under `outputs/` once untouched for an hour (CORE-15). A user-chosen output folder is not walked.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). WAV, MP3, AIFF, and M4A are kept as they are; any other readable format (FLAC, Ogg, AIF, CAF) is converted to canonical WAV before the candidate is staged, through a transient `cache/normalized_clone_refs/saved-voice-import-<UUID>.wav` removed once the candidate holds its copy (MAC-09). Voices saved by earlier builds are not rewritten. Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
   Cloning from a voice whose audio is not already canonical 24 kHz mono WAV keeps a normalized copy and its mirrored transcript in
@@ -158,7 +158,8 @@ Maintained iPhone subtrees:
 - `ios_model_delivery_state.json` under `downloads/` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data, and hard links to the shared blobs a delivery reuses.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 200 records and 5 MB (the same shared store as macOS). It excludes raw URLs, absolute paths, device identity, and user data.
-- `outputs/` stores generated audio. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
+- `outputs/` stores generated audio, named as on macOS, never after the script (SEC-1); the share sheet
+  and the Saved outputs copy hand a take out under that name. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
   The internal App Group copy always remains available to History. Checking/unowned access skips
   the paid-mode external copy, not internal persistence; export manually after verification.
@@ -312,7 +313,7 @@ cannot see what a running app writes.
 Runtime diagnostics go through one projection instead (AUD-08): `DiagnosticPrivacy` in
 `Sources/QwenVoiceCore/DiagnosticPrivacy.swift`. Error text is not safe to keep. A file error's
 `localizedDescription` quotes the file name and its reflected description adds the absolute path;
-generated output names begin with the script; a wrapped error can quote a prompt or transcript. A
+the output names of takes from builds before SEC-1 begin with the script; a wrapped error can quote a prompt or transcript. A
 persisted or exported diagnostic therefore records a failure as its typed summary, never as error
 text. The summary holds the `GenerationFailureDiagnosticLogger.errorMetadata` code, the error type
 and enum case, the `NSError` domain and code, the domains and codes of the errors it wraps, the

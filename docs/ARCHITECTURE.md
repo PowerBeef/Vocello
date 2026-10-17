@@ -862,7 +862,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   final-file handoff, the autoplay hold and take succession) are value types in
   `Services/AudioPlaybackResumePolicy.swift`, tested in `VocelloCoreTests`),
   `ReferenceClipRecorder` + `ClipReviewPlayer` (reference capture), `WaveformService` (block-read
-  waveform bars) and `GenerationOutputFileName` (take file names in the POSIX locale),
+  waveform bars) and `GenerationOutputFileName` (neutral take file names, a POSIX-locale timestamp
+  and the app's name, and the neutral names of exported copies; SEC-1),
   `ReferenceTranscriptionReviewState` (operation-generation review and explicit audio-only policy),
   `VoiceClipTranscriber` (on-device transcription plus privacy-safe enrollment metadata), `GenerationPersistence`
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,

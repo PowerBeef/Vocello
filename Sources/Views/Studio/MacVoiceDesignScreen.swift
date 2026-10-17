@@ -370,7 +370,7 @@ struct MacVoiceDesignScreen: View {
         let request = MacStudioGenerationRequestFactory.voiceDesign(
             modelID: model.id,
             text: text,
-            outputPath: makeOutputPath(subfolder: model.outputSubfolder, text: text),
+            outputPath: makeOutputPath(subfolder: model.outputSubfolder),
             language: draft.selectedLanguage,
             voiceDescription: voiceDescription,
             deliveryStyle: emotion,

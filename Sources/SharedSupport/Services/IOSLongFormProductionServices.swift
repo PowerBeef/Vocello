@@ -13,8 +13,8 @@ final class IOSLongFormProductionServices: IOSLongFormProjectServices {
 
     var shouldAutoPlay: Bool { AudioService.shouldAutoPlay }
 
-    func segmentOutputPath(subfolder: String, text: String) -> String {
-        AudioService.makeOutputPath(subfolder: subfolder, text: text)
+    func segmentOutputPath(subfolder: String) -> String {
+        AudioService.makeOutputPath(subfolder: subfolder)
     }
 
     func recordSubmitted(id: UUID, mode: String) async {

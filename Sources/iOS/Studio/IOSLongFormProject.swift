@@ -95,7 +95,7 @@ protocol IOSLongFormAudioPlayback: AnyObject, Sendable {
 @MainActor
 protocol IOSLongFormProjectServices: AnyObject, Sendable {
     var shouldAutoPlay: Bool { get }
-    func segmentOutputPath(subfolder: String, text: String) -> String
+    func segmentOutputPath(subfolder: String) -> String
     func recordSubmitted(id: UUID, mode: String) async
     func recordCompleted(
         id: UUID,
@@ -308,10 +308,6 @@ struct IOSLongFormProjectRequest {
     var joinedOutputPauseBudget: Int {
         lines.reduce(0) { $0 + PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: $1) }
             + max(0, lines.count - 1)
-    }
-
-    func outputText(forSegment index: Int) -> String {
-        String(format: "segment_%04d_%@", index + 1, String(lines[index].prefix(40)))
     }
 
     /// The planned sub-seed of a segment, the seed of its first take.
@@ -894,8 +890,7 @@ final class IOSLongFormProjectRunner {
             let generationID = UUID()
             var generationCompleted = false
             let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
-                subfolder: request.model.outputSubfolder,
-                text: request.outputText(forSegment: index)
+                subfolder: request.model.outputSubfolder
             ))).path
             do {
                 // Live narration per segment (playback gated by the user's
@@ -1164,8 +1159,7 @@ final class IOSLongFormProjectRunner {
 
         let generationID = UUID()
         let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
-            subfolder: request.model.outputSubfolder,
-            text: request.outputText(forSegment: segmentIndex)
+            subfolder: request.model.outputSubfolder
         ))).path
         var candidateAudioURLs: [URL] = []
         var generationCompleted = false

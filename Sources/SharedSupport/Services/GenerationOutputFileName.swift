@@ -1,26 +1,30 @@
 import Foundation
 
-/// The file name of a generated take on both platforms: a timestamp and a
-/// short snippet of the script, `20260926_14-03-07-512_Hello_world.wav`.
+/// The file name of a generated take on both platforms: a timestamp and the
+/// app's name, `20260926_14-03-07-512_Vocello.wav`.
+///
+/// SEC-1 (BKL-09): the name carries none of the script. A take leaves the app
+/// under its own name (the iPhone share sheet, AirDrop and Files, the Mac's
+/// output folder, Save As and the recovery export), so the script snippet that
+/// earlier builds put in it showed the text wherever the file went. Those
+/// takes keep their `<timestamp>_<snippet>.wav` names on disk;
+/// `exportName(forTakeNamed:)` names their saved and exported copies. Takes
+/// are written one at a time, so the millisecond timestamp keeps names unique;
+/// a long-form segment also adds a UUID (`LongFormHistoryAcceptance`).
 ///
 /// MAC-16 / IOS-16: the timestamp is formatted with the POSIX locale and the
 /// Gregorian calendar, so a Buddhist or Japanese calendar, or a locale with its
-/// own digits, never changes the year or the characters of a file name, and the
-/// snippet keeps no newline, tab or other whitespace run, only single `_`s.
+/// own digits, never changes the year or the characters of a file name.
 enum GenerationOutputFileName {
-    static let fallbackSnippet = "audio"
-    static let snippetLength = 20
-    /// P09-03: the snippet's UTF-8 budget. A file name allows 255 characters,
-    /// the staging name adds about 42 and a long-form segment another 37; twenty
-    /// CJK letters (60 bytes) still fit whole.
-    static let snippetUTF8Budget = 80
-    /// Scalars kept per character: a letter and its first marks. ICU `\w` keeps
-    /// combining marks, so a stacked ("zalgo") letter is otherwise one
-    /// character of unbounded size.
-    static let maximumScalarsPerCharacter = 4
+    /// The word after the timestamp. It names the app, never the take's content.
+    static let neutralLabel = "Vocello"
+    /// The `yyyyMMdd_HH-mm-ss-SSS` timestamp that begins every take's name,
+    /// then `_`. The macOS playback-capture analysis matches it too
+    /// (`OUTPUT_NAME_RE` in `scripts/lib/playback_capture.py`).
+    private static let timestampPrefixPattern = #"^[0-9]{8}_[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{3}_"#
 
-    static func make(text: String, date: Date = Date(), timeZone: TimeZone = .current) -> String {
-        "\(timestamp(for: date, timeZone: timeZone))_\(snippet(from: text)).wav"
+    static func make(date: Date = Date(), timeZone: TimeZone = .current) -> String {
+        "\(timestamp(for: date, timeZone: timeZone))_\(neutralLabel).wav"
     }
 
     /// `yyyyMMdd_HH-mm-ss-SSS` in `timeZone`, with ASCII digits whatever the
@@ -36,48 +40,22 @@ enum GenerationOutputFileName {
         return formatter.string(from: date)
     }
 
-    /// Letters, digits, `_` and `-` of the script's opening, whitespace runs
-    /// (newlines and tabs included) collapsed to one `_`, at most
-    /// `snippetLength` characters and `snippetUTF8Budget` bytes, never starting
-    /// or ending with `_`. P09-03: marks, joiners and variation selectors left
-    /// without a letter (the emoji they belonged to is stripped) are dropped,
-    /// and a letter keeps at most `maximumScalarsPerCharacter` scalars, so no
-    /// script can push a take's file name past the file system's limit.
-    static func snippet(from text: String) -> String {
-        let kept = text.replacingOccurrences(of: #"[^\w\s-]"#, with: "", options: .regularExpression)
-        let words = kept.split(whereSeparator: { $0.isWhitespace })
-        let joined = words.joined(separator: "_")
-        var clipped = ""
-        var characters = 0
-        var bytes = 0
-        for character in joined {
-            guard characters < snippetLength else { break }
-            guard let first = character.unicodeScalars.first, !isBaselessExtender(first) else { continue }
-            var piece = String.UnicodeScalarView()
-            piece.append(contentsOf: character.unicodeScalars.prefix(maximumScalarsPerCharacter))
-            let bounded = String(piece)
-            guard bytes + bounded.utf8.count <= snippetUTF8Budget else { break }
-            clipped += bounded
-            characters += 1
-            bytes += bounded.utf8.count
+    /// SEC-1: the name a copy of the take named `name` gets where the user
+    /// saves or exports it. A take name keeps its timestamp and extension and
+    /// drops everything between them, an earlier build's script snippet and a
+    /// long-form segment's UUID alike, so `20260926_14-03-07-512_Hello_world.wav`
+    /// becomes `20260926_14-03-07-512_Vocello.wav`. A name that does not begin
+    /// with a take timestamp (a joined long-form project, a recovery journal)
+    /// carries no script and is returned as it is.
+    static func exportName(forTakeNamed name: String) -> String {
+        guard let prefix = name.range(of: timestampPrefixPattern, options: .regularExpression) else {
+            return name
         }
-        clipped = clipped.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-        return clipped.isEmpty ? fallbackSnippet : clipped
-    }
-
-    /// A scalar that only extends the character before it: a combining mark, a
-    /// zero-width joiner or a variation selector.
-    private static func isBaselessExtender(_ scalar: Unicode.Scalar) -> Bool {
-        let properties = scalar.properties
-        if properties.isGraphemeExtend || properties.isVariationSelector || scalar.value == 0x200D {
-            return true
-        }
-        switch properties.generalCategory {
-        case .nonspacingMark, .spacingMark, .enclosingMark:
-            return true
-        default:
-            return false
-        }
+        let stamp = name[prefix].dropLast()
+        let pathExtension = (name as NSString).pathExtension
+        return pathExtension.isEmpty
+            ? "\(stamp)_\(neutralLabel)"
+            : "\(stamp)_\(neutralLabel).\(pathExtension)"
     }
 }
 

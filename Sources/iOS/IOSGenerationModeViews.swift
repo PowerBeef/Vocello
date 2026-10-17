@@ -489,7 +489,7 @@ struct IOSCustomVoiceView: View {
                     coordinator.finish(attempt: attempt)
                 }
             }
-            let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
+            let outputPath = makeOutputPath(subfolder: model.outputSubfolder)
             do {
                 let plan = try IOSSingleTakeGenerationPlan(
                     request: GenerationRequest(
@@ -1388,7 +1388,7 @@ struct IOSVoiceDesignView: View {
                     coordinator.finish(attempt: attempt)
                 }
             }
-            let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: promptText)
+            let outputPath = makeOutputPath(subfolder: model.outputSubfolder)
             do {
                 let plan = try IOSSingleTakeGenerationPlan(
                     request: GenerationRequest(
@@ -2230,7 +2230,7 @@ struct IOSVoiceCloningView: View {
                     transcript: currentDraft.trimmedReferenceTranscript,
                     preparedVoiceID: currentDraft.selectedSavedVoiceID
                 )
-                let outputPath = makeOutputPath(subfolder: model.outputSubfolder, text: currentPrompt)
+                let outputPath = makeOutputPath(subfolder: model.outputSubfolder)
                 let voiceName = currentVoiceName
                     ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
                 let plan = try IOSSingleTakeGenerationPlan(

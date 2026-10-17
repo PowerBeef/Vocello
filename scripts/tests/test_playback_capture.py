@@ -144,6 +144,17 @@ class HelperTests(unittest.TestCase):
             self.assertIsNone(pc.resolve_reference_wav(Path(tmp), "clone", epoch + 60_000, epoch + 70_000, 2.32))
             self.assertIsNone(pc.resolve_reference_wav(Path(tmp), "unknown", epoch - 2000, epoch + 5000, 2.32))
 
+    def test_reference_resolution_reads_the_neutral_take_name(self) -> None:
+        # SEC-1 (BKL-09): takes are named `<timestamp>_Vocello.wav`, without the script.
+        with tempfile.TemporaryDirectory() as tmp:
+            clones = Path(tmp, "Clones")
+            clones.mkdir()
+            stamp = dt.datetime(2026, 10, 16, 9, 5, 1, 125_000)
+            name = stamp.strftime("%Y%m%d_%H-%M-%S-") + "125_Vocello.wav"
+            pc.write_wav_int16(clones / name, 24_000, np.zeros(int(24_000 * 1.5)))
+            epoch = stamp.timestamp() * 1000
+            self.assertEqual(pc.resolve_reference_wav(Path(tmp), "clone", epoch - 2000, epoch + 5000, 1.5), clones / name)
+
 
 class GateTests(unittest.TestCase):
     def test_a_clean_capture_passes_and_each_threshold_is_named(self) -> None:

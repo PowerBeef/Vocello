@@ -196,7 +196,7 @@ private final class LongFormFixtureServices: IOSLongFormProjectServices {
         self.outputsRoot = outputsRoot
     }
 
-    func segmentOutputPath(subfolder: String, text: String) -> String {
+    func segmentOutputPath(subfolder: String) -> String {
         let directory = outputsRoot.appendingPathComponent(subfolder, isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         outputCount += 1

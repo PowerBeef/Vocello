@@ -326,7 +326,7 @@ struct MacCustomVoiceScreen: View {
         let request = MacStudioGenerationRequestFactory.customVoice(
             modelID: model.id,
             text: text,
-            outputPath: makeOutputPath(subfolder: model.outputSubfolder, text: text),
+            outputPath: makeOutputPath(subfolder: model.outputSubfolder),
             language: draft.selectedLanguage,
             speakerID: speaker,
             deliveryStyle: model.supportsInstructionControl ? draft.emotion : nil,

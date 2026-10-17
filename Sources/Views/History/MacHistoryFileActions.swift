@@ -9,9 +9,13 @@ import UniformTypeIdentifiers
 enum MacHistoryFileActions {
     /// Copies the take's WAV where the user chooses. Returns the failure
     /// description, or nil when the copy succeeded or the user cancelled.
+    /// The suggested name is neutral, even for a take an earlier build named
+    /// after its script (SEC-1).
     static func saveCopy(of audioPath: String) -> String? {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = URL(fileURLWithPath: audioPath).lastPathComponent
+        panel.nameFieldStringValue = GenerationOutputFileName.exportName(
+            forTakeNamed: URL(fileURLWithPath: audioPath).lastPathComponent
+        )
         panel.allowedContentTypes = [.wav]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
@@ -27,9 +31,9 @@ enum MacHistoryFileActions {
         }
     }
 
-    /// Copies the pending recovery audio into a folder the user chooses.
-    /// Returns the number of files that could not be copied, or nil when the
-    /// user cancelled.
+    /// Copies the pending recovery audio into a folder the user chooses, each
+    /// copy under its neutral export name (SEC-1). Returns the number of files
+    /// that could not be copied, or nil when the user cancelled.
     static func exportPendingAudio(_ urls: [URL]) -> Int? {
         guard !urls.isEmpty else { return nil }
         let panel = NSOpenPanel()
@@ -42,10 +46,11 @@ enum MacHistoryFileActions {
 
         var failures = 0
         for source in urls {
-            var target = destination.appendingPathComponent(source.lastPathComponent)
+            let exportName = GenerationOutputFileName.exportName(forTakeNamed: source.lastPathComponent) as NSString
+            var target = destination.appendingPathComponent(exportName as String)
             if FileManager.default.fileExists(atPath: target.path) {
                 target = destination.appendingPathComponent(
-                    "\(source.deletingPathExtension().lastPathComponent)-\(UUID().uuidString.prefix(8)).\(source.pathExtension)"
+                    "\(exportName.deletingPathExtension)-\(UUID().uuidString.prefix(8)).\(exportName.pathExtension)"
                 )
             }
             do {

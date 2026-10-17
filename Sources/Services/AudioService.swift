@@ -57,8 +57,9 @@ enum AudioService {
         configuredOutputDirectoryIssue() == nil ? configuredOutputsRoot : AppPaths.outputsDir
     }
 
-    /// Generate an output file path with timestamp and text snippet.
-    static func makeOutputPath(subfolder: String, text: String) -> String {
+    /// A new take's path: the output folder and a neutral, timestamped name
+    /// that carries none of the script (SEC-1).
+    static func makeOutputPath(subfolder: String) -> String {
         var outputsDir = effectiveOutputsRoot.appendingPathComponent(subfolder, isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: outputsDir, withIntermediateDirectories: true)
@@ -68,11 +69,11 @@ enum AudioService {
             outputsDir = AppPaths.outputsDir.appendingPathComponent(subfolder, isDirectory: true)
             try? FileManager.default.createDirectory(at: outputsDir, withIntermediateDirectories: true)
         }
-        return outputsDir.appendingPathComponent(GenerationOutputFileName.make(text: text)).path
+        return outputsDir.appendingPathComponent(GenerationOutputFileName.make()).path
     }
 }
 
 /// Global convenience function used by generate views.
-func makeOutputPath(subfolder: String, text: String) -> String {
-    AudioService.makeOutputPath(subfolder: subfolder, text: text)
+func makeOutputPath(subfolder: String) -> String {
+    AudioService.makeOutputPath(subfolder: subfolder)
 }

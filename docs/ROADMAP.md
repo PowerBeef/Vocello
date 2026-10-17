@@ -55,8 +55,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
-| `BG-01` | planned | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
-| `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
+| `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
+| `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
@@ -109,10 +109,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`AUD-09`** (planned, due 2026-10-21) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
-- **`BG-01`** (planned, due 2026-10-22) — Prove or rule out GPU work outliving the foreground (engine review BG-1).
+- **`BG-01`** (in-flight, due 2026-10-22) — Prove or rule out GPU work outliving the foreground (engine review BG-1).
   gate: Proactive model work (the Clone prime, the saved-voice prompt prebuild, model-only warms) is refused unless the app is active and is cancelled when it stops being active; a take checks cancellation before marking; clone-artifact adoption, persistence and codec replay run inside MLX error scopes with the embedding's finite check on the CPU stream, and the ICL reference encode is evaluated inside its own scope and lease (engine audit B-01, F-01, B-14, F-07). Deterministic tests pin each. scripts/ui_test.sh ios smoke --scenario background-warmup runs in the next announced iPhone window; the MLX refresh (CONV-21) adds the mechanism-level fix.
 
-- **`CONV-21`** (planned, due 2026-10-22) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
+- **`CONV-21`** (in-flight, due 2026-10-22) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: Authorized by the maintainer on 2026-10-16 before the freeze: mlx-swift 0.32.3 (never 0.32.2), mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and swift-huggingface 1.0.0 move together, after BG-01's error scopes, readback failure probes (F-03), a golden seeded-sampling canary recorded on the old pin (F-20), the MLX version in the clone-artifact identity (F-06) and the Tokenizers-only product (F-11). The seed change is accepted with a release-note line (F-02) and prewarm covers the runtime-compiled gemv shapes (F-04, F-05). config/toolchain.json pins a CI toolchain GitHub's runners provide; the deployment targets stay at 26; the move is reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline, re-pooled from three seeded runs) and a clean unit lane; scripts/dev.sh ci is green; Mac memory qualification and a qc-takes screen pass. The iPhone smoke, background-warmup and memory benchmark run in the next announced iPhone window.
 
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.

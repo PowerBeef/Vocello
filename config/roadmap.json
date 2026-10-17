@@ -169,7 +169,7 @@
       "id": "CONV-21",
       "plan": "release-first-3-0-2026-09",
       "title": "Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Authorized by the maintainer on 2026-10-16 before the freeze: mlx-swift 0.32.3 (never 0.32.2), mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and swift-huggingface 1.0.0 move together, after BG-01's error scopes, readback failure probes (F-03), a golden seeded-sampling canary recorded on the old pin (F-20), the MLX version in the clone-artifact identity (F-06) and the Tokenizers-only product (F-11). The seed change is accepted with a release-note line (F-02) and prewarm covers the runtime-compiled gemv shapes (F-04, F-05). config/toolchain.json pins a CI toolchain GitHub's runners provide; the deployment targets stay at 26; the move is reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline, re-pooled from three seeded runs) and a clean unit lane; scripts/dev.sh ci is green; Mac memory qualification and a qc-takes screen pass. The iPhone smoke, background-warmup and memory benchmark run in the next announced iPhone window.",
       "sourceOfTruth": [
@@ -179,7 +179,7 @@
         "project.yml",
         "scripts/macos_test.sh"
       ],
-      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started. Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. 2026-10-16: re-homed into the release plan by the maintainer (engine audit DEP-1, DEP-2, F-01 to F-19).",
+      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started. Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. 2026-10-16: re-homed into the release plan by the maintainer (engine audit DEP-1, DEP-2, F-01 to F-19). 2026-10-16: prerequisites landed: F-03 readback probes, F-06 the MLX build in the clone feature version (checked against the pin), F-11 the Hub and Tokenizers products only, F-20 the golden sampler canary on 0.31.6. Next: the repin.",
       "updated": "2026-10-16",
       "due": "2026-10-22"
     },
@@ -1728,7 +1728,7 @@
       "id": "BG-01",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
-      "status": "planned",
+      "status": "in-flight",
       "due": "2026-10-22",
       "blockedBy": [],
       "gate": "Proactive model work (the Clone prime, the saved-voice prompt prebuild, model-only warms) is refused unless the app is active and is cancelled when it stops being active; a take checks cancellation before marking; clone-artifact adoption, persistence and codec replay run inside MLX error scopes with the embedding's finite check on the CPU stream, and the ICL reference encode is evaluated inside its own scope and lease (engine audit B-01, F-01, B-14, F-07). Deterministic tests pin each. scripts/ui_test.sh ios smoke --scenario background-warmup runs in the next announced iPhone window; the MLX refresh (CONV-21) adds the mechanism-level fix.",
@@ -1740,7 +1740,7 @@
         "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift"
       ],
       "updated": "2026-10-16",
-      "notes": "Maintainer decision 2026-10-13: more device checks before classifying. The first check (ios-xcui-smoke-20261013-232424-a8c32853) passed at 0.3, 1.5 and 3.0 s after the Clone handoff but could not show a warm-up was in flight; the scenario now waits for visible in-flight states and attaches what each pass observed. 2026-10-13: the strengthened check PASSES (ios-xcui-smoke-20261014-013015-ab48517b): all six passes left with the work in flight (three during Preparing reference, three during a cold take's load and warm) and the app survived each, with a clean crash delta. The prompt prebuild after Save voice and marking at a take's end have no visible signal and stay uncovered. The maintainer chose to cover those two paths before classifying: internal-diagnostics-only events for leaving the foreground, marking and the prompt prebuild, then device passes. Paused by the maintainer on 2026-10-13 before any code changed. 2026-10-16: the maintainer chose the engine audit's hardening as BG-01's fix shape before the freeze, together with the MLX refresh (CONV-21)."
+      "notes": "Maintainer decision 2026-10-13: device checks before classifying. The strengthened check passed (ios-xcui-smoke-20261014-013015-ab48517b): six exits with work visibly in flight (Preparing reference; a cold take's load and warm) left the app running with a clean crash delta; the prompt prebuild after Save voice and end-of-take marking have no visible signal. 2026-10-16: the maintainer chose the engine audit's hardening as the fix, with the MLX refresh (CONV-21). Landed on the Mac the same day: the foreground permit (also applied when the engine starts in the background); leaving cancels the clone prime and the chained prompt prebuilds; a take checks cancellation before marking; clone adoption, persistence and codec replay run in MLX error scopes, where only an evaluation or allocation failure unloads the model; the CPU finite check; the evaluated ICL encode. Tests pin the permit, the chain, adoption's typed failure and the unload rule; the pre-marking check is verified by review only. Left: smoke --scenario background-warmup in the next announced iPhone window."
     },
     {
       "id": "RF-18",
@@ -1841,7 +1841,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "Absorbs BKL-01.",
+      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls.",
       "legacyIds": [
         "BKL-01"
       ]

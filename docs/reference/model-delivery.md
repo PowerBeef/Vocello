@@ -7,6 +7,8 @@ sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
   - Sources/QwenVoiceCore/IOSModelDownloadLedger.swift
   - Sources/Resources/qwenvoice_production_model_catalog.json
+  - Sources/Resources/qwenvoice_ios_model_catalog.json
+  - config/model-artifact-receipts.json
   - config/model-host-availability-policy.json
 ---
 # Model delivery
@@ -125,6 +127,31 @@ below); the latest passing iPhone acceptance is the 2026-08-29 run
 predate the 2026.09.14.1 fp32-tokenizer re-pin; the 2026-09-23 PA-29 iPhone runs delivered the
 current artifacts but are not acceptance. The 2026-07-23 six-artifact Mac run and three-artifact iPhone run described below remain exact
 history for the prior artifact generation.
+
+## Artifact provenance
+
+The six artifacts are MLX conversions of `Qwen/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}`,
+published as `PowerBeef02/Qwen3-TTS-12Hz-1.7B-<variant>-{4bit,8bit}` at the revisions the catalogs pin:
+Speed is the 4-bit tier, Quality the 8-bit one. Files, byte counts and SHA-256 digests live only in the
+catalogs: `Sources/Resources/qwenvoice_production_model_catalog.json`, generated from
+`config/model-artifact-receipts.json` (which holds the Quality receipts), and, for the iPhone's Speed
+artifacts, `Sources/Resources/qwenvoice_ios_model_catalog.json` (`scripts/model_catalog_contract.py`).
+
+- **Quantization.** Affine, group size 64, over every talker and code-predictor projection, the 15
+  code-predictor heads, `codec_head`, `small_to_mtp_projection` and `text_projection`. The talker's text
+  embedding is 8-bit in both tiers, Vocello's one change to the weights
+  (`scripts/convert_text_embedding_8bit.py`, 2026-07-26): it saved 292 MB on disk and changed
+  fixed-seed output. Codec embeddings, norms and biases stay bf16, the Base speaker encoder stays float,
+  and compute runs in bf16, so the talker KV cache is bf16.
+- **Shared codec.** `speech_tokenizer/model.safetensors` is fp32 and byte-identical to Qwen's release.
+- **Marking.** `marking/audioseal_wm16_generator_fp16.safetensors` is Meta's AudioSeal generator (MIT).
+- **`generation_config.json`** is upstream's, unchanged.
+- **`artifactVersion` history.** 2026.04.05.2 → 2026.05.25.1 → 2026.07.26.1 (8-bit text embedding) →
+  2026.08.01.1 (f16 codec, withdrawn) → 2026.08.06.1 (AudioSeal) → 2026.09.14.1 (fp32 codec restored
+  after a burst in the first 50 ms of streamed clone takes).
+
+The sourced verification is section 7 of the
+[ER-13 model research](../audits/2026-10-17-qwen3-tts-model-research.md#7-vocellos-shipped-artifacts-verified).
 
 ## Shared component store
 

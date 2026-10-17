@@ -40,7 +40,7 @@ public enum VocelloQwen3AudioMarking {
         return try VocelloQwen3MLXErrorScope().capture {
             try autoreleasepool {
                 let generator = try AudioSealGenerator(weightsURL: weightsURL)
-                return generator.watermark(pcm: pcm)
+                return try generator.watermark(pcm: pcm)
             }
         }
     }

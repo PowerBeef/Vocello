@@ -153,11 +153,17 @@ public enum VocelloQwen3Runtime {
 ///   asynchronous evaluation) is thrown on a Metal thread outside any task and
 ///   is not captured; neither is MLX work on a detached task or on MLX's CPU
 ///   scheduler thread.
-/// - After a captured error MLX returns without evaluating. Reading an array
-///   back (`asArray`, `item`) before the next scope check can still trap in
-///   Swift, which the scope cannot intercept.
-/// - `adoptCloneArtifact`, `persistCloneArtifact` and `replayCodecTrace` are not
-///   wrapped; their MLX errors still reach mlx-swift's fallback.
+/// - After a captured error MLX returns without evaluating. Since F-03
+///   (2026-10-16) every production `asArray` readback is preceded by a probe
+///   (`evalForReadback`, a nested `withError`) that throws the evaluation's
+///   error instead of copying from a buffer MLX never filled; `item` reads
+///   return a default value on failure, and the next scope check stops the
+///   operation. A probe's error reaches the facade as a thrown `MLXError`
+///   that this scope maps, not as a recorded failure.
+/// - Since BG-01 (2026-10-16) `adoptCloneArtifact`, `persistCloneArtifact`
+///   and `replayCodecTrace` run inside a scope too, and the speaker
+///   embedding's finite check runs on the CPU stream, so adopting a stored
+///   clone artifact submits no Metal work.
 public enum VocelloQwen3RuntimeFailure: Error, Equatable, Sendable {
     /// MLX or Metal could not allocate memory: a buffer larger than the device
     /// allows, an exhausted resource limit, or a failed buffer allocation.

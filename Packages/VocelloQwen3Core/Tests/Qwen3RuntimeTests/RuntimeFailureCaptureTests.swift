@@ -1,4 +1,5 @@
 import MLX
+@testable import MLXAudioTTS
 @testable import VocelloQwen3Core
 import XCTest
 
@@ -132,5 +133,65 @@ final class RuntimeFailureCaptureTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
         }
+    }
+
+    /// F-03 (engine audit 2026-10-16): inside a scope a failed evaluation
+    /// returns normally and leaves its buffer unfilled, so `asArray` would trap
+    /// on a nil base address. The readback probe throws first, the scope maps
+    /// the error to the typed failure, and the probe's own handler owns it.
+    func testReadbackProbeThrowsAForcedAllocationFailureInsteadOfTrapping() throws {
+        let scope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try scope.capture { () -> [Float] in
+                let oversized = Self.oversizedArray()
+                try evalForReadback(oversized)
+                return oversized.asArray(Float.self)
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(scope.failure, "the probe, not the outer scope, caught the error")
+
+        // The facade's completion probes the final waveform the same way.
+        XCTAssertThrowsError(
+            try VocelloQwen3GenerationCompletion(
+                AudioGenerationCompletion(audio: Self.oversizedArray(), info: nil, finishReason: .eos)
+            )
+        ) { error in
+            XCTAssertEqual(VocelloQwen3RuntimeFailure(mlxError: error), .allocation)
+        }
+
+        // A healthy array passes the probe unchanged.
+        let healthy = MLXArray([1, 2, 3] as [Float]) * 2
+        try evalForReadback(healthy)
+        XCTAssertEqual(healthy.asArray(Float.self), [2, 4, 6])
+        let completion = try VocelloQwen3GenerationCompletion(
+            AudioGenerationCompletion(audio: healthy, info: nil, finishReason: .eos)
+        )
+        XCTAssertEqual(completion.audio, [2, 4, 6])
+    }
+
+    /// BG-01 review: an unleased artifact operation marks the loaded model for
+    /// unload only for an evaluation error its scope recorded or an allocation
+    /// failure; a file error from mlx-swift's own I/O leaves the model intact.
+    func testUnleasedArtifactFailuresMarkTheModelOnlyForEvaluationOrAllocation() {
+        XCTAssertTrue(VocelloQwen3Engine.unleasedFailureMarksModelForUnload(
+            recorded: .mlx, error: VocelloQwen3RuntimeFailure.mlx
+        ))
+        XCTAssertTrue(VocelloQwen3Engine.unleasedFailureMarksModelForUnload(
+            recorded: nil, error: VocelloQwen3RuntimeFailure.allocation
+        ))
+        XCTAssertFalse(VocelloQwen3Engine.unleasedFailureMarksModelForUnload(
+            recorded: nil, error: VocelloQwen3RuntimeFailure.mlx
+        ))
+        XCTAssertFalse(VocelloQwen3Engine.unleasedFailureMarksModelForUnload(
+            recorded: nil, error: CancellationError()
+        ))
+    }
+
+    /// 2^36 float32 elements (256 GiB): larger than any device's maximum
+    /// buffer length, so MLX refuses the allocation before making it.
+    private static func oversizedArray() -> MLXArray {
+        MLXArray.zeros([1 << 18, 1 << 18], type: Float.self)
     }
 }

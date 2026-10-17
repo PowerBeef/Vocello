@@ -132,15 +132,20 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
     }
 
     func testConditioningVersionBindsReferenceEncodePreprocessing() {
-        // Any change to the ICL reference-encode preprocessing must move this
-        // composite so persisted artifacts and prompt caches rebuild.
+        // Any change to the ICL reference-encode preprocessing or to the MLX
+        // build (F-06) must move this composite so persisted artifacts and
+        // prompt caches rebuild.
         XCTAssertEqual(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion,
-            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2"
+            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.31.6"
         )
         XCTAssertTrue(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion
-                .hasSuffix(Qwen3TTSReferenceAudio.codecEncodeConditioningVersion)
+                .contains("+\(Qwen3TTSReferenceAudio.codecEncodeConditioningVersion)+")
+        )
+        XCTAssertTrue(
+            Qwen3TTSVoiceClonePrompt.speakerFeatureVersion
+                .hasSuffix("+\(Qwen3TTSVoiceClonePrompt.mlxNumericsVersion)")
         )
     }
 

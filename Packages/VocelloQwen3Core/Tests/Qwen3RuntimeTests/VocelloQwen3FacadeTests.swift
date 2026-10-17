@@ -1,3 +1,4 @@
+import CryptoKit
 @testable import VocelloQwen3Core
 import HuggingFace
 @preconcurrency import MLX
@@ -2075,6 +2076,64 @@ final class VocelloQwen3FacadeTests: XCTestCase {
             sink: RecordingProductOutputSink()
         )
         XCTAssertEqual(terminal.disposition, .published)
+    }
+
+    /// BG-01 / F-01: adoption runs inside an MLX error scope. A tensor file MLX
+    /// cannot parse, behind an integrity manifest that still matches it, fails
+    /// as a typed runtime failure rather than mlx-swift's `fatalError`; it is a
+    /// file error, so the loaded model is not marked for unload.
+    func testAdoptingAMalformedArtifactFailsTypedWithoutMarkingTheModel() async throws {
+        let loadedModel = try makeLoadedFixture(
+            compatibilityModel: FacadeCompatibilityModel(),
+            capabilities: VocelloQwen3CapabilitySet([.streaming, .voiceClone])
+        )
+        let engine = VocelloQwen3Engine(adoptingCompatibilityModel: loadedModel)
+        let metadata = VocelloQwen3CloneArtifactMetadata(modelID: "fixture-custom", xVectorOnlyMode: true)
+        let prompt = try loadedModel.makeClonePrompt(
+            referenceSamples: [0.1, 0.2],
+            referenceText: nil,
+            xVectorOnlyMode: true
+        ).withArtifactMetadata(metadata)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-bg01-adopt-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try prompt.writeAtomically(to: directory)
+
+        // A safetensors header of 10 bytes that is not JSON, recorded in the
+        // integrity manifest so the integrity check passes and MLX parses it.
+        var malformed = Data()
+        withUnsafeBytes(of: UInt64(10).littleEndian) { malformed.append(contentsOf: $0) }
+        malformed.append(Data("{not json}".utf8))
+        try Self.replaceArtifactFile("speaker_embedding.safetensors", in: directory, with: malformed)
+
+        do {
+            _ = try await engine.adoptCloneArtifact(
+                from: directory,
+                expectedMetadata: metadata,
+                conditioningDigest: String(repeating: "e", count: 64)
+            )
+            XCTFail("a malformed tensor file must not adopt")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .mlx, "\(error)")
+        }
+        let marked = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertFalse(marked, "a file error leaves the model's MLX state intact")
+    }
+
+    private static func replaceArtifactFile(_ name: String, in directory: URL, with data: Data) throws {
+        try data.write(to: directory.appendingPathComponent(name), options: .atomic)
+        let integrityURL = directory.appendingPathComponent("integrity.json")
+        var integrity = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: integrityURL)) as? [String: Any]
+        )
+        var files = try XCTUnwrap(integrity["files"] as? [String: Any])
+        var entry = try XCTUnwrap(files[name] as? [String: Any])
+        entry["byteCount"] = data.count
+        entry["sha256"] = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        files[name] = entry
+        integrity["files"] = files
+        try JSONSerialization.data(withJSONObject: integrity, options: [.prettyPrinted, .sortedKeys])
+            .write(to: integrityURL, options: .atomic)
     }
 
     func testValidatedClonePromptAdoptionRejectsCapabilityAndIdentityMismatch() async throws {

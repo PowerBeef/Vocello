@@ -113,6 +113,37 @@ final class Qwen3RequestSamplingTests: XCTestCase {
         XCTAssertNil(makePolicy(seed: 1).eosSuppressionFrames)
     }
 
+    /// F-20 (engine audit 2026-10-16): the production sampler's exact draws for a
+    /// fixed seed and fixed `[1, V]` logits. Self-consistency tests cannot see a
+    /// dependency that changes what a seed draws (MLX #4177's inverse-CDF
+    /// categorical does); this canary fails, and its expected tokens are then
+    /// re-recorded on purpose with the pin move and a release-note line.
+    func testSeededSamplerGoldenTokens() {
+        let vocabulary = 2_048
+        var state: UInt64 = 0x9E37_79B9_7F4A_7C15
+        let values: [Float] = (0 ..< vocabulary).map { _ in
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Float(Int32(truncatingIfNeeded: state >> 33)) / Float(Int32.max) * 4
+        }
+        let logits = MLXArray(values).reshaped(1, 1, vocabulary)
+        let policy = makePolicy(seed: 0x5EED_CA9A_2026_1016)
+        let tokens: [Int32] = policy.runWithRandomState {
+            (0 ..< 32).map { _ in
+                let token = Qwen3TTSModel.sampleToken(logits, temperature: 0.9, topP: 0.95, topK: 50)
+                eval(token)
+                return token.item(Int32.self)
+            }
+        }
+        XCTAssertEqual(tokens, Self.goldenSeededSamplerTokens, "Recorded on mlx-swift 0.31.6: \(tokens)")
+    }
+
+    /// mlx-swift 0.31.6 (MLX ce45c525), recorded 2026-10-16. Re-record only with a
+    /// reviewed pin move (CONV-21), with a release-note line that seeds changed.
+    private static let goldenSeededSamplerTokens: [Int32] = [
+        1758, 262, 1648, 434, 837, 1339, 1483, 1718, 1870, 617, 1828, 269, 206, 1397, 1339, 1397,
+        1339, 1758, 71, 1648, 837, 262, 71, 655, 1648, 1483, 706, 1339, 1483, 1483, 1339, 1718,
+    ]
+
     private func makePolicy(seed: UInt64) -> Qwen3RequestSamplingPolicy {
         let stage = Qwen3SamplingStage(
             temperature: 0.9,

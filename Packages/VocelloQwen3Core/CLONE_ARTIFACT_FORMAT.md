@@ -41,11 +41,15 @@ language (prompt creation takes none), so Vocello binds every artifact under the
 `auto` and a single artifact serves takes in every language.
 
 The composite runtime-contract signature includes that immutable installed-artifact identity, the
-validated Qwen runtime topology, and the speaker-feature algorithm identifier. The current feature
-contract is `qwen-speaker-mel-v1`: 24 kHz audio, 1024-point FFT, 256-sample hop, 384-sample reflect
-padding, periodic Hann window, magnitude spectrum, 128 Slaney-scale/Slaney-normalized mel bands,
-and natural-log scaling. Changed weights or a runtime/feature-contract change invalidates both
-in-memory and persisted prompts.
+validated Qwen runtime topology, and the speaker-feature identifier. That identifier joins three
+versions with `+`: the speaker mel frontend, the ICL reference-encode preprocessing
+(`icl-ref-silence500ms-v2`), and the MLX build that computed the stored tensors (`mlx-swift-<pin>`,
+since 2026-10-16; it moves with the mlx-swift pin, and `scripts/qwen3_core_contract.py` checks it).
+The current frontend contract is `qwen-speaker-mel-v1`: 24 kHz audio, 1024-point FFT, 256-sample
+hop, 384-sample reflect padding, periodic Hann window, magnitude spectrum, 128
+Slaney-scale/Slaney-normalized mel bands, and natural-log scaling. Changed weights, a
+runtime/feature-contract change or an MLX move invalidates both in-memory and persisted prompts, so
+each saved voice rebuilds its prompt once from its reference audio.
 Schema-2 artifacts predate this binding and are rejected by both the compatibility reader and the
 public `VocelloQwen3Core` facade; they must be rebuilt from their reference audio.
 

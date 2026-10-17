@@ -251,7 +251,10 @@ struct VocelloQwen3GenerationCompletion: Sendable {
     public let info: VocelloQwen3GenerationInfo?
     public let finishReason: VocelloQwen3GenerationFinishReason
 
-    init(_ value: AudioGenerationCompletion) {
+    /// Throws the MLX error a failed final evaluation raised (F-03) instead of
+    /// reading back a buffer MLX never filled.
+    init(_ value: AudioGenerationCompletion) throws {
+        try withError { eval(value.audio) }
         audio = value.audio.asArray(Float.self)
         info = value.info.map(VocelloQwen3GenerationInfo.init)
         switch value.finishReason {
@@ -775,7 +778,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 isolation: isolation
             )
         }
-        let completion = VocelloQwen3GenerationCompletion(rawCompletion)
+        let completion = try VocelloQwen3GenerationCompletion(rawCompletion)
         try Task.checkCancellation()
         if let info = completion.info {
             try await sink(.info(info))
@@ -830,7 +833,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         sampling: VocelloQwen3SamplingConfiguration,
         memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault
     ) async throws -> VocelloQwen3GenerationCompletion {
-        VocelloQwen3GenerationCompletion(try await box.optimized.generateCustomVoice(
+        try await VocelloQwen3GenerationCompletion(box.optimized.generateCustomVoice(
             text: text,
             language: language,
             speaker: speaker,
@@ -867,7 +870,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         sampling: VocelloQwen3SamplingConfiguration,
         memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault
     ) async throws -> VocelloQwen3GenerationCompletion {
-        VocelloQwen3GenerationCompletion(try await box.optimized.generateVoiceDesign(
+        try await VocelloQwen3GenerationCompletion(box.optimized.generateVoiceDesign(
             text: text,
             language: language,
             voiceDescription: description,
@@ -915,7 +918,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         sampling: VocelloQwen3SamplingConfiguration,
         memory: VocelloQwen3MemoryConfiguration = .compatibilityDefault
     ) async throws -> VocelloQwen3GenerationCompletion {
-        VocelloQwen3GenerationCompletion(try await box.optimized.generateVoiceClone(
+        try await VocelloQwen3GenerationCompletion(box.optimized.generateVoiceClone(
             text: text,
             language: language,
             voiceClonePrompt: prompt.compatibilityValue,

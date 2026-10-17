@@ -443,7 +443,7 @@
   "sourceFiles": [
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "6528b667a9acbef1ee92e76c5bf48bf92857dd0ce3bc790b2c6efeec8fb3aa30"
+      "sha256": "70e65b986cb646eb5b69c275366e67863500d5d4459aa768f8576f4467145068"
     },
     {
       "path": "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
@@ -459,7 +459,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "714d5d94254e73e66c50b13a766f0f9eb9bdc3930c16b3d2394e79ca494cd5f3"
+      "sha256": "613a3433a99993a5c444396344aa471ab406e101ba6b2e5069863782ab40ef21"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
@@ -467,7 +467,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "64d0b671b6d4f0619f375ea7de37e7bc466fc4be56ba07c1ff39104c51e21e82"
+      "sha256": "321f049861a2b4667c421581bd00c0da2cd92ff3fced4c17d733164e0d804974"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",
@@ -475,7 +475,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "9a7021a654378674d83152954154619503b1f47bccdb37cc02474ff07bcf8cc8"
+      "sha256": "a719d55418c11c979e7060debb9fb042d319fa7b885d2f83afaee6b0cf2a66d2"
     }
   ],
   "sourceRoot": "Sources/VocelloQwen3Core"

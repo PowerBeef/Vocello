@@ -19,7 +19,10 @@ final class Qwen3CloneArtifactIntegrityTests: XCTestCase {
         )
 
         XCTAssertEqual(manifest.schemaVersion, 3)
-        XCTAssertEqual(manifest.speakerFeatureVersion, "qwen-speaker-mel-v1+icl-ref-silence500ms-v2")
+        XCTAssertEqual(
+            manifest.speakerFeatureVersion,
+            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.31.6"
+        )
         XCTAssertEqual(loaded.refCodes?.shape, [1, 2, 2])
         XCTAssertEqual(loaded.refCodes?.dtype, .int32)
         XCTAssertEqual(loaded.refCodes?.asArray(Int32.self), [1, 2, 3, 4])
@@ -94,6 +97,36 @@ final class Qwen3CloneArtifactIntegrityTests: XCTestCase {
                 "expected the conditioning-version gate to reject the stale artifact, got: \(error)"
             )
         }
+    }
+
+    /// BG-01 / F-01: the speaker embedding's finite check runs on the CPU stream
+    /// (adoption submits no Metal work) and still rejects every non-finite value,
+    /// on write and on its own, while a finite embedding passes unchanged.
+    func testSpeakerEmbeddingFiniteCheckRejectsNonFiniteValues() throws {
+        for bad in [Float.nan, Float.infinity, -Float.infinity] {
+            let embedding = MLXArray([Float(0.25), bad, 0.75]).reshaped(1, 3)
+            XCTAssertThrowsError(
+                try Qwen3TTSVoiceClonePrompt.validateSpeakerEmbedding(
+                    embedding, expectedDimension: 3, allowOfficialVectorShape: false
+                ),
+                "\(bad)"
+            )
+            let directory = temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let prompt = Qwen3TTSVoiceClonePrompt(
+                refCodes: MLXArray([Int32(1), 2, 3, 4]).reshaped(1, 2, 2),
+                speakerEmbedding: embedding,
+                refText: "fixture",
+                xVectorOnlyMode: false,
+                iclMode: true
+            )
+            XCTAssertThrowsError(try prompt.write(to: directory), "\(bad) must not persist")
+        }
+        let finite = try Qwen3TTSVoiceClonePrompt.validateSpeakerEmbedding(
+            MLXArray([Float(0.25), -0.5, 0.75]), expectedDimension: 3, allowOfficialVectorShape: true
+        )
+        XCTAssertEqual(finite.shape, [1, 3])
+        XCTAssertEqual(finite.asArray(Float.self), [0.25, -0.5, 0.75])
     }
 
     func testDigestCorruptionFailsClosed() throws {

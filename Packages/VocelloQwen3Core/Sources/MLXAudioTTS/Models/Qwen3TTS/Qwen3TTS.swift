@@ -36,6 +36,17 @@ private func qwen3TTSLog(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
+/// F-03 (engine audit 2026-10-16): evaluates `array` and throws the error MLX
+/// raised while evaluating it. Under an outer MLX error scope a failed
+/// evaluation returns normally and leaves the buffer unfilled, and `asArray`
+/// then traps on a nil base address; probing first turns that into a thrown
+/// `MLXError` the facade maps to its typed failure. An already-evaluated
+/// array costs one no-op `eval`. Synchronous, so async callers also get
+/// `withError`'s synchronous overload.
+func evalForReadback(_ array: MLXArray) throws {
+    try withError { eval(array) }
+}
+
 /// Bounded, audio/path-free records emitted only by explicit codec replay.
 /// MLX counters are allocator measurements, not physical footprint or RSS.
 struct CodecReplayMemoryObservation: Encodable {
@@ -764,11 +775,19 @@ public struct Qwen3TTSVoiceClonePrompt: @unchecked Sendable {
     public static let schemaVersion = 3
     /// Conditioning-pipeline identity persisted in the manifest's
     /// speaker-feature field. It composes the speaker mel-frontend algorithm
-    /// version with the ICL reference-encode preprocessing version, so a
-    /// change to either rejects stale artifacts at load and the host rebuilds
-    /// them fail-closed from the source reference.
+    /// version, the ICL reference-encode preprocessing version and the MLX
+    /// build that computed the stored tensors, so a change to any of them
+    /// rejects stale artifacts at load and the host rebuilds them fail-closed
+    /// from the source reference.
     public static let speakerFeatureVersion =
         "\(Qwen3TTSSpeakerMelFrontend.featureVersion)+\(Qwen3TTSReferenceAudio.codecEncodeConditioningVersion)"
+            + "+\(mlxNumericsVersion)"
+    /// F-06 (engine audit 2026-10-16): the MLX build behind stored speaker
+    /// embeddings and reference codes. An MLX move can change their numerics,
+    /// so artifacts built on another one rebuild once instead of being
+    /// reused. It names the exact mlx-swift pin and moves with it;
+    /// `scripts/qwen3_core_contract.py` checks it against COMPATIBILITY.json.
+    static let mlxNumericsVersion = "mlx-swift-0.31.6"
     public static let integritySchemaVersion = 1
     public static let integrityFilename = "integrity.json"
     public let refCodes: MLXArray?
@@ -1007,7 +1026,10 @@ public struct Qwen3TTSVoiceClonePrompt: @unchecked Sendable {
             )
         }
 
-        let allFinite = isFinite(canonical).all()
+        // BG-01 / F-01: a 1 x D check needs no Metal work. On the CPU stream,
+        // adopting a stored artifact (where this eval also loads the embedding
+        // from disk) submits no command buffer iOS could refuse in the background.
+        let allFinite = isFinite(canonical, stream: .cpu).all(stream: .cpu)
         eval(canonical, allFinite)
         guard allFinite.item(Bool.self) else {
             throw AudioGenerationError.invalidInput(
@@ -2162,7 +2184,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 )
             }
             let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(refAudio)
-            refCodes = try speechTokenizer.encode(refAudioForEncoder)
+            let encoded = try speechTokenizer.encode(refAudioForEncoder)
+            // F-07: evaluate the reference encode here, inside the caller's MLX
+            // error scope and lease, instead of letting the lazy graph run later
+            // in artifact persistence or the first take.
+            eval(encoded)
+            refCodes = encoded
         } else {
             refCodes = nil
         }
@@ -3133,7 +3160,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             let encoderInput = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(MLXArray(samples))
             // [1, codebooks, frames] -> [1, frames, codebooks], the codec trace layout.
             let encoded = try speechTokenizer.encode(encoderInput).transposed(0, 2, 1)
-            eval(encoded)
+            try evalForReadback(encoded)
             return (encoded.asArray(Int32.self), encoded.dim(1), encoded.dim(2))
         }
         if memoryPolicy.clearCacheOnStreamChunkEmit { Memory.clearCache() }
@@ -3188,10 +3215,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
             // Release temporary arrays before clearing recyclable allocations.
             // The decoder's live KV/convolution state is deliberately retained.
-            let chunk: [Float] = autoreleasepool {
+            let chunk: [Float] = try autoreleasepool {
                 let input = codes[0..., range.start ..< range.endExclusive, 0...].transposed(0, 2, 1)
                 let decoded = decoder.streamingStep(input)[0, 0]
-                eval(decoded)
+                try evalForReadback(decoded)
                 return decoded.asArray(Float.self)
             }
             samples.append(contentsOf: chunk)
@@ -3769,6 +3796,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 cloneAudioChunkEvalTotal += flushElapsed
             }
             try Task.checkCancellation()
+            try evalForReadback(pending.audioChunk)
             let materializedSamples = pending.audioChunk.asArray(Float.self)
             if let timings = pending.timings {
                 let handoffStartedAt = ContinuousClock.now
@@ -4033,6 +4061,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             }
             let materializedCodeFrame: [Int32]?
             if emitMaterializedCodecTrace || codecTraceSink != nil || !isStreaming {
+                try evalForReadback(allCodes)
                 materializedCodeFrame = allCodes.asArray(Int32.self)
             } else {
                 materializedCodeFrame = nil
@@ -4133,7 +4162,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     assert(pendingMaterializedChunk == nil)
                     let materializedSamples: [Float]?
                     if materializedEventSink != nil, !deferChunkMaterialization {
-                        eval(audioChunk)
+                        try evalForReadback(audioChunk)
                         try Task.checkCancellation()
                         materializedSamples = audioChunk.asArray(Float.self)
                     } else {
@@ -4325,6 +4354,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 let materializedSamples: [Float]?
                 if materializedEventSink != nil {
                     try Task.checkCancellation()
+                    try evalForReadback(audioChunk)
                     materializedSamples = audioChunk.asArray(Float.self)
                 } else {
                     materializedSamples = nil

@@ -49,7 +49,7 @@ final class AudioSealParityTests: XCTestCase {
             }
             let pcm = input.asArray(Float.self)
             let reference = expected.asArray(Float.self)
-            let delta = generator.watermarkDelta(pcm: pcm)
+            let delta = try generator.watermarkDelta(pcm: pcm)
             XCTAssertEqual(delta.count, reference.count, "delta length")
             let error = zip(delta, reference).map(-)
             let snr = snrDB(reference: reference, error: error)
@@ -72,21 +72,21 @@ final class AudioSealParityTests: XCTestCase {
 
         // Small cores force four windows on the 60 000-sample (188-frame)
         // fixture; margins stay far above the conv receptive field.
-        let windowed = generator.watermark(pcm: pcm, coreFrames: 50, marginFrames: 64)
-        let windowed2 = generator.watermark(pcm: pcm, coreFrames: 50, marginFrames: 64)
+        let windowed = try generator.watermark(pcm: pcm, coreFrames: 50, marginFrames: 64)
+        let windowed2 = try generator.watermark(pcm: pcm, coreFrames: 50, marginFrames: 64)
         XCTAssertEqual(windowed, windowed2, "windowed embedding must be deterministic")
 
         // Zero-peak geometry: the conv stacks' receptive field is a handful
         // of frames, so small margins must stay exact too — this is the
         // shipping window shape (small transients bound the marking pass's
         // Metal-heap high-water).
-        let tight = generator.watermark(pcm: pcm, coreFrames: 64, marginFrames: 8)
+        let tight = try generator.watermark(pcm: pcm, coreFrames: 64, marginFrames: 8)
         let tightError = zip(tight, windowed).map(-)
         let tightSNR = snrDB(reference: windowed.map { $0 }, error: tightError)
         XCTAssertGreaterThanOrEqual(tightSNR, 55,
             "tight-margin windowing (64/8) SNR \(tightSNR) dB — margins no longer cover the receptive field")
 
-        let wholeDelta = generator.watermarkDelta(pcm: pcm)
+        let wholeDelta = try generator.watermarkDelta(pcm: pcm)
         let whole = zip(pcm, wholeDelta).map { max(-1, min(1, $0 + $1)) }
         let error = zip(windowed, whole).map(-)
         let snr = snrDB(reference: wholeDelta, error: error)
@@ -97,7 +97,7 @@ final class AudioSealParityTests: XCTestCase {
             // Design-parameter windowed run on a 10 s tiled signal for the
             // Python-detector adjudication of the shipping window geometry.
             let long = Array(repeating: pcm, count: 4).flatMap { $0 }
-            let longWindowed = generator.watermark(pcm: long)
+            let longWindowed = try generator.watermark(pcm: long)
             var arrays: [String: MLXArray] = [
                 "windowed_1": MLXArray(windowed),
                 "whole_delta_1": MLXArray(wholeDelta),
@@ -106,7 +106,7 @@ final class AudioSealParityTests: XCTestCase {
             ]
             if let speech = fixtures["in_speech"] {
                 let speechPCM = speech.asArray(Float.self)
-                arrays["speech_windowed_design"] = MLXArray(generator.watermark(pcm: speechPCM))
+                arrays["speech_windowed_design"] = try MLXArray(generator.watermark(pcm: speechPCM))
             }
             try save(arrays: arrays, url: dir.appendingPathComponent("swift-windowed-out.safetensors"))
         }
@@ -172,7 +172,7 @@ final class AudioSealParityTests: XCTestCase {
         let generator = try AudioSealGenerator(weightsURL: try syntheticWeightsURL())
         let pcm = syntheticPCM()
 
-        let wholeDelta = generator.watermarkDelta(pcm: pcm)
+        let wholeDelta = try generator.watermarkDelta(pcm: pcm)
         XCTAssertEqual(wholeDelta.count, pcm.count)
         XCTAssertTrue(wholeDelta.allSatisfy(\.isFinite))
         XCTAssertTrue(wholeDelta.contains { $0 != 0 }, "the message must reach the watermark delta")
@@ -182,7 +182,7 @@ final class AudioSealParityTests: XCTestCase {
         // the LSTMs run over the full frame sequence, so every window geometry
         // with margins above the receptive field reproduces the whole buffer.
         for (coreFrames, marginFrames) in [(64, 8), (16, 8), (24, 12)] {
-            let windowed = generator.watermark(pcm: pcm, coreFrames: coreFrames, marginFrames: marginFrames)
+            let windowed = try generator.watermark(pcm: pcm, coreFrames: coreFrames, marginFrames: marginFrames)
             XCTAssertEqual(windowed.count, pcm.count)
             XCTAssertTrue(windowed.allSatisfy { $0 >= -1 && $0 <= 1 }, "embedding clamps to full scale")
             let error = zip(windowed, whole).map(-)
@@ -190,7 +190,7 @@ final class AudioSealParityTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(
                 snr, 55, "\(coreFrames)/\(marginFrames) windowing SNR \(snr) dB — windowing is no longer exact")
         }
-        XCTAssertEqual(generator.watermark(pcm: pcm), generator.watermark(pcm: pcm), "embedding is deterministic")
+        XCTAssertEqual(try generator.watermark(pcm: pcm), try generator.watermark(pcm: pcm), "embedding is deterministic")
     }
 
     func testFacadeTransformMarksWithTheShippingEmbedderAndKeepsTheSampleCount() throws {

@@ -452,7 +452,12 @@ public actor VocelloQwen3Engine {
         in mlxErrors: VocelloQwen3MLXErrorScope,
         lease: VocelloQwen3RuntimeOperationLease
     ) {
-        if mlxErrors.failure != nil || VocelloQwen3RuntimeFailure(mlxError: error) != nil {
+        // A nested `withError` (an F-03 readback probe) intercepts its
+        // evaluation error before `mlxErrors` sees it, so the error itself
+        // counts too, raw or already mapped by a capture.
+        if mlxErrors.failure != nil
+            || error is VocelloQwen3RuntimeFailure
+            || VocelloQwen3RuntimeFailure(mlxError: error) != nil {
             runtimeFailureModelEpoch = lease.modelEpoch
         }
     }
@@ -708,7 +713,9 @@ public actor VocelloQwen3Engine {
         guard let record = validCloneRecord(for: handle) else {
             throw VocelloQwen3EngineError.invalidCloneHandle
         }
-        try record.prompt.withArtifactMetadata(metadata).writeAtomically(to: directory)
+        try capturingUnleasedMLX {
+            try record.prompt.withArtifactMetadata(metadata).writeAtomically(to: directory)
+        }
     }
 
     /// Loads and validates a persisted schema-3 clone artifact inside the
@@ -719,15 +726,46 @@ public actor VocelloQwen3Engine {
         expectedMetadata: VocelloQwen3CloneArtifactMetadata,
         conditioningDigest: String
     ) throws -> VocelloQwen3CloneHandle {
-        let prompt = try VocelloQwen3ClonePrompt.load(
-            from: directory,
-            expectedMetadata: expectedMetadata
-        )
+        let prompt = try capturingUnleasedMLX {
+            try VocelloQwen3ClonePrompt.load(
+                from: directory,
+                expectedMetadata: expectedMetadata
+            )
+        }
         return try adoptValidatedClonePrompt(
             prompt,
             capability: prompt.xVectorOnlyMode ? .decoderOnly : .encoderAndDecoder,
             conditioningDigest: conditioningDigest
         )
+    }
+
+    /// BG-01 / F-01 (engine audit 2026-10-16): artifact adoption and
+    /// persistence evaluate MLX arrays outside a lease. An MLX error there
+    /// (a refused or out-of-memory command buffer) surfaces as a typed
+    /// `VocelloQwen3RuntimeFailure` instead of mlx-swift's `fatalError`.
+    private func capturingUnleasedMLX<R>(_ body: () throws -> R) throws -> R {
+        let mlxErrors = VocelloQwen3MLXErrorScope()
+        do {
+            return try mlxErrors.capture(body)
+        } catch {
+            if loadedModel != nil,
+               Self.unleasedFailureMarksModelForUnload(recorded: mlxErrors.failure, error: error) {
+                runtimeFailureModelEpoch = modelEpoch
+            }
+            throw error
+        }
+    }
+
+    /// Whether an unleased artifact operation's failure marks the loaded model
+    /// for unload: an evaluation error the scope recorded, or an allocation
+    /// failure. mlx-swift's own file I/O (`MLX.save`, `loadArrays`) reports an
+    /// unwritable or malformed file as an MLX error too; that leaves the
+    /// model's state intact, so it fails the operation without an unload.
+    static func unleasedFailureMarksModelForUnload(
+        recorded: VocelloQwen3RuntimeFailure?,
+        error: any Error
+    ) -> Bool {
+        recorded != nil || (error as? VocelloQwen3RuntimeFailure) == .allocation
     }
 
     /// Prepares the currently loaded model without exposing its mutable facade.
@@ -898,19 +936,23 @@ public actor VocelloQwen3Engine {
             throw VocelloQwen3EngineError.noLoadedModel
         }
         let lease = try beginOperation(kind: .prewarm, generationID: nil, phase: .prewarming)
+        let mlxErrors = VocelloQwen3MLXErrorScope()
         do {
             try Task.checkCancellation()
-            let result = try model.replayCodecTrace(
-                frames: frames,
-                incrementalRanges: incrementalRanges,
-                memory: memory
-            )
+            let result = try mlxErrors.capture {
+                try model.replayCodecTrace(
+                    frames: frames,
+                    incrementalRanges: incrementalRanges,
+                    memory: memory
+                )
+            }
             try revalidate(lease)
             try Task.checkCancellation()
             activeOperation = nil
             phase = .ready
             return result
         } catch {
+            recordRuntimeFailure(error, in: mlxErrors, lease: lease)
             failOperationIfCurrent(lease)
             throw error
         }
@@ -1535,6 +1577,7 @@ public actor VocelloQwen3Engine {
             // the terminal resumes the product, so a take that ends cancelled
             // still has its model unloaded.
             let mlxFailure = mlxErrors.failure
+                ?? (error as? VocelloQwen3RuntimeFailure)
                 ?? VocelloQwen3RuntimeFailure(mlxError: error)
             if mlxFailure != nil {
                 runtimeFailureModelEpoch = pending.lease.modelEpoch

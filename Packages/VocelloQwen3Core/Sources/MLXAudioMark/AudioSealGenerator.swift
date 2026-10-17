@@ -273,12 +273,14 @@ public final class AudioSealGenerator {
     }
 
     /// Whole-buffer watermark delta — the parity reference. `[T]` in, `[T]` out.
-    public func watermarkDelta(pcm: [Float]) -> [Float] {
+    /// Throws the MLX error a failed evaluation raised instead of reading back
+    /// a buffer MLX never filled (F-03, engine audit 2026-10-16).
+    public func watermarkDelta(pcm: [Float]) throws -> [Float] {
         let x = MLXArray(pcm).reshaped([1, pcm.count, 1])
         let d = decoderConvs(frameStages(encoderConvs(x)))
         let count = min(pcm.count, d.dim(1))
         let delta = d[0..., 0 ..< count, 0].reshaped([count])
-        delta.eval()
+        try withError { delta.eval() }
         return delta.asArray(Float.self)
     }
 
@@ -294,11 +296,11 @@ public final class AudioSealGenerator {
     // ≥55 dB against whole-buffer), and the ~3.5× smaller windows bound the
     // marking pass's per-window conv workspaces — the Metal-heap high-water
     // this leaves behind is what the fail-closed peak-equality lane meters.
-    public func watermark(pcm: [Float], coreFrames: Int = 64, marginFrames: Int = 8) -> [Float] {
+    public func watermark(pcm: [Float], coreFrames: Int = 64, marginFrames: Int = 8) throws -> [Float] {
         let stride = Self.totalStride
         let totalFrames = (pcm.count + stride - 1) / stride
         guard totalFrames > coreFrames + 2 * marginFrames else {
-            let delta = watermarkDelta(pcm: pcm)
+            let delta = try watermarkDelta(pcm: pcm)
             return zip(pcm, delta).map { Self.markedSample($0, delta: $1) }
         }
 
@@ -344,11 +346,14 @@ public final class AudioSealGenerator {
             return out
         }
 
-        // Stage 3: windowed decoder convolutions → delta samples.
+        // Stage 3: windowed decoder convolutions → delta samples. Only this
+        // stage reads arrays back, so only its evaluation is probed: a failure
+        // in stages 1-2 re-raises here, and the caller's error scope reports
+        // one that a retried evaluation got past.
         var out = [Float](repeating: 0, count: pcm.count)
         frame = 0
         while frame < totalFrames {
-            autoreleasepool {
+            try autoreleasepool {
                 let coreEnd = min(frame + coreFrames, totalFrames)
                 let windowStartFrame = max(0, frame - marginFrames)
                 let windowEndFrame = min(totalFrames, coreEnd + marginFrames)
@@ -359,7 +364,7 @@ public final class AudioSealGenerator {
                 let span = coreSampleEnd - coreStart
                 let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
                     .reshaped([-1])
-                deltaSlice.eval()
+                try withError { deltaSlice.eval() }
                 let delta = deltaSlice.asArray(Float.self)
                 for i in 0 ..< min(span, delta.count) {
                     out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])

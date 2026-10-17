@@ -38,6 +38,23 @@ class VendorRuntimeContractTests(unittest.TestCase):
     def test_repository_contract_is_valid(self) -> None:
         self.assertEqual(MODULE.validate(ROOT), [])
 
+    def test_clone_numerics_version_tracks_the_mlx_swift_pin(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            runtime = Path(raw)
+            source = runtime / MODULE.CLONE_NUMERICS_SOURCE
+            source.parent.mkdir(parents=True)
+            contract = {"directDependencies": {"mlx-swift": "0.31.6"}}
+            self.assertEqual(
+                MODULE.clone_numerics_version_errors(runtime, contract),
+                ["clone artifact MLX numerics version is missing (F-06)"],
+            )
+            source.write_text('    static let mlxNumericsVersion = "mlx-swift-0.31.6"\n', encoding="utf-8")
+            self.assertEqual(MODULE.clone_numerics_version_errors(runtime, contract), [])
+            moved = {"directDependencies": {"mlx-swift": "0.32.3"}}
+            errors = MODULE.clone_numerics_version_errors(runtime, moved)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("0.32.3", errors[0])
+
     def test_facade_api_baseline_is_canonical_and_hides_raw_runtime_types(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         baseline = MODULE.load_json(runtime / MODULE.FACADE_API_BASELINE_NAME)

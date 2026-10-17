@@ -29,6 +29,8 @@ OWNERSHIP_NAME = "OWNERSHIP.json"
 BASELINE_SCOPE = (".gitignore", "Package.swift", "Sources/**", "Tests/**", "Examples/**")
 IMPLEMENTATION_SCOPE = ("Package.swift", "Sources/**")
 RUNTIME_IMPACT_SCOPE = ("Package.swift", "Package.resolved", "Sources/**")
+CLONE_NUMERICS_SOURCE = "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+CLONE_NUMERICS_PATTERN = re.compile(r'static let mlxNumericsVersion = "([^"]*)"')
 LEGACY_RUNTIME_RELATIVE = Path("third_party_patches/mlx-audio-swift")
 ALLOWED_UPSTREAM_STATUSES = {"identical", "modified", "added"}
 EXPECTED_PATCH_STATES = {
@@ -186,6 +188,23 @@ def benchmark_neutral_dependency_errors(
         if not isinstance(reason, str) or not reason.strip():
             errors.append(f"benchmark-neutral dependency requires a reason: {identity}")
     return errors
+
+
+def clone_numerics_version_errors(runtime: Path, package_contract: dict) -> list[str]:
+    """F-06 (engine audit 2026-10-16): stored clone artifacts name the MLX build that computed
+    them, so an MLX move rebuilds them once. The name must track the pinned mlx-swift, or a pin
+    move would reuse tensors from the previous build."""
+    source = runtime / CLONE_NUMERICS_SOURCE
+    match = CLONE_NUMERICS_PATTERN.search(source.read_text(encoding="utf-8")) if source.is_file() else None
+    if match is None:
+        return ["clone artifact MLX numerics version is missing (F-06)"]
+    pinned = package_contract.get("directDependencies", {}).get("mlx-swift")
+    if match.group(1) != f"mlx-swift-{pinned}":
+        return [
+            f"clone artifact MLX numerics version {match.group(1)!r} differs from the mlx-swift pin "
+            f"{pinned}; move it with the pin so stored clone artifacts rebuild (F-06)"
+        ]
+    return []
 
 
 def benchmark_dependency_projection(
@@ -1075,6 +1094,7 @@ def validate(repo_root: Path) -> list[str]:
     for dependency, version in package_contract.get("directDependencies", {}).items():
         if dependency not in package or f'"{version}"' not in package:
             errors.append(f"Package.swift dependency pin missing or stale: {dependency} {version}")
+    errors.extend(clone_numerics_version_errors(runtime, package_contract))
     errors.extend(
         benchmark_neutral_dependency_errors(
             package_contract,

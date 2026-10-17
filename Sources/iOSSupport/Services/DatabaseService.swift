@@ -49,7 +49,9 @@ final class DatabaseService: @unchecked Sendable {
         GenerationMigrations.makeMigrator()
     }
 
-    private static func openQueue(at path: String, rootDirectory: URL) throws -> DatabaseQueue {
+    /// Opens, migrates and repairs `history.sqlite` at `path`. Internal so the
+    /// tests can read the connection's settings (SEC-5).
+    static func openQueue(at path: String, rootDirectory: URL) throws -> DatabaseQueue {
         // IOS-11: on iPhone the database lives in the App Group container, and
         // iOS terminates an app that is suspended while holding a lock on a
         // shared file (0xDEAD10CC). The app suspends the queue just before it can
@@ -59,6 +61,15 @@ final class DatabaseService: @unchecked Sendable {
         // commits it. macOS never posts the notifications.
         var configuration = Configuration()
         configuration.observesSuspensionNotifications = true
+        // SEC-5 (BKL-09): SQLite zeroes the content a delete frees, so a deleted
+        // or cleared take's script does not linger in the file (with the macOS
+        // system SQLite's default it stays readable there). The pragma is per
+        // connection and runs before the migrations; the schema, journal mode
+        // and busy mode are unchanged. Content freed under earlier builds keeps
+        // its bytes until SQLite reuses the space.
+        configuration.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA secure_delete = ON")
+        }
         let queue: DatabaseQueue
         do {
             queue = try DatabaseQueue(path: path, configuration: configuration)

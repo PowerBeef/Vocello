@@ -570,6 +570,49 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(Set(try again.fetchAllGenerations().map(\.audioPath)), paths)
     }
 
+    /// SEC-5 (BKL-09): History's connection turns secure delete on, from the
+    /// first open of a fresh database.
+    func testAFreshHistoryOpensWithSecureDeleteOn() throws {
+        let root = try makeRoot()
+        let queue = try DatabaseService.openQueue(
+            at: root.appendingPathComponent("history.sqlite").path,
+            rootDirectory: root
+        )
+        XCTAssertEqual(try queue.read { try Int.fetchOne($0, sql: "PRAGMA secure_delete") }, 1)
+    }
+
+    /// SEC-5: a deleted take's script is gone from the database file, both the
+    /// part in the table's page and the end of a long script, which SQLite
+    /// keeps on overflow pages that a delete moves to the free list. The kept
+    /// take's script is found, so the scan reads the committed file.
+    func testADeletedTakesScriptDoesNotStayInTheDatabaseFile() throws {
+        let root = try makeRoot()
+        let service = DatabaseService(rootDirectory: root)
+        let token = UUID().uuidString
+        let kept = "SEC5 kept \(token)"
+        let short = "SEC5 short \(token)"
+        let longStart = "SEC5 long start \(token)"
+        let longEnd = "SEC5 long end \(token)"
+        let long = longStart + String(repeating: " lorem ipsum", count: 2_000) + " " + longEnd
+
+        var keptTake = row("/nonexistent/kept.wav", text: kept, at: 0)
+        var shortTake = row("/nonexistent/short.wav", text: short, at: 1)
+        var longTake = row("/nonexistent/long.wav", text: long, at: 2)
+        try service.saveGeneration(&keptTake)
+        try service.saveGeneration(&shortTake)
+        try service.saveGeneration(&longTake)
+        let shortID = try XCTUnwrap(shortTake.id)
+        let longID = try XCTUnwrap(longTake.id)
+        try service.deleteGeneration(id: shortID)
+        try service.deleteGeneration(id: longID)
+
+        let bytes = try Data(contentsOf: root.appendingPathComponent("history.sqlite"))
+        XCTAssertNotNil(bytes.range(of: Data(kept.utf8)), "The kept take's script is in the file")
+        for deleted in [short, longStart, longEnd] {
+            XCTAssertNil(bytes.range(of: Data(deleted.utf8)), "\(deleted) stayed in the file")
+        }
+    }
+
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {
         // The directory does not exist yet, so SQLite cannot create the database.
         let root = try makeRoot(creatingDirectory: false)

@@ -5008,6 +5008,24 @@
         "file:Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift",
         "doc:docs/reference/model-delivery.md"
       ]
+    },
+    {
+      "id": "BKL-17",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The qc-takes lane runs QC v2 under a Python without its dependencies",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "scripts/macos_test.sh qc-takes scores its take pool with QC v2 through the interpreter scripts/select_python.py picks, and a missing dependency fails the lane instead of reporting qc_v2=ERROR.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/select_python.py"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Found 2026-10-16: every qc-takes run that day (RF-18's screen and CONV-21's) generated its takes but printed qc_v2=ERROR run=none, because the lane calls scripts/qc.py with the plain python3 (Homebrew 3.15, no numpy). Fast QC still judged every take; only the report-only QC v2 scoring was missing. Done 2026-10-16 (maintainer's go for the backlog items that need no iPhone): the Mac qc-takes and lang-bench lanes and the iPhone lang-bench run qc.py through the interpreter scripts/select_python.py picks, and a lane whose interpreter cannot import numpy fails before it generates. RF-15's language benchmark needed it.",
+      "evidence": [
+        "file:scripts/lib/shared.sh",
+        "file:scripts/tests/test_shared_sh.py"
+      ]
     }
   ]
 }

@@ -82,6 +82,22 @@ benchmark_nonce() {
   python3 -c 'import secrets; print(secrets.token_hex(4))'
 }
 
+# QC v2 (scripts/qc.py) runs under the interpreter scripts/select_python.py picks, which
+# honours VOCELLO_PYTHON, never under whichever python3 the shell finds first: that one
+# can lack numpy, which turned every QC v2 score into an error (BKL-17). A lane calls
+# this before it generates, so a missing dependency fails the lane at once; it sets
+# QC_PYTHON.
+require_qc_python() {
+  local scripts_dir selected
+  scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  selected="$(python3 "$scripts_dir/select_python.py")" \
+    || die "QC v2: no repository Python was found (scripts/select_python.py); set VOCELLO_PYTHON"
+  "$selected" -c 'import numpy' >/dev/null 2>&1 \
+    || die "QC v2: $selected cannot import numpy; install the pinned packages (config/toolchain.json) or set VOCELLO_PYTHON"
+  # shellcheck disable=SC2034  # read by the lane script that sourced this file
+  QC_PYTHON="$selected"
+}
+
 # Publish one qualified artifact directory into benchmarks/runs; the evidence is
 # preserved and the exact repair command printed when publication fails.
 record_benchmark_history() {

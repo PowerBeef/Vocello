@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-16",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked.",
+    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot.",
     "maxInFlight": 4
   },
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
@@ -267,7 +267,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-10-16",
-      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. RF-13, RF-14 and ASR-08 are closed. 2026-10-16: the maintainer added RF-18, RF-19, BG-01 and CONV-21 before the freeze (engine audit); the engine-remediation programme pauses at the freeze until the submission. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
+      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. RF-13, RF-14 and ASR-08 are closed. 2026-10-16: the maintainer added RF-18, RF-19, BG-01 and CONV-21 before the freeze (engine audit); the engine-remediation programme pauses at the freeze until the submission. The iPhone proofs of BG-01, CONV-21 and RF-18 stay before the freeze (maintainer, 2026-10-16). (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
       "blockedBy": [
         "ASR-08",
         "BG-01",
@@ -2000,21 +2000,6 @@
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
       "notes": "Requested by the maintainer on 2026-10-16; doc-only, so it may run before the freeze. Re-homed into the release plan on 2026-10-16 while worked (doc-only). The research report is in (two read-only research agents plus the lead's verification against code); its §9 gap analysis is pass 1's work list, and pass 2 follows RF-18 and CONV-21 as shipped.",
       "due": "2026-10-22"
-    },
-    {
-      "id": "BKL-17",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The qc-takes lane runs QC v2 under a Python without its dependencies",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "scripts/macos_test.sh qc-takes scores its take pool with QC v2 through the interpreter scripts/select_python.py picks, and a missing dependency fails the lane instead of reporting qc_v2=ERROR.",
-      "sourceOfTruth": [
-        "scripts/macos_test.sh",
-        "scripts/select_python.py"
-      ],
-      "updated": "2026-10-16",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-16: every qc-takes run that day (RF-18's screen and CONV-21's) generated its takes but printed qc_v2=ERROR run=none, because the lane calls scripts/qc.py with the plain python3 (Homebrew 3.15, no numpy). Fast QC still judged every take; only the report-only QC v2 scoring was missing."
     }
   ]
 }

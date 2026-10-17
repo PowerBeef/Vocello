@@ -8,7 +8,7 @@
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-16): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked.
+**Focus lock** (decided 2026-10-16): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot.
 Only this plan may hold planned or in-flight work, at most 4 items in flight.
 
 ## Plans
@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 4 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 10/20 (50%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 11/20 (55%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -540,7 +540,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-13` | parked | Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project | — |
 | `BKL-15` | parked | Mac Saved Voices empty and error states may lay the window out off screen | — |
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
-| `BKL-17` | parked | The qc-takes lane runs QC v2 under a Python without its dependencies | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -569,10 +568,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-16`** (parked) — iOS UI text replacement cannot clear an editor whose caret lands at the start.
   gate: VocelloUITextEntry.replace on iOS clears existing text wherever the tap leaves the caret and verifies the result, and the control audit's Design brief restore observes the restored value.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-17`** (parked) — The qc-takes lane runs QC v2 under a Python without its dependencies.
-  gate: scripts/macos_test.sh qc-takes scores its take pool with QC v2 through the interpreter scripts/select_python.py picks, and a missing dependency fails the lane instead of reporting qc_v2=ERROR.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

@@ -977,6 +977,7 @@ cmd_lang_bench() {
   local matrix="$ROOT_DIR/config/language-bench-matrix.json"
   local corpus="$ROOT_DIR/config/language-bench-corpus.json"
   [[ -f "$matrix" && -f "$corpus" ]] || die "missing language bench config"
+  require_qc_python
 
   "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
 
@@ -1104,18 +1105,18 @@ PY
   # be computed, reports and never fails the lane; spoken content must pass.
   local qc_takes="$artifacts/qc-takes.json" recognitions="$artifacts/qc-language-evidence.json"
   local qc_run="" takes_st=0 run_st=0 content_st=2 gates_st=2
-  python3 "$SCRIPT_DIR/qc.py" language-bench takes --platform macos --run-id "$run_id" \
+  "$QC_PYTHON" "$SCRIPT_DIR/qc.py" language-bench takes --platform macos --run-id "$run_id" \
     --plan "$plan" --corpus "$corpus" --diagnostics "$diag_root" --wav-dir "$wav_dir" \
     --output "$qc_takes" || takes_st=$?
   if (( takes_st == 0 )); then
-    qc_run="$(python3 "$SCRIPT_DIR/qc.py" run --takes "$qc_takes" --lane language-bench)" || run_st=$?
+    qc_run="$("$QC_PYTHON" "$SCRIPT_DIR/qc.py" run --takes "$qc_takes" --lane language-bench)" || run_st=$?
   fi
   if (( takes_st == 0 && run_st == 0 )) && [[ -n "$qc_run" ]]; then
     content_st=0
-    python3 "$SCRIPT_DIR/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
+    "$QC_PYTHON" "$SCRIPT_DIR/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
       | tee "$artifacts/spoken-content.txt" || content_st=$?
     gates_st=0
-    python3 "$SCRIPT_DIR/qc.py" gate --lane language-bench --run "$qc_run" \
+    "$QC_PYTHON" "$SCRIPT_DIR/qc.py" gate --lane language-bench --run "$qc_run" \
       | tee "$artifacts/audio-qc-gates.txt" || gates_st=$?
   fi
   local content_verdict gates_verdict
@@ -1203,6 +1204,7 @@ cmd_qc_takes() {
   [[ -f "$policy" ]] || die "qc-takes: missing the take policy (config/audio-qc-calibration-takes.json)"
   python3 "$takes_tool" validate-policy --policy "$policy" >/dev/null \
     || die "qc-takes: the take policy is invalid"
+  require_qc_python
 
   "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
   # Read-only: downloads stay an explicit `models ensure` repair action.
@@ -1380,11 +1382,11 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
   local qc_status="SKIPPED" qc_run="" qc_gate="none" qc_queue="none"
   if (( manifest_st == 0 && validate_st == 0 )); then
     qc_status="ERROR"
-    if qc_run="$(python3 "$SCRIPT_DIR/qc.py" run --takes "$artifacts" --lane qc-takes \
+    if qc_run="$("$QC_PYTHON" "$SCRIPT_DIR/qc.py" run --takes "$artifacts" --lane qc-takes \
         2> >(tee "$artifacts/logs/qc-run.log" >&2))" && [[ -n "$qc_run" ]]; then
       qc_status="COMPLETE"
-      qc_gate="$(python3 "$SCRIPT_DIR/qc.py" gate --lane qc-takes --run "$qc_run" 2>&1 | tail -n 1)" || true
-      if python3 "$SCRIPT_DIR/qc.py" queue --top 50 --run "$qc_run" --batch "queue-$qc_run" \
+      qc_gate="$("$QC_PYTHON" "$SCRIPT_DIR/qc.py" gate --lane qc-takes --run "$qc_run" 2>&1 | tail -n 1)" || true
+      if "$QC_PYTHON" "$SCRIPT_DIR/qc.py" queue --top 50 --run "$qc_run" --batch "queue-$qc_run" \
           >"$artifacts/logs/qc-queue.log" 2>&1; then
         qc_queue="queue-$qc_run"
       else

@@ -1472,6 +1472,7 @@ cmd_lang_bench() {
   local corpus="$ROOT_DIR/config/language-bench-corpus.json"
   [[ -f "$matrix" && -f "$corpus" ]] || die "missing language bench config (expected $matrix and $corpus)"
   [[ -z "$cohort" || -f "$cohort" ]] || die "diagnostic cohort config not found: $cohort"
+  require_qc_python
 
   local run_id
   if [[ -n "$cohort" ]]; then
@@ -1643,18 +1644,18 @@ PY
   local qc_takes="$artifacts/qc-takes.json" recognitions="$artifacts/qc-language-evidence.json"
   local qc_run="" takes_st=0 run_st=0 content_st=2 gates_st=2
   if [[ $collect_st -eq 0 ]]; then
-    python3 "$ROOT_DIR/scripts/qc.py" language-bench takes --platform ios --run-id "$run_id" \
+    "$QC_PYTHON" "$ROOT_DIR/scripts/qc.py" language-bench takes --platform ios --run-id "$run_id" \
       --plan "$plan" --corpus "$corpus" --diagnostics "$diag" --output "$qc_takes" || takes_st=$?
     if (( takes_st == 0 )); then
-      qc_run="$(python3 "$ROOT_DIR/scripts/qc.py" run --takes "$qc_takes" --lane ios-language-bench)" \
+      qc_run="$("$QC_PYTHON" "$ROOT_DIR/scripts/qc.py" run --takes "$qc_takes" --lane ios-language-bench)" \
         || run_st=$?
     fi
     if (( takes_st == 0 && run_st == 0 )) && [[ -n "$qc_run" ]]; then
       content_st=0
-      python3 "$ROOT_DIR/scripts/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
+      "$QC_PYTHON" "$ROOT_DIR/scripts/qc.py" language-bench evidence --run "$qc_run" --output "$recognitions" \
         | tee "$artifacts/spoken-content.txt" || content_st=$?
       gates_st=0
-      python3 "$ROOT_DIR/scripts/qc.py" gate --lane ios-language-bench --run "$qc_run" \
+      "$QC_PYTHON" "$ROOT_DIR/scripts/qc.py" gate --lane ios-language-bench --run "$qc_run" \
         | tee "$artifacts/audio-qc-gates.txt" || gates_st=$?
     fi
   fi

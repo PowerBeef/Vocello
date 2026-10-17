@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -57,6 +59,27 @@ class HelperTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0)
         self.assertTrue(completed.stdout.strip())
+
+    def test_qc_python_is_the_selected_interpreter_and_needs_numpy(self) -> None:
+        """BKL-17: QC v2 runs under the selected Python, and one without numpy fails the lane up front."""
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("the test interpreter has no numpy")
+        environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "VOCELLO_PYTHON": sys.executable}
+        completed = run_helper('require_qc_python; printf "%s" "$QC_PYTHON"', env=environment)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, os.path.abspath(sys.executable))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            # The same interpreter without site-packages: a valid Python that cannot import numpy.
+            bare = Path(temporary) / "python3"
+            bare.write_text(f'#!/bin/sh\nexec "{sys.executable}" -S "$@"\n', encoding="utf-8")
+            bare.chmod(0o755)
+            completed = run_helper('require_qc_python; echo "reached"', env={**environment, "VOCELLO_PYTHON": str(bare)})
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("cannot import numpy", completed.stderr)
+        self.assertNotIn("reached", completed.stdout)
 
     def test_failed_publication_preserves_evidence_and_prints_the_repair(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

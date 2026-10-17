@@ -58,6 +58,31 @@ class BenchmarkProfileTests(unittest.TestCase):
             self.assertIn("mac-mini-m2-8gb", errors[0])
 
 
+class ReadmeImageryTests(unittest.TestCase):
+    PUBLIC = {"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"}}
+
+    def imagery_errors(self, readme: str, files: list[str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(readme, encoding="utf-8")
+            for name in files:
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_bytes(b"")
+            return [e for e in MODULE.validate_readme(root, self.PUBLIC) if "imagery" in e or "product asset" in e]
+
+    def test_img_tags_and_markdown_images_both_count(self) -> None:
+        files = [f"docs/readme/art{i}.png" for i in range(3)] + ["docs/screenshots/a.png", "docs/screenshots/b.png"]
+        readme = "".join(f'<img src="{name}" alt="">\n' for name in files[:3])
+        readme += "".join(f"![shot]({name})\n" for name in files[3:])
+        self.assertEqual(self.imagery_errors(readme, files), [])
+
+    def test_too_few_or_missing_images_fail(self) -> None:
+        files = [f"docs/readme/art{i}.png" for i in range(5)]
+        readme = "".join(f'<img src="{name}" alt="">\n' for name in files)
+        self.assertEqual(len(self.imagery_errors(readme, files[:4])), 1)
+        self.assertEqual(len(self.imagery_errors(readme.replace("art4", "art3"), files)), 1)
+
+
 class CandidateClaimTests(unittest.TestCase):
     PUBLIC = {
         "stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"},

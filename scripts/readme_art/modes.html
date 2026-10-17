@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="art.css">
+<style>
+  :root { --w: 800px; --h: 276px; }
+  .row { display: flex; gap: 14px; padding: 20px; }
+  .card {
+    flex: 1; padding: 16px; border-radius: 16px; background: var(--charcoal-800);
+    border: 1px solid var(--stroke-inline);
+  }
+  .card.custom { border-color: rgba(237, 204, 138, 0.35); }
+  .card.design { border-color: rgba(191, 170, 219, 0.35); }
+  .card.clone { border-color: rgba(219, 168, 135, 0.35); }
+  h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+  p { margin-top: 6px; height: 34px; font-size: 12.5px; line-height: 17px; color: var(--fg-secondary); }
+  .shot { margin-top: 14px; width: 100%; border-radius: 9px; border: 1px solid var(--stroke-inline); display: block; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="card custom">
+      <h2><i class="dot custom"></i>Built-in Voice</h2>
+      <p>Nine speakers and ten languages, with the delivery you choose.</p>
+      <img class="shot" src="../../docs/screenshots/vocello-custom-voice.png" alt="">
+    </div>
+    <div class="card design">
+      <h2><i class="dot design"></i>Voice Design</h2>
+      <p>Describe a voice in your own words, then keep the ones you like.</p>
+      <img class="shot" src="../../docs/screenshots/vocello-voice-design.png" alt="">
+    </div>
+    <div class="card clone">
+      <h2><i class="dot clone"></i>Voice Cloning</h2>
+      <p>A new voice from a short clip you have permission to use.</p>
+      <img class="shot" src="../../docs/screenshots/vocello-voice-cloning.png" alt="">
+    </div>
+  </div>
+</body></html>

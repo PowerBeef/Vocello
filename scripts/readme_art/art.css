@@ -1,0 +1,33 @@
+/* README art: rendered to docs/readme/*.png by scripts/readme_art/render.sh.
+   Colors come from the website's tokens, which mirror the app's theme. */
+@import url("../../website/src/tokens.css");
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { width: var(--w); height: var(--h); overflow: hidden; }
+
+body {
+  background:
+    radial-gradient(90% 70% at 50% -10%, #23252E 0%, rgba(35, 37, 46, 0) 70%),
+    linear-gradient(180deg, var(--aurora-top), var(--charcoal-1000));
+  color: var(--fg-primary);
+  font-family: system-ui, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 30px; padding: 0 14px; border-radius: 15px;
+  background: var(--charcoal-800); border: 1px solid var(--stroke-inline);
+  font-size: 13px; font-weight: 600; color: var(--fg-primary);
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; }
+.dot.custom { background: var(--mode-custom); }
+.dot.design { background: var(--mode-design); }
+.dot.clone { background: var(--mode-clone); }
+
+.window {
+  border-radius: 12px; border: 1px solid var(--stroke-card);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  display: block;
+}

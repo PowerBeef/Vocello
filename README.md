@@ -1,149 +1,187 @@
 <div align="center">
 
-![Vocello banner with abstract voice waves and the Vocello logo](docs/readme_banner_vocello.png)
+<img src="docs/readme/hero.png" width="100%" alt="Vocello: premium voice studio, proven performance, private by design. Write a script, pick or describe a voice, and generate speech locally on your Mac and iPhone. The Mac Studio shows a Built-in Voice take ready to play beside the iPhone app, under the three mode pills: Built-in Voice in gold, Voice Design in lavender, Voice Cloning in terracotta.">
 
-### Premium voice studio. Proven performance. Private by design.
+<br>
 
-Write a script, choose or shape a voice, and generate speech on your own device.<br>
-Native Swift and MLX. No account. No credits. Nothing you write or record leaves your device.
+<a href="https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/Vocello-macos26.dmg"><img src="docs/readme/download-mac.svg" height="56" alt="Download Vocello 2.4.0 for macOS 26 or newer"></a>&nbsp;&nbsp;<a href="https://testflight.apple.com/join/Cvp6yCv7"><img src="docs/readme/join-iphone-beta.svg" height="56" alt="Join the Vocello iPhone beta on TestFlight"></a>
 
-<a href="https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/Vocello-macos26.dmg"><img src="docs/readme/download-mac.svg" alt="Download Vocello 2.4.0 for macOS 26 or newer" height="56"></a>&nbsp;&nbsp;<a href="https://testflight.apple.com/join/Cvp6yCv7"><img src="docs/readme/join-iphone-beta.svg" alt="Join the Vocello iPhone beta on TestFlight" height="56"></a>
+<br>
 
-[What is new in 2.4.0](docs/releases/v2.4.0.md) · [Release details](https://github.com/PowerBeef/Vocello/releases/tag/v2.4.0) · [All releases](https://github.com/PowerBeef/Vocello/releases) · [Website](https://vocello.vercel.app/)
+[![macOS 26+](https://img.shields.io/badge/macOS-26%2B-EDCC8A?style=flat-square&logo=apple&logoColor=F5F6F8&labelColor=1C1E26)](#get-vocello) [![iPhone beta](https://img.shields.io/badge/iPhone-TestFlight%20beta-BFAADB?style=flat-square&logo=apple&logoColor=F5F6F8&labelColor=1C1E26)](https://testflight.apple.com/join/Cvp6yCv7) [![Swift 6 and MLX](https://img.shields.io/badge/Swift%206-MLX-DBA887?style=flat-square&logo=swift&logoColor=F5F6F8&labelColor=1C1E26)](#for-developers) [![Qwen3-TTS 1.7B](https://img.shields.io/badge/Qwen3--TTS-1.7B-BFAADB?style=flat-square&labelColor=1C1E26)](https://github.com/QwenLM/Qwen3-TTS) [![Runs locally](https://img.shields.io/badge/runs-locally-EDCC8A?style=flat-square&labelColor=1C1E26)](#meet-vocello) [![MIT license](https://img.shields.io/badge/license-MIT-8C8F9B?style=flat-square&labelColor=1C1E26)](LICENSE)
 
-[![Vocello 2.4.0](https://img.shields.io/badge/Vocello-2.4.0-EDCC8A?style=flat-square&labelColor=16181E)](https://github.com/PowerBeef/Vocello/releases/tag/v2.4.0) ![macOS 26 or newer](https://img.shields.io/badge/macOS-26%2B-EDCC8A?style=flat-square&labelColor=16181E&logo=apple&logoColor=F5F6F8) [![iPhone TestFlight beta](https://img.shields.io/badge/iPhone-TestFlight%20beta-BFAADB?style=flat-square&labelColor=16181E&logo=apple&logoColor=F5F6F8)](https://testflight.apple.com/join/Cvp6yCv7) ![Apple Silicon required](https://img.shields.io/badge/Apple%20Silicon-required-DBA887?style=flat-square&labelColor=16181E) [![MIT License](https://img.shields.io/badge/License-MIT-3A3D48?style=flat-square&labelColor=16181E)](LICENSE)
-
-**[Voices](#three-ways-to-make-a-voice) · [Privacy](#private-by-design) · [Install](#install-on-mac) · [iPhone](#vocello-for-iphone) · [Under the hood](#under-the-hood) · [Build from source](#build-from-source)**
+**[Meet Vocello](#meet-vocello)** · **[Three voices](#three-ways-to-make-a-voice)** · **[Performance](#performance)** · **[Get Vocello](#get-vocello)** · **[For developers](#for-developers)**
 
 </div>
 
-> [!NOTE]
-> The Mac download is **Vocello 2.4.0**. This page follows the current source, the upcoming **Vocello 3.0**, and marks what is new in it with **(3.0)**. The Mac screenshots show the 3.0 interface; the iPhone screenshot is an earlier capture whose mode tab still reads Custom.
+<br>
 
-![Vocello Studio with a script, a chosen speaker, and a generated take ready to play](docs/screenshots/vocello-custom-voice.png)
+## Meet Vocello
+
+Vocello is a voice studio for your Mac and iPhone. Write a script, pick one of nine voices or describe a new one, and Vocello speaks it with Qwen3-TTS running on your own Apple Silicon. There is no account, no credits and no cloud: what you write and record stays local.
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+<img src="docs/readme/icons/private.svg" width="40" height="40" alt="">
+
+**Private by design**<br>
+Generation runs locally once the models are installed. Scripts, recordings, voices and takes stay in local storage unless you export them.
+
+</td>
+<td width="33%" valign="top">
+
+<img src="docs/readme/icons/fast.svg" width="40" height="40" alt="">
+
+**Fast**<br>
+On a Mac mini M6, once the model is loaded, a minute of speech generates in under 20 seconds, and long scripts play while the rest is still being made.
+
+</td>
+<td width="33%" valign="top">
+
+<img src="docs/readme/icons/native.svg" width="40" height="40" alt="">
+
+**Native**<br>
+Swift and MLX on Apple Silicon, with no Python and no server. Ten languages, long-form projects and a searchable History.
+
+</td>
+</tr>
+</table>
 
 ## Three ways to make a voice
 
-- <img src="docs/readme/mode-built-in.svg" width="12" height="12" alt=""> **Built-in Voice.** Choose one of nine built-in Qwen3 speakers, then set language and delivery. Vocello 2.4.0 calls this mode Custom Voice.
-- <img src="docs/readme/mode-design.svg" width="12" height="12" alt=""> **Voice Design.** Describe a voice in plain language and generate it from that brief.
-- <img src="docs/readme/mode-cloning.svg" width="12" height="12" alt=""> **Voice Cloning.** Capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip, import an audio file, or reuse a voice from Saved Voices, including one saved from Voice Design.
+<img src="docs/readme/modes.png" width="100%" alt="Three cards, each edged in its mode's color. Built-in Voice, gold: nine speakers and ten languages, with the delivery you choose. Voice Design, lavender: describe a voice in your own words, then keep the ones you like. Voice Cloning, terracotta: a new voice from a short clip you have permission to use.">
 
-| <img src="docs/readme/mode-design.svg" width="12" height="12" alt=""> Voice Design | <img src="docs/readme/mode-cloning.svg" width="12" height="12" alt=""> Voice Cloning |
-| --- | --- |
-| ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
-| Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app or import a file: WAV, MP3, AIFF, M4A, or FLAC on the Mac, plus OGG where macOS can decode it; WAV, MP3, AIFF, or M4A from Files on iPhone. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
+- **Built-in Voice.** Nine Qwen3 speakers in ten languages, with a delivery preset or a few words about how it should sound. Vocello 2.4.0 calls this mode Custom Voice.
+- **Voice Design.** Describe a voice ("a warm, clear narrator") and hear it. Save the ones you like to use again.
+- **Voice Cloning.** Record or import a clip of a voice you own or have permission to use, and save it to your library. Voice Cloning follows the reference voice, so the clip sets its character.
 
-**Long scripts and ten languages.** Scripts past 900 characters (about 300 in Chinese, Japanese or Korean) become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection.
+Paste a whole chapter: past 900 characters, Vocello plans the script into segments that play one after another while the rest generates, then joins them into one file. Languages are detected automatically: Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish and Italian.
 
-**Delivery.** **(3.0)** Built-in Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip. In Vocello 2.4.0, Custom Voice and Voice Design offer ten delivery styles at subtle, normal, or strong intensity plus a free-text description, and cloned voices have no delivery choice.
+Clone generation waits for your consent in Settings, and **(3.0)** every take carries an inaudible AudioSeal watermark that marks it as AI-generated.
 
-**Variation and reproducibility.** The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. **(3.0)** Every finished take also records the seed it actually used: pin a take's seed from History and subsequent generations reproduce it exactly with the same settings, or leave it unpinned for a fresh take each time. In Vocello 2.4.0, interactive takes cannot be pinned or replayed by seed.
+> [!NOTE]
+> The Mac download is **Vocello 2.4.0**. This page describes the upcoming **Vocello 3.0**, and **(3.0)** marks what is new in it.
 
-| Models | History |
-| --- | --- |
-| ![Vocello model download settings](docs/screenshots/vocello-model-downloads.png) | ![Vocello History screen](docs/screenshots/vocello-history.png) |
-| Install and manage the available model package for each voice mode from Settings. | Generations remain local and can be replayed, searched, exported, or removed. |
+## Performance
 
-Vocello is not a wrapper around a Python server: generation runs through a first-party Swift runtime on MLX, and the full engineering story lives in [Under the hood](#under-the-hood).
+<img src="docs/readme/performance.png" width="100%" alt="Speed: a real-time factor of 0.26 to 0.32, warm, in all three modes on a Mac mini M6 with 16 GB and the Speed models, which is 3.1 to 3.8 times real time. Peak memory: about 3 GB, flat as scripts grow, against about 8 GB before streaming, on an 8 GB Mac mini M2. Long-form drift: memory ended 1.1 percent below its start across a 12-segment project with 10.4 minutes of audio, on the same M2.">
 
-## Private by design
+<details>
+<summary><b>How these were measured</b></summary>
 
-- Speech generation runs locally after models are installed.
-- Generated audio, recorded references, transcripts, saved voices, and history remain in local app storage unless you export them.
-- Model installation downloads pinned model artifacts from Hugging Face.
-- Reference recording requests microphone access. Transcript auto-fill requests Speech Recognition access and uses on-device recognition with the required system language assets.
-- Voice cloning should only be used with voices you own or have permission to use. Clone generation remains disabled until its visible consent acknowledgment is enabled in Settings; the choice is stored locally and can be changed there.
-- **(3.0)** Generated audio is marked as AI-generated: an inaudible AudioSeal watermark plus a machine-readable provenance note in the WAV file. The 2.4.0 download does not mark its output.
-- In either version, if you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this disclosure (EU AI Act, Article 50).
+<br>
 
-Storage locations and deletion behavior are documented in [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md).
+The real-time factor (RTF) is seconds of generation per second of audio, so lower is faster and anything under 1.0 plays ahead of generation. The speed figures pool warm takes of the Speed models from the canonical benchmark host, a Mac mini M6 with 16 GB; the chart under [Performance, measured](#performance-measured) breaks them down by mode and script length. The 8 GB Mac mini M2 is the support floor: its records (the last canonical one, `379db820`, measured warm RTF 0.53 to 0.82) form an earlier series that is never compared with the M6's. The memory figures come from that M2: streaming took the peak of the same take from about 8 GB to about 3 GB (`benchmarks/OPTIMIZATION.md` §F.1), and a 12-segment long-form project (smoke run `8f15c1fd`) ended 1.1% below its starting footprint.
 
-## Open source, and the iOS export unlock
+Every published record is in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md), and the method is in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
 
-Vocello's source remains MIT-licensed. For the upcoming official iOS 3.0 release, **Design & Clone Export** is a one-time purchase with a **US base price of $19.99** and Apple-managed regional prices shown in your local currency. Generation, listening, internal History, voice enrollment and Built-in audio exports remain free. **macOS and CLI exports remain unrestricted.** The iOS product is configured, but metadata, purchase testing and App Store review are still pending; this is not an availability claim.
+</details>
 
-The purchase supports the official iOS distribution, not an exclusive license to the source. People may build and modify the MIT-licensed code, including its export checks, subject to the license terms. A modified build is not the official App Store app and does not create an Apple purchase or entitlement. We accept this tradeoff instead of adding a licensing server, obfuscation or restrictions on forks. Third-party models and assets retain their applicable terms; the code license does not clear all content rights. See the [iOS purchase guide](docs/reference/ios-app-guide.md#ios-export-purchase) and [purchase security boundary](SECURITY.md#open-source-purchase-boundary).
+## Get Vocello
 
----
+**On a Mac:** [download Vocello 2.4.0](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/Vocello-macos26.dmg), drag it to Applications, then install a voice model from **Settings > Model downloads**. The app is signed with an Apple Developer ID and notarized.
 
-## Install on Mac
+**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7).
 
-1. Download [`Vocello-macos26.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/Vocello-macos26.dmg).
-2. Open the DMG and drag `Vocello.app` to `/Applications`.
-3. Open Vocello, then install models from **Settings > Model downloads**.
-4. Generate from Custom Voice (Built-in Voice in 3.0), Voice Design, or Voice Cloning.
-
-The DMG is signed with an Apple Developer ID certificate, notarized, and stapled. The attached [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/release-metadata.txt) records source and toolchain provenance.
-
-| Platform | Support | Model variants | Public status |
+| Platform | Requirements | Model variants | Status |
 | --- | --- | --- | --- |
 | Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.4.0 is available now |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | Public beta via [TestFlight](https://testflight.apple.com/join/Cvp6yCv7) |
 
-Settings recommends Speed on 8 GB Macs, where it uses less memory, and Quality on Macs with 16 GB or more. Quality is a Mac-only option; the iPhone uses Speed. The three Mac Speed packages total about 6 GB.
+Speed uses less memory and suits 8 GB Macs; Quality is a Mac option for 16 GB or more. The three Mac Speed models total about 6 GB.
 
 <details>
-<summary><strong>Upgrading, older Macs, and benchmark hardware</strong></summary>
+<summary><b>Upgrading, and older Macs</b></summary>
 
 <br>
 
-Upgrading from an earlier Vocello 2.x does not require reinstalling models; application data remains under `~/Library/Application Support/QwenVoice/`. After updating to 2.3.0 or newer, Settings shows an optional in-place update for installed models to the current smaller packages.
-
-With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `PowerBeef/Vocello`; every old link and clone URL redirects to the new name.
-
-Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
-
-Support floors and benchmark machines are different facts: the support floor is any Apple Silicon Mac with 8 GB. Canonical evidence is produced on a Mac mini M6 with 16 GB (since 2026-09-22) and an iPhone 17 Pro; the Mac figures published so far were measured on the retired canonical host, a Mac mini M2 with 8 GB, and remain valid history that is never compared with M6 records. See [Performance, measured](#performance-measured) below. The pinned Mac record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json), produced with a Vocello 3.0 build from source on the 2026.08.06.1 model packages, has the exact matrix and conditions.
+Upgrading from Vocello 2.x keeps your models and data under `~/Library/Application Support/QwenVoice/`. Vocello was called QwenVoice before 2.2.0; old repository links redirect here. Macs on macOS 15 can use the legacy [QwenVoice 1.2.3](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). Each release's notes are in [`docs/releases/`](docs/releases/), and the 2.4.0 release attaches [`release-metadata.txt`](https://github.com/PowerBeef/Vocello/releases/download/v2.4.0/release-metadata.txt) with its source and toolchain provenance.
 
 </details>
 
-## Vocello for iPhone
-
-<img src="docs/screenshots/vocello-ios-studio.png" alt="Vocello Studio running on iPhone" width="230" align="right">
-
-The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Built-in Voice, Voice Design, Voice Cloning (from a microphone recording, a WAV, MP3, AIFF, or M4A file in Files, or a saved voice), local history, and the memory-conscious Speed models.
-
-On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends.
-
-A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision.
-
-Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
-
-<br clear="right">
+<br>
 
 ---
 
-## Under the hood
+## For developers
 
-This is the maintained engineering record of the whole package, refreshed with each release. It follows the current source, the upcoming 3.0; where the 2.4.0 download differs, the text says so. Every claim below traces to a tracked benchmark record, a machine-readable contract, or a documented measurement in this repository.
+Vocello is a working reference for running a 1.7B-parameter text-to-speech model natively on Apple Silicon: Swift 6 with strict concurrency, a first-party MLX runtime, audio that streams with bounded memory, and a measurement discipline that keeps every performance claim tied to a record. The docs record each decision and the measurement behind it.
 
-### The owned runtime
-
-Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and every retained, modified and added file is tracked in a generated inventory (`Packages/VocelloQwen3Core/CURRENT_INVENTORY.json`) with its named semantic changes under an immutable lineage ledger (`Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
-
-One engine serves three hosts. **(3.0)** On the Mac the engine runs inside the app process, exactly as on the iPhone (since 2026-09-15; the 2.4.0 download still runs it in a separate XPC service process), so one store, one lifecycle and one memory policy serve both apps: the engine's own pressure responder trims and unloads, and the per-tier policy unloads an idle model. The `vocello` command-line tool links the same engine framework and drives it in-process with no UI.
+### How it works
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
   <img alt="Architecture diagram: the SwiftUI app hosts the engine in its own process, which drives the owned VocelloQwen3Core runtime (an engine actor owning each session, the Qwen3-TTS talker and code predictor, the Mimi decoder) on MLX and Metal; PCM audio streams back chunk by chunk." src="docs/charts/architecture-light.svg">
 </picture>
 
-Every request moves through one synthesis pipeline from conditioning to a verified 24 kHz mono 16-bit WAV, owned end to end by an engine actor. The full request lifecycle and engine invariants are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+One engine serves three hosts: the Mac app, the iPhone app and the `vocello` command-line tool, all built on `NativeRuntimeFactory`. Every request takes one path from conditioning to a verified 24 kHz mono WAV: an engine actor owns the session, the Qwen3-TTS talker and code predictor sample codec frames, the Mimi decoder turns them into audio, and PCM streams back chunk by chunk to the player, a limiter, an atomic WAV writer and a quality check. → [Architecture](docs/ARCHITECTURE.md)
 
-### Streaming, memory, and determinism
+### Engineering highlights
 
-Long scripts do not need a bigger Mac. Audio crosses an actor-owned, frame-bounded channel chunk by chunk: audio-bearing events are never dropped, backpressure suspends the producer instead of buffering, and cancelling a suspended producer is proven by test to wake it cleanly. Making streaming the default collapsed peak generation memory from about 8 GB to about 3 GB on the same take and made the peak flat with output length, a measurement that overturned the project's own earlier analysis (`benchmarks/OPTIMIZATION.md` §F.1). A 12-segment long-form project producing 10.4 minutes of audio ended about 1.1% below its starting footprint:
+<table>
+<tr>
+<td width="50%" valign="top">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/longform-memory-dark.svg">
-  <img alt="Line chart of engine physical footprint across a 12-segment long-form project: end-of-segment values oscillate in a flat band around 2.4 GB and peaks stay near 3.0 GB, with a first-to-last change of minus 1.1 percent across 10.4 minutes of audio" src="docs/charts/longform-memory-light.svg">
-</picture>
+<img src="docs/readme/icons/runtime.svg" width="40" height="40" alt="">
 
-Takes are reproducible by construction: every request carries its own seed and fresh sampler state, nothing samples from process-global state, and cancellation is a typed, awaited operation (user, memory pressure, superseded, or shutdown), so a cancelled take can never land in History. Memory policy is set per device tier, with no hard memory cap in production and no silent quality fallback.
+**An owned runtime, not a Python wrapper**<br>
+The runtime, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md), is derived from mlx-audio-swift v0.1.2 and narrowed to exactly what Vocello ships: about 36,000 of its 49,000 upstream lines were removed. Every retained, changed and added file is tracked in a generated inventory with a named semantic delta, and a facade contract keeps raw MLX types out of the apps.
+
+</td>
+<td width="50%" valign="top">
+
+<img src="docs/readme/icons/streaming.svg" width="40" height="40" alt="">
+
+**Streaming that doesn't grow**<br>
+Audio crosses an actor-owned, frame-bounded channel: audio-bearing events are never dropped, backpressure suspends the producer instead of buffering, and cancelling a suspended producer wakes it cleanly, by test. Making streaming the default took the peak of the same take from about 8 GB to about 3 GB and made it flat with script length.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+<img src="docs/readme/icons/launches.svg" width="40" height="40" alt="">
+
+**Launch-bound, not compute-bound**<br>
+Profiling showed the GPU idle for most of each frame while the host built the graph. Fusing the code predictor's rotary embedding removed about 600 kernel launches per frame (+26% warm), compiling the per-frame predictor pass added +8 to 11% with byte-identical output, and GPU busy rose from 31 to 37% to about 49%.
+
+</td>
+<td valign="top">
+
+<img src="docs/readme/icons/reproducible.svg" width="40" height="40" alt="">
+
+**Reproducible by construction**<br>
+Every request carries its own seed and fresh sampler state, and nothing samples from process-global state. Cancellation is typed and awaited (user, memory pressure, superseded, shutdown), so a cancelled take can never reach History, and MLX errors arrive as typed failures instead of aborting the process.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+<img src="docs/readme/icons/proof.svg" width="40" height="40" alt="">
+
+**Proof before merge**<br>
+Fixed-seed byte identity gates every scheduling change. Regressions are kept as measured do-nots with their numbers, and the benchmark lane once caught its own observer effect: a +55% swing from the test harness recording the screen. Published records are pass-only and privacy-allowlisted.
+
+</td>
+<td valign="top">
+
+<img src="docs/readme/icons/device.svg" width="40" height="40" alt="">
+
+**Tested on real hardware**<br>
+UI tests drive the native Mac app and a paired iPhone, never a Simulator. Every take passes a byte-bound audio check before it is saved, and long scripts, downloads, cancellation and background exits each have their own lane.
+
+</td>
+</tr>
+</table>
+
+→ [Optimization ledger](benchmarks/OPTIMIZATION.md) · [Testing runbook](docs/reference/testing-runbook.md) · [MLX guide](docs/reference/mlx-guide.md)
 
 ### Performance, measured
 
-Every number below comes from a tracked, privacy-safe benchmark record in this repository, measured on the canonical benchmark host, a Mac mini M6 with 16 GB. The chart below pools the takes of the most recent canonical records that share one comparison lineage and one app build (up to five), so one run's noise does not move a bar; today that pool is record `c37aa311` alone, measured with a Vocello 3.0 build from source. The Mac mini M2 with 8 GB remains the support floor; its records (the last canonical one is `379db820`, warm RTF 0.53 to 0.82) form an earlier series that is never compared with the M6's.
+Warm real-time factor by mode and script length on the Mac mini M6 (16 GB), pooled from the most recent canonical records of one build (today record `c37aa311`, a Vocello 3.0 build from source):
 
 <!-- rtf-chart:start (generated by scripts/generate_readme_charts.py) -->
 <picture>
@@ -151,36 +189,12 @@ Every number below comes from a tracked, privacy-safe benchmark record in this r
   <img alt="Grouped bar chart: warm real-time factor of the Speed models by script length, lower is faster: Built-in Voice 0.27 to 0.31, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.32. Every bar sits below the real-time line at 1.0." src="docs/charts/rtf-by-mode-light.svg">
 </picture>
 <!-- rtf-chart:end -->
-<details>
-<summary><strong>The optimization ledger:</strong> where that speed comes from</summary>
 
-<br>
+The charts regenerate from the named records with `scripts/generate_readme_charts.py`. → [Benchmark history](benchmarks/HISTORY.md)
 
-That speed is the sum of an evergreen optimization ledger, not one trick. Section letters cite `benchmarks/OPTIMIZATION.md`:
+### Build from source
 
-- The workload proved launch-bound, not compute-bound: whole-generation GPU busy rose from 31 to 37% up to about 49% as host-side graph building was removed, and that characterization has steered every optimization since (§H, §M).
-- A fused code-predictor rotary embedding removed about 600 kernel launches per frame, worth +26% warm; this is the change that took the 8 GB floor Mac past realtime (§H P3).
-- The per-frame code-predictor pass is compiled once and replayed, worth +8 to 11% warm on every cell with byte-identical output (§M P3).
-- Stream-chunk materialization is pipelined off the token hot path with identical event order, verified byte-identical across 12 of 12 fixed-seed takes (§M P2a-i).
-- Switching models reuses the byte-identical 682 MB speech tokenizer: its load cost drops from 503 ms to zero (§N 2.1).
-- The model packages carry 8-bit text embeddings, about 278 MB less resident memory and 292 MB less disk per Speed package, published across six public Hugging Face repositories at verified equal quality (§N 2.2).
-- The interface steps aside while the engine works: attribution put window compositing near 23% of the same warm take against about 3% for the engine transport of the time, so translucent surfaces render as solid fills during generation (§K).
-
-</details>
-
-The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts in this section regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
-
-### Honest measurement
-
-Performance work here merges only with proof. Fixed-seed byte-identity is the merge gate for scheduling changes (a change that moves a single sample is not a scheduling change), and the losses are recorded next to the wins: experiments that regressed are kept as measured do-NOTs with their numbers, and a whole conversion arm was parked when its regression reproduced across data types (`benchmarks/OPTIMIZATION.md` §M, §N 2.3). The benchmark lane once caught its own observer effect, a +55% swing traced to the test harness video-encoding the screen during UI benchmarks, and the affected records are marked non-comparable rather than quietly deleted (§J). Published benchmark records are PASS-only and privacy-allowlisted by design, and every take carries a typed quality identity (audio, prosody, transcription, and continuity gate verdicts) in the registry schema.
-
-Vocello is built by a solo developer with heavy use of coding agents. Every performance claim above is gated by deterministic, fixed-seed checks and the tracked benchmark records in this repository.
-
----
-
-## Build from source
-
-Building requires **full Xcode** (CI pins the version in `config/toolchain.json`) on an Apple Silicon Mac running macOS 26 or newer; the Command Line Tools alone are not enough, even for the CLI, because every product (app and `vocello`) is a target of the generated Xcode project. If `xcodebuild` reports the active developer directory is a Command Line Tools instance, point it at Xcode: `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. The scripts also need the pinned xcodegen and ripgrep, Python 3.11 or newer as `python3` (Apple's `/usr/bin/python3` is too old) with the pinned `numpy`, `pytest` and `pytest-xdist`, and the Metal toolchain component. Setting up a new Mac from a fresh clone, step by step, is in [`docs/reference/development-setup.md`](docs/reference/development-setup.md).
+You need full Xcode (the CI version is pinned in `config/toolchain.json`) on an Apple Silicon Mac with macOS 26 or newer, plus the pinned xcodegen, ripgrep and Python packages. [`docs/reference/development-setup.md`](docs/reference/development-setup.md) sets up a new Mac step by step.
 
 ```sh
 git clone https://github.com/PowerBeef/Vocello.git
@@ -189,85 +203,72 @@ cd Vocello
 ./scripts/build.sh build
 ```
 
-Repository scripts are the authoritative build and test interface. `project.yml` generates the Xcode project, so edit it instead of the generated project file. To work in Xcode after generation, open `QwenVoice.xcodeproj`.
+`project.yml` generates the Xcode project, and the repository scripts are the build and test interface: `scripts/dev.sh check` runs the lint, contracts and tests your changes touch, and `scripts/dev.sh ci` runs exactly what CI runs. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md); coding agents also read [`CLAUDE.md`](CLAUDE.md).
 
-The ordinary deterministic loop is `scripts/dev.sh check` (lint, contracts, the tests the dirty tree touches; advisory) and `scripts/dev.sh ci` (exactly what push CI runs, serially).
+### Command-line tool
 
-<details>
-<summary><strong>Test lanes</strong></summary>
-
-<br>
-
-The individual lanes remain available; `check_project_inputs.sh` without flags runs the complete Python suite, and `build.sh build` signs with an Apple Development identity when one is installed (ad-hoc otherwise, with a warning that microphone and speech grants will not survive rebuilds):
-
-```sh
-./scripts/check_project_inputs.sh
-scripts/macos_test.sh test
-./scripts/build.sh build
-./scripts/build_foundation_targets.sh ios
-```
-
-The iOS command compiles both the app and its standalone, app-host-free platform-policy XCTest bundle for the physical-device SDK. It does not execute tests or require a connected phone. The same Foundation-level policy sources and their `Tests/VocelloiOSLogicTests` suite run inside `VocelloCoreTests` during the ordinary macOS deterministic lane. Xcode 26 (the pinned CI toolchain) does not support executing the standalone tool-hosted, app-host-free bundle on a physical-device destination, so that duplicate target remains compile-only; physical runtime and UI acceptance use the explicit device diagnostics and XCUITest lanes. The selected Xcode must still have matching iOS Platform Support/runtime availability for `-destination generic/platform=iOS`; the repository checks this before package resolution and never downloads or runs a Simulator component automatically.
-
-These checks are sufficient for ordinary commits and for the push to `main` that produces `CI required`. XCUITest is explicit frontend acceptance: native macOS or a paired physical iPhone, never Simulator. Models, a phone, and UI evidence are not prerequisites for sharing development work.
-
-</details>
-
-<details>
-<summary><strong>Build outputs and cache hygiene</strong></summary>
-
-<br>
-
-Generated native output is governed by [`config/build-output-policy.json`](config/build-output-policy.json): persistent platform caches live under `build/cache/`, temporary builds under `build/scratch/`, evidence and current symbols under `build/artifacts/`, and distribution products under `build/dist/`. The same contract owns child-result retention and free-space floors for heavy lanes, so a low-space run stops before creating another partial cache or result. Do not introduce another DerivedData root or a source-local `.build` directory.
-
-Inspect before deleting anything:
-
-```sh
-python3 scripts/build_output_policy.py status
-scripts/clean_build_caches.sh --routine --dry-run
-scripts/clean_build_caches.sh --prune-ui-results --dry-run
-scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
-```
-
-Status separates automatically eligible bytes from blocked evidence and explicit failed-profile reclamation. If only one persistent cache is stale, use `--cache macos`, `--cache ios`, `--cache packages`, or `--cache runtime` rather than `--aggressive`. See [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md) for the exact retention and compaction rules.
-
-</details>
-
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for the human contribution flow. Maintainers and coding agents should also read [`CLAUDE.md`](CLAUDE.md). Deeper references:
-
-- [`docs/development-progress.md`](docs/development-progress.md): current implementation checkpoint and open acceptance work
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): runtime topology and engine invariants
-- [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md): deterministic and explicit frontend test lanes
-- [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md): benchmark protocol and PASS-only publication
-
-## Command-line tool
-
-The source tree also builds `vocello`, a headless interface to the same local Swift and MLX engine. It is not included in the app download.
-
-The upcoming 3.0 release programme adds a separate CLI DMG containing the complete runtime-resource folder. Packaging source is in place; signed candidate and generation qualification remain pending. Use the source-build instructions below until a qualified CLI asset is published.
+`vocello` drives the same engine without a UI. It writes machine-readable output, with progress on standard error.
 
 ```sh
 ./scripts/build.sh cli
-build/vocello modes
-build/vocello speakers list
 build/vocello models list
 build/vocello custom --variant speed --text "The train left at dawn."
 echo "Hello there." | build/vocello generate --variant speed --stream --json
 ```
 
-The CLI supports single generation, mode shortcuts, batches, saved voices, speaker and model discovery, model installation, and benchmark matrices. Standard output is machine-readable; progress is written to standard error. See [`docs/reference/cli.md`](docs/reference/cli.md).
+→ [CLI reference](docs/reference/cli.md)
 
-> [!TIP]
-> **Reproducing the benchmark numbers:** `./scripts/build.sh cli` produces an unoptimized development build that lands around a real-time factor of 1.0 (generation as long as the audio). The published figures come from the optimized Release path, and the two build topologies are not comparable; see the like-for-like rules in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
+### Project layout
 
-## Contributing
+```text
+Sources/                 the apps and the engine
+  QwenVoiceApp.swift       macOS app (Views/, ViewModels/, Services/)
+  iOS/                     iPhone app
+  QwenVoiceCore/           engine host: runtime factory, generation, model delivery
+  VocelloCLI/              the vocello command-line tool
+Packages/VocelloQwen3Core/ the owned Qwen3-TTS runtime on MLX, with its own tests
+Tests/                   unit and iPhone logic tests, Mac and iPhone UI tests
+scripts/                 build, test, benchmark and release lanes, and the README art
+config/                  machine-readable contracts: models, privacy, release, roadmap
+benchmarks/              published benchmark records and the optimization ledger
+website/                 vocello.vercel.app (React and Vite)
+docs/                    architecture, references, audits, release notes
+```
 
-- Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a change.
-- Report bugs and request features through [GitHub Issues](https://github.com/PowerBeef/Vocello/issues).
-- Security-sensitive reports should use GitHub's [private security advisory form](https://github.com/PowerBeef/Vocello/security/advisories/new).
+### Design system
+
+Dark-first, warm neutrals on a charcoal canvas, and one accent per mode. Liquid Glass stays on chrome and falls back to solid surfaces under Reduce Transparency and while audio generates. The tokens live in the app's theme and in [`website/src/tokens.css`](website/src/tokens.css).
+
+| Token | Color | Use |
+| --- | --- | --- |
+| Gold | ![#EDCC8A](https://img.shields.io/badge/-EDCC8A-EDCC8A?style=flat-square) | Built-in Voice, the brand accent |
+| Lavender | ![#BFAADB](https://img.shields.io/badge/-BFAADB-BFAADB?style=flat-square) | Voice Design |
+| Terracotta | ![#DBA887](https://img.shields.io/badge/-DBA887-DBA887?style=flat-square) | Voice Cloning |
+| Charcoal | ![#16181E](https://img.shields.io/badge/-16181E-16181E?style=flat-square) | The canvas |
+| Text | ![#F5F6F8](https://img.shields.io/badge/-F5F6F8-F5F6F8?style=flat-square) | Primary text |
+
+The README art comes from the same tokens: `scripts/readme_art/render.sh` redraws it from the screenshots in `docs/screenshots/`.
+
+### Documentation
+
+| | |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Ownership, the life of a take, the engine's invariants |
+| [Development setup](docs/reference/development-setup.md) | A new Mac, from clone to first build |
+| [Testing runbook](docs/reference/testing-runbook.md) | Which lane proves what, on the Mac and on a paired iPhone |
+| [Benchmarking](docs/reference/benchmarking-procedure.md) | The protocol behind every published number |
+| [Privacy and storage](docs/reference/privacy-storage.md) | What is stored where, and how it is deleted |
+| [iPhone app](docs/reference/ios-app-guide.md) | The iPhone app, including the 3.0 export purchase |
+| [Roadmap](docs/ROADMAP.md) | What is in flight for 3.0 and what follows |
 
 ## License and acknowledgements
 
-Vocello is available under the [MIT License](LICENSE).
+Vocello is available under the [MIT License](LICENSE). It builds on [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS), [MLX](https://github.com/ml-explore/mlx), [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) and [GRDB.swift](https://github.com/groue/GRDB.swift). Third-party models and assets keep their own terms; see the [third-party attributions](Sources/Resources/third_party_attributions.json) and the runtime's [notices](Packages/VocelloQwen3Core/NOTICES.md).
 
-The project builds on [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS), [MLX](https://github.com/ml-explore/mlx), [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift), and [GRDB.swift](https://github.com/groue/GRDB.swift). Vocello owns the first-party [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md) Swift package derived from `mlx-audio-swift` v0.1.2. Its immutable origin, preserved package compatibility, ownership boundary, current capabilities, and historical upstream deltas are tracked with the package.
+<br>
+
+<div align="center">
+<img src="docs/readme/icon.png" width="56" alt="The Vocello app icon">
+<br>
+<sub>Vocello · a private voice studio for your Mac and iPhone</sub>
+</div>

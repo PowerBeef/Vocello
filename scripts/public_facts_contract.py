@@ -123,9 +123,12 @@ def validate_readme(root: Path, public: dict) -> list[str]:
         errors.append("README.md: iPhone model availability must state Speed only")
     if not re.search(r"(?i)Voice Cloning follows the reference voice", readme):
         errors.append("README.md: clone delivery must be attributed to the reference voice")
-    local_assets = set(re.findall(r"\]\((docs/(?:screenshots/[^)]+|readme_banner_vocello\.png))\)", readme))
+    # Product imagery comes from the repository, as markdown images or as <img> tags: the
+    # screenshots, the banner, and the README art rendered from them under docs/readme/.
+    local_assets = set(re.findall(
+        r"(?:\]\(|src=\")(docs/(?:screenshots/[^)\"]+|readme/[^)\"]+|readme_banner_vocello\.png))[)\"]", readme))
     if len(local_assets) < 5:
-        errors.append("README.md: expected repository-versioned banner and product screenshots are missing")
+        errors.append("README.md: expected repository-versioned product imagery is missing")
     for asset in local_assets:
         if not (root / asset).is_file():
             errors.append(f"README.md: missing repository-versioned product asset {asset}")

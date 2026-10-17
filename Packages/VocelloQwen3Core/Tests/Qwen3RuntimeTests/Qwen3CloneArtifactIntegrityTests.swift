@@ -21,7 +21,7 @@ final class Qwen3CloneArtifactIntegrityTests: XCTestCase {
         XCTAssertEqual(manifest.schemaVersion, 3)
         XCTAssertEqual(
             manifest.speakerFeatureVersion,
-            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.31.6"
+            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3"
         )
         XCTAssertEqual(loaded.refCodes?.shape, [1, 2, 2])
         XCTAssertEqual(loaded.refCodes?.dtype, .int32)

@@ -32,16 +32,16 @@
     "Packages/VocelloQwen3Core/Sources"
   ],
   "mlxExceptionReview": {
-    "reviewedAt": "2026-08-26",
+    "reviewedAt": "2026-10-16",
     "reviewedPins": {
-      "mlx-swift": "0.31.6",
-      "mlx-swift-lm": "3.31.4"
+      "mlx-swift": "0.32.3",
+      "mlx-swift-lm": "3.32.3"
     },
     "exceptionEntitlements": [
       "com.apple.security.cs.allow-unsigned-executable-memory",
       "com.apple.security.cs.disable-library-validation"
     ],
-    "conclusion": "Retain for the current MLX Metal runtime; the app loads no user-selected executable code and, since the in-process engine (2026-09-15), it is the only Mach-O that needs the two exceptions.",
+    "conclusion": "Retain for the current MLX Metal runtime; the app loads no user-selected executable code and, since the in-process engine (2026-09-15), it is the only Mach-O that needs the two exceptions. The 0.32.3 move (CONV-21) changes no entitlement and still compiles Metal kernels at runtime; a removal re-test needs a signed hardened-runtime build and was not run.",
     "removalCondition": "Re-test and remove either exception when an MLX upgrade or Apple runtime change can load and execute the pinned Metal/runtime graph without it."
   }
 }

@@ -8,8 +8,8 @@ import MLXAudioMark
 /// fused wm16 generator, embeds the fixed Vocello payload with the
 /// exact-streaming windowed embedder, and drops the generator before
 /// returning (load-and-drop keeps the take lifecycle's peak footprint
-/// unchanged). The whole pass is scoped to the CPU device so publication-time
-/// marking never allocates GPU wired memory.
+/// unchanged). The pass runs on the GPU inside an MLX error scope (see
+/// `markedPCM`).
 public enum VocelloQwen3AudioMarking {
     /// The fixed 16-bit payload every published Vocello WAV carries
     /// (deterministic embedding and detector-side attribution).

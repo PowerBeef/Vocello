@@ -75,7 +75,8 @@
         "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
         "scripts/macos_test.sh test",
         "./scripts/build_foundation_targets.sh ios",
-        "model catalog and isolated download lifecycle validation"
+        "model catalog and isolated download lifecycle validation",
+        "moves with swift-transformers: swift-huggingface 1.x needs swift-transformers 1.3.5 or newer (engine audit F-19)"
       ]
     },
     {
@@ -92,7 +93,8 @@
         "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
         "scripts/macos_test.sh test",
         "./scripts/build_foundation_targets.sh ios",
-        "fixed-seed tokenizer byte-identity or justified full benchmark battery"
+        "fixed-seed tokenizer byte-identity or justified full benchmark battery",
+        "moves with swift-huggingface: 1.3.5 is the first release that allows swift-huggingface 1.x (engine audit F-19)"
       ]
     }
   ]

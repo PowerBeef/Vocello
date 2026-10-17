@@ -787,7 +787,7 @@ public struct Qwen3TTSVoiceClonePrompt: @unchecked Sendable {
     /// so artifacts built on another one rebuild once instead of being
     /// reused. It names the exact mlx-swift pin and moves with it;
     /// `scripts/qwen3_core_contract.py` checks it against COMPATIBILITY.json.
-    static let mlxNumericsVersion = "mlx-swift-0.31.6"
+    static let mlxNumericsVersion = "mlx-swift-0.32.3"
     public static let integritySchemaVersion = 1
     public static let integrityFilename = "integrity.json"
     public let refCodes: MLXArray?

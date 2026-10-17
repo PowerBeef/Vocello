@@ -147,12 +147,14 @@ public enum VocelloQwen3Runtime {
 /// this typed value; the raw message never crosses the facade.
 ///
 /// Real coverage is narrower than "every MLX error":
-/// - Only errors MLX raises synchronously on a task inside the scope are
-///   captured. A Metal command-buffer failure reported from the completion
-///   handler (`kIOGPUCommandBufferCallbackErrorOutOfMemory` after an
-///   asynchronous evaluation) is thrown on a Metal thread outside any task and
-///   is not captured; neither is MLX work on a detached task or on MLX's CPU
-///   scheduler thread.
+/// - Only errors MLX raises on a task inside the scope are captured. Since
+///   mlx-swift 0.32.3 (MLX #3523, CONV-21) a Metal command-buffer failure (a
+///   GPU submission refused in the background,
+///   `kIOGPUCommandBufferCallbackErrorOutOfMemory`) is recorded by the
+///   completion handler, poisons the buffer's events and is raised at the next
+///   wait or evaluation, on the waiting task; before it, the handler threw on a
+///   Metal thread and aborted the process. MLX work on a detached task or on
+///   MLX's CPU scheduler thread is still not captured.
 /// - After a captured error MLX returns without evaluating. Since F-03
 ///   (2026-10-16) every production `asArray` readback is preceded by a probe
 ///   (`evalForReadback`, a nested `withError`) that throws the evaluation's

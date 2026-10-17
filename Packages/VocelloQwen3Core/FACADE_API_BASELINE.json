@@ -443,7 +443,7 @@
   "sourceFiles": [
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "70e65b986cb646eb5b69c275366e67863500d5d4459aa768f8576f4467145068"
+      "sha256": "204c0f2db8ba48dd5527ada139a57aab471ebac35860e54869eeec9b9bf88086"
     },
     {
       "path": "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
@@ -475,7 +475,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "a719d55418c11c979e7060debb9fb042d319fa7b885d2f83afaee6b0cf2a66d2"
+      "sha256": "005636885a93632c5576e7d87b4632b3e8d916cb88d8a2248b260aa0624d067c"
     }
   ],
   "sourceRoot": "Sources/VocelloQwen3Core"

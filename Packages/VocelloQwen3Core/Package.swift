@@ -26,16 +26,21 @@ let package = Package(
         .library(name: "MLXAudioTTS", targets: ["MLXAudioTTS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.31.6"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
-        .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "0.9.0"),
+        // CONV-21 (2026-10-16): mlx-swift 0.32.3 (never 0.32.2, which crashes at launch below
+        // iOS 26.4) carries MLX's typed command-buffer errors (ml-explore/mlx#3523); the pair
+        // moves together, and swift-huggingface 1.0.0 with swift-transformers 1.3.5, which is
+        // the first to allow it (engine audit F-19).
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.32.3"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.32.3"),
+        .package(url: "https://github.com/huggingface/swift-huggingface.git", exact: "1.0.0"),
         // mlx-swift-lm 3.x dropped its swift-transformers dependency; the app now brings the
         // concrete Hub/Tokenizers implementation. Exact-pinned because tokenizer behavior is
-        // engine behavior: 1.3.3 (from 1.1.9, 2026-08-05) deliberately changes BPE/Unigram
-        // tokenization (Unicode-scalar merges, NFD fixes) and speeds up encode 5-25x, so the
-        // bump carried the benchmark battery instead of the byte-identity A/B; see
+        // engine behavior: 1.3.3 (from 1.1.9, 2026-08-05) deliberately changed BPE/Unigram
+        // tokenization (Unicode-scalar merges, NFD fixes) and sped up encode 5-25x, so that
+        // bump carried the benchmark battery instead of the byte-identity A/B; 1.3.5 only
+        // honors byte_fallback, which Qwen's byte-level BPE does not set. See
         // benchmarks/HISTORY.md and the pin-bump procedure in docs/reference/mlx-guide.md §9.
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.3")
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.5")
     ],
     targets: [
         // MARK: - VocelloQwen3Core

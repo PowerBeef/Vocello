@@ -134,14 +134,16 @@ final class Qwen3RequestSamplingTests: XCTestCase {
                 return token.item(Int32.self)
             }
         }
-        XCTAssertEqual(tokens, Self.goldenSeededSamplerTokens, "Recorded on mlx-swift 0.31.6: \(tokens)")
+        XCTAssertEqual(tokens, Self.goldenSeededSamplerTokens, "Recorded on mlx-swift 0.32.3: \(tokens)")
     }
 
-    /// mlx-swift 0.31.6 (MLX ce45c525), recorded 2026-10-16. Re-record only with a
-    /// reviewed pin move (CONV-21), with a release-note line that seeds changed.
+    /// mlx-swift 0.32.3 (MLX core 0.32.2), re-recorded 2026-10-16 with the CONV-21
+    /// pin move: MLX's inverse-CDF categorical draws differently for the same seed
+    /// (F-02, accepted with a release-note line). The 0.31.6 draws began
+    /// 1758, 262, 1648, 434. Re-record only with a reviewed pin move.
     private static let goldenSeededSamplerTokens: [Int32] = [
-        1758, 262, 1648, 434, 837, 1339, 1483, 1718, 1870, 617, 1828, 269, 206, 1397, 1339, 1397,
-        1339, 1758, 71, 1648, 837, 262, 71, 655, 1648, 1483, 706, 1339, 1483, 1483, 1339, 1718,
+        1758, 1458, 1617, 1381, 1483, 92, 333, 706, 767, 1617, 706, 1680, 269, 1247, 1247, 1339,
+        1030, 1870, 631, 837, 1397, 1697, 410, 617, 1680, 1870, 1648, 1828, 1514, 434, 434, 311,
     ]
 
     private func makePolicy(seed: UInt64) -> Qwen3RequestSamplingPolicy {

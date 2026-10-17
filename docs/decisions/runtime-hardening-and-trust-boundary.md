@@ -82,5 +82,6 @@ Disabling library validation increases the consequence of a malicious library en
 and unsigned executable memory increases the importance of dependency and model-data boundaries.
 The release and runtime contracts reduce but do not eliminate that risk. Re-evaluate sandboxing and
 library validation whenever MLX packaging changes, Apple adds a compatible entitlement model, or the
-runtime no longer needs these exceptions. The current 0.31.6/3.31.4 review retains both exceptions;
-the machine-readable policy makes that conclusion stale automatically when either resolved pin moves.
+runtime no longer needs these exceptions. The 2026-10-16 review for 0.32.3/3.32.3 (CONV-21) retains
+both exceptions; it ran no removal re-test, which needs a signed hardened-runtime build. The
+machine-readable policy makes that conclusion stale automatically when either resolved pin moves.

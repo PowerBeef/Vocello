@@ -23,10 +23,10 @@
       "Qwen3RuntimeTests"
     ],
     "directDependencies": {
-      "mlx-swift": "0.31.6",
-      "mlx-swift-lm": "3.31.4",
-      "swift-huggingface": "0.9.0",
-      "swift-transformers": "1.3.3"
+      "mlx-swift": "0.32.3",
+      "mlx-swift-lm": "3.32.3",
+      "swift-huggingface": "1.0.0",
+      "swift-transformers": "1.3.5"
     },
     "benchmarkNeutralResolvedDependencies": {
       "swift-nio": "Transitive EventSource transport primitives do not participate in prepared Qwen model loading, tokenization, or synthesis; lockstep, security-baseline, and deterministic build checks still apply."

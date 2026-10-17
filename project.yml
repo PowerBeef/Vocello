@@ -37,13 +37,13 @@ packages:
     path: Packages/VocelloQwen3Core
   MLXSwift:
     url: https://github.com/ml-explore/mlx-swift.git
-    exactVersion: "0.31.6"
+    exactVersion: "0.32.3"
   # No product target links the HuggingFace product (owned sources import no
   # HuggingFace module). The owned package depends on it; this exact pin moves in
   # lockstep with Packages/VocelloQwen3Core/Package.swift.
   SwiftHuggingFace:
     url: https://github.com/huggingface/swift-huggingface.git
-    exactVersion: "0.9.0"
+    exactVersion: "1.0.0"
 
 schemes:
   QwenVoice:

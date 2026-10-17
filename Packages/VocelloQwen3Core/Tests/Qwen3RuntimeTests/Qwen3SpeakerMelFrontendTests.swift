@@ -137,7 +137,7 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         // prompt caches rebuild.
         XCTAssertEqual(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion,
-            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.31.6"
+            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3"
         )
         XCTAssertTrue(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion

@@ -12,7 +12,7 @@ sourceOfTruth:
 >
 > Last reviewed: 2026-09-12 (RTF = wall ÷ audio with the §7 history relabelled `decodeSpeedupX`;
 > the shipped compiled code predictor DECODE-001; the pinned `PowerBeef02` catalog; the lean
-> verification loop). Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
+> verification loop). Shipping pins since 2026-10-16 (CONV-21): `mlx-swift` **0.32.3**, `mlx-swift-lm` **3.32.3**, `swift-transformers` **1.3.5**, `swift-huggingface` **1.0.0** (§9.1). The rest of this guide was written for 0.31.6 and is being revised against 0.32.3 (ER-13).
 
 ---
 
@@ -445,12 +445,14 @@ See [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) for the ful
 
 ### 9.1 Current pins
 
-- `mlx-swift`: exact **0.31.6** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
-- `mlx-swift-lm`: exact **3.31.4** in `Packages/VocelloQwen3Core/Package.swift`
-- `swift-transformers`: exact **1.3.3** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
+- `mlx-swift`: exact **0.32.3** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift` (never
+  0.32.2, which crashes at launch below iOS 26.4)
+- `mlx-swift-lm`: exact **3.32.3** in `Packages/VocelloQwen3Core/Package.swift`
+- `swift-transformers`: exact **1.3.5** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
   Hub/Tokenizers implementation required since mlx-swift-lm 3.x
-- `swift-huggingface`: exact **0.9.0** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
-  (model download transport)
+- `swift-huggingface`: exact **1.0.0** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
+  (model download transport); 1.x needs swift-transformers 1.3.5 or newer, so the two move together
+  (F-19)
 - `GRDB.swift`: exact **7.10.0** in `project.yml` (app only)
 
 These are the five coordinated exact pins that `config/swift-dependency-update-policy.json` binds
@@ -463,7 +465,7 @@ Move the mlx pair in lockstep; review the swift-transformers pin in the same cha
 Only upgrade when:
 
 - A security or correctness fix requires it.
-- A new model variant requires an MLX feature not present in 0.31.6.
+- A new model variant requires an MLX feature not present in 0.32.3.
 - A measured performance win is proven on the Qwen3-TTS backend.
 
 ### 9.3 Upgrade procedure

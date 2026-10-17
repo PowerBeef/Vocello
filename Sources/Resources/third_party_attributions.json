@@ -43,11 +43,11 @@
       "id": "mlx-swift",
       "licenseID": "MIT",
       "notice": null,
-      "revision": "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
+      "revision": "19601207e9a0de51e03ee6ec0c3c5f3784275075",
       "scope": "application-and-owned-runtime",
       "sourceURL": "https://github.com/ml-explore/mlx-swift",
       "upstreamLicenseSHA256": "44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057",
-      "version": "0.31.6"
+      "version": "0.32.3"
     },
     {
       "copyrightNotice": "Copyright (c) 2024 ml-explore",
@@ -55,23 +55,11 @@
       "id": "mlx-swift-lm",
       "licenseID": "MIT",
       "notice": null,
-      "revision": "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57",
+      "revision": "3b339ad6e3b3f44c8121ecff5131c7fd55e075e6",
       "scope": "application-and-owned-runtime",
       "sourceURL": "https://github.com/ml-explore/mlx-swift-lm",
       "upstreamLicenseSHA256": "7b1d86acac816ce8192209d7e01141c129b4d48d474c15cc5fb4af62f497c323",
-      "version": "3.31.4"
-    },
-    {
-      "copyrightNotice": null,
-      "displayName": "Swift Argument Parser",
-      "id": "swift-argument-parser",
-      "licenseID": "Apache-2.0",
-      "notice": null,
-      "revision": "6a52f3251125d74daf04fcbd5e6f08a75d074382",
-      "scope": "application-and-owned-runtime",
-      "sourceURL": "https://github.com/apple/swift-argument-parser",
-      "upstreamLicenseSHA256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55",
-      "version": "1.8.2"
+      "version": "3.32.3"
     },
     {
       "copyrightNotice": null,
@@ -115,11 +103,11 @@
       "id": "swift-huggingface",
       "licenseID": "Apache-2.0",
       "notice": null,
-      "revision": "b721959445b617d0bf03910b2b4aced345fd93bf",
+      "revision": "c30143a4616f3fa994ee3ab3e3464f752845c07c",
       "scope": "application-and-owned-runtime",
       "sourceURL": "https://github.com/huggingface/swift-huggingface",
       "upstreamLicenseSHA256": "4d6ad72952a8329063a71de28329b493de96cf57459e2ac217110d1a6a5f84ae",
-      "version": "0.9.0"
+      "version": "1.0.0"
     },
     {
       "copyrightNotice": null,
@@ -163,11 +151,11 @@
       "id": "swift-transformers",
       "licenseID": "Apache-2.0",
       "notice": null,
-      "revision": "2fa33e1f5e7131a7fc64c28e6d161dcec0d24820",
+      "revision": "48473106a93b2d8dfb114b82f0628ebbb71734e7",
       "scope": "application-and-owned-runtime",
       "sourceURL": "https://github.com/huggingface/swift-transformers",
       "upstreamLicenseSHA256": "648b81e6c6f9975c3b6cf6d630229b6c8d6f1ddaef55f5770f576adda19f3495",
-      "version": "1.3.3"
+      "version": "1.3.5"
     },
     {
       "copyrightNotice": null,
@@ -274,9 +262,9 @@
     }
   ],
   "generatedFrom": {
-    "applicationPackageResolutionSHA256": "a3bde2fe2753992858a7b91bfc17ab24c534ff442bacde92937fb3149fd4dd0c",
-    "ownedRuntimePackageResolutionSHA256": "295e8a6d2f512181f28cd8827657a00326daaa7a14a1856768da3ea82c78421f",
-    "policySHA256": "764e38c2d63f7ba0798d85f15773c66b97e59c56553dce2981b737778b15afe9",
+    "applicationPackageResolutionSHA256": "d5b093a19c2d7e96447d3dd0b4708d0cf334dd3ab6b7cd2cbfe8844988b12ab3",
+    "ownedRuntimePackageResolutionSHA256": "f0d6902e9f07a0a68b597a4f3dff097f6baff57cb0c0b2a48144490363799068",
+    "policySHA256": "985f821c137abb6fd68010cf3714439f34e0377c5f180acd4915380f11b14b96",
     "productionModelCatalogSHA256": "f8e97b8ab1bb042348da771ac42c76c1bec2f571b66aa9c057749fafe8c21eb8"
   },
   "licenses": [
@@ -384,7 +372,7 @@
   ],
   "schemaVersion": 1,
   "summary": {
-    "componentCount": 20,
+    "componentCount": 19,
     "modelArtifactCount": 6,
     "pendingContentRightsCount": 4
   }

@@ -954,6 +954,17 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-06 | [`macos-engine-20260806-000045-08eda29d`](runs/engine-generation/macos-engine-20260806-000045-08eda29d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.95 | `d8e31ffe4957` | `ff3d5167376d` | baseline | dp23-crosstier |
 
+## engine-generation / macos / mac-mini-m6-16gb / config `0f180adde00f`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-10-17 | [`mac-gate-bench-20261017-002836-b101d762`](runs/engine-generation/mac-gate-bench-20261017-002836-b101d762.json) | focused | focused | passed | qualified | 6 | 0.27 | `3d6e297fc55d` | `0f180adde00f` | baseline | mac-gate-bench |
+| 2026-10-17 | [`mac-gate-bench-20261017-003226-4b33e21a`](runs/engine-generation/mac-gate-bench-20261017-003226-4b33e21a.json) | focused | focused | passed | qualified | 6 | 0.27 | `3d6e297fc55d` | `0f180adde00f` | vs mac-gate-bench-20261017-002836-b101d762: RTF -0.5% (within noise), TTFC -0.6% (within noise), RAM -0.0% (within noise) | mac-gate-bench |
+| 2026-10-17 | [`mac-gate-bench-20261017-003444-d5fb10c9`](runs/engine-generation/mac-gate-bench-20261017-003444-d5fb10c9.json) | focused | focused | passed | qualified | 6 | 0.27 | `3d6e297fc55d` | `0f180adde00f` | vs mac-gate-bench-20261017-003226-4b33e21a: RTF -0.1% (within noise), TTFC -0.1% (within noise), RAM -0.0% (within noise) | mac-gate-bench |
+| 2026-10-17 | [`mac-gate-bench-20261017-003807-05356926`](runs/engine-generation/mac-gate-bench-20261017-003807-05356926.json) | focused | focused | passed | qualified | 6 | 0.27 | `57196483d72b` | `0f180adde00f` | vs mac-gate-bench-20261017-003444-d5fb10c9: RTF +0.6% (within noise), TTFC +6.3% (slower), RAM +1.2% (within noise) | mac-gate-bench |
+| 2026-10-17 | [`mac-gate-bench-20261017-004204-3cbe6ff1`](runs/engine-generation/mac-gate-bench-20261017-004204-3cbe6ff1.json) | focused | focused | passed | qualified | 6 | 0.27 | `57196483d72b` | `0f180adde00f` | vs mac-gate-bench-20261017-003807-05356926: RTF -0.5% (within noise), TTFC -0.2% (within noise), RAM +0.2% (within noise) | mac-gate-bench |
+| 2026-10-17 | [`mac-gate-bench-20261017-004417-cfef80fb`](runs/engine-generation/mac-gate-bench-20261017-004417-cfef80fb.json) | focused | focused | passed | qualified | 6 | 0.27 | `57196483d72b` | `0f180adde00f` | vs mac-gate-bench-20261017-004204-3cbe6ff1: RTF +0.1% (within noise), TTFC +0.3% (within noise), RAM -0.2% (within noise) | mac-gate-bench |
+
 ## engine-generation / macos / mac-mini-m6-16gb / config `1be7d302eadb`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

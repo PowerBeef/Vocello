@@ -1675,9 +1675,9 @@
         ".github/workflows/release-rehearsal.yml",
         "scripts/release.sh"
       ],
-      "updated": "2026-10-13",
+      "updated": "2026-10-16",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Failing since 2026-10-10 (8c71d64b). On 2026-10-12 (86d910dd) and 2026-10-13 (c08a1360) hdiutil reported 'No space left on device' while building the DMG, after the macOS build, bundle verification and CLI smoke had passed; the iOS archive prerequisites job passes. Parked without investigation under the focus lock: macOS packaging is not part of the 3.0 iOS submission."
+      "notes": "Failing since 2026-10-10 (8c71d64b); 86d910dd, c08a1360 and b5553ab5 failed the same way, a1efaf0f (2026-10-17) passed. Diagnosed 2026-10-16: not the runner disk but the DMG's own intermediate image, which hdiutil sized from a short estimate, so copying the app's Metal library into /Volumes/Vocello ran out of space. create_dmg.sh now sizes the image from the payload's logical and allocated size with headroom (verified locally on the app: 223 MB image, 31 MB compressed DMG, checksum valid). Closes after the rehearsal passes on three consecutive pushes; pushes wait for the maintainer."
     },
     {
       "id": "BKL-13",

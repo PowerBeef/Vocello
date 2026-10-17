@@ -53,9 +53,18 @@ if [ "$PAYLOAD_KIND" = app ]; then
 fi
 
 echo "[2/3] Building compressed DMG..."
+# hdiutil sizes its intermediate image from its own estimate of the folder, which came out
+# short on GitHub's runners: copying the app's Metal library into the image failed with
+# "No space left on device" (BKL-12). Size the image from the larger of the folder's
+# logical and allocated sizes plus a fifth and 64 MB of headroom; the compressed DMG does
+# not grow with it.
+logical_kb="$(du -skA "$STAGING_DIR" | cut -f1)"
+allocated_kb="$(du -sk "$STAGING_DIR" | cut -f1)"
+payload_kb=$(( logical_kb > allocated_kb ? logical_kb : allocated_kb ))
 hdiutil create \
     -volname "$DISPLAY_NAME" \
     -srcfolder "$STAGING_DIR" \
+    -size "$(( payload_kb + payload_kb / 5 + 65536 ))k" \
     -ov \
     -format UDBZ \
     "$DMG_OUTPUT"

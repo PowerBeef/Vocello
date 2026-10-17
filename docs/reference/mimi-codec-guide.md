@@ -1,9 +1,12 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-10-16
 summary: The Mimi-style neural audio codec as owned in the Qwen3 speech tokenizer — architecture, streaming overlap-and-discard semantics, and Vocello deltas from canonical Mimi.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift
+  - docs/audits/2026-10-17-qwen3-tts-model-research.md
 ---
 # Mimi Codec Guide for Vocello
 
@@ -25,11 +28,11 @@ Vocello's text-to-speech pipeline ends with a **neural audio codec** that turns 
 | Quantizers | 8 | 16 |
 | Codebook size | 2,048 | 2,048 (decoder) |
 | Semantic codebooks | 1 | 1 |
-| Bitrate | ~1.1 kbps | ~2.1 kbps |
+| Bitrate | ~1.1 kbps | ~2.2 kbps (16 × 11 bits × 12.5 Hz) |
 | Decoder transformer | No | Yes (8-layer causal) |
 | Decoder SEANet | Yes | Yes, with SnakeBeta + ConvNeXt |
 
-The decoder is the quality-critical path. It receives 16 integer codes per frame from the code predictor, looks up quantized vectors, runs a small transformer, upsamples, and emits waveform samples through a SEANet-style upsampling stack. Because Vocello streams audio as soon as tokens are available, the decoder must be **causal** and **chunk-size invariant**: the same audio must be produced whether tokens are decoded in one 300-token batch or in 12-token dribbles.
+The decoder is the quality-critical path. It receives 16 integer codes per frame from the code predictor, looks up quantized vectors, runs a small transformer, upsamples, and emits waveform samples through a SEANet-style upsampling stack. Because Vocello streams audio as soon as tokens are available, the decoder must be **causal** and **chunk-size invariant**: within Vocello, decoding the same tokens in one batch or in small streaming chunks must give the same audio within floating-point tolerance. That is a property of Vocello's decoder, not of the reference: upstream gives every decoder layer a 72-frame sliding window and decodes batches in 300-frame chunks with 25 frames of context, while Vocello's decoder attends causally over the whole take (engine audit A-03, PA-16).
 
 **Source-of-truth hierarchy**
 
@@ -101,7 +104,7 @@ Audio [B, 1, T]
     ↓
 SeanetEncoder          (SEANet downsampling convolutions, ratios [8, 6, 5, 4])
     ↓
-ProjectedTransformer   (8-layer causal transformer with RoPE)
+ProjectedTransformer   (8-layer causal transformer with RoPE; see the RoPE note below)
     ↓
 ConvDownsample1d       (stride computed from encoderFrameRate / frameRate)
     ↓
@@ -109,6 +112,16 @@ SplitResidualVectorQuantizer  (semantic + acoustic RVQ)
     ↓
 Codes [B, Q, T_frame]
 ```
+
+**RoPE convention (engine audit A-02).** The checkpoint stores HF-format q/k weights, permuted for
+transformers' `rotate_half` (split-half) rotary embedding, but Vocello's encoder transformer applies
+`RoPE(traditional: true)` (adjacent pairs; `MLXAudioCodecs/Mimi/Transformer.swift`). mlx-audio fixed
+the same port with `rope_traditional=False`; mlx-audio-swift and Vocello have not. Every
+transcript-backed clone therefore encodes reference codes that differ from the official tokenizer's,
+and persisted clone artifacts hold them; the fix ships with an encoder version in the clone identity
+so they rebuild (ER-04). The encoder's attention is full causal, which matches upstream: its
+250-frame `sliding_window` is honoured only under FlashAttention-2, which the official loader no
+longer selects.
 
 The encoder is configured for **32 quantizers** during training but Vocello validates that only **16** are emitted at inference (`encoderValidNumQuantizers`). This is a source of frequent confusion: the checkpoint has 32 codebook layers, the contract says 16, and the decoder expects 16.
 
@@ -154,7 +167,7 @@ The decoder has two distinct upsampling stages:
 | Decoder quantizers | 16 | `numQuantizers`. |
 | Semantic quantizers | 1 | `numSemanticQuantizers`; first codebook. |
 | Codebook size | 2,048 | Per quantizer. |
-| Semantic codebook size | 4,096 | Used by the talker, not the decoder lookup table. |
+| Semantic codebook size | 4,096 | A config value only: no official code reads it, and the talker's codebook 0 has 2,048 codes. |
 | Codebook dim | 512 | Decoder; encoder uses 256. |
 | Latent dim | 1,024 | Transformer input/output width. |
 | Decoder dim | 1,536 | SEANet decoder channel width. |
@@ -319,7 +332,7 @@ The decoder has three operating modes:
 | Mode | Call site | Chunk size | Use case |
 | --- | --- | --- | --- |
 | Full batch | `callAsFunction(_:)` | Full utterance | Offline synthesis, quality baseline. |
-| Chunked | `chunkedDecode(_:)` | 300 tokens (+25 left context) | Non-streaming but memory-bounded synthesis. |
+| Chunked | `chunkedDecode(_:)` | 300 tokens (+25 left context) | Mirrors the reference batch decode, but in Vocello only the dead legacy `decode` reaches it (engine audit A-22); quality-first takes decode with `streamingStep` over 25-frame ranges. |
 | Generic streaming helper | `streamingStep(_:)` via `streamingDecode` | Variable (helper default 100) | Low-level API and diagnostics. |
 | Vocello production streaming | Qwen3 runtime schedule | Derived from `appStreamingInterval` and mode-specific later-chunk policy | Bounded playback chunks with a final barrier. |
 
@@ -448,7 +461,7 @@ For short chunks, the decoder transformer and attention are the dominant cost be
 | `headDim` | 64 | Per-head dimension. |
 | `numQuantizers` | 16 | Total decoder quantizers. |
 | `numSemanticQuantizers` | 1 | First codebook is semantic. |
-| `semanticCodebookSize` | 4,096 | Talker-side semantic vocabulary size. |
+| `semanticCodebookSize` | 4,096 | Config value only; unused by official code. |
 | `slidingWindow` | 72 | Local attention context. |
 | `upsampleRates` | [8, 5, 4, 3] | SEANet upsampling per block. |
 | `upsamplingRatios` | [2, 2] | Transformer-side upsampling. |
@@ -503,6 +516,7 @@ For short chunks, the decoder transformer and attention are the dominant cost be
 
 ### 8.5 External references
 
-- Kyutai Mimi paper: *"Mimi: A Streaming Transformer-based Neural Audio Codec"* (arXiv, 2024).
+- Kyutai Mimi is introduced in the Moshi paper (arXiv:2410.00037).
 - `mlx-audio-swift` upstream: <https://github.com/Blaizzy/mlx-audio-swift>.
-- Qwen3-TTS technical report: <https://huggingface.co/Qwen>. Vocello's pinned MLX checkpoints are the six `PowerBeef02/Qwen3-TTS-12Hz-1.7B-*` repositories recorded in `Sources/Resources/qwenvoice_contract.json`.
+- Qwen3-TTS technical report: arXiv:2601.15621; Vocello's sourced research and parity ledger:
+  [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md). Vocello's pinned MLX checkpoints are the six `PowerBeef02/Qwen3-TTS-12Hz-1.7B-*` repositories recorded in `Sources/Resources/qwenvoice_contract.json`.

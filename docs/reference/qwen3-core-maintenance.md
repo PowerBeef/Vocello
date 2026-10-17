@@ -55,13 +55,17 @@ with a fresh upstream tree. Direct SwiftPM work must use
 
 - Custom, Design, and Clone use the bounded streaming pipeline. Non-final chunk evaluation may
   overlap token generation; the final chunk is synchronized before terminal completion.
-- Talker and subtalker sampling use official checkpoint behavior unless an explicit diagnostic
-  override is active.
+- Talker and subtalker sampling use official checkpoint behavior under the default Expressive
+  variation, unless an explicit diagnostic override is active. Balanced and Consistent, the
+  subtalker's inheritance of the talker's values and the EOS re-insertion (D2) are deliberate
+  departures, recorded in the research report's parity ledger
+  (`docs/audits/2026-10-17-qwen3-tts-model-research.md`).
 - `maxTokens` is a quality failure, not a successful truncated result.
 - Clone prompt artifacts are atomically published and fail closed on file, digest, shape, dtype,
   mode, or runtime-profile mismatch.
 - The generation gate has one owner and deterministic FIFO/cancellation-transfer behavior.
-- Decoder partitioning, reset, and timing instrumentation must not change the waveform.
+- Decoder partitioning, reset, and timing instrumentation must not change the waveform beyond
+  floating-point tolerance (partition invariance is tested within tolerance, not bit for bit).
 
 Details and test references live in `PERFORMANCE.md`, `CLONE_ARTIFACT_FORMAT.md`, and
 `RUNTIME_CAPABILITIES.json`.

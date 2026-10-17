@@ -165,9 +165,9 @@ The talker is a small LLM that predicts the next audio-codebook token conditione
 
 Key implementation details:
 
-- **Interleaved MRoPE** `[24, 20, 20]` — multi-dimensional rotary position embeddings that separate time, codebook, and text positions.
+- **MRoPE** `[24, 20, 20]` with `interleaved: true` — but all three position streams are identical for TTS (`cumsum(mask) - 1`), so it behaves as plain 1-D split-half RoPE (engine audit A-19).
 - **`MLXFast.scaledDotProductAttention`** — fused attention on supported shapes.
-- **fp16 KV cache** by default (`KVCacheSimple`).
+- **bf16 KV cache** by default (`KVCacheSimple`): the compute dtype of the shipped checkpoints is bf16.
 - The talker runs one forward pass per generated audio frame.
 
 ### 4.2 Code Predictor
@@ -279,7 +279,8 @@ Over-clearing can hurt RTF by forcing the allocator to re-create buffers; under-
 
 ### 5.5 iOS memory specifics
 
-On iOS the engine runs **in-process** inside the app. The app and the engine share one Jetsam budget. The entitlement `com.apple.developer.kernel.increased-memory-limit` raises the per-app ceiling (measured at ~6 GB on iPhone 17 Pro, ~5–5.5 GB on 8 GB devices). The engine never relies on a hard MLX limit; it uses `os_proc_available_memory()` and the pressure bands in `IOSMemoryBudgetPolicy`.
+On iOS the engine runs **in-process** inside the app. The app and the engine share one Jetsam budget. The entitlement `com.apple.developer.kernel.increased-memory-limit` raises the per-app ceiling (measured at 8,192 MB on the 12 GB iPhone 17 Pro under iOS 27, engine audit D-06; the iOS 26
+figures were ~6 GB, and 8 GB devices under iOS 27 are unmeasured). The engine never relies on a hard MLX limit; it uses `os_proc_available_memory()` and the pressure bands in `IOSMemoryBudgetPolicy`.
 
 ---
 
@@ -357,8 +358,10 @@ Cacheing dtype-keyed `-inf` rows, zero rows, EOS rows, and the code-predictor pa
 The streaming decode loop replays a per-pass compiled code predictor on every frame: the 15
 code-predictor passes are compiled once per generation per pass index
 (`Qwen3TTSCodePredictorCompiled.swift`; `SEMANTIC_DELTAS.json` DECODE-001, state `active`). The per-frame
-position sequence is identical, so the pass-indexed traces are exact and fixed-seed output stays
-byte-identical (`Qwen3CodePredictorCompiledTests`). Its same-day A/B measured +8.3% to +10.6% warm
+position sequence is identical, so the pass-indexed traces are exact. `Qwen3CodePredictorCompiledTests`
+checks the compiled path against the eager one within `accuracy: 2e-6` on a small fp32 model, not
+byte for byte (engine audit F-15); the trace bakes the weights it saw, so reusing a plan across
+takes must declare them as inputs or key it by load epoch (A-16). Its same-day A/B measured +8.3% to +10.6% warm
 decode speedup with 12/12 fixed-seed byte identity; the benchmark evidence stays classed
 `diagnostic` until a clean canonical matrix upgrades it.
 
@@ -370,9 +373,11 @@ What remains rejected is compiling the quantized talker MLP with its packed weig
 
 ### 7.5 KV cache options
 
-Vocello's default talker KV cache is unbounded `KVCacheSimple` in fp16. Two alternatives were evaluated:
+Vocello's default talker KV cache is unbounded `KVCacheSimple` in bf16. Two alternatives were evaluated:
 
-- **`RotatingKVCache` (sliding window)** — implemented and validated, but **inert at the current token cap**. `maxNewTokens` is 2048 and the window was 2048, so the cache never rotates. It is kept as an env-only override (`QVOICE_TALKER_KV_WINDOW`) for future token-ceiling increases.
+- **`RotatingKVCache` (sliding window)** — implemented and validated, but **inert at the current token cap**. `maxNewTokens` is 2048 and the window was 2048, so the cache never rotates. It is kept as an env-only override (`QVOICE_TALKER_KV_WINDOW`). Never enable it with the streaming
+text layout: the prefill holds one text token, so a window would evict text the take has not spoken
+yet (engine audit A-05).
 - **`QuantizedKVCache` (8-bit / 4-bit)** — saves ~271 MB physical footprint on clone/long, but costs **−8.6% decode speedup** (`decodeSpeedupX`) because dequant kernels add overhead on a launch-bound decode. It is kept as a dev-only knob (`QVOICE_TALKER_KV_QUANT=8|4`), default off.
 
 Neither is shipped on any tier because the iOS streaming peak is already ~3 GB and 0 trims.
@@ -533,7 +538,7 @@ Do not regress these without a maintainer decision:
 - **No hard `Memory.memoryLimit` in production.** Use `cacheLimit`, explicit clears, and pressure bands.
 - **No Quality→Speed OOM fallback.** iPhone is Speed-only by contract; load the chosen variant and surface the real error.
 - **No TTS KV quantization by default.** It saves memory but slows decode (−8.6% `decodeSpeedupX`, §7.5).
-- **No `compile()` that declares quantized parameters as `inputs:`.** It was measured and regressed (§7.4). The pass-indexed compiled code predictor (`SEMANTIC_DELTAS.json` DECODE-001) is the shipped exception and must keep fixed-seed byte identity (`Qwen3CodePredictorCompiledTests`).
+- **No `compile()` that declares quantized parameters as `inputs:`.** It was measured and regressed (§7.4). The pass-indexed compiled code predictor (`SEMANTIC_DELTAS.json` DECODE-001) is the shipped exception and must keep matching the eager path (`Qwen3CodePredictorCompiledTests`, within tolerance).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**
 - **Do not pipeline the 15-pass Code Predictor loop.** It is autoregressive; pipelining would change sampling semantics.
@@ -558,7 +563,7 @@ Do not regress these without a maintainer decision:
 | `QuantizationMode` | `MLXNN` | `.affine`, `.nvfp4`, `.mxfp8`. Vocello uses `.affine`. |
 | `MLXFast.scaledDotProductAttention` | `MLX` | Fused SDPA. |
 | `MLXFast.RoPE` | `MLX` | Fused rotary position embedding. |
-| `KVCacheSimple` | `MLXLMCommon` | Unbounded fp16 KV cache. |
+| `KVCacheSimple` | `MLXLMCommon` | Unbounded KV cache in the compute dtype (bf16). |
 | `RotatingKVCache` | `MLXLMCommon` | Sliding-window KV cache. |
 | `QuantizedKVCache` | `MLXLMCommon` | 4/8-bit KV cache. |
 | `Memory.cacheLimit` | `MLX` | MLX buffer-pool cap. |

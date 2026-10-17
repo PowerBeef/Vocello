@@ -53,6 +53,12 @@ each saved voice rebuilds its prompt once from its reference audio.
 Schema-2 artifacts predate this binding and are rejected by both the compatibility reader and the
 public `VocelloQwen3Core` facade; they must be rebuilt from their reference audio.
 
+**Known gap (engine audit A-02, G-03).** The reference codes in transcript-backed artifacts come from
+a speech-tokenizer encoder whose rotary embedding uses the wrong convention (adjacent pairs instead
+of the checkpoint's split-half layout), so they differ from the official tokenizer's codes. The
+identifier does not yet name the encoder implementation; the fix adds an encoder version to it, so
+every transcript-backed artifact rebuilds once (ER-04).
+
 ## Integrity
 
 `integrity.json` records the exact file set, byte count, SHA-256 digest, and each tensor’s key,

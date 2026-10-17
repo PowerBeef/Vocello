@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-01
+reviewed: 2026-10-16
 summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - config/delivery-instruction-contract.json
@@ -74,9 +74,14 @@ The prompt format is **not** a suspect for delivery problems.
 1. `textProjection(embed("<|im_start|>user\n{instruct}<|im_end|>\n"))` — optional; absent when
    there is no instruction.
 2. `textProjection(embed("<|im_start|>assistant\n"))` — the role prefix, always present.
-3. A codec lane: TTS padding, BOS, then a **language prefill**, then the speaker embedding.
+3. The codec prefix: `think` (or `nothink` for Auto), `think_bos`, the **language** id (absent for
+   Auto), `think_eos`, the speaker embedding (a CustomVoice speaker row or a Base x-vector), then
+   `codec_pad` and `codec_bos`. The text lane under it carries `tts_pad` and, on `codec_pad`,
+   `tts_bos`.
 
-Text and codec lanes are **summed**, not concatenated — the same position carries both.
+From the codec prefix on, text and codec lanes are **summed**, not concatenated: the same position
+carries both. The instruct turn and the role prefix above are text-only positions (upstream
+`modeling_qwen3_tts.py` L2068-2186; the research report's §3).
 
 ### 1.2 There is no chat template and no system turn
 
@@ -414,7 +419,8 @@ with there being no duration conditioning anywhere in the architecture.
 `[laughing]` as "Qwen3 TTS emotion tags." These belong to the DashScope-hosted
 `qwen-audio-3.0-tts-*` family, a different product with an inline-tag interface. Alibaba's own docs
 draw the line explicitly. Feeding `[angry]` to Qwen3-TTS synthesizes the literal characters. A
-feature request to add inline tags (upstream discussion #238, 24 upvotes) has no maintainer reply.
+feature request to add inline tags (upstream discussion #238, 13 upvotes as of 2026-10-16) has no
+maintainer reply.
 
 `OFFICIAL`. CosyVoice conventions do not carry over either. CosyVoice prepends a description
 followed by `<|endofprompt|>` and accepts inline `[laughter]` / `<strong>` markers. `<|endofprompt|>`
@@ -611,10 +617,13 @@ with `max_new_tokens=2048` and bf16. That is the strongest available statement a
 these settings are what the reported instruction-following numbers were measured at.
 
 `MEASURED-HERE`. [`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json)
-matches on every value, and the owned runtime plumbs the **subtalker sampler independently** rather
-than pinning it to the backbone (`Qwen3RequestSamplingPolicy.subtalker`). A port that exposes only
-one temperature silently pins the residual-codebook sampler, which can degrade timbre even when
-prosody is right; this checkout does not have that bug.
+matches on every value. The owned runtime carries the **subtalker sampler as its own stage**
+(`Qwen3RequestSamplingPolicy.subtalker`), but production fills it from the talker's values
+(`UnsafeSpeechGenerationModel.swift`): under Expressive both are 0.9 / 50 / 1.0, as upstream, while
+Balanced and Consistent lower the subtalker with the talker. Upstream keeps the subtalker at
+0.9 / 50 / 1.0 whatever the talker uses, so this checkout does pin the residual-codebook sampler for
+the two non-default variations (ER-05; every failure in RF-18's long-form screen ran under
+Consistent).
 
 `MEASURED-HERE`. The decode budget is a **fixed constant**
 (`Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens`, 2048), not derived from text length. A slow or heavy delivery therefore cannot clip against a text-proportional
@@ -645,7 +654,7 @@ settled one.
 | System turn | none (correct) |
 | Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone identity |
 | 0.6B instruction guard | present, matches upstream |
-| Subtalker sampler | plumbed independently |
+| Subtalker sampler | its own stage, but filled from the talker's values (upstream keeps it at 0.9 / 50 / 1.0) |
 | Decode budget | fixed constant, not text-derived |
 | Sampling defaults | match the checkpoint exactly |
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
@@ -805,10 +814,10 @@ each is actually worth.
 | Concrete acoustic wording beats persona-only wording | **`RESEARCH`, supported.** InstructTTSEval APS 77–83 versus RP 61–64 on our checkpoint. The strongest-supported item on either list. |
 | Combine emotion + pace + pitch + timbre | **`OFFICIAL`, supported.** Alibaba's "be multi-dimensional, not one-dimensional". The twelve APS features go further: volume, speed, and tone-distinct-from-emotion are also first-class and our copy is thin on them. |
 | Imperative verbs (Speak / Whisper / Narrate) are followed more reliably | **`UNVERIFIED`.** Upstream examples use both imperative (`Speak slowly and professionally`) and descriptive (`Male, 17 years old, tenor range…`) forms with no stated preference. Plausible, unsourced. |
-| Negative constraints work (`no laughing`, `never shout`) | **`UNVERIFIED`, and the one nearby datapoint is negative.** No upstream source endorses them. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation that nothing supports (roster cut to 8 on 2026-08-03; the surviving copy still carries negation clauses). |
+| Negative constraints work (`no laughing`, `never shout`) | **`OFFICIAL` suggestion, unmeasured, and the one nearby datapoint is negative.** A Qwen collaborator recommends "very happy but without laughing" (QwenLM#16); no ablation measures it. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation that nothing supports (roster cut to 8 on 2026-08-03; the surviving copy still carries negation clauses). |
 | Intelligibility clauses help bound extreme emotions | **`UNVERIFIED` as written, with a documented cousin.** The vendor-supported version is a *recording-quality anchor* at the end ("Perfect broadcast quality audio."), which addresses texture-mistaken-for-degradation. Ours is a *command to the speaker* ("stay fully audible") in the middle. Different mechanism, and ours is what trips the §8.2 boilerplate rule. |
 | Avoid stacked intensifiers; `very very very happy` adds no value | **Partly contradicted.** Upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`. The defensible claim is that *repetition* adds nothing; our copy over-generalized it into avoiding intensifiers, and further into avoiding naming the emotion plainly at all — while emotion is an explicit APS feature. |
-| High-arousal instructions trigger literal laughter or breath sounds | **`COMMUNITY`, plausible.** Reported for extended generations. The `no laughing` remedy is the unverified part, not the symptom. |
+| High-arousal instructions trigger literal laughter or breath sounds | **`OFFICIAL` acknowledgement.** Qwen confirms emotive instructs can add laughter (QwenLM#16) and that non-verbal sounds come out only implicitly (QwenLM#9). The `no laughing` remedy is Qwen's suggestion, still unmeasured. |
 
 `MEASURED-HERE`. Two further corrections, both **applied 2026-08-02**:
 [`qwen3-tts-guide.md`](qwen3-tts-guide.md) and [`../qwen_tone.md`](../qwen_tone.md) each stated the

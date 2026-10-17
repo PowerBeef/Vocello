@@ -470,9 +470,11 @@ public struct EmotionPreset: Identifiable, Sendable {
     //   12 paired seeds. Do NOT shorten this copy toward the upstream examples --
     //   that experiment is done and the shorter form lost. Volume, speed, and tone
     //   (distinct from emotion) remain scored features this copy underuses.
-    // - UNVERIFIED: negative constraints for high-arousal emotions (no laughing /
-    //   shouting / gasping). No upstream source endorses them, and the nearest
-    //   published ablation found bare paralinguistic tags *reduced* adherence.
+    // - SUGGESTED UPSTREAM, UNMEASURED: negative constraints for high-arousal
+    //   emotions (no laughing / shouting / gasping). A Qwen collaborator recommends
+    //   "very happy but without laughing" (QwenLM#16, 2026-01-23), but no ablation
+    //   measures it, and the nearest published ablation found bare paralinguistic
+    //   tags *reduced* adherence.
     // - UNVERIFIED: imperative verbs (Speak / Whisper / Narrate) are followed more
     //   reliably. Upstream examples use imperative and descriptive forms alike.
     // - UNVERIFIED: intelligibility clauses for quiet/fragile tiers. The vendor-

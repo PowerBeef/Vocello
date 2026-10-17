@@ -43,9 +43,11 @@ can compensate for a malformed speaker embedding.
 
 Sampling algorithm v2 resolves one immutable policy at the product boundary. Every request has an
 effective seed and owns a fresh `MLXRandom.RandomState`; categorical draws run under that
-task-local state and never advance the process-global RNG. The talker uses the official effective
-generation parameters. The subtalker/Code Predictor inherits temperature, top-k, top-p, and min-p
-by default, but remains independently configurable and never inherits repetition penalty. Both
+task-local state and never advance the process-global RNG. Under Expressive the talker uses the
+official effective generation parameters; Balanced and Consistent lower its temperature and top-p.
+The subtalker/Code Predictor inherits temperature, top-k, top-p, and min-p by default (so it departs
+from upstream's fixed 0.9 / 50 / 1.0 for those two variations), remains independently configurable,
+and never inherits repetition penalty. Both
 stages sample from float32 logits, as Qwen's reference does (SAMPLER-003, the default since
 2026-10-13); the cast is lazy inside the per-frame graph and adds no synchronization.
 Diagnostic environment values are resolved into the request policy before the model is invoked;

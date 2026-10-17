@@ -1,12 +1,15 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-10-16
 summary: Qwen3-TTS architecture reference — model variants, tokenizer profile, Talker/decoder, speaker roster, generation modes, and parameters.
 sourceOfTruth:
   - Sources/Resources/qwenvoice_contract.json
   - Sources/QwenVoiceCore/EmotionPreset.swift
   - Sources/QwenVoiceCore/GenerationSemantics.swift
+  - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - docs/audits/2026-10-17-qwen3-tts-model-research.md
 ---
 
 # Qwen3-TTS Reference Guide
@@ -36,9 +39,15 @@ Qwen3-TTS is an open-weights text-to-speech family from Alibaba Cloud's Qwen tea
 
 - **Custom Voice** — 9 built-in preset speakers with optional natural-language style instructions. (Upstream checkpoint name; the app's user-facing label for this mode is **Built-in Voice** since 2026-08-15. Internal mode id stays `custom`.)
 - **Voice Design** — describe a voice in plain text and synthesize speech in that voice.
-- **Voice Cloning** — clone a speaker from a short reference audio clip (≈3 s is enough; 10–20 s is the sweet spot).
+- **Voice Cloning** — clone a speaker from a short reference audio clip (Qwen: about 3 s is enough;
+  Vocello asks for 10–20 s, guidance that comes from Alibaba's hosted service rather than the open
+  model).
 
-All three patterns generate **24 kHz mono PCM**. Vocello ships only the **12 Hz tokenizer** variant; the faster 25 Hz variant mentioned in the technical report is not used.
+All three patterns generate **24 kHz mono PCM**. Vocello ships the **12 Hz tokenizer** family, the
+only one released: the 25 Hz models and tokenizer described in the technical report were never
+published (QwenLM#294). The sourced research behind this guide, including a parity ledger of every
+place Vocello departs from the reference implementation, is
+[`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md).
 
 ---
 
@@ -92,9 +101,9 @@ The canonical profile is defined once per model capability block in `qwenvoice_c
 | Encoder valid quantizers | 16 |
 | Encoder configured quantizers | 32 (training config; inference uses 16) |
 | Per-quantizer codebook size | 2,048 |
-| Semantic codebook size (contract) | 4,096 |
-| Effective bitrate | ~2.1 kbps |
-| Compression ratio | ~183× vs. 16-bit 24 kHz PCM (~366× vs. float32 PCM). The `decodeUpsampleRate` is 1,920 (24,000 / 12.5). |
+| Semantic codebook size | 4,096 in the config only; no official code reads it, and every decoder codebook has 2,048 entries |
+| Effective bitrate | ~2.2 kbps (16 codebooks × 11 bits × 12.5 Hz) |
+| Compression ratio | ~175× vs. 16-bit 24 kHz PCM (~349× vs. float32 PCM). The `decodeUpsampleRate` is 1,920 (24,000 / 12.5). |
 
 Each frame is therefore a vector of 16 integers in `[0, 2047]`. The first codebook carries the most semantic content; later codebooks add prosody, speaker identity, and acoustic residuals.
 
@@ -119,7 +128,9 @@ Each frame is therefore a vector of 16 integers in `[0, 2047]`. The first codebo
 Key implementation details:
 
 - Q and K are **per-head RMSNorm'd** before RoPE.
-- RoPE is **interleaved** (adjacent pairs), not NeoX split-half.
+- RoPE is NeoX-style **split-half** (`rotate_half` over `cat(freqs, freqs)`), as upstream and
+  Vocello's `Qwen3TTSTalker.swift` both implement it. The config's `interleaved: true` only decides
+  which M-RoPE stream feeds each frequency.
 - For TTS, all three M-RoPE position dimensions are identical, so it behaves like standard RoPE.
 - The Talker predicts tokens from a separate **codec vocabulary** of size 3,072, not the text vocabulary.
 
@@ -148,10 +159,12 @@ This means ~103 layer evaluations per 80 ms frame (28 Talker + 75 Code Predictor
 
 A Mimi-based neural codec decoder that converts the 16-code frames back to a 24 kHz waveform. It is causal and streaming-friendly:
 
-- 8 pre-transformer layers
-- 7 convolutional decoder blocks with Snake activation
-- 2 ConvNeXt upsampling blocks
-- Final tanh → float samples in `[-1, 1]`
+- 8 pre-transformer layers (upstream gives every one a 72-frame sliding window; Vocello's decoder
+  attends causally over the whole take, engine audit A-03)
+- a SEANet decoder: an input conv, four SnakeBeta upsampling blocks (rates 8, 5, 4, 3), SnakeBeta
+  and an output conv
+- 2 ConvNeXt upsampling blocks before it
+- a final `clamp(-1, 1)` (no tanh) → float samples in `[-1, 1]`
 
 The speech-tokenizer weights ship as **fp32** (682,293,092 bytes, the file Vocello 2.4.0 carried), even when the Talker is quantized to 4/8 bit. The unified f16 codec promoted on 2026-08-01 was withdrawn on 2026-09-14 (artifactVersion `2026.09.14.1`): with the f16 weights the streaming decoder opened clone takes with a burst inside the first 50 ms (roadmap MV-07) — see `benchmarks/OPTIMIZATION.md` §R.
 
@@ -295,20 +308,11 @@ Surprised present as directional hints with advisory copy — the measured resul
 [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) and the measurement protocol in
 [`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
 
-`EmotionIntensity` survives internally, addressing both texts, so the delivery bench can
-keep measuring both tiers and drafts saved before the change resolve to exactly what they
-stored. The table below is that internal pair; the second column is what ships.
-
-| Preset | normal | strong |
-| --- | --- | --- |
-| `neutral` | Neutral (steady, slightly monotone) | same |
-| `happy` | Happy and upbeat, smiling | High pitch, loud, fast, bright, without laughing |
-| `sad` | Heavy, restrained, lowered pitch | Fragile, tearful, slow, clear words |
-| `angry` | Fiercely angry/frustrated, tense force, clipped consonants, fast emphasis | Forceful tension, hostile resentment |
-| `fearful` | Anxious, breath caught | Trembling panic, still audible |
-| `surprised` | Pitch jumps, quick, astonished | High rising pitch, amazed, no gasping |
-| `whisper` | Hushed, breathy, confidential | Urgent, barely voiced, secretive |
-| `calm` | Smooth, unhurried, reassuring | Serene, meditative stillness |
+`EmotionIntensity` survives internally, addressing both texts, so the delivery bench can keep
+measuring both tiers and drafts saved before the change resolve to exactly what they stored. The
+internal normal/strong pair and the copy that ships (`shippedIntensity`) live only in
+`EmotionPreset.swift`; this guide no longer restates them, because its copy went stale after the
+2026-08-24/25 remediation.
 
 > `narrator` and `news` are Voice Design brief archetypes, not delivery presets.
 
@@ -317,9 +321,9 @@ sourced or retracted on 2026-08-02, and [`qwen3-tts-prompting-guide.md`](qwen3-t
 carries the full adjudication with references. Summary:
 
 - **Concrete acoustic wording** (pitch, pace, timbre, volume) is followed more reliably than persona-only wording. *Supported* — InstructTTSEval scores our checkpoint at 77–83 on explicit acoustic specification versus 61–64 on role-play framing.
-- **Negative constraints work** (`"joyful but without laughing"`). *Unverified* — no upstream source endorses them, and the nearest published ablation found bare paralinguistic tags reduced adherence.
+- **Negative constraints work** (`"joyful but without laughing"`). *Suggested upstream, unmeasured* — a Qwen collaborator recommends "very happy but without laughing" (QwenLM#16), but no ablation measures it, and the nearest published ablation found bare paralinguistic tags reduced adherence.
 - **Stacked intensifiers do not work** (`"very very very happy"` adds no value). *Partly contradicted* — repetition adding nothing is defensible, but upstream's own examples are `"Very happy."` and `"Say it in a very angry and disappointed tone"`.
-- High-arousal instructions (`happy`, `surprised`) can otherwise trigger literal laughter or extra breath sounds; the shipped copy explicitly forbids that. *Symptom is community-reported; the remedy is the unverified part.*
+- High-arousal instructions (`happy`, `surprised`) can otherwise trigger literal laughter or extra breath sounds. *Qwen acknowledges the symptom (QwenLM#16).* The shipped copy no longer carries "without laughing" or "no gasping" clauses; read the current copy in `EmotionPreset.swift`.
 - An intelligibility clause (`"keeping every word audible"`) helps bound extreme emotions. *Unverified as written* — the vendor-documented cousin is a closing recording-quality anchor, which is a different mechanism.
 
 ---
@@ -461,10 +465,11 @@ Vocello's effective defaults:
 | `do_sample` | true | App policy |
 | `repetition_penalty` | 1.05 | App policy |
 
-The **Code Predictor** inherits the effective Talker sampling policy by default. Vocello can apply
-independent subtalker overrides when they are explicitly configured; it is not unconditionally
-greedy. This keeps the default residual-codebook sampling aligned with the public generation
-policy while preserving a typed override surface for controlled experiments.
+The **Code Predictor** copies the talker's effective temperature, top-p and top-k
+(`UnsafeSpeechGenerationModel.swift`), and it never applies the repetition penalty. That matches
+upstream only under Expressive: upstream keeps its subtalker at 0.9 / top-k 50 / top-p 1.0 for every
+request, so Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) depart from it (research ledger;
+ER-05). Internal-diagnostics knobs can set the subtalker separately.
 
 Streaming:
 
@@ -500,8 +505,11 @@ Official reference numbers (CUDA, torch.compile, CUDA Graph):
 
 | Model | First-packet latency | RTF (real-time factor) |
 | --- | --- | --- |
-| 0.6B | ~97 ms | — |
+| 0.6B | ~97 ms | 0.288 |
 | 1.7B | ~101 ms | 0.313 |
+
+A packet is 4 tokens (320 ms of audio), which is where Vocello's 0.32 s streaming interval comes
+from.
 
 Apple Silicon MLX numbers depend heavily on quantization tier, model size, text length, and memory pressure. Use Vocello's built-in telemetry (`QWENVOICE_NATIVE_TELEMETRY_MODE=verbose`) to capture per-generation memory curves.
 
@@ -533,12 +541,16 @@ These are compiled from the official docs, community reports, and Vocello's own 
 - **Accent/dialect control is suggestive, not deterministic.** It works better for broad language-native speakers than for fine-grained regional accents.
 - **Conflicting descriptions fail.** `"high-pitched deep bass voice"` will produce unpredictable results.
 - **High-arousal emotions can add sounds.** The shipped preset copy carries no anti-laughing clause; that remedy is unverified (see the prompting guide).
-- **Reference audio sweet spot is 10–20 s.** Shorter clips work (the paper claims 3 s rapid clone) but may be less consistent. Over 60 s is blocked.
-- **Music and noise are not the model's strength.** The tokenizer is optimized for clean speech; noisy or musical references degrade.
+- **Reference length.** Qwen claims a 3 s rapid clone; Vocello asks for 10–20 s and refuses more
+  than 60 s when a saved voice is kept, guidance that follows Alibaba's hosted service. Mac one-off
+  references skip that policy (engine audit G-11).
+- **Music and noise.** Qwen says the tokenizer preserves the acoustic environment, so a noisy or
+  musical reference carries its noise into the clone.
 - **Celebrity/voice impersonation requests are rejected** by the prompt validator.
 - **Long outputs can hit the 2048-token app cap.** If generation truncates, the finish reason will be `max_tokens`.
 - **Latin-script language detection can be ambiguous.** When in doubt, set the language explicitly in the UI.
-- **25 Hz checkpoints exist** but Vocello does not ship them; this guide covers only the 12 Hz tokenizer.
+- **No 25 Hz checkpoint has been released**; the technical report describes them, and Qwen has
+  given no date (QwenLM#294). This guide covers only the 12 Hz family.
 
 ---
 
@@ -560,9 +572,9 @@ These are compiled from the official docs, community reports, and Vocello's own 
 ## 13. External references
 
 - Qwen3-TTS GitHub: https://github.com/QwenLM/Qwen3-TTS
-- Qwen3-TTS documentation site: https://qwenlm-qwen3-tts.mintlify.app/
-- Qwen3-TTS tokenizer docs: https://mintlify.com/QwenLM/Qwen3-TTS/concepts/tokenizer
 - Technical report: *Qwen3-TTS Technical Report*, arXiv:2601.15621
+- Vocello's research and parity ledger: [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md)
 - Vocello's pinned MLX conversions: https://huggingface.co/PowerBeef02
-- Mimi codec (Kyutai): https://kyutai.org/codec-explainer
-- Community architecture / weight reference (unofficial but well-verified): https://github.com/gabriele-mastrapasqua/qwen3-tts/blob/main/MODEL.md
+- Mimi codec (Kyutai): https://kyutai.org/codec-explainer; paper: Moshi, arXiv:2410.00037
+- Not authoritative: the Mintlify "documentation site" (no publisher, not linked by Qwen) and the
+  community MODEL.md write-up, whose RoPE and tanh claims are wrong

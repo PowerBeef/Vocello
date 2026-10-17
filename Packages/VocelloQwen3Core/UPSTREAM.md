@@ -47,8 +47,8 @@ tokenizer, sampler, streaming, codec, and clone-artifact implementation.
 generation defaults and policy vocabulary, finish reasons, and a minimal app-owned backend
 abstraction.
 
-The macOS app reaches the engine through an XPC service. The iPhone engine runs in-process. There
-is no iPhone extension engine and no repository-owned Python inference runtime.
+Both apps host the engine in-process (the macOS XPC service was retired on 2026-09-15). There is no
+iPhone extension engine and no repository-owned Python inference runtime.
 
 ## Production posture
 
@@ -57,8 +57,11 @@ Clone. The pipeline asynchronously materializes non-final chunks, synchronizes c
 uses a final barrier before reporting completion or publishing the final WAV. Full-result helpers
 remain useful for explicit offline/diagnostic paths; they are not the universal production default.
 
-Sampling follows the checkpoint’s official talker defaults. The Code Predictor/subtalker inherits
-the effective talker temperature, top-k, and top-p unless a controlled diagnostic override is set.
+Under the default Expressive variation, sampling follows the checkpoint’s official talker defaults;
+Balanced and Consistent lower the talker's temperature and top-p. The Code Predictor/subtalker
+inherits the effective talker temperature, top-k, and top-p unless a controlled diagnostic override
+is set, so for those two variations it departs from upstream, whose subtalker stays at
+0.9 / 50 / 1.0 (`docs/audits/2026-10-17-qwen3-tts-model-research.md`, the parity ledger).
 See [`PERFORMANCE.md`](PERFORMANCE.md) for the design narrative; `RUNTIME_CAPABILITIES.json` records
 each capability's production, diagnostic, internal or retired state and `SEMANTIC_DELTAS.json` each delta's
 active, diagnostic, dormant, shared, superseded or removed state.

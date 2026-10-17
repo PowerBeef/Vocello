@@ -349,7 +349,7 @@ flowchart TD
     CL --> Reserve
     Reserve["3. VocelloQwen3Engine.reserveGeneration<br/>one inert lease + classified session"] --> Bind["4. GenerationOutputAdapter claims<br/>the mandatory audio consumer"]
     Bind --> Open["5. open(reservation) → Qwen prompt + MLX inference"]
-    Open --> Codec["6. Mimi codec → materialized PCM<br/>(owned MLXAudioCodecs)"]
+    Open --> Codec["6. Qwen3 speech-tokenizer decoder → materialized PCM<br/>(owned MLXAudioTTS)"]
     Codec --> Channel["7. frame-bounded suspending channel<br/>ordered, single consumer, lossless"]
     Channel --> Lim["8. PCM16StreamLimiter + defect detection<br/>(clip/click/slew/dropout/nanInf)"]
     Lim --> WAV["9. AtomicPCM16WAVWriter"]
@@ -488,7 +488,9 @@ after the slot was handed to it releases the slot before throwing, so a finished
 leave the gate held.
 Prewarm identity keys are per mode (e.g.
 `custom:<speakerID>:<instruction-hash>`); `NativeCustomPrewarmPolicy` is `.eager`
-on capable tiers and `.skipDedicatedCustomPrewarm` on `.floor8GBMac`. Depth is
+on capable Macs and `.skipDedicatedCustomPrewarm` on `.floor8GBMac` and on the iPhone
+(`IOSAppBootstrap`), which is why the first Custom take after an iPhone launch pays about 0.2 s to
+warm the decoder (engine audit D-02). Depth is
 tunable via `CustomVoicePrewarmDepth { .full, .skipDecoderBucket, .skipStreamStep }`.
 
 ### 4.8 Voice cloning cache
@@ -1042,7 +1044,8 @@ schema. It defines `defaultSpeaker`, `speakers` (+ `speakerMetadata`), and a
 The generated cross-platform artifact contract is
 `Sources/Resources/qwenvoice_production_model_catalog.json`, governed by
 `config/model-catalog-schema-v2.json` and exact evidence in
-`config/model-artifact-receipts.json`. It is **complete**: all three Speed and all three Quality
+`config/model-artifact-receipts.json` (the three Quality receipts) and the bundled iPhone catalog
+`Sources/Resources/qwenvoice_ios_model_catalog.json` (the three Speed receipts). It is **complete**: all three Speed and all three Quality
 artifacts have exact pinned revisions, file sizes, and SHA-256 digests for every required file.
 No missing identity may be inferred or fabricated. Schema v2 identifies the identical
 `speech_tokenizer` component shared by all six artifacts using separate content and compatibility
@@ -1066,8 +1069,9 @@ The shipped model ids:
 | `pro_design` | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit` | `…-8bit` |
 | `pro_clone` | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit` | `…-8bit` |
 
-The exact pinned revisions and file digests live in `config/model-artifact-receipts.json`, from
-which the production catalog is generated.
+The exact pinned revisions and file digests live in `config/model-artifact-receipts.json` (Quality)
+and `Sources/Resources/qwenvoice_ios_model_catalog.json` (Speed), from which the production catalog
+is generated (`scripts/model_catalog_contract.py`).
 
 `ContractBackedModelRegistry` loads the contract and is expanded per-platform
 (`expandedForPlatform(_:deviceClass:includeBaseAliases:)`). Built-in speakers:

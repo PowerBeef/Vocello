@@ -40,8 +40,8 @@ unavailable and no Mac XCUITest ran.
   swift-huggingface 1.0.0 with their prerequisites. A same-host A/B kept RTF, memory and audio QC
   unchanged; the warm first chunk rose 146 → 155 ms, and the first cold run paid a one-time Metal
   compile, so prewarm now also runs the production sampler. Gate baseline re-pooled, memory
-  qualification and a 336-take qc-takes screen pass; seeds changed (release note). Left: TSan and
-  `dev.sh ci`, the Mac smoke lanes, the iPhone checks.
+  qualification, a 336-take qc-takes screen and `dev.sh ci` (TSan included) pass; seeds changed
+  (release note). Left: the Mac smoke lanes and the iPhone checks.
 - **ER-13:** the sourced research report
   ([`2026-10-17-qwen3-tts-model-research.md`](audits/2026-10-17-qwen3-tts-model-research.md)) and
   docs pass 1, which corrected the wrong model facts in the guides. Pass 2 follows the freeze

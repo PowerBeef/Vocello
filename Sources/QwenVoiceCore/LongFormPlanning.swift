@@ -128,8 +128,18 @@ extension LongFormPlanningConfiguration {
     public static var shippingRuntimeTokenLimit: Int {
         let codecCap = Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens
         let codecSafeBudget = max(64, codecCap / 4)
-        let deliveryValidatedBudget = 300
+        let deliveryValidatedBudget = deliveryBudgetDiagnosticOverride ?? 300
         return min(codecSafeBudget, deliveryValidatedBudget)
+    }
+
+    /// RF-18 follow-up (internal diagnostics only): a machine screen of shorter
+    /// segments lowers the delivery budget through the registered
+    /// `QWENVOICE_LONG_FORM_DELIVERY_BUDGET`. Inert without the diagnostics gate,
+    /// and only values from 60 to 300 apply.
+    static var deliveryBudgetDiagnosticOverride: Int? {
+        guard let raw = RuntimeDebugGate.value(for: "QWENVOICE_LONG_FORM_DELIVERY_BUDGET"),
+              let value = Int(raw), (60 ... 300).contains(value) else { return nil }
+        return value
     }
 }
 

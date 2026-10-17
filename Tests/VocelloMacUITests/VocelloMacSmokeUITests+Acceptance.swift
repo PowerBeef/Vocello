@@ -109,16 +109,16 @@ extension VocelloMacSmokeUITests {
         let artifacts = try XCTUnwrap(ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"])
         let empty = URL(fileURLWithPath: artifacts).appendingPathComponent("saved-voices-empty-profile")
         relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": empty.path])
-        openSavedVoices(settlingOn: "voices_emptyState")
-        try assertSavedVoicesStateFitsWindow("voices_emptyState", named: "empty")
+        openSavedVoices(showingError: false)
+        try assertSavedVoicesStateFitsWindow(named: "empty")
 
         let failing = URL(fileURLWithPath: artifacts).appendingPathComponent("saved-voices-error-profile")
         try FileManager.default.createDirectory(at: failing, withIntermediateDirectories: true)
         try Data("saved voices store failure fixture".utf8)
             .write(to: failing.appendingPathComponent("voice-candidates"))
         relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": failing.path])
-        openSavedVoices(settlingOn: "voices_errorState")
-        try assertSavedVoicesStateFitsWindow("voices_errorState", named: "error")
+        openSavedVoices(showingError: true)
+        try assertSavedVoicesStateFitsWindow(named: "error")
         let retry = button("voices_retryButton")
         VocelloUILayoutAssert.assertFullyWithinWindow(retry, of: app)
         XCTAssertTrue(retry.isHittable, "Retry must be reachable at the minimum window")
@@ -126,7 +126,7 @@ extension VocelloMacSmokeUITests {
         // Retry's own listing passes too quickly to observe; the store still
         // fails, so the screen must settle on the error again.
         XCTAssertTrue(VocelloUIWait.condition("Saved Voices to settle on its error after Retry", timeout: 30) {
-            self.element("voices_errorState").exists && !self.element("voices_loadingState").exists
+            self.savedVoicesSettled(showingError: true)
         })
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-error-retried")
     }
@@ -177,25 +177,34 @@ extension VocelloMacSmokeUITests {
         }
     }
 
-    /// Opens Saved Voices and waits for the screen to settle on `identifier`.
-    /// While the engine starts the screen shows `voices_startingState`, and
-    /// every load passes through `voices_loadingState`; neither is the state
-    /// under test, and `voices_emptyState` appears only once the engine is
-    /// ready and the store lists no voice (BKL-15).
-    private func openSavedVoices(settlingOn identifier: String) {
-        navigate(to: .voices)
-        XCTAssertTrue(VocelloUIWait.condition("Saved Voices to settle on \(identifier)", timeout: 90) {
-            self.element(identifier).exists
-                && !self.element("voices_startingState").exists
-                && !self.element("voices_loadingState").exists
+    /// Opens Saved Voices once the engine is ready and waits for its listing
+    /// to settle on the empty or the error state. A state card is then the
+    /// whole screen, which SwiftUI exposes under `screen_voices`, so the state
+    /// card's own identifier does not resolve: readiness comes from the status
+    /// strip, a finished listing from the loading card's progress indicator
+    /// having gone, and the error from its Retry button (BKL-15).
+    private func openSavedVoices(showingError: Bool) {
+        XCTAssertTrue(VocelloUIWait.condition("the engine to be ready", timeout: 90) {
+            self.element("sidebar_backendStatus_standby").exists || self.element("sidebar_backendStatus_idle").exists
         })
+        navigate(to: .voices)
+        XCTAssertTrue(VocelloUIWait.condition("Saved Voices to settle", timeout: 30) {
+            self.savedVoicesSettled(showingError: showingError)
+        })
+    }
+
+    private func savedVoicesSettled(showingError: Bool) -> Bool {
+        let screen = element("screen_voices")
+        return screen.exists
+            && !screen.progressIndicators.firstMatch.exists
+            && element("voices_retryButton").exists == showingError
     }
 
     /// The window the state opened keeps a height a display can show (F-16's
     /// failure was a window thousands of points tall), and pinned to the
-    /// minimum window, which that failure cannot reach, the state sits inside
-    /// it (BKL-15).
-    private func assertSavedVoicesStateFitsWindow(_ identifier: String, named name: String) throws {
+    /// minimum window, which that failure cannot reach, the state card sits
+    /// inside it (BKL-15).
+    private func assertSavedVoicesStateFitsWindow(named name: String) throws {
         // The screenshot comes first, so a regression's oversized window is kept.
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-\(name)-opened")
         let opened = app.windows.firstMatch.frame
@@ -206,7 +215,7 @@ extension VocelloMacSmokeUITests {
             "Saved Voices laid the window out \(Int(opened.height)) pt tall, taller than any display"
         )
         pinToNarrowestWindow()
-        VocelloUILayoutAssert.assertFullyWithinWindow(element(identifier), of: app)
+        VocelloUILayoutAssert.assertFullyWithinWindow(element("screen_voices"), of: app)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-\(name)-minimum")
     }
 

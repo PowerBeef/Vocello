@@ -75,11 +75,6 @@ struct MacVoicesScreen: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            // A container, so the screen identifier stays on the screen and does
-            // not replace the state card's own (`voices_startingState`,
-            // `voices_emptyState`, `voices_errorState`), which is the whole
-            // content in those states (BKL-15), as on the Studio screens.
-            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("screen_voices")
             .task(id: loadTaskID) {
                 guard ttsEngineStore.isReady else { return }
@@ -124,9 +119,7 @@ struct MacVoicesScreen: View {
     @ViewBuilder
     private var content: some View {
         if !ttsEngineStore.isReady {
-            // Its own identifier, so `voices_emptyState` always means no saved
-            // voices (BKL-15).
-            voicesStateContainer(identifier: "voices_startingState") {
+            voicesStateContainer(identifier: "voices_emptyState") {
                 VocelloEmptyStateCard(
                     title: MacInterfaceText.voicesEngineStarting,
                     message: MacInterfaceText.voicesWaitingForEngine,

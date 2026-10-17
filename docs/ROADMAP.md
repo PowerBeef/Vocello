@@ -15,8 +15,8 @@ Only this plan may hold planned or in-flight work, at most 4 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 11/35 (31%) |
-| `engine-remediation-2026-10` | active | backend-and-platform | 0/15 (0%) |
+| `release-first-3-0-2026-09` | active | release-qa | 11/36 (31%) |
+| `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -58,6 +58,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
 | `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
+| `ER-13` | in-flight | Qwen3-TTS model research and reference documentation | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
@@ -118,6 +119,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
+- **`ER-13`** (in-flight, due 2026-10-22) — Qwen3-TTS model research and reference documentation.
+  gate: A sourced research report on the shipped Qwen3-TTS checkpoints and their upstream family (docs/audits/2026-10-17-qwen3-tts-model-research.md) is committed, and the model reference docs (qwen3-tts-guide, qwen3-tts-prompting-guide, mimi-codec-guide, mlx-guide, ios-engine-optimization, the package README, UPSTREAM, ORIGINS, PERFORMANCE and CLONE_ARTIFACT_FORMAT, and ARCHITECTURE's engine sections) are rewritten against it and the audit's verified facts, with a parity ledger, one owner per fact and current front matter; a second pass reflects RF-18 and CONV-21 as shipped.
+
 - **`F-01`** (planned, due 2026-10-30) — High — make saved-voice review transactional and add iOS deletion.
   gate: Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
@@ -169,7 +173,6 @@ Narrative authority: [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2
 | `ER-10` | parked | Delivery, storage and persistence | `ER-01` |
 | `ER-11` | parked | Fast QC and output-path hygiene | — |
 | `ER-12` | parked | Tests, dead code, docs and registry | — |
-| `ER-13` | parked | Qwen3-TTS model research and reference documentation | — |
 | `PA-16` | parked | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-33` | parked | Engine-side lease for model deletion | — |
 
@@ -221,10 +224,6 @@ Narrative authority: [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2
 
 - **`ER-12`** (parked) — Tests, dead code, docs and registry.
   gate: Dead fork code and the HuggingFace client are removed with the inventory and facade baseline regenerated (A-22, F-12, F-13, C-27, C-28); stale docs and comments are corrected (A-19, C-10/EN-5, F-08, F-09, F-15, ARCHITECTURE sections 4.5 and 4.8); the concurrency registry drops ResolvedCloneConditioning (B-20); PA-26's B6 and E6-02 are closed.
-  unparkWhen: Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.
-
-- **`ER-13`** (parked) — Qwen3-TTS model research and reference documentation.
-  gate: A sourced research report on the shipped Qwen3-TTS checkpoints and their upstream family (docs/audits/2026-10-17-qwen3-tts-model-research.md) is committed, and the model reference docs (qwen3-tts-guide, qwen3-tts-prompting-guide, mimi-codec-guide, mlx-guide, ios-engine-optimization, the package README, UPSTREAM, ORIGINS, PERFORMANCE and CLONE_ARTIFACT_FORMAT, and ARCHITECTURE's engine sections) are rewritten against it and the audit's verified facts, with a parity ledger, one owner per fact and current front matter; a second pass reflects RF-18 and CONV-21 as shipped.
   unparkWhen: Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.
 
 - **`PA-16`** (parked) — Speech-tokenizer attention honors the model's sliding windows.

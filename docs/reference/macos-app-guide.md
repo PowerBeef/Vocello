@@ -177,7 +177,10 @@ candidate a save was still staging when the sheet closed (F-01). Editing a
 voice supplies replacement intent to the same transaction, so the old assets remain recoverable
 until the new audio crosses the publication boundary. Row deletion stops a matching preview before
 the engine atomically removes that voice's audio, transcript, and prepared prompt artifacts.
-Voice-bank siblings are independent and never cascade.
+Voice-bank siblings are independent and never cascade. As on iPhone, Delete waits while a take, a
+line batch or a long-form project runs, since a Clone line batch or long-form project reads the
+voice again for every line or segment, and a retained long-form project that reads the deleted
+voice can no longer resume or regenerate a segment (`MacSavedVoiceDeletion`, BKL-13).
 
 Imported and recorded references use the same operation-generation transcription-review policy as
 iPhone. Save stays disabled until on-device transcription resolves; a delayed recognizer result

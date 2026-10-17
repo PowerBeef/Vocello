@@ -19,6 +19,7 @@ struct MacVoicesScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(MacAppModel.self) private var appModel
 
     let enrollRequestID: UUID?
     let canUseInVoiceCloning: Bool
@@ -57,6 +58,17 @@ struct MacVoicesScreen: View {
     /// a pure function of the (id, name) list.
     private var bankCatalog: VoiceBankCatalog {
         MacVoiceBankCatalogCache.catalog(for: voices.map { (id: $0.id, name: $0.name) })
+    }
+
+    /// Delete waits while a take, a line batch or a long-form project may
+    /// still read a saved voice, and releases the retained project that reads
+    /// a deleted one, as on the iPhone (BKL-13).
+    private var savedVoiceDeletion: MacSavedVoiceDeletion {
+        MacSavedVoiceDeletion(
+            engine: ttsEngineStore,
+            longForm: appModel.longForm,
+            isLineBatchProcessing: appModel.lineBatch.isProcessing
+        )
     }
 
     var body: some View {
@@ -156,6 +168,7 @@ struct MacVoicesScreen: View {
             }
         } else {
             let bankCatalog = self.bankCatalog
+            let canDelete = !savedVoiceDeletion.isGenerationUsingVoices
             ScrollViewReader { proxy in
                 List {
                     // A plain heading row avoids macOS's section-header chrome.
@@ -176,6 +189,7 @@ struct MacVoicesScreen: View {
                             caption: rowCaption(for: voice, bankCatalog: bankCatalog),
                             isHighlighted: highlightedVoiceID == voice.id,
                             canUseInVoiceCloning: canUseInVoiceCloning,
+                            canDelete: canDelete,
                             onUseInVoiceCloning: { onUseInVoiceCloning(voice) },
                             onPlay: { playVoicePreview(voice) },
                             onDelete: { requestDeleteVoice(voice) },
@@ -319,12 +333,17 @@ private extension MacVoicesScreen {
     }
 
     func deleteVoice(_ voice: Voice) {
+        guard !savedVoiceDeletion.isGenerationUsingVoices else {
+            presentDeleteWaitAlert()
+            return
+        }
         if audioPlayer.currentFilePath == voice.wavPath {
             audioPlayer.stop()
         }
         Task {
             do {
-                try await ttsEngineStore.deletePreparedVoice(id: voice.id)
+                // Read again here: a run may have started since the check.
+                try await savedVoiceDeletion.delete(voiceID: voice.id)
                 await MainActor.run {
                     // MAC-13: a deleted voice's reference leaves the player too,
                     // so it can no longer be played or revealed (⇧⌘R).
@@ -334,6 +353,8 @@ private extension MacVoicesScreen {
                     savedVoicesViewModel.removeVoiceFromVisibleState(id: voice.id)
                     onVoiceDeleted(voice.id)
                 }
+            } catch MacSavedVoiceDeletion.Refusal.generationUsingVoices {
+                await MainActor.run { presentDeleteWaitAlert() }
             } catch {
                 await MainActor.run {
                     presentActionAlert(
@@ -350,6 +371,10 @@ private extension MacVoicesScreen {
 
     func presentActionAlert(title: String, message: String) {
         actionAlert = MacVoicesAlertState(title: title, message: message)
+    }
+
+    func presentDeleteWaitAlert() {
+        presentActionAlert(title: MacInterfaceText.voicesDeleteFailed, message: MacInterfaceText.voicesDeleteWait)
     }
 }
 
@@ -379,6 +404,7 @@ private struct MacVoiceRow: View {
     let caption: String
     let isHighlighted: Bool
     let canUseInVoiceCloning: Bool
+    let canDelete: Bool
     let onUseInVoiceCloning: () -> Void
     let onPlay: () -> Void
     let onDelete: () -> Void
@@ -422,6 +448,7 @@ private struct MacVoiceRow: View {
             MacVoiceRowActions(
                 voiceID: voice.id,
                 canUseInVoiceCloning: canUseInVoiceCloning,
+                canDelete: canDelete,
                 onPlay: onPlay,
                 onUseInVoiceCloning: onUseInVoiceCloning,
                 onDelete: onDelete
@@ -552,6 +579,9 @@ private struct MacVoiceRowMetadata: View {
 private struct MacVoiceRowActions: View {
     let voiceID: String
     let canUseInVoiceCloning: Bool
+    /// False while a take, a line batch or a long-form project may read the
+    /// voice; the menu's help then says why (BKL-13).
+    let canDelete: Bool
     let onPlay: () -> Void
     let onUseInVoiceCloning: () -> Void
     let onDelete: () -> Void
@@ -585,6 +615,7 @@ private struct MacVoiceRowActions: View {
 
             Menu {
                 Button(MacInterfaceText.voicesDeleteAction, role: .destructive, action: onDelete)
+                    .disabled(!canDelete)
                     .accessibilityIdentifier("voicesRow_delete_\(voiceID)")
             } label: {
                 Image(systemName: "ellipsis")
@@ -596,7 +627,7 @@ private struct MacVoiceRowActions: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(MacInterfaceText.voicesMoreActions)
+            .help(canDelete ? MacInterfaceText.voicesMoreActions : MacInterfaceText.voicesDeleteWait)
             .accessibilityLabel(MacInterfaceText.voicesMoreActions)
             .accessibilityIdentifier("voicesRow_more_\(voiceID)")
         }

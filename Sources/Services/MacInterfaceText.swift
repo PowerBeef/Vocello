@@ -1835,6 +1835,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.voices.deleteTitle", defaultValue: "Delete Saved Voice?",
                comment: "macOS interface: Saved Voices delete confirmation title. Presentation only.")
     }
+    static var voicesDeleteWait: String {
+        localization.string(localized: "vocello.mac.voices.deleteWait", defaultValue: "Wait for the current generation to finish before deleting this voice.",
+               comment: "macOS interface: why a saved voice cannot be deleted while a take, a line batch or a long-form project runs; the Delete Failed alert message and the row menu's help while Delete is unavailable. Presentation only.")
+    }
     static var voicesDetailAudioOnly: String {
         localization.string(localized: "vocello.mac.voices.detailAudioOnly", defaultValue: "Add a transcript for the strongest clone.",
                comment: "macOS interface: Saved Voices row detail for an audio-only voice. Presentation only.")

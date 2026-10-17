@@ -551,6 +551,9 @@ targets:
       - path: Sources/iOS/Studio/IOSLongFormProject.swift
       - path: Sources/SharedSupport/Services/LivePreviewEstimate.swift
       - path: Sources/SharedSupport/Services/AudioQualityGate.swift
+      # BKL-13: the Mac Saved Voices delete waits for a running project and
+      # releases a retained one, driven over the long-form coordinator above.
+      - path: Sources/Services/MacSavedVoiceDeletion.swift
       # PA-26 (MAC-09, MAC-16/IOS-16, MAC-17, MAC-25): take file names and the
       # iPhone output-root guard, block-read waveform bars, recorded-clip
       # cleanup and the Mac reference-import formats.

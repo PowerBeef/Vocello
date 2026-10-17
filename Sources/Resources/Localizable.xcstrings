@@ -37579,6 +37579,72 @@
         }
       }
     },
+    "vocello.mac.voices.deleteWait": {
+      "comment": "macOS interface: why a saved voice cannot be deleted while a take, a line batch or a long-form project runs; the Delete Failed alert message and the row menu's help while Delete is unavailable. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current generation to finish before deleting this voice."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendez la fin de la génération en cours avant de supprimer cette voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espera a que termine la generación actual antes de eliminar esta voz."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warte vor dem Löschen dieser Stimme, bis die aktuelle Generierung beendet ist."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendi il termine della generazione attuale prima di eliminare questa voce."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aguarde a geração atual terminar antes de excluir esta voz."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请等待当前生成完成后再删除此声音。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の生成が終わってからこの声を削除してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 생성이 끝난 뒤 이 음성을 삭제하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дождитесь завершения текущей генерации перед удалением голоса."
+          }
+        }
+      }
+    },
     "vocello.mac.voices.deleteDetail": {
       "comment": "macOS interface: Saved Voices delete confirmation body. %1$@ is the saved voice name, never translated.",
       "extractionState": "manual",

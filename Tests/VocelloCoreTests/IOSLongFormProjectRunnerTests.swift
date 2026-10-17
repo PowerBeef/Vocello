@@ -27,6 +27,17 @@ private final class LongFormFixtureEngine: StoreFixtureEngine {
     var heldTakes: Set<Int> = []
     /// Every request that reached the engine, including failed takes.
     private(set) var takeRequests: [GenerationRequest] = []
+    /// Thrown in place of a saved-voice deletion while set.
+    var voiceDeletionError: (any Error)?
+    /// Every saved voice the engine deleted.
+    private(set) var deletedVoiceIDs: [String] = []
+
+    override func deletePreparedVoice(id: String) async throws {
+        if let voiceDeletionError {
+            throw voiceDeletionError
+        }
+        deletedVoiceIDs.append(id)
+    }
 
     override func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         let index = takeRequests.count
@@ -257,13 +268,22 @@ private final class LongFormBarrierBox {
     var barrier: Task<Void, Never>?
 }
 
+/// What a Mac Saved Voices delete saw from inside a project's run.
+@MainActor
+private final class MacSavedVoiceDeletionProbe {
+    var sawActiveTake: Bool?
+    var sawProjectRunning: Bool?
+    var refusal: MacSavedVoiceDeletion.Refusal?
+}
+
 /// PA-19: the long-form coordinator and runner both apps share, compiled by path
 /// and driven over the store's fake engine, a player recorder and a private
 /// History on real SQLite. Covers one sequential take per segment and History
 /// acceptance of the joined output, cancellation mid-project and resume, a take
 /// that finishes after the cancellation request, a failed and a QC-rejected
-/// segment, an acceptance left to recovery (PA-30) or refused, and
-/// single-segment regeneration.
+/// segment, an acceptance left to recovery (PA-30) or refused,
+/// single-segment regeneration, and the Mac Saved Voices delete that waits for
+/// a running project or line batch and releases a retained project (BKL-13).
 @MainActor
 final class IOSLongFormProjectRunnerTests: XCTestCase {
     /// Three sentences of nine planner tokens each: one segment per sentence
@@ -1216,5 +1236,132 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertNil(f.studio.lastCompletedOutput)
         XCTAssertFalse(f.studio.isGenerating)
         XCTAssertTrue(coordinator.canResume)
+    }
+
+    // MARK: - Mac Saved Voices delete (BKL-13)
+
+    /// The fixture's project carrying the saved voice `voiceID`, as a Clone
+    /// project started on a saved voice does; only its identity matters here.
+    private static func savedVoiceRequest(
+        _ base: IOSLongFormProjectRequest,
+        voiceID: String
+    ) -> IOSLongFormProjectRequest {
+        IOSLongFormProjectRequest(
+            mode: base.mode, model: base.model, plan: base.plan, voice: base.voice, emotion: base.emotion,
+            deliveryInstructionCellID: base.deliveryInstructionCellID, languageHint: base.languageHint,
+            voiceDescription: base.voiceDescription, refAudio: "/saved/\(voiceID).wav", refText: nil,
+            preparedVoiceID: voiceID
+        )
+    }
+
+    /// A running project reads its saved voice again for every segment, and
+    /// between two segments no take is active for the engine to refuse the
+    /// delete by: the Mac delete waits all the same, and neither the voice nor
+    /// the project changes.
+    func testTheMacDeleteWaitsForAProjectBetweenItsTakes() async throws {
+        let f = try makeFixture()
+        let coordinator = f.makeCoordinator()
+        let store = f.store
+        let probe = MacSavedVoiceDeletionProbe()
+        f.services.onPersist = { index in
+            guard index == 0 else { return }
+            // The first take has returned and the second has not started.
+            probe.sawActiveTake = store.hasActiveGeneration
+            probe.sawProjectRunning = coordinator.isProcessing
+            do {
+                try await MacSavedVoiceDeletion(engine: store, longForm: coordinator, isLineBatchProcessing: false)
+                    .delete(voiceID: "voice-1")
+            } catch let refusal as MacSavedVoiceDeletion.Refusal {
+                probe.refusal = refusal
+            } catch {
+                XCTFail("Expected the delete to wait, got \(error)")
+            }
+        }
+
+        coordinator.start(
+            request: Self.savedVoiceRequest(f.request, voiceID: "voice-1"),
+            ttsEngine: f.store,
+            audioPlayer: f.player,
+            studioCoordinator: f.studio
+        )
+        await waitUntil("the project to finish") { !coordinator.isProcessing }
+
+        XCTAssertEqual(probe.sawActiveTake, false, "No take is active between two segments")
+        XCTAssertEqual(probe.sawProjectRunning, true)
+        XCTAssertEqual(probe.refusal, .generationUsingVoices)
+        XCTAssertTrue(f.engine.deletedVoiceIDs.isEmpty, "The delete never reached the engine")
+        guard case .completed = coordinator.outcome else {
+            return XCTFail("Expected a completed project, got \(String(describing: coordinator.outcome))")
+        }
+        XCTAssertEqual(f.engine.takeRequests.count, 3)
+        XCTAssertTrue(coordinator.canRegenerateSegments, "The project keeps its voice")
+    }
+
+    /// A Mac line batch reads its saved voice for every line, between which no
+    /// take is active either: the delete waits while it runs.
+    func testTheMacDeleteWaitsForARunningLineBatch() async throws {
+        let f = try makeFixture()
+        let deletion = MacSavedVoiceDeletion(
+            engine: f.store,
+            longForm: f.makeCoordinator(),
+            isLineBatchProcessing: true
+        )
+        XCTAssertFalse(f.store.hasActiveGeneration)
+        XCTAssertTrue(deletion.isGenerationUsingVoices)
+
+        do {
+            try await deletion.delete(voiceID: "voice-1")
+            XCTFail("The delete must wait for the line batch")
+        } catch {
+            XCTAssertEqual(error as? MacSavedVoiceDeletion.Refusal, .generationUsingVoices)
+        }
+        XCTAssertTrue(f.engine.deletedVoiceIDs.isEmpty)
+    }
+
+    /// Once the Mac deletes the saved voice a retained project reads, the
+    /// project can neither resume nor regenerate a segment, and its History
+    /// stays; a delete the engine refused, or another voice's, leaves it.
+    func testTheMacDeleteReleasesTheRetainedProjectThatReadsTheVoice() async throws {
+        let f = try makeFixture()
+        let coordinator = f.makeCoordinator()
+        // History refuses the joined output, so the stopped project has every
+        // segment saved and could both resume and regenerate one (U10).
+        f.services.acceptanceError = .invalidCandidate
+        coordinator.start(
+            request: Self.savedVoiceRequest(f.request, voiceID: "voice-1"),
+            ttsEngine: f.store,
+            audioPlayer: f.player,
+            studioCoordinator: f.studio
+        )
+        await waitUntil("the project to stop") { !coordinator.isProcessing }
+        XCTAssertTrue(coordinator.canResume)
+        XCTAssertTrue(coordinator.canRegenerateSegments)
+        f.services.acceptanceError = nil
+
+        let deletion = MacSavedVoiceDeletion(engine: f.store, longForm: coordinator, isLineBatchProcessing: false)
+        XCTAssertFalse(deletion.isGenerationUsingVoices)
+        f.engine.voiceDeletionError = LongFormFixtureEngineFailure()
+        do {
+            try await deletion.delete(voiceID: "voice-1")
+            XCTFail("The engine refused the delete")
+        } catch {
+            XCTAssertNil(error as? MacSavedVoiceDeletion.Refusal)
+        }
+        XCTAssertTrue(coordinator.canResume, "A voice the engine kept keeps its project")
+
+        f.engine.voiceDeletionError = nil
+        try await deletion.delete(voiceID: "voice-2")
+        XCTAssertTrue(coordinator.canResume, "Another voice's deletion leaves the project")
+        XCTAssertTrue(coordinator.canRegenerateSegments)
+
+        try await deletion.delete(voiceID: "voice-1")
+        XCTAssertEqual(f.engine.deletedVoiceIDs, ["voice-2", "voice-1"])
+        XCTAssertFalse(coordinator.canResume)
+        XCTAssertFalse(coordinator.canRegenerateSegments)
+        coordinator.resume(ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        coordinator.regenerateSegment(index: 0, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        XCTAssertFalse(coordinator.isProcessing, "Neither starts on the deleted voice")
+        XCTAssertEqual(f.engine.takeRequests.count, 3)
+        XCTAssertEqual(try rows(f, role: "segment").count, 3, "Its History stays")
     }
 }

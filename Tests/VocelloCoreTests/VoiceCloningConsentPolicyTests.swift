@@ -53,6 +53,7 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
         func prewarmModelIfNeeded(for request: GenerationRequest) async { prewarmCount += 1 }
         func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws { primeCount += 1 }
         func cancelClonePreparationIfNeeded() async {}
+        func cancelProactiveModelWork() async {}
         func generate(_ request: GenerationRequest) async throws -> GenerationResult {
             throw ConsentFixtureEngineReached()
         }

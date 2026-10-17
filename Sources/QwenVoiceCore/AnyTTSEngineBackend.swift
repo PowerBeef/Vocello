@@ -37,6 +37,7 @@ public final class AnyTTSEngineBackend {
     private let prefetchInteractiveReadinessIfNeededBlock: (GenerationRequest) async -> InteractivePrefetchDiagnostics?
     private let ensureCloneReferencePrimedBlock: (String, CloneReference) async throws -> Void
     private let cancelClonePreparationIfNeededBlock: () async -> Void
+    private let cancelProactiveModelWorkBlock: () async -> Void
     private let cancelActiveGenerationBlock: (GenerationCancellationReason) async throws -> Void
     private let generateBlock: (GenerationRequest) async throws -> GenerationResult
     private let replayStartupReliabilityCodecTraceBlock: (
@@ -129,6 +130,7 @@ public final class AnyTTSEngineBackend {
         }
         self.ensureCloneReferencePrimedBlock = { try await engine.ensureCloneReferencePrimed(modelID: $0, reference: $1) }
         self.cancelClonePreparationIfNeededBlock = { await engine.cancelClonePreparationIfNeeded() }
+        self.cancelProactiveModelWorkBlock = { await engine.cancelProactiveModelWork() }
         if let engine = engine as? any ActiveGenerationCancellable {
             self.cancelActiveGenerationBlock = { reason in
                 try await engine.cancelActiveGeneration(reason: reason)
@@ -260,6 +262,7 @@ public final class AnyTTSEngineBackend {
         try await ensureCloneReferencePrimedBlock(modelID, reference)
     }
     public func cancelClonePreparationIfNeeded() async { await cancelClonePreparationIfNeededBlock() }
+    public func cancelProactiveModelWork() async { await cancelProactiveModelWorkBlock() }
     public func cancelActiveGeneration(reason: GenerationCancellationReason = .user) async throws {
         try await cancelActiveGenerationBlock(reason)
     }

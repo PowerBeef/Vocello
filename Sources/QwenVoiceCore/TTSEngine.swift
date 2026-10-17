@@ -115,6 +115,12 @@ public protocol TTSEngine: ObservableObject {
     func prewarmModelIfNeeded(for request: GenerationRequest) async
     func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws
     func cancelClonePreparationIfNeeded() async
+    /// BG-01: stops the proactive model work in flight (a clone prime, the
+    /// saved-voice prompt prebuild) when the app stops being active. A running
+    /// take's state is untouched, unlike `cancelClonePreparationIfNeeded`
+    /// (B-10); in-flight work settles at its next cancellation point. No
+    /// default: each engine names its own proactive work.
+    func cancelProactiveModelWork() async
     func generate(_ request: GenerationRequest) async throws -> GenerationResult
     func listPreparedVoices() async throws -> [PreparedVoice]
     func preparePreparedVoiceCandidate(

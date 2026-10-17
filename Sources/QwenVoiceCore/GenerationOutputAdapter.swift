@@ -2126,6 +2126,11 @@ struct StreamingExecutionContext: Sendable {
             // take peak. The boundaries are captured only when marking
             // actually executes, so a knob-disabled run can never present
             // marking-shaped telemetry as marking evidence.
+            //
+            // BG-01 path d: a take cancelled after its last frame (a foreground
+            // exit at the end of a segment) stops here, before marking submits
+            // its GPU work; the staging file is discarded like any failure's.
+            try Task.checkCancellation()
             if let markingConfiguration, AudioMarkingPolicy.resolvedEnabled() {
                 await telemetrySampler?.captureBoundary("before_marking")
                 // Zero-peak ordering (the CP-2 gate's design): release the

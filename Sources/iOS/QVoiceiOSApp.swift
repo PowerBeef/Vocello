@@ -160,6 +160,12 @@ struct QVoiceiOSApp: App {
         if IOSStartupReliabilityRunner.runCleanupIfRequested() {
             return
         }
+        // BG-01: the store may first exist after the scene already left (a
+        // background relaunch, or leaving during startup); those phase changes
+        // found no engine to tell.
+        engine.applyLaunchForegroundState(
+            isInBackground: UIApplication.shared.applicationState == .background
+        )
         engine.start()
         Task {
             do {
@@ -197,6 +203,8 @@ struct QVoiceiOSApp: App {
             }
             if let engine = deps.engine {
                 Task {
+                    // BG-01: proactive model work may run again.
+                    await engine.setForegroundActive(true)
                     await engine.refreshMemoryContext(reason: "scene_active", source: "app")
                 }
             }
@@ -221,7 +229,12 @@ struct QVoiceiOSApp: App {
             IOSAudioSessionOwner.shared.enterBackground()
             handleForegroundExit()
         case .inactive:
-            break
+            // BG-01: Apple directs apps to stop submitting GPU work once they
+            // are deactivated, so proactive model work stops here; a running
+            // take is the foreground exit's to stop.
+            if let engine = deps.engine {
+                Task { await engine.setForegroundActive(false) }
+            }
         @unknown default:
             break
         }
@@ -247,6 +260,9 @@ struct QVoiceiOSApp: App {
             return
         }
         Task { @MainActor in
+            // BG-01: no proactive model work in the background, even when the
+            // scene skipped .inactive.
+            await engine.setForegroundActive(false)
             var studioCancelled = false
             if let interruption = plan.studioInterruption {
                 studioCancelled = await backgroundGeneration.interruptStudio(

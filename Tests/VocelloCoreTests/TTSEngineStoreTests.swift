@@ -75,6 +75,8 @@ class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellab
     private(set) var prewarmCount = 0
     private(set) var prefetchCount = 0
     private(set) var ensureLoadedCount = 0
+    private(set) var clonePrimeCount = 0
+    private(set) var proactiveWorkCancellationCount = 0
     private(set) var clearGenerationActivityCount = 0
     private var pendingGeneration: CheckedContinuation<GenerationResult, any Error>?
     private var pendingRequest: GenerationRequest?
@@ -162,8 +164,9 @@ class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellab
 
     func ensureModelLoadedIfNeeded(id: String) async { ensureLoadedCount += 1 }
     func prewarmModelIfNeeded(for request: GenerationRequest) async { prewarmCount += 1 }
-    func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws {}
+    func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws { clonePrimeCount += 1 }
     func cancelClonePreparationIfNeeded() async {}
+    func cancelProactiveModelWork() async { proactiveWorkCancellationCount += 1 }
 
     func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         generateRequests.append(request)
@@ -565,6 +568,66 @@ final class TTSEngineStoreTests: XCTestCase {
         XCTAssertEqual(engine.prefetchCount, 1)
         XCTAssertEqual(engine.ensureLoadedCount, 1)
         XCTAssertEqual(engine.proactiveWarmAllowances.last, true)
+    }
+
+    /// BG-01: iOS refuses GPU work once the app stops being active, so losing the
+    /// foreground refuses every proactive path and cancels the work in flight,
+    /// once; coming back restores the memory-band gate.
+    func testLosingTheForegroundRefusesProactiveWorkAndCancelsWhatIsInFlight() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+
+        await store.setForegroundActive(false)
+        XCTAssertFalse(store.isForegroundActive)
+        XCTAssertEqual(engine.proactiveWorkCancellationCount, 1)
+        XCTAssertEqual(engine.proactiveWarmAllowances.last, false)
+
+        await store.prewarmModelIfNeeded(for: request())
+        _ = await store.prefetchInteractiveReadinessIfNeeded(for: request())
+        await store.ensureModelLoadedIfNeeded(id: "pro_custom")
+        try await store.ensureCloneReferencePrimed(
+            modelID: "pro_clone",
+            reference: CloneReference(audioPath: "/nonexistent/bg01-reference.wav", transcript: "Hello.")
+        )
+        XCTAssertEqual(engine.prewarmCount, 0)
+        XCTAssertEqual(engine.prefetchCount, 0)
+        XCTAssertEqual(engine.ensureLoadedCount, 0)
+        XCTAssertEqual(engine.clonePrimeCount, 0)
+        XCTAssertEqual(engine.proactiveWarmAllowances.last, false, "A later sync keeps the engine gate closed")
+
+        await store.setForegroundActive(false)
+        XCTAssertEqual(engine.proactiveWorkCancellationCount, 1, "Staying inactive cancels nothing more")
+
+        await store.setForegroundActive(true)
+        XCTAssertEqual(engine.proactiveWarmAllowances.last, true)
+        await store.ensureModelLoadedIfNeeded(id: "pro_custom")
+        XCTAssertEqual(engine.ensureLoadedCount, 1)
+        XCTAssertEqual(engine.proactiveWorkCancellationCount, 1, "Coming back cancels nothing")
+    }
+
+    /// BG-01 review: an engine started in the background (a relaunch for the
+    /// download relay, or a user who left during startup) starts without the
+    /// permit, so proactive work waits for the scene to become active; a launch
+    /// through `.inactive` keeps it.
+    func testAnEngineStartedInTheBackgroundRefusesProactiveWorkUntilActive() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+
+        store.applyLaunchForegroundState(isInBackground: false)
+        XCTAssertTrue(store.isForegroundActive, "A launch through .inactive keeps the permit")
+
+        store.applyLaunchForegroundState(isInBackground: true)
+        XCTAssertFalse(store.isForegroundActive)
+        XCTAssertEqual(engine.proactiveWarmAllowances.last, false)
+        XCTAssertEqual(engine.proactiveWorkCancellationCount, 0, "Nothing runs before the start")
+        await store.ensureModelLoadedIfNeeded(id: "pro_custom")
+        XCTAssertEqual(engine.ensureLoadedCount, 0)
+
+        await store.setForegroundActive(true)
+        await store.ensureModelLoadedIfNeeded(id: "pro_custom")
+        XCTAssertEqual(engine.ensureLoadedCount, 1)
     }
 
     // MARK: - Critical-pressure relief

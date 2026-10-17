@@ -572,6 +572,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// build; nil when startup could not reconcile. Counts only.
     private(set) var savedVoiceStoreStartupSummary: PreparedVoiceReconciliationSummary?
     private var allowsProactiveWarmOperations = true
+    /// The commit-time saved-voice prompt prebuild in flight (BG-01).
+    private let clonePromptPrebuilds = ProactiveTaskChain()
     private var idleUnloadTask: Task<Void, Never>?
     private var idleUnloadToken: UUID?
     private var activeModelOperation: ActiveModelOperation?
@@ -1098,6 +1100,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     public func ensureModelLoadedIfNeeded(id: String) async {
+        // B-33 / BG-01: a proactive load honours the same gate as every other
+        // proactive operation (closed in the background and at a bad band).
+        guard allowsProactiveWarmOperations else { return }
         guard let operationID = beginProactiveModelOperation(.proactiveLoad) else { return }
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
@@ -1276,6 +1281,17 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         if case .running(let modelID, _, _) = loadState {
             loadState = modelID.map { .loaded(modelID: $0) } ?? .idle
         }
+    }
+
+    /// BG-01: iOS refuses GPU work from the background, and Apple directs apps
+    /// to stop submitting it when they deactivate. Stops the commit-time prompt
+    /// prebuilds and a proactive clone prime; each settles its own published
+    /// state at its next cancellation point, so nothing here rewrites a running
+    /// take's state. A proactive model load already running finishes (CONC-1,
+    /// ER-02).
+    public func cancelProactiveModelWork() async {
+        clonePromptPrebuilds.cancelAll()
+        await runtime.cancelClonePreparation()
     }
 
     public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
@@ -2328,8 +2344,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             return
         }
         let cloneReference = Self.savedVoicePrebuildReference(for: voice)
-        Task { @MainActor [weak self] in
-            guard let self,
+        // BG-01: chained, so leaving the foreground cancels every prebuild and a
+        // newer save waits for a running one instead of losing both.
+        clonePromptPrebuilds.append { [weak self] in
+            guard let self, self.allowsProactiveWarmOperations,
                   let operationID = self.beginProactiveModelOperation(.clonePriming) else {
                 return
             }
@@ -2690,5 +2708,39 @@ final class DiagnosticAppSupportBox: @unchecked Sendable {
             storage = newValue
             lock.unlock()
         }
+    }
+}
+
+/// BG-01: proactive operations that run one after another. A newer operation
+/// waits for the running one instead of cancelling it: a cancelled prompt
+/// prebuild still holds the engine's proactive lease until its next
+/// cancellation point, so the newer one would be refused and both prompts lost.
+/// Cancelling the chain cancels every operation in it.
+@MainActor
+final class ProactiveTaskChain {
+    private var tail: Task<Void, Never>?
+
+    func append(_ operation: @escaping @MainActor () async -> Void) {
+        let previous = tail
+        tail = Task { @MainActor in
+            await withTaskCancellationHandler {
+                await previous?.value
+            } onCancel: {
+                previous?.cancel()
+            }
+            guard !Task.isCancelled else { return }
+            await operation()
+        }
+    }
+
+    /// The cancelled tail stays: an operation appended later waits for the
+    /// cancelled ones to wind down, then runs.
+    func cancelAll() {
+        tail?.cancel()
+    }
+
+    /// Waits for the operations appended so far to settle.
+    func settle() async {
+        await tail?.value
     }
 }

@@ -1557,21 +1557,27 @@ actor NativeEngineRuntime {
         }
 
         do {
+            // BG-01: the prebuild's Task is cancelled when the app stops being
+            // active; each step below is GPU work iOS would refuse.
+            try Task.checkCancellation()
             let capabilities = try await loadCoordinator.qwen3Capabilities(for: modelID)
             try Self.validateCloneConditioningCapability(
                 reference: reference,
                 capabilities: capabilities
             )
+            try Task.checkCancellation()
             let loadResult = try await loadModel(
                 id: modelID,
                 capabilityProfile: .cloneOnly,
                 preserveActiveClonePrimeToken: true
             )
+            try Task.checkCancellation()
             let conditioning = try await resolveCloneConditioning(
                 modelID: modelID,
                 reference: reference,
                 sampleRate: loadResult.model.sampleRate
             )
+            try Task.checkCancellation()
             // Keyed without a language, like every prompt, so the first take of
             // the new voice in any language adopts it (U17).
             _ = try await preparedCloneConditioningCache.resolveVoiceClonePrompt(

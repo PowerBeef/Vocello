@@ -319,6 +319,57 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         notifyMemoryContextDidChange()
     }
 
+    /// BG-01: whether the scene is active. iOS refuses GPU work from the
+    /// background, and Apple directs apps to stop submitting it once they
+    /// deactivate, so proactive model work (loads, warms, clone priming, the
+    /// prompt prebuild) starts only while the scene is active. A proactive load
+    /// already running finishes (CONC-1, ER-02); generation is the foreground
+    /// exit's to stop. The Mac app never leaves this state.
+    private(set) var isForegroundActive = true
+
+    /// BG-01: the scene became active or stopped being active. Losing it
+    /// refuses new proactive work and cancels the clone prime and the prompt
+    /// prebuild in flight.
+    func setForegroundActive(_ active: Bool) async {
+        guard updateForegroundPermit(active), !active else { return }
+        diagnosticsRecorder?.recordAction(
+            event: "proactive_work_cancelled",
+            reason: "not_foreground",
+            context: latestMemoryContext
+        )
+        await cancelProactiveModelWork()
+    }
+
+    /// BG-01: the permit at engine start. The store starts permitted, so an
+    /// engine started in the background (a relaunch for the download relay, or
+    /// a user who left during startup) has missed the phase changes that would
+    /// have turned it off. A launch passing through `.inactive` keeps it: the
+    /// next change, to active or to the background, settles it. Nothing
+    /// proactive runs before the start, so nothing is cancelled.
+    func applyLaunchForegroundState(isInBackground: Bool) {
+        if isInBackground {
+            updateForegroundPermit(false)
+        }
+    }
+
+    @discardableResult
+    private func updateForegroundPermit(_ active: Bool) -> Bool {
+        guard isForegroundActive != active else { return false }
+        isForegroundActive = active
+        backend.setAllowsProactiveWarmOperations(
+            active && memoryBudgetPolicy.allowsProactiveWarmOperations(for: latestMemoryContext.pressureBand)
+        )
+        return true
+    }
+
+    /// BG-01: stops the clone prime and the prompt prebuild without touching a
+    /// running take's state (the engine's own implementation; B-10).
+    func cancelProactiveModelWork() async {
+        await backend.cancelProactiveModelWork()
+        syncFromBackend()
+        notifyMemoryContextDidChange()
+    }
+
     func cancelActiveGeneration(reason: GenerationCancellationReason = .user) async throws {
         try await backend.cancelActiveGeneration(reason: reason)
         // Run-scoped device diagnostics only (inert otherwise): the typed
@@ -722,7 +773,8 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
             hasActiveGeneration = nextHasActiveGeneration
         }
         backend.setAllowsProactiveWarmOperations(
-            memoryBudgetPolicy.allowsProactiveWarmOperations(for: latestMemoryContext.pressureBand)
+            isForegroundActive
+                && memoryBudgetPolicy.allowsProactiveWarmOperations(for: latestMemoryContext.pressureBand)
         )
         // Before the chunk forwarding below, which returns early for a
         // streaming backend (every MLXTTSEngine) and when no new chunk arrived:
@@ -789,7 +841,16 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
     }
 
     private func allowsProactiveWarmOperations(reason: String) async -> Bool {
-        // Proactive warm + clone-reference priming are gated ONLY by the live memory band
+        // BG-01: no proactive GPU work unless the scene is active.
+        guard isForegroundActive else {
+            diagnosticsRecorder?.recordAction(
+                event: "proactive_warm_blocked",
+                reason: "\(reason)_not_foreground",
+                context: latestMemoryContext
+            )
+            return false
+        }
+        // Proactive warm + clone-reference priming are otherwise gated by the live memory band
         // (the real safety — see `memoryBudgetPolicy.allowsProactiveWarmOperations`). The
         // former blanket "disabled on Release hardware" default was a pre-entitlement
         // caution that silently blocked clone priming (and prewarm); with the
@@ -837,7 +898,7 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         let previousBand = latestMemoryContext.pressureBand
         latestMemoryContext = context
         backend.setAllowsProactiveWarmOperations(
-            memoryBudgetPolicy.allowsProactiveWarmOperations(for: band)
+            isForegroundActive && memoryBudgetPolicy.allowsProactiveWarmOperations(for: band)
         )
         recordActiveGenerationPeakIfNeeded(context)
         diagnosticsRecorder?.recordMemoryContext(context, event: "memory_context")

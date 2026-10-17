@@ -30,7 +30,13 @@ excludes files added after that event. It must not be substituted for the live c
 
 - Imported release: `v0.1.2`
 - Imported commit: `fcbd04daa1bfebe881932f630af2ba6ce9af3274`
-- Last reviewed upstream head: `d302a5c6080d2bb97bae38c7418f82abb76013b6` on 2026-07-14
+- Last reviewed upstream head: `dbe5eaac964e8257785f9d015c81f819a38016a8` (v0.1.5) on 2026-10-17,
+  in the ER-13 model research ([section 6](../../docs/audits/2026-10-17-qwen3-tts-model-research.md#6-ports-and-changes-since-the-fork)).
+  Nothing was ported: the MLX pins match since CONV-21, and the open differences are tracked as
+  A-02 (Mimi RoPE), D1 (text layout), D2 (EOS re-insertion) and the load leak of upstream PR #286.
+  The previous review point was `d302a5c6` (v0.1.3) on 2026-07-14.
+- Also reviewed in that pass: [`Blaizzy/mlx-audio`](https://github.com/Blaizzy/mlx-audio) (Python) and
+  the reference implementation `qwen_tts` in the official model family below.
 - Official Qwen model family: [`QwenLM/Qwen3-TTS`](https://github.com/QwenLM/Qwen3-TTS)
 
 The import was specialized to Qwen3-TTS. Vocello retains `MLXAudioCore`, the Mimi subset of

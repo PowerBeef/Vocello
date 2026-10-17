@@ -8,6 +8,14 @@ sourceOfTruth:
 ---
 # iOS Engine Optimization — Progress & Roadmap
 
+> **Historical figures (2026-10-17).** The memory numbers below predate iOS 27. On the iPhone 17 Pro
+> (12 GB) under iOS 27.0.1 the per-app limit measured in the October 14 and 16 smoke diagnostics is
+> 8,192 MB, not ~6 GB, while the shipping memory bands still assume the older figure (engine audit
+> D-06, programme item ER-07). Current measured budgets are in section D of the
+> [engine audit](../audits/2026-10-16-engine-runtime-audit.md). An "RTF" above 1 in this record is a
+> decode-loop speedup (audio seconds per wall second), not the standard real-time factor (wall ÷ audio,
+> lower is faster).
+
 The standing record of how Vocello's **iPhone** TTS engine was made to run on-device, what has
 been measured/optimized/shipped, and the prioritized future work. The iOS engine is a distinct
 optimization problem from the macOS engine (different process model, a hard per-app Jetsam ceiling,

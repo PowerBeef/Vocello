@@ -16,8 +16,8 @@
     "sha256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
   },
   "lastReviewedUpstream": {
-    "commit": "d302a5c6080d2bb97bae38c7418f82abb76013b6",
-    "date": "2026-07-14"
+    "commit": "dbe5eaac964e8257785f9d015c81f819a38016a8",
+    "date": "2026-10-17"
   },
   "monorepoRelocation": {
     "from": "third_party_patches/mlx-audio-swift",

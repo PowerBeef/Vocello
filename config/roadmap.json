@@ -1660,9 +1660,9 @@
         "Sources/SharedSupport/Services/GenerationOutputFileName.swift",
         "Sources/PrivacyInfo.xcprivacy"
       ],
-      "updated": "2026-10-16",
+      "updated": "2026-10-17",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Raised by the 2026-10-13 core engine review (read-only); details and file evidence are in the report. 2026-10-16 (maintainer's go for the iPhone-free backlog): SEC-1 for new takes (named <stamp>_Vocello, Mac Save As and recovery export rename older takes; e45b71f7), SEC-5 (History secure_delete; dab281f6) and SEC-8's README and orphaned entitlements (4521d593) landed with tests. Left: the iPhone share sheet still hands an earlier build's take out under its script-bearing name (a neutral temporary copy inside IOSExportGate needs an iPhone run); SEC-3 with ER-12; SEC-7 (env-only telemetry and systemFreeSize need an iPhone run; package stderr does not); get-task-allow (iPhone run). Review notes for later: a local-clock rewind can repeat a take's millisecond stamp; exportName ignores pre-PA-26 non-Latin-digit stamps. EN-5 goes to ER-12."
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); details and file evidence are in the report. 2026-10-16 (maintainer's go for the iPhone-free backlog): SEC-1 for new takes (named <stamp>_Vocello, Mac Save As and recovery export rename older takes; e45b71f7), SEC-5 (History secure_delete; dab281f6) and SEC-8's README and orphaned entitlements (4521d593) landed with tests. Left: the iPhone share sheet still hands an earlier build's take out under its script-bearing name (a neutral temporary copy inside IOSExportGate needs an iPhone run); SEC-3 with ER-12; SEC-7's env-only telemetry and systemFreeSize (an iPhone run; its package stderr is done, domain and code only); get-task-allow (iPhone run). Review notes for later: a local-clock rewind can repeat a take's millisecond stamp; exportName ignores pre-PA-26 non-Latin-digit stamps. EN-5 goes to ER-12."
     },
     {
       "id": "BKL-12",

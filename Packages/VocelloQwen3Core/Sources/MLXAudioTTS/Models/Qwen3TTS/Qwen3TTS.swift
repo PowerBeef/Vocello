@@ -36,6 +36,14 @@ private func qwen3TTSLog(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
+/// SEC-7 (BKL-09): an error's domain and code only. A file-system error's
+/// description names the model folder, a private path, and the package sits
+/// below `DiagnosticPrivacy`, so its standard-error lines never carry it.
+private func qwen3TTSLogDescription(_ error: any Error) -> String {
+    let error = error as NSError
+    return "\(error.domain) \(error.code)"
+}
+
 /// F-03 (engine audit 2026-10-16): evaluates `array` and throws the error MLX
 /// raised while evaluating it. Under an outer MLX error scope a failed
 /// evaluation returns normally and leaves the buffer unfilled, and `asArray`
@@ -6032,7 +6040,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 }
             }
         } catch {
-            qwen3TTSLog("Warning: Could not load tokenizer: \(error)")
+            qwen3TTSLog("Warning: Could not load tokenizer: \(qwen3TTSLogDescription(error))")
         }
 
         return LoadedTokenizerComponent(
@@ -6308,7 +6316,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             )
             qwen3TTSLog("Generated tokenizer.json from vocab.json + merges.txt")
         } catch {
-            qwen3TTSLog("Warning: Failed to generate tokenizer.json: \(error)")
+            qwen3TTSLog("Warning: Failed to generate tokenizer.json: \(qwen3TTSLogDescription(error))")
         }
     }
 

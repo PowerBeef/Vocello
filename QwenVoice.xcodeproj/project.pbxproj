@@ -642,7 +642,6 @@
 		C9FBC35551E6CDEC763E65EC /* VoiceModelsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1011AA81653BEFF317EAF4B5 /* VoiceModelsScreen.swift */; };
 		CAA823F9D6BDBCA4A050304A /* MacSavedVoiceDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803DDA2894963BDCD16DA65D /* MacSavedVoiceDeletion.swift */; };
 		CAC104EFF8BBD01F0674A3FD /* IOSAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473C7A803F9F31801C56EDE1 /* IOSAccessibility.swift */; };
-		CAE5016FA22E3B09634BB66F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 955EAA47F1E723B2D9DED7AD /* README.md */; };
 		CB4530B2CA5247991733622B /* MacSavedVoiceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F7EAEAFB23D20105D362790 /* MacSavedVoiceSheet.swift */; };
 		CC23D52B5D042DDF39ED5D44 /* EmotionPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288BDF7769F75089A6F065B4 /* EmotionPreset.swift */; };
 		CC5CC1BBEA13315DBC9AF473 /* VoiceCloningConsentPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8E087D550BE343605BC5F7 /* VoiceCloningConsentPolicyTests.swift */; };
@@ -749,7 +748,6 @@
 		EDA50C5B7EBB79527D8D1CA7 /* IOSModelDownloadLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B290DD34425D07A47B0BACDD /* IOSModelDownloadLedger.swift */; };
 		EDED2896EF8C1D3663A2403C /* IOSExportGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540B4DEFE1EEEBD5390326EB /* IOSExportGate.swift */; };
 		EDF41C8B957AB78E77BC3E50 /* GenerationHistoryEnqueueWarning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 380012487B245AF09C5E6B92 /* GenerationHistoryEnqueueWarning.swift */; };
-		EE07BEF2786B5C66AD3F61DA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 955EAA47F1E723B2D9DED7AD /* README.md */; };
 		EE74F86575A75A733CEB560D /* VocelloiOSUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDB19FC47AD8EFFA3B2539D /* VocelloiOSUITestCase.swift */; };
 		EE85D1358512C183E7DA9F63 /* qwenvoice_production_model_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = B5AA98B0445794A0B2E8CDE9 /* qwenvoice_production_model_catalog.json */; };
 		EE9C991DADF85B8748E2B82B /* AudioPreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CA6871405D0795C9867A2F7 /* AudioPreparation.swift */; };
@@ -1252,7 +1250,6 @@
 		94EA9E34083906B2A7FF4DE4 /* AppPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPerformanceSignposts.swift; sourceTree = "<group>"; };
 		954096CC19F2467A5543DC03 /* GenerationStreamingTelemetryV9Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationStreamingTelemetryV9Bridge.swift; sourceTree = "<group>"; };
 		95531DAD82F81EB939497A92 /* MacMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMotion.swift; sourceTree = "<group>"; };
-		955EAA47F1E723B2D9DED7AD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		958B08B9790BD411BEE24FA0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		95E236009140CEC9CCD798E0 /* CodecLoopMutationEvidenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodecLoopMutationEvidenceTests.swift; sourceTree = "<group>"; };
 		96F5016EE4D0700F679AAE5D /* VocelloiOSLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloiOSLogicTests.swift; sourceTree = "<group>"; };
@@ -1330,7 +1327,6 @@
 		BAA4224D950A99B2DFA7659B /* IOSModelDownloadProgressMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSModelDownloadProgressMappingTests.swift; sourceTree = "<group>"; };
 		BAC61B277C885BA647101CAF /* MacAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppModel.swift; sourceTree = "<group>"; };
 		BAE74A91CEE65CD8BF7BA3EC /* MacVoiceCloningScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVoiceCloningScreen.swift; sourceTree = "<group>"; };
-		BB32F260AC5AC53C0C94D153 /* VocelloiOSLocalDevice.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VocelloiOSLocalDevice.entitlements; sourceTree = "<group>"; };
 		BB46CEB7DE369F4E1B24668E /* GenerationTelemetryMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationTelemetryMerger.swift; sourceTree = "<group>"; };
 		BBCE5DF7AD407A17AF522154 /* VocelloiOSBenchmarkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloiOSBenchmarkUITests.swift; sourceTree = "<group>"; };
 		BC2B47BB4F36569E72D128B1 /* ono_anna.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ono_anna.wav; sourceTree = "<group>"; };
@@ -2015,7 +2011,6 @@
 				EDAF51C92D6D16B455C573AC /* dylan.wav */,
 				3B9B756B0B79BA2E94926CD3 /* eric.wav */,
 				BC2B47BB4F36569E72D128B1 /* ono_anna.wav */,
-				955EAA47F1E723B2D9DED7AD /* README.md */,
 				7DE42BFBCAD789F940DC13D4 /* ryan.wav */,
 				C52FA18321C5A22081DC54BB /* serena.wav */,
 				B03BDEE35746990C5202A7A9 /* sohee.wav */,
@@ -2141,7 +2136,6 @@
 				8DEBDBA37B6B01D5C89EF110 /* QVoiceiOSRootView.swift */,
 				73E7AE4ADBE28C15D463E8CC /* TTSEngineStore.swift */,
 				D8C3DAC6B72B4D38C5870A78 /* VocelloiOS.entitlements */,
-				BB32F260AC5AC53C0C94D153 /* VocelloiOSLocalDevice.entitlements */,
 				A7E2584F639E4BB6307A19F6 /* VocelloiOSRelease.entitlements */,
 				E9B1AA0CCD8C83E6BE9AC1AC /* App */,
 				6F8C5DC05391864D68291F5A /* Commerce */,
@@ -2807,7 +2801,6 @@
 				82B95BB3F61F41F3BB882283 /* LaunchScreen.storyboard in Resources */,
 				588F848BBD25F811E6F294DF /* Localizable.xcstrings in Resources */,
 				18487B74AD18E807694F77BE /* PrivacyInfo.xcprivacy in Resources */,
-				EE07BEF2786B5C66AD3F61DA /* README.md in Resources */,
 				C13D76C100EC7CEFA73DDD96 /* aiden.wav in Resources */,
 				3E444C927389EB2A594792C0 /* dylan.wav in Resources */,
 				5377189B01790E90BDEEE4AE /* eric.wav in Resources */,
@@ -2841,7 +2834,6 @@
 				9209D72BC3D97F44F463EB92 /* InfoPlist.xcstrings in Resources */,
 				D45E70C2A9C0B4764989CD4E /* Localizable.xcstrings in Resources */,
 				25FD6846BBC91DACB7E80100 /* PrivacyInfo.xcprivacy in Resources */,
-				CAE5016FA22E3B09634BB66F /* README.md in Resources */,
 				451768049CF773CE92C4DE8E /* aiden.wav in Resources */,
 				7D03D989EE55E8E630CCB17E /* dylan.wav in Resources */,
 				7EF1FAF304C4761E6BC38F2B /* eric.wav in Resources */,

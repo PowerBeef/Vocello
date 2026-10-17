@@ -184,7 +184,6 @@ Current identity and entitlement source of truth:
 - `config/apple-platform-capability-matrix.json` declares the iOS app bundle ID, App Group, and the required increased-memory entitlement (no extension block — the engine is in-process).
 - `project.yml` signs `VocelloiOS` as `com.patricedery.vocello`.
 - `project.yml` signs every build with `Sources/iOS/VocelloiOS.entitlements` (`QVOICE_IOS_APP_ENTITLEMENTS`), overridable to `Sources/iOS/VocelloiOSRelease.entitlements` for App Store archive/export; both declare the increased-memory key (the former also carries `get-task-allow` for the `ios_device.sh debug` lane, the latter omits it). There is no Debug configuration.
-- `Sources/iOS/VocelloiOSLocalDevice.entitlements` (App Group only) is not referenced by any build route.
 
 Process measurement and guardrails:
 

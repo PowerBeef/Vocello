@@ -165,6 +165,8 @@ targets:
           - "Resources/**/*.whl"
           - "Resources/**/__pycache__/**"
           - "Resources/**/*.pyc"
+          # SEC-8 (BKL-09): the previews' developer notes stay in the repository.
+          - "Resources/voice-previews/README.md"
           - "InfoPlist.xcstrings"
       # PA-20 (MAC-11): the microphone and Speech purpose strings in every
       # interface language, bundled explicitly like the iOS permission catalog.
@@ -207,6 +209,7 @@ targets:
           - "**/*.whl"
           - "**/__pycache__/**"
           - "**/*.pyc"
+          - "voice-previews/README.md"
       - path: Sources/Assets.xcassets
         buildPhase: resources
       - path: Sources/PrivacyInfo.xcprivacy
@@ -352,6 +355,9 @@ targets:
         buildPhase: resources
       - path: Sources/Resources/voice-previews
         buildPhase: resources
+        # SEC-8 (BKL-09): the folder's developer notes stay out of the app.
+        excludes:
+          - "README.md"
         # Per-voice preview WAVs (24 kHz mono Int16). Each file
         # is named after the speaker id from qwenvoice_contract.json. The voice
         # picker sheet plays them via IOSVoicePreviewPlayer when the

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="236" height="56" viewBox="0 0 236 56" role="img" aria-labelledby="t">
+  <title id="t">Join the Vocello iPhone beta on TestFlight</title>
+  <rect x="0.5" y="0.5" width="235" height="55" rx="27.5" fill="#1C1E26" stroke="#EDCC8A" stroke-opacity="0.45"/>
+  <g fill="none" stroke="#EDCC8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="29" y="16" width="14" height="24" rx="3.5"/>
+    <path d="M34 36h4"/>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" fill="#F5F6F8">
+    <text x="60" y="25" font-size="16" font-weight="600">Join the iPhone beta</text>
+    <text x="60" y="42" font-size="12" font-weight="500" fill-opacity="0.65">TestFlight · iOS 26+</text>
+  </g>
+</svg>

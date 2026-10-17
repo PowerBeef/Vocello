@@ -85,6 +85,32 @@ In practice Vocello keeps the hot path on the GPU stream; CPU streams are used f
 
 On Apple Silicon, `MLXArray` buffers live in memory that both CPU and GPU can access. There is no explicit `.to(device:)` call. The benefit is zero-copy data movement; the risk is that GPU allocations, CPU allocations, and OS memory pressure all compete for the same physical RAM. This is why Vocello's iOS memory policy is built around `os_proc_available_memory()` and `physFootprint`, not a traditional "GPU memory" reading.
 
+### 2.6 Errors and error scopes
+
+MLX reports a C++ error through one callback that carries only a message. mlx-swift keeps a
+task-local stack of handlers (`withErrorHandler`) and calls only the innermost; with none installed it
+calls `fatalError`. `withError { … }` installs its own handler and throws `MLXError.caught` when the
+block returns. After an error MLX returns without evaluating: the array stays unevaluated, an `item`
+read returns a default value (mlx-c catches the exception), and an `asArray` read would copy from a
+nil buffer and trap.
+
+Vocello's rules (`VocelloQwen3MLXErrorScope` in
+`Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Runtime.swift`):
+
+- Every facade entry point that runs MLX work (load, prewarm, priming, clone conditioning, clone
+  artifact adoption and persistence, codec replay, marking, generation) runs inside a scope that
+  keeps the first error and throws a typed `VocelloQwen3RuntimeFailure`: `.allocation` reaches the
+  product as memory pressure, `.mlx` as a runtime failure. The raw message never crosses the facade.
+- Every production `asArray` readback is preceded by `evalForReadback`, a nested `withError`, so a
+  failed evaluation throws before the copy (F-03).
+- A recorded evaluation or allocation failure marks the loaded model for unload, because it may hold
+  half-evaluated state; a file error from mlx-swift's own I/O (`MLX.save`, `loadArrays`) does not.
+- Since mlx-swift 0.32.3 (ml-explore/mlx#3523), a Metal command-buffer failure — a GPU submission
+  refused in the background, an out-of-memory buffer — is recorded by the completion handler,
+  poisons the buffer's events and is raised at the next wait, on the waiting task, inside its
+  scope. On 0.31.x the completion handler threw on a Metal thread and aborted the process (BG-1).
+- Not captured: MLX work on a detached task or on MLX's CPU scheduler thread.
+
 ---
 
 ## 3. Quantization and model loading
@@ -128,7 +154,7 @@ let bits: Int
 let mode: QuantizationMode
 ```
 
-### 3.3 The 0.31.x API change (why Vocello stays pinned)
+### 3.3 Earlier pin moves: the 0.31.x API change
 
 `mlx-swift` 0.31.x introduced breaking changes to the quantization surface:
 
@@ -136,7 +162,7 @@ let mode: QuantizationMode
 - `quantize(model:groupSize:bits:)` moved to a top-level function with a `mode:` argument.
 - The `biases` result from `quantized()` became optional.
 
-Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned bump to **0.31.6 / 3.31.4** followed the required process — lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, fixed-seed `vocello bench` A/B against a same-day 0.30.6 control, clean audioQC — and measured warm RTF inside the noise band with byte-equal clone durations (`benchmarks/OPTIMIZATION.md` §Q). Any future upgrade repeats that evidence process directly on `main`; the quantization call sites compiled unchanged across the 0.31 API revision.
+Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned bump to **0.31.6 / 3.31.4** followed the required process — lockstep across `project.yml` and `Packages/VocelloQwen3Core/Package.swift`, fixed-seed `vocello bench` A/B against a same-day 0.30.6 control, clean audioQC — and measured warm RTF inside the noise band with byte-equal clone durations (`benchmarks/OPTIMIZATION.md` §Q). Any future upgrade repeats that evidence process directly on `main`; the quantization call sites compiled unchanged across the 0.31 API revision. The 2026-10-16 move to **0.32.3 / 3.32.3** (CONV-21, for #3523's catchable command-buffer errors) repeated it with a same-host A/B, because the toolchain had moved since the committed baseline was pooled (§9.6).
 
 ### 3.4 Loading weights
 
@@ -195,7 +221,9 @@ The decoder uses input-side overlap-and-discard (`inputContext`) to avoid chunk-
 Sampling algorithm v2 resolves one immutable `VocelloQwen3SamplingConfiguration` per request.
 Every request has a recorded effective seed and owns a fresh `MLXRandom.RandomState`; all talker and
 Code Predictor categorical draws run under that state and do not advance MLX's process-global RNG.
-Talker and subtalker stages have independent temperature, top-k, top-p, and min-p values. The
+Talker and subtalker stages carry their own temperature, top-k, top-p, and min-p values, but
+production fills the subtalker from the talker's (see `qwen3-tts-guide.md` §9; RF-18's follow-up
+screen tests the reference's independent subtalker). The
 subtalker never inherits repetition penalty. Both stages sample from float32 logits whatever the
 model's precision, as Qwen's reference does (RF-14 D3, the default since 2026-10-13;
 `QWENVOICE_SAMPLER_FLOAT32=off` restores model-precision sampling for comparison). The order matters:
@@ -528,6 +556,28 @@ still apply, including MLX lockstep and measured audio/performance evidence.
 - `quantize(model:groupSize:bits:)` becomes a top-level function with `mode:`.
 - `quantized()` may return optional `biases`.
 - These touch the 4-bit/8-bit model-load path, so a clean build is not enough — you must re-run the full bench matrix.
+
+### 9.6 Known 0.32.x notes (2026-10-16)
+
+- **Never 0.32.2:** it crashes at launch below iOS 26.4.
+- **Seeds draw differently.** MLX's categorical uses an inverse CDF for `[1, V]` logits
+  (ml-explore/mlx#4177), which is every Vocello draw, so a seed from 0.31.x does not reproduce its
+  take (F-02, accepted with a release-note line). `testSeededSamplerGoldenTokens` pins the 0.32.3
+  draws; re-record it only with a reviewed pin move.
+- **Kernels compile at first use.** The first cold run after the move compiled for about 8 s on the
+  M6 (prewarm 6.5 s instead of 0.2 s, and about 1.6 s more before the first take's first chunk);
+  later processes reuse the system's Metal cache. Prewarm now also runs the production sampler
+  (F-04/F-05); whether the first take is entirely clean is checked on the iPhone.
+- **Warm first chunk** rose from 146 to 155 ms on the M6, because the new sampler path launches more
+  kernels per frame (F-04). RTF, memory and audio QC were unchanged (`benchmarks/HISTORY.md`, the
+  2026-10-17 gate records).
+- **Not yet ported:** mlx-audio-swift v0.1.5 replaced MLX's scalar-gather form, which passes empty
+  index metadata to Metal when API validation is on, in RVQ decode and MRoPE; Vocello still uses it
+  (`Qwen3TTSSpeechTokenizer.swift`, `Qwen3TTSTalker.swift`). Release builds do not enable API
+  validation.
+- **Load leak:** every quantized load leaks its initialization graph (ml-explore/mlx#4710,
+  mlx-audio-swift #286, both open; about 110 MB after 43 reloads), which matters to the iPhone's
+  idle unload (ER-06/ER-07).
 
 ---
 

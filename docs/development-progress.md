@@ -17,7 +17,39 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 16, night — RF-19 closes; BG-01, the MLX refresh and the model research land on the Mac (resume here)
+### October 17, early morning — the freeze waits for an iPhone window; backlog work without the iPhone (resume here)
+
+On local `main`, not pushed (pushes wait for the maintainer's request).
+
+- **Maintainer decisions (2026-10-16, in `focusLock`):** the iPhone proofs of BG-01, CONV-21 and RF-18
+  stay before the freeze, so the October 23 freeze needs an iPhone window the maintainer announces;
+  the backlog items that need no iPhone may be fixed now, each closed in the change that fixes it.
+- **Closed:** BKL-17 (the QC v2 lanes run under the selected Python and fail before generating
+  without numpy; RF-15's language bench needed it), BKL-13 (Mac Saved Voices Delete waits for a
+  take, a Studio Clone take still priming, a line batch or a long-form project, and releases the
+  retained project that reads a deleted voice) and BKL-15 (Saved Voices' empty and error states stay
+  inside the window; new `ui_test.sh macos smoke --scenario saved-voices-states`).
+- **In part:** BKL-09 (new takes are named `<stamp>_Vocello.wav`, History uses SQLite secure delete,
+  the app ships no developer README; the iPhone share of older takes, SEC-3, SEC-7 and
+  `get-task-allow` remain) and BKL-12 (the DMG's intermediate image is sized from its payload; it
+  closes after the rehearsal passes on three consecutive pushes). New parked line: BKL-18.
+- **ER-13:** the v0.1.5 upstream review point, a banner on the historical iPhone memory figures and
+  the artifact provenance in `model-delivery.md`. Pass 2 follows the RF-18 follow-up screen.
+- **RF-18 follow-up screen** (pre-registered in the engine audit, A2): seven arms of 56 long-form
+  projects through the CLI, untracked under `build/private/qc/rf18-followup/`; its rules decide C-02,
+  the subtalker defaults (ER-05) and D2.
+- **Next iPhone window, in order:**
+  1. `scripts/ios_device.sh preflight`
+  2. `scripts/ui_test.sh ios smoke`: CONV-21's iPhone smoke on the new MLX, and the long-form
+     journey pinned to Expressive (RF-18's iPhone scenario); it also exercises the new take names.
+  3. `scripts/ui_test.sh ios smoke --scenario background-warmup` (BG-01).
+  4. `scripts/ios_device.sh memory --voice-id <benchmark clone voice>` (CONV-21's memory benchmark).
+  5. `scripts/dev.sh triage <smoke run dir> --json` for the first take after the update (the
+     one-time Metal compile, F-05).
+- **Freeze day:** a Security run on the exact freeze commit (the weekly run is on Tuesdays, so a
+  dispatch on request), ASR-08's manual build-24 check, the push, and `focusLock.freeze`.
+
+### October 16, night — RF-19 closes; BG-01, the MLX refresh and the model research land on the Mac
 
 All on local `main`, not pushed (pushes wait for the maintainer's request). The iPhone stayed
 unavailable and no Mac XCUITest ran.

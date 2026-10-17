@@ -103,7 +103,11 @@ let package = Package(
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
-                .product(name: "Transformers", package: "swift-transformers"),
+                // F-11 (engine audit 2026-10-16): only the modules the runtime imports. The
+                // `Transformers` umbrella also linked swift-transformers' Core ML generation
+                // and model code into an MLX-only app.
+                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             path: "Sources/MLXAudioTTS"
         ),

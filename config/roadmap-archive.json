@@ -5046,6 +5046,26 @@
         "file:Sources/Services/MacSavedVoiceDeletion.swift",
         "file:Tests/VocelloCoreTests/IOSLongFormProjectRunnerTests.swift"
       ]
+    },
+    {
+      "id": "BKL-15",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Mac Saved Voices empty and error states may lay the window out off screen",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "On macOS, the Saved Voices empty and error states render inside the window at its minimum size, as History's do since F-16's fix (a minimum width on the state container), and a UI lane covers them.",
+      "sourceOfTruth": [
+        "Sources/Views/Voices/MacVoicesScreen.swift",
+        "Sources/Views/History/MacHistoryScreen.swift"
+      ],
+      "updated": "2026-10-17",
+      "notes": "Found 2026-10-14 by the review of F-16's Mac recovery journey: History with its recovery notice on an empty History laid the whole window out about 3,900 pt tall and off screen, because the window's minimum-size pass wraps fixed-height text a word per line; History now bounds the width. The Saved Voices state container has the same structure and no lane opens it empty. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission. Done 2026-10-17 (maintainer's go for the iPhone-free backlog): the Saved Voices state container keeps History's minimum width (shared as libraryMessageMinWidth), and test14 (ui_test.sh macos smoke --scenario saved-voices-states) opens the empty and a genuine error state on isolated profiles: both stay inside the window at its minimum size, Retry reachable. When a state card is the whole screen SwiftUI exposes it as screen_voices, so the test reads the status strip and Retry instead of the card identifiers (History's cards are masked the same way). The layout scenario passes on the same tree.",
+      "evidence": [
+        "commit:0267b02e",
+        "commit:1ed8505e",
+        "run:macos-xcui-smoke-20261017-035201-7351edbb",
+        "run:macos-xcui-smoke-20261017-035412-8f96c736"
+      ]
     }
   ]
 }

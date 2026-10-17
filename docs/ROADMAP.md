@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 4 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 12/21 (57%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/21 (62%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -537,7 +537,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-08` | parked | iOS energy hygiene | — |
 | `BKL-09` | parked | Privacy and security hygiene | — |
 | `BKL-12` | parked | Release rehearsal's macOS DMG step runs out of runner disk | — |
-| `BKL-15` | parked | Mac Saved Voices empty and error states may lay the window out off screen | — |
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
 | `BKL-18` | parked | iPhone Saved Voices Delete is offered while a Clone take primes its reference | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
@@ -556,10 +555,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-12`** (parked) — Release rehearsal's macOS DMG step runs out of runner disk.
   gate: The release rehearsal's macOS package job passes on GitHub's runner: the DMG step gets the disk it needs, by freeing runner space before packaging or staging the DMG on a larger volume, and the rehearsal is green on three consecutive pushes.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-15`** (parked) — Mac Saved Voices empty and error states may lay the window out off screen.
-  gate: On macOS, the Saved Voices empty and error states render inside the window at its minimum size, as History's do since F-16's fix (a minimum width on the state container), and a UI lane covers them.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-16`** (parked) — iOS UI text replacement cannot clear an editor whose caret lands at the start.

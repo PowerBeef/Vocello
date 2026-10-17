@@ -161,8 +161,9 @@ Maintained iPhone subtrees:
 - `ios_model_delivery_state.json` under `downloads/` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data, and hard links to the shared blobs a delivery reuses.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 200 records and 5 MB (the same shared store as macOS). It excludes raw URLs, absolute paths, device identity, and user data.
-- `outputs/` stores generated audio, named as on macOS, never after the script (SEC-1); the share sheet
-  and the Saved outputs copy hand a take out under that name. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
+- `outputs/` stores generated audio, named as on macOS: since SEC-1 a new take's name carries none of
+  the script, and the share sheet and the Saved outputs copy hand a take out under its own name, so a
+  take made by an earlier build still shares under its old, script-bearing name (BKL-09). Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
   The internal App Group copy always remains available to History. Checking/unowned access skips
   the paid-mode external copy, not internal persistence; export manually after verification.

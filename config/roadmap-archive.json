@@ -5026,6 +5026,26 @@
         "file:scripts/lib/shared.sh",
         "file:scripts/tests/test_shared_sh.py"
       ]
+    },
+    {
+      "id": "BKL-13",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "On macOS, a saved voice cannot be deleted while a long-form project or line batch that may read it is running, and a retained long-form project that reads a deleted voice can no longer resume or regenerate, as on the iPhone; deterministic tests cover both.",
+      "sourceOfTruth": [
+        "Sources/Views/Voices/MacVoicesScreen.swift",
+        "Sources/iOS/IOSVoicesView.swift"
+      ],
+      "updated": "2026-10-16",
+      "notes": "Found 2026-10-13 while closing F-01's iOS gap (G4): the engine refuses a delete only during an active take, and a long-form Clone project reads its voice again for every segment. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission. Done 2026-10-16 (maintainer's go for the iPhone-free backlog): MacSavedVoiceDeletion refuses a delete while a take (including a Studio Clone take still priming), a line batch or a long-form project runs, and releases the retained project that reads a deleted voice; four tests in IOSLongFormProjectRunnerTests (25 pass). The iPhone's priming window is BKL-18.",
+      "evidence": [
+        "commit:9de724a5",
+        "commit:a9c0a7c6",
+        "file:Sources/Services/MacSavedVoiceDeletion.swift",
+        "file:Tests/VocelloCoreTests/IOSLongFormProjectRunnerTests.swift"
+      ]
     }
   ]
 }

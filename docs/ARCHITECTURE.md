@@ -908,7 +908,7 @@ table (current schema, after migrations `v1_create_generations` →
 | `voice` | text | speaker id (nullable) |
 | `emotion` | text | delivery style (nullable) |
 | `speed` | double | reserved/unused (nullable) |
-| `audioPath` | text | not null — absolute filesystem path of the generated WAV (`AudioService.makeOutputPath`: `<outputs>/<mode>/<yyyyMMdd_HH-mm-ss-SSS>_<text>.wav`); the outbox and enqueue state key records by it |
+| `audioPath` | text | not null — absolute filesystem path of the generated WAV (`AudioService.makeOutputPath`: `<outputs>/<mode>/<yyyyMMdd_HH-mm-ss-SSS>_Vocello.wav`, a long-form segment adding `_<UUID>`; earlier builds put the script's opening in place of `Vocello`); the outbox and enqueue state key records by it |
 | `duration` | double | seconds (nullable) |
 | `createdAt` | datetime | not null, default `CURRENT_TIMESTAMP` |
 | `longFormProjectID` | text | owning long-form plan digest; NULL for ordinary takes (v5) |

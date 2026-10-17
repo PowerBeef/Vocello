@@ -1662,7 +1662,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Raised by the 2026-10-13 core engine review (read-only); parked without investigation under the focus lock. Details and file evidence are in the report. 2026-10-16: SEC-3 goes with the dead-code removal in ER-12 and CONV-21 (F-12)."
+      "notes": "Raised by the 2026-10-13 core engine review (read-only); details and file evidence are in the report. 2026-10-16 (maintainer's go for the iPhone-free backlog): SEC-1 for new takes (named <stamp>_Vocello, Mac Save As and recovery export rename older takes; e45b71f7), SEC-5 (History secure_delete; dab281f6) and SEC-8's README and orphaned entitlements (4521d593) landed with tests. Left: the iPhone share sheet still hands an earlier build's take out under its script-bearing name (a neutral temporary copy inside IOSExportGate needs an iPhone run); SEC-3 with ER-12; SEC-7 (env-only telemetry and systemFreeSize need an iPhone run; package stderr does not); get-task-allow (iPhone run). Review notes for later: a local-clock rewind can repeat a take's millisecond stamp; exportName ignores pre-PA-26 non-Latin-digit stamps. EN-5 goes to ER-12."
     },
     {
       "id": "BKL-12",
@@ -1678,21 +1678,6 @@
       "updated": "2026-10-16",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Failing since 2026-10-10 (8c71d64b); 86d910dd, c08a1360 and b5553ab5 failed the same way, a1efaf0f (2026-10-17) passed. Diagnosed 2026-10-16: not the runner disk but the DMG's own intermediate image, which hdiutil sized from a short estimate, so copying the app's Metal library into /Volumes/Vocello ran out of space. create_dmg.sh now sizes the image from the payload's logical and allocated size with headroom (verified locally on the app: 223 MB image, 31 MB compressed DMG, checksum valid). Closes after the rehearsal passes on three consecutive pushes; pushes wait for the maintainer."
-    },
-    {
-      "id": "BKL-13",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "Mac Voices Delete does not wait for a running long-form project or line batch, nor release a retained project",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "On macOS, a saved voice cannot be deleted while a long-form project or line batch that may read it is running, and a retained long-form project that reads a deleted voice can no longer resume or regenerate, as on the iPhone; deterministic tests cover both.",
-      "sourceOfTruth": [
-        "Sources/Views/Voices/MacVoicesScreen.swift",
-        "Sources/iOS/IOSVoicesView.swift"
-      ],
-      "updated": "2026-10-13",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-13 while closing F-01's iOS gap (G4): the engine refuses a delete only during an active take, and a long-form Clone project reads its voice again for every segment. Parked without investigation under the focus lock: macOS is not part of the 3.0 iOS submission."
     },
     {
       "id": "BKL-15",

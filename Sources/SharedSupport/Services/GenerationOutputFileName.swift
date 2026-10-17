@@ -7,10 +7,12 @@ import Foundation
 /// under its own name (the iPhone share sheet, AirDrop and Files, the Mac's
 /// output folder, Save As and the recovery export), so the script snippet that
 /// earlier builds put in it showed the text wherever the file went. Those
-/// takes keep their `<timestamp>_<snippet>.wav` names on disk;
-/// `exportName(forTakeNamed:)` names their saved and exported copies. Takes
-/// are written one at a time, so the millisecond timestamp keeps names unique;
-/// a long-form segment also adds a UUID (`LongFormHistoryAcceptance`).
+/// takes keep their `<timestamp>_<snippet>.wav` names on disk; on the Mac,
+/// `exportName(forTakeNamed:)` names their saved and exported copies, while the
+/// iPhone share sheet still hands an earlier build's take out under its old
+/// name (BKL-09). Takes are written one at a time, so the millisecond timestamp
+/// keeps names unique; a long-form segment also adds a UUID
+/// (`LongFormHistoryAcceptance`).
 ///
 /// MAC-16 / IOS-16: the timestamp is formatted with the POSIX locale and the
 /// Gregorian calendar, so a Buddhist or Japanese calendar, or a locale with its

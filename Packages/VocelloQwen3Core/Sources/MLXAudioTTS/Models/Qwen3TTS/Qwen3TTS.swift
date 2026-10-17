@@ -1877,6 +1877,44 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         )
     }
 
+    /// CONV-21 (engine audit F-04/F-05): mlx-swift 0.32 compiles the
+    /// sampler's kernels at first use (the inverse-CDF categorical, top-k's
+    /// partition, top-p's sort and cumulative sum, the suppression and
+    /// penalty scatters), and the greedy argMax prewarm never reaches them, so
+    /// the first take after an update paid about 1.5 s on an M6. Draws once
+    /// from the talker's and the code predictor's logits through the
+    /// production sampler, with and without top-p, on a private random state
+    /// that no take reads; the draws are evaluated with the prewarm and then
+    /// discarded, so no output changes.
+    static func productionSamplerWarmDraws(
+        talkerLogits: MLXArray,
+        codeLogits: MLXArray?,
+        eosTokenId: Int,
+        suppressTokens: [Int]
+    ) -> [MLXArray] {
+        withRandomState(MLXRandom.RandomState(seed: 0)) {
+            var draws: [MLXArray] = []
+            for topP: Float in [1.0, 0.95] {
+                draws.append(sampleToken(
+                    talkerLogits,
+                    temperature: 0.9,
+                    topP: topP,
+                    topK: 50,
+                    repetitionPenalty: 1.05,
+                    // One penalized id and then several, as a take's second step
+                    // and later steps hold: MLX picks different binary kernels.
+                    generatedTokenIDs: topP < 1 ? [0, 1] : [0],
+                    suppressTokens: suppressTokens,
+                    eosTokenId: eosTokenId
+                ))
+                if let codeLogits {
+                    draws.append(sampleToken(codeLogits, temperature: 0.9, topP: topP, topK: 50))
+                }
+            }
+            return draws
+        }
+    }
+
     private func warmPreparedInputs(
         _ inputEmbedsInit: MLXArray,
         trailingTextHidden: MLXArray? = nil,
@@ -1927,6 +1965,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         let codeHidden = hidden[0..., (-1)..., 0...]
         var codeTokens = [nextToken]
+        var lastCodeLogits: MLXArray?
 
         for layerCache in codeCache {
             _ = layerCache.trim(layerCache.offset)
@@ -1953,8 +1992,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     keepDims: true
                 )
                 codeTokens.append(nextCode)
+                lastCodeLogits = codeLogits
             }
         }
+        let samplerWarmDraws = Self.productionSamplerWarmDraws(
+            talkerLogits: logits,
+            codeLogits: lastCodeLogits,
+            eosTokenId: talkerConfig.codecEosTokenId,
+            suppressTokens: Array(max(0, talkerConfig.vocabSize - 1024) ..< talkerConfig.vocabSize)
+                .filter { $0 != talkerConfig.codecEosTokenId }
+        )
 
         let allCodes = concatenated(codeTokens, axis: 1)
         let codesChunk = stacked([allCodes], axis: 1)
@@ -1977,7 +2024,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         preparationBooleanFlags["decoder_bucket_cache_hit"] = decoderBucketCacheHit
         speechTokenizer.decoder.resetStreamingState()
         let preparationEvalStartedAt = ContinuousClock.now
-        eval(logits, hidden, allCodes, codesForDecoder, decoded)
+        eval([logits, hidden, allCodes, codesForDecoder, decoded] + samplerWarmDraws)
         var timingsMS = [
             "prepare_inputs": inputPreparationMS,
             "first_decoder_step": firstDecoderStepMS,

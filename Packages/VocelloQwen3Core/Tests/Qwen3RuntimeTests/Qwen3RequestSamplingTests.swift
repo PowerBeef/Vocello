@@ -146,6 +146,38 @@ final class Qwen3RequestSamplingTests: XCTestCase {
         1030, 1870, 631, 837, 1397, 1697, 410, 617, 1680, 1870, 1648, 1828, 1514, 434, 434, 311,
     ]
 
+    /// CONV-21 (F-04/F-05): the prewarm's sampler draws run the production
+    /// sampler with and without top-p for both stages, stay in range, never
+    /// draw a suppressed talker id, and leave the global random state alone.
+    func testPrewarmSamplerDrawsStayPrivateAndInRange() {
+        // The suppressed ids carry the dominant logits, so a dropped suppression
+        // would almost surely be drawn.
+        let talker = MLXArray((0 ..< 64).map { $0 >= 61 ? 20 : Float($0 % 7) / 7 }).reshaped(1, 1, 64)
+        let code = MLXArray((0 ..< 32).map { Float($0 % 5) / 5 }).reshaped(1, 1, 32)
+        MLXRandom.seed(0xBEEF)
+        let expectedGlobal = drawGlobalSequence()
+        MLXRandom.seed(0xBEEF)
+
+        let draws = Qwen3TTSModel.productionSamplerWarmDraws(
+            talkerLogits: talker,
+            codeLogits: code,
+            eosTokenId: 60,
+            suppressTokens: [61, 62, 63]
+        )
+        eval(draws)
+
+        XCTAssertEqual(draws.count, 4, "talker and code predictor, with and without top-p")
+        for (index, draw) in draws.enumerated() {
+            let token = draw.item(Int32.self)
+            let isTalker = index.isMultiple(of: 2)
+            XCTAssertTrue((0 ..< (isTalker ? 64 : 32)).contains(token), "draw \(index): \(token)")
+            if isTalker {
+                XCTAssertFalse([61, 62, 63].contains(token), "draw \(index) took a suppressed id")
+            }
+        }
+        XCTAssertEqual(drawGlobalSequence(), expectedGlobal, "the warm draws use a private random state")
+    }
+
     private func makePolicy(seed: UInt64) -> Qwen3RequestSamplingPolicy {
         let stage = Qwen3SamplingStage(
             temperature: 0.9,

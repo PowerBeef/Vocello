@@ -1725,6 +1725,21 @@
       "notes": "Found 2026-10-16 by RF-13's purchase exports run (ios-xcui-purchase-20261016-172823-49bad283): tapping the Design brief editor left the caret before the existing text, so the helper's backspaces deleted nothing. The purchase lane now selects the brief with a triple tap and checks the value; the control audit's brief restore still uses the helper without checking, so it may leave the original brief prefixed to the test's. Parked without investigation under the focus lock: test tooling, not a release blocker."
     },
     {
+      "id": "BKL-18",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "iPhone Saved Voices Delete is offered while a Clone take primes its reference",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "On the iPhone, Delete waits while a Studio take holds its mode, including a Clone take still priming its reference before the engine reserves it, as the Mac does since BKL-13; a deterministic test covers it.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSVoicesView.swift",
+        "Sources/Services/MacSavedVoiceDeletion.swift"
+      ],
+      "updated": "2026-10-16",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-16 by the review of BKL-13: IOSVoicesView refuses a delete only while the engine has an active take or a long-form project runs, and a Clone take primes its saved voice before the engine reserves it. A delete in that window removes the reference, and the take ends in a typed failure (audio.input_missing): no crash, no History row. Parked without investigation under the focus lock: not a release blocker."
+    },
+    {
       "id": "BG-01",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",

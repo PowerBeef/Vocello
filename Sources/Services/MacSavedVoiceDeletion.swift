@@ -20,11 +20,15 @@ struct MacSavedVoiceDeletion {
     let longForm: IOSLongFormCoordinator
     /// `MacLineBatchRunner.isProcessing`, read where this value is made.
     let isLineBatchProcessing: Bool
+    /// A Studio take holds its mode (`MacAppModel.studioBusyMode`). A Clone
+    /// take primes its reference before the engine reserves it, and only the
+    /// reservation sets `hasActiveGeneration`.
+    let isStudioTakeRunning: Bool
 
     /// A take, a line batch or a long-form project may still read a saved
     /// voice. The iPhone asks the same of its take and project.
     var isGenerationUsingVoices: Bool {
-        engine.hasActiveGeneration || isLineBatchProcessing || longForm.isProcessing
+        engine.hasActiveGeneration || isStudioTakeRunning || isLineBatchProcessing || longForm.isProcessing
     }
 
     /// Deletes the voice through the engine transaction, then releases the

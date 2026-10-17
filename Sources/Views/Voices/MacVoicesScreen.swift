@@ -67,7 +67,8 @@ struct MacVoicesScreen: View {
         MacSavedVoiceDeletion(
             engine: ttsEngineStore,
             longForm: appModel.longForm,
-            isLineBatchProcessing: appModel.lineBatch.isProcessing
+            isLineBatchProcessing: appModel.lineBatch.isProcessing,
+            isStudioTakeRunning: appModel.studioBusyMode != nil
         )
     }
 

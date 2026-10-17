@@ -1269,7 +1269,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
             probe.sawActiveTake = store.hasActiveGeneration
             probe.sawProjectRunning = coordinator.isProcessing
             do {
-                try await MacSavedVoiceDeletion(engine: store, longForm: coordinator, isLineBatchProcessing: false)
+                try await MacSavedVoiceDeletion(engine: store, longForm: coordinator, isLineBatchProcessing: false, isStudioTakeRunning: false)
                     .delete(voiceID: "voice-1")
             } catch let refusal as MacSavedVoiceDeletion.Refusal {
                 probe.refusal = refusal
@@ -1304,7 +1304,8 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         let deletion = MacSavedVoiceDeletion(
             engine: f.store,
             longForm: f.makeCoordinator(),
-            isLineBatchProcessing: true
+            isLineBatchProcessing: true,
+            isStudioTakeRunning: false
         )
         XCTAssertFalse(f.store.hasActiveGeneration)
         XCTAssertTrue(deletion.isGenerationUsingVoices)
@@ -1312,6 +1313,28 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         do {
             try await deletion.delete(voiceID: "voice-1")
             XCTFail("The delete must wait for the line batch")
+        } catch {
+            XCTAssertEqual(error as? MacSavedVoiceDeletion.Refusal, .generationUsingVoices)
+        }
+        XCTAssertTrue(f.engine.deletedVoiceIDs.isEmpty)
+    }
+
+    /// A Studio Clone take primes its saved voice before the engine reserves
+    /// the take, so no take is active yet: the delete waits all the same.
+    func testTheMacDeleteWaitsForAStudioTakeTheEngineHasNotReserved() async throws {
+        let f = try makeFixture()
+        let deletion = MacSavedVoiceDeletion(
+            engine: f.store,
+            longForm: f.makeCoordinator(),
+            isLineBatchProcessing: false,
+            isStudioTakeRunning: true
+        )
+        XCTAssertFalse(f.store.hasActiveGeneration)
+        XCTAssertTrue(deletion.isGenerationUsingVoices)
+
+        do {
+            try await deletion.delete(voiceID: "voice-1")
+            XCTFail("The delete must wait for the Studio take")
         } catch {
             XCTAssertEqual(error as? MacSavedVoiceDeletion.Refusal, .generationUsingVoices)
         }
@@ -1338,7 +1361,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertTrue(coordinator.canRegenerateSegments)
         f.services.acceptanceError = nil
 
-        let deletion = MacSavedVoiceDeletion(engine: f.store, longForm: coordinator, isLineBatchProcessing: false)
+        let deletion = MacSavedVoiceDeletion(engine: f.store, longForm: coordinator, isLineBatchProcessing: false, isStudioTakeRunning: false)
         XCTAssertFalse(deletion.isGenerationUsingVoices)
         f.engine.voiceDeletionError = LongFormFixtureEngineFailure()
         do {

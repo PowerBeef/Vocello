@@ -31,7 +31,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
-  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|long-form-recovery] [--long-form-segments N]
+  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|long-form-recovery|saved-voices-states] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
@@ -239,8 +239,8 @@ elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" 
   [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" \
       || "$scenario_argument" == "generation-errors" || "$scenario_argument" == "design-enrollment" \
       || "$scenario_argument" == "clone-reference" || "$scenario_argument" == "long-form" \
-      || "$scenario_argument" == "long-form-recovery" ]] \
-    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, or long-form-recovery"
+      || "$scenario_argument" == "long-form-recovery" || "$scenario_argument" == "saved-voices-states" ]] \
+    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, long-form-recovery, or saved-voices-states"
 elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   scenario_argument="${scenario_argument:-lifecycle}"
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
@@ -457,7 +457,7 @@ if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20
         payload["modes"] = [{"design-enrollment": "design", "clone-reference": "clone"}.get(sys.argv[20], "custom")]
         payload["lengths"] = []
         payload["warm"] = 0
-    if sys.argv[20] == "long-form-recovery":
+    if sys.argv[20] in ("long-form-recovery", "saved-voices-states"):
         payload["modes"] = []
         payload["lengths"] = []
         payload["warm"] = 0
@@ -1647,13 +1647,13 @@ elif [[ "$platform" == "macos" ]]; then
   elif [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
   elif [[ "$lane" == "smoke" ]]; then
-    # The smoke class runs its fourteen ordered journeys (test00-test13: window
+    # The smoke class runs its fifteen ordered journeys (test00-test14: window
     # sizes + Settings scene, navigation/readiness, completed generation +
     # History, mid-generation cancellation, virtual-mic recording, library
     # surfaces, long-form project, line batch, Design brief/player, Clone
     # reference/player, missing models + Studio links, generation error +
-    # recovery, cross-language Studio content, long-form recovery Discard) in
-    # method-name order.
+    # recovery, cross-language Studio content, long-form recovery Discard,
+    # Saved Voices empty and error states) in method-name order.
     only_test="VocelloMacUITests/VocelloMacSmokeUITests"
     case "$scenario_argument" in
       layout) only_test+="/test00_WindowSizesAndSettingsScene" ;;
@@ -1663,6 +1663,7 @@ elif [[ "$platform" == "macos" ]]; then
       clone-reference) only_test+="/test09_CloneReferenceAndCompletedPlayer" ;;
       long-form) only_test+="/test06_LongFormProjectJourney" ;;
       long-form-recovery) only_test+="/test13_LongFormRecoveryDiscard" ;;
+      saved-voices-states) only_test+="/test14_SavedVoicesEmptyAndErrorStates" ;;
     esac
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"

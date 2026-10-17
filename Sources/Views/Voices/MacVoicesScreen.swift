@@ -62,6 +62,11 @@ struct MacVoicesScreen: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // A container, so the screen identifier stays on the screen and does
+            // not replace the state card's own (`voices_emptyState`,
+            // `voices_errorState`), which is the whole content in those states
+            // (BKL-15), as on the Studio screens.
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("screen_voices")
             .task(id: loadTaskID) {
                 guard ttsEngineStore.isReady else { return }
@@ -224,7 +229,14 @@ private extension MacVoicesScreen {
             content()
         }
         .padding(VocelloTheme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Bounds the card's fixed-height text in the window's minimum-size pass,
+        // as History's state cards do (F-16, BKL-15).
+        .frame(
+            minWidth: MacShellMetrics.libraryMessageMinWidth,
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .top
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }

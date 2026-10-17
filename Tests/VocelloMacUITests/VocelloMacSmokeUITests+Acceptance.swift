@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -95,6 +96,39 @@ extension VocelloMacSmokeUITests {
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-long-form-recovery-discarded")
     }
 
+    /// BKL-15: Saved Voices' empty and error states lay out inside the window,
+    /// as History's do since F-16, whose minimum-size pass had laid an empty
+    /// History out about 3,900 pt tall and off screen. Both run on isolated
+    /// profiles, the registered storage isolation test10 and test13 use, so the
+    /// user's voices are never touched. The empty profile is new; the error is a
+    /// genuine store failure, a plain file where the store keeps its review
+    /// candidates, which fails every listing, Retry's included.
+    func test14_SavedVoicesEmptyAndErrorStates() throws {
+        beginSession()
+        defer { endSession() }
+        let artifacts = try XCTUnwrap(ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"])
+        let empty = URL(fileURLWithPath: artifacts).appendingPathComponent("saved-voices-empty-profile")
+        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": empty.path])
+        openSavedVoices(settlingOn: "voices_emptyState")
+        try assertSavedVoicesStateFitsWindow("voices_emptyState", named: "empty")
+
+        let failing = URL(fileURLWithPath: artifacts).appendingPathComponent("saved-voices-error-profile")
+        try FileManager.default.createDirectory(at: failing, withIntermediateDirectories: true)
+        try Data("saved voices store failure fixture".utf8)
+            .write(to: failing.appendingPathComponent("voice-candidates"))
+        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": failing.path])
+        openSavedVoices(settlingOn: "voices_errorState")
+        try assertSavedVoicesStateFitsWindow("voices_errorState", named: "error")
+        let retry = button("voices_retryButton")
+        VocelloUILayoutAssert.assertFullyWithinWindow(retry, of: app)
+        XCTAssertTrue(retry.isHittable, "Retry must be reachable at the minimum window")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: retry, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("Retry to meet the same store failure", timeout: 30) {
+            self.element("voices_errorState").exists && !self.element("voices_loadingState").exists
+        })
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-error-retried")
+    }
+
     /// Presentation follows speech language; user-authored instructions survive
     /// both speech-language and interface-language changes without translation.
     func test12_CrossLanguageStudioContent() {
@@ -139,6 +173,38 @@ extension VocelloMacSmokeUITests {
             VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-\(interface)-\(speech)-preserved-brief")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceBrief_confirm"), timeout: 20))
         }
+    }
+
+    /// Opens Saved Voices once the engine has started and waits for the screen
+    /// to settle on `identifier`. While the engine starts, the screen shows its
+    /// starting card under the empty state's identifier, and every load passes
+    /// through the loading state; neither is the state under test (BKL-15).
+    private func openSavedVoices(settlingOn identifier: String) {
+        XCTAssertTrue(VocelloUIWait.condition("the engine to finish starting", timeout: 60) {
+            !self.element("sidebar_backendStatus_starting").exists
+        })
+        navigate(to: .voices)
+        XCTAssertTrue(VocelloUIWait.condition("Saved Voices to settle on \(identifier)", timeout: 30) {
+            self.element(identifier).exists && !self.element("voices_loadingState").exists
+        })
+    }
+
+    /// The window the state opened keeps a height a display can show (F-16's
+    /// failure was a window thousands of points tall), and pinned to the
+    /// minimum window, which that failure cannot reach, the state sits inside
+    /// it (BKL-15).
+    private func assertSavedVoicesStateFitsWindow(_ identifier: String, named name: String) throws {
+        let opened = app.windows.firstMatch.frame
+        let displayHeights = NSScreen.screens.map { $0.frame.height }
+        let tallestDisplay = try XCTUnwrap(displayHeights.max(), "No display to measure the window against")
+        XCTAssertLessThanOrEqual(
+            opened.height, tallestDisplay,
+            "Saved Voices laid the window out \(Int(opened.height)) pt tall, taller than any display"
+        )
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-\(name)-opened")
+        pinToNarrowestWindow()
+        VocelloUILayoutAssert.assertFullyWithinWindow(element(identifier), of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-\(name)-minimum")
     }
 
     private func selectSpeechLanguage(_ language: String, picker: String) {

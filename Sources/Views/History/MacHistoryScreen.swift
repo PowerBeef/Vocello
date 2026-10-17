@@ -748,7 +748,7 @@ private extension MacHistoryScreen {
         // Bounds the card's fixed-height text in the window's minimum-size pass,
         // as the recovery banner does (F-16).
         .frame(
-            minWidth: MacShellMetrics.historyMessageMinWidth,
+            minWidth: MacShellMetrics.libraryMessageMinWidth,
             maxWidth: .infinity,
             maxHeight: .infinity,
             alignment: .top

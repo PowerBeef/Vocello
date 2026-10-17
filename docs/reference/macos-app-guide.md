@@ -167,6 +167,7 @@ without native pinned-header material or section rules. Search still renders a f
 | Element | Identifier |
 |---|---|
 | Enroll | `voices_enrollButton` (toolbar) |
+| States | `voices_loadingState` / `voices_emptyState` (also while the engine starts) / `voices_errorState` with `voices_retryButton`; the screen is a container, so `screen_voices` does not replace them, and their cards keep a minimum width so the window's minimum-size pass cannot stretch the window off screen (BKL-15) |
 | Row | `voicesRow_<voiceID>` (name) / `voicesRow_<voiceID>_transcriptStatus` (metadata) / `voicesRow_<voiceID>_qualityWarning` (compact icon, opens the popover with `voicesRow_<voiceID>_replaceReference`) / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_more_<voiceID>` (native MenuButton containing `voicesRow_delete_<voiceID>`); a 32-point avatar, two-line metadata and compact actions share one horizontal row |
 | Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton`; `voicesEnroll_inlineConsent` (one-time, same key as the Settings toggle) shows while consent is off and Confirm stays disabled until it is recorded |
 

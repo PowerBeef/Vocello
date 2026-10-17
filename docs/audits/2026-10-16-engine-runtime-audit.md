@@ -217,6 +217,35 @@ a device. An optional download-race scenario needs a separate go for multi-GB do
        - C-02 goes back to the maintainer. Every D1-off failure was in a segment of 45 s or more,
          which argues for shorter segments, but C-02 changes every long-form plan and needs its
          own screen.
+   - **Follow-up screen (maintainer go-ahead 2026-10-16; pre-registered before any run).** On the
+     shipping tip (mlx-swift 0.32.3) through the `vocello` CLI, each arm runs 56 long-form
+     projects: the 16 English and French long-form calibration cells at three seeds each, plus
+     the RF-15 fixture at seeds 1–8.
+
+     | Arm | Variation | Change |
+     |---|---|---|
+     | C0 | Consistent | none (control) |
+     | C1 | Consistent | subtalker at the reference 0.9 / top-k 50 / top-p 1.0 (ER-05) |
+     | C2 | Consistent | delivery budget 200 instead of 300 (C-02) |
+     | C4 | Consistent | EOS filtered like any token (D2) |
+     | E0 | Expressive | none (control) |
+     | E2 | Expressive | delivery budget 200 |
+     | E4 | Expressive | EOS filtered like any token |
+
+     - **Primary metric:** failed projects, a project failing when Fast QC refuses any of its
+       segments. **Secondary:** refused segments, runaway endings (the token cap, or terminal
+       silence of 10 s or more), mid-take dropouts and the failure classes.
+     - **The control must reproduce the defect:** C0 needs at least 3 failed projects;
+       otherwise nothing is adopted and the known limitation stands.
+     - **C1 (subtalker)** is adopted if its failed projects are at most half of C0's with no new
+       failure class. It changes only Balanced and Consistent.
+     - **C2 (budget 200)** is adopted if its failed projects are at most half of C0's with no new
+       failure class, and E2 fails at most one project more than E0.
+     - **D2 (EOS filtering)** is adopted if C4's runaway endings and failed projects do not exceed
+       C0's, E4 fails at most one project more than E0, and no new failure class appears;
+       otherwise re-insertion stays, documented as a deliberate divergence.
+     - **Combinations:** if more than one change is adopted, a combined Consistent arm must fail at
+       most one project more than the best single arm before the combination ships.
 3. **D1 adoption (if the rule passes).**
    - Flip both `.production` constants together: `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`
      45-49 and `Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift` 122.

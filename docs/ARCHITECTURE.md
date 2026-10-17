@@ -556,6 +556,19 @@ reservation, including terminal-before-release ordering. It does not execute con
 loaded weights, `EngineReservedTake`, the limiter, file writer, telemetry, and transport together;
 that integration boundary remains explicit in the takeover audit.
 
+**MLX failures.** Every actor entry point that runs MLX work does so inside an MLX error scope, so
+an MLX error ends the operation as a typed `VocelloQwen3RuntimeFailure` (allocation reaches the
+host as memory pressure) instead of mlx-swift's `fatalError`; an evaluation or allocation failure
+marks the loaded model for unload before the next admission. Since mlx-swift 0.32.3 that covers a
+Metal command buffer refused in the background or out of memory. The semantics and the readback
+probes are owned by [`mlx-guide.md` §2.6](reference/mlx-guide.md#26-errors-and-error-scopes).
+
+**Leaving the foreground (iOS).** The store holds a foreground permit: when the scene stops being
+active it refuses proactive model work (loads, warms, clone priming, the prompt prebuild) and
+cancels the clone prime and the chained prompt prebuilds; a running take is the foreground exit's
+to stop, and a take checks cancellation once more before marking. An engine started in the
+background starts without the permit (BG-01).
+
 ### 4.10 Audio prep & QC
 
 `AudioPreparation.swift` normalizes reference audio to the canonical 24 kHz /

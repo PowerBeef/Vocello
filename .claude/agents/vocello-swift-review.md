@@ -33,7 +33,36 @@ Check, and cite the rule for each finding:
 8. Generated project: `project.yml` edited rather than the `.xcodeproj`; new files sit in an existing
    target's source root with `./scripts/regenerate_project.sh --fast` in the same change.
 
+Then check test adequacy. Green suites passed about 200 engine defects because tests stopped short of
+the code or asserted the wrong thing (`docs/audits/2026-10-18-dev-workflow-audit.md` A-02). For every
+behavioural change (anything beyond names, comments, docs or formatting), answer each question below
+for each new or changed test, citing file and line. A question you cannot answer from the code is a
+coverage-gap finding; "not applicable" needs a reason.
+9. Revert: would the test fail if the fix were reverted? Name the assertion that would fail and the
+   changed line it depends on. A test that passes on both sides of the fix pins nothing, and neither
+   does an assertion that restates the fixture. A fix with no failing-on-revert test is a finding.
+10. Fake reach: does each fake, stub or injected failure reach the changed code, or does it throw or
+    return before it? Trace the call from the test through the seam to the changed lines. Engine audit
+    B-02: `ResidentLoadCoordinator(warmRequests: .cancel)` throws in `qwen3Capabilities`, so the warm
+    body and its catch in `NativeEngineRuntime` never run, and the unload-on-cancel defect stayed green.
+11. Ground truth: does the assertion check what happened (the fake's ordered event log, the bytes or
+    file written, the row committed, the unload performed) rather than a published state that another
+    path also produces? `TTSEngineStoreTests` asserted `.loaded` and `unloads == 1`, which the
+    cancelled-take path satisfies with nothing resident.
+12. Error paths: does a catch-all in the change (`catch`, `catch let error`, a `default:` over errors)
+    treat cancellation as failure, by unloading, retrying, recording a failure or showing an error,
+    without a `CancellationError` or typed-cancellation arm first? Does a `try?` swallow an I/O,
+    persistence or MLX error the caller needs (a write, fsync, rename or delete, a GRDB commit,
+    `MLX.save`)? Name each site and whether a test drives its failure branch.
+13. Numerics: does a change to model numerics, sampling, the codec, the decoder, the prompt or text
+    layout, or MLX dtypes cite a parity fixture or a seeded canary test by name, and say whether seeded
+    output changes? Silent seeded-output drift, no fixture or canary, or a tolerance loosened until the
+    test passes is a finding.
+
 Preserve the physical-iPhone-only and XCUITest-only rules. Distinguish a demonstrated defect from a
 coverage gap and do not invent requirements. Reply with findings ordered by severity (blocking, should
-fix, note), each as `path:line — rule — evidence — impact — suggested change`, then a one-line verdict.
-If nothing is actionable, say so and state the limits of the review.
+fix, note), each as `path:line — rule — evidence — impact — suggested change`, then the test-adequacy
+answers (9–13, one line per test), then a one-line verdict. If nothing is actionable, say so and state
+the limits of the review. The lead records a completed review in the commit message with the trailer
+`Reviewed-by: vocello-swift-review`; `scripts/hooks/commit_lint.sh` warns, without blocking, when a
+commit of engine, iOS, service, view-model or package Swift sources lacks it.

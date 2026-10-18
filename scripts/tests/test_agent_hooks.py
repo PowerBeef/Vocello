@@ -1014,6 +1014,127 @@ class CommitContentLintTests(CommitLintTests):
                     self.assertEqual(self.lint(root, command).returncode, 2)
 
 
+class ReviewTrailerLintTests(unittest.TestCase):
+    """A commit of behaviour-bearing Swift without the review trailer is warned about, never blocked."""
+
+    repo = CommitLintTests.repo
+    lint = CommitLintTests.lint
+    TRAILER = "Reviewed-by: vocello-swift-review"
+    COMMIT = "git com" "mit"
+    ENGINE = "Sources/QwenVoiceCore/Engine.swift"
+
+    def committed(self, root: Path) -> None:
+        self.repo(root)
+        for relative in (self.ENGINE, "Sources/Views/Screen.swift"):
+            (root / relative).parent.mkdir(parents=True, exist_ok=True)
+            (root / relative).write_text("struct A {}\n")
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"], check=True)
+
+    def stage(self, root: Path, relative: str) -> None:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(path.read_text() + "// changed\n" if path.exists() else "struct B {}\n")
+        subprocess.run(["git", "-C", str(root), "add", relative], check=True)
+
+    def advice(self, root: Path, command: str) -> str:
+        """The additionalContext the hook returns, or '' when it says nothing; it never blocks."""
+        result = self.lint(root, command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if not result.stdout.strip():
+            return ""
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "PreToolUse")
+        self.assertNotIn("permissionDecision", output)
+        return output["additionalContext"]
+
+    def test_behaviour_bearing_swift_without_the_trailer_is_warned_about_not_blocked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            for relative in (self.ENGINE, "Sources/iOS/Views/Studio.swift", "Sources/Services/Store.swift",
+                             "Sources/ViewModels/Model.swift", "Packages/VocelloQwen3Core/Sources/Core/Run.swift"):
+                with self.subTest(source=relative):
+                    subprocess.run(["git", "-C", str(root), "reset", "-q"], check=True)
+                    self.stage(root, relative)
+                    advice = self.advice(root, f"{self.COMMIT} -m 'fix: x'")
+                    self.assertIn(relative, advice)
+                    self.assertIn(f"`{self.TRAILER}`", advice)
+                    self.assertIn("vocello-swift-review agent", advice)
+            # The trailer the hook asks for is the one the reviewer and the workflow tell the lead to record.
+            for document in (".claude/agents/vocello-swift-review.md", "docs/reference/development-workflow.md"):
+                with self.subTest(document=document):
+                    self.assertIn(f"`{self.TRAILER}`", (ROOT / document).read_text(encoding="utf-8"))
+
+    def test_other_files_get_no_warning(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            for relative in ("Sources/Views/Screen.swift", "Tests/VocelloCoreTests/EngineTests.swift",
+                             "Sources/QwenVoiceCore/README.md", "Packages/VocelloQwen3Core/Tests/T/Run.swift",
+                             "scripts/x.py"):
+                with self.subTest(path=relative):
+                    subprocess.run(["git", "-C", str(root), "reset", "-q"], check=True)
+                    self.stage(root, relative)
+                    self.assertEqual(self.advice(root, f"{self.COMMIT} -m x"), "")
+
+    def test_the_trailer_is_read_wherever_the_message_comes_from(self):
+        commit = self.COMMIT
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            self.stage(root, self.ENGINE)
+            (root / "reviewed.txt").write_text(f"fix: x\n\n{self.TRAILER}\n")
+            (root / "plain.txt").write_text("fix: x\n")
+            reviewed = {
+                f'{commit} -m "fix: x" -m "{self.TRAILER}"',
+                f"{commit} -m 'fix: x' --trailer '{self.TRAILER}'",
+                f'{commit} -m "$(cat <<\'EOF\'\nfix: x\n\n{self.TRAILER}\nEOF\n)"',
+                f"{commit} -q -F - <<'EOF'\nfix: x\n\n{self.TRAILER}\nEOF",
+                f"{commit} -F reviewed.txt", f"{commit} --file=reviewed.txt",
+                f"{commit} -m 'fix: x' --trailer 'reviewed-by=vocello-swift-review'",
+            }
+            unreviewed = {
+                f"{commit} -m 'fix: x' -m 'Reviewed-by: someone-else'",
+                f'{commit} -m "$(cat <<\'EOF\'\nfix: x\n\nbody\nEOF\n)"',
+                f"{commit} -q -F - <<'EOF'\nfix: x\nEOF", f"{commit} -F plain.txt", f"{commit} -qam 'fix: x'",
+            }
+            for command in sorted(reviewed | unreviewed):
+                with self.subTest(command=command):
+                    self.assertEqual(bool(self.advice(root, command)), command in unreviewed)
+            # A reused message, or HEAD's for an amend that keeps it, is read from the commit.
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", f"fix: y\n\n{self.TRAILER}"], check=True)
+            self.stage(root, self.ENGINE)
+            self.assertEqual(self.advice(root, f"{commit} --amend --no-edit"), "")
+            self.assertEqual(self.advice(root, f"{commit} -C HEAD"), "")
+            self.assertTrue(self.advice(root, f"{commit} --amend -m 'fix: y'"))
+            self.assertTrue(self.advice(root, f"{commit} -C HEAD~1"))
+
+    def test_an_unreadable_message_or_a_parser_failure_says_nothing(self):
+        commit = self.COMMIT
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            self.stage(root, self.ENGINE)
+            for command in (commit, f'{commit} -m "$MESSAGE"', f'{commit} -m "$(git log -1 --format=%B)"',
+                            f"{commit} -F missing.txt", f"printf x | {commit} -F -", f"{commit} --fixup HEAD"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.advice(root, command), "")
+            hooks = fixture_hooks(root)
+            with (hooks / "git_commands.py").open("a", encoding="utf-8") as module:
+                module.write("\n\ndef _long(*_args):\n    raise RuntimeError('parser defect')\n")
+            payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": str(root),
+                       "tool_input": {"command": f"{commit} --message x"}}
+            result = subprocess.run(["bash", str(hooks / "commit_lint.sh")], input=json.dumps(payload), text=True,
+                                    capture_output=True, cwd=root, timeout=20)
+            self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+            # The direct run has no message to read.
+            result = subprocess.run(["bash", str(hooks / "commit_lint.sh"), "--staged"], text=True,
+                                    capture_output=True, cwd=root, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("advisory", result.stdout + result.stderr)
+
+
 class WorktreeCommitLintTests(unittest.TestCase):
     """Commits and pushes are judged in the checkout they act on, not the hook's."""
 

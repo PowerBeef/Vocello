@@ -73,7 +73,9 @@ be missed locally; the Linux CI job still runs the whole suite.
 checkout or a `worktree-*` branch in a registered linked worktree (a Claude Code agent worktree), pushes
 only from `main`, a whitespace-clean
 staged diff (`git diff --cached --check`) and a clean `scripts/privacy_scan.py --staged` (no developer
-home path, no credential-shaped token, no key file). It never builds or tests. Two more guards block
+home path, no credential-shaped token, no key file). It never builds or tests. Its one advisory check
+returns a warning, not a block, when behaviour-bearing Swift is committed without the Swift review's
+trailer (see Operating defaults); a message it cannot read skips the check. Two more guards block
 Simulator destinations, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made
 branches, `project.pbxproj` writes and hand edits of generated files;
 `scripts/tests/test_agent_hooks.py` pins all of them.
@@ -248,6 +250,15 @@ Read them directly when planning.
 Use targeted deterministic tests, changed-file lint and warm incremental builds while editing.
 Before committing run the routed checks and review the actual diff. Use independent Swift review
 for substantive Swift changes and focused review for persistence, privacy, hooks and release paths.
+The Swift review (`vocello-swift-review`) checks the policy boundaries, then test adequacy for every
+behavioural change: a test that fails when the fix is reverted, fakes that reach the changed code,
+assertions on what happened rather than on a state another path also publishes, cancellation and
+swallowed errors on error paths, and a named parity fixture or seeded canary for numerics. Record a
+completed review in the commit message with the trailer `Reviewed-by: vocello-swift-review`
+(`git commit --trailer 'Reviewed-by: vocello-swift-review'`); for an agent's commit reviewed before
+integration, `git cherry-pick -n <sha>`, then `git commit -C <sha> --trailer '...'`. The commit lint
+warns, never blocks, when a commit of Swift under `Sources/QwenVoiceCore`, `Sources/iOS`,
+`Sources/Services`, `Sources/ViewModels` or `Packages/*/Sources` lacks it.
 At a coherent checkpoint run the smallest relevant existing model, UI, device or performance lane.
 Full matrices are task/release-specific. Local validation and scoped commits on `main` are authorized;
 pushes require an explicit request, including the existing unpushed commits. Do not reinterpret a

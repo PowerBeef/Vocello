@@ -37,7 +37,8 @@ Authority: `Sources/` → `project.yml` → `config/` contracts → `scripts/` �
 reference rules → other prose. Fix conflicting active prose in the same change.
 `config/public-product-facts.json` and `project.yml` own public facts. `config/roadmap.json` owns open
 work and `config/roadmap-archive.json` completed work; `docs/ROADMAP.md` is generated
-(`python3 scripts/roadmap.py render`). `docs/ARCHITECTURE.md` traces ownership and lifecycles.
+(`python3 scripts/roadmap.py render`). Change items with `roadmap.py set|note|close`, which validate
+and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycles.
 
 ## Architecture
 

@@ -25,7 +25,7 @@ while IFS= read -r file_path; do
   relative="$file_path"
   case "$relative" in
   docs/ROADMAP.md)
-    block "edit config/roadmap.json, then python3 scripts/roadmap.py render" ;;
+    block "use python3 scripts/roadmap.py set|note|close (they re-render), or edit config/roadmap.json and run roadmap.py render" ;;
   Sources/Resources/qwenvoice_production_model_catalog.json)
     block "edit config/model-artifact-receipts.json, then python3 scripts/model_catalog_contract.py rebuild" ;;
   Sources/Resources/third_party_attributions.json)

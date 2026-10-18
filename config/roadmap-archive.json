@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Finished roadmap work (done, declined, superseded items and the plans they completed). Kept for history and progress counts only; never validated or rendered. Evidence references may point at files that no longer exist.",
+  "description": "Finished roadmap work (done, declined, superseded items and the plans they completed), kept for history and progress counts. roadmap.py close appends to it and validate reads it for identifiers and evidence; it is not rendered. Evidence references may point at files that no longer exist.",
   "plans": [
     {
       "id": "convergence-metal4-stage4-2026-08",

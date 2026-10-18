@@ -2002,15 +2002,15 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-20",
-      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice."
+      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice. P0-1 to P0-9, P0-11 and P0-12 landed the same day (a7b765c2 to f49a4c4f, plus a roadmap validate cache): a roadmap-only check selects 6 Python modules and takes 29 s (was about 75 s; validate itself 2.9 s to 0.05 s); the 20 s target waits on P1-3's contract gate. The CI failure summary and cache re-save are proven at the next push's CI run."
     },
     {
       "id": "DW-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: structural tooling (audit Phase 1)",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
-      "gate": "Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, a rehearsal that skips gates push CI proved, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window).",
+      "gate": "Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.",
       "sourceOfTruth": [
         "docs/audits/2026-10-18-dev-workflow-audit.md",
         "scripts/macos_test.sh",
@@ -2019,7 +2019,7 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-22",
-      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18."
+      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-4 and P1-5 (a59c556d), P1-11 (d4b08f21), P1-14 (9204b75d)."
     },
     {
       "id": "DW-03",

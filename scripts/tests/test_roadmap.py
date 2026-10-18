@@ -5,13 +5,17 @@ The accuracy tests matter most. A tracker where `status: done` is a
 self-assertion is worse than no tracker, because it looks like evidence. Each
 test below is one way an item could claim completion it has not earned.
 """
+import contextlib
 import copy
 import datetime
+import difflib
+import io
 import json
 import os
 import pathlib
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -488,6 +492,342 @@ class ProgressTests(unittest.TestCase):
         text = (REPO_ROOT / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
         self.assertEqual(text, roadmap.render(REPO_ROOT),
                          "docs/ROADMAP.md is stale; run: python3 scripts/roadmap.py render")
+
+
+# --------------------------------------------------------------------------
+# editing commands: set, note, close
+# --------------------------------------------------------------------------
+
+EDIT_ROADMAP = {
+    "schemaVersion": 1,
+    "primaryPlan": "p1",
+    "focusLock": {"plan": "p1", "decided": "2026-08-01", "decision": "ship p1 first", "maxInFlight": 1},
+    "description": "fixture",
+    "plans": [
+        {"id": "p1", "title": "Plan one", "status": "active", "owner": "backend-mlx",
+         "adopted": "2026-08-01", "goal": "do a thing"},
+        {"id": "p2", "title": "Plan two", "status": "parked", "owner": "release-qa",
+         "adopted": "2026-08-01", "goal": "later"},
+    ],
+    "items": [
+        {"id": "A-1", "plan": "p1", "title": "first", "status": "in-flight", "blockedBy": [],
+         "gate": "ship it", "updated": "2026-08-01", "notes": "Started."},
+        {"id": "A-2", "plan": "p1", "title": "second", "status": "planned", "gate": "then this",
+         "updated": "2026-08-01", "notes": "Queued."},
+        {"id": "A-3", "plan": "p1", "title": "third", "status": "parked", "blockedBy": ["A-2"],
+         "gate": "maybe", "updated": "2026-08-01", "unparkWhen": "A-2 lands", "notes": "Waiting."},
+        {"id": "B-1", "plan": "p2", "title": "elsewhere", "status": "parked", "gate": "later",
+         "updated": "2026-08-01", "unparkWhen": "after p1", "notes": "Parked."},
+    ],
+}
+EDIT_ARCHIVE = {
+    "schemaVersion": 1,
+    "description": "fixture archive",
+    "plans": [],
+    "items": [
+        {"id": "A-0", "plan": "p1", "title": "zeroth", "status": "done", "gate": "done before",
+         "updated": "2026-07-30", "notes": "Finished.", "evidence": ["run:fixture-run-0"]},
+    ],
+}
+EDIT_DATE = "2026-08-05"
+FILES = (roadmap.ROADMAP_PATH, roadmap.ARCHIVE_PATH, roadmap.RENDER_PATH)
+
+
+class EditHarness(unittest.TestCase):
+    """A small, valid roadmap in a temporary root; edits never touch the real config.
+
+    The fixture cites no commits and sets no freeze, so validation never asks git
+    about a directory that is not a repository.
+    """
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = pathlib.Path(temporary.name)
+        (self.root / "config").mkdir()
+        (self.root / "docs").mkdir()
+        self.write_json(roadmap.ROADMAP_PATH, EDIT_ROADMAP)
+        self.write_json(roadmap.ARCHIVE_PATH, EDIT_ARCHIVE)
+        (self.root / "evidence.txt").write_text("proof\n", encoding="utf-8")
+        (self.root / roadmap.RENDER_PATH).write_text(roadmap.render(self.root), encoding="utf-8")
+        self.assertConsistent()
+
+    def write_json(self, relative, data):
+        (self.root / relative).write_text(roadmap.dump_json(copy.deepcopy(data)), encoding="utf-8")
+
+    def edit(self, *args):
+        """Run one editing command against the fixture; returns (exit code, stdout, stderr)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = roadmap.main([*args, "--root", str(self.root), "--date", EDIT_DATE])
+        return code, out.getvalue(), err.getvalue()
+
+    def snapshot(self):
+        return {path: (self.root / path).read_bytes() for path in FILES}
+
+    def data(self, relative=roadmap.ROADMAP_PATH):
+        return json.loads((self.root / relative).read_text(encoding="utf-8"))
+
+    def item(self, item_id):
+        return next(item for item in self.data()["items"] if item["id"] == item_id)
+
+    def archived(self):
+        return self.data(roadmap.ARCHIVE_PATH)["items"]
+
+    def assertRefused(self, args, message, code=1):
+        before = self.snapshot()
+        result, _, err = self.edit(*args)
+        self.assertEqual(result, code, err)
+        self.assertIn(message, err)
+        self.assertEqual(self.snapshot(), before, "a refused edit wrote a file")
+
+    def assertConsistent(self):
+        """What one editing call promises: valid, rendered and in the files' own format."""
+        report = roadmap.validate(self.root, today=datetime.date.fromisoformat(EDIT_DATE))
+        self.assertTrue(report["ok"], report["errors"])
+        self.assertEqual((self.root / roadmap.RENDER_PATH).read_text(encoding="utf-8"),
+                         roadmap.render(self.root))
+        for relative in (roadmap.ROADMAP_PATH, roadmap.ARCHIVE_PATH):
+            text = (self.root / relative).read_text(encoding="utf-8")
+            self.assertEqual(roadmap.dump_json(json.loads(text)), text)
+
+
+class SetTests(EditHarness):
+    def test_set_due_inserts_one_line_after_status_and_keeps_updated(self):
+        before = (self.root / roadmap.ROADMAP_PATH).read_text(encoding="utf-8").splitlines()
+        code, out, err = self.edit("set", "A-2", "--due", "2026-08-20")
+        self.assertEqual(code, 0, err)
+        after = (self.root / roadmap.ROADMAP_PATH).read_text(encoding="utf-8").splitlines()
+        changes = [line for line in difflib.ndiff(before, after) if line[:2] in ("+ ", "- ")]
+        self.assertEqual(changes, ['+       "due": "2026-08-20",'])
+        self.assertEqual(list(self.item("A-2"))[:5], ["id", "plan", "title", "status", "due"])
+        self.assertEqual(self.item("A-2")["updated"], "2026-08-01", "a date change alone does not touch the item")
+        self.assertIn("(planned, due 2026-08-20)", (self.root / roadmap.RENDER_PATH).read_text(encoding="utf-8"))
+        self.assertIn("set A-2: due", out)
+        self.assertConsistent()
+
+    def test_a_status_change_moves_updated_to_the_date(self):
+        code, _, err = self.edit("set", "A-3", "--status", "planned")
+        self.assertEqual(code, 0, err)
+        item = self.item("A-3")
+        self.assertEqual((item["status"], item["updated"]), ("planned", EDIT_DATE))
+        self.assertEqual(item["unparkWhen"], "A-2 lands", "unparking keeps the recorded condition")
+        self.assertConsistent()
+
+    def test_a_gate_change_moves_updated_and_touch_moves_it_for_anything(self):
+        self.assertEqual(self.edit("set", "A-2", "--gate", "a sharper gate")[0], 0)
+        self.assertEqual(self.item("A-2")["updated"], EDIT_DATE)
+        self.assertEqual(self.edit("set", "B-1", "--title", "renamed", "--touch")[0], 0)
+        self.assertEqual((self.item("B-1")["title"], self.item("B-1")["updated"]), ("renamed", EDIT_DATE))
+        self.assertConsistent()
+
+    def test_none_removes_optional_fields(self):
+        self.assertEqual(self.edit("set", "A-2", "--due", "2026-08-20")[0], 0)
+        self.assertEqual(self.edit("set", "A-2", "--due", "none")[0], 0)
+        self.assertNotIn("due", self.item("A-2"))
+        self.assertEqual(self.edit("set", "A-3", "--blocked-by", "none")[0], 0)
+        self.assertEqual(self.item("A-3")["blockedBy"], [])
+        self.assertEqual(self.edit("set", "A-3", "--status", "planned", "--unpark-when", "none")[0], 0)
+        self.assertNotIn("unparkWhen", self.item("A-3"))
+        self.assertConsistent()
+
+    def test_blockers_may_be_open_or_archived_and_land_before_the_gate(self):
+        self.assertEqual(self.edit("set", "A-2", "--blocked-by", "A-0,B-1")[0], 0)
+        item = self.item("A-2")
+        self.assertEqual(item["blockedBy"], ["A-0", "B-1"])
+        self.assertEqual(list(item).index("blockedBy") + 1, list(item).index("gate"))
+        self.assertConsistent()
+
+    def test_an_unknown_or_archived_id_is_refused(self):
+        self.assertRefused(("set", "Z-9", "--status", "planned"), "unknown item Z-9")
+        self.assertRefused(("set", "A-0", "--status", "planned"), "A-0 is archived")
+
+    def test_a_bad_date_is_refused(self):
+        for value in ("2026-13-01", "next week", "20260820", "2026-8-1"):
+            with self.subTest(value=value):
+                self.assertRefused(("set", "A-2", "--due", value), "--due must be an ISO date")
+        before = self.snapshot()
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = roadmap.main(["set", "A-2", "--due", "2026-08-20", "--root", str(self.root), "--date", "soon"])
+        self.assertEqual(code, 1)
+        self.assertIn("--date must be an ISO date", err.getvalue())
+        self.assertEqual(self.snapshot(), before)
+
+    def test_invalid_values_are_refused(self):
+        self.assertRefused(("set", "A-2", "--status", "done"), "roadmap.py close A-2 --status done")
+        self.assertRefused(("set", "A-2", "--status", "mostly-done"), "--status must be one of")
+        self.assertRefused(("set", "A-2", "--blocked-by", "ghost"), "unknown item(s): ghost")
+        self.assertRefused(("set", "A-2", "--blocked-by", "A-2"), "cannot block itself")
+        self.assertRefused(("set", "A-2", "--blocked-by", "A-1,,A-3"), "distinct comma-separated")
+        self.assertRefused(("set", "A-2", "--title", "  "), "--title cannot be empty")
+        self.assertRefused(("set", "A-2"), "set needs at least one of")
+
+    def test_an_edit_that_changes_nothing_writes_nothing(self):
+        before = self.snapshot()
+        code, out, _ = self.edit("set", "A-2", "--status", "planned")
+        self.assertEqual(code, 0)
+        self.assertIn("no change", out)
+        self.assertEqual(self.snapshot(), before)
+
+
+class NoteTests(EditHarness):
+    def test_note_replaces_or_appends_without_touching_updated(self):
+        self.assertEqual(self.edit("note", "A-2", "New position.")[0], 0)
+        self.assertEqual(self.item("A-2")["notes"], "New position.")
+        self.assertEqual(self.edit("note", "A-2", "--append", "More.")[0], 0)
+        self.assertEqual(self.item("A-2")["notes"], "New position. More.")
+        self.assertEqual(self.item("A-2")["updated"], "2026-08-01")
+        self.assertEqual(self.edit("note", "A-2", "--append", "Measured.", "--touch")[0], 0)
+        self.assertEqual(self.item("A-2")["updated"], EDIT_DATE)
+        self.assertConsistent()
+
+    def test_notes_stop_at_the_limit_and_are_never_truncated(self):
+        self.assertEqual(self.edit("note", "A-2", "x" * roadmap.NOTES_MAX_CHARS)[0], 0)
+        self.assertRefused(("note", "A-2", "--append", "y"), "notes would be 1202 characters, 2 over the "
+                                                              "1200-character limit")
+        self.assertRefused(("note", "A-2", "z" * 1201), "1201 characters")
+        self.assertEqual(self.item("A-2")["notes"], "x" * 1200)
+        self.assertConsistent()
+
+    def test_note_takes_text_or_append(self):
+        self.assertRefused(("note", "A-2"), "note takes TEXT")
+        self.assertRefused(("note", "A-2", "both", "--append", "ways"), "note takes TEXT")
+        self.assertRefused(("note", "A-2", " "), "TEXT cannot be empty")
+
+
+class CloseTests(EditHarness):
+    def test_close_moves_the_item_to_the_end_of_the_archive(self):
+        keys = list(self.item("A-3"))
+        code, out, err = self.edit("close", "A-3", "--evidence", "run:fixture-run-3",
+                                   "--evidence", "file:evidence.txt", "--note", "Done 2026-08-05.")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("A-3", [item["id"] for item in self.data()["items"]])
+        closed = self.archived()[-1]
+        self.assertEqual([item["id"] for item in self.archived()], ["A-0", "A-3"])
+        self.assertEqual((closed["status"], closed["updated"]), ("done", EDIT_DATE))
+        self.assertEqual(closed["notes"], "Waiting. Done 2026-08-05.")
+        self.assertEqual(closed["evidence"], ["run:fixture-run-3", "file:evidence.txt"])
+        # Same fields in the same order; a closed item never wakes, and new evidence goes last.
+        self.assertEqual(list(closed), [key for key in keys if key != "unparkWhen"] + ["evidence"])
+        rendered = (self.root / roadmap.RENDER_PATH).read_text(encoding="utf-8")
+        self.assertNotIn("`A-3`", rendered)
+        self.assertIn("| `p1` | active | backend-mlx | 2/4 (50%) |", rendered)
+        self.assertIn("close A-3: done", out)
+        self.assertConsistent()
+
+    def test_done_needs_evidence_that_resolves(self):
+        self.assertRefused(("close", "A-2"), "done is never a bare assertion")
+        self.assertRefused(("close", "A-2", "--evidence", "file:missing.txt"), "file not found: missing.txt")
+        self.assertRefused(("close", "A-2", "--evidence", "vibes:it-feels-done"), "unknown evidence kind")
+
+    def test_superseding_records_both_sides(self):
+        code, _, err = self.edit("close", "A-3", "--status", "superseded", "--superseded-by", "A-2")
+        self.assertEqual(code, 0, err)
+        loser = self.archived()[-1]
+        self.assertEqual((loser["id"], loser["status"]), ("A-3", "superseded"))
+        self.assertEqual(list(loser)[-1], "supersededBy")
+        self.assertEqual(loser["supersededBy"], "A-2")
+        winner = self.item("A-2")
+        self.assertEqual(winner["legacyIds"], ["A-3"])
+        self.assertEqual(list(winner)[-1], "legacyIds")
+        self.assertEqual(winner["updated"], "2026-08-01", "absorbing an id is not a status or gate change")
+        self.assertConsistent()
+
+    def test_a_winner_keeps_its_earlier_legacy_ids(self):
+        data = copy.deepcopy(EDIT_ROADMAP)
+        data["items"][1]["legacyIds"] = ["OLD-1"]
+        self.write_json(roadmap.ROADMAP_PATH, data)
+        (self.root / roadmap.RENDER_PATH).write_text(roadmap.render(self.root), encoding="utf-8")
+        self.assertEqual(self.edit("close", "A-3", "--status", "superseded", "--superseded-by", "A-2")[0], 0)
+        self.assertEqual(self.item("A-2")["legacyIds"], ["OLD-1", "A-3"])
+        self.assertConsistent()
+
+    def test_superseding_needs_an_open_winner(self):
+        self.assertRefused(("close", "A-3", "--status", "superseded"), "needs --superseded-by")
+        self.assertRefused(("close", "A-3", "--status", "superseded", "--superseded-by", "A-3"),
+                           "cannot supersede itself")
+        self.assertRefused(("close", "A-3", "--status", "superseded", "--superseded-by", "A-0"),
+                           "A-0 is archived")
+        self.assertRefused(("close", "A-3", "--status", "superseded", "--superseded-by", "Z-9"),
+                           "Z-9 is not an item")
+        self.assertRefused(("close", "A-3", "--superseded-by", "A-2", "--evidence", "run:x"),
+                           "--superseded-by goes with --status superseded")
+
+    def test_declining_needs_a_reason(self):
+        self.assertRefused(("close", "B-1", "--status", "declined"), "needs --reason")
+        code, _, err = self.edit("close", "B-1", "--status", "declined", "--reason", "not needed")
+        self.assertEqual(code, 0, err)
+        closed = self.archived()[-1]
+        self.assertEqual((closed["status"], closed["reason"], list(closed)[-1]), ("declined", "not needed", "reason"))
+        self.assertConsistent()
+
+    def test_dependents_of_a_superseded_item_are_named(self):
+        code, _, err = self.edit("close", "A-2", "--status", "superseded", "--superseded-by", "A-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("A-3 is blocked by A-2", err)
+        self.assertIn("roadmap.py set ID --blocked-by A-1", err)
+        self.assertConsistent()
+
+
+class DryRunAndGateTests(EditHarness):
+    def test_dry_run_prints_the_diff_and_writes_nothing(self):
+        before = self.snapshot()
+        code, out, err = self.edit("set", "A-2", "--status", "parked", "--unpark-when", "after A-1", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.snapshot(), before)
+        for line in ("--- a/config/roadmap.json", '-      "status": "planned",', '+      "status": "parked",',
+                     '+      "unparkWhen": "after A-1",', "+++ b/docs/ROADMAP.md", "dry run"):
+            self.assertIn(line, out)
+
+    def test_dry_run_of_a_close_shows_the_archive(self):
+        before = self.snapshot()
+        code, out, err = self.edit("close", "A-3", "--evidence", "run:fixture-run-3", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.snapshot(), before)
+        self.assertIn("+++ b/config/roadmap-archive.json", out)
+        self.assertIn('+      "id": "A-3",', out)
+        self.assertIn('-      "id": "A-3",', out)
+
+    def test_a_result_that_fails_validation_writes_nothing(self):
+        self.assertRefused(("set", "A-2", "--status", "in-flight"), "the focus lock allows 1")
+        self.assertRefused(("set", "A-2", "--status", "parked"), "parked requires unparkWhen")
+        self.assertRefused(("set", "B-1", "--status", "planned"), "outside the focus plan p1")
+        self.assertRefused(("set", "A-2", "--status", "in-flight", "--dry-run"), "fails validation")
+
+    def test_a_file_off_the_format_is_refused(self):
+        path = self.root / roadmap.ROADMAP_PATH
+        path.write_text(json.dumps(EDIT_ROADMAP, indent=4) + "\n", encoding="utf-8")
+        self.assertRefused(("set", "A-2", "--due", "2026-08-20"), "not in the format roadmap.py writes", code=2)
+
+
+class FormatAndCliTests(EditHarness):
+    def test_the_real_files_round_trip_byte_identically(self):
+        """Edits rewrite only their own lines because a load and dump changes nothing else."""
+        for relative in (roadmap.ROADMAP_PATH, roadmap.ARCHIVE_PATH):
+            with self.subTest(file=relative):
+                text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+                self.assertEqual(roadmap.dump_json(json.loads(text)), text)
+
+    def test_in_memory_validation_ignores_the_files(self):
+        data = self.data()
+        data["items"][1]["status"] = "in-flight"
+        report = roadmap.validate(self.root, today=datetime.date.fromisoformat(EDIT_DATE), data=data,
+                                  archive=self.data(roadmap.ARCHIVE_PATH))
+        self.assertIn("the focus lock allows 1", " | ".join(report["errors"]))
+        self.assertTrue(roadmap.validate(self.root)["ok"])
+
+    def test_root_is_accepted_before_and_after_the_command(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(roadmap.main(["--root", str(self.root), "validate"]), 0)
+            self.assertEqual(roadmap.main(["validate", "--root", str(self.root)]), 0)
+            self.assertEqual(roadmap.main(["render", "--check", "--root", str(self.root)]), 0)
+            self.assertEqual(roadmap.main(["--root", str(self.root), "status", "--json"]), 0)
+
+    def test_help_documents_the_editing_commands(self):
+        text = roadmap.build_parser().format_help()
+        for fragment in ("set ID", "note ID", "close ID", "--dry-run", "--superseded-by", "--blocked-by"):
+            self.assertIn(fragment, text)
 
 
 if __name__ == "__main__":

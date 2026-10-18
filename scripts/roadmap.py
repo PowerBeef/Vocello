@@ -36,18 +36,43 @@ decision instead of an edit. Its optional `freeze` requires every commit after
 the freeze commit to name an item of that plan in its subject. An item's optional
 `due` date is surfaced once it passes.
 
+EDITING -- a roadmap change is one command, not a hand edit of a 200 KB JSON file.
+Each editing command changes the data in memory, runs the same validation as
+`validate` on the result, and only then writes config/roadmap.json,
+config/roadmap-archive.json and docs/ROADMAP.md together, in the files' own format;
+a result that fails validation writes nothing. `updated` moves with a status or
+gate change and on close (evidence), never for a title, date, blocker or note
+alone unless --touch asks for it.
+
 Usage:
     python3 scripts/roadmap.py validate [--strict]
     python3 scripts/roadmap.py render [--check]
     python3 scripts/roadmap.py status [--plan ID] [--json]
+
+    python3 scripts/roadmap.py set ID [--status planned|in-flight|parked] [--due YYYY-MM-DD|none]
+        [--title T] [--gate G] [--blocked-by ID,ID|none] [--unpark-when TEXT|none] [--touch]
+    python3 scripts/roadmap.py note ID TEXT | --append TEXT  [--touch]
+    python3 scripts/roadmap.py close ID [--status done|declined|superseded] [--superseded-by ID]
+        [--evidence KIND:VALUE ...] [--reason TEXT] [--note TEXT]
+
+    Every editing command also takes --dry-run (print the unified diff, write
+    nothing), --date YYYY-MM-DD (the date written to `updated` and validated
+    against; default today) and --root DIR (default: this checkout). Notes stay
+    within 1200 characters and are never truncated. close moves the item to the
+    end of the archive; done needs evidence, declined a reason, and superseded a
+    winner, which lists the closed id in its legacyIds.
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as _dt
+import difflib
 import json
+import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -182,9 +207,10 @@ def resolve_evidence(root: pathlib.Path, reference: str) -> str | None:
 ARCHIVE_RESOLVED_KINDS = ("commit", "benchmark")
 
 
-def validate_archive(root: pathlib.Path) -> list[str]:
+def validate_archive(root: pathlib.Path, archive: dict | None = None) -> list[str]:
     errors: list[str] = []
-    for item in load_archive(root).get("items", []):
+    archive = load_archive(root) if archive is None else archive
+    for item in archive.get("items", []):
         if item.get("status") != "done":
             continue
         iid = item.get("id", "?")
@@ -349,9 +375,12 @@ def focus_findings(root: pathlib.Path, data: dict, items: dict,
 # validation
 # --------------------------------------------------------------------------
 
-def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
+def validate(root: pathlib.Path, today: _dt.date | None = None,
+             data: dict | None = None, archive: dict | None = None) -> dict:
+    """Validate the roadmap on disk, or the in-memory `data` and `archive` an edit is about to write."""
     today = today or _dt.date.today()
-    data = load(root)
+    data = load(root) if data is None else data
+    archive = load_archive(root) if archive is None else archive
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -455,9 +484,9 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
 
         warnings.extend(f"item {iid}: {f}" for f in staleness_findings(root, item, today))
 
-    errors.extend(validate_archive(root))
+    errors.extend(validate_archive(root, archive))
 
-    archived_items = load_archive(root).get("items", [])
+    archived_items = archive.get("items", [])
     focus_errors, focus_warnings = focus_findings(root, data, items, archived_items)
     errors.extend(focus_errors)
     warnings.extend(focus_warnings)
@@ -527,9 +556,9 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
 # progress + render
 # --------------------------------------------------------------------------
 
-def progress(root: pathlib.Path) -> dict:
-    data = load(root)
-    archived = load_archive(root).get("items", [])
+def progress(root: pathlib.Path, data: dict | None = None, archive: dict | None = None) -> dict:
+    data = load(root) if data is None else data
+    archived = (load_archive(root) if archive is None else archive).get("items", [])
     out = []
     for plan in sorted(data["plans"], key=lambda p: p["id"] != data.get("primaryPlan")):
         owned = [i for i in data["items"] + archived if i.get("plan") == plan["id"]]
@@ -549,9 +578,9 @@ def progress(root: pathlib.Path) -> dict:
     return {"plans": out}
 
 
-def render(root: pathlib.Path) -> str:
-    data = load(root)
-    report = progress(root)
+def render(root: pathlib.Path, data: dict | None = None, archive: dict | None = None) -> str:
+    data = load(root) if data is None else data
+    report = progress(root, data, archive)
     lines = [
         "# Roadmap",
         "",
@@ -643,18 +672,426 @@ def _item_sort_key(item_id: str):
     return (item_id, 0)
 
 
+# --------------------------------------------------------------------------
+# editing -- one call per change, validated in memory before anything is written
+# --------------------------------------------------------------------------
+
+EDIT_COMMANDS = ("set", "note", "close")
+EDITABLE_STATUSES = tuple(s for s in ITEM_STATUSES if s not in TERMINAL)
+NONE = "none"  # the value that removes an optional field (--due, --blocked-by, --unpark-when)
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# Where `set` and `note` insert a field the item does not have yet, so it lands where the
+# ledger's items already keep it and the diff stays one small hunk. Keys outside this
+# order keep their place; what `close` adds (evidence, reason, supersededBy, and the
+# winner's legacyIds) goes last, as the archive's own closes do.
+KEY_ORDER = ("id", "plan", "title", "status", "due", "blockedBy", "gate", "sourceOfTruth",
+             "evidence", "updated", "unparkWhen", "notes")
+
+
+class EditError(RuntimeError):
+    """An editing command refused its input; nothing was written."""
+
+
+def dump_json(data: dict) -> str:
+    """The one format both roadmap files are kept in, so an edit rewrites only the lines it changes."""
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
+def _read_json(root: pathlib.Path, relative: str, required: bool) -> tuple[str | None, dict | None]:
+    path = root / relative
+    if not path.exists():
+        if required:
+            raise RoadmapError(f"missing {relative}")
+        return None, None
+    text = path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise RoadmapError(f"{relative} is not valid JSON: {error}") from error
+    if not isinstance(data, dict) or not all(isinstance(data.get(key), list) for key in ("plans", "items")):
+        raise RoadmapError(f"{relative} must be an object with plans and items lists")
+    if dump_json(data) != text:
+        raise RoadmapError(f"{relative} is not in the format roadmap.py writes (json.dumps with indent=2 and "
+                           "ensure_ascii=False, one trailing newline), so an edit would rewrite unrelated lines; "
+                           "normalise it in a change of its own first")
+    return text, data
+
+
+def load_for_edit(root: pathlib.Path) -> tuple[dict, dict, dict[str, str | None]]:
+    """Both files and the text each was read from.
+
+    Unlike load_archive, an unreadable archive is an error here: writing the archive
+    back from an empty fallback would erase the finished work.
+    """
+    roadmap_text, data = _read_json(root, ROADMAP_PATH, required=True)
+    archive_text, archive = _read_json(root, ARCHIVE_PATH, required=False)
+    render_path = root / RENDER_PATH
+    before = {
+        ROADMAP_PATH: roadmap_text,
+        ARCHIVE_PATH: archive_text,
+        RENDER_PATH: render_path.read_text(encoding="utf-8") if render_path.exists() else None,
+    }
+    return data, archive if archive is not None else {"plans": [], "items": []}, before
+
+
+def _set_key(item: dict, key: str, value) -> None:
+    """Set `key` in place, or insert a new key before the first later key of KEY_ORDER."""
+    if key in item or key not in KEY_ORDER:
+        item[key] = value
+        return
+    rank = KEY_ORDER.index(key)
+    entries = list(item.items())
+    position = next((index for index, (existing, _) in enumerate(entries)
+                     if existing in KEY_ORDER and KEY_ORDER.index(existing) > rank), len(entries))
+    entries.insert(position, (key, value))
+    item.clear()
+    item.update(entries)
+
+
+def _live_item(data: dict, archive: dict, item_id: str) -> dict:
+    for item in data["items"]:
+        if item.get("id") == item_id:
+            return item
+    if any(item.get("id") == item_id for item in archive.get("items", [])):
+        raise EditError(f"{item_id} is archived in {ARCHIVE_PATH}; only open items in {ROADMAP_PATH} can be edited")
+    raise EditError(f"unknown item {item_id}")
+
+
+def iso_date(value: str, flag: str) -> _dt.date:
+    """A strict YYYY-MM-DD date; fromisoformat alone also takes forms the ledger never uses."""
+    parsed = parse_date(value) if ISO_DATE.fullmatch(value) else None
+    if parsed is None:
+        raise EditError(f"{flag} must be an ISO date (YYYY-MM-DD), got {value!r}")
+    return parsed
+
+
+def _text(value: str, flag: str) -> str:
+    text = value.strip()
+    if not text:
+        raise EditError(f"{flag} cannot be empty")
+    return text
+
+
+def _appended(existing: str | None, addition: str) -> str:
+    existing = (existing or "").rstrip()
+    return f"{existing} {addition}" if existing else addition
+
+
+def _check_notes(item_id: str, notes: str) -> None:
+    if len(notes) > NOTES_MAX_CHARS:
+        raise EditError(
+            f"{item_id}: notes would be {len(notes)} characters, {len(notes) - NOTES_MAX_CHARS} over the "
+            f"{NOTES_MAX_CHARS}-character limit, and they are never truncated; keep the current position, "
+            f"leave history to git, and rewrite them with: roadmap.py note {item_id} TEXT"
+        )
+
+
+def _changed_keys(before: dict, after: dict) -> list[str]:
+    keys = list(dict.fromkeys([*before, *after]))
+    return [key for key in keys if before.get(key) != after.get(key)]
+
+
+def edit_set(data: dict, archive: dict, item_id: str, today: _dt.date, *, status: str | None = None,
+             due: str | None = None, title: str | None = None, gate: str | None = None,
+             blocked_by: str | None = None, unpark_when: str | None = None, touch: bool = False) -> dict:
+    """Edit fields of an open item. `updated` moves with a status or gate change, or with `touch`."""
+    item = _live_item(data, archive, item_id)
+    if all(value is None for value in (status, due, title, gate, blocked_by, unpark_when)) and not touch:
+        raise EditError("set needs at least one of --status, --due, --title, --gate, --blocked-by, "
+                        "--unpark-when or --touch")
+    before = copy.deepcopy(item)
+    if status is not None:
+        if status in TERMINAL:
+            raise EditError(f"{status} is terminal and terminal items leave the open ledger; run: "
+                            f"roadmap.py close {item_id} --status {status}")
+        if status not in EDITABLE_STATUSES:
+            raise EditError(f"--status must be one of {', '.join(EDITABLE_STATUSES)}, got {status!r}")
+        _set_key(item, "status", status)
+    if due is not None:
+        if due == NONE:
+            item.pop("due", None)
+        else:
+            _set_key(item, "due", iso_date(due, "--due").isoformat())
+    if title is not None:
+        _set_key(item, "title", _text(title, "--title"))
+    if gate is not None:
+        _set_key(item, "gate", _text(gate, "--gate"))
+    if blocked_by is not None:
+        blockers = [] if blocked_by == NONE else [part.strip() for part in blocked_by.split(",")]
+        if not all(blockers) or len(set(blockers)) != len(blockers):
+            raise EditError(f"--blocked-by takes distinct comma-separated item ids, or {NONE}; got {blocked_by!r}")
+        if item_id in blockers:
+            raise EditError(f"{item_id} cannot block itself")
+        known = {other.get("id") for other in [*data["items"], *archive.get("items", [])]}
+        unknown = [blocker for blocker in blockers if blocker not in known]
+        if unknown:
+            raise EditError(f"--blocked-by names unknown item(s): {', '.join(unknown)}")
+        if blockers or "blockedBy" in item:
+            _set_key(item, "blockedBy", blockers)
+    if unpark_when is not None:
+        if unpark_when == NONE:
+            item.pop("unparkWhen", None)
+        else:
+            _set_key(item, "unparkWhen", _text(unpark_when, "--unpark-when"))
+
+    # The ledger's rule: `updated` records a status, gate or evidence change, so editing a
+    # title, a date or a blocker does not make old work look freshly touched.
+    if touch or {"status", "gate"} & set(_changed_keys(before, item)):
+        _set_key(item, "updated", today.isoformat())
+    changed = _changed_keys(before, item)
+    return {"ids": [item_id], "summary": f"set {item_id}: {', '.join(changed)}" if changed else "", "notices": []}
+
+
+def edit_note(data: dict, archive: dict, item_id: str, today: _dt.date, *, text: str | None = None,
+              append: str | None = None, touch: bool = False) -> dict:
+    """Replace or append to an open item's notes, within NOTES_MAX_CHARS and never truncated."""
+    item = _live_item(data, archive, item_id)
+    if (text is None) == (append is None):
+        raise EditError("note takes TEXT to replace the notes, or --append TEXT to add to them")
+    notes = _text(text, "TEXT") if text is not None else _appended(item.get("notes"), _text(append, "--append"))
+    _check_notes(item_id, notes)
+    before = copy.deepcopy(item)
+    _set_key(item, "notes", notes)
+    if touch:
+        _set_key(item, "updated", today.isoformat())
+    changed = _changed_keys(before, item)
+    return {"ids": [item_id], "summary": f"note {item_id}: {', '.join(changed)}" if changed else "", "notices": []}
+
+
+def edit_close(root: pathlib.Path, data: dict, archive: dict, item_id: str, today: _dt.date, *,
+               status: str = "done", superseded_by: str | None = None, note: str | None = None,
+               evidence: list[str] | tuple[str, ...] = (), reason: str | None = None) -> dict:
+    """Make an open item terminal and move it to the end of the archive, as the ledger's closes do.
+
+    The item keeps its fields and their order; its status and `updated` change in place,
+    `unparkWhen` goes (a closed item never wakes), a note is appended to its notes, and
+    new evidence, the reason and supersededBy go last. A superseded item's id joins the
+    winner's legacyIds, so references to it lead to the work that continues.
+    """
+    item = _live_item(data, archive, item_id)
+    if status not in TERMINAL:
+        raise EditError(f"--status must be one of {', '.join(TERMINAL)}, got {status!r}")
+    if superseded_by is not None and status != "superseded":
+        raise EditError("--superseded-by goes with --status superseded")
+    if reason is not None and status != "declined":
+        raise EditError("--reason goes with --status declined")
+
+    winner = None
+    if status == "superseded":
+        if not superseded_by:
+            raise EditError(f"superseding {item_id} needs --superseded-by ID, the open item that carries its work")
+        if superseded_by == item_id:
+            raise EditError(f"{item_id} cannot supersede itself")
+        winner = next((other for other in data["items"] if other.get("id") == superseded_by), None)
+        if winner is None:
+            archived = any(other.get("id") == superseded_by for other in archive.get("items", []))
+            raise EditError(f"--superseded-by {superseded_by} is {'archived' if archived else 'not an item'}; "
+                            f"the winner must be an open item in {ROADMAP_PATH}")
+    reason_text = _text(reason, "--reason") if reason is not None else None
+    if status == "declined" and not (reason_text or item.get("reason")):
+        raise EditError(f"declining {item_id} needs --reason TEXT")
+
+    current = list(item.get("evidence") or [])
+    added: list[str] = []
+    for reference in evidence:
+        problem = resolve_evidence(root, reference)
+        if problem:
+            raise EditError(f"--evidence {problem}")
+        if reference not in current and reference not in added:
+            added.append(reference)
+    if status == "done" and not (current or added):
+        raise EditError(f"closing {item_id} as done needs --evidence KIND:VALUE "
+                        "(benchmark, commit, doc, file or run): done is never a bare assertion")
+    notes = None
+    if note is not None:
+        notes = _appended(item.get("notes"), _text(note, "--note"))
+        _check_notes(item_id, notes)
+
+    _set_key(item, "status", status)
+    _set_key(item, "updated", today.isoformat())
+    item.pop("unparkWhen", None)
+    if notes is not None:
+        _set_key(item, "notes", notes)
+    if added:
+        item["evidence"] = [*current, *added]
+    if reason_text is not None:
+        item["reason"] = reason_text
+    ids = [item_id]
+    if winner is not None:
+        item["supersededBy"] = winner["id"]
+        legacy = list(winner.get("legacyIds") or [])
+        if item_id not in legacy:
+            winner["legacyIds"] = [*legacy, item_id]
+        ids.append(winner["id"])
+
+    index = next(index for index, other in enumerate(data["items"]) if other is item)
+    del data["items"][index]
+    archive.setdefault("items", []).append(item)
+
+    notices = []
+    dependents = sorted((other["id"] for other in data["items"] if item_id in other.get("blockedBy", [])),
+                        key=_item_sort_key)
+    if dependents and status != "done":
+        target = f"set ID --blocked-by {winner['id']}" if winner else "set ID --blocked-by ..."
+        notices.append(f"{', '.join(dependents)} {'is' if len(dependents) == 1 else 'are'} blocked by {item_id}, "
+                       "which the archive now satisfies; if the blocking work continues elsewhere, run: "
+                       f"roadmap.py {target}")
+    destination = f"{status}, moved to {ARCHIVE_PATH}"
+    if winner is not None:
+        destination += f"; {winner['id']} lists it in legacyIds"
+    return {"ids": ids, "summary": f"close {item_id}: {destination}", "notices": notices}
+
+
+def _unified(relative: str, old: str | None, new: str) -> str:
+    return "".join(difflib.unified_diff(
+        (old or "").splitlines(keepends=True), new.splitlines(keepends=True),
+        "/dev/null" if old is None else f"a/{relative}", f"b/{relative}"))
+
+
+def _write(path: pathlib.Path, text: str) -> None:
+    """Replace the file in one step, so an interrupted edit never leaves half a JSON file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+    if path.exists():
+        shutil.copymode(path, temporary)
+    os.replace(temporary, path)
+
+
+def apply_edit(root: pathlib.Path, today: _dt.date, dry_run: bool, mutate) -> int:
+    """Run one edit: mutate in memory, validate the result, then write all three files or none."""
+    data, archive, before = load_for_edit(root)
+    result = mutate(data, archive)
+    after = {ROADMAP_PATH: dump_json(data)}
+    if before[ARCHIVE_PATH] is not None or archive.get("plans") or archive.get("items"):
+        after[ARCHIVE_PATH] = dump_json(archive)
+    if all(text == before[path] for path, text in after.items()):
+        print(f"roadmap edit: no change; {result['ids'][0]} already says that")
+        return 0
+    after[RENDER_PATH] = render(root, data, archive)
+    changed = {path: text for path, text in after.items() if text != before[path]}
+    report = validate(root, today, data=data, archive=archive)
+
+    if dry_run:
+        for path, text in changed.items():
+            sys.stdout.write(_unified(path, before[path], text))
+    # The whole roadmap is validated; only what concerns the edited items is repeated here.
+    pattern = re.compile(r"\b(?:" + "|".join(map(re.escape, result["ids"])) + r")\b")
+    related = [warning for warning in report["warnings"] if pattern.search(warning)]
+    for warning in related:
+        print(f"roadmap warning: {warning}", file=sys.stderr)
+    for notice in result["notices"]:
+        print(f"roadmap notice: {notice}", file=sys.stderr)
+    for error in report["errors"]:
+        print(f"roadmap error: {error}", file=sys.stderr)
+    if not report["ok"]:
+        print(f"roadmap edit refused, nothing was written: the result fails validation "
+              f"({len(report['errors'])} error(s))", file=sys.stderr)
+        return 1
+    others = len(report["warnings"]) - len(related)
+    tail = f"; {others} other warning(s), see roadmap.py validate" if others else ""
+    if dry_run:
+        print(f"{result['summary']} (dry run: validation passes, nothing written{tail})")
+        return 0
+    for path in (ARCHIVE_PATH, ROADMAP_PATH, RENDER_PATH):
+        if path in changed:
+            _write(root / path, changed[path])
+    print(f"{result['summary']} (wrote {', '.join(changed)}{tail})")
+    return 0
+
+
+def _edit(root: pathlib.Path, args) -> int:
+    try:
+        today = iso_date(args.date, "--date") if args.date else _dt.date.today()
+        if args.command == "set":
+            def mutate(data, archive):
+                return edit_set(data, archive, args.item_id, today, status=args.status, due=args.due,
+                                title=args.title, gate=args.gate, blocked_by=args.blocked_by,
+                                unpark_when=args.unpark_when, touch=args.touch)
+        elif args.command == "note":
+            def mutate(data, archive):
+                return edit_note(data, archive, args.item_id, today, text=args.text, append=args.append,
+                                 touch=args.touch)
+        else:
+            def mutate(data, archive):
+                return edit_close(root, data, archive, args.item_id, today, status=args.status,
+                                  superseded_by=args.superseded_by, note=args.note,
+                                  evidence=args.evidence or [], reason=args.reason)
+        return apply_edit(root, today, args.dry_run, mutate)
+    except EditError as error:
+        print(f"roadmap edit refused, nothing was written: {error}", file=sys.stderr)
+        return 1
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog=__doc__[__doc__.index("Usage:"):],
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--root", default=str(REPO_ROOT), help="repository root (default: this checkout)")
+    # Also accepted after the command, as the flat parser this replaced allowed.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--root", default=argparse.SUPPRESS, help="repository root (default: this checkout)")
+    editing = argparse.ArgumentParser(add_help=False)
+    editing.add_argument("--dry-run", action="store_true",
+                         help="print the unified diff of every file the edit would change; write nothing")
+    editing.add_argument("--date", metavar="YYYY-MM-DD",
+                         help="the date written to updated and validated against (default: today)")
+    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+
+    command = commands.add_parser("validate", parents=[common], help="check the roadmap and its archive")
+    command.add_argument("--strict", action="store_true", help="warnings fail too")
+    command = commands.add_parser("render", parents=[common], help=f"write {RENDER_PATH}")
+    command.add_argument("--check", action="store_true", help="verify, do not write")
+    command = commands.add_parser("status", parents=[common], help="progress per plan")
+    command.add_argument("--plan", help="limit to one plan")
+    command.add_argument("--json", action="store_true", help="machine-readable")
+
+    command = commands.add_parser(
+        "set", parents=[common, editing], help="edit fields of an open item",
+        description="Edit fields of an open item. updated moves to --date with a status or gate change, "
+                    "or with --touch.")
+    command.add_argument("item_id", metavar="ID")
+    command.add_argument("--status", metavar="STATUS",
+                         help=f"one of {', '.join(EDITABLE_STATUSES)}; terminal statuses go through close")
+    command.add_argument("--due", metavar="YYYY-MM-DD|none")
+    command.add_argument("--title")
+    command.add_argument("--gate")
+    command.add_argument("--blocked-by", metavar="ID,ID|none")
+    command.add_argument("--unpark-when", metavar="TEXT|none")
+    command.add_argument("--touch", action="store_true", help="move updated without a status or gate change")
+
+    command = commands.add_parser(
+        "note", parents=[common, editing], help="replace or append to an open item's notes",
+        description=f"Replace or append to an open item's notes: at most {NOTES_MAX_CHARS} characters, "
+                    "never truncated. updated moves only with --touch.")
+    command.add_argument("item_id", metavar="ID")
+    command.add_argument("text", metavar="TEXT", nargs="?", help="the new notes")
+    command.add_argument("--append", metavar="TEXT", help="add TEXT after the current notes")
+    command.add_argument("--touch", action="store_true", help="also move updated")
+
+    command = commands.add_parser(
+        "close", parents=[common, editing], help="make an open item terminal and move it to the archive",
+        description=f"Make an open item terminal and move it to the end of {ARCHIVE_PATH}: updated moves "
+                    "to --date, unparkWhen goes, and new evidence, reason and supersededBy go last; a "
+                    "superseded item joins the winner's legacyIds.")
+    command.add_argument("item_id", metavar="ID")
+    command.add_argument("--status", choices=TERMINAL, default="done")
+    command.add_argument("--superseded-by", metavar="ID", help="with superseded: the open item that carries the work")
+    command.add_argument("--evidence", metavar="KIND:VALUE", action="append",
+                         help="repeatable; done needs at least one reference (benchmark, commit, doc, file, run)")
+    command.add_argument("--reason", metavar="TEXT", help="with declined: why")
+    command.add_argument("--note", metavar="TEXT", help="append TEXT to the notes")
+    return parser
+
+
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["validate", "render", "status"])
-    parser.add_argument("--root", default=str(REPO_ROOT))
-    parser.add_argument("--check", action="store_true", help="render: verify, do not write")
-    parser.add_argument("--strict", action="store_true", help="validate: warnings fail too")
-    parser.add_argument("--plan", help="status: limit to one plan")
-    parser.add_argument("--json", action="store_true", help="status: machine-readable")
-    args = parser.parse_args(argv)
+    args = build_parser().parse_args(argv)
     root = pathlib.Path(args.root).resolve()
 
     try:
+        if args.command in EDIT_COMMANDS:
+            return _edit(root, args)
+
         if args.command == "render":
             text = render(root)
             target = root / RENDER_PATH

@@ -84,7 +84,7 @@ Vocello's concurrency design is intentionally coarse-grained:
 - **`actor NativeEngineRuntime`** — the engine's mutable runtime state and MLX call serialization.
 - **`actor NativePreparedCloneConditioningCache`** — mutable clone-conditioning cache with LRU eviction.
 - **Background `Task` / `Task.detached`** — telemetry sampler, chunk forwarding, audio decoding consumer.
-- **`Mutex` (Synchronization)** — small synchronous state shared across threads (`MainThreadStallWatchdog`, the `TelemetryGate` latch, the diagnostics loggers) lives in a `Mutex`, so those types stay checked `Sendable`; every remaining `@unchecked Sendable` is registered in `config/concurrency-safety.json`.
+- **`Mutex` (Synchronization)** — small synchronous state shared across threads (`MainThreadStallWatchdog`, the `TelemetryGate` latch, `GenerationFailureDiagnosticLogger`) lives in a `Mutex`, so those types stay checked `Sendable`. `ModelDownloadDiagnosticsStore` also keeps its state in a `Mutex` but stays `@unchecked Sendable` for its injected `FileManager`; it and every other remaining `@unchecked Sendable` are registered in `config/concurrency-safety.json`.
 
 This keeps data-race checking tractable and matches the natural boundaries of the app.
 

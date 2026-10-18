@@ -146,6 +146,29 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
+    /// The journal Mutex serializes the create-or-append and the prune, so concurrent
+    /// failures neither lose a row nor tear one.
+    func testConcurrentLogsKeepEveryRowWhole() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-failure-log-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directory.appendingPathComponent("generation-failures.jsonl")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let logger = GenerationFailureDiagnosticLogger(fileURL: fileURL, ignoresTelemetryGate: true)
+        let count = 64
+        DispatchQueue.concurrentPerform(iterations: count) { index in
+            logger.log(
+                surfacedMessage: "private \(index)",
+                stage: "generation startup",
+                underlyingError: TTSEngineError.generationFailed("private \(index)")
+            )
+        }
+
+        let lines = try Data(contentsOf: fileURL).split(separator: 0x0A, omittingEmptySubsequences: true)
+        XCTAssertEqual(lines.count, count)
+        XCTAssertEqual(logger.read().count, count, "every row decodes whole")
+    }
+
     func testUnknownStageAndErrorDoNotReflectSourceText() throws {
         struct PrivateError: LocalizedError {
             let errorDescription: String? =

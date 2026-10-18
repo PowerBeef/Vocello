@@ -199,11 +199,11 @@
         "IOSCrashObserver"
       ],
       "owner": "framework callback lifetime plus lock, actor, or main-queue isolation",
-      "invariant": "Framework callbacks mutate only the registered synchronized state and are invalidated before owner teardown.",
-      "reviewedAt": "2026-08-26",
+      "invariant": "Framework callbacks mutate only the registered synchronized state and are invalidated before owner teardown. No deterministic test drives the framework callbacks themselves (speech recognition and crash delivery need the live frameworks); the listed test covers the transcriber logic around the speech task handle.",
+      "reviewedAt": "2026-10-18",
       "removalCondition": "Remove each callback bridge escape when the corresponding Apple framework offers checked Sendable callbacks or ownership can remain in one actor for its full lifetime.",
       "tests": [
-        "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift"
+        "Tests/VocelloCoreTests/VoiceCloneEnrollmentConfidenceTests.swift"
       ]
     },
     {

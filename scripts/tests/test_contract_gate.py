@@ -99,7 +99,7 @@ class RunnerTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("broken contract", output)
-        self.assertIn(f"==> FAILED (exit 3, ", output)
+        self.assertIn("==> FAILED (exit 3, ", output)
         self.assertIn("passing: PASS", output)
         self.assertLess(output.index("broken contract"), output.index("passing: PASS"))
         self.assertIn(f"failed: {failing.name}", output)

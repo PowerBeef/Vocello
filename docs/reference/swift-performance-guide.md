@@ -43,13 +43,13 @@ If you change any of those areas in `Sources/`, update this doc with the new rat
 
 | Script | Optimization | Use case |
 | --- | --- | --- |
-| `scripts/build.sh build` | `-Onone`, incremental | Fast local dev loop. |
-| `scripts/build.sh cli` | `-Onone`, incremental | Headless CLI dev loop. |
+| `scripts/build.sh build` | owned code `-Onone`, incremental; packages at their Release defaults | Fast local dev loop. |
+| `scripts/build.sh cli` | owned code `-Onone`, incremental; packages at their Release defaults | Headless CLI dev loop. |
 | `scripts/build.sh cli-optimized` | `-O` | Optimized `vocello` for benchmark and shipping-performance evidence; `toolchain.optimization` in a record comes from its hash-bound build receipt, never a literal. |
 | `scripts/release.sh` | Xcode Release defaults (`-O`, whole-module) | Signed/notarized DMG. |
 | `scripts/build.sh release` | runs `scripts/release.sh` | The same DMG build through the shared regeneration and SwiftPM caches. |
 
-The release build relies on Xcode's default Release optimization level (`-O`) and whole-module compilation. We do **not** override `SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_COMPILATION_MODE`, or `GCC_OPTIMIZATION_LEVEL` in `project.yml`; the scripts pass them as build-settings overrides. This keeps `project.yml` simple and lets the release path stay at Xcode defaults.
+`project.yml` sets `SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_COMPILATION_MODE`, `GCC_OPTIMIZATION_LEVEL` and `ENABLE_TESTABILITY` at project level to `QVOICE_OWNED_*` variables whose defaults are the Release values (`-O`, whole-module, `s`, no testability), so the release path compiles exactly as Xcode's Release defaults did. Project-level settings reach only this project's targets, never the Swift packages. The development and test builds of the shared `-Onone` arena (`build.sh build` and `cli`, `macos_test.sh test` and `tsan`, the macOS XCUITest `--gate` compile) pass `QVOICE_OWNED_DEV_SETTINGS` (`scripts/lib/build_cache.sh`), which makes owned code `-Onone`, incremental and testable while MLX and the other packages keep their optimized builds. Builds that pass `SWIFT_OPTIMIZATION_LEVEL` on the command line (the optimized CLI, the release scripts, the device lanes and the foundation compiles) still set it for every target, packages included.
 
 ### 2.2 Swift 6 language mode
 

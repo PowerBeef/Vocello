@@ -2036,7 +2036,7 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-22",
-      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release, not after the submission. Each change is validated on the Mac (unit lane, TSan, generic iOS compile, Mac smoke) before it lands; device proof joins the next announced iPhone window."
+      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release. Landed 2026-10-18: P2-1 owned-target optimization variables (a2147383; packages build optimized in dev and test builds; measured gain 2% of core-suite time, kept for shipped-configuration parity; lineage keys restart, gate baseline re-pooled with RF-18's adoption); P2-6 MemberImportVisibility and project-level Swift 6 (a2147383), first-party @preconcurrency imports removed (42b15022); P2-4 Swift Testing in the owned package only, since the lane's xctest runner cannot run it in the Xcode targets (c406eea2, 54842e39 with the A-15 fix); P2-7 signposts, Logger and macOS MetricKit (adb556a2, 25192b69, 82c921a7). Declined with reasons: P2-2 dwarf test builds (the lane preserves dSYMs for crash symbolication) and the compilation cache (disk-constrained host, single-branch workflow). Open: P2-3 shared framework and P2-5 test-adequacy seams await the maintainer; package warnings-as-errors waits on the 15 MLXArray Sendable warnings (engine work)."
     },
     {
       "id": "DW-04",
@@ -2052,7 +2052,7 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-30",
-      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release. Items that need an external condition (GitHub runners with Xcode 27, a new tool's approval, an iPhone window) wait for it and say so here."
+      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release. Landed 2026-10-18: P3-1 report-only daily run on GitHub's xcode-27 preview image (848046e6); moving the required gate to Xcode 27 is the maintainer's decision (the image is a preview with capacity warnings). Open and awaiting the maintainer's go because they change shipped code or add tools: P3-2 modernization, P3-3 NonisolatedNonsendingByDefault, strict memory safety and Enhanced Security, P3-4 Periphery and type checkers, P3-5 lane orchestration in Python (iOS side in an iPhone window)."
     }
   ]
 }

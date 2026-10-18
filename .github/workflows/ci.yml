@@ -156,6 +156,24 @@ jobs:
       - name: Contract gate
         run: ./scripts/check_project_inputs.sh --python none
 
+      # Static analysis over the whole tree (DW-02, audit P1-7 and P1-8), run even when the
+      # contract gate failed so one push names every finding. shellcheck at the local lint's
+      # severity and ruff's syntax and pyflakes rules (ruff.toml), both SHA-pinned in
+      # config/toolchain.json. Only a finding absent from config/lint-baseline/<tool>.json fails;
+      # a baseline only shrinks (`python3 scripts/lint_baseline.py <tool> --update`).
+      - name: Install the pinned shellcheck and ruff
+        id: lint-tools
+        if: ${{ !cancelled() }}
+        run: ./scripts/install_pinned_tools.sh shellcheck-linux-x86_64 ruff-linux-x86_64
+
+      - name: shellcheck fails on new findings
+        if: ${{ !cancelled() && steps.lint-tools.outcome == 'success' }}
+        run: python3 scripts/lint_baseline.py shellcheck
+
+      - name: ruff fails on new findings
+        if: ${{ !cancelled() && steps.lint-tools.outcome == 'success' }}
+        run: python3 scripts/lint_baseline.py ruff
+
   # The Python suite on Linux, every module included: the benchmark publisher's
   # host probes are mocked in its tests, so nothing here needs the macOS host.
   python:

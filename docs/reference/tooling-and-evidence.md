@@ -33,7 +33,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last
   run in which that lane's job passed (a cancelled superseded run cannot leave a lane unrun); `macos-tests` and `ios-compile`
   restore the persistent DerivedData caches from `config/build-output-policy.json`
-  (`scripts/ci/restore_mtimes.py` first); `contracts` and `python` run on ubuntu; `CI required` is the
+  (`scripts/ci/restore_mtimes.py` first); `contracts` and `python` run on ubuntu, and `contracts` also
+  runs shellcheck and ruff over the whole tree, failing only on findings absent from
+  `config/lint-baseline/` (`scripts/lint_baseline.py`; a baseline only shrinks); `CI required` is the
   only branch-protection context and passes when jobs are path-skipped. The shared toolchain step is
   `.github/actions/native-toolchain`; `macos-tsan` runs the ThreadSanitizer subset with the Swift lane
   (blocking since 2026-09-14, `config/tsan-policy.json`). `nightly.yml` runs a cold TSan pass, the complete Python suite and cold
@@ -68,7 +70,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   distribution outputs.
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
-  artifacts (gh and the advisory local swiftlint on demand); numpy, pytest and pytest-xdist pip-pin to
+  artifacts (gh, the advisory local swiftlint and ruff on demand; the Linux contracts job installs the
+  `-linux-x86_64` shellcheck and ruff entries); numpy, pytest and pytest-xdist pip-pin to
   the manifest; the website's Node and npm pin only their major version (24 / 11). Dependabot proposes, the manifest and comment change together:
   on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the
   manifest to its branch; CI never writes back.

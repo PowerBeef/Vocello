@@ -93,6 +93,12 @@
       "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79",
       "archivePath": "shellcheck-v0.11.0/shellcheck"
     },
+    "shellcheck-linux-x86_64": {
+      "version": "0.11.0",
+      "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz",
+      "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
+      "archivePath": "shellcheck-v0.11.0/shellcheck"
+    },
     "gh": {
       "version": "2.96.0",
       "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip",
@@ -104,6 +110,18 @@
       "url": "https://github.com/realm/SwiftLint/releases/download/0.65.1/portable_swiftlint.zip",
       "sha256": "c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0",
       "archivePath": "swiftlint"
+    },
+    "ruff": {
+      "version": "0.17.1",
+      "url": "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-aarch64-apple-darwin.tar.gz",
+      "sha256": "1c8e6e36538eaa0b996378a20c226403c4ca6369ac24884751b024d3a9530b86",
+      "archivePath": "ruff-aarch64-apple-darwin/ruff"
+    },
+    "ruff-linux-x86_64": {
+      "version": "0.17.1",
+      "url": "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "a293ac937715ae6fb6b64da86761598379e6149f40fbc00fde9ba8a2a562ac65",
+      "archivePath": "ruff-x86_64-unknown-linux-gnu/ruff"
     }
   },
   "release": {

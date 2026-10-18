@@ -13,8 +13,11 @@
 # Usage: scripts/install_pinned_tools.sh [--prefix DIR] [TOOL...]
 #   Default prefix: $HOME/.qwenvoice-pinned-tools/bin
 #   Default tools: xcodegen ripgrep xcbeautify shellcheck. Name other
-#   `artifactPins` entries (for example gh, which release jobs need, or
-#   swiftlint for the advisory local lint, which CI never runs) to install them.
+#   `artifactPins` entries (for example gh, which release jobs need,
+#   swiftlint for the advisory local lint, which CI never runs, or ruff) to
+#   install them. Unsuffixed entries are Apple-silicon macOS artifacts; the
+#   Linux contracts job names the `-linux-x86_64` entries (shellcheck, ruff),
+#   which install the same version under the same binary name.
 #   In GitHub Actions the prefix is appended to $GITHUB_PATH so subsequent
 #   steps resolve the pinned binaries first.
 
@@ -51,7 +54,11 @@ install_pin() {
     local artifact="$workdir/$tool-artifact"
     curl -fsSL --retry 3 -o "$artifact" "$url"
     local observed
-    observed="$(shasum -a 256 "$artifact" | cut -d' ' -f1)"
+    if command -v shasum >/dev/null 2>&1; then
+        observed="$(shasum -a 256 "$artifact" | cut -d' ' -f1)"
+    else
+        observed="$(sha256sum "$artifact" | cut -d' ' -f1)"
+    fi
     if [[ "$observed" != "$sha" ]]; then
         echo "error: $tool artifact SHA-256 mismatch (expected $sha, observed $observed)" >&2
         return 1

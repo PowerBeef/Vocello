@@ -110,6 +110,16 @@ it reaches CI. Flaky tests go into `config/test-quarantine.json`
 sets `VOCELLO_QUARANTINE=1` and skips them, nightly runs them, and `scripts/repo_invariants.sh`
 fails once an entry is 30 days old.
 
+CI's `contracts` job lints the whole tree through `scripts/lint_baseline.py`: shellcheck
+(`-x -S warning`) over every tracked shell script, and ruff over every tracked Python file with only
+syntax errors (`E9`) and pyflakes (`F`) selected in `ruff.toml` (Python 3.10; 3.9 for the hooks and
+`scripts/select_python.py`). Both are SHA-pinned in `config/toolchain.json` (`artifactPins`; the
+runner installs the `-linux-x86_64` entries). Only a finding absent from
+`config/lint-baseline/<tool>.json` fails. A finding is keyed by file, rule and the text of its line,
+not its line number, so editing a line that carries a baselined finding makes it new: fix it then.
+The baselines only shrink: `python3 scripts/lint_baseline.py shellcheck|ruff` reproduces the gate
+locally and names entries that no longer occur, `--update` removes them, and nothing adds one.
+
 ## Python tests
 
 `scripts/dev.sh` selects an already-installed Python and propagates it to its child commands.

@@ -1,0 +1,17 @@
+# Ruff for the repository's Python tooling (all of it under scripts/). The binary is SHA-pinned in
+# config/toolchain.json (artifactPins: ruff, ruff-linux-x86_64). CI's contracts job runs it over the
+# whole tree through scripts/lint_baseline.py, where only findings absent from
+# config/lint-baseline/ruff.json fail; that baseline may only shrink.
+#
+# Narrow on purpose: syntax errors (E9) and pyflakes (F). Widening the selection is a separate,
+# reviewed change that re-seeds the baseline.
+
+# Workflow scripts need Python 3.10 (scripts/select_python.py enforces it).
+target-version = "py310"
+# Hooks and the interpreter bootstrap run under the host's bare python3, often the macOS
+# system Python 3.9 (pyrightconfig.json declares the same split).
+per-file-target-version = { "scripts/hooks/**/*.py" = "py39", "scripts/select_python.py" = "py39" }
+extend-exclude = ["build", "website", ".claude/worktrees"]
+
+[lint]
+select = ["E9", "F"]

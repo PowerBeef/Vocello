@@ -212,9 +212,13 @@ UTC and on dispatch) runs a cold pass of the TSan subset (`tsan`), the complete 
 (`python-full`) and cold compiles of both platforms (`foundation-cold`, which also compiles the
 macOS app optimized with warnings as errors); a failure keeps one open issue labelled `nightly`,
 titled "Nightly lane failing", commenting on it rather than filing a second
-(`scripts/ci/failure_issue.py`). `release-rehearsal.yml` runs weekly, on dispatch and on pushes that
-touch release inputs: without secrets it installs the release toolchain through
-`.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized)
+(`scripts/ci/failure_issue.py`). Its report-only jobs file no issue and gate nothing: `coverage`,
+`migration-warnings` and `dead-code`, where `scripts/dead_code_report.sh` compiles the macOS app,
+the CLI and the iOS app into one scratch root with the index store kept (`QVOICE_INDEX_STORE=1`),
+runs the pinned Periphery over all three schemes and keeps owned code only, and
+`scripts/ci/periphery_report.py` summarizes the findings. `release-rehearsal.yml` runs weekly, on
+dispatch and on pushes that touch release inputs: without secrets it installs the release toolchain
+through `.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized)
 and the packaged-DMG verification, and validates the release evidence locally; a failure keeps one
 issue labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and
 inside `release.yml` on the tagged commit.

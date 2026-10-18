@@ -7,8 +7,9 @@ name: Nightly
 # compiles of both platforms. Failure opens (or refreshes) one issue labelled
 # `nightly`; this workflow itself blocks no commit or push, and no retry is
 # automatic. The report-only jobs file no issue: coverage (line coverage of the
-# watched engine files and the pinned Xcode's build-setting probe) and
-# migration-warnings (what the migrate-mode strictness settings would flag).
+# watched engine files and the pinned Xcode's build-setting probe),
+# migration-warnings (what the migrate-mode strictness settings would flag) and
+# dead-code (what the pinned Periphery reports unused in owned code).
 on:
   schedule:
     - cron: '0 4 * * *'
@@ -190,6 +191,49 @@ jobs:
             build/artifacts/foundation/qwenvoice-macos-migration.log
             build/artifacts/foundation/migration-plan.json
             build/artifacts/foundation/migration-report.md
+          if-no-files-found: warn
+          retention-days: 14
+
+  dead-code:
+    # Report-only (audit P3-4, DW-04): what the pinned Periphery reports unused in owned
+    # code (Sources/, Packages/VocelloQwen3Core/). scripts/dead_code_report.sh compiles the
+    # macOS app, the CLI and the iOS app (-Onone, from a clean tree) into one scratch root
+    # with the index store kept and scans all three schemes, so code only one product uses
+    # is not reported. It files no issue; no finding is a verdict.
+    name: Dead code (Periphery, report-only)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+
+      - name: Install the pinned Periphery
+        run: ./scripts/install_pinned_tools.sh periphery
+
+      - name: Compile the three schemes and scan their index
+        run: ./scripts/dead_code_report.sh
+
+      - name: Summarize the findings
+        if: always()
+        run: >-
+          python3 scripts/ci/periphery_report.py build/artifacts/dead-code/periphery.json
+          --root "$PWD" --output build/artifacts/dead-code/periphery-report.md
+
+      - name: Retain the results, the report and the logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dead-code-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/artifacts/dead-code/periphery.json
+            build/artifacts/dead-code/periphery-report.md
+            build/artifacts/dead-code/*.log
           if-no-files-found: warn
           retention-days: 14
 

@@ -80,6 +80,7 @@ METADATA_ALLOWLIST = (
 HEAVY_LANE_IDS = {
     "development-build",
     "foundation-compile",
+    "dead-code-scan",
     "device-build",
     "runtime-tests",
     "language-benchmark",

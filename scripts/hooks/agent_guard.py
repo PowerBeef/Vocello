@@ -29,11 +29,11 @@ import git_commands  # noqa: E402
 PROTECTED_FILES = {"config/roadmap.json", "docs/development-progress.md"}
 # Repository scripts that build, test, drive devices or run models or measured lanes.
 LANE_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "build.sh", "build_foundation_targets.sh",
-                "build_ui_test_bundles.sh", "release.sh", "create_dmg.sh", "clean_build_caches.sh",
-                "install_pinned_tools.sh", "publish_benchmark_history.py"}
+                "build_ui_test_bundles.sh", "dead_code_report.sh", "release.sh", "create_dmg.sh",
+                "clean_build_caches.sh", "install_pinned_tools.sh", "publish_benchmark_history.py"}
 DEV_NATIVE_VERBS = {"build", "run", "ios", "test", "ci"}
 # Usage text only: these scripts print it and exit before any lock, build, device or model work.
-HELP_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "dev.sh"}
+HELP_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "dead_code_report.sh", "dev.sh"}
 HELP_WORDS = {"help", "--help", "-h"}
 # `xcodebuild` actions that only report the version, the SDKs or a project's targets and schemes.
 # `-list` is not one of them: on a project with packages it can resolve them outside the native lock

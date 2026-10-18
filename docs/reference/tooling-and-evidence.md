@@ -46,8 +46,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   `.github/actions/native-toolchain`; `macos-tsan` runs the ThreadSanitizer subset with the Swift lane
   (blocking since 2026-09-14, `config/tsan-policy.json`). `nightly.yml` runs a cold TSan pass, the complete Python suite and cold
   compiles (the macOS app also optimized with warnings as errors) and keeps one open issue labelled
-  `nightly`, refreshed rather than duplicated; `security.yml` runs weekly, on dispatch and inside
-  `release.yml` on the tagged commit.
+  `nightly`, refreshed rather than duplicated; its report-only jobs (coverage, migrate-mode warnings
+  and a Periphery dead-code scan of the macOS app, CLI and iOS app, `scripts/dead_code_report.sh`)
+  file no issue and gate nothing; `security.yml` runs weekly, on dispatch and inside `release.yml` on
+  the tagged commit.
 - Ordinary CI never executes XCUITest, a model or a device; it compiles `VocelloiOS` and the
   policy-test bundle for `-destination generic/platform=iOS`, runs the macOS deterministic bundles with the direct
   `xcrun xctest` runner, and compiles both XCUITest bundles (`build_ui_test_bundles.sh --gate`,
@@ -76,8 +78,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   distribution outputs.
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
-  artifacts (gh, swiftlint and ruff on demand; the Linux contracts job installs the `-linux-x86_64`
-  shellcheck, ruff and swiftlint entries); numpy, pytest and pytest-xdist pip-pin to
+  artifacts (gh, swiftlint, ruff and periphery on demand; the Linux contracts job installs the
+  `-linux-x86_64` shellcheck, ruff and swiftlint entries); numpy, pytest and pytest-xdist pip-pin to
   the manifest and Pyright npm-pins to its `npmPins` entry; the website's Node and npm pin only their major version (24 / 11). Dependabot proposes, the manifest and comment change together:
   on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the
   manifest to its branch; CI never writes back.

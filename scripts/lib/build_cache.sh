@@ -661,7 +661,9 @@ QVOICE_OWNED_DEV_SETTINGS=(
 # QVOICE_BUILD_TIMING_SUMMARY=1 (set by CI) adds -showBuildTimingSummary to build and
 # build-for-testing invocations, so a job log ends with where the build time went. On
 # CI (CI=true) those invocations also skip the index store, which only a local editor
-# reads and CI deleted before saving its caches (audit P1-11).
+# reads and CI deleted before saving its caches (audit P1-11). A caller that reads the
+# index store sets QVOICE_INDEX_STORE=1 to keep it: the nightly dead-code scan
+# (scripts/dead_code_report.sh, DW-04) runs Periphery over it.
 xcb_run() {
     acquire_native_lock "xcodebuild:${QVOICE_NATIVE_LOCK_LABEL:-$(basename "$0")}" || return 1
     local status=0
@@ -674,7 +676,8 @@ xcb_run() {
     done
     if (( builds )); then
         [[ "${QVOICE_BUILD_TIMING_SUMMARY:-0}" != "1" ]] || extra_args+=(-showBuildTimingSummary)
-        [[ "${CI:-}" != "true" ]] || extra_args+=(COMPILER_INDEX_STORE_ENABLE=NO)
+        [[ "${CI:-}" != "true" || "${QVOICE_INDEX_STORE:-0}" == "1" ]] \
+            || extra_args+=(COMPILER_INDEX_STORE_ENABLE=NO)
     fi
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
         set -o pipefail

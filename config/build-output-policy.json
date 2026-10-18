@@ -53,6 +53,10 @@
         "requiredFreeBytes": 10737418240,
         "cleanupHint": "scripts/clean_build_caches.sh --routine"
       },
+      "dead-code-scan": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --routine"
+      },
       "device-build": {
         "requiredFreeBytes": 10737418240,
         "cleanupHint": "scripts/clean_build_caches.sh --cache ios"
@@ -248,6 +252,15 @@
       "env": "QVOICE_SCRATCH_FOUNDATION"
     },
     {
+      "id": "scratch-dead-code",
+      "path": "build/scratch/derived-data/dead-code",
+      "class": "scratch",
+      "owner": "Report-only dead-code scan (scripts/dead_code_report.sh): the macOS app, CLI and iOS compiles whose index store Periphery reads",
+      "cleanup": "routine",
+      "retention": "Deleted when the scan exits, whatever its result, and during routine cleanup",
+      "env": "QVOICE_SCRATCH_DEAD_CODE"
+    },
+    {
       "id": "scratch-package-resolution",
       "path": "build/scratch/derived-data/package-resolution",
       "class": "scratch",
@@ -399,6 +412,15 @@
       "cleanup": "routine",
       "retention": "Compile logs are disposable once the command has reported its verdict",
       "env": "QVOICE_ARTIFACTS_UI_BUNDLES"
+    },
+    {
+      "id": "artifacts-dead-code",
+      "path": "build/artifacts/dead-code",
+      "class": "artifact",
+      "owner": "Report-only dead-code scan results and compile logs (scripts/dead_code_report.sh, scripts/ci/periphery_report.py)",
+      "cleanup": "routine",
+      "retention": "Periphery's JSON, its Markdown summary and the compile logs are disposable once read; no finding is a verdict",
+      "env": "QVOICE_ARTIFACTS_DEAD_CODE"
     },
     {
       "id": "dist-macos",

@@ -543,6 +543,29 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
 
     /// The crash observer persists MetricKit payloads whose Objective-C exception reason
     /// carries the same message as its own exception record (AUD-08).
+    /// A macOS crash's dyld termination reason and faulting-region description can name a file
+    /// under the user's home folder; both are redacted, the rest of the metadata stays.
+    func testMetricKitPayloadRedactsPathBearingCrashMetadata() throws {
+        let fixture = PrivateDiagnosticFixture.self
+        let crash: [String: Any] = [
+            "diagnosticMetaData": [
+                "terminationReason": "Library not loaded: @rpath/X.framework/X Referenced from: \(fixture.path)",
+                "virtualMemoryRegionInfo": "0 is not in any region. REGION TYPE \(fixture.directory)/x.dylib",
+                "exceptionType": 1,
+                "signal": 6,
+            ],
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: ["crashDiagnostics": [crash]])
+        let redacted = try XCTUnwrap(DiagnosticPrivacy.redactedMetricKitPayload(payload))
+        let text = String(decoding: redacted, as: UTF8.self)
+        fixture.assertNoPrivateContent(text)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: redacted) as? [String: Any])
+        let metadata = try XCTUnwrap((object["crashDiagnostics"] as? [[String: Any]])?.first?["diagnosticMetaData"]
+            as? [String: Any])
+        XCTAssertTrue((metadata["terminationReason"] as? String)?.hasPrefix("Library not loaded") == true)
+        XCTAssertEqual(metadata["signal"] as? Int, 6)
+    }
+
     func testMetricKitPayloadRedactsExceptionReasonAndKeepsSymbolication() throws {
         let fixture = PrivateDiagnosticFixture.self
         let frame: [String: Any] = [

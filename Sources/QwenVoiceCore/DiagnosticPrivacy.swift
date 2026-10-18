@@ -86,6 +86,8 @@ public enum DiagnosticPrivacy {
     /// symbolication. A payload without an exception reason is returned as is;
     /// one that is not JSON returns nil, so a caller never persists it unread.
     public static func redactedMetricKitPayload(_ json: Data) -> Data? {
+        // Exception-reason text and the crash metadata that can name a path are redacted;
+        // everything else in the payload is runtime-owned.
         guard let object = try? JSONSerialization.jsonObject(with: json) else { return nil }
         var changed = false
         let redacted = redactingExceptionReasons(in: object, changed: &changed)
@@ -96,6 +98,10 @@ public enum DiagnosticPrivacy {
     /// `MXCrashDiagnosticObjectiveCExceptionReason` text fields; its
     /// `exceptionName`, `className` and `exceptionType` are runtime-owned.
     private static let exceptionReasonTextKeys: Set<String> = ["composedMessage", "formatString"]
+
+    /// Crash metadata text that can name a file: a macOS `terminationReason` from dyld
+    /// ("Library not loaded … Referenced from: <path>") and the faulting region's description.
+    private static let crashMetadataTextKeys: Set<String> = ["terminationReason", "virtualMemoryRegionInfo"]
 
     private static func redactingExceptionReasons(in value: Any, changed: inout Bool) -> Any {
         if var dictionary = value as? [String: Any] {
@@ -115,6 +121,14 @@ public enum DiagnosticPrivacy {
                     }
                     dictionary[key] = redactedArguments
                     changed = true
+                } else if crashMetadataTextKeys.contains(key), let text = element as? String {
+                    // Only a value that redaction alters marks the payload changed, so a payload
+                    // with nothing private keeps MetricKit's bytes.
+                    let redactedValue = redactedText(text, limit: 512)
+                    if redactedValue != text {
+                        dictionary[key] = redactedValue
+                        changed = true
+                    }
                 } else {
                     dictionary[key] = redactingExceptionReasons(in: element, changed: &changed)
                 }

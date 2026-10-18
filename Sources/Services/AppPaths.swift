@@ -22,6 +22,14 @@ enum AppPaths {
         return baseApplicationSupportDir().appendingPathComponent(defaultFolderName, isDirectory: true)
     }
 
+    /// Whether this launch writes under a registered app-support override (a UI or
+    /// benchmark lane's temporary root) rather than the user's own folder.
+    static var usesAppSupportOverride: Bool {
+        guard let overridePath = RuntimeDebugGate.value(for: appSupportOverrideEnvironmentKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+        return validatedDebugOverride(overridePath) != nil
+    }
+
     static var modelsDir: URL {
         appSupportDir.appendingPathComponent("models", isDirectory: true)
     }

@@ -34,8 +34,11 @@ final class MacMetricKitReporter: NSObject, MXMetricManagerSubscriber, Sendable 
         super.init()
     }
 
-    /// Idempotent; called once at launch.
+    /// Idempotent; called once at launch. A launch under an app-support override (a lane's
+    /// temporary root) does not subscribe: MetricKit delivers each payload once, and the
+    /// host's own crash or hang report would vanish with that root.
     func start() {
+        guard !AppPaths.usesAppSupportOverride else { return }
         let alreadyStarted = startState.withLock { isStarted in
             defer { isStarted = true }
             return isStarted

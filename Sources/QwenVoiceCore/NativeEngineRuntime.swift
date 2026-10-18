@@ -518,8 +518,10 @@ actor NativeEngineRuntime {
     }
 
     func unloadModel() async {
-        // DW-03: a trace-visible full unload, whatever asked for it (memory
-        // relief, idle unload, a model switch or delete). Model IDs are
+        // DW-03: a trace-visible full unload for the requests routed through
+        // here (memory relief, idle unload, delete). stop(), a model switch
+        // inside a load and a failed load or prewarm release the weights
+        // through the coordinator directly and emit no event. Model IDs are
         // catalog identifiers.
         let unloadedModelID = activeModelID ?? "none"
         Self.signposter.emitEvent(

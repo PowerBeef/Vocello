@@ -282,7 +282,8 @@ value changes with them. Inside `Native Final WAV Finish`, the manual writer's
 `Long-Form Provenance Marking` (category `long-form`); `Model Artifact Download`,
 `Model File Download` and `Model File Verification` (the SHA-256 pass; category `model-download`);
 and the point events `Native Memory Pressure`, `Native Memory Trim` and `Native Model Unload`
-(category `runtime`). None of these names is in `scripts/lib/trace_intervals.py`'s decode-loop set,
+(category `runtime`; the unload event marks unloads through `NativeEngineRuntime.unloadModel`,
+not `stop()`, an iOS model switch inside a load or a failed load or prewarm). None of these names is in `scripts/lib/trace_intervals.py`'s decode-loop set,
 and only `Native Prepare Generation` and `Native Generation Stream` bound a take's window, so the
 per-take interval statistics ignore them; a profile's total signpost row counts include them. The
 macOS CLI bench also publishes `ttfcObserverLagMS`, the part of `ttfcMS` its own

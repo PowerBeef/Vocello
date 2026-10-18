@@ -38,6 +38,29 @@ def ruff_output(root: Path, *items: tuple[str, int, str | None, str]) -> str:
     ])
 
 
+def swiftlint_output(root: Path, *items: tuple[str, int | None, int | None, str, str]) -> str:
+    """swiftlint lint --reporter json, as 0.65.1 prints it (absolute files; `character` may be null)."""
+    return json.dumps([
+        {"character": character, "file": str(root / file), "line": line, "reason": reason, "rule_id": rule,
+         "severity": "Warning", "type": rule.replace("_", " ").title()}
+        for file, line, character, rule, reason in items
+    ], indent=2)
+
+
+SWIFTLINT_CONFIG = """# Lint scope (a comment)
+only_rules:
+  - empty_count
+  - trailing_whitespace
+included:
+- Sources
+  - "Tests/"
+excluded:
+  - Packages  # the owned package
+  - 'Sources/Generated'
+  - Tests/**/Fixtures
+"""
+
+
 class LintBaselineTests(unittest.TestCase):
     def setUp(self) -> None:
         temporary = tempfile.TemporaryDirectory(prefix="vocello lint ")
@@ -223,6 +246,94 @@ class LintBaselineTests(unittest.TestCase):
         with mock.patch.object(MODULE.subprocess, "run", return_value=pinned), \
                 mock.patch.dict("os.environ", {"CI": "true"}):
             MODULE.check_version(self.root, "ruff")
+
+    def test_swiftlint_findings_parse_with_repository_relative_paths(self) -> None:
+        output = swiftlint_output(self.root, ("Sources/A.swift", 4, 6, "empty_count", "Prefer `isEmpty`"),
+                                  ("Sources/B.swift", None, None, "file_length", "too long"))
+        self.assertEqual(MODULE.parse_findings("swiftlint", output, self.root), [
+            MODULE.Finding("Sources/A.swift", 4, 6, "empty_count", "Prefer `isEmpty`"),
+            MODULE.Finding("Sources/B.swift", 0, 0, "file_length", "too long"),
+        ])
+        # A clean run prints an empty array; an empty stdout is no findings too.
+        self.assertEqual(MODULE.parse_findings("swiftlint", "[\n\n]\n", self.root), [])
+        self.assertEqual(MODULE.parse_findings("swiftlint", "", self.root), [])
+        with self.assertRaises(MODULE.LintBaselineError):
+            MODULE.parse_findings("swiftlint", json.dumps([{"file": "x.swift", "line": 1}]), self.root)
+
+    def test_swiftlint_lints_the_tracked_swift_files_its_configuration_covers(self) -> None:
+        self.write(".swiftlint.yml", SWIFTLINT_CONFIG)
+        self.assertEqual(MODULE.swiftlint_scope(self.root),
+                         (("Sources", "Tests"), ("Packages", "Sources/Generated", "Tests/**/Fixtures")))
+        sources = ["Sources/App.swift", "Sources/Generated/Table.swift", "Tests/CoreTests/A.swift",
+                   "Tests/Core/Fixtures/F.swift", "Packages/Core/Sources/X.swift", "scripts/tool.swift",
+                   "Sources/Notes.md", "SourcesExtra/Y.swift"]
+        for source in sources:
+            self.write(source, "let x = 1\n")
+        listing = "\0".join([*sources, "Sources/Deleted.swift"]) + "\0"
+        completed = subprocess.CompletedProcess([], 0, stdout=listing.encode(), stderr=b"")
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            self.assertEqual(MODULE.tracked_files(self.root, "swiftlint"),
+                             ["Sources/App.swift", "Tests/CoreTests/A.swift"])
+        # Without `included`, every tracked Swift file outside `excluded` is in scope.
+        self.write(".swiftlint.yml", "excluded:\n  - Packages\n")
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            self.assertEqual(MODULE.tracked_files(self.root, "swiftlint"), [
+                "Sources/App.swift", "Sources/Generated/Table.swift", "SourcesExtra/Y.swift",
+                "Tests/Core/Fixtures/F.swift", "Tests/CoreTests/A.swift", "scripts/tool.swift",
+            ])
+
+    def test_swiftlint_scope_refuses_forms_it_does_not_read(self) -> None:
+        with self.assertRaisesRegex(MODULE.LintBaselineError, ".swiftlint.yml"):
+            MODULE.swiftlint_scope(self.root)  # no configuration at all
+        for text in ("excluded: [Packages]\n", "excluded:\n  Packages: true\n", "included:\n  -\n"):
+            self.write(".swiftlint.yml", text)
+            with self.assertRaises(MODULE.LintBaselineError, msg=text):
+                MODULE.swiftlint_scope(self.root)
+
+    def test_swiftlint_gates_new_findings_against_its_own_baseline(self) -> None:
+        self.write("Sources/A.swift", "let values = [1]\nlet empty = values.count == 0\n")
+        finding = ("Sources/A.swift", 2, 13, "empty_count", "Prefer checking `isEmpty`")
+        self.assertEqual(self.main("swiftlint", "--seed", output=swiftlint_output(self.root, finding))[0], 0)
+        baseline = self.baseline("swiftlint")
+        self.assertIn("(DW-03)", baseline["description"])
+        self.assertEqual(baseline["findings"], [{
+            "file": "Sources/A.swift", "code": "empty_count",
+            "fingerprint": MODULE.fingerprint("let empty = values.count == 0"), "count": 1,
+        }])
+        code, stdout, _ = self.main("swiftlint", output=swiftlint_output(self.root, finding))
+        self.assertEqual(code, 0, stdout)
+        self.write("Sources/A.swift",
+                   "let values = [1]\nlet empty = values.count == 0\nlet none = values.count == 0 \n")
+        code, stdout, _ = self.main("swiftlint", output=swiftlint_output(
+            self.root, finding, ("Sources/A.swift", 3, 12, "empty_count", "Prefer checking `isEmpty`"),
+            ("Sources/A.swift", 3, 30, "trailing_whitespace", "Lines should not have trailing whitespace")))
+        self.assertEqual(code, 1)
+        self.assertIn("Sources/A.swift:3:12: empty_count Prefer checking `isEmpty`", stdout)
+        self.assertIn("Sources/A.swift:3:30: trailing_whitespace", stdout)
+        self.assertNotIn("Sources/A.swift:2:", stdout)
+        self.assertIn("2 new", stdout)
+
+    def test_swiftlint_error_severity_findings_are_not_a_tool_error(self) -> None:
+        output = swiftlint_output(self.root, ("Sources/A.swift", 2, 13, "empty_count", "Prefer `isEmpty`"))
+        commands = []
+
+        def fake_run(command, **_):
+            commands.append(command)
+            return subprocess.CompletedProcess(command, 2, stdout=output, stderr="")
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run):
+            self.assertEqual(MODULE.run_tool(self.root, "swiftlint", ["Sources/A.swift", "Tests/B.swift"]),
+                             [output])
+        # One invocation for every file: SwiftLint lints in parallel itself.
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0][:2], ["swiftlint", "lint"])
+        self.assertIn("--force-exclude", commands[0])
+        self.assertEqual(commands[0][-2:], ["Sources/A.swift", "Tests/B.swift"])
+
+        def failing_run(command, **_):
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="Error: No lintable files found")
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=failing_run):
+            with self.assertRaisesRegex(MODULE.LintBaselineError, "exited 1"):
+                MODULE.run_tool(self.root, "swiftlint", ["Sources/A.swift"])
 
     def test_committed_baselines_are_valid(self) -> None:
         for tool in MODULE.TOOLS:

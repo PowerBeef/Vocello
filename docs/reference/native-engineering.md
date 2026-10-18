@@ -169,7 +169,10 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - **Flaky tests are quarantined, not deleted or retried.** List the test in `config/test-quarantine.json`
   and call `try TestQuarantine.skipIfListed(self)`; push CI skips it, nightly still runs it, and the entry
   expires after 30 days.
-- `scripts/dev.sh lint` runs the advisory SwiftLint rules in `.swiftlint.yml` on changed files and
+- **SwiftLint is a CI gate against a baseline.** CI's `contracts` job runs the `.swiftlint.yml` rules
+  over every tracked Swift file outside `Packages/` (`python3 scripts/lint_baseline.py swiftlint`) and
+  fails on any finding absent from `config/lint-baseline/swiftlint.json`, which only shrinks and was
+  empty when the gate began (DW-03). `scripts/dev.sh lint` runs the same rules on changed files and
   reports a missing or unpinned SwiftLint (`./scripts/install_pinned_tools.sh swiftlint`); formatting
   stays Xcode's.
 

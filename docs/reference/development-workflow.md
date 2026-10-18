@@ -118,24 +118,28 @@ CI while nothing under `scripts/` or `config/` is dirty.
 
 `scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell and
 SwiftLint's low-noise rules in `.swiftlint.yml` on changed Swift files under `Sources/` and `Tests/`
-(advisory; formatting stays Xcode's). Both linters are pinned in `config/toolchain.json`; a missing
-one is reported, not silently skipped, and a SwiftLint other than the pin is named
-(`./scripts/install_pinned_tools.sh swiftlint` installs the pin; CI never runs it). Owned Xcode
-targets compile with `SWIFT_TREAT_WARNINGS_AS_ERRORS`, so a new warning fails the local build before
-it reaches CI. Flaky tests go into `config/test-quarantine.json`
+(advisory locally, where it reports every finding on a changed file; formatting stays Xcode's). Both
+linters are pinned in `config/toolchain.json`; a missing one is reported, not silently skipped, and a
+SwiftLint other than the pin is named (`./scripts/install_pinned_tools.sh swiftlint` installs the pin;
+CI gates it, below). Owned Xcode targets compile with `SWIFT_TREAT_WARNINGS_AS_ERRORS`, so a new
+warning fails the local build before it reaches CI. Flaky tests go into `config/test-quarantine.json`
 (`Tests/VocelloCoreTests/TestQuarantine.swift` for XCTest, the pytest node id for Python); push CI
 sets `VOCELLO_QUARANTINE=1` and skips them, nightly runs them, and `scripts/repo_invariants.sh`
 fails once an entry is 30 days old.
 
 CI's `contracts` job lints the whole tree through `scripts/lint_baseline.py`: shellcheck
-(`-x -S warning`) over every tracked shell script, and ruff over every tracked Python file with only
+(`-x -S warning`) over every tracked shell script, ruff over every tracked Python file with only
 syntax errors (`E9`) and pyflakes (`F`) selected in `ruff.toml` (Python 3.10; 3.9 for the hooks and
-`scripts/select_python.py`). Both are SHA-pinned in `config/toolchain.json` (`artifactPins`; the
-runner installs the `-linux-x86_64` entries). Only a finding absent from
-`config/lint-baseline/<tool>.json` fails. A finding is keyed by file, rule and the text of its line,
-not its line number, so editing a line that carries a baselined finding makes it new: fix it then.
-The baselines only shrink: `python3 scripts/lint_baseline.py shellcheck|ruff` reproduces the gate
-locally and names entries that no longer occur, `--update` removes them, and nothing adds one.
+`scripts/select_python.py`), and SwiftLint's `.swiftlint.yml` rules over every tracked Swift file its
+`excluded` list leaves in (`Sources/`, `Tests/` and `scripts/`; not `Packages/`). All three are
+SHA-pinned in `config/toolchain.json` (`artifactPins`; the runner installs the `-linux-x86_64`
+entries, for SwiftLint its fully static binary, which needs no Swift toolchain because none of the
+rules uses SourceKit). Only a finding absent from `config/lint-baseline/<tool>.json` fails; the
+SwiftLint baseline was empty when its gate began (DW-03), so any finding of its rules fails. A
+finding is keyed by file, rule and the text of its line, not its line number, so editing a line that
+carries a baselined finding makes it new: fix it then. The baselines only shrink: `python3
+scripts/lint_baseline.py shellcheck|ruff|swiftlint` reproduces the gate locally and names entries
+that no longer occur, `--update` removes them, and nothing adds one.
 
 ## Python tests
 

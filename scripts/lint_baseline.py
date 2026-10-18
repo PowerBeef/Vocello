@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Gate shellcheck and ruff on new findings only, against a committed baseline that may only shrink.
+"""Gate shellcheck, ruff and SwiftLint on new findings only, against a baseline that may only shrink.
 
     python3 scripts/lint_baseline.py shellcheck            lint every tracked shell script and compare
     python3 scripts/lint_baseline.py ruff                  lint every tracked Python file and compare
+    python3 scripts/lint_baseline.py swiftlint             lint every tracked Swift file .swiftlint.yml covers
     python3 scripts/lint_baseline.py ruff --input out.json compare a saved run instead of running the tool
     python3 scripts/lint_baseline.py ruff --update         also drop baseline entries that no longer occur
     python3 scripts/lint_baseline.py ruff --seed           write the first baseline (refused once one exists)
 
-shellcheck runs as `shellcheck -x -S warning` (the severity `scripts/dev.sh lint` uses) and ruff with
-the repository's ruff.toml; both use the versions pinned in config/toolchain.json `artifactPins`
-(`scripts/install_pinned_tools.sh shellcheck ruff` installs them). The baselines live in
-config/lint-baseline/<tool>.json.
+shellcheck runs as `shellcheck -x -S warning` (the severity `scripts/dev.sh lint` uses), ruff with
+the repository's ruff.toml and SwiftLint with .swiftlint.yml's rules over the tracked Swift files its
+`included` and `excluded` lists select; all three use the versions pinned in config/toolchain.json
+`artifactPins` (`scripts/install_pinned_tools.sh shellcheck ruff swiftlint` installs them). The
+baselines live in config/lint-baseline/<tool>.json.
 
 A finding's key is its file, its rule code and a fingerprint of the offending line's text with
 whitespace collapsed, never its line number, so edits elsewhere in the file do not move it; identical
@@ -24,6 +26,7 @@ Exit status: 0 no new findings, 1 new findings, 2 the tool, the baseline or an i
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -46,18 +49,27 @@ class ToolSpec:
     accepted_exit_codes: frozenset[int]
     version_command: tuple[str, ...]
     per_file: bool  # one process per file, run in parallel (the tool itself is single-threaded)
+    introduced_by: str  # the roadmap item whose baseline recorded the findings that existed then
 
 
 TOOLS: dict[str, ToolSpec] = {
     # 0: no findings, 1: findings; 2 and above: a file could not be read or the call was invalid.
     "shellcheck": ToolSpec(
         ("shellcheck", "-x", "-S", "warning", "-f", "json1"), frozenset({0, 1}), ("shellcheck", "--version"),
-        per_file=True,
+        per_file=True, introduced_by="DW-02",
     ),
     # --exit-zero: findings exit 0, so any other status is an error. No cache directory in the tree.
     "ruff": ToolSpec(
         ("ruff", "check", "--no-cache", "--force-exclude", "--output-format", "json", "--exit-zero"),
-        frozenset({0}), ("ruff", "--version"), per_file=False,
+        frozenset({0}), ("ruff", "--version"), per_file=False, introduced_by="DW-02",
+    ),
+    # 0: no findings or only warning-severity ones, 2: an error-severity finding (empty_count is one);
+    # 1: no lintable file, an unreadable configuration or another failure. --force-exclude applies
+    # .swiftlint.yml's `excluded` to the paths named here too; no cache directory is written.
+    "swiftlint": ToolSpec(
+        ("swiftlint", "lint", "--quiet", "--no-cache", "--reporter", "json", "--config", ".swiftlint.yml",
+         "--force-exclude"),
+        frozenset({0, 2}), ("swiftlint", "version"), per_file=False, introduced_by="DW-03",
     ),
 }
 
@@ -91,7 +103,7 @@ def _relative(root: Path, filename: str) -> str:
 
 
 def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
-    """Findings from shellcheck's `-f json1` or ruff's `--output-format json`."""
+    """Findings from shellcheck's `-f json1`, ruff's `--output-format json` or SwiftLint's `--reporter json`."""
     try:
         payload = json.loads(output) if output.strip() else ({"comments": []} if tool == "shellcheck" else [])
     except json.JSONDecodeError as error:
@@ -112,6 +124,12 @@ def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
                     int(location.get("column") or 0),
                     # Syntax errors carry no rule code in some ruff versions.
                     str(item.get("code") or "invalid-syntax"), str(item.get("message", "")),
+                ))
+        elif tool == "swiftlint":
+            for item in payload:
+                findings.append(Finding(
+                    _relative(root, item["file"]), int(item.get("line") or 0), int(item.get("character") or 0),
+                    str(item["rule_id"]), str(item.get("reason", "")),
                 ))
         else:
             raise LintBaselineError(f"unknown tool: {tool}")
@@ -181,8 +199,8 @@ def write_baseline(path: Path, tool: str, counts: Counter[Key]) -> None:
         "schemaVersion": SCHEMA_VERSION,
         "tool": tool,
         "description": (
-            "Findings that existed when the gate was introduced (DW-02). Only findings absent from "
-            "this list fail CI. It may only shrink: `python3 scripts/lint_baseline.py "
+            f"Findings that existed when the gate was introduced ({TOOLS[tool].introduced_by}). Only "
+            "findings absent from this list fail CI. It may only shrink: `python3 scripts/lint_baseline.py "
             f"{tool} --update` removes fixed entries; nothing adds one."
         ),
     }
@@ -197,7 +215,58 @@ def write_baseline(path: Path, tool: str, counts: Counter[Key]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _yaml_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+        value = value[1:-1]
+    return value.rstrip("/")
+
+
+def swiftlint_scope(root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The `included` and `excluded` path lists of the repository's .swiftlint.yml.
+
+    Only block-style lists (`excluded:` then `  - Packages` lines) are read; any other form of either
+    key is refused rather than guessed, so the gate never lints a scope the configuration does not say.
+    """
+    path = root / ".swiftlint.yml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise LintBaselineError(f"{path}: {error}") from error
+    lists: dict[str, list[str]] = {"included": [], "excluded": []}
+    current: str | None = None
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = re.sub(r"(^|\s)#.*$", "", raw).rstrip()
+        if not line.strip():
+            continue
+        # A sequence may sit at its key's own indentation (`excluded:` then `- Packages`).
+        if not line[0].isspace() and not line.startswith("-"):
+            key, _, rest = line.partition(":")
+            current = key.strip() if key.strip() in lists else None
+            if current and rest.strip():
+                raise LintBaselineError(f"{path}:{number}: write `{current}` as a block list of paths")
+            continue
+        if current is None:
+            continue
+        item = line.strip()
+        if not item.startswith("- ") or not _yaml_scalar(item[2:]):
+            raise LintBaselineError(f"{path}:{number}: `{current}` holds `- <path>` lines only")
+        lists[current].append(_yaml_scalar(item[2:]))
+    return tuple(lists["included"]), tuple(lists["excluded"])
+
+
+def _under(relative: str, entry: str) -> bool:
+    """SwiftLint's path semantics: an entry names a file or a directory tree, globs allowed."""
+    if any(character in entry for character in "*?["):
+        return fnmatch.fnmatchcase(relative, entry) or fnmatch.fnmatchcase(relative, f"{entry}/*")
+    return relative == entry or relative.startswith(f"{entry}/")
+
+
 def tracked_files(root: Path, tool: str) -> list[str]:
+    included: tuple[str, ...] = ()
+    excluded: tuple[str, ...] = ()
+    if tool == "swiftlint":
+        included, excluded = swiftlint_scope(root)
     try:
         listing = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=True,
@@ -211,6 +280,10 @@ def tracked_files(root: Path, tool: str) -> list[str]:
             continue
         if tool == "ruff":
             if relative.endswith(".py"):
+                selected.append(relative)
+        elif tool == "swiftlint":
+            if (relative.endswith(".swift") and not any(_under(relative, entry) for entry in excluded)
+                    and (not included or any(_under(relative, entry) for entry in included))):
                 selected.append(relative)
         elif relative.endswith(".sh"):
             selected.append(relative)

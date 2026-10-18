@@ -13,11 +13,14 @@
 # Usage: scripts/install_pinned_tools.sh [--prefix DIR] [TOOL...]
 #   Default prefix: $HOME/.qwenvoice-pinned-tools/bin
 #   Default tools: xcodegen ripgrep xcbeautify shellcheck. Name other
-#   `artifactPins` entries (for example gh, which release jobs need,
-#   swiftlint for the advisory local lint, which CI never runs, or ruff) to
-#   install them. Unsuffixed entries are Apple-silicon macOS artifacts; the
-#   Linux contracts job names the `-linux-x86_64` entries (shellcheck, ruff),
-#   which install the same version under the same binary name.
+#   `artifactPins` entries (for example gh, which release jobs need, or
+#   swiftlint and ruff, which `scripts/dev.sh lint` uses) to install them.
+#   Unsuffixed entries are Apple-silicon macOS artifacts; the Linux contracts
+#   job names the `-linux-x86_64` entries (shellcheck, ruff, swiftlint),
+#   which install the same version under the same binary name. A pin whose
+#   archived binary has another name (SwiftLint's Linux zip ships the fully
+#   static `swiftlint-static`) names its command with `binaryName`, the name
+#   the wrapper is installed under; it defaults to the archived file's name.
 #   In GitHub Actions the prefix is appended to $GITHUB_PATH so subsequent
 #   steps resolve the pinned binaries first.
 
@@ -43,13 +46,19 @@ mkdir -p "$PREFIX"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
+# The command a pin installs: its `binaryName`, else the archived binary's file name.
+pinned_binary_name() {
+    python3 -c "import json,os;pin=json.load(open('$MANIFEST'))['artifactPins']['$1'];print(pin.get('binaryName') or os.path.basename(pin['archivePath']))"
+}
+
 install_pin() {
     local tool="$1"
-    local url sha archive_path version
+    local url sha archive_path version binary_name
     url="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['url'])")"
     sha="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['sha256'])")"
     archive_path="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['archivePath'])")"
     version="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['version'])")"
+    binary_name="$(pinned_binary_name "$tool")"
 
     local artifact="$workdir/$tool-artifact"
     curl -fsSL --retry 3 -o "$artifact" "$url"
@@ -91,7 +100,7 @@ install_pin() {
     mv "$extract" "$tool_home"
     chmod +x "$tool_home/$archive_path"
     local wrapper
-    wrapper="$PREFIX/$(basename "$archive_path")"
+    wrapper="$PREFIX/$binary_name"
     printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$tool_home/$archive_path" > "$wrapper"
     chmod +x "$wrapper"
     echo "installed $tool $version -> $wrapper"
@@ -106,6 +115,6 @@ if [[ -n "${GITHUB_PATH:-}" ]]; then
 fi
 
 for tool in "${TOOLS[@]}"; do
-    binary="$(python3 -c "import json,os;print(os.path.basename(json.load(open('$MANIFEST'))['artifactPins']['$tool']['archivePath']))")"
+    binary="$(pinned_binary_name "$tool")"
     PATH="$PREFIX:$PATH" "$binary" --version | head -2
 done

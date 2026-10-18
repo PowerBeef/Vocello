@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "tool": "swiftlint",
+  "description": "Findings that existed when the gate was introduced (DW-03). Only findings absent from this list fail CI. It may only shrink: `python3 scripts/lint_baseline.py swiftlint --update` removes fixed entries; nothing adds one.",
+  "findings": []
+}

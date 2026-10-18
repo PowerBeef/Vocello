@@ -1,5 +1,7 @@
-# Advisory lint on changed Swift files (scripts/dev.sh lint). Low-noise correctness rules only;
-# formatting is left to Xcode. Never a gate: CI compiles with warnings as errors instead.
+# Low-noise correctness rules only; formatting is left to Xcode. CI's contracts job gates them over
+# every tracked Swift file outside `excluded` against config/lint-baseline/swiftlint.json, which only
+# shrinks (scripts/lint_baseline.py swiftlint); scripts/dev.sh lint runs them on changed files.
+# `included` and `excluded` stay block lists of paths: the gate reads them to pick its files.
 only_rules:
   - duplicate_imports
   - empty_count

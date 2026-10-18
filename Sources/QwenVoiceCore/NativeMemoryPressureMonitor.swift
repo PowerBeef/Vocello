@@ -1,6 +1,16 @@
 import Foundation
 import os
 
+/// Trace-visible kernel pressure (DW-03): one event per translated level the
+/// monitor publishes, beside the runtime's `Native Memory Trim` and
+/// `Native Model Unload` events.
+private enum NativeMemoryPressureSignposts {
+    static let signposter = OSSignposter(
+        subsystem: "com.qwenvoice.engine",
+        category: "runtime"
+    )
+}
+
 /// Synchronous, thread-safe snapshot storage for the latest kernel-pressure
 /// translation.
 ///
@@ -263,6 +273,10 @@ public final class NativeMemoryPressureMonitor: @unchecked Sendable {
     private func transition(to level: NativeMemoryTrimLevel?, emit: Bool) {
         let previous = snapshotState.transition(to: level)
         guard emit, let level, previous != level else { return }
+        NativeMemoryPressureSignposts.signposter.emitEvent(
+            "Native Memory Pressure",
+            "level=\(level.rawValue, privacy: .public)"
+        )
         continuation.yield(level)
     }
     #endif

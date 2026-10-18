@@ -1,6 +1,19 @@
 import CryptoKit
 @preconcurrency import Foundation
+import OSLog
 import Synchronization
+
+/// Trace-only intervals of a model download (DW-03): the whole artifact run,
+/// each file's staging and each SHA-256 verification pass. Every interval takes
+/// its own signpost ID because files download and verify concurrently. They
+/// carry no take correlation and no `timingsMS` key, so the benchmark trace
+/// parsers (`scripts/lib/trace_intervals.py`) ignore them.
+private enum ModelDownloadSignposts {
+    static let signposter = OSSignposter(
+        subsystem: "com.qwenvoice.engine",
+        category: "model-download"
+    )
+}
 
 /// Downloads a HuggingFace model repository using native URLSession.
 public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
@@ -1476,7 +1489,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             )
         }
         guard let expectedSHA256 = normalizedSHA256(sha256) else { return }
-        let actualSHA256 = try sha256Hex(for: url)
+        let actualSHA256: String = try {
+            let verificationSignpost = ModelDownloadSignposts.signposter.beginInterval(
+                "Model File Verification",
+                id: ModelDownloadSignposts.signposter.makeSignpostID(),
+                "bytes=\(actualSize, privacy: .public)"
+            )
+            defer {
+                ModelDownloadSignposts.signposter.endInterval(
+                    "Model File Verification",
+                    verificationSignpost
+                )
+            }
+            return try sha256Hex(for: url)
+        }()
         guard actualSHA256 == expectedSHA256 else {
             throw DownloadError.integrityCheckFailed(
                 path: url.path,
@@ -1601,6 +1627,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     "This downloader already ran. Create a new downloader for another download."
                 )
             }
+        }
+        let signpostModelID = requestIdentity?.modelID ?? "unspecified"
+        let artifactSignpost = ModelDownloadSignposts.signposter.beginInterval(
+            "Model Artifact Download",
+            id: ModelDownloadSignposts.signposter.makeSignpostID(),
+            "model=\(signpostModelID, privacy: .public) files=\(files.count, privacy: .public)"
+        )
+        defer {
+            ModelDownloadSignposts.signposter.endInterval("Model Artifact Download", artifactSignpost)
         }
         await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
         let stagingRoot = explicitStagingRoot ?? Self.stagingRoot(forTargetDirectory: targetDir)
@@ -2060,6 +2095,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
 
         let relativePath = try Self.validatedRelativeRepoPath(file.path)
+        // The catalog's repository-relative path, never a local absolute path.
+        let fileSignpost = ModelDownloadSignposts.signposter.beginInterval(
+            "Model File Download",
+            id: ModelDownloadSignposts.signposter.makeSignpostID(),
+            "file=\(relativePath, privacy: .public) bytes=\(file.size, privacy: .public)"
+        )
+        defer {
+            ModelDownloadSignposts.signposter.endInterval("Model File Download", fileSignpost)
+        }
         let destURL = try Self.validatedDestinationURL(for: relativePath, in: filesRoot)
         let partialURL = try Self.partialURL(for: relativePath, in: partialRoot)
         let resumeDataURL = Self.resumeDataURL(for: relativePath, in: resumeRoot)

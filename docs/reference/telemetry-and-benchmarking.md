@@ -272,7 +272,19 @@ interval closes, so a JSONL row and a trace time the same span (audit #48):
 
 Each key appears only when its span ran. The pairs are written by hand at each site,
 because every interval carries correlation arguments; the unused generic helper
-(`withMirroredSignpost`, which could not carry them) was removed on 2026-09-25. The
+(`withMirroredSignpost`, which could not carry them) was removed on 2026-09-25.
+
+Some intervals are trace-only, with no `timingsMS` key, so no telemetry row or published
+value changes with them. Inside `Native Final WAV Finish`, the manual writer's
+`Native Final WAV Manual Header Build` / `File Write` / `Publish` and the publication marking pass
+`Native Final WAV Marking` carry the take correlation. Outside a take, subsystem
+`com.qwenvoice.engine` also emits `Long-Form Assembly`, `Long-Form Segment Join` and
+`Long-Form Provenance Marking` (category `long-form`); `Model Artifact Download`,
+`Model File Download` and `Model File Verification` (the SHA-256 pass; category `model-download`);
+and the point events `Native Memory Pressure`, `Native Memory Trim` and `Native Model Unload`
+(category `runtime`). None of these names is in `scripts/lib/trace_intervals.py`'s decode-loop set,
+and only `Native Prepare Generation` and `Native Generation Stream` bound a take's window, so the
+per-take interval statistics ignore them; a profile's total signpost row counts include them. The
 macOS CLI bench also publishes `ttfcObserverLagMS`, the part of `ttfcMS` its own
 first-chunk observer adds after the engine handed chunk 0 to the product sink: the
 observer's uptime at its first chunk minus chunk 0's nested-v9 `transportPublishedAtNS`,
@@ -854,7 +866,10 @@ committed bounded quality summaries and baselines remain permitted.
 - **New signpost interval:** open the interval and read the clock around the same code, and
   close it where the timing is captured (as `native_prepare_generation_ms` and the Qwen3 loop
   spans do), so the trace and the `timingsMS` key time the same span (audit #48). Inside the token loop use the allocation-free
-  `os_signpost` entry point: `OSSignposter.beginInterval` allocates per call.
+  `os_signpost` entry point: `OSSignposter.beginInterval` allocates per call. A trace-only
+  interval (no `timingsMS` key, so no telemetry change) is listed in §6.0, takes a name outside
+  `scripts/lib/trace_intervals.py`'s decode-loop set, and takes its own signpost ID when instances
+  can overlap.
 - **New field on the record:** add an optional field to `GenerationTelemetryRecord` (so old
   rows still decode) and bump `currentSchemaVersion`.
 - **Naming:** use the `NativeTelemetry…` / `GenerationTelemetry…` families for new telemetry

@@ -1,7 +1,18 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import OSLog
 import VocelloQwen3Core
+
+/// Trace-only intervals of the long-form join (DW-03). They carry no
+/// correlation fields and no `timingsMS` key, so the benchmark trace parsers
+/// (`scripts/lib/trace_intervals.py`) ignore them.
+private enum LongFormAssemblySignposts {
+    static let signposter = OSSignposter(
+        subsystem: "com.qwenvoice.engine",
+        category: "long-form"
+    )
+}
 
 public enum LongFormAssemblyError: Error, Equatable, Sendable {
     case noSegments
@@ -199,6 +210,13 @@ public enum BoundedLongFormAssembler {
         provenanceModelID: String? = nil,
         provenanceMode: String? = nil
     ) async throws -> LongFormAssemblyEvidence {
+        let assemblySignpost = LongFormAssemblySignposts.signposter.beginInterval(
+            "Long-Form Assembly",
+            "segments=\(segments.count, privacy: .public)"
+        )
+        defer {
+            LongFormAssemblySignposts.signposter.endInterval("Long-Form Assembly", assemblySignpost)
+        }
         try Task.checkCancellation()
         let configuration = try configuration.validated()
         guard !segments.isEmpty else { throw LongFormAssemblyError.noSegments }
@@ -224,6 +242,16 @@ public enum BoundedLongFormAssembler {
 
         do {
             for (index, segment) in segments.enumerated() {
+                let segmentSignpost = LongFormAssemblySignposts.signposter.beginInterval(
+                    "Long-Form Segment Join",
+                    "index=\(index, privacy: .public)"
+                )
+                defer {
+                    LongFormAssemblySignposts.signposter.endInterval(
+                        "Long-Form Segment Join",
+                        segmentSignpost
+                    )
+                }
                 try Task.checkCancellation()
                 let analysis = try analyze(
                     segment: segment,
@@ -295,6 +323,15 @@ public enum BoundedLongFormAssembler {
             // would stack watermark deltas for no detection gain.
             if let provenanceModelID, let provenanceMode,
                AudioMarkingPolicy.resolvedEnabled() {
+                let markingSignpost = LongFormAssemblySignposts.signposter.beginInterval(
+                    "Long-Form Provenance Marking"
+                )
+                defer {
+                    LongFormAssemblySignposts.signposter.endInterval(
+                        "Long-Form Provenance Marking",
+                        markingSignpost
+                    )
+                }
                 try WAVProvenanceChunk.append(
                     toWAVAt: stagingURL,
                     software: WAVProvenanceChunk.generatorSoftware(),

@@ -2147,6 +2147,20 @@ struct StreamingExecutionContext: Sendable {
                 // cache to the take's typed `mlxCachePeakMB` maximum.
                 mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
                 do {
+                    // DW-03: trace-only sub-interval of `Native Final WAV
+                    // Finish` (no `timingsMS` key), like its manual-writer
+                    // siblings. The marking pass is most of end-of-take time.
+                    let markingSignpost = NativeStreamingSignposts.signposter.beginInterval(
+                        "Native Final WAV Marking",
+                        "\(signpostCorrelation.message, privacy: .public)"
+                    )
+                    defer {
+                        NativeStreamingSignposts.signposter.endInterval(
+                            "Native Final WAV Marking",
+                            markingSignpost,
+                            "\(signpostCorrelation.message, privacy: .public)"
+                        )
+                    }
                     try AudioPublicationMarker.markStagedWAV(
                         at: stagingURL,
                         configuration: markingConfiguration

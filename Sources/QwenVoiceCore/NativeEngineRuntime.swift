@@ -518,6 +518,14 @@ actor NativeEngineRuntime {
     }
 
     func unloadModel() async {
+        // DW-03: a trace-visible full unload, whatever asked for it (memory
+        // relief, idle unload, a model switch or delete). Model IDs are
+        // catalog identifiers.
+        let unloadedModelID = activeModelID ?? "none"
+        Self.signposter.emitEvent(
+            "Native Model Unload",
+            "model=\(unloadedModelID, privacy: .public)"
+        )
         await loadCoordinator.unloadModel()
         activeModelID = nil
         await clearCloneState()
@@ -673,6 +681,12 @@ actor NativeEngineRuntime {
         }()
         await telemetryRecorder?.mark(
             metadata: MemoryTrimMetadata(level: level, reason: reason, source: eventSource)
+        )
+        // DW-03: the trim action on the trace beside its `memory_trim` mark.
+        // The level is an enum case and every reason is a code-owned constant.
+        Self.signposter.emitEvent(
+            "Native Memory Trim",
+            "level=\(level.rawValue, privacy: .public) reason=\(reason, privacy: .public)"
         )
 
         switch level {
